@@ -57,6 +57,11 @@ namespace CNC.Core
         private volatile Comms.State state = Comms.State.ACK;
         private Dispatcher Dispatcher { get; set; }
 
+        private readonly string portParams;
+        private readonly string portName;
+        private readonly int resetDelay;
+        private readonly Reconnector reconnector;
+
         public event DataReceivedHandler DataReceived;
 
 #if RESPONSELOG
@@ -79,44 +84,88 @@ namespace CNC.Core
                 System.Environment.Exit(2);
             }
 
-            serialPort = new SerialPort();
-            serialPort.PortName = PortParams.Substring(0, PortParams.IndexOf(":"));
-            serialPort.BaudRate = int.Parse(parameter[0]);
-            serialPort.Parity = ParseParity(parameter[1]);
-            serialPort.DataBits = int.Parse(parameter[2]);
-            serialPort.StopBits = int.Parse(parameter[3]) == 1 ? StopBits.One : StopBits.Two;
-            serialPort.ReceivedBytesThreshold = 1;
-            serialPort.ReadTimeout = 50;
-            serialPort.ReadBufferSize = Comms.RXBUFFERSIZE;
-            serialPort.WriteBufferSize = Comms.TXBUFFERSIZE;
+            portParams = PortParams;
+            portName = PortParams.Substring(0, PortParams.IndexOf(":"));
+            resetDelay = ResetDelay;
 
-            if (parameter.Count() > 4) switch (parameter[4])
+            // Auto-reconnect: when the device disappears (USB re-enumeration, cable unplug,
+            // controller reset on SD-card insert/remove...) a failing write calls NotifyLost().
+            // We then poll for the port name to reappear and reopen it, resuming the session.
+            reconnector = new Reconnector(() => PortAvailable() && OpenPort());
+
+            OpenPort();
+        }
+
+        private bool PortAvailable()
+        {
+            try
             {
-                case "P": // Cannot be used With ESP32!
-                    serialPort.Handshake = Handshake.RequestToSend;
-                    break;
-
-                case "X":
-                    serialPort.Handshake = Handshake.XOnXOff;
-                    break;
+                return SerialPort.GetPortNames().Contains(portName);
             }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Opens (or re-opens) the configured port. Returns true when the port is open.
+        // Safe to call from the reconnect timer thread: the serialPort field is only published
+        // once the port is actually open, so other threads never see a non-null-but-closed port.
+        private bool OpenPort()
+        {
+            string[] parameter = portParams.Substring(portParams.IndexOf(":") + 1).Split(',');
+
+            SerialPort port = null;
 
             try
             {
-                serialPort.Open();
+                port = new SerialPort();
+                port.PortName = portName;
+                port.BaudRate = int.Parse(parameter[0]);
+                port.Parity = ParseParity(parameter[1]);
+                port.DataBits = int.Parse(parameter[2]);
+                port.StopBits = int.Parse(parameter[3]) == 1 ? StopBits.One : StopBits.Two;
+                port.ReceivedBytesThreshold = 1;
+                port.ReadTimeout = 50;
+                port.ReadBufferSize = Comms.RXBUFFERSIZE;
+                port.WriteBufferSize = Comms.TXBUFFERSIZE;
+
+                if (parameter.Count() > 4) switch (parameter[4])
+                {
+                    case "P": // Cannot be used With ESP32!
+                        port.Handshake = Handshake.RequestToSend;
+                        break;
+
+                    case "X":
+                        port.Handshake = Handshake.XOnXOff;
+                        break;
+                }
+
+                port.Open();
             }
             catch
             {
             }
 
-            if (serialPort.IsOpen)
+            if (port != null && port.IsOpen)
             {
-                serialPort.DtrEnable = true;
+                port.DtrEnable = true;
+
+                try
+                {
+                    port.DiscardInBuffer();
+                    port.DiscardOutBuffer();
+                }
+                catch { }
+                Reply = string.Empty;
+
+                // Publish the port (open and ready) before wiring the receive handler / resetting,
+                // so the controller's reset banner isn't dropped by the null-port guard.
+                serialPort = port;
 
                 Comms.ResetMode ResetMode = Comms.ResetMode.None;
 
-                PurgeQueue();
-                serialPort.DataReceived += new SerialDataReceivedEventHandler(SerialPort_DataReceived);
+                port.DataReceived += new SerialDataReceivedEventHandler(SerialPort_DataReceived);
 
                 if (parameter.Count() > 5)
                     Enum.TryParse(parameter[5], true, out ResetMode);
@@ -125,25 +174,25 @@ namespace CNC.Core
                 {
                     case Comms.ResetMode.RTS:
                         /* For resetting ESP32 */
-                        serialPort.RtsEnable = true;
+                        port.RtsEnable = true;
                         System.Threading.Thread.Sleep(5);
   //                      serialPort.RtsEnable = false;
-                        if(ResetDelay > 0)
-                            System.Threading.Thread.Sleep(ResetDelay);
+                        if(resetDelay > 0)
+                            System.Threading.Thread.Sleep(resetDelay);
                         break;
 
                     case Comms.ResetMode.DTR:
                         /* For resetting Arduino */
-                        serialPort.DtrEnable = false;
+                        port.DtrEnable = false;
                         System.Threading.Thread.Sleep(5);
-                        serialPort.DtrEnable = true;
-                        if (ResetDelay > 0)
-                            System.Threading.Thread.Sleep(ResetDelay);
+                        port.DtrEnable = true;
+                        if (resetDelay > 0)
+                            System.Threading.Thread.Sleep(resetDelay);
                         break;
                 }
 
 #if RESPONSELOG
-                if (Resources.DebugFile != string.Empty) try
+                if (log == null && Resources.DebugFile != string.Empty) try
                 {
                     log = new StreamWriter(Resources.DebugFile);
                 }
@@ -152,7 +201,15 @@ namespace CNC.Core
                     MessageBox.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
 #endif
+                return true;
             }
+
+            if (port != null)
+            {
+                try { port.Dispose(); } catch { }
+            }
+
+            return false;
         }
 
         ~SerialStream()
@@ -174,17 +231,35 @@ namespace CNC.Core
         public string Reply { get; private set; }
         public bool IsOpen { get { return serialPort != null && serialPort.IsOpen; } }
         public bool IsClosing { get; private set; }
-        public int OutCount { get { return serialPort.BytesToWrite; } }
+        public int OutCount { get { return serialPort != null ? serialPort.BytesToWrite : 0; } }
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 
+        public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
+
+        public event System.Action ConnectionLost
+        {
+            add { reconnector.ConnectionLost += value; }
+            remove { reconnector.ConnectionLost -= value; }
+        }
+
+        public event System.Action Reconnected
+        {
+            add { reconnector.Reconnected += value; }
+            remove { reconnector.Reconnected -= value; }
+        }
+
         public void PurgeQueue()
         {
-            if (serialPort != null)
+            try
             {
-                serialPort.DiscardInBuffer();
-                serialPort.DiscardOutBuffer();
+                if (serialPort != null && serialPort.IsOpen)
+                {
+                    serialPort.DiscardInBuffer();
+                    serialPort.DiscardOutBuffer();
+                }
             }
+            catch { }
             Reply = string.Empty;
             if (!EventMode)
                 input.Clear();
@@ -218,6 +293,8 @@ namespace CNC.Core
 
         public void Close()
         {
+            reconnector?.Cancel(); // an explicit close must not trigger an auto-reconnect
+
             if (!IsClosing && IsOpen)
             {
                 IsClosing = true;
@@ -237,6 +314,30 @@ namespace CNC.Core
             }
         }
 
+        // Tear down a faulted port (without the buffer-discard/Sleep dance Close() does, which
+        // would itself throw on a dead device) and kick off the reconnect loop.
+        private void HandleWriteError(Exception ex)
+        {
+            // A vanished device surfaces as one of these. Other exceptions are swallowed so a
+            // background (poll timer) thread can't crash the process, but are not a disconnect.
+            if (ex is IOException || ex is InvalidOperationException ||
+                 ex is UnauthorizedAccessException || ex is TimeoutException)
+            {
+                try
+                {
+                    if (serialPort != null)
+                    {
+                        serialPort.DataReceived -= SerialPort_DataReceived;
+                        serialPort.Close();
+                    }
+                }
+                catch { }
+                serialPort = null;
+
+                reconnector?.NotifyLost();
+            }
+        }
+
         public int ReadByte()
         {
             int c = input.Length == 0 ? -1 : input[0];
@@ -249,13 +350,28 @@ namespace CNC.Core
 
         public void WriteByte(byte data)
         {
-            if(serialPort != null)
-                serialPort.BaseStream.Write(new byte[1] { data }, 0, 1);
+            try
+            {
+                if (serialPort != null && serialPort.IsOpen)
+                    serialPort.BaseStream.Write(new byte[1] { data }, 0, 1);
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteBytes(byte[] bytes, int len)
         {
-            serialPort.BaseStream.WriteAsync(bytes, 0, len);
+            try
+            {
+                if (serialPort != null && serialPort.IsOpen)
+                    serialPort.BaseStream.WriteAsync(bytes, 0, len);
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteString(string data)
@@ -288,8 +404,15 @@ namespace CNC.Core
 #endif
                 command += "\r";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(command);
-                if(serialPort != null)
-                    serialPort.BaseStream.Write(bytes, 0, bytes.Length);
+                try
+                {
+                    if (serialPort != null && serialPort.IsOpen)
+                        serialPort.BaseStream.Write(bytes, 0, bytes.Length);
+                }
+                catch (Exception ex)
+                {
+                    HandleWriteError(ex);
+                }
             }
         }
 
@@ -355,9 +478,23 @@ namespace CNC.Core
             //    DataReceived(s);
             //};
 
+            // Runs on the SerialPort event thread; the port can be torn down concurrently by a
+            // failing write (device removed), so guard against a null/closed port and I/O faults.
+            SerialPort port = serialPort;
+            if (port == null || !port.IsOpen)
+                return;
+
             lock (input)
             {
-                input.Append(serialPort.ReadExisting());
+                try
+                {
+                    input.Append(port.ReadExisting());
+                }
+                catch (Exception ex)
+                {
+                    HandleWriteError(ex);
+                    return;
+                }
 
                 if (EventMode)
                 {

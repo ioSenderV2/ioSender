@@ -361,6 +361,51 @@ namespace CNC.Core
         public bool IsReady { get; set; } = false;
         public bool IsGrblHAL { get { return GrblInfo.IsGrblHAL; } }
         public string Firmware { get; set; } = string.Empty;
+
+        // Status poll interval (ms), captured at connect so polling can be resumed after an
+        // auto-reconnect. 0 = polling disabled.
+        public int PollInterval { get; set; } = 0;
+
+        private bool _isConnectionLost = false;
+        public bool IsConnectionLost
+        {
+            get { return _isConnectionLost; }
+            private set { if (_isConnectionLost != value) { _isConnectionLost = value; OnPropertyChanged(); } }
+        }
+
+        // Wired (at connect, see AppConfig) to the active StreamComms' ConnectionLost/Reconnected
+        // events. These fire on a background reconnect-timer thread, so marshal to the UI thread.
+        public void OnConnectionLost()
+        {
+            RunOnUIThread(() =>
+            {
+                IsConnectionLost = true;
+                Poller.SetState(0); // stop polling a dead link; resumed on reconnect
+                var msg = LibStrings.FindResource("ConnectionLost");
+                Message = msg == string.Empty ? "Connection lost - attempting to reconnect..." : msg;
+            });
+        }
+
+        public void OnReconnected()
+        {
+            RunOnUIThread(() =>
+            {
+                IsConnectionLost = false;
+                if (PollInterval > 0)
+                    Poller.SetState(PollInterval);
+                var msg = LibStrings.FindResource("Reconnected");
+                Message = msg == string.Empty ? "Connection re-established." : msg;
+            });
+        }
+
+        private static void RunOnUIThread(System.Action action)
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.BeginInvoke(action);
+        }
         public bool SuspendProcessing { get; set; } = false;
         public bool IgnoreNextCycleStart { get; set; } = false;
 
