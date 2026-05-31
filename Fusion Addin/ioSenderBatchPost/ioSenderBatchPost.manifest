@@ -1,0 +1,11 @@
+{
+    "autodeskProduct": "Fusion360",
+    "type": "addin",
+    "id": "ioSenderBatchPost",
+    "author": "Io Engineering",
+    "description": { "": "Post every CAM operation to its own <seq>_<name>_T<tool>.nc file in a folder, for ioSender's File > Load Folder command." },
+    "version": "1.0.0",
+    "runOnStartup": true,
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}
