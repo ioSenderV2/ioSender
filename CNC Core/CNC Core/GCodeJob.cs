@@ -89,6 +89,12 @@ namespace CNC.Core
         }
         public bool ProgramEnd { get; set; }
         public bool Ok { get; set; }
+
+        // Outline grouping: set when a program is assembled from a folder of
+        // per-toolpath files (see GCode.LoadFolder). Null for ordinary single-
+        // file loads (the Program list then renders flat, ungrouped).
+        public string Section { get; set; }
+        public bool IsSectionStart { get; set; }
     }
 
     public class GCodeJob
@@ -121,6 +127,22 @@ namespace CNC.Core
         public ObservableCollection<GCodeBlock> Blocks { get { return blocks; } }
         public bool Loaded { get { return blocks.Count > 0; } }
         public bool HeightMapApplied { get; set; }
+
+        // Section currently being assembled (outline grouping). The next block
+        // added after BeginSection() is flagged as that section's first block.
+        public string CurrentSection { get; set; }
+        private bool sectionStartPending = false;
+
+        public void BeginSection(string name)
+        {
+            CurrentSection = name;
+            sectionStartPending = true;
+        }
+
+        // Whether AddBlock prepends N<line> numbers (when GrblInfo.UseLinenumbers is also set).
+        // Default true preserves existing callers; LoadFile takes its own addLineNumber arg.
+        // Reset to true by Reset().
+        public bool AddLineNumbers { get; set; } = true;
 
         public List<GCodeToken> Tokens { get { return Parser.Tokens; } }
         public GcodeBoundingBox BoundingBox { get; private set; } = new GcodeBoundingBox();
@@ -213,21 +235,21 @@ namespace CNC.Core
                 block = block.Trim();
                 if (Parser.ParseBlock(ref block, false, out ln, out isComment))
                 {
-                    if(GrblInfo.UseLinenumbers)
+                    if(GrblInfo.UseLinenumbers && AddLineNumbers)
                     {
                         LineNumber += 10;
                         block = "N" + LineNumber.ToString() + block;
                     } else
                         LineNumber++;
- 
-                    blocks.Add(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
+
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
                         LineNumber++;
-                        if (GrblInfo.UseLinenumbers)
+                        if (GrblInfo.UseLinenumbers && AddLineNumbers)
                             block = "N" + (LineNumber).ToString() + block;
-                        blocks.Add(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                     }
                 }
             }
@@ -284,6 +306,17 @@ namespace CNC.Core
             AddBlock(block, Action.Add);
         }
 
+        private void AddStamped(GCodeBlock b)
+        {
+            b.Section = CurrentSection;
+            if (sectionStartPending)
+            {
+                b.IsSectionStart = true;
+                sectionStartPending = false;
+            }
+            blocks.Add(b);
+        }
+
         public void CloseFile()
         {
             if (Loaded)
@@ -305,6 +338,9 @@ namespace CNC.Core
             BoundingBox.Reset();
             LineNumber = 0;
             HeightMapApplied = false;
+            CurrentSection = null;
+            sectionStartPending = false;
+            AddLineNumbers = true;
             Parser.Reset();
         }
     }

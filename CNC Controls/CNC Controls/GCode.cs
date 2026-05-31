@@ -223,6 +223,8 @@ namespace CNC.Controls
         public void Close()
         {
             Program.CloseFile();
+            if (Model != null)
+                Model.IsFolderView = false;
             Model.Blocks = Blocks;
         }
 
@@ -249,8 +251,115 @@ namespace CNC.Controls
             Model.Blocks = Blocks;
         }
 
+        // Load a folder of per-toolpath .nc files (named <seq>_<name>_T<tool>.nc, as produced
+        // by the SRWCommands Fusion add-in) and combine them, in memory, into one program shown
+        // as an expandable per-toolpath outline. See FusionFolderLoader for the combine rules.
+        public void OpenFolder()
+        {
+            // Modern folder picker (IFileOpenDialog with FOS_PICKFOLDERS) - same dialog family as
+            // File > Load, in folder-select mode, and it remembers the last-used location.
+            string folder = FolderPicker.Select("Select the folder of per-toolpath files (<seq>_<name>_T<tool>.nc)");
+
+            if (string.IsNullOrEmpty(folder))
+                return;
+
+            bool restoreRapids = MessageBox.Show(
+                "Restore rapid moves that Fusion Personal Use downgraded to feed moves (G1 → G0)?",
+                "Load Folder", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
+
+            LoadFolder(folder, restoreRapids);
+        }
+
+        public void LoadFolder(string folder, bool restoreRapids)
+        {
+            var ops = FusionFolderLoader.MatchFolder(folder);
+
+            if (ops.Count == 0)
+            {
+                MessageBox.Show("No per-toolpath files matching <seq>_<name>_T<tool>.nc were found in the selected folder.",
+                                "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // Combine can be a big (multi-MB / 100k+ line) program. Keep the list ungrouped while
+            // bulk-adding so the bound DataGrid stays cheap, and pump messages periodically so the
+            // STA thread doesn't trip a ContextSwitchDeadlock; group once at the end.
+            if (Model != null)
+                Model.IsFolderView = false;
+
+            using (new UIUtils.WaitCursor())
+            {
+                // Use the folder's leaf name as the "filename" - not a real path, so the
+                // sender won't treat it as a reloadable on-disk single file.
+                Program.AddBlock(new DirectoryInfo(folder.TrimEnd('\\', '/')).Name, Core.Action.New);
+
+                // Match a normal file load: only prepend N<line> numbers when the user has enabled
+                // both controller line numbers and the "add line numbers" option.
+                Program.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
+
+                // File prolog (also re-sent before a toolpath when starting a run partway through).
+                Program.BeginSection("Program start");
+                foreach (var line in FusionFolderLoader.Prolog)
+                    Program.AddBlock(line);
+
+                int sincePump = 0;
+                foreach (var op in ops)
+                {
+                    string content;
+                    try
+                    {
+                        content = System.IO.File.ReadAllText(op.FilePath);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (restoreRapids)
+                    {
+                        int n;
+                        content = FusionFolderLoader.RestoreRapids(content, out n);
+                        op.RapidsRestored = n;
+                    }
+
+                    op.Body = FusionFolderLoader.StripWrappers(content);
+
+                    Program.BeginSection(op.Section);
+                    Program.AddBlock("G53 G0 Z0");          // machine-coord safe-Z retract before the tool change
+                    // Only insert a tool change if the posted file doesn't already have one
+                    // (e.g. grbl.cps omits M6, but an M6-emitting post includes it - avoid doubling).
+                    if (!FusionFolderLoader.ContainsToolChange(op.Body))
+                        Program.AddBlock("M6 T" + op.Tool); // M0 swap-pause is handled by the controller's tc.macro
+                    foreach (var line in op.Body)
+                    {
+                        Program.AddBlock(line);
+                        if (++sincePump >= 2000)
+                        {
+                            sincePump = 0;
+                            EventUtils.DoEvents();
+                        }
+                    }
+                }
+
+                Program.BeginSection("Program end");
+                Program.AddBlock("M5");
+                Program.AddBlock("M30");
+
+                Program.AddBlock("", Core.Action.End);
+            }
+
+            if (Model != null)
+            {
+                Model.IsFolderView = true;
+                Model.Blocks = Blocks;
+            }
+        }
+
         public void Load(string filename)
         {
+            if (Model != null)
+                Model.IsFolderView = false;
+
             foreach (var converter in Converters)
             {
                 var filetypes = converter.FileExtensions.Split(',');

@@ -146,6 +146,8 @@
       <DependentUpon>JobControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="GCode.cs" />
+    <Compile Include="FusionFolderLoader.cs" />
+    <Compile Include="FolderPicker.cs" />
     <Compile Include="JogBaseControl.xaml.cs">
       <DependentUpon>JogBaseControl.xaml</DependentUpon>
     </Compile>
