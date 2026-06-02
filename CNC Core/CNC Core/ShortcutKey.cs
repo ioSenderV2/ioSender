@@ -92,15 +92,39 @@ namespace CNC.Core
             if (key == Key.None)
                 return string.Empty;
 
-            string disp = (modifiers == ModifierKeys.None
+            string mods = modifiers == ModifierKeys.None
                 ? string.Empty
-                : modifiers.ToString().Replace(", ", "+").Replace("Control", "Ctrl") + "+") + key.ToString();
+                : modifiers.ToString().Replace(", ", "+").Replace("Control", "Ctrl") + "+";
 
-            return disp.Replace("Oem3", "`").Replace("OemTilde", "`")
-                       .Replace("OemPlus", "+").Replace("OemMinus", "-")
-                       .Replace("OemQuestion", "/").Replace("OemPeriod", ".").Replace("OemComma", ",")
-                       .Replace("Escape", "Esc")
-                       .Replace("Prior", "PageUp").Replace("Next", "PageDown");
+            return mods + KeyName(key);
+        }
+
+        /// <summary>Friendly display name for a single key (e.g. D0 -> 0, NumPad5 -> Num 5, Escape -> Esc).</summary>
+        private static string KeyName(Key key)
+        {
+            string k = key.ToString();
+
+            // D0-D9 are the top-row number keys; show the bare digit.
+            if (k.Length == 2 && k[0] == 'D' && k[1] >= '0' && k[1] <= '9')
+                return k.Substring(1);
+
+            if (k.Length == 7 && k.StartsWith("NumPad") && k[6] >= '0' && k[6] <= '9')
+                return "Num " + k.Substring(6);
+
+            switch (k)
+            {
+                case "Oem3":
+                case "OemTilde": return "`";
+                case "OemPlus": return "+";
+                case "OemMinus": return "-";
+                case "OemQuestion": return "/";
+                case "OemPeriod": return ".";
+                case "OemComma": return ",";
+                case "Escape": return "Esc";
+                case "Prior": return "PageUp";
+                case "Next": return "PageDown";
+                default: return k;
+            }
         }
 
         /// <summary>True if the modifier combination is one the keypress dispatcher will act on.</summary>
