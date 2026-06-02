@@ -118,7 +118,9 @@ namespace CNC.Controls
         }
         private void OnColonAtChanged()
         {
-            grid.ColumnDefinitions[0].Width = new GridLength(ColonAt);
+            // ColonAt is the minimum label-column width; the column itself is Auto so the label can
+            // grow with the font instead of being truncated at high DPI / large text sizes.
+            grid.ColumnDefinitions[0].MinWidth = ColonAt;
         }
 
         public string Text

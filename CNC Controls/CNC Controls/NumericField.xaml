@@ -9,16 +9,19 @@
              x:Name="numericField">
     <Grid x:Name="grid">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="70"/>
+            <!-- Label column: Auto so it grows with the font (no truncation at high DPI), with ColonAt
+                 as a minimum width. SharedSizeGroup aligns labels within any container that sets
+                 Grid.IsSharedSizeScope="True"; ignored where no scope is present. -->
+            <ColumnDefinition Width="Auto" MinWidth="70" SharedSizeGroup="NumericFieldLabel"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <Label x:Name="label" x:Uid="lbl_NumField" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Height="26"/>
+        <Label x:Name="label" x:Uid="lbl_NumField" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
         <local:NumericTextBox x:Name="data" Grid.Column="1" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" Width="64"
             IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
             Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
             Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}">
         </local:NumericTextBox>
-        <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Height="26" Width="Auto"/>
+        <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto"/>
     </Grid>
 </UserControl>

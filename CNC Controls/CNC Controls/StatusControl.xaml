@@ -48,8 +48,8 @@
     </UserControl.Resources>
     <StackPanel Orientation="Vertical">
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-            <Label x:Uid="lbl_state" x:Name="lblState" Content="State:" HorizontalContentAlignment="Right" HorizontalAlignment="Left" VerticalAlignment="Center" Height="26" Width="50"/>
-            <TextBox x:Name="txtState" HorizontalAlignment="Left" Height="24" Margin="2,0" TextWrapping="NoWrap" IsReadOnly="True" TextAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" Width="74"
+            <Label x:Uid="lbl_state" x:Name="lblState" Content="State:" HorizontalContentAlignment="Right" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="50"/>
+            <TextBox x:Name="txtState" HorizontalAlignment="Left" MinHeight="24" Margin="2,0" TextWrapping="NoWrap" IsReadOnly="True" TextAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" MinWidth="74"
                      Text="{Binding Path=GrblState, Converter={StaticResource ToStringConverter}}"
                      Background="{Binding Path=GrblState, Converter={StaticResource ToColorConverter}}"
              />
@@ -62,7 +62,7 @@
                     </MultiBinding>
                 </CheckBox.IsEnabled>
             </CheckBox>
-            <Label x:Uid="lbl_check" Content="Check" VerticalAlignment="Center" Height="26"/>
+            <Label x:Uid="lbl_check" Content="Check" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalAlignment="Bottom">
             <Button x:Uid="btn_home" x:Name="btnHome" Content="Home" ToolTip="Ctrl+H" Background="{Binding Path=HomedState, Converter={StaticResource HomedStateConverter}}" Style="{StaticResource StatusButtonStyle}" Click="btn_Click">

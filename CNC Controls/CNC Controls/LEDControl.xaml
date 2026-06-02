@@ -5,8 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
-             d:DesignHeight="28" d:DesignWidth="140"
-             MaxHeight="28" MaxWidth="140">
+             d:DesignHeight="28" d:DesignWidth="140">
     <UserControl.Resources>
         <Style x:Key="ButtonStyleNoHighlighting" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}">
             <Setter Property="Template">
@@ -25,10 +24,10 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <StackPanel Orientation="Horizontal" Height="28" HorizontalAlignment="Left">
-        <Border BorderBrush="LightGray" BorderThickness="1" Width="12" Height="12" Margin="2,0,0,0" HorizontalAlignment="Center">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+        <Border BorderBrush="LightGray" BorderThickness="1" Width="12" Height="12" Margin="2,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center">
             <Button x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
         </Border>
-        <Label x:Name="labelLED" Content="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Width="100" Height="24" Margin="2,1.5,0,0" VerticalAlignment="Center" FontSize="12" FontFamily="Global User Interface"/>
+        <Label x:Name="labelLED" Content="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" MinWidth="100" Margin="2,0,0,0" VerticalAlignment="Center" FontSize="12" FontFamily="Global User Interface"/>
     </StackPanel>
 </UserControl>

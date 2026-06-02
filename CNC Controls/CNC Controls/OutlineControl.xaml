@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="125" d:DesignWidth="250">
-    <GroupBox x:Uid="grp_outline" x:Name="grpOutline" Header="Outline" HorizontalAlignment="Left" VerticalAlignment="Top" Width="250" Height="125">
+    <GroupBox x:Uid="grp_outline" x:Name="grpOutline" Header="Outline" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250">
         <local:OutlineBaseControl/>
     </GroupBox>
 </UserControl>

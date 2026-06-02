@@ -461,7 +461,9 @@ namespace CNC.Controls.Probing
                 width = droPanel.ActualWidth;
 
             droPanel.Visibility = (tab.ActualWidth + width + t1.ActualWidth + 20) < ActualWidth ? Visibility.Visible : Visibility.Collapsed;
-            dp.Width = droPanel.Visibility == Visibility.Visible  ? 460 : 240;
+            // Let the left panel size to its content (DRO + parameters) so it scales with text size /
+            // DPI instead of being clamped to fixed 240/460 px and truncating labels.
+            dp.Width = double.NaN;
         }
     }
 }

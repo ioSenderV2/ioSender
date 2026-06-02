@@ -44,20 +44,20 @@
         </Style>
     </UserControl.Resources>
     <DockPanel Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" Width="240" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" HorizontalAlignment="Left" VerticalAlignment="Stretch">
             <StackPanel x:Name="droPanel" Visibility ="Collapsed" Margin="0,0,5,0" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Top" DockPanel.Dock="Left">
                 <Controls:DROControl x:Name="DRO" HorizontalAlignment="Left" VerticalAlignment="Top"/>
             </StackPanel>
             <StackPanel x:Name="t1" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Stretch" DockPanel.Dock="Right" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsVisibleConverter}}">
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5" HorizontalAlignment="Stretch">
-                    <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Height="25" Width="48"/>
-                    <ComboBox x:Name="cbxProfile" IsEditable="True"  HorizontalAlignment="Left" VerticalAlignment="Center" Width="155" Height="22"
+                    <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="cbxProfile" IsEditable="True"  HorizontalAlignment="Left" VerticalAlignment="Center" Width="155" MinHeight="22"
                         ItemsSource="{Binding Path=Profiles}"
                         SelectedItem="{Binding Path=Profile, Mode=TwoWay}"
                         DisplayMemberPath="Name"
                         SelectedValuePath="Id" 
                     />
-                    <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." HorizontalAlignment="Right" VerticalAlignment="Center" Width="22" Height="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
+                    <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." HorizontalAlignment="Right" VerticalAlignment="Center" Width="22" MinHeight="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="cm">
                                 <MenuItem x:Uid="mnu_add" x:Name="mnuAdd" Header="Add" Click="mnu_Click"/>
@@ -77,7 +77,7 @@
                     </StackPanel>
                 </GroupBox>
                 <GroupBox x:Uid="grp_distanceAndSpeed" Header="Probing distances and speed">
-                    <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Vertical" Grid.IsSharedSizeScope="True">
                         <Controls:NumericField x:Uid="lbl_rapidsFeed" Label="Rapids feed rate:" ToolTip="Feed rate for rapid moves, set to 0 to use controller setting" Format="###0" Unit="mm/min" Value="{Binding Path=RapidsFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
                         <Controls:NumericField x:Uid="lbl_searchFeed" Label="Search feed rate:" ToolTip="Feed rate for initial probing move" Unit="mm/min" Format="###0" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
                         <Controls:NumericField x:Uid="lbl_latchFeed" Label="Latch feed rate:" ToolTip="Feed rate for second slow probing move" Unit="mm/min" Format="###0" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
@@ -86,7 +86,7 @@
                     </StackPanel>
                 </GroupBox>
                 <GroupBox x:Uid="grp_clearances" x:Name="Clearances" Header="Probing clearances">
-                    <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Vertical" Grid.IsSharedSizeScope="True">
                         <Controls:NumericField x:Uid="fld_xyClearance" Label="XY Clearance:" Tooltip2="Initial distance away from face to probe" Value="{Binding Path=XYClearance, Mode=TwoWay}" IsEnabled="{Binding Path=XYOffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
                         <Controls:NumericField x:Uid="fld_offset" Label="Offset:" ToolTip="Distance from corner to probe" Value="{Binding Path=Offset, Mode=TwoWay}" IsEnabled="{Binding Path=OffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
                         <Controls:NumericField x:Uid="fld_depth" Label="Depth:" ToolTip="Z offset from current position where probing will take place" Value="{Binding Depth, Mode=TwoWay}" IsEnabled="{Binding XYOffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>

@@ -24,7 +24,7 @@
         </Style>
     </UserControl.Resources>
     <Border BorderBrush="DarkGray" BorderThickness="1" CornerRadius="3" Background="#FFE5E5EA">
-        <Grid Height="120">
+        <Grid>
             <local:OutlineBaseControl Margin="0,15,0,0"/>
             <Button Content="×" Focusable="False" Style="{StaticResource SmallXButtonStyle}" VerticalContentAlignment="Top" HorizontalAlignment="Left" Margin="285,0,0,0" VerticalAlignment="Top" Width="14" Height="18" Click="btn_Close"/>
         </Grid>

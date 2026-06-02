@@ -13,12 +13,12 @@
                     <ColumnDefinition Width="160"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Label x:Uid="lbl_theme" x:Name="lblTheme" Content="Theme:" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Height="26"/>
+                <Label x:Uid="lbl_theme" x:Name="lblTheme" Content="Theme:" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 <ComboBox Grid.Column="1" IsEnabled="False" ItemsSource="{Binding Path=Themes}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding Path=Theme, Mode=TwoWay}" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Center" Width="80"/>
             </Grid>
-            <local:NumericField x:Uid="fld_resetDelay" Label="Reset delay:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=ResetDelay, Mode=TwoWay}" Height="29" VerticalAlignment="Bottom" ToolTip="Delay to allow controller to finish booting before communication starts."/>
-            <local:NumericField x:Uid="fld_pollInterval" Label="Poll interval:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=PollInterval, Mode=TwoWay}" Height="29" VerticalAlignment="Bottom" ToolTip="Time between status request sent to controller."/>
-            <local:NumericField x:Uid="fld_maxBuffer" Label="Max buffer:" ColonAt="160" Unit="bytes" Format="###0" Value="{Binding Path=MaxBufferSize, Mode=TwoWay}" Height="29" VerticalAlignment="Bottom" ToolTip="Maximum serial buffer size utilized (limited to 90% of reported value)."/>
+            <local:NumericField x:Uid="fld_resetDelay" Label="Reset delay:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=ResetDelay, Mode=TwoWay}" ToolTip="Delay to allow controller to finish booting before communication starts."/>
+            <local:NumericField x:Uid="fld_pollInterval" Label="Poll interval:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=PollInterval, Mode=TwoWay}" ToolTip="Time between status request sent to controller."/>
+            <local:NumericField x:Uid="fld_maxBuffer" Label="Max buffer:" ColonAt="160" Unit="bytes" Format="###0" Value="{Binding Path=MaxBufferSize, Mode=TwoWay}" ToolTip="Maximum serial buffer size utilized (limited to 90% of reported value)."/>
             <CheckBox x:Uid="lbl_agressiveBuffering" Content="Agressive buffering" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=UseBuffering, Mode=TwoWay}" ToolTip="Buffers more than one GCode block in controller for smoother execution. For grblHAL only!"/>
             <CheckBox x:Uid="lbl_keepMdiFocus" Content="Keep MDI focus" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=KeepMdiFocus, Mode=TwoWay}" ToolTip="Buffers more than one GCode block in controller for smoother execution. For grblHAL only!"/>
             <CheckBox x:Uid="lbl_FilterOk" Content='Filter "ok" response' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=FilterOkResponse, Mode=TwoWay}" ToolTip="Enable if ok responses overwhelm console logging, typically happens when sending lots of short commands."/>

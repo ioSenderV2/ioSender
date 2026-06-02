@@ -17,11 +17,11 @@
         <!-- Left: inputs -->
         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="5,5,0,0" HorizontalAlignment="Left" Width="370">
             <StackPanel Orientation="Horizontal">
-                <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Height="26" Width="120"/>
+                <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120"/>
                 <ComboBox x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
                           ItemsSource="{Binding Path=CalAxes, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                           SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                          HorizontalAlignment="Left" VerticalAlignment="Center" Width="60" Height="22" Margin="2"/>
+                          HorizontalAlignment="Left" VerticalAlignment="Center" Width="60" MinHeight="22" Margin="2"/>
             </StackPanel>
             <local:NumericField x:Uid="fld_sccurrent" Label="Current steps/mm:" ColonAt="120" IsReadOnly="True" Format="###0.000###"
                 Value="{Binding CurrentResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="steps/mm"/>

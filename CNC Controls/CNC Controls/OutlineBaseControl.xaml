@@ -12,17 +12,21 @@
             <local:LogicalNotConverter x:Key="LogicalNotConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
-    <Grid Height="100" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource LogicalNotConverter}}">
+    <Grid IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource LogicalNotConverter}}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="180"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center" Margin="5,0,4,0" Width="Auto" VerticalAlignment="Top" Grid.ColumnSpan="2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center" Margin="5,0,4,0" Width="Auto" VerticalAlignment="Top" Grid.Row="0" Grid.ColumnSpan="2">
             <Run x:Uid="txt_line1" Text="Execute moves to outline X and Y program limits."/>
             <LineBreak/>
             <Run x:Uid="txt_line2" Text="Ensure tool tip is clear of any obstructions!" Foreground="Red" FontWeight="Bold"/>
         </TextBlock>
-        <local:NumericField x:Uid="lbl_feedrate" Label="Feed rate:" Value="{Binding Path=FeedRate, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}}" Unit="{Binding Path=FeedrateUnit, Mode=OneWay}" Format="###0" HorizontalAlignment="Left" Margin="5,70,0,0" VerticalAlignment="Top"/>
-        <Button x:Uid="btn_go" Content="Go" IsEnabled="{Binding Path=IsFileLoaded}" Grid.Column="1" Width="50" Height="25" HorizontalAlignment="Right" Margin="0,70,8,0" VerticalAlignment="Top" Click="button_Go" />
+        <local:NumericField x:Uid="lbl_feedrate" Label="Feed rate:" Value="{Binding Path=FeedRate, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}}" Unit="{Binding Path=FeedrateUnit, Mode=OneWay}" Format="###0" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" Margin="5,5,0,5" VerticalAlignment="Top"/>
+        <Button x:Uid="btn_go" Content="Go" IsEnabled="{Binding Path=IsFileLoaded}" Grid.Row="1" Grid.Column="1" Width="50" Height="25" HorizontalAlignment="Right" Margin="0,5,8,5" VerticalAlignment="Top" Click="button_Go" />
     </Grid>
 </UserControl>

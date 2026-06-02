@@ -13,13 +13,13 @@
             <CheckBox x:Uid="chk_confirmMove" Content="Confirm move" IsChecked="{Binding Path=Camera.ConfirmMove, Mode=TwoWay}" Margin="90,0,0,0"/>
             <Controls:NumericField x:Uid="fld_xOffset" x:Name="xOffset" Label="X offset:" ColonAt="90" Value="{Binding Path=Camera.XOffset, Mode=TwoWay}"/>
             <Controls:NumericField x:Uid="fld_yOffset" x:Name="yOffset" Label="Y offset:" ColonAt="90" Value="{Binding Path=Camera.YOffset, Mode=TwoWay}"/>
-            <Grid Height="29">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="90"/>
                     <ColumnDefinition Width="100*"/>
                 </Grid.ColumnDefinitions>
-                <Label x:Uid="lbl_offsetMotion" Content="Offset motion:" HorizontalAlignment="Right" Margin="0,0,0,0" VerticalAlignment="Top"/>
-                <ComboBox x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top" Width="80"/>
+                <Label x:Uid="lbl_offsetMotion" Content="Offset motion:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <ComboBox x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Width="80"/>
             </Grid>
             <Button x:Uid="btn_getPosition" x:Name="getPosition" Content="Get current position" Width="150" Margin="0,4,0,0" Click="getPosition_Click"/>
         </StackPanel>
