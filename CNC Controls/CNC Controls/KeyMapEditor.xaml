@@ -3,11 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
         Title="Edit Key Mappings" Height="560" Width="500" MinHeight="360" MinWidth="420"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FocusManager.IsFocusScope="True">
     <Window.Resources>
+        <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
         <Style x:Key="BindingButton" TargetType="Button">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="6,2"/>
@@ -37,6 +39,11 @@
                   CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                   SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
                   HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="ToolTip" Value="{Binding Description}"/>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
                 <DataGridTemplateColumn Header="Shortcut" Width="160">
@@ -65,7 +72,9 @@
                                         <Expander IsExpanded="True" Margin="0,2,0,0" Background="#FFF3F4F6"
                                                   BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
                                             <Expander.Header>
-                                                <StackPanel Orientation="Horizontal">
+                                                <StackPanel Orientation="Horizontal"
+                                                            ToolTip="{Binding Name, Converter={StaticResource GroupTip}}"
+                                                            ToolTipService.ShowOnDisabled="True">
                                                     <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
                                                     <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Foreground="#FF808080"/>
                                                 </StackPanel>

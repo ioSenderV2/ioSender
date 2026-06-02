@@ -45,15 +45,15 @@ namespace CNC.Controls
             rows.Clear();
 
             foreach (var b in keyboard.GetJogBindings())
-                Add(new BindingRow(b, "Jog " + b.AxisLabel));
+                Add(new BindingRow(b, "Jog " + b.AxisLabel) { Description = JogDescription(b.AxisLabel) });
 
             foreach (var b in keyboard.GetActionBindings())
-                Add(new BindingRow(b, Label(b.Method)));
+                Add(new BindingRow(b, Label(b.Method)) { Description = Description(b.Method) });
 
-            // The console toggle is just another shortcut - surface it alongside the rest.
+            // The console toggle is just another program-level toggle - surface it alongside the rest.
             var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null" };
             ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
-            Add(new BindingRow(console, "Toggle console window") { IsConsole = true });
+            Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
 
             var view = new ListCollectionView(rows);
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BindingRow.Category)));
@@ -200,7 +200,7 @@ namespace CNC.Controls
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
-            if (r.IsConsole) { r.Set("Console", 11); return; }
+            if (r.IsConsole) { r.Set("Program", 8); return; }
 
             string m = r.Model.Method ?? string.Empty;
 
@@ -216,6 +216,96 @@ namespace CNC.Controls
                      m.Contains("Unlock") || m.Contains("Reset") || m.Contains("FeedHold")) r.Set("Job control", 1);
             else if (m.Contains("OptionalStop") || m.Contains("SingleBlock") || m.Contains("ProbeConnected")) r.Set("Program", 8);
             else r.Set("Other", 12);
+        }
+
+        // ---- descriptions (tooltips) ----------------------------------------------------------
+
+        private static readonly Dictionary<string, string> groupDescriptions = new Dictionary<string, string>
+        {
+            { "Jog", "Keys that jog each axis. Hold Ctrl for a single step, Shift for fast jog." },
+            { "Job control", "Run, stop and recover the current job." },
+            { "Feed rate", "Nudge the programmed feed rate up or down." },
+            { "Feed override", "Real-time feed rate override, as a percentage of the programmed feed." },
+            { "Rapids override", "Real-time override of rapid (G0) traverse speed." },
+            { "Spindle override", "Real-time override of spindle speed." },
+            { "Coolant & aux", "Toggle coolant outputs and the auxiliary fan." },
+            { "Zeroing", "Set the work-coordinate zero for an axis (or all axes)." },
+            { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
+            { "Probing", "Start or stop probing and toggle the probe-connected state." },
+            { "3D view", "Control the 3D tool-path viewer." },
+            { "Other", "Additional actions." }
+        };
+
+        public static string GroupDescription(string name)
+        {
+            string d;
+            return name != null && groupDescriptions.TryGetValue(name, out d) ? d : null;
+        }
+
+        private static readonly Dictionary<string, string> descriptions = new Dictionary<string, string>
+        {
+            { "JobControl.StartJob", "Start the loaded job, or resume after a feed hold." },
+            { "JobControl.StopJob", "Stop the running job." },
+            { "JobControl.Home", "Run the homing cycle." },
+            { "JobControl.Unlock", "Clear an alarm / unlock the controller ($X)." },
+            { "JobControl.Reset", "Soft-reset the controller (Ctrl-X)." },
+            { "JobControl.FeedHold", "Pause motion (feed hold)." },
+            { "JobControl.FeedRateUp", "Increase the programmed feed rate." },
+            { "JobControl.FeedRateDown", "Decrease the programmed feed rate." },
+            { "JobControl.FeedRateUpFine", "Increase the feed rate in a small step." },
+            { "JobControl.FeedRateDownFine", "Decrease the feed rate in a small step." },
+            { "DROControl.ZeroX", "Set the X work position to zero." },
+            { "DROControl.ZeroY", "Set the Y work position to zero." },
+            { "DROControl.ZeroZ", "Set the Z work position to zero." },
+            { "DROControl.ZeroA", "Set the A work position to zero." },
+            { "DROControl.ZeroB", "Set the B work position to zero." },
+            { "DROControl.ZeroC", "Set the C work position to zero." },
+            { "DROControl.ZeroAxes", "Set all work positions to zero." },
+            { "RenderControl.ResetView", "Reset the 3D view to the default orientation." },
+            { "RenderControl.RestoreView", "Restore the last saved 3D view." },
+            { "RenderControl.ToggleGrid", "Show or hide the grid in the 3D view." },
+            { "RenderControl.ToggleJobEnvelope", "Show or hide the job bounding box." },
+            { "RenderControl.ToggleWorkEnvelope", "Show or hide the work envelope." },
+            { "ProbingView.StartProbe", "Start the selected probing routine." },
+            { "ProbingView.StopProbe", "Stop the running probing routine." },
+            { "ProbingView.ProbeConnectedToggle", "Toggle the simulated probe-connected state." },
+            { "KeypressHandler.FeedOverrideFinePlus", "Increase feed override by 1%." },
+            { "KeypressHandler.FeedOverrideFineMinus", "Decrease feed override by 1%." },
+            { "KeypressHandler.FeedOverrideCoarsePlus", "Increase feed override by 10%." },
+            { "KeypressHandler.FeedOverrideCoarseMinus", "Decrease feed override by 10%." },
+            { "KeypressHandler.FeedOverrideReset", "Reset feed override to 100%." },
+            { "KeypressHandler.FeedOverrideRapidsMedium", "Set rapid override to the medium step." },
+            { "KeypressHandler.FeedOverrideRapidsLow", "Set rapid override to the low step." },
+            { "KeypressHandler.FeedOverrideRapidsReset", "Reset rapid override to 100%." },
+            { "KeypressHandler.FloodOverrideToggle", "Toggle flood coolant (M7/M9)." },
+            { "KeypressHandler.MistOverrideToggle", "Toggle mist coolant (M8/M9)." },
+            { "KeypressHandler.Fan0Toggle", "Toggle the auxiliary fan output." },
+            { "KeypressHandler.SpindleOverrideFinePlus", "Increase spindle override by 1%." },
+            { "KeypressHandler.SpindleOverrideFineMinus", "Decrease spindle override by 1%." },
+            { "KeypressHandler.SpindleOverrideCoarsePlus", "Increase spindle override by 10%." },
+            { "KeypressHandler.SpindleOverrideCoarseMinus", "Decrease spindle override by 10%." },
+            { "KeypressHandler.SpindleOverrideStop", "Stop the spindle while in feed hold." },
+            { "KeypressHandler.ProbeConnectedToggle", "Toggle the simulated probe-connected state." },
+            { "KeypressHandler.OptionalStopToggle", "Toggle optional stop (M1) handling." },
+            { "KeypressHandler.SingleBlockToggle", "Toggle single-block (step one line at a time) mode." }
+        };
+
+        private static string Description(string method)
+        {
+            string d;
+            if (method != null && descriptions.TryGetValue(method, out d))
+                return d;
+            return null;
+        }
+
+        private static string JogDescription(string axisLabel)
+        {
+            if (string.IsNullOrEmpty(axisLabel))
+                return null;
+
+            string letter = axisLabel.Substring(0, 1);
+            string dir = axisLabel.Contains("+") ? "positive" : "negative";
+            return string.Format("Jog the {0} axis in the {1} direction while the key is held.", letter, dir);
         }
 
         // ---- friendly labels ------------------------------------------------------------------
@@ -300,6 +390,7 @@ namespace CNC.Controls
         {
             public KeypressHandler.KeyBinding Model { get; }
             public string Label { get; }
+            public string Description { get; set; }
             public bool IsConsole { get; set; }
             public bool IsJog { get { return Model.IsJog; } }
 
@@ -340,6 +431,20 @@ namespace CNC.Controls
             {
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             }
+        }
+    }
+
+    /// <summary>Maps an outline group name to its description for the group-header tooltip.</summary>
+    public class KeyMapGroupTooltipConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return KeyMapEditor.GroupDescription(value as string);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotSupportedException();
         }
     }
 }
