@@ -109,6 +109,9 @@ namespace CNC.Controls
         public bool HasGoPredefinedPosition { get { return Program.Parser.HasGoPredefinedPosition; } }
         public int Decimals { get { return Program.Parser.Decimals; } }
         public bool HeightMapApplied { get { return Program.HeightMapApplied; } set { Program.HeightMapApplied = value; } }
+        // Whether AddBlock prepends N<line> numbers. Set false for programs built in memory (e.g. the
+        // calibration generator) so the gcode column doesn't duplicate the row's sequence number.
+        public bool AddLineNumbers { get { return Program.AddLineNumbers; } set { Program.AddLineNumbers = value; } }
 
         public ObservableCollection<GCodeBlock> Data { get { return Program.Blocks; } }
         public int Blocks { get { return Program.Blocks.Count; } }

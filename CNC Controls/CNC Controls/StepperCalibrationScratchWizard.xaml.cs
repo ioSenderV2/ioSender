@@ -391,6 +391,10 @@ namespace CNC.Controls
 
             // Load the program into the job view (in memory), like the Load Folder feature.
             GCode.File.AddBlock(string.Format("stepper_cal_{0}", GrblInfo.AxisIndexToLetter(Axis)), Core.Action.New);
+            // Match a normal file load: only prepend N<line> numbers when the user has enabled both
+            // controller line numbers and the "add line numbers" option - otherwise the gcode column
+            // would duplicate the row's sequence number.
+            GCode.File.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
             foreach (var line in lines)
                 GCode.File.AddBlock(line);
             GCode.File.AddBlock("", Core.Action.End);
