@@ -10,6 +10,7 @@
         FocusManager.IsFocusScope="True">
     <Window.Resources>
         <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
+        <local:KeyMapGroupExpandedConverter x:Key="GroupExpanded"/>
         <Style x:Key="BindingButton" TargetType="Button">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="6,2"/>
@@ -69,7 +70,9 @@
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="{x:Type GroupItem}">
-                                        <Expander IsExpanded="True" Margin="0,2,0,0" Background="#FFF3F4F6"
+                                        <Expander IsExpanded="{Binding Name, Converter={StaticResource GroupExpanded}, Mode=OneWay}"
+                                                  Expanded="Group_Expanded" Collapsed="Group_Collapsed"
+                                                  Margin="0,2,0,0" Background="#FFF3F4F6"
                                                   BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
                                             <Expander.Header>
                                                 <StackPanel Orientation="Horizontal"
