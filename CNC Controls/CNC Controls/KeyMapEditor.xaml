@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Edit Key Mappings" Height="540" Width="500" MinHeight="360" MinWidth="420"
+        Title="Edit Key Mappings" Height="560" Width="500" MinHeight="360" MinWidth="420"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FocusManager.IsFocusScope="True">
     <Window.Resources>
@@ -19,67 +19,69 @@
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="2,2,2,8" Foreground="#FF505050"
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF505050"
                    Text="Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast)."/>
 
-        <TabControl Grid.Row="1" x:Name="tabs">
-            <TabItem Header="Jog">
-                <DataGrid x:Name="gridJog" AutoGenerateColumns="False" CanUserAddRows="False"
-                          CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          SelectionMode="Single" IsReadOnly="True" BorderThickness="0"
-                          HorizontalScrollBarVisibility="Disabled">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Axis / direction" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
-                        <DataGridTemplateColumn Header="Key" Width="160">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
-                                            Tag="{Binding}" Click="Binding_Click"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
-            <TabItem Header="Shortcuts">
-                <DataGrid x:Name="gridActions" AutoGenerateColumns="False" CanUserAddRows="False"
-                          CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          SelectionMode="Single" IsReadOnly="True" BorderThickness="0"
-                          HorizontalScrollBarVisibility="Disabled">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
-                        <DataGridTemplateColumn Header="Shortcut" Width="160">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
-                                            Tag="{Binding}" Click="Binding_Click"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
-        </TabControl>
+        <DockPanel Grid.Row="1" Margin="2,0,2,6">
+            <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,1" Margin="4,0,0,0" Click="CollapseAll_Click"/>
+            <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,1" Click="ExpandAll_Click"/>
+            <TextBlock VerticalAlignment="Center" Foreground="#FF707070" Text="Grouped by function"/>
+        </DockPanel>
 
-        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+        <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
+                  CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
+                  HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
+                <DataGridTemplateColumn Header="Shortcut" Width="160">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
+                                    Tag="{Binding}" Click="Binding_Click"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="{x:Type GroupItem}">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                        <Expander IsExpanded="True" Margin="0,2,0,0" Background="#FFF3F4F6"
+                                                  BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
+                                            <Expander.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Foreground="#FF808080"/>
+                                                </StackPanel>
+                                            </Expander.Header>
+                                            <ItemsPresenter/>
+                                        </Expander>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
+        </DataGrid>
+
+        <DockPanel Grid.Row="3" Margin="0,8,0,0">
             <TextBlock x:Name="lblConflict" DockPanel.Dock="Left" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
