@@ -24,7 +24,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Width="100">
+                <StackPanel Orientation="Vertical" HorizontalAlignment="Right" MinWidth="100">
                     <ComboBox x:Name="cbxSpindle" HorizontalAlignment="Right" VerticalAlignment="Top" Width="100" Height="22" Margin="0,5,0,5"
                               DisplayMemberPath="Name" SelectedValuePath="SpindleNum" ItemsSource="{Binding Path=Spindles}" SelectedValue="{Binding Path=SpindleNum, Mode=OneWay}"
                               IsEnabled="{Binding Path=GcodeCommandsAllowed}"
