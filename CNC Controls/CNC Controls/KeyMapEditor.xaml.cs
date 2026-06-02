@@ -2,7 +2,8 @@
  * KeyMapEditor.xaml.cs - part of CNC Controls library for Grbl
  *
  * Modal editor for keyboard mappings: jog keys and action shortcuts (including the
- * console-toggle shortcut). Edits the live KeypressHandler; the caller persists.
+ * console-toggle shortcut), presented as one list grouped (outline) by function.
+ * Edits the live KeypressHandler; the caller persists.
  *
  */
 
@@ -14,7 +15,9 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -22,8 +25,7 @@ namespace CNC.Controls
     public partial class KeyMapEditor : Window
     {
         private readonly KeypressHandler keyboard;
-        private readonly ObservableCollection<BindingRow> jogRows = new ObservableCollection<BindingRow>();
-        private readonly ObservableCollection<BindingRow> actionRows = new ObservableCollection<BindingRow>();
+        private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();
         private BindingRow capturing = null;
 
         public KeyMapEditor(GrblViewModel model)
@@ -34,30 +36,38 @@ namespace CNC.Controls
 
             LoadRows();
 
-            gridJog.ItemsSource = jogRows;
-            gridActions.ItemsSource = actionRows;
-
             PreviewKeyDown += KeyMapEditor_PreviewKeyDown;
         }
 
         private void LoadRows()
         {
             capturing = null;
-            jogRows.Clear();
-            actionRows.Clear();
+            rows.Clear();
 
             foreach (var b in keyboard.GetJogBindings())
-                jogRows.Add(new BindingRow(b, "Jog " + b.AxisLabel));
+                Add(new BindingRow(b, "Jog " + b.AxisLabel));
 
-            foreach (var b in keyboard.GetActionBindings().OrderBy(x => Label(x.Method), StringComparer.OrdinalIgnoreCase))
-                actionRows.Add(new BindingRow(b, Label(b.Method)));
+            foreach (var b in keyboard.GetActionBindings())
+                Add(new BindingRow(b, Label(b.Method)));
 
             // The console toggle is just another shortcut - surface it alongside the rest.
             var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null" };
             ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
-            actionRows.Add(new BindingRow(console, "Toggle console window") { IsConsole = true });
+            Add(new BindingRow(console, "Toggle console window") { IsConsole = true });
+
+            var view = new ListCollectionView(rows);
+            view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BindingRow.Category)));
+            view.SortDescriptions.Add(new SortDescription(nameof(BindingRow.CategoryOrder), ListSortDirection.Ascending));
+            view.SortDescriptions.Add(new SortDescription(nameof(BindingRow.Label), ListSortDirection.Ascending));
+            grid.ItemsSource = view;
 
             UpdateConflicts();
+        }
+
+        private void Add(BindingRow row)
+        {
+            Categorize(row);
+            rows.Add(row);
         }
 
         private static readonly HashSet<Key> modifierKeys = new HashSet<Key>
@@ -129,10 +139,10 @@ namespace CNC.Controls
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
-            keyboard.ApplyJogBindings(jogRows.Select(r => r.Model));
-            keyboard.ApplyActionBindings(actionRows.Where(r => !r.IsConsole).Select(r => r.Model));
+            keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
+            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
 
-            var console = actionRows.FirstOrDefault(r => r.IsConsole);
+            var console = rows.FirstOrDefault(r => r.IsConsole);
             if (console != null)
                 AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
                     ? string.Empty
@@ -141,9 +151,25 @@ namespace CNC.Controls
             DialogResult = true;
         }
 
+        private void ExpandAll_Click(object sender, RoutedEventArgs e)
+        {
+            SetExpanded(true);
+        }
+
+        private void CollapseAll_Click(object sender, RoutedEventArgs e)
+        {
+            SetExpanded(false);
+        }
+
+        private void SetExpanded(bool expanded)
+        {
+            foreach (var ex in FindVisualChildren<Expander>(grid))
+                ex.IsExpanded = expanded;
+        }
+
         private void UpdateConflicts()
         {
-            var dups = actionRows.Concat(jogRows)
+            var dups = rows
                 .Where(r => r.Model.Key != Key.None)
                 .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers))
                 .Where(g => g.Count() > 1)
@@ -151,6 +177,45 @@ namespace CNC.Controls
                 .ToList();
 
             lblConflict.Text = dups.Count == 0 ? string.Empty : "Duplicate: " + string.Join(", ", dups);
+        }
+
+        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+                yield break;
+
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T t)
+                    yield return t;
+                foreach (var d in FindVisualChildren<T>(child))
+                    yield return d;
+            }
+        }
+
+        // ---- categories (outline groups) ------------------------------------------------------
+
+        private static void Categorize(BindingRow r)
+        {
+            if (r.IsJog) { r.Set("Jog", 0); return; }
+            if (r.IsConsole) { r.Set("Console", 11); return; }
+
+            string m = r.Model.Method ?? string.Empty;
+
+            if (m.StartsWith("DROControl.Zero")) r.Set("Zeroing", 7);
+            else if (m.StartsWith("RenderControl.")) r.Set("3D view", 10);
+            else if (m.StartsWith("ProbingView.")) r.Set("Probing", 9);
+            else if (m.Contains("Rapids")) r.Set("Rapids override", 4);
+            else if (m.Contains("FeedOverride")) r.Set("Feed override", 3);
+            else if (m.Contains("SpindleOverride")) r.Set("Spindle override", 5);
+            else if (m.Contains("Flood") || m.Contains("Mist") || m.Contains("Fan")) r.Set("Coolant & aux", 6);
+            else if (m.Contains("FeedRate")) r.Set("Feed rate", 2);
+            else if (m.Contains("StartJob") || m.Contains("StopJob") || m.Contains("Home") ||
+                     m.Contains("Unlock") || m.Contains("Reset") || m.Contains("FeedHold")) r.Set("Job control", 1);
+            else if (m.Contains("OptionalStop") || m.Contains("SingleBlock") || m.Contains("ProbeConnected")) r.Set("Program", 8);
+            else r.Set("Other", 12);
         }
 
         // ---- friendly labels ------------------------------------------------------------------
@@ -174,14 +239,14 @@ namespace CNC.Controls
             { "DROControl.ZeroB", "Zero B" },
             { "DROControl.ZeroC", "Zero C" },
             { "DROControl.ZeroAxes", "Zero all axes" },
-            { "RenderControl.ResetView", "3D view: reset" },
-            { "RenderControl.RestoreView", "3D view: restore" },
-            { "RenderControl.ToggleGrid", "3D view: toggle grid" },
-            { "RenderControl.ToggleJobEnvelope", "3D view: toggle job envelope" },
-            { "RenderControl.ToggleWorkEnvelope", "3D view: toggle work envelope" },
-            { "ProbingView.StartProbe", "Probing: start" },
-            { "ProbingView.StopProbe", "Probing: stop" },
-            { "ProbingView.ProbeConnectedToggle", "Probing: toggle probe connected" },
+            { "RenderControl.ResetView", "Reset view" },
+            { "RenderControl.RestoreView", "Restore view" },
+            { "RenderControl.ToggleGrid", "Toggle grid" },
+            { "RenderControl.ToggleJobEnvelope", "Toggle job envelope" },
+            { "RenderControl.ToggleWorkEnvelope", "Toggle work envelope" },
+            { "ProbingView.StartProbe", "Start probe" },
+            { "ProbingView.StopProbe", "Stop probe" },
+            { "ProbingView.ProbeConnectedToggle", "Toggle probe connected" },
             { "KeypressHandler.FeedOverrideFinePlus", "Feed override +1%" },
             { "KeypressHandler.FeedOverrideFineMinus", "Feed override −1%" },
             { "KeypressHandler.FeedOverrideCoarsePlus", "Feed override +10%" },
@@ -237,6 +302,10 @@ namespace CNC.Controls
             public string Label { get; }
             public bool IsConsole { get; set; }
             public bool IsJog { get { return Model.IsJog; } }
+
+            public string Category { get; private set; }
+            public int CategoryOrder { get; private set; }
+            public void Set(string category, int order) { Category = category; CategoryOrder = order; }
 
             private bool capturing;
             public bool Capturing
