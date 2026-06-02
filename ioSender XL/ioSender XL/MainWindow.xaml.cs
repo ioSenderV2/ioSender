@@ -469,46 +469,24 @@ namespace GCode_Sender
         private Key consoleKey = Key.None;
         private ModifierKeys consoleModifiers = ModifierKeys.None;
 
+        private bool consoleShortcutHooked = false;
+
         private void registerConsoleShortcut()
         {
-            // Parse the configurable (App.config) console shortcut into key + modifiers. Done manually
-            // rather than via KeyGesture so a modifier-less key such as Esc is allowed. Default is Esc.
-            consoleKey = Key.None;
-            consoleModifiers = ModifierKeys.None;
+            // Parse the configurable console shortcut into key + modifiers. Parsed manually (not via
+            // KeyGesture) so a modifier-less key such as Esc is allowed. Default is Esc.
+            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out consoleKey, out consoleModifiers);
 
-            string shortcut = AppConfig.Settings.Base.ConsoleShortcut;
-            if (string.IsNullOrWhiteSpace(shortcut))
-                return;
-
-            try
+            if (!consoleShortcutHooked)
             {
-                string[] parts = shortcut.Split('+');
-                string keyName = parts[parts.Length - 1].Trim();
-                if (keyName.Equals("Esc", StringComparison.OrdinalIgnoreCase))
-                    keyName = "Escape";
-                consoleKey = (Key)Enum.Parse(typeof(Key), keyName, true);
-
-                for (int i = 0; i < parts.Length - 1; i++) switch (parts[i].Trim().ToLowerInvariant())
-                {
-                    case "ctrl":
-                    case "control": consoleModifiers |= ModifierKeys.Control; break;
-                    case "alt": consoleModifiers |= ModifierKeys.Alt; break;
-                    case "shift": consoleModifiers |= ModifierKeys.Shift; break;
-                    case "win":
-                    case "windows": consoleModifiers |= ModifierKeys.Windows; break;
-                }
-            }
-            catch
-            {
-                consoleKey = Key.None; // invalid shortcut string in App.config - leave the console without a shortcut
-                return;
+                // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
+                PreviewKeyDown += MainWindow_PreviewKeyDown;
+                // Re-register live when the shortcut is changed in the Key Mappings editor.
+                AppConfig.ConsoleShortcutChanged += registerConsoleShortcut;
+                consoleShortcutHooked = true;
             }
 
-            // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
-            PreviewKeyDown += MainWindow_PreviewKeyDown;
-
-            string disp = (consoleModifiers == ModifierKeys.None ? "" : consoleModifiers.ToString().Replace(", ", "+").Replace("Control", "Ctrl") + "+") + consoleKey.ToString();
-            menuOpenConsole.InputGestureText = disp.Replace("Oem3", "`").Replace("OemTilde", "`").Replace("OemPlus", "+").Replace("OemMinus", "-").Replace("Escape", "Esc");
+            menuOpenConsole.InputGestureText = consoleKey == Key.None ? string.Empty : ShortcutKey.ToDisplayString(consoleKey, consoleModifiers);
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)

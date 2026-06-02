@@ -322,6 +322,11 @@ namespace CNC.Controls
 
         public static AppConfig Settings { get { return settings.Value; } }
 
+        // Raised when the console toggle shortcut is changed in the Key Mappings editor so the
+        // main window(s) can re-register it without a restart.
+        public static event System.Action ConsoleShortcutChanged;
+        public static void NotifyConsoleShortcutChanged() { ConsoleShortcutChanged?.Invoke(); }
+
         public static string ColorMode { get { return Properties.Settings.Default.ColorMode; } }
 
         public Config Base
