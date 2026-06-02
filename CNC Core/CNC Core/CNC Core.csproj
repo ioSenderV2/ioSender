@@ -76,6 +76,7 @@
     <Compile Include="ShortcutKey.cs" />
     <Compile Include="TelnetStream.cs" />
     <Compile Include="WebsocketStream.cs" />
+    <Compile Include="XInput.cs" />
     <Compile Include="YModem.cs" />
   </ItemGroup>
   <ItemGroup>
