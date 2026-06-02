@@ -48,7 +48,11 @@ namespace CNC.Controls
                 Add(new BindingRow(b, "Jog " + b.AxisLabel) { Description = JogDescription(b.AxisLabel) });
 
             foreach (var b in keyboard.GetActionBindings())
+            {
+                if (IsHidden(b.Method))
+                    continue; // internal jog plumbing - jog axis keys are remapped in the Jog group
                 Add(new BindingRow(b, Label(b.Method)) { Description = Description(b.Method) });
+            }
 
             // The console toggle is just another program-level toggle - surface it alongside the rest.
             var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null" };
@@ -167,6 +171,41 @@ namespace CNC.Controls
                 ex.IsExpanded = expanded;
         }
 
+        // Remembers which outline groups are collapsed, so the dialog looks the same next time
+        // it is opened within this session. Default (unseen group) is expanded.
+        private static readonly Dictionary<string, bool> groupExpanded = new Dictionary<string, bool>();
+
+        public static bool IsGroupExpanded(string name)
+        {
+            bool v;
+            return !(name != null && groupExpanded.TryGetValue(name, out v)) || v;
+        }
+
+        private void Group_Expanded(object sender, RoutedEventArgs e)
+        {
+            RecordGroup(sender, true);
+        }
+
+        private void Group_Collapsed(object sender, RoutedEventArgs e)
+        {
+            RecordGroup(sender, false);
+        }
+
+        private static void RecordGroup(object sender, bool expanded)
+        {
+            var name = ((sender as FrameworkElement)?.DataContext as CollectionViewGroup)?.Name as string;
+            if (name != null)
+                groupExpanded[name] = expanded;
+        }
+
+        private static bool IsHidden(string method)
+        {
+            if (string.IsNullOrEmpty(method))
+                return false;
+            // Directional jog handlers and jog cancel are internal plumbing for the Jog group keys.
+            return method.Contains("CursorJog") || method.Contains("KeyJog") || method.Contains("EndJog");
+        }
+
         private void UpdateConflicts()
         {
             var dups = rows
@@ -200,21 +239,24 @@ namespace CNC.Controls
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
-            if (r.IsConsole) { r.Set("Program", 8); return; }
+            if (r.IsConsole) { r.Set("Program", 9); return; }
 
             string m = r.Model.Method ?? string.Empty;
 
-            if (m.StartsWith("DROControl.Zero")) r.Set("Zeroing", 7);
-            else if (m.StartsWith("RenderControl.")) r.Set("3D view", 10);
-            else if (m.StartsWith("ProbingView.")) r.Set("Probing", 9);
-            else if (m.Contains("Rapids")) r.Set("Rapids override", 4);
-            else if (m.Contains("FeedOverride")) r.Set("Feed override", 3);
-            else if (m.Contains("SpindleOverride")) r.Set("Spindle override", 5);
-            else if (m.Contains("Flood") || m.Contains("Mist") || m.Contains("Fan")) r.Set("Coolant & aux", 6);
-            else if (m.Contains("FeedRate")) r.Set("Feed rate", 2);
+            if (m.StartsWith("DROControl.Zero")) r.Set("Zeroing", 8);
+            else if (m.StartsWith("RenderControl.")) r.Set("3D view", 11);
+            else if (m.StartsWith("ProbingView.")) r.Set("Probing", 10);
+            else if (m.Contains("JogStep") || m.Contains("JogFeed") ||
+                     m.EndsWith("FeedInc") || m.EndsWith("FeedDec") ||
+                     m.EndsWith("StepInc") || m.EndsWith("StepDec")) r.Set("Jog speed & step", 1);
+            else if (m.Contains("Rapids")) r.Set("Rapids override", 5);
+            else if (m.Contains("FeedOverride")) r.Set("Feed override", 4);
+            else if (m.Contains("SpindleOverride")) r.Set("Spindle override", 6);
+            else if (m.Contains("Flood") || m.Contains("Mist") || m.Contains("Fan")) r.Set("Coolant & aux", 7);
+            else if (m.Contains("FeedRate")) r.Set("Feed rate", 3);
             else if (m.Contains("StartJob") || m.Contains("StopJob") || m.Contains("Home") ||
-                     m.Contains("Unlock") || m.Contains("Reset") || m.Contains("FeedHold")) r.Set("Job control", 1);
-            else if (m.Contains("OptionalStop") || m.Contains("SingleBlock") || m.Contains("ProbeConnected")) r.Set("Program", 8);
+                     m.Contains("Unlock") || m.Contains("Reset") || m.Contains("FeedHold")) r.Set("Job control", 2);
+            else if (m.Contains("OptionalStop") || m.Contains("SingleBlock") || m.Contains("ProbeConnected")) r.Set("Program", 9);
             else r.Set("Other", 12);
         }
 
@@ -223,6 +265,7 @@ namespace CNC.Controls
         private static readonly Dictionary<string, string> groupDescriptions = new Dictionary<string, string>
         {
             { "Jog", "Keys that jog each axis. Hold Ctrl for a single step, Shift for fast jog." },
+            { "Jog speed & step", "Select or nudge the jog step size and jog feed rate." },
             { "Job control", "Run, stop and recover the current job." },
             { "Feed rate", "Nudge the programmed feed rate up or down." },
             { "Feed override", "Real-time feed rate override, as a percentage of the programmed feed." },
@@ -260,7 +303,22 @@ namespace CNC.Controls
             { "DROControl.ZeroA", "Set the A work position to zero." },
             { "DROControl.ZeroB", "Set the B work position to zero." },
             { "DROControl.ZeroC", "Set the C work position to zero." },
+            { "DROControl.ZeroU", "Set the U work position to zero." },
+            { "DROControl.ZeroV", "Set the V work position to zero." },
+            { "DROControl.ZeroW", "Set the W work position to zero." },
             { "DROControl.ZeroAxes", "Set all work positions to zero." },
+            { "JogBaseControl.JogStep0", "Select jog step size preset 1." },
+            { "JogBaseControl.JogStep1", "Select jog step size preset 2." },
+            { "JogBaseControl.JogStep2", "Select jog step size preset 3." },
+            { "JogBaseControl.JogStep3", "Select jog step size preset 4." },
+            { "JogBaseControl.JogFeed0", "Select jog feed rate preset 1." },
+            { "JogBaseControl.JogFeed1", "Select jog feed rate preset 2." },
+            { "JogBaseControl.JogFeed2", "Select jog feed rate preset 3." },
+            { "JogBaseControl.JogFeed3", "Select jog feed rate preset 4." },
+            { "JogBaseControl.FeedInc", "Increase the jog feed rate." },
+            { "JogBaseControl.FeedDec", "Decrease the jog feed rate." },
+            { "JogBaseControl.StepInc", "Increase the jog step size." },
+            { "JogBaseControl.StepDec", "Decrease the jog step size." },
             { "RenderControl.ResetView", "Reset the 3D view to the default orientation." },
             { "RenderControl.RestoreView", "Restore the last saved 3D view." },
             { "RenderControl.ToggleGrid", "Show or hide the grid in the 3D view." },
@@ -328,7 +386,22 @@ namespace CNC.Controls
             { "DROControl.ZeroA", "Zero A" },
             { "DROControl.ZeroB", "Zero B" },
             { "DROControl.ZeroC", "Zero C" },
+            { "DROControl.ZeroU", "Zero U" },
+            { "DROControl.ZeroV", "Zero V" },
+            { "DROControl.ZeroW", "Zero W" },
             { "DROControl.ZeroAxes", "Zero all axes" },
+            { "JogBaseControl.JogStep0", "Jog step size 1" },
+            { "JogBaseControl.JogStep1", "Jog step size 2" },
+            { "JogBaseControl.JogStep2", "Jog step size 3" },
+            { "JogBaseControl.JogStep3", "Jog step size 4" },
+            { "JogBaseControl.JogFeed0", "Jog feed rate 1" },
+            { "JogBaseControl.JogFeed1", "Jog feed rate 2" },
+            { "JogBaseControl.JogFeed2", "Jog feed rate 3" },
+            { "JogBaseControl.JogFeed3", "Jog feed rate 4" },
+            { "JogBaseControl.FeedInc", "Jog feed +" },
+            { "JogBaseControl.FeedDec", "Jog feed −" },
+            { "JogBaseControl.StepInc", "Jog step +" },
+            { "JogBaseControl.StepDec", "Jog step −" },
             { "RenderControl.ResetView", "Reset view" },
             { "RenderControl.RestoreView", "Restore view" },
             { "RenderControl.ToggleGrid", "Toggle grid" },
@@ -440,6 +513,20 @@ namespace CNC.Controls
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             return KeyMapEditor.GroupDescription(value as string);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    /// <summary>Maps an outline group name to its remembered expanded/collapsed state.</summary>
+    public class KeyMapGroupExpandedConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return KeyMapEditor.IsGroupExpanded(value as string);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
