@@ -146,6 +146,8 @@
       <DependentUpon>JobControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="GCode.cs" />
+    <Compile Include="FusionFolderLoader.cs" />
+    <Compile Include="FolderPicker.cs" />
     <Compile Include="JogBaseControl.xaml.cs">
       <DependentUpon>JogBaseControl.xaml</DependentUpon>
     </Compile>
@@ -228,6 +230,9 @@
     </Compile>
     <Compile Include="StepperCalibrationWizard.xaml.cs">
       <DependentUpon>StepperCalibrationWizard.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="StepperCalibrationScratchWizard.xaml.cs">
+      <DependentUpon>StepperCalibrationScratchWizard.xaml</DependentUpon>
     </Compile>
     <Compile Include="StripGCodeConfigControl.xaml.cs">
       <DependentUpon>StripGCodeConfigControl.xaml</DependentUpon>
@@ -468,6 +473,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="StepperCalibrationWizard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="StepperCalibrationScratchWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

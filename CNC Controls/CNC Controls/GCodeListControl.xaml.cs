@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System.Data;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Collections.Generic;
 using CNC.Core;
 
@@ -91,7 +92,10 @@ namespace CNC.Controls
             scroll = UIUtils.GetScrollViewer(grdGCode);
             grdGCode.DataContext = GCode.File.Data;
             if (DataContext is GrblViewModel)
+            {
                 (DataContext as GrblViewModel).PropertyChanged += GCodeListControl_PropertyChanged;
+                ApplyGrouping((DataContext as GrblViewModel).IsFolderView);
+            }
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -105,7 +109,87 @@ namespace CNC.Controls
                     else
                         scroll.ScrollToVerticalOffset(sp);
                     break;
+
+                case nameof(GrblViewModel.IsFolderView):
+                    ApplyGrouping(((GrblViewModel)sender).IsFolderView);
+                    break;
             }
+        }
+
+        // Group the gcode list by toolpath section when a folder is loaded (outline view),
+        // ungrouped flat list otherwise. The DataGrid uses the default view of GCode.File.Data.
+        private void ApplyGrouping(bool grouped)
+        {
+            var view = CollectionViewSource.GetDefaultView(GCode.File.Data);
+            if (view == null)
+                return;
+
+            using (view.DeferRefresh())
+            {
+                view.GroupDescriptions.Clear();
+                if (grouped)
+                    view.GroupDescriptions.Add(new PropertyGroupDescription("Section"));
+            }
+        }
+
+        private void StartSection_Click(object sender, RoutedEventArgs e)
+        {
+            StartSection(GetGroup(sender), false);
+        }
+
+        private void RunSection_Click(object sender, RoutedEventArgs e)
+        {
+            StartSection(GetGroup(sender), true);
+        }
+
+        private static CollectionViewGroup GetGroup(object sender)
+        {
+            var mi = sender as MenuItem;
+            var group = mi?.DataContext as CollectionViewGroup;
+            if (group == null)
+            {
+                var cm = mi?.Parent as ContextMenu;
+                group = (cm?.PlacementTarget as FrameworkElement)?.DataContext as CollectionViewGroup;
+            }
+            return group;
+        }
+
+        // Run a toolpath outline section. runOnlyThisToolpath: stop at the end of this section
+        // ("Run just this toolpath"); otherwise run from here to program end ("Start from this toolpath").
+        private void StartSection(CollectionViewGroup group, bool runOnlyThisToolpath)
+        {
+            if (group == null || group.ItemCount == 0)
+                return;
+
+            var first = group.Items[0] as GCodeBlock;
+            var last = group.Items[group.ItemCount - 1] as GCodeBlock;
+            var model = DataContext as GrblViewModel;
+            if (first == null || last == null || model == null)
+                return;
+
+            int startIndex = GCode.File.Data.IndexOf(first);
+            int endIndex = GCode.File.Data.IndexOf(last);
+            if (startIndex < 0 || endIndex < 0 || !model.StartFromBlock.CanExecute(startIndex))
+                return;
+
+            string prompt = runOnlyThisToolpath
+                ? string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath.", group.Name)
+                : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
+
+            if (MessageBox.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+                return;
+
+            // Bound the run to this section only, when requested.
+            if (runOnlyThisToolpath)
+                model.RunToBlock = endIndex;
+
+            // Re-establish modal state (distance/feed mode, plane, units) for a mid-program start.
+            // Queued ahead of the toolpath via the streamed command queue, which is drained first
+            // by SendNextLine and survives CycleStart's serial PurgeQueue.
+            foreach (var line in FusionFolderLoader.Prolog)
+                GCode.File.Commands.Enqueue(line);
+
+            model.StartFromBlock.Execute(startIndex);
         }
 
         void grdGCode_SelectionChanged(object sender, SelectionChangedEventArgs e)

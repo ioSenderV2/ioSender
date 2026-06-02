@@ -302,6 +302,11 @@ namespace GCode_Sender
             GCode.File.Open();
         }
 
+        private void fileOpenFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.OpenFolder();
+        }
+
         private void fileCloseMenuItem_Click(object sender, RoutedEventArgs e)
         {
             GCode.File.Close();

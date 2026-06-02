@@ -533,6 +533,10 @@ namespace CNC.Controls
                     job.ToolChangeLine = -1;
                     model.BlockExecuting = fromBlock;
                     job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
+                    // Bound the run: stop after RunToBlock when set ("Run just this toolpath"),
+                    // otherwise run to program end. One-shot - consumed here.
+                    job.PgmEndLine = model.RunToBlock >= 0 ? model.RunToBlock : GCode.File.Blocks - 1;
+                    model.RunToBlock = -1;
                     job.serialUsed = missed = 0;
                     job.Started = job.Transferred = job.HasError = job.ToolChanged = false;
                     job.NextRow = GCode.File.Data[job.CurrBlock];
