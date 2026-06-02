@@ -141,6 +141,48 @@ namespace CNC.Controls
             LoadRows();
         }
 
+        private void NoNumpad_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var row in rows)
+            {
+                Key key;
+                ModifierKeys mods;
+                if (NoNumpadAlternate(row.Model.Method, out key, out mods))
+                {
+                    row.Model.Key = key;
+                    row.Model.Modifiers = mods;
+                    row.Refresh();
+                }
+            }
+
+            UpdateConflicts();
+        }
+
+        // Non-numpad replacements for the NumPad-bound jog actions, mirroring the numpad layout
+        // onto the number row + brackets so machines without a numeric keypad can use them.
+        private static bool NoNumpadAlternate(string method, out Key key, out ModifierKeys mods)
+        {
+            mods = ModifierKeys.None;
+            key = Key.None;
+
+            switch (method)
+            {
+                case "JogBaseControl.JogStep0": key = Key.D1; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep1": key = Key.D2; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep2": key = Key.D3; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep3": key = Key.D4; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed0": key = Key.D5; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed1": key = Key.D6; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed2": key = Key.D7; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed3": key = Key.D8; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.StepDec": key = Key.OemOpenBrackets; return true;
+                case "JogBaseControl.StepInc": key = Key.OemCloseBrackets; return true;
+                case "JogBaseControl.FeedDec": key = Key.OemMinus; return true;
+                case "JogBaseControl.FeedInc": key = Key.OemPlus; return true;
+                default: return false;
+            }
+        }
+
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
             keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
