@@ -47,6 +47,7 @@ using System.Windows.Threading;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Threading;
+using System.Windows.Input;
 #if ADD_CAMERA
 using CNC.Controls.Camera;
 #endif
@@ -171,6 +172,16 @@ namespace GCode_Sender
             Comms.com.PurgeQueue();
             UIViewModel.CurrentView.Activate(true, ViewType.Startup);
 
+            // Restore preserved console preferences
+            var gvm = DataContext as GrblViewModel;
+            gvm.ResponseLogVerbose = AppConfig.Settings.Base.ConsoleVerbose;
+            gvm.ResponseLogFilterRT = AppConfig.Settings.Base.ConsoleFilterRT;
+            gvm.ResponseLogShowRTAll = AppConfig.Settings.Base.ConsoleShowRTAll;
+            if (AppConfig.Settings.Base.ConsoleWindowOpen)
+                openConsole();
+
+            registerConsoleShortcut();
+
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
                 // Delay loading until app is ready
@@ -208,7 +219,11 @@ namespace GCode_Sender
                 UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
 
                 if (UIViewModel.Console != null)
+                {
+                    // Don't let the shutdown close overwrite the preserved open state
+                    UIViewModel.Console.IsVisibleChanged -= Console_IsVisibleChanged;
                     UIViewModel.Console.Close();
+                }
 #if ADD_CAMERA
                 if (UIViewModel.Camera != null)
                 {
@@ -414,10 +429,24 @@ namespace GCode_Sender
 
         private void openConsoleMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            openConsole();
+        }
+#else
+        private void CameraOpen_Click(object sender, RoutedEventArgs e)
+        {
+        }
+#endif
+
+        private void openConsole()
+        {
             if (UIViewModel.Console == null)
             {
                 UIViewModel.Console = new ConsoleWindow();
                 UIViewModel.Console.DataContext = DataContext;
+                UIViewModel.Console.IsVisibleChanged += Console_IsVisibleChanged;
+                // Same shortcut handler on the console window so the toggle also fires when the
+                // console (not the main window) has focus - lets one keypress hide it again.
+                UIViewModel.Console.PreviewKeyDown += MainWindow_PreviewKeyDown;
                 UIViewModel.Console.Show();
             }
             else
@@ -428,11 +457,70 @@ namespace GCode_Sender
                     UIViewModel.Console.Show();
             }
         }
-#else
-        private void CameraOpen_Click(object sender, RoutedEventArgs e)
+
+        private void Console_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            // Preserve the floating console window open state for the next session
+            if (AppConfig.Settings.Base != null)
+            {
+                AppConfig.Settings.Base.ConsoleWindowOpen = (bool)e.NewValue;
+                AppConfig.Settings.Save();
+            }
         }
-#endif
+
+        private Key consoleKey = Key.None;
+        private ModifierKeys consoleModifiers = ModifierKeys.None;
+
+        private void registerConsoleShortcut()
+        {
+            // Parse the configurable (App.config) console shortcut into key + modifiers. Done manually
+            // rather than via KeyGesture so a modifier-less key such as Esc is allowed. Default is Esc.
+            consoleKey = Key.None;
+            consoleModifiers = ModifierKeys.None;
+
+            string shortcut = AppConfig.Settings.Base.ConsoleShortcut;
+            if (string.IsNullOrWhiteSpace(shortcut))
+                return;
+
+            try
+            {
+                string[] parts = shortcut.Split('+');
+                string keyName = parts[parts.Length - 1].Trim();
+                if (keyName.Equals("Esc", StringComparison.OrdinalIgnoreCase))
+                    keyName = "Escape";
+                consoleKey = (Key)Enum.Parse(typeof(Key), keyName, true);
+
+                for (int i = 0; i < parts.Length - 1; i++) switch (parts[i].Trim().ToLowerInvariant())
+                {
+                    case "ctrl":
+                    case "control": consoleModifiers |= ModifierKeys.Control; break;
+                    case "alt": consoleModifiers |= ModifierKeys.Alt; break;
+                    case "shift": consoleModifiers |= ModifierKeys.Shift; break;
+                    case "win":
+                    case "windows": consoleModifiers |= ModifierKeys.Windows; break;
+                }
+            }
+            catch
+            {
+                consoleKey = Key.None; // invalid shortcut string in App.config - leave the console without a shortcut
+                return;
+            }
+
+            // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+
+            string disp = (consoleModifiers == ModifierKeys.None ? "" : consoleModifiers.ToString().Replace(", ", "+").Replace("Control", "Ctrl") + "+") + consoleKey.ToString();
+            menuOpenConsole.InputGestureText = disp.Replace("Oem3", "`").Replace("OemTilde", "`").Replace("OemPlus", "+").Replace("OemMinus", "-").Replace("Escape", "Esc");
+        }
+
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (consoleKey != Key.None && e.Key == consoleKey && Keyboard.Modifiers == consoleModifiers)
+            {
+                openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
+                e.Handled = true;
+            }
+        }
 
         private static ICNCView getView(TabItem tab)
         {

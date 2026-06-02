@@ -273,6 +273,15 @@ namespace CNC.Controls
         public bool AutoCompress { get { return _autoCompress; } set { _autoCompress = value; OnPropertyChanged(); } }
         public bool SendComments { get { return _send_comments; } set { _send_comments = value; OnPropertyChanged(); } }
         public bool AddLineNumbers { get { return _addLinenumbers; } set { _addLinenumbers = value; OnPropertyChanged(); } }
+        public bool ConsoleVerbose { get; set; } = false;
+        public bool ConsoleFilterRT { get; set; } = false;
+        public bool ConsoleShowRTAll { get; set; } = false;
+        public bool ConsoleWindowOpen { get; set; } = false;
+        public string ConsoleShortcut { get; set; } = "Esc";
+        public double ConsoleWindowLeft { get; set; } = double.NaN;
+        public double ConsoleWindowTop { get; set; } = double.NaN;
+        public double ConsoleWindowWidth { get; set; } = double.NaN;
+        public double ConsoleWindowHeight { get; set; } = double.NaN;
 
         [XmlIgnore]
         public CommandIgnoreState[] CommandIgnoreStates { get { return (CommandIgnoreState[])Enum.GetValues(typeof(CommandIgnoreState)); } }

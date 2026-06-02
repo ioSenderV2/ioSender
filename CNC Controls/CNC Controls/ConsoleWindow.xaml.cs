@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
 using System.Windows;
 
 namespace CNC.Controls
@@ -48,6 +49,7 @@ namespace CNC.Controls
         public ConsoleWindow()
         {
             InitializeComponent();
+            RestorePlacement();
         }
 
         public new void Close()
@@ -58,11 +60,56 @@ namespace CNC.Controls
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            // Preserve size and position for the next session (runs both on user hide and on app shutdown close)
+            SavePlacement();
+
             if (userClosing)
             {
                 e.Cancel = true;
                 Hide();
             }
+        }
+
+        private void RestorePlacement()
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            if (!double.IsNaN(cfg.ConsoleWindowWidth))
+                Width = Math.Max(Math.Min(cfg.ConsoleWindowWidth, SystemParameters.VirtualScreenWidth), MinWidth);
+            if (!double.IsNaN(cfg.ConsoleWindowHeight))
+                Height = Math.Max(Math.Min(cfg.ConsoleWindowHeight, SystemParameters.VirtualScreenHeight), MinHeight);
+
+            if (!double.IsNaN(cfg.ConsoleWindowLeft) && !double.IsNaN(cfg.ConsoleWindowTop))
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                // Clamp so the window stays on the visible virtual desktop
+                Left = Math.Max(Math.Min(cfg.ConsoleWindowLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - Width), SystemParameters.VirtualScreenLeft);
+                Top = Math.Max(Math.Min(cfg.ConsoleWindowTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - Height), SystemParameters.VirtualScreenTop);
+            }
+        }
+
+        private void SavePlacement()
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            Rect bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+
+            if (cfg.ConsoleWindowLeft == bounds.Left && cfg.ConsoleWindowTop == bounds.Top &&
+                 cfg.ConsoleWindowWidth == bounds.Width && cfg.ConsoleWindowHeight == bounds.Height)
+                return;
+
+            cfg.ConsoleWindowLeft = bounds.Left;
+            cfg.ConsoleWindowTop = bounds.Top;
+            cfg.ConsoleWindowWidth = bounds.Width;
+            cfg.ConsoleWindowHeight = bounds.Height;
+
+            AppConfig.Settings.Save();
         }
     }
 }

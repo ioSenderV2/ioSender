@@ -57,5 +57,19 @@ namespace CNC.Controls
         {
             (DataContext as GrblViewModel).ResponseLog.Clear();
         }
+
+        private void consoleOption_Click(object sender, RoutedEventArgs e)
+        {
+            // Preserve all three console checkbox states for the next session
+            // (the IsChecked bindings have already updated the model)
+            if (AppConfig.Settings.Base != null)
+            {
+                var model = DataContext as GrblViewModel;
+                AppConfig.Settings.Base.ConsoleVerbose = model.ResponseLogVerbose;
+                AppConfig.Settings.Base.ConsoleFilterRT = model.ResponseLogFilterRT;
+                AppConfig.Settings.Base.ConsoleShowRTAll = model.ResponseLogShowRTAll;
+                AppConfig.Settings.Save();
+            }
+        }
     }
 }
