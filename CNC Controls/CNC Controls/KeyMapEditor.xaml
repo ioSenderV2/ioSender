@@ -33,6 +33,8 @@
         <DockPanel Grid.Row="1" Margin="2,0,2,6">
             <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,1" Margin="4,0,0,0" Click="CollapseAll_Click"/>
             <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,1" Click="ExpandAll_Click"/>
+            <Button DockPanel.Dock="Left" Content="No-numpad keys" Padding="6,1" Margin="0,0,8,0" Click="NoNumpad_Click"
+                    ToolTip="Reassign the NumPad jog actions to non-numpad keys (Ctrl+1-8 for step/feed presets, [ ] for jog step, - = for jog feed). Tweak afterward, or Reset to revert."/>
             <TextBlock VerticalAlignment="Center" Foreground="#FF707070" Text="Grouped by function"/>
         </DockPanel>
 
