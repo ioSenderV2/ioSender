@@ -33,8 +33,13 @@
         <DockPanel Grid.Row="1" Margin="2,0,2,6">
             <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,1" Margin="4,0,0,0" Click="CollapseAll_Click"/>
             <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,1" Click="ExpandAll_Click"/>
-            <Button DockPanel.Dock="Left" Content="No-numpad keys" Padding="6,1" Margin="0,0,8,0" Click="NoNumpad_Click"
-                    ToolTip="Reassign the NumPad jog actions to non-numpad keys (Ctrl+1-8 for step/feed presets, [ ] for jog step, - = for jog feed). Tweak afterward, or Reset to revert."/>
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <TextBlock Text="Jog presets:" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#FF707070"/>
+                <RadioButton x:Name="rbNumpad" GroupName="JogPreset" Content="Numeric keypad" VerticalAlignment="Center" Margin="0,0,6,0" Checked="JogPreset_Checked"
+                             ToolTip="Use the numeric keypad for jog step/feed presets (Ctrl+NumPad0-7) and step/feed adjust (NumPad2/4/6/8)."/>
+                <RadioButton x:Name="rbTopRow" GroupName="JogPreset" Content="Top-row numbers" VerticalAlignment="Center" Checked="JogPreset_Checked"
+                             ToolTip="For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed."/>
+            </StackPanel>
             <TextBlock VerticalAlignment="Center" Foreground="#FF707070" Text="Grouped by function"/>
         </DockPanel>
 

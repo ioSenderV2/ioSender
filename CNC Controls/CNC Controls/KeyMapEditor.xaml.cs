@@ -65,6 +65,7 @@ namespace CNC.Controls
             view.SortDescriptions.Add(new SortDescription(nameof(BindingRow.Label), ListSortDirection.Ascending));
             grid.ItemsSource = view;
 
+            UpdateJogPresetRadios();
             UpdateConflicts();
         }
 
@@ -141,44 +142,67 @@ namespace CNC.Controls
             LoadRows();
         }
 
-        private void NoNumpad_Click(object sender, RoutedEventArgs e)
+        private bool suppressPreset = false;
+
+        // Reflect the current jog-preset bindings in the radio buttons without re-applying them.
+        private void UpdateJogPresetRadios()
+        {
+            if (rbNumpad == null || rbTopRow == null)
+                return;
+
+            var row = rows.FirstOrDefault(r => r.Model.Method == "JogBaseControl.JogStep0");
+            Key k = row == null ? Key.None : row.Model.Key;
+
+            suppressPreset = true;
+            rbNumpad.IsChecked = k >= Key.NumPad0 && k <= Key.NumPad9;
+            rbTopRow.IsChecked = k >= Key.D1 && k <= Key.D9;
+            suppressPreset = false;
+        }
+
+        private void JogPreset_Checked(object sender, RoutedEventArgs e)
+        {
+            if (suppressPreset)
+                return;
+
+            SetJogPreset(rbTopRow.IsChecked == true);
+            UpdateConflicts();
+        }
+
+        private void SetJogPreset(bool topRow)
         {
             foreach (var row in rows)
             {
                 Key key;
                 ModifierKeys mods;
-                if (NoNumpadAlternate(row.Model.Method, out key, out mods))
+                if (JogPresetKey(row.Model.Method, topRow, out key, out mods))
                 {
                     row.Model.Key = key;
                     row.Model.Modifiers = mods;
                     row.Refresh();
                 }
             }
-
-            UpdateConflicts();
         }
 
-        // Non-numpad replacements for the NumPad-bound jog actions, mirroring the numpad layout
-        // onto the number row + brackets so machines without a numeric keypad can use them.
-        private static bool NoNumpadAlternate(string method, out Key key, out ModifierKeys mods)
+        // The NumPad-bound jog actions and their top-row equivalents (for keyboards without a keypad).
+        private static bool JogPresetKey(string method, bool topRow, out Key key, out ModifierKeys mods)
         {
             mods = ModifierKeys.None;
             key = Key.None;
 
             switch (method)
             {
-                case "JogBaseControl.JogStep0": key = Key.D1; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogStep1": key = Key.D2; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogStep2": key = Key.D3; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogStep3": key = Key.D4; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogFeed0": key = Key.D5; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogFeed1": key = Key.D6; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogFeed2": key = Key.D7; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.JogFeed3": key = Key.D8; mods = ModifierKeys.Control; return true;
-                case "JogBaseControl.StepDec": key = Key.OemOpenBrackets; return true;
-                case "JogBaseControl.StepInc": key = Key.OemCloseBrackets; return true;
-                case "JogBaseControl.FeedDec": key = Key.OemMinus; return true;
-                case "JogBaseControl.FeedInc": key = Key.OemPlus; return true;
+                case "JogBaseControl.JogStep0": key = topRow ? Key.D1 : Key.NumPad0; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep1": key = topRow ? Key.D2 : Key.NumPad1; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep2": key = topRow ? Key.D3 : Key.NumPad2; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogStep3": key = topRow ? Key.D4 : Key.NumPad3; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed0": key = topRow ? Key.D5 : Key.NumPad4; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed1": key = topRow ? Key.D6 : Key.NumPad5; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed2": key = topRow ? Key.D7 : Key.NumPad6; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.JogFeed3": key = topRow ? Key.D8 : Key.NumPad7; mods = ModifierKeys.Control; return true;
+                case "JogBaseControl.StepDec": key = topRow ? Key.OemOpenBrackets : Key.NumPad4; return true;
+                case "JogBaseControl.StepInc": key = topRow ? Key.OemCloseBrackets : Key.NumPad6; return true;
+                case "JogBaseControl.FeedDec": key = topRow ? Key.OemMinus : Key.NumPad2; return true;
+                case "JogBaseControl.FeedInc": key = topRow ? Key.OemPlus : Key.NumPad8; return true;
                 default: return false;
             }
         }
