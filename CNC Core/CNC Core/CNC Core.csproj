@@ -65,6 +65,7 @@
     <Compile Include="GCodeParser.cs" />
     <Compile Include="Grbl.cs" />
     <Compile Include="Comms.cs" />
+    <Compile Include="ControllerService.cs" />
     <Compile Include="GCodeJob.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="KeypressHandler.cs" />
