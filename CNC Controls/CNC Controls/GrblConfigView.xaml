@@ -20,5 +20,8 @@
         <TabItem x:Uid="tab_stepperCalibration" x:Name="tabStepperCalibration" Header="Stepper calibration">
             <local:StepperCalibrationWizard x:Name="calibWizard"/>
         </TabItem>
+        <TabItem x:Uid="tab_stepperCalibrationScratch" x:Name="tabStepperCalibrationScratch" Header="Stepper calibration (scratch)">
+            <local:StepperCalibrationScratchWizard x:Name="calibScratchWizard"/>
+        </TabItem>
     </TabControl>
 </UserControl>
