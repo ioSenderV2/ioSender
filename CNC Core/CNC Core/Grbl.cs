@@ -3351,11 +3351,20 @@ namespace CNC.Core
 
         void pollTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if(!suspend)
-                Comms.com.WriteByte(RTCommand);
+            // This runs on a ThreadPool timer thread - an unhandled exception here terminates
+            // the whole process. The write path now handles a vanished device (and triggers
+            // auto-reconnect), but keep a catch-all here as a last line of defence.
+            try
+            {
+                if(!suspend)
+                    Comms.com.WriteByte(RTCommand);
 
-            if (RTCommand == GrblConstants.CMD_STATUS_REPORT_ALL)
-                RTCommand = GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT);
+                if (RTCommand == GrblConstants.CMD_STATUS_REPORT_ALL)
+                    RTCommand = GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT);
+            }
+            catch
+            {
+            }
         }
     }
 

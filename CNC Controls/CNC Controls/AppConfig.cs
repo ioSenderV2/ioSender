@@ -562,6 +562,11 @@ namespace CNC.Controls
             {
                 Comms.com.DataReceived += model.DataReceived;
 
+                // Auto-reconnect: let the view model react when the link drops / is restored.
+                model.PollInterval = Base.PollInterval;
+                Comms.com.ConnectionLost += model.OnConnectionLost;
+                Comms.com.Reconnected += model.OnReconnected;
+
                 CancellationToken cancellationToken = new CancellationToken();
 
                 // Wait 400ms to see if a MPG is polling Grbl...

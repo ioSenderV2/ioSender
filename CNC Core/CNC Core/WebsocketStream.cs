@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.IO;
 using System.Text;
 using System.Windows.Threading;
 using WebSocketSharp;
@@ -53,6 +54,10 @@ namespace CNC.Core
         private StringBuilder input = new StringBuilder(1024);
         private Dispatcher Dispatcher { get; set; }
 
+        private readonly string hostUrl;
+        private readonly Reconnector reconnector;
+        private volatile bool closing = false;
+
         public event DataReceivedHandler DataReceived;
 
         public WebsocketStream(string host, Dispatcher dispatcher)
@@ -61,9 +66,21 @@ namespace CNC.Core
             Reply = string.Empty;
             Dispatcher = dispatcher;
 
+            hostUrl = host;
+
+            // Auto-reconnect: same Reconnector state machine as the serial/network transports.
+            reconnector = new Reconnector(() => OpenConnection());
+
+            OpenConnection();
+        }
+
+        // Opens (or re-opens) the websocket. Returns true when connected.
+        // Safe to call from the reconnect timer thread.
+        private bool OpenConnection()
+        {
             try
             {
-                websocket = new WebSocketSharp.WebSocket(host);
+                websocket = new WebSocketSharp.WebSocket(hostUrl);
                 websocket.OnMessage += OnMessage;
                 websocket.OnOpen += OnOpen;
                 websocket.OnClose += OnClose;
@@ -71,6 +88,18 @@ namespace CNC.Core
             }
             catch
             {
+            }
+
+            return IsOpen;
+        }
+
+        private void HandleWriteError(Exception ex)
+        {
+            if (ex is IOException || ex is ObjectDisposedException || ex is InvalidOperationException)
+            {
+                _isOpen = false;
+                if (!closing)
+                    reconnector?.NotifyLost();
             }
         }
 
@@ -87,6 +116,20 @@ namespace CNC.Core
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 
+        public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
+
+        public event System.Action ConnectionLost
+        {
+            add { reconnector.ConnectionLost += value; }
+            remove { reconnector.ConnectionLost -= value; }
+        }
+
+        public event System.Action Reconnected
+        {
+            add { reconnector.Reconnected += value; }
+            remove { reconnector.Reconnected -= value; }
+        }
+
         public void PurgeQueue()
         {
             Reply = string.Empty;
@@ -96,6 +139,9 @@ namespace CNC.Core
 
         public void Close()
         {
+            closing = true;
+            reconnector?.Cancel(); // an explicit close must not trigger an auto-reconnect
+
             if (IsOpen)
             {
                 websocket.OnMessage -= OnMessage;
@@ -116,19 +162,33 @@ namespace CNC.Core
 
         public void WriteByte(byte data)
         {
-            websocket.Send(new byte[1] { data });
+            try
+            {
+                if (websocket != null && IsOpen)
+                    websocket.Send(new byte[1] { data });
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteBytes(byte[] bytes, int len)
         {
-            websocket.Send(bytes);
+            try
+            {
+                if (websocket != null && IsOpen)
+                    websocket.Send(bytes);
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteString(string data)
         {
-            byte[] bytes = Encoding.Default.GetBytes(data);
-
-            websocket.Send(bytes);
+            WriteBytes(Encoding.Default.GetBytes(data), 0);
         }
 
         public void WriteCommand(string command)
@@ -189,8 +249,19 @@ namespace CNC.Core
         private void OnClose(object sender, CloseEventArgs e)
         {
             _isOpen = false;
-            websocket.OnClose -= OnClose;
-            websocket = null;
+
+            var ws = sender as WebSocket;
+            if (ws != null)
+            {
+                ws.OnMessage -= OnMessage;
+                ws.OnOpen -= OnOpen;
+                ws.OnClose -= OnClose;
+            }
+
+            // Unexpected close -> start the reconnect loop (OpenConnection will create a fresh
+            // socket). An intentional Close() sets 'closing' first to suppress this.
+            if (!closing)
+                reconnector?.NotifyLost();
         }
 
         private int gp()

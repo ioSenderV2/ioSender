@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.IO;
 using System.Text;
 using System.Net.Sockets;
 using System.Windows.Threading;
@@ -53,6 +54,10 @@ namespace CNC.Core
         private StringBuilder input = new StringBuilder(1024);
         private Dispatcher Dispatcher { get; set; }
 
+        private readonly string hostParams;
+        private readonly Reconnector reconnector;
+        private volatile bool closing = false;
+
         public event DataReceivedHandler DataReceived;
 
         public TelnetStream(string host, Dispatcher dispatcher)
@@ -64,7 +69,20 @@ namespace CNC.Core
             if (!host.Contains(":"))
                 host += ":23";
 
-            string[] parameter = host.Split(':');
+            hostParams = host;
+
+            // Auto-reconnect: shares the same Reconnector state machine as the serial transport;
+            // only the "reopen" step differs - here it is simply a fresh TCP connect attempt.
+            reconnector = new Reconnector(() => OpenConnection());
+
+            OpenConnection();
+        }
+
+        // Opens (or re-opens) the connection. Returns true when connected.
+        // Safe to call from the reconnect timer thread.
+        private bool OpenConnection()
+        {
+            string[] parameter = hostParams.Split(':');
 
             if (parameter.Length == 2) try
             {
@@ -75,7 +93,34 @@ namespace CNC.Core
             }
             catch
             {
+                ipstream = null;
+                ipserver = null;
             }
+
+            return IsOpen;
+        }
+
+        // Tear down a faulted connection and start the reconnect loop, unless we are
+        // closing intentionally.
+        private void OnConnectionLost()
+        {
+            if (closing)
+                return;
+
+            try { ipstream?.Close(); ipstream?.Dispose(); } catch { }
+            ipstream = null;
+
+            try { ipserver?.Close(); } catch { }
+            ipserver = null;
+
+            reconnector?.NotifyLost();
+        }
+
+        private void HandleWriteError(Exception ex)
+        {
+            if (ex is IOException || ex is SocketException ||
+                 ex is ObjectDisposedException || ex is InvalidOperationException)
+                OnConnectionLost();
         }
 
         ~TelnetStream()
@@ -91,10 +136,28 @@ namespace CNC.Core
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 
+        public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
+
+        public event System.Action ConnectionLost
+        {
+            add { reconnector.ConnectionLost += value; }
+            remove { reconnector.ConnectionLost -= value; }
+        }
+
+        public event System.Action Reconnected
+        {
+            add { reconnector.Reconnected += value; }
+            remove { reconnector.Reconnected -= value; }
+        }
+
         public void PurgeQueue()
         {
-            while (ipstream.DataAvailable)
-                ipstream.ReadByte();
+            try
+            {
+                while (ipstream != null && ipstream.DataAvailable)
+                    ipstream.ReadByte();
+            }
+            catch { }
             Reply = string.Empty;
             if (!EventMode)
                 input.Clear();
@@ -102,6 +165,9 @@ namespace CNC.Core
 
         public void Close()
         {
+            closing = true;
+            reconnector?.Cancel(); // an explicit close must not trigger an auto-reconnect
+
             if (IsOpen)
             {
                 PurgeQueue();
@@ -125,18 +191,34 @@ namespace CNC.Core
 
         public void WriteByte(byte data)
         {
-            ipstream.WriteAsync(new byte[1] { data }, 0, 1);
+            try
+            {
+                if (ipstream != null && IsOpen)
+                    ipstream.WriteAsync(new byte[1] { data }, 0, 1);
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteBytes(byte[] bytes, int len)
         {
-            ipstream.WriteAsync(bytes, 0, len);
+            try
+            {
+                if (ipstream != null && IsOpen)
+                    ipstream.WriteAsync(bytes, 0, len);
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
         }
 
         public void WriteString(string data)
         {
             byte[] bytes = Encoding.Default.GetBytes(data);
-            ipstream.WriteAsync(bytes, 0, bytes.Length);
+            WriteBytes(bytes, bytes.Length);
         }
 
         public void WriteCommand(string command)
@@ -201,6 +283,7 @@ namespace CNC.Core
         void ReadComplete(IAsyncResult iar)
         {
             int bytesAvailable = 0;
+            bool failed = false;
             byte[] buffer = (byte[])iar.AsyncState;
 
             try
@@ -209,7 +292,15 @@ namespace CNC.Core
             }
             catch
             {
-                // error handling required here (and many other places)...
+                failed = true;
+            }
+
+            // A read of 0 bytes (or a read error) means the remote end closed the connection -
+            // hand off to the reconnect logic rather than silently spinning on dead reads.
+            if (failed || bytesAvailable == 0)
+            {
+                OnConnectionLost();
+                return;
             }
 
             int pos = 0;
@@ -231,9 +322,16 @@ namespace CNC.Core
                 }
                 else
                     ByteReceived?.Invoke(ReadByte());
+            }
 
+            try
+            {
                 if (ipstream != null && ipserver.Connected)
                     ipstream.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
+            }
+            catch
+            {
+                OnConnectionLost();
             }
         }
     }

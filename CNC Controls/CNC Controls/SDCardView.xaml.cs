@@ -73,6 +73,13 @@ namespace CNC.Controls
         {
             if (activate)
             {
+                if (Comms.com == null || !Comms.com.IsOpen)
+                {
+                    GrblSDCard.Clear();
+                    (DataContext as GrblViewModel).Message = (string)FindResource("NoConnection");
+                    return;
+                }
+
                 CanUpload = GrblInfo.UploadProtocol != string.Empty && (DataContext as GrblViewModel).SDCardMountStatus != SDState.Undetected;
                 CanDelete = GrblInfo.Build >= 20210421;
                 CanViewAll = GrblInfo.Build >= 20230312;
@@ -415,6 +422,12 @@ namespace CNC.Controls
             grbl = model;
 
             data.Clear();
+
+            // No point talking to the controller if the link is down or reconnecting - this
+            // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
+            // The user-facing message is set by the caller (SDCardView.Activate).
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
 
             if (GrblInfo.HasSDCard && grbl.SDCardMountStatus == SDState.Unmounted)
             {

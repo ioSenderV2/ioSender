@@ -59,6 +59,12 @@ namespace CNC.Core
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 
+        // Auto-reconnect is not implemented for the (optional, USEELTIMA) Eltima transport;
+        // these satisfy the StreamComms contract.
+        public bool IsReconnecting { get { return false; } }
+        public event System.Action ConnectionLost;
+        public event System.Action Reconnected;
+
         public event DataReceivedHandler DataReceived;
 
 #if RESPONSELOG
