@@ -316,6 +316,117 @@ namespace CNC.Core
             return ok;
         }
 
+        // ---- Editor API (used by the Key Mappings editor) -------------------------------------
+
+        /// <summary>A single editable binding row surfaced to the Key Mappings editor.</summary>
+        public class KeyBinding
+        {
+            public string Method;           // catalog identity for action bindings, "Jogkey.X.plus" for jog
+            public string Context;          // owning control name or "null"
+            public Key Key;
+            public ModifierKeys Modifiers;
+            public bool OnUp = true;
+            public bool IsJog;
+            public int JogIndex = -1;       // index into jogKeys for jog bindings
+            public string AxisLabel;        // e.g. "X +" for jog bindings
+        }
+
+        /// <summary>All bindable actions (bound and unbound), excluding the macro Fn-key dispatcher.</summary>
+        public List<KeyBinding> GetActionBindings()
+        {
+            var list = new List<KeyBinding>();
+
+            foreach (var fn in functions)
+            {
+                if (fn.Method == "JobControl.FnKeyHandler")
+                    continue;
+
+                var h = handlers.FirstOrDefault(k => k.Call == fn.Call && k.context == fn.context);
+
+                list.Add(new KeyBinding {
+                    Method = fn.Method,
+                    Context = fn.Context,
+                    Key = h == null ? Key.None : h.Key,
+                    Modifiers = h == null ? ModifierKeys.None : h.Modifiers,
+                    OnUp = h == null || h.OnUp
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>Per-axis jog keys for the active machine (active axes only).</summary>
+        public List<KeyBinding> GetJogBindings()
+        {
+            var list = new List<KeyBinding>();
+
+            for (int i = 0; i < jogKeys.Length; i++)
+            {
+                if (string.IsNullOrEmpty(jogKeys[i].Command))
+                    continue;
+
+                bool plus = (i & 1) == 0;
+                string letter = GrblInfo.AxisIndexToLetter(jogKeys[i].AxisIndex);
+
+                list.Add(new KeyBinding {
+                    IsJog = true,
+                    JogIndex = i,
+                    Key = jogKeys[i].Key,
+                    Modifiers = ModifierKeys.None,
+                    AxisLabel = letter + (plus ? " +" : " −"),
+                    Method = "Jogkey." + letter + (plus ? ".plus" : ".minus")
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>Apply edited action bindings back onto the live handler list.</summary>
+        public void ApplyActionBindings(IEnumerable<KeyBinding> bindings)
+        {
+            foreach (var b in bindings)
+            {
+                if (b.IsJog)
+                    continue;
+
+                var fn = functions.FirstOrDefault(f => f.Method == b.Method && f.Context == b.Context);
+                if (fn == null)
+                    continue;
+
+                var existing = handlers.FirstOrDefault(k => k.Call == fn.Call && k.context == fn.context);
+
+                if (b.Key == Key.None)
+                {
+                    if (existing != null)
+                        handlers.Remove(existing);
+                }
+                else if (existing != null)
+                {
+                    existing.Key = b.Key;
+                    existing.Modifiers = b.Modifiers;
+                    existing.OnUp = b.OnUp;
+                }
+                else
+                    handlers.Add(new KeypressHandlerFn { Key = b.Key, Modifiers = b.Modifiers, Call = fn.Call, context = fn.context, OnUp = b.OnUp });
+            }
+        }
+
+        /// <summary>Apply edited jog keys back onto the live jog key table.</summary>
+        public void ApplyJogBindings(IEnumerable<KeyBinding> bindings)
+        {
+            foreach (var b in bindings)
+            {
+                if (!b.IsJog || b.JogIndex < 0 || b.JogIndex >= jogKeys.Length)
+                    continue;
+
+                if (jogKeys[b.JogIndex].Key != b.Key)
+                {
+                    jogKeys[b.JogIndex].Key = b.Key;
+                    jogKeys[b.JogIndex].Remapped = true;
+                }
+            }
+        }
+
         public bool ProcessKeypress(KeyEventArgs e, bool allowJog, UserControl context = null)
         {
             bool isJogging = IsJogging, jogkeyPressed = false;

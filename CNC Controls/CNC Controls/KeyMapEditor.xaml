@@ -1,0 +1,92 @@
+<Window x:Class="CNC.Controls.KeyMapEditor"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Edit Key Mappings" Height="540" Width="500" MinHeight="360" MinWidth="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        FocusManager.IsFocusScope="True">
+    <Window.Resources>
+        <Style x:Key="BindingButton" TargetType="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FFB0B0B0"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="2,2,2,8" Foreground="#FF505050"
+                   Text="Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast)."/>
+
+        <TabControl Grid.Row="1" x:Name="tabs">
+            <TabItem Header="Jog">
+                <DataGrid x:Name="gridJog" AutoGenerateColumns="False" CanUserAddRows="False"
+                          CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          SelectionMode="Single" IsReadOnly="True" BorderThickness="0"
+                          HorizontalScrollBarVisibility="Disabled">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Axis / direction" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
+                        <DataGridTemplateColumn Header="Key" Width="160">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
+                                            Tag="{Binding}" Click="Binding_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Shortcuts">
+                <DataGrid x:Name="gridActions" AutoGenerateColumns="False" CanUserAddRows="False"
+                          CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          SelectionMode="Single" IsReadOnly="True" BorderThickness="0"
+                          HorizontalScrollBarVisibility="Disabled">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
+                        <DataGridTemplateColumn Header="Shortcut" Width="160">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
+                                            Tag="{Binding}" Click="Binding_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+        </TabControl>
+
+        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+            <TextBlock x:Name="lblConflict" DockPanel.Dock="Left" VerticalAlignment="Center"
+                       Foreground="#FFCF222E" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Reset" Width="80" Margin="4,0" Padding="5,2" Click="Reset_Click"/>
+                <Button Content="OK" Width="80" Margin="4,0" Padding="5,2" IsDefault="True" Click="Ok_Click"/>
+                <Button Content="Cancel" Width="80" Margin="4,0" Padding="5,2" IsCancel="True"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

@@ -104,11 +104,24 @@ namespace CNC.Controls
                 Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");
         }
 
-        private void btnSaveKeyMap_Click(object sender, RoutedEventArgs e)
+        private void btnEditKeyMap_Click(object sender, RoutedEventArgs e)
         {
-            string filename = CNC.Core.Resources.ConfigPath + string.Format("KeyMap{0}.xml", (int)AppConfig.Settings.Jog.Mode);
-            if(Grbl.GrblViewModel.Keyboard.SaveMappings(filename))
+            if (Grbl.GrblViewModel.Keyboard == null)
+            {
+                Grbl.GrblViewModel.Message = "Key mappings are not available until a controller is connected.";
+                return;
+            }
+
+            var dlg = new KeyMapEditor(Grbl.GrblViewModel) { Owner = Window.GetWindow(this) };
+
+            if (dlg.ShowDialog() == true)
+            {
+                string filename = CNC.Core.Resources.ConfigPath + string.Format("KeyMap{0}.xml", (int)AppConfig.Settings.Jog.Mode);
+                Grbl.GrblViewModel.Keyboard.SaveMappings(filename);
+                AppConfig.Settings.Save();
+                AppConfig.NotifyConsoleShortcutChanged();
                 Grbl.GrblViewModel.Message = string.Format(LibStrings.FindResource("KeymappingsSaved"), filename);
+            }
         }
     }
 }
