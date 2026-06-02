@@ -274,11 +274,14 @@ namespace CNC.Controls
 
         private void UpdateConflicts()
         {
+            // Same key+modifiers only conflicts within the same control context - actions bound to
+            // the same key in different contexts (e.g. Start job vs Start probe on Alt+R) are fine.
             var dups = rows
                 .Where(r => r.Model.Key != Key.None)
-                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers))
+                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + " " + (r.Model.Context ?? "null"))
                 .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
+                .Select(g => ShortcutKey.ToDisplayString(g.First().Model.Key, g.First().Model.Modifiers))
+                .Distinct()
                 .ToList();
 
             lblConflict.Text = dups.Count == 0 ? string.Empty : "Duplicate: " + string.Join(", ", dups);
