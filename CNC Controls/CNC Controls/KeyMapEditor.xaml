@@ -71,7 +71,7 @@
                             </Style>
                         </DataGrid.RowStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True">
+                            <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" MinWidth="200" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -84,7 +84,7 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTemplateColumn Header="Shortcut" Width="170">
+                            <DataGridTemplateColumn Header="Shortcut" Width="170" MinWidth="140">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
@@ -103,7 +103,8 @@
                                                     <Expander IsExpanded="{Binding Name, Converter={StaticResource GroupExpanded}, Mode=OneWay}"
                                                               Expanded="Group_Expanded" Collapsed="Group_Collapsed"
                                                               Margin="0,2,0,0" Background="#FFF3F4F6"
-                                                              BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
+                                                              BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1"
+                                                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                                         <Expander.Header>
                                                             <StackPanel Orientation="Horizontal"
                                                                         DataContext="{Binding Name, Converter={StaticResource GroupState}}"
