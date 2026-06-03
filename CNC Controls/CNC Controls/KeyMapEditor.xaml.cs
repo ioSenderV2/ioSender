@@ -375,6 +375,14 @@ namespace CNC.Controls
         private static List<ActionItem> BuildActionItems()
         {
             const string jogNote = " by the distance and feed rate currently selected in the Jog panel.";
+
+            // Use the conventional mill directions (X+ right, Y+ away, Z+ up) - same as the on-screen jog
+            // arrows. In lathe mode the convention differs, so fall back to plain axis +/-.
+            bool lathe = GrblInfo.LatheModeEnabled;
+            string xp = lathe ? "" : " (right)", xm = lathe ? "" : " (left)";
+            string yp = lathe ? "" : " (away)", ym = lathe ? "" : " (toward you)";
+            string zp = lathe ? "" : " (up)", zm = lathe ? "" : " (down)";
+
             return new List<ActionItem>
             {
                 new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
@@ -384,12 +392,12 @@ namespace CNC.Controls
                 new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),
                 new ActionItem(ControllerAction.Home, "Home", "Run the homing cycle ($H)."),
                 new ActionItem(ControllerAction.SpindleStop, "Spindle stop", "Stop the spindle (during a feed hold)."),
-                new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis in the + direction" + jogNote),
-                new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis in the − direction" + jogNote),
-                new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis in the + direction" + jogNote),
-                new ActionItem(ControllerAction.JogYMinus, "Jog Y −", "Jog the Y axis in the − direction" + jogNote),
-                new ActionItem(ControllerAction.JogZPlus, "Jog Z +", "Jog the Z axis in the + direction" + jogNote),
-                new ActionItem(ControllerAction.JogZMinus, "Jog Z −", "Jog the Z axis in the − direction" + jogNote),
+                new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis +" + xp + jogNote),
+                new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis −" + xm + jogNote),
+                new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis +" + yp + jogNote),
+                new ActionItem(ControllerAction.JogYMinus, "Jog Y −", "Jog the Y axis −" + ym + jogNote),
+                new ActionItem(ControllerAction.JogZPlus, "Jog Z +", "Jog the Z axis +" + zp + jogNote),
+                new ActionItem(ControllerAction.JogZMinus, "Jog Z −", "Jog the Z axis −" + zm + jogNote),
                 new ActionItem(ControllerAction.JogStepIncrease, "Jog step +", "Increase the jog step size (×10)."),
                 new ActionItem(ControllerAction.JogStepDecrease, "Jog step −", "Decrease the jog step size (÷10).")
             };
