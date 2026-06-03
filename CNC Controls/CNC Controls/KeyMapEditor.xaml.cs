@@ -257,8 +257,7 @@ namespace CNC.Controls
             UpdateControllerStatus();
             model.Controller.Connected += Controller_StatusChanged;
             model.Controller.Disconnected += Controller_StatusChanged;
-            model.Controller.ButtonPressed += Controller_ButtonChanged;
-            model.Controller.ButtonReleased += Controller_ButtonChanged;
+            model.Controller.Polled += Controller_Polled;
         }
 
         private void KeyMapEditor_Closed(object sender, EventArgs e)
@@ -267,8 +266,7 @@ namespace CNC.Controls
             {
                 model.Controller.Connected -= Controller_StatusChanged;
                 model.Controller.Disconnected -= Controller_StatusChanged;
-                model.Controller.ButtonPressed -= Controller_ButtonChanged;
-                model.Controller.ButtonReleased -= Controller_ButtonChanged;
+                model.Controller.Polled -= Controller_Polled;
             }
             if (model.ControllerMapper != null)
                 model.ControllerMapper.Enabled = true;   // resume machine dispatch
@@ -286,12 +284,13 @@ namespace CNC.Controls
             UpdateControllerStatus();
         }
 
-        private void Controller_ButtonChanged(object sender, ControllerButtonEventArgs e)
+        // Drive the press indicators straight from the raw XInput state every poll - the definitive
+        // check of what the controller actually reports (D-pad lights here = input is getting through).
+        private void Controller_Polled(object sender, EventArgs e)
         {
-            bool pressed = model.Controller != null && (model.Controller.State.wButtons & (ushort)e.Button) != 0;
+            ushort buttons = model.Controller.State.wButtons;
             foreach (var r in controllerRows)
-                if (r.Button == e.Button)
-                    r.Pressed = pressed;
+                r.Pressed = (buttons & (ushort)r.Button) != 0;
         }
 
         private void ControllerDefaults_Click(object sender, RoutedEventArgs e)

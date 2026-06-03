@@ -122,10 +122,20 @@ namespace CNC.Core
 
         private void OnButtonPressed(object sender, ControllerButtonEventArgs e)
         {
-            if (!Enabled || !IsConnected)
+            if (!Enabled)
+                return;   // editor is open - intentionally silent
+
+            ControllerAction action = GetAction(e.Button);
+            if (action == ControllerAction.None)
                 return;
 
-            Execute(GetAction(e.Button));
+            if (!IsConnected)
+            {
+                grbl.Message = "Controller: " + e.Button + " ignored - no controller-board connection.";
+                return;
+            }
+
+            Execute(action);
         }
 
         private void Execute(ControllerAction action)
@@ -177,7 +187,10 @@ namespace CNC.Core
         private void JogStep(string axis, int dir)
         {
             if (!CanJog)
+            {
+                grbl.Message = string.Format("Controller jog ignored - state is {0} (needs Idle/Jog).", grbl.GrblState.State);
                 return;
+            }
 
             double dist = grbl.JogStep;
             if (dist <= 0d)
