@@ -364,6 +364,11 @@ namespace CNC.Core
         public ControllerService Controller { get; private set; }
         public ControllerMapper ControllerMapper { get; private set; }
 
+        // Supplied by the jog panel (CNC Controls) so non-UI code (e.g. controller jogging) can use the
+        // same distance/feed the on-screen jog uses. Null until the jog panel has loaded.
+        public Func<double> JogDistanceProvider { get; set; }
+        public Func<double> JogFeedProvider { get; set; }
+
         public bool ResponseLogVerbose { get { return _responseLogVerbose; } set { _responseLogVerbose = value; OnPropertyChanged(); } }
         public bool ResponseLogFilterRT { get; set; } = false;
         public bool ResponseLogFilterOk { get; set; } = false;

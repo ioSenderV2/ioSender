@@ -192,13 +192,16 @@ namespace CNC.Core
                 return;
             }
 
-            double dist = grbl.JogStep;
-            if (dist <= 0d)
-                dist = 1d;
+            // Mirror the on-screen jog panel's distance/feed when available.
+            double dist = grbl.JogDistanceProvider != null ? grbl.JogDistanceProvider() : grbl.JogStep;
+            if (dist <= 0d)   // 0, or continuous (-1) - fall back to a sane fixed step
+                dist = grbl.JogStep > 0d ? grbl.JogStep : 1d;
             if (dir < 0)
                 dist = -dist;
 
-            double feed = grbl.Keyboard != null ? grbl.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] : 0d;
+            double feed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
+            if (feed <= 0d && grbl.Keyboard != null)
+                feed = grbl.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step];
             if (feed <= 0d)
                 feed = 500d;
 
