@@ -14,6 +14,9 @@
         <local:KeyMapGroupStateConverter x:Key="GroupState"/>
         <Style TargetType="ToolTip">
             <Setter Property="MaxWidth" Value="200"/>
+            <Setter Property="Placement" Value="MousePoint"/>
+            <Setter Property="HorizontalOffset" Value="25"/>
+            <Setter Property="VerticalOffset" Value="0"/>
             <Setter Property="ContentTemplate">
                 <Setter.Value>
                     <DataTemplate>
