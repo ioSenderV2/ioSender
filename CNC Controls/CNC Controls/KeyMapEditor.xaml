@@ -11,6 +11,16 @@
     <Window.Resources>
         <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
         <local:KeyMapGroupExpandedConverter x:Key="GroupExpanded"/>
+        <local:KeyMapGroupStateConverter x:Key="GroupState"/>
+        <ContextMenu x:Key="RowMenu">
+            <MenuItem Header="Reset to default" Click="ResetRow_Click" IsEnabled="{Binding IsChanged}"/>
+        </ContextMenu>
+        <ContextMenu x:Key="GroupMenu">
+            <MenuItem Header="Expand all" Click="ExpandAll_Click"/>
+            <MenuItem Header="Collapse all" Click="CollapseAll_Click"/>
+            <Separator/>
+            <MenuItem Header="Reset group to defaults" Click="ResetGroup_Click" IsEnabled="{Binding Modified}"/>
+        </ContextMenu>
         <Style x:Key="BindingButton" TargetType="Button">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="6,2"/>
@@ -45,11 +55,8 @@
                             <RadioButton x:Name="rbTopRow" GroupName="JogPreset" Content="Top-row numbers" VerticalAlignment="Center" Checked="JogPreset_Checked"
                                          ToolTip="For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed."/>
                         </StackPanel>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,1" Margin="4,0,0,0" Click="CollapseAll_Click"/>
-                            <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,1" Click="ExpandAll_Click"/>
-                            <TextBlock VerticalAlignment="Center" Foreground="#FF707070" Text="Grouped by function"/>
-                        </DockPanel>
+                        <TextBlock Foreground="#FF707070" TextWrapping="Wrap"
+                                   Text="Grouped by function. Right-click a group header for expand/collapse/reset; right-click a row to reset it. Changed bindings are highlighted."/>
                     </StackPanel>
 
                     <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
@@ -59,10 +66,23 @@
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                <Setter Property="ContextMenu" Value="{StaticResource RowMenu}"/>
                             </Style>
                         </DataGrid.RowStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChanged}" Value="True">
+                                                <Setter Property="Foreground" Value="#FFD9730D"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTemplateColumn Header="Shortcut" Width="160">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -92,10 +112,21 @@
                                                               BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
                                                         <Expander.Header>
                                                             <StackPanel Orientation="Horizontal"
-                                                                        ToolTip="{Binding Name, Converter={StaticResource GroupTip}}"
-                                                                        ToolTipService.ShowOnDisabled="True">
-                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
-                                                                <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Foreground="#FF808080"/>
+                                                                        DataContext="{Binding Name, Converter={StaticResource GroupState}}"
+                                                                        ContextMenu="{StaticResource GroupMenu}"
+                                                                        ToolTip="{Binding Description}" ToolTipService.ShowOnDisabled="True">
+                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Modified}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="#FFD9730D"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Count, StringFormat=' ({0})'}" Foreground="#FF808080"/>
                                                             </StackPanel>
                                                         </Expander.Header>
                                                         <ItemsPresenter/>

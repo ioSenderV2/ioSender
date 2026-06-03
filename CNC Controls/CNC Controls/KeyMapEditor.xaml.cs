@@ -28,6 +28,8 @@ namespace CNC.Controls
         private readonly GrblViewModel model;
         private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();
         private readonly ObservableCollection<ControllerRow> controllerRows = new ObservableCollection<ControllerRow>();
+        private readonly Dictionary<string, GroupRowState> groupStates = new Dictionary<string, GroupRowState>();
+        private KeyMapGroupStateConverter groupStateConverter;
         private BindingRow capturing = null;
 
         /// <summary>Action choices for the Controller tab dropdowns (bound from XAML).</summary>
@@ -40,6 +42,7 @@ namespace CNC.Controls
             this.model = model;
             keyboard = model.Keyboard;
             DataContext = this;
+            groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 
             LoadRows();
             LoadController();
@@ -64,9 +67,11 @@ namespace CNC.Controls
             }
 
             // The console toggle is just another program-level toggle - surface it alongside the rest.
-            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null" };
+            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null", DefaultKey = Key.Escape };
             ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
             Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
+
+            BuildGroupStates();
 
             var view = new ListCollectionView(rows);
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BindingRow.Category)));
@@ -104,6 +109,7 @@ namespace CNC.Controls
             capturing.Model.Key = key;
             capturing.Model.Modifiers = capturing.IsJog ? ModifierKeys.None : Keyboard.Modifiers;
             capturing.Capturing = false;
+            capturing.Refresh();   // update changed-state + group indicator
             capturing = null;
 
             UpdateConflicts();
@@ -149,6 +155,48 @@ namespace CNC.Controls
         private void Reset_Click(object sender, RoutedEventArgs e)
         {
             LoadRows();
+        }
+
+        private void BuildGroupStates()
+        {
+            groupStates.Clear();
+            foreach (var row in rows)
+            {
+                GroupRowState gs;
+                if (!groupStates.TryGetValue(row.Category, out gs))
+                {
+                    gs = new GroupRowState(row.Category, GroupDescription(row.Category));
+                    groupStates[row.Category] = gs;
+                }
+                gs.Rows.Add(row);
+                row.Group = gs;
+            }
+            foreach (var gs in groupStates.Values)
+                gs.Recompute();
+
+            if (groupStateConverter != null)
+                groupStateConverter.Lookup = groupStates;
+        }
+
+        // Reset a single binding to its factory default (row context menu).
+        private void ResetRow_Click(object sender, RoutedEventArgs e)
+        {
+            var row = (sender as FrameworkElement)?.DataContext as BindingRow;
+            if (row == null)
+                return;
+            row.ResetToDefault();
+            UpdateConflicts();
+        }
+
+        // Reset every binding in a group to its factory default (group-header context menu).
+        private void ResetGroup_Click(object sender, RoutedEventArgs e)
+        {
+            var gs = (sender as FrameworkElement)?.DataContext as GroupRowState;
+            if (gs == null)
+                return;
+            foreach (var row in gs.Rows)
+                row.ResetToDefault();
+            UpdateConflicts();
         }
 
         private bool suppressPreset = false;
@@ -365,8 +413,9 @@ namespace CNC.Controls
 
         public static bool IsGroupExpanded(string name)
         {
+            // Default collapsed (like the Load Folder outline); remembered once toggled this session.
             bool v;
-            return !(name != null && groupExpanded.TryGetValue(name, out v)) || v;
+            return name != null && groupExpanded.TryGetValue(name, out v) && v;
         }
 
         private void Group_Expanded(object sender, RoutedEventArgs e)
@@ -702,6 +751,21 @@ namespace CNC.Controls
             public int CategoryOrder { get; private set; }
             public void Set(string category, int order) { Category = category; CategoryOrder = order; }
 
+            public GroupRowState Group;   // owning outline group (for header change indication)
+
+            /// <summary>True when the binding differs from its factory default.</summary>
+            public bool IsChanged
+            {
+                get { return Model.Key != Model.DefaultKey || Model.Modifiers != Model.DefaultModifiers; }
+            }
+
+            public void ResetToDefault()
+            {
+                Model.Key = Model.DefaultKey;
+                Model.Modifiers = Model.DefaultModifiers;
+                Refresh();
+            }
+
             private bool capturing;
             public bool Capturing
             {
@@ -728,6 +792,42 @@ namespace CNC.Controls
             public void Refresh()
             {
                 Notify(nameof(DisplayText));
+                Notify(nameof(IsChanged));
+                if (Group != null)
+                    Group.Recompute();
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            private void Notify(string name)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
+        }
+
+        /// <summary>Per-outline-group state so the group header can flag (and reset) modified bindings.</summary>
+        public class GroupRowState : INotifyPropertyChanged
+        {
+            public string Name { get; }
+            public string Description { get; }
+            public int Count { get { return Rows.Count; } }
+            public List<BindingRow> Rows { get; } = new List<BindingRow>();
+
+            private bool modified;
+            public bool Modified
+            {
+                get { return modified; }
+                private set { if (modified != value) { modified = value; Notify(nameof(Modified)); } }
+            }
+
+            public GroupRowState(string name, string description)
+            {
+                Name = name;
+                Description = description;
+            }
+
+            public void Recompute()
+            {
+                Modified = Rows.Any(r => r.IsChanged);
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
@@ -753,6 +853,23 @@ namespace CNC.Controls
     }
 
     /// <summary>Maps an outline group name to its remembered expanded/collapsed state.</summary>
+    /// <summary>Maps an outline group name to its live GroupRowState (for header change-indication / reset).</summary>
+    public class KeyMapGroupStateConverter : IValueConverter
+    {
+        public Dictionary<string, KeyMapEditor.GroupRowState> Lookup;
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            KeyMapEditor.GroupRowState gs;
+            return Lookup != null && value is string && Lookup.TryGetValue((string)value, out gs) ? gs : null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     public class KeyMapGroupExpandedConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
