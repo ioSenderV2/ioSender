@@ -305,7 +305,7 @@ namespace CNC.Controls
             foreach (var b in ControllerMapper.MappableButtons)
             {
                 var def = ControllerMapper.DefaultAction(b);
-                var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label) : a).ToList();
+                var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label, a.Description) : a).ToList();
                 controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
             }
 
@@ -374,23 +374,24 @@ namespace CNC.Controls
 
         private static List<ActionItem> BuildActionItems()
         {
+            const string jogNote = " by the distance and feed rate currently selected in the Jog panel.";
             return new List<ActionItem>
             {
-                new ActionItem(ControllerAction.None, "(none)"),
-                new ActionItem(ControllerAction.CycleStart, "Cycle Start / Resume"),
-                new ActionItem(ControllerAction.FeedHold, "Feed Hold"),
-                new ActionItem(ControllerAction.Reset, "Reset (soft-reset)"),
-                new ActionItem(ControllerAction.Unlock, "Unlock"),
-                new ActionItem(ControllerAction.Home, "Home"),
-                new ActionItem(ControllerAction.SpindleStop, "Spindle stop"),
-                new ActionItem(ControllerAction.JogXPlus, "Jog X +"),
-                new ActionItem(ControllerAction.JogXMinus, "Jog X −"),
-                new ActionItem(ControllerAction.JogYPlus, "Jog Y +"),
-                new ActionItem(ControllerAction.JogYMinus, "Jog Y −"),
-                new ActionItem(ControllerAction.JogZPlus, "Jog Z +"),
-                new ActionItem(ControllerAction.JogZMinus, "Jog Z −"),
-                new ActionItem(ControllerAction.JogStepIncrease, "Jog step +"),
-                new ActionItem(ControllerAction.JogStepDecrease, "Jog step −")
+                new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
+                new ActionItem(ControllerAction.CycleStart, "Cycle Start / Resume", "Start the loaded program, or resume after a feed hold."),
+                new ActionItem(ControllerAction.FeedHold, "Feed Hold", "Pause motion (feed hold)."),
+                new ActionItem(ControllerAction.Reset, "Reset (soft-reset)", "Soft-reset the controller (Ctrl-X)."),
+                new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),
+                new ActionItem(ControllerAction.Home, "Home", "Run the homing cycle ($H)."),
+                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", "Stop the spindle (during a feed hold)."),
+                new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis in the + direction" + jogNote),
+                new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis in the − direction" + jogNote),
+                new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis in the + direction" + jogNote),
+                new ActionItem(ControllerAction.JogYMinus, "Jog Y −", "Jog the Y axis in the − direction" + jogNote),
+                new ActionItem(ControllerAction.JogZPlus, "Jog Z +", "Jog the Z axis in the + direction" + jogNote),
+                new ActionItem(ControllerAction.JogZMinus, "Jog Z −", "Jog the Z axis in the − direction" + jogNote),
+                new ActionItem(ControllerAction.JogStepIncrease, "Jog step +", "Increase the jog step size (×10)."),
+                new ActionItem(ControllerAction.JogStepDecrease, "Jog step −", "Decrease the jog step size (÷10).")
             };
         }
 
@@ -724,7 +725,13 @@ namespace CNC.Controls
         {
             public ControllerAction Action { get; }
             public string Label { get; }
-            public ActionItem(ControllerAction action, string label) { Action = action; Label = label; }
+            public string Description { get; }
+            public ActionItem(ControllerAction action, string label, string description = null)
+            {
+                Action = action;
+                Label = label;
+                Description = description;
+            }
         }
 
         public class ControllerRow : INotifyPropertyChanged
@@ -737,7 +744,17 @@ namespace CNC.Controls
             public ControllerAction Action
             {
                 get { return action; }
-                set { action = value; Notify(nameof(Action)); }
+                set { action = value; Notify(nameof(Action)); Notify(nameof(Description)); }
+            }
+
+            /// <summary>Description of the currently-selected action (for the row tooltip).</summary>
+            public string Description
+            {
+                get
+                {
+                    var c = Choices == null ? null : Choices.FirstOrDefault(x => x.Action == action);
+                    return c == null ? null : c.Description;
+                }
             }
 
             private bool pressed;

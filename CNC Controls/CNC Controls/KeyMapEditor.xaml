@@ -156,6 +156,11 @@
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                               SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
                               HorizontalScrollBarVisibility="Disabled">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="ToolTip" Value="{Binding Description}"/>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="30">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -184,7 +189,13 @@
                                         <ComboBox Margin="1" VerticalAlignment="Center"
                                                   ItemsSource="{Binding Choices}"
                                                   DisplayMemberPath="Label" SelectedValuePath="Action"
-                                                  SelectedValue="{Binding Action, Mode=TwoWay}"/>
+                                                  SelectedValue="{Binding Action, Mode=TwoWay}">
+                                            <ComboBox.ItemContainerStyle>
+                                                <Style TargetType="ComboBoxItem">
+                                                    <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                                </Style>
+                                            </ComboBox.ItemContainerStyle>
+                                        </ComboBox>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
