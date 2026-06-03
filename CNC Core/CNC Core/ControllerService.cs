@@ -21,7 +21,7 @@ namespace CNC.Core
     public class ControllerService
     {
         private readonly DispatcherTimer timer;
-        private readonly int index;
+        private int activeIndex = -1;   // XInput slot currently in use, -1 while searching
         private bool connected = false;
         private ushort prevButtons = 0;
         private XInputGamepad pad;
@@ -35,14 +35,13 @@ namespace CNC.Core
 
         public bool IsConnected { get { return connected; } }
         public bool IsRunning { get { return timer.IsEnabled; } }
-        public int ControllerIndex { get { return index; } }
+        public int ControllerIndex { get { return activeIndex; } }
 
         /// <summary>Latest gamepad snapshot (valid while IsConnected).</summary>
         public XInputGamepad State { get { return pad; } }
 
-        public ControllerService(int controllerIndex = 0, int pollHz = 60)
+        public ControllerService(int pollHz = 60)
         {
-            index = controllerIndex < 0 ? 0 : controllerIndex;
             timer = new DispatcherTimer(DispatcherPriority.Input)
             {
                 Interval = TimeSpan.FromMilliseconds(1000.0 / Math.Max(15, pollHz))
@@ -63,6 +62,7 @@ namespace CNC.Core
             if (connected)
             {
                 connected = false;
+                activeIndex = -1;
                 prevButtons = 0;
                 Disconnected?.Invoke(this, EventArgs.Empty);
             }
@@ -78,31 +78,38 @@ namespace CNC.Core
 
         private void Poll(object sender, EventArgs e)
         {
-            XInputState state;
-
-            if (!XInput.GetState(index, out state))
+            // While disconnected, scan all XInput slots for the first connected controller.
+            if (activeIndex < 0)
             {
-                if (connected)
+                for (int i = 0; i < XInput.MaxControllers; i++)
                 {
-                    connected = false;
-                    prevButtons = 0;
-                    Disconnected?.Invoke(this, EventArgs.Empty);
+                    XInputState s;
+                    if (XInput.GetState(i, out s))
+                    {
+                        activeIndex = i;
+                        connected = true;
+                        pad = s.Gamepad;
+                        prevButtons = s.Gamepad.wButtons;   // adopt held buttons so they don't fire on connect
+                        Connected?.Invoke(this, EventArgs.Empty);
+                        Polled?.Invoke(this, EventArgs.Empty);
+                        return;
+                    }
                 }
+                return;
+            }
+
+            XInputState state;
+            if (!XInput.GetState(activeIndex, out state))
+            {
+                activeIndex = -1;
+                connected = false;
+                prevButtons = 0;
+                Disconnected?.Invoke(this, EventArgs.Empty);
                 return;
             }
 
             pad = state.Gamepad;
             ushort cur = state.Gamepad.wButtons;
-
-            if (!connected)
-            {
-                // Adopt the current button state on connect so buttons held at plug-in don't fire.
-                connected = true;
-                prevButtons = cur;
-                Connected?.Invoke(this, EventArgs.Empty);
-                Polled?.Invoke(this, EventArgs.Empty);
-                return;
-            }
 
             ushort changed = (ushort)(cur ^ prevButtons);
             if (changed != 0)
@@ -113,7 +120,7 @@ namespace CNC.Core
                     if ((changed & bit) == 0)
                         continue;
 
-                    var args = new ControllerButtonEventArgs { Controller = index, Button = b };
+                    var args = new ControllerButtonEventArgs { Controller = activeIndex, Button = b };
                     if ((cur & bit) != 0)
                         ButtonPressed?.Invoke(this, args);
                     else
@@ -128,10 +135,10 @@ namespace CNC.Core
         /// <summary>Pulse the rumble motors (0..65535) for the given duration.</summary>
         public void Rumble(ushort leftMotor, ushort rightMotor, int milliseconds = 200)
         {
-            if (!connected)
+            if (!connected || activeIndex < 0)
                 return;
 
-            XInput.SetVibration(index, leftMotor, rightMotor);
+            XInput.SetVibration(activeIndex, leftMotor, rightMotor);
 
             if (rumbleTimer == null)
             {
@@ -147,7 +154,8 @@ namespace CNC.Core
         {
             if (rumbleTimer != null)
                 rumbleTimer.Stop();
-            XInput.SetVibration(index, 0, 0);
+            if (activeIndex >= 0)
+                XInput.SetVibration(activeIndex, 0, 0);
         }
 
         // ---- analog helpers: normalize to -1..1 (sticks) / 0..1 (triggers) past a deadzone ----

@@ -30,6 +30,7 @@ namespace CNC.Core
             service = controllerService;
             BuildDefaultMap();
             service.ButtonPressed += OnButtonPressed;
+            service.Connected += (s, e) => service.Rumble(20000, 20000, 150);   // brief "found it" buzz
         }
 
         private bool IsConnected
