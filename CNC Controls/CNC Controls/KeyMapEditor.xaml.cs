@@ -311,6 +311,10 @@ namespace CNC.Controls
 
             gridController.ItemsSource = controllerRows;
 
+            foreach (var r in controllerRows)
+                r.PropertyChanged += ControllerRow_Changed;
+            UpdateRestoreDefaultsButton();
+
             UpdateControllerStatus();
             model.Controller.Connected += Controller_StatusChanged;
             model.Controller.Disconnected += Controller_StatusChanged;
@@ -354,6 +358,18 @@ namespace CNC.Controls
         {
             foreach (var r in controllerRows)
                 r.Action = ControllerMapper.DefaultAction(r.Button);
+        }
+
+        private void ControllerRow_Changed(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ControllerRow.Action))
+                UpdateRestoreDefaultsButton();
+        }
+
+        private void UpdateRestoreDefaultsButton()
+        {
+            if (btnRestoreDefaults != null)
+                btnRestoreDefaults.IsEnabled = controllerRows.Any(r => r.Action != ControllerMapper.DefaultAction(r.Button));
         }
 
         private static List<ActionItem> BuildActionItems()

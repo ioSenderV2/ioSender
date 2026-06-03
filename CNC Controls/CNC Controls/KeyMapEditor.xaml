@@ -146,7 +146,7 @@
                     </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="2,2,2,2">
-                        <Button DockPanel.Dock="Right" Content="Defaults" Padding="6,1" Click="ControllerDefaults_Click"/>
+                        <Button x:Name="btnRestoreDefaults" DockPanel.Dock="Right" Content="Restore Defaults" Padding="6,1" IsEnabled="False" Click="ControllerDefaults_Click"/>
                         <TextBlock x:Name="lblController" VerticalAlignment="Center" FontWeight="Bold" Text="Searching for controller…"/>
                     </DockPanel>
                     <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF707070"
