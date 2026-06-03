@@ -189,8 +189,10 @@ namespace CNC.Core
             if (feed <= 0d)
                 feed = 500d;
 
-            string cmd = string.Format(CultureInfo.InvariantCulture, "$J=G91G21{0}{1}F{2}", axis, dist, feed);
-            Comms.com.WriteCommand(cmd);
+            // Use the same path the on-screen jog buttons use (GrblViewModel.ExecuteCommand), not a raw
+            // stream write - otherwise the jog line never reaches the controller.
+            string cmd = string.Format(CultureInfo.InvariantCulture, "$J=G91G21{0}{1}F{2}", axis, dist, Math.Ceiling(feed));
+            grbl.ExecuteCommand(cmd);
         }
     }
 }
