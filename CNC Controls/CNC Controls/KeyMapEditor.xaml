@@ -134,9 +134,11 @@
                             <DataGridTemplateColumn Width="30">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border Width="14" Height="14" CornerRadius="7" Margin="6,1" Background="#FFE0E0E0" BorderBrush="#FFC0C0C0" BorderThickness="1">
+                                        <Border Width="14" Height="14" CornerRadius="7" Margin="6,1" BorderThickness="1">
                                             <Border.Style>
                                                 <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#FFE0E0E0"/>
+                                                    <Setter Property="BorderBrush" Value="#FFC0C0C0"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Pressed}" Value="True">
                                                             <Setter Property="Background" Value="#FF2DA44E"/>
