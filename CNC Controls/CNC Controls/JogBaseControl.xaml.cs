@@ -113,6 +113,11 @@ namespace CNC.Controls
 
                     keyboard = (DataContext as GrblViewModel).Keyboard;
 
+                    // Let controller jogging use the same step distance/feed as the on-screen jog panel.
+                    var gvm = DataContext as GrblViewModel;
+                    gvm.JogDistanceProvider = () => JogData.Distance;
+                    gvm.JogFeedProvider = () => JogData.FeedRate;
+
                     keyboardMappingsOk = true;
 
                     if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.UI)

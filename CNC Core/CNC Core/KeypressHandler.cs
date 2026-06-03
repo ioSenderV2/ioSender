@@ -150,6 +150,8 @@ namespace CNC.Core
         {
             public UserControl context;
             public Func<Key, bool> Call;
+            public Key DefaultKey = Key.None;                 // factory default (first AddHandler key)
+            public ModifierKeys DefaultModifiers = ModifierKeys.None;
             public string Context { get { return context == null ? "null" : context.Name; } }
             public string Method { get { return Call.Method.ReflectedType.Name + "." + Call.Method.Name; } }
         }
@@ -159,17 +161,20 @@ namespace CNC.Core
             public JogKey (int axisIndex, Key key)
             {
                 Key = key;
+                DefaultKey = key;
                 Command = string.Empty;
                 AxisIndex = axisIndex;
             }
             public JogKey(int axisIndex)
             {
                 Key = Key.None;
+                DefaultKey = Key.None;
                 Command = string.Empty;
                 AxisIndex = axisIndex;
             }
 
             public Key Key { get; set; }
+            public Key DefaultKey { get; private set; }
             public string Command { get; set; }
             public int AxisIndex { get; private set; }
             public bool Remapped { get; set; } = false;
@@ -199,12 +204,24 @@ namespace CNC.Core
         public void AddHandler(Key key, ModifierKeys modifiers, Func<Key, bool> handler, UserControl context = null, bool onUp = true)
         {
             AddFunction(handler, context);
+            SetDefault(handler, context, key, modifiers);
             handlers.Add(new KeypressHandlerFn(){ Key = key, Modifiers = modifiers, Call = handler, context = context, OnUp = onUp });
         }
         public void AddHandler(Key key, ModifierKeys modifiers, Func<Key, bool> handler, bool onUp)
         {
             AddFunction(handler, null);
+            SetDefault(handler, null, key, modifiers);
             handlers.Add(new KeypressHandlerFn() { Key = key, Modifiers = modifiers, Call = handler, context = null, OnUp = onUp });
+        }
+
+        private void SetDefault(Func<Key, bool> handler, UserControl context, Key key, ModifierKeys modifiers)
+        {
+            var fn = functions.Where(k => k.Call == handler && k.context == context).FirstOrDefault();
+            if (fn != null && fn.DefaultKey == Key.None)   // first registration wins
+            {
+                fn.DefaultKey = key;
+                fn.DefaultModifiers = modifiers;
+            }
         }
 
         public double[] JogDistances { get; set; } = new double[3] { 0.01, 500.0, 500.0 };
@@ -325,6 +342,8 @@ namespace CNC.Core
             public string Context;          // owning control name or "null"
             public Key Key;
             public ModifierKeys Modifiers;
+            public Key DefaultKey;          // factory default binding (for change detection / reset)
+            public ModifierKeys DefaultModifiers;
             public bool OnUp = true;
             public bool IsJog;
             public int JogIndex = -1;       // index into jogKeys for jog bindings
@@ -348,6 +367,8 @@ namespace CNC.Core
                     Context = fn.Context,
                     Key = h == null ? Key.None : h.Key,
                     Modifiers = h == null ? ModifierKeys.None : h.Modifiers,
+                    DefaultKey = fn.DefaultKey,
+                    DefaultModifiers = fn.DefaultModifiers,
                     OnUp = h == null || h.OnUp
                 });
             }
@@ -373,6 +394,8 @@ namespace CNC.Core
                     JogIndex = i,
                     Key = jogKeys[i].Key,
                     Modifiers = ModifierKeys.None,
+                    DefaultKey = jogKeys[i].DefaultKey,
+                    DefaultModifiers = ModifierKeys.None,
                     AxisLabel = letter + (plus ? " +" : " −"),
                     Method = "Jogkey." + letter + (plus ? ".plus" : ".minus")
                 });

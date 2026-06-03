@@ -71,6 +71,8 @@
     <Compile Include="GCodeParser.cs" />
     <Compile Include="Grbl.cs" />
     <Compile Include="Comms.cs" />
+    <Compile Include="ControllerService.cs" />
+    <Compile Include="ControllerMapper.cs" />
     <Compile Include="GCodeJob.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="KeypressHandler.cs" />
@@ -82,6 +84,7 @@
     <Compile Include="ShortcutKey.cs" />
     <Compile Include="TelnetStream.cs" />
     <Compile Include="WebsocketStream.cs" />
+    <Compile Include="XInput.cs" />
     <Compile Include="YModem.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -25,18 +25,30 @@ namespace CNC.Controls
     public partial class KeyMapEditor : Window
     {
         private readonly KeypressHandler keyboard;
+        private readonly GrblViewModel model;
         private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();
+        private readonly ObservableCollection<ControllerRow> controllerRows = new ObservableCollection<ControllerRow>();
+        private readonly Dictionary<string, GroupRowState> groupStates = new Dictionary<string, GroupRowState>();
+        private KeyMapGroupStateConverter groupStateConverter;
         private BindingRow capturing = null;
+
+        /// <summary>Action choices for the Controller tab dropdowns (bound from XAML).</summary>
+        public List<ActionItem> ActionItems { get; private set; }
 
         public KeyMapEditor(GrblViewModel model)
         {
             InitializeComponent();
 
+            this.model = model;
             keyboard = model.Keyboard;
+            DataContext = this;
+            groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 
             LoadRows();
+            LoadController();
 
             PreviewKeyDown += KeyMapEditor_PreviewKeyDown;
+            Closed += KeyMapEditor_Closed;
         }
 
         private void LoadRows()
@@ -55,9 +67,11 @@ namespace CNC.Controls
             }
 
             // The console toggle is just another program-level toggle - surface it alongside the rest.
-            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null" };
+            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null", DefaultKey = Key.Escape };
             ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
             Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
+
+            BuildGroupStates();
 
             var view = new ListCollectionView(rows);
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BindingRow.Category)));
@@ -95,6 +109,7 @@ namespace CNC.Controls
             capturing.Model.Key = key;
             capturing.Model.Modifiers = capturing.IsJog ? ModifierKeys.None : Keyboard.Modifiers;
             capturing.Capturing = false;
+            capturing.Refresh();   // update changed-state + group indicator
             capturing = null;
 
             UpdateConflicts();
@@ -122,7 +137,8 @@ namespace CNC.Controls
 
         private void Clear_Click(object sender, RoutedEventArgs e)
         {
-            var row = (sender as Button)?.Tag as BindingRow;
+            var fe = sender as FrameworkElement;
+            var row = (fe?.Tag as BindingRow) ?? (fe?.DataContext as BindingRow);   // button Tag or menu-item DataContext
             if (row == null)
                 return;
 
@@ -140,6 +156,48 @@ namespace CNC.Controls
         private void Reset_Click(object sender, RoutedEventArgs e)
         {
             LoadRows();
+        }
+
+        private void BuildGroupStates()
+        {
+            groupStates.Clear();
+            foreach (var row in rows)
+            {
+                GroupRowState gs;
+                if (!groupStates.TryGetValue(row.Category, out gs))
+                {
+                    gs = new GroupRowState(row.Category, GroupDescription(row.Category));
+                    groupStates[row.Category] = gs;
+                }
+                gs.Rows.Add(row);
+                row.Group = gs;
+            }
+            foreach (var gs in groupStates.Values)
+                gs.Recompute();
+
+            if (groupStateConverter != null)
+                groupStateConverter.Lookup = groupStates;
+        }
+
+        // Reset a single binding to its factory default (row context menu).
+        private void ResetRow_Click(object sender, RoutedEventArgs e)
+        {
+            var row = (sender as FrameworkElement)?.DataContext as BindingRow;
+            if (row == null)
+                return;
+            row.ResetToDefault();
+            UpdateConflicts();
+        }
+
+        // Reset every binding in a group to its factory default (group-header context menu).
+        private void ResetGroup_Click(object sender, RoutedEventArgs e)
+        {
+            var gs = (sender as FrameworkElement)?.DataContext as GroupRowState;
+            if (gs == null)
+                return;
+            foreach (var row in gs.Rows)
+                row.ResetToDefault();
+            UpdateConflicts();
         }
 
         private bool suppressPreset = false;
@@ -218,7 +276,171 @@ namespace CNC.Controls
                     ? string.Empty
                     : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
 
+            if (model.ControllerMapper != null)
+            {
+                var m = model.ControllerMapper;
+                foreach (var r in controllerRows)
+                    m.SetAction(r.Button, r.Action);
+
+                m.AnalogJogEnabled = chkAnalogEnabled.IsChecked == true;
+                int dz;
+                if (int.TryParse(txtDeadzone.Text, out dz))
+                    m.DeadzonePercent = Math.Max(0, Math.Min(95, dz));
+                double fs;
+                if (double.TryParse(txtFeedScale.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fs))
+                    m.FeedScale = Math.Max(0.1d, Math.Min(10d, fs));
+                m.InvertX = chkInvertX.IsChecked == true;
+                m.InvertY = chkInvertY.IsChecked == true;
+                m.InvertZ = chkInvertZ.IsChecked == true;
+
+                m.SaveMap();
+            }
+
             DialogResult = true;
+        }
+
+        // ---- Controller tab ------------------------------------------------------------------
+
+        private void LoadController()
+        {
+            ActionItems = BuildActionItems();
+
+            if (model.Controller == null || model.ControllerMapper == null)
+            {
+                lblController.Text = "Controller support is not available.";
+                return;
+            }
+
+            // Pause machine dispatch so pressing buttons to test/assign here cannot move the machine.
+            model.ControllerMapper.Enabled = false;
+            model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
+
+            foreach (var b in ControllerMapper.MappableButtons)
+            {
+                var def = ControllerMapper.DefaultAction(b);
+                var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label, a.Description) : a).ToList();
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
+            }
+
+            gridController.ItemsSource = controllerRows;
+
+            foreach (var r in controllerRows)
+                r.PropertyChanged += ControllerRow_Changed;
+            UpdateRestoreDefaultsButton();
+
+            // Analog jog settings
+            var m = model.ControllerMapper;
+            chkAnalogEnabled.IsChecked = m.AnalogJogEnabled;
+            txtDeadzone.Text = m.DeadzonePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            txtFeedScale.Text = m.FeedScale.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            chkInvertX.IsChecked = m.InvertX;
+            chkInvertY.IsChecked = m.InvertY;
+            chkInvertZ.IsChecked = m.InvertZ;
+
+            UpdateControllerStatus();
+            model.Controller.Connected += Controller_StatusChanged;
+            model.Controller.Disconnected += Controller_StatusChanged;
+            model.Controller.Polled += Controller_Polled;
+        }
+
+        private void KeyMapEditor_Closed(object sender, EventArgs e)
+        {
+            if (model.Controller != null)
+            {
+                model.Controller.Connected -= Controller_StatusChanged;
+                model.Controller.Disconnected -= Controller_StatusChanged;
+                model.Controller.Polled -= Controller_Polled;
+            }
+            if (model.ControllerMapper != null)
+                model.ControllerMapper.Enabled = true;   // resume machine dispatch
+        }
+
+        private void UpdateControllerStatus()
+        {
+            lblController.Text = model.Controller != null && model.Controller.IsConnected
+                ? "Controller connected (slot " + model.Controller.ControllerIndex + ")."
+                : "No controller detected.";
+        }
+
+        private void Controller_StatusChanged(object sender, EventArgs e)
+        {
+            UpdateControllerStatus();
+        }
+
+        // Drive the press indicators straight from the raw XInput state every poll - the definitive
+        // check of what the controller actually reports (D-pad lights here = input is getting through).
+        private void Controller_Polled(object sender, EventArgs e)
+        {
+            ushort buttons = model.Controller.State.wButtons;
+            foreach (var r in controllerRows)
+                r.Pressed = (buttons & (ushort)r.Button) != 0;
+        }
+
+        private void ControllerDefaults_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var r in controllerRows)
+                r.Action = ControllerMapper.DefaultAction(r.Button);
+        }
+
+        private void ControllerRow_Changed(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ControllerRow.Action))
+                UpdateRestoreDefaultsButton();
+        }
+
+        private void UpdateRestoreDefaultsButton()
+        {
+            if (btnRestoreDefaults != null)
+                btnRestoreDefaults.IsEnabled = controllerRows.Any(r => r.Action != ControllerMapper.DefaultAction(r.Button));
+        }
+
+        private static List<ActionItem> BuildActionItems()
+        {
+            const string jogNote = " by the distance and feed rate currently selected in the Jog panel.";
+
+            // Use the conventional mill directions (X+ right, Y+ away, Z+ up) - same as the on-screen jog
+            // arrows. In lathe mode the convention differs, so fall back to plain axis +/-.
+            bool lathe = GrblInfo.LatheModeEnabled;
+            string xp = lathe ? "" : " (right)", xm = lathe ? "" : " (left)";
+            string yp = lathe ? "" : " (away)", ym = lathe ? "" : " (toward you)";
+            string zp = lathe ? "" : " (up)", zm = lathe ? "" : " (down)";
+
+            return new List<ActionItem>
+            {
+                new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
+                new ActionItem(ControllerAction.CycleStart, "Cycle Start / Resume", "Start the loaded program, or resume after a feed hold."),
+                new ActionItem(ControllerAction.FeedHold, "Feed Hold", "Pause motion (feed hold)."),
+                new ActionItem(ControllerAction.Reset, "Reset (soft-reset)", "Soft-reset the controller (Ctrl-X)."),
+                new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),
+                new ActionItem(ControllerAction.Home, "Home", "Run the homing cycle ($H)."),
+                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", "Stop the spindle (during a feed hold)."),
+                new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis +" + xp + jogNote),
+                new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis −" + xm + jogNote),
+                new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis +" + yp + jogNote),
+                new ActionItem(ControllerAction.JogYMinus, "Jog Y −", "Jog the Y axis −" + ym + jogNote),
+                new ActionItem(ControllerAction.JogZPlus, "Jog Z +", "Jog the Z axis +" + zp + jogNote),
+                new ActionItem(ControllerAction.JogZMinus, "Jog Z −", "Jog the Z axis −" + zm + jogNote),
+                new ActionItem(ControllerAction.JogStepIncrease, "Jog step +", "Increase the jog step size (×10)."),
+                new ActionItem(ControllerAction.JogStepDecrease, "Jog step −", "Decrease the jog step size (÷10).")
+            };
+        }
+
+        private static string ButtonName(XInputButton b)
+        {
+            switch (b)
+            {
+                case XInputButton.DPadUp: return "D-pad ↑";
+                case XInputButton.DPadDown: return "D-pad ↓";
+                case XInputButton.DPadLeft: return "D-pad ←";
+                case XInputButton.DPadRight: return "D-pad →";
+                case XInputButton.LeftShoulder: return "Left bumper (LB)";
+                case XInputButton.RightShoulder: return "Right bumper (RB)";
+                case XInputButton.Back: return "Back / View";
+                case XInputButton.Start: return "Start / Menu";
+                case XInputButton.LeftThumb: return "Left stick click (L3)";
+                case XInputButton.RightThumb: return "Right stick click (R3)";
+                default: return b.ToString();
+            }
         }
 
         private void ExpandAll_Click(object sender, RoutedEventArgs e)
@@ -243,8 +465,9 @@ namespace CNC.Controls
 
         public static bool IsGroupExpanded(string name)
         {
+            // Default collapsed (like the Load Folder outline); remembered once toggled this session.
             bool v;
-            return !(name != null && groupExpanded.TryGetValue(name, out v)) || v;
+            return name != null && groupExpanded.TryGetValue(name, out v) && v;
         }
 
         private void Group_Expanded(object sender, RoutedEventArgs e)
@@ -278,7 +501,7 @@ namespace CNC.Controls
             // the same key in different contexts (e.g. Start job vs Start probe on Alt+R) are fine.
             var dups = rows
                 .Where(r => r.Model.Key != Key.None)
-                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + " " + (r.Model.Context ?? "null"))
+                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + "" + (r.Model.Context ?? "null"))
                 .Where(g => g.Count() > 1)
                 .Select(g => ShortcutKey.ToDisplayString(g.First().Model.Key, g.First().Model.Modifiers))
                 .Distinct()
@@ -528,6 +751,64 @@ namespace CNC.Controls
             return sb.ToString();
         }
 
+        public class ActionItem
+        {
+            public ControllerAction Action { get; }
+            public string Label { get; }
+            public string Description { get; }
+            public ActionItem(ControllerAction action, string label, string description = null)
+            {
+                Action = action;
+                Label = label;
+                Description = description;
+            }
+        }
+
+        public class ControllerRow : INotifyPropertyChanged
+        {
+            public XInputButton Button { get; }
+            public string ButtonName { get; }
+            public List<ActionItem> Choices { get; }   // per-button: the default action is marked with '*'
+
+            private ControllerAction action;
+            public ControllerAction Action
+            {
+                get { return action; }
+                set { action = value; Notify(nameof(Action)); Notify(nameof(Description)); }
+            }
+
+            /// <summary>Description of the currently-selected action (for the row tooltip).</summary>
+            public string Description
+            {
+                get
+                {
+                    var c = Choices == null ? null : Choices.FirstOrDefault(x => x.Action == action);
+                    return c == null ? null : c.Description;
+                }
+            }
+
+            private bool pressed;
+            public bool Pressed
+            {
+                get { return pressed; }
+                set { if (pressed != value) { pressed = value; Notify(nameof(Pressed)); } }
+            }
+
+            public ControllerRow(XInputButton button, string buttonName, ControllerAction action, List<ActionItem> choices)
+            {
+                Button = button;
+                ButtonName = buttonName;
+                this.action = action;
+                Choices = choices;
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            private void Notify(string name)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
+        }
+
         public class BindingRow : INotifyPropertyChanged
         {
             public KeypressHandler.KeyBinding Model { get; }
@@ -539,6 +820,24 @@ namespace CNC.Controls
             public string Category { get; private set; }
             public int CategoryOrder { get; private set; }
             public void Set(string category, int order) { Category = category; CategoryOrder = order; }
+
+            public GroupRowState Group;   // owning outline group (for header change indication)
+
+            /// <summary>True when the binding differs from its factory default.</summary>
+            public bool IsChanged
+            {
+                get { return Model.Key != Model.DefaultKey || Model.Modifiers != Model.DefaultModifiers; }
+            }
+
+            /// <summary>True when a key is assigned (so Clear is meaningful).</summary>
+            public bool IsBound { get { return Model.Key != Key.None; } }
+
+            public void ResetToDefault()
+            {
+                Model.Key = Model.DefaultKey;
+                Model.Modifiers = Model.DefaultModifiers;
+                Refresh();
+            }
 
             private bool capturing;
             public bool Capturing
@@ -566,6 +865,43 @@ namespace CNC.Controls
             public void Refresh()
             {
                 Notify(nameof(DisplayText));
+                Notify(nameof(IsChanged));
+                Notify(nameof(IsBound));
+                if (Group != null)
+                    Group.Recompute();
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            private void Notify(string name)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
+        }
+
+        /// <summary>Per-outline-group state so the group header can flag (and reset) modified bindings.</summary>
+        public class GroupRowState : INotifyPropertyChanged
+        {
+            public string Name { get; }
+            public string Description { get; }
+            public int Count { get { return Rows.Count; } }
+            public List<BindingRow> Rows { get; } = new List<BindingRow>();
+
+            private bool modified;
+            public bool Modified
+            {
+                get { return modified; }
+                private set { if (modified != value) { modified = value; Notify(nameof(Modified)); } }
+            }
+
+            public GroupRowState(string name, string description)
+            {
+                Name = name;
+                Description = description;
+            }
+
+            public void Recompute()
+            {
+                Modified = Rows.Any(r => r.IsChanged);
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
@@ -591,6 +927,23 @@ namespace CNC.Controls
     }
 
     /// <summary>Maps an outline group name to its remembered expanded/collapsed state.</summary>
+    /// <summary>Maps an outline group name to its live GroupRowState (for header change-indication / reset).</summary>
+    public class KeyMapGroupStateConverter : IValueConverter
+    {
+        public Dictionary<string, KeyMapEditor.GroupRowState> Lookup;
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            KeyMapEditor.GroupRowState gs;
+            return Lookup != null && value is string && Lookup.TryGetValue((string)value, out gs) ? gs : null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     public class KeyMapGroupExpandedConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)

@@ -5,12 +5,36 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        Title="Edit Key Mappings" Height="560" Width="500" MinHeight="360" MinWidth="420"
+        Title="Edit Key Mappings" Height="560" Width="520" MinHeight="360" MinWidth="440"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FocusManager.IsFocusScope="True">
     <Window.Resources>
         <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
         <local:KeyMapGroupExpandedConverter x:Key="GroupExpanded"/>
+        <local:KeyMapGroupStateConverter x:Key="GroupState"/>
+        <Style TargetType="ToolTip">
+            <Setter Property="MaxWidth" Value="200"/>
+            <Setter Property="Placement" Value="MousePoint"/>
+            <Setter Property="HorizontalOffset" Value="25"/>
+            <Setter Property="VerticalOffset" Value="0"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <ContextMenu x:Key="RowMenu">
+            <MenuItem Header="Reset to default" Click="ResetRow_Click" IsEnabled="{Binding IsChanged}"/>
+            <MenuItem Header="Clear (unbind)" Click="Clear_Click" IsEnabled="{Binding IsBound}"/>
+        </ContextMenu>
+        <ContextMenu x:Key="GroupMenu">
+            <MenuItem Header="Expand all" Click="ExpandAll_Click"/>
+            <MenuItem Header="Collapse all" Click="CollapseAll_Click"/>
+            <Separator/>
+            <MenuItem Header="Reset group to defaults" Click="ResetGroup_Click" IsEnabled="{Binding Modified}"/>
+        </ContextMenu>
         <Style x:Key="BindingButton" TargetType="Button">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="6,2"/>
@@ -21,88 +45,208 @@
     </Window.Resources>
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF505050"
-                   Text="Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast)."/>
+        <TabControl Grid.Row="0">
+            <TabItem Header="Keyboard">
+                <Grid Margin="0,6,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="1" Margin="2,0,2,6">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                <TextBlock Text="Jog presets:" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#FF707070"/>
-                <RadioButton x:Name="rbNumpad" GroupName="JogPreset" Content="Numeric keypad" VerticalAlignment="Center" Margin="0,0,12,0" Checked="JogPreset_Checked"
-                             ToolTip="Use the numeric keypad for jog step/feed presets (Ctrl+NumPad0-7) and step/feed adjust (NumPad2/4/6/8)."/>
-                <RadioButton x:Name="rbTopRow" GroupName="JogPreset" Content="Top-row numbers" VerticalAlignment="Center" Checked="JogPreset_Checked"
-                             ToolTip="For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed."/>
-            </StackPanel>
-            <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,1" Margin="4,0,0,0" Click="CollapseAll_Click"/>
-                <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,1" Click="ExpandAll_Click"/>
-                <TextBlock VerticalAlignment="Center" Foreground="#FF707070" Text="Grouped by function"/>
-            </DockPanel>
-        </StackPanel>
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF505050"
+                               Text="Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast)."/>
 
-        <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
-                  CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
-                  HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <Setter Property="ToolTip" Value="{Binding Description}"/>
-                </Style>
-            </DataGrid.RowStyle>
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" IsReadOnly="True"/>
-                <DataGridTemplateColumn Header="Shortcut" Width="160">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
-                                    Tag="{Binding}" Click="Binding_Click"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTemplateColumn Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
-            <DataGrid.GroupStyle>
-                <GroupStyle>
-                    <GroupStyle.ContainerStyle>
-                        <Style TargetType="{x:Type GroupItem}">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="{x:Type GroupItem}">
-                                        <Expander IsExpanded="{Binding Name, Converter={StaticResource GroupExpanded}, Mode=OneWay}"
-                                                  Expanded="Group_Expanded" Collapsed="Group_Collapsed"
-                                                  Margin="0,2,0,0" Background="#FFF3F4F6"
-                                                  BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
-                                            <Expander.Header>
-                                                <StackPanel Orientation="Horizontal"
-                                                            ToolTip="{Binding Name, Converter={StaticResource GroupTip}}"
-                                                            ToolTipService.ShowOnDisabled="True">
-                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
-                                                    <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}" Foreground="#FF808080"/>
-                                                </StackPanel>
-                                            </Expander.Header>
-                                            <ItemsPresenter/>
-                                        </Expander>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </GroupStyle.ContainerStyle>
-                </GroupStyle>
-            </DataGrid.GroupStyle>
-        </DataGrid>
+                    <StackPanel Grid.Row="1" Margin="2,0,2,6">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                            <TextBlock Text="Jog presets:" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#FF707070"/>
+                            <RadioButton x:Name="rbNumpad" GroupName="JogPreset" Content="Numeric keypad" VerticalAlignment="Center" Margin="0,0,12,0" Checked="JogPreset_Checked"
+                                         ToolTip="Use the numeric keypad for jog step/feed presets (Ctrl+NumPad0-7) and step/feed adjust (NumPad2/4/6/8)."/>
+                            <RadioButton x:Name="rbTopRow" GroupName="JogPreset" Content="Top-row numbers" VerticalAlignment="Center" Checked="JogPreset_Checked"
+                                         ToolTip="For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed."/>
+                        </StackPanel>
+                        <TextBlock Foreground="#FF707070" TextWrapping="Wrap"
+                                   Text="Grouped by function. Right-click a group header for expand/collapse/reset; right-click a row to reset it. Changed bindings are highlighted."/>
+                    </StackPanel>
 
-        <DockPanel Grid.Row="3" Margin="0,8,0,0">
+                    <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                              SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
+                              HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                <Setter Property="ContextMenu" Value="{StaticResource RowMenu}"/>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Action" Binding="{Binding Label}" Width="*" MinWidth="200" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChanged}" Value="True">
+                                                <Setter Property="Foreground" Value="#FFD9730D"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTemplateColumn Header="Shortcut" Width="170" MinWidth="140">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
+                                                Tag="{Binding}" Click="Binding_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Expander IsExpanded="{Binding Name, Converter={StaticResource GroupExpanded}, Mode=OneWay}"
+                                                              Expanded="Group_Expanded" Collapsed="Group_Collapsed"
+                                                              Margin="0,2,0,0" Background="#FFF3F4F6"
+                                                              BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1"
+                                                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                                        <Expander.Header>
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        DataContext="{Binding Name, Converter={StaticResource GroupState}}"
+                                                                        ContextMenu="{StaticResource GroupMenu}"
+                                                                        ToolTip="{Binding Description}" ToolTipService.ShowOnDisabled="True">
+                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Modified}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="#FFD9730D"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Count, StringFormat=' ({0})'}" Foreground="#FF808080"/>
+                                                            </StackPanel>
+                                                        </Expander.Header>
+                                                        <ItemsPresenter/>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Controller">
+                <Grid Margin="0,6,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0" Header="Buttons" Margin="0,0,0,6">
+                      <Grid Margin="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="2,2,2,2">
+                        <Button x:Name="btnRestoreDefaults" DockPanel.Dock="Right" Content="Restore Defaults" Padding="6,1" IsEnabled="False" Click="ControllerDefaults_Click"/>
+                        <TextBlock x:Name="lblController" VerticalAlignment="Center" FontWeight="Bold" Text="Searching for controller…"/>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF707070"
+                               Text="Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. The left stick jogs X/Y and the triggers jog Z (analog) - see settings below."/>
+
+                    <DataGrid Grid.Row="2" x:Name="gridController" AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                              SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
+                              RowHeight="26" ColumnHeaderHeight="26" Height="184"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="ToolTip" Value="{Binding Description}"/>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="14" Height="14" CornerRadius="7" Margin="6,1" BorderThickness="1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#FFE0E0E0"/>
+                                                    <Setter Property="BorderBrush" Value="#FFC0C0C0"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Pressed}" Value="True">
+                                                            <Setter Property="Background" Value="#FF2DA44E"/>
+                                                            <Setter Property="BorderBrush" Value="#FF1A7F37"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Button" Binding="{Binding ButtonName}" Width="*" IsReadOnly="True"/>
+                            <DataGridTemplateColumn Header="Action" Width="210">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox Margin="1" VerticalAlignment="Center"
+                                                  ItemsSource="{Binding Choices}"
+                                                  DisplayMemberPath="Label" SelectedValuePath="Action"
+                                                  SelectedValue="{Binding Action, Mode=TwoWay}">
+                                            <ComboBox.ItemContainerStyle>
+                                                <Style TargetType="ComboBoxItem">
+                                                    <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                                </Style>
+                                            </ComboBox.ItemContainerStyle>
+                                        </ComboBox>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                      </Grid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1" Header="Analog stick jog (left stick X/Y, triggers Z)">
+                      <WrapPanel Margin="4,2,4,2">
+                        <CheckBox x:Name="chkAnalogEnabled" Content="Enable" VerticalAlignment="Center" Margin="0,0,14,4"
+                                  ToolTip="Enable jogging with the left stick (X/Y) and triggers (Z)."/>
+                        <TextBlock Text="Deadzone" VerticalAlignment="Center" Margin="0,0,3,4"/>
+                        <TextBox x:Name="txtDeadzone" Width="34" VerticalAlignment="Center" Margin="0,0,1,4"
+                                 ToolTip="Left-stick deadzone, percent of full deflection. Raise if the machine drifts at rest."/>
+                        <TextBlock Text="%" VerticalAlignment="Center" Margin="0,0,14,4"/>
+                        <TextBlock Text="Max feed ×" VerticalAlignment="Center" Margin="0,0,3,4"/>
+                        <TextBox x:Name="txtFeedScale" Width="40" VerticalAlignment="Center" Margin="0,0,14,4"
+                                 ToolTip="Full-stick feed as a multiple of the Jog panel feed (clamped to the machine's max rate)."/>
+                        <TextBlock Text="Invert:" VerticalAlignment="Center" Margin="0,0,4,4"/>
+                        <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                        <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                        <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,4"/>
+                      </WrapPanel>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <DockPanel Grid.Row="1" Margin="0,8,0,0">
             <TextBlock x:Name="lblConflict" DockPanel.Dock="Left" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
