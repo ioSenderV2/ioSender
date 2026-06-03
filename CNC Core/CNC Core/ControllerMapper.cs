@@ -222,6 +222,8 @@ namespace CNC.Core
         // into continuous motion. Jog-cancel on release flushes the queue, so this adds no overshoot
         // (only a small feed-change latency). Lower it if feed changes feel laggy; raise if it stutters.
         private const double JogOverlap = 3.0;
+        private const double StartupBoost = 2.5;         // longer first move to bridge the planner fill
+        private const double AnalogFeedScale = 2.0;      // analog max feed = 2x the jog panel feed (headroom)
         private const double DefaultMaxJogFeed = 1500d;  // used if the jog panel feed is unavailable
 
         private int pollCounter = 0;
@@ -251,9 +253,10 @@ namespace CNC.Core
             if (Comms.com.OutCount != 0)
                 return;
 
-            double maxFeed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
-            if (maxFeed <= 0d)
-                maxFeed = DefaultMaxJogFeed;
+            double panelFeed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
+            if (panelFeed <= 0d)
+                panelFeed = DefaultMaxJogFeed;
+            double maxFeed = panelFeed * AnalogFeedScale;   // headroom; feather the stick to slow near target
 
             double feed = maxFeed * mag;
             if (feed < 10d)
@@ -261,6 +264,8 @@ namespace CNC.Core
 
             double interval = JogSendEveryNthPoll / 60d;             // seconds between sends
             double baseDist = maxFeed / 60d * interval * JogOverlap; // mm at max feed per send
+            if (!analogJogging)
+                baseDist *= StartupBoost;   // first move of a jog is longer to avoid the start-up jerk
 
             var sb = new StringBuilder("$J=G91G21");
             AppendAxis(sb, "X", x * baseDist);
