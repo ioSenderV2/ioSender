@@ -217,8 +217,11 @@ namespace CNC.Core
 
         private const short StickDeadzone = 7000;        // ~21% of full deflection
         private const byte TriggerDeadzone = 40;
-        private const int JogSendEveryNthPoll = 6;       // ~10 Hz at a 60 Hz poll
-        private const double JogOverlap = 1.6;           // distance overlap so motion stays continuous
+        private const int JogSendEveryNthPoll = 4;       // ~15 Hz at a 60 Hz poll
+        // Each send queues ~JogOverlap intervals of travel, so grbl always has 2-3 jog blocks to blend
+        // into continuous motion. Jog-cancel on release flushes the queue, so this adds no overshoot
+        // (only a small feed-change latency). Lower it if feed changes feel laggy; raise if it stutters.
+        private const double JogOverlap = 3.0;
         private const double DefaultMaxJogFeed = 1500d;  // used if the jog panel feed is unavailable
 
         private int pollCounter = 0;
