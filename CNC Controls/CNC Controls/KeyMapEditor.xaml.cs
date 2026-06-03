@@ -25,18 +25,27 @@ namespace CNC.Controls
     public partial class KeyMapEditor : Window
     {
         private readonly KeypressHandler keyboard;
+        private readonly GrblViewModel model;
         private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();
+        private readonly ObservableCollection<ControllerRow> controllerRows = new ObservableCollection<ControllerRow>();
         private BindingRow capturing = null;
+
+        /// <summary>Action choices for the Controller tab dropdowns (bound from XAML).</summary>
+        public List<ActionItem> ActionItems { get; private set; }
 
         public KeyMapEditor(GrblViewModel model)
         {
             InitializeComponent();
 
+            this.model = model;
             keyboard = model.Keyboard;
+            DataContext = this;
 
             LoadRows();
+            LoadController();
 
             PreviewKeyDown += KeyMapEditor_PreviewKeyDown;
+            Closed += KeyMapEditor_Closed;
         }
 
         private void LoadRows()
@@ -218,7 +227,117 @@ namespace CNC.Controls
                     ? string.Empty
                     : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
 
+            if (model.ControllerMapper != null)
+                foreach (var r in controllerRows)
+                    model.ControllerMapper.SetAction(r.Button, r.Action);
+
             DialogResult = true;
+        }
+
+        // ---- Controller tab ------------------------------------------------------------------
+
+        private void LoadController()
+        {
+            ActionItems = BuildActionItems();
+
+            if (model.Controller == null || model.ControllerMapper == null)
+            {
+                lblController.Text = "Controller support is not available.";
+                return;
+            }
+
+            // Pause machine dispatch so pressing buttons to test/assign here cannot move the machine.
+            model.ControllerMapper.Enabled = false;
+
+            foreach (var b in ControllerMapper.MappableButtons)
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b)));
+
+            gridController.ItemsSource = controllerRows;
+
+            UpdateControllerStatus();
+            model.Controller.Connected += Controller_StatusChanged;
+            model.Controller.Disconnected += Controller_StatusChanged;
+            model.Controller.ButtonPressed += Controller_ButtonChanged;
+            model.Controller.ButtonReleased += Controller_ButtonChanged;
+        }
+
+        private void KeyMapEditor_Closed(object sender, EventArgs e)
+        {
+            if (model.Controller != null)
+            {
+                model.Controller.Connected -= Controller_StatusChanged;
+                model.Controller.Disconnected -= Controller_StatusChanged;
+                model.Controller.ButtonPressed -= Controller_ButtonChanged;
+                model.Controller.ButtonReleased -= Controller_ButtonChanged;
+            }
+            if (model.ControllerMapper != null)
+                model.ControllerMapper.Enabled = true;   // resume machine dispatch
+        }
+
+        private void UpdateControllerStatus()
+        {
+            lblController.Text = model.Controller != null && model.Controller.IsConnected
+                ? "Controller connected (slot " + model.Controller.ControllerIndex + ")."
+                : "No controller detected.";
+        }
+
+        private void Controller_StatusChanged(object sender, EventArgs e)
+        {
+            UpdateControllerStatus();
+        }
+
+        private void Controller_ButtonChanged(object sender, ControllerButtonEventArgs e)
+        {
+            bool pressed = model.Controller != null && (model.Controller.State.wButtons & (ushort)e.Button) != 0;
+            foreach (var r in controllerRows)
+                if (r.Button == e.Button)
+                    r.Pressed = pressed;
+        }
+
+        private void ControllerDefaults_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var r in controllerRows)
+                r.Action = ControllerMapper.DefaultAction(r.Button);
+        }
+
+        private static List<ActionItem> BuildActionItems()
+        {
+            return new List<ActionItem>
+            {
+                new ActionItem(ControllerAction.None, "(none)"),
+                new ActionItem(ControllerAction.CycleStart, "Cycle Start / Resume"),
+                new ActionItem(ControllerAction.FeedHold, "Feed Hold"),
+                new ActionItem(ControllerAction.Reset, "Reset (soft-reset)"),
+                new ActionItem(ControllerAction.Unlock, "Unlock"),
+                new ActionItem(ControllerAction.Home, "Home"),
+                new ActionItem(ControllerAction.SpindleStop, "Spindle stop"),
+                new ActionItem(ControllerAction.JogXPlus, "Jog X +"),
+                new ActionItem(ControllerAction.JogXMinus, "Jog X −"),
+                new ActionItem(ControllerAction.JogYPlus, "Jog Y +"),
+                new ActionItem(ControllerAction.JogYMinus, "Jog Y −"),
+                new ActionItem(ControllerAction.JogZPlus, "Jog Z +"),
+                new ActionItem(ControllerAction.JogZMinus, "Jog Z −"),
+                new ActionItem(ControllerAction.JogStepIncrease, "Jog step +"),
+                new ActionItem(ControllerAction.JogStepDecrease, "Jog step −")
+            };
+        }
+
+        private static string ButtonName(XInputButton b)
+        {
+            switch (b)
+            {
+                case XInputButton.DPadUp: return "D-pad ↑";
+                case XInputButton.DPadDown: return "D-pad ↓";
+                case XInputButton.DPadLeft: return "D-pad ←";
+                case XInputButton.DPadRight: return "D-pad →";
+                case XInputButton.LeftShoulder: return "Left bumper (LB)";
+                case XInputButton.RightShoulder: return "Right bumper (RB)";
+                case XInputButton.Back: return "Back / View";
+                case XInputButton.Start: return "Start / Menu";
+                case XInputButton.LeftThumb: return "Left stick click (L3)";
+                case XInputButton.RightThumb: return "Right stick click (R3)";
+                default: return b.ToString();
+            }
         }
 
         private void ExpandAll_Click(object sender, RoutedEventArgs e)
@@ -278,7 +397,7 @@ namespace CNC.Controls
             // the same key in different contexts (e.g. Start job vs Start probe on Alt+R) are fine.
             var dups = rows
                 .Where(r => r.Model.Key != Key.None)
-                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + " " + (r.Model.Context ?? "null"))
+                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + "" + (r.Model.Context ?? "null"))
                 .Where(g => g.Count() > 1)
                 .Select(g => ShortcutKey.ToDisplayString(g.First().Model.Key, g.First().Model.Modifiers))
                 .Distinct()
@@ -526,6 +645,46 @@ namespace CNC.Controls
             }
 
             return sb.ToString();
+        }
+
+        public class ActionItem
+        {
+            public ControllerAction Action { get; }
+            public string Label { get; }
+            public ActionItem(ControllerAction action, string label) { Action = action; Label = label; }
+        }
+
+        public class ControllerRow : INotifyPropertyChanged
+        {
+            public XInputButton Button { get; }
+            public string ButtonName { get; }
+
+            private ControllerAction action;
+            public ControllerAction Action
+            {
+                get { return action; }
+                set { action = value; Notify(nameof(Action)); }
+            }
+
+            private bool pressed;
+            public bool Pressed
+            {
+                get { return pressed; }
+                set { if (pressed != value) { pressed = value; Notify(nameof(Pressed)); } }
+            }
+
+            public ControllerRow(XInputButton button, string buttonName, ControllerAction action)
+            {
+                Button = button;
+                ButtonName = buttonName;
+                this.action = action;
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            private void Notify(string name)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
         }
 
         public class BindingRow : INotifyPropertyChanged
