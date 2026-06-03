@@ -94,6 +94,15 @@ namespace CNC.Core
             Clear();
 
             Keyboard = new KeypressHandler(this);
+
+            try
+            {
+                Controller = new ControllerService();
+                ControllerMapper = new ControllerMapper(this, Controller);
+                Controller.Start();
+            }
+            catch { /* XInput or dispatcher unavailable - controller support stays inert */ }
+
             MDICommand = new ActionCommand<string>(ExecuteMDI);
             StartFromBlock = new ActionCommand<int>(ExecuteStartFromBlock, canExecuteStartFromBlock);
 
@@ -352,6 +361,8 @@ namespace CNC.Core
         }
 
         public KeypressHandler Keyboard { get; private set; }
+        public ControllerService Controller { get; private set; }
+        public ControllerMapper ControllerMapper { get; private set; }
 
         public bool ResponseLogVerbose { get { return _responseLogVerbose; } set { _responseLogVerbose = value; OnPropertyChanged(); } }
         public bool ResponseLogFilterRT { get; set; } = false;
