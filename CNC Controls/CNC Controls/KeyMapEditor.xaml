@@ -153,11 +153,17 @@
             <TabItem Header="Controller">
                 <Grid Margin="0,6,0,0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0" Header="Buttons" Margin="0,0,0,6">
+                      <Grid Margin="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="2,2,2,2">
                         <Button x:Name="btnRestoreDefaults" DockPanel.Dock="Right" Content="Restore Defaults" Padding="6,1" IsEnabled="False" Click="ControllerDefaults_Click"/>
@@ -215,9 +221,12 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+                      </Grid>
+                    </GroupBox>
 
-                    <WrapPanel Grid.Row="3" Margin="2,8,2,0">
-                        <CheckBox x:Name="chkAnalogEnabled" Content="Analog stick jog" VerticalAlignment="Center" Margin="0,0,14,4"
+                    <GroupBox Grid.Row="1" Header="Analog stick jog (left stick X/Y, triggers Z)">
+                      <WrapPanel Margin="4,2,4,2">
+                        <CheckBox x:Name="chkAnalogEnabled" Content="Enable" VerticalAlignment="Center" Margin="0,0,14,4"
                                   ToolTip="Enable jogging with the left stick (X/Y) and triggers (Z)."/>
                         <TextBlock Text="Deadzone" VerticalAlignment="Center" Margin="0,0,3,4"/>
                         <TextBox x:Name="txtDeadzone" Width="34" VerticalAlignment="Center" Margin="0,0,1,4"
@@ -230,7 +239,8 @@
                         <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,6,4"/>
                         <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,6,4"/>
                         <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,4"/>
-                    </WrapPanel>
+                      </WrapPanel>
+                    </GroupBox>
                 </Grid>
             </TabItem>
         </TabControl>
