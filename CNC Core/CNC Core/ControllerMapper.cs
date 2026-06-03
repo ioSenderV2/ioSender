@@ -19,6 +19,16 @@ using System.Xml.Serialization;
 namespace CNC.Core
 {
     [XmlType("ControllerMapping")]
+    [XmlRoot("ControllerMap")]
+    public class ControllerMapFile
+    {
+        public List<ControllerMapEntry> Buttons = new List<ControllerMapEntry>();
+        public bool AnalogJogEnabled = true;
+        public double FeedScale = 2.0;
+        public int DeadzonePercent = 21;
+        public bool InvertX, InvertY, InvertZ;
+    }
+
     public class ControllerMapEntry
     {
         public XInputButton Button;
@@ -112,14 +122,22 @@ namespace CNC.Core
                 if (!File.Exists(MapPath))
                     return false;
 
-                var xs = new XmlSerializer(typeof(List<ControllerMapEntry>), new XmlRootAttribute("ControllerMap"));
+                var xs = new XmlSerializer(typeof(ControllerMapFile));
                 using (var reader = new StreamReader(MapPath))
                 {
-                    var list = (List<ControllerMapEntry>)xs.Deserialize(reader);
+                    var file = (ControllerMapFile)xs.Deserialize(reader);
                     map.Clear();
-                    foreach (var e in list)
-                        if (e.Action != ControllerAction.None)
-                            map[e.Button] = e.Action;
+                    if (file.Buttons != null)
+                        foreach (var e in file.Buttons)
+                            if (e.Action != ControllerAction.None)
+                                map[e.Button] = e.Action;
+
+                    AnalogJogEnabled = file.AnalogJogEnabled;
+                    FeedScale = file.FeedScale;
+                    DeadzonePercent = file.DeadzonePercent;
+                    InvertX = file.InvertX;
+                    InvertY = file.InvertY;
+                    InvertZ = file.InvertZ;
                 }
                 return true;
             }
@@ -133,10 +151,19 @@ namespace CNC.Core
         {
             try
             {
-                var list = map.Select(kv => new ControllerMapEntry { Button = kv.Key, Action = kv.Value }).ToList();
-                var xs = new XmlSerializer(typeof(List<ControllerMapEntry>), new XmlRootAttribute("ControllerMap"));
+                var file = new ControllerMapFile
+                {
+                    Buttons = map.Select(kv => new ControllerMapEntry { Button = kv.Key, Action = kv.Value }).ToList(),
+                    AnalogJogEnabled = AnalogJogEnabled,
+                    FeedScale = FeedScale,
+                    DeadzonePercent = DeadzonePercent,
+                    InvertX = InvertX,
+                    InvertY = InvertY,
+                    InvertZ = InvertZ
+                };
+                var xs = new XmlSerializer(typeof(ControllerMapFile));
                 using (var fs = new FileStream(MapPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    xs.Serialize(fs, list);
+                    xs.Serialize(fs, file);
                 return true;
             }
             catch
@@ -291,8 +318,13 @@ namespace CNC.Core
         // (only a small feed-change latency). Lower it if feed changes feel laggy; raise if it stutters.
         private const double JogOverlap = 3.0;
         private const double StartupBoost = 2.5;         // longer first move to bridge the planner fill
-        private const double AnalogFeedScale = 2.0;      // analog max feed = 2x the jog panel feed (headroom)
         private const double DefaultMaxJogFeed = 1500d;  // used if the jog panel feed is unavailable
+
+        // User-configurable analog jog settings (Controller tab), persisted in ControllerMap.xml.
+        public bool AnalogJogEnabled = true;
+        public double FeedScale = 2.0;                   // analog max feed = FeedScale x the jog panel feed
+        public int DeadzonePercent = 21;                 // left-stick deadzone, percent of full deflection
+        public bool InvertX = false, InvertY = false, InvertZ = false;
 
         private int pollCounter = 0;
         private bool analogJogging = false;
@@ -302,12 +334,20 @@ namespace CNC.Core
         {
             EnsureLoaded();
 
+            if (!AnalogJogEnabled)
+            {
+                StopAnalogJog();
+                return;
+            }
+
             XInputGamepad pad = service.State;
 
-            double x = ControllerService.Normalize(pad.sThumbLX, StickDeadzone);
-            double y = ControllerService.Normalize(pad.sThumbLY, StickDeadzone);
-            double z = ControllerService.NormalizeTrigger(pad.bRightTrigger, TriggerDeadzone)
-                     - ControllerService.NormalizeTrigger(pad.bLeftTrigger, TriggerDeadzone);
+            short stickDeadzone = (short)Math.Max(0, Math.Min(32000, DeadzonePercent / 100.0 * XInput.ThumbMax));
+
+            double x = ControllerService.Normalize(pad.sThumbLX, stickDeadzone) * (InvertX ? -1d : 1d);
+            double y = ControllerService.Normalize(pad.sThumbLY, stickDeadzone) * (InvertY ? -1d : 1d);
+            double z = (ControllerService.NormalizeTrigger(pad.bRightTrigger, TriggerDeadzone)
+                     - ControllerService.NormalizeTrigger(pad.bLeftTrigger, TriggerDeadzone)) * (InvertZ ? -1d : 1d);
 
             double mag = Math.Max(Math.Abs(x), Math.Max(Math.Abs(y), Math.Abs(z)));
 
@@ -326,7 +366,7 @@ namespace CNC.Core
             double panelFeed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
             if (panelFeed <= 0d)
                 panelFeed = DefaultMaxJogFeed;
-            double maxFeed = panelFeed * AnalogFeedScale;   // headroom; feather the stick to slow near target
+            double maxFeed = panelFeed * (FeedScale <= 0d ? 1d : FeedScale);   // feather the stick to slow near target
 
             double feed = maxFeed * mag;
             if (feed < 10d)

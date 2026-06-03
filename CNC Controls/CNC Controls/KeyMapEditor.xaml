@@ -156,6 +156,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="2,2,2,2">
@@ -163,7 +164,7 @@
                         <TextBlock x:Name="lblController" VerticalAlignment="Center" FontWeight="Bold" Text="Searching for controller…"/>
                     </DockPanel>
                     <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF707070"
-                               Text="Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. Analog sticks (jog) are configured later."/>
+                               Text="Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. The left stick jogs X/Y and the triggers jog Z (analog) - see settings below."/>
 
                     <DataGrid Grid.Row="2" x:Name="gridController" AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
@@ -214,6 +215,22 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <WrapPanel Grid.Row="3" Margin="2,8,2,0">
+                        <CheckBox x:Name="chkAnalogEnabled" Content="Analog stick jog" VerticalAlignment="Center" Margin="0,0,14,4"
+                                  ToolTip="Enable jogging with the left stick (X/Y) and triggers (Z)."/>
+                        <TextBlock Text="Deadzone" VerticalAlignment="Center" Margin="0,0,3,4"/>
+                        <TextBox x:Name="txtDeadzone" Width="34" VerticalAlignment="Center" Margin="0,0,1,4"
+                                 ToolTip="Left-stick deadzone, percent of full deflection. Raise if the machine drifts at rest."/>
+                        <TextBlock Text="%" VerticalAlignment="Center" Margin="0,0,14,4"/>
+                        <TextBlock Text="Max feed ×" VerticalAlignment="Center" Margin="0,0,3,4"/>
+                        <TextBox x:Name="txtFeedScale" Width="40" VerticalAlignment="Center" Margin="0,0,14,4"
+                                 ToolTip="Full-stick feed as a multiple of the Jog panel feed (clamped to the machine's max rate)."/>
+                        <TextBlock Text="Invert:" VerticalAlignment="Center" Margin="0,0,4,4"/>
+                        <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                        <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,6,4"/>
+                        <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,4"/>
+                    </WrapPanel>
                 </Grid>
             </TabItem>
         </TabControl>

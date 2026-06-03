@@ -278,9 +278,22 @@ namespace CNC.Controls
 
             if (model.ControllerMapper != null)
             {
+                var m = model.ControllerMapper;
                 foreach (var r in controllerRows)
-                    model.ControllerMapper.SetAction(r.Button, r.Action);
-                model.ControllerMapper.SaveMap();
+                    m.SetAction(r.Button, r.Action);
+
+                m.AnalogJogEnabled = chkAnalogEnabled.IsChecked == true;
+                int dz;
+                if (int.TryParse(txtDeadzone.Text, out dz))
+                    m.DeadzonePercent = Math.Max(0, Math.Min(95, dz));
+                double fs;
+                if (double.TryParse(txtFeedScale.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fs))
+                    m.FeedScale = Math.Max(0.1d, Math.Min(10d, fs));
+                m.InvertX = chkInvertX.IsChecked == true;
+                m.InvertY = chkInvertY.IsChecked == true;
+                m.InvertZ = chkInvertZ.IsChecked == true;
+
+                m.SaveMap();
             }
 
             DialogResult = true;
@@ -314,6 +327,15 @@ namespace CNC.Controls
             foreach (var r in controllerRows)
                 r.PropertyChanged += ControllerRow_Changed;
             UpdateRestoreDefaultsButton();
+
+            // Analog jog settings
+            var m = model.ControllerMapper;
+            chkAnalogEnabled.IsChecked = m.AnalogJogEnabled;
+            txtDeadzone.Text = m.DeadzonePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            txtFeedScale.Text = m.FeedScale.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            chkInvertX.IsChecked = m.InvertX;
+            chkInvertY.IsChecked = m.InvertY;
+            chkInvertZ.IsChecked = m.InvertZ;
 
             UpdateControllerStatus();
             model.Controller.Connected += Controller_StatusChanged;
