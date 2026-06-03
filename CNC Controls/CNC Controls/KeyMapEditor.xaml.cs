@@ -228,8 +228,11 @@ namespace CNC.Controls
                     : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
 
             if (model.ControllerMapper != null)
+            {
                 foreach (var r in controllerRows)
                     model.ControllerMapper.SetAction(r.Button, r.Action);
+                model.ControllerMapper.SaveMap();
+            }
 
             DialogResult = true;
         }
@@ -248,6 +251,7 @@ namespace CNC.Controls
 
             // Pause machine dispatch so pressing buttons to test/assign here cannot move the machine.
             model.ControllerMapper.Enabled = false;
+            model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
                 controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b)));

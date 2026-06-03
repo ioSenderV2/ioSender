@@ -11,10 +11,20 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text;
+using System.Xml.Serialization;
 
 namespace CNC.Core
 {
+    [XmlType("ControllerMapping")]
+    public class ControllerMapEntry
+    {
+        public XInputButton Button;
+        public ControllerAction Action;
+    }
+
     public enum ControllerAction
     {
         None,
@@ -79,6 +89,62 @@ namespace CNC.Core
                 map[button] = action;
         }
 
+        // ---- persistence (ControllerMap.xml alongside the KeyMap files) -------------------------
+
+        private bool mapLoaded = false;
+        private static string MapPath { get { return Resources.ConfigPath + "ControllerMap.xml"; } }
+
+        /// <summary>Load the saved map once (config path isn't available when the mapper is constructed).</summary>
+        public void EnsureLoaded()
+        {
+            if (mapLoaded)
+                return;
+            mapLoaded = true;
+            LoadMap();
+        }
+
+        public bool LoadMap()
+        {
+            mapLoaded = true;
+
+            try
+            {
+                if (!File.Exists(MapPath))
+                    return false;
+
+                var xs = new XmlSerializer(typeof(List<ControllerMapEntry>), new XmlRootAttribute("ControllerMap"));
+                using (var reader = new StreamReader(MapPath))
+                {
+                    var list = (List<ControllerMapEntry>)xs.Deserialize(reader);
+                    map.Clear();
+                    foreach (var e in list)
+                        if (e.Action != ControllerAction.None)
+                            map[e.Button] = e.Action;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool SaveMap()
+        {
+            try
+            {
+                var list = map.Select(kv => new ControllerMapEntry { Button = kv.Key, Action = kv.Value }).ToList();
+                var xs = new XmlSerializer(typeof(List<ControllerMapEntry>), new XmlRootAttribute("ControllerMap"));
+                using (var fs = new FileStream(MapPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    xs.Serialize(fs, list);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static readonly Dictionary<XInputButton, ControllerAction> defaults = new Dictionary<XInputButton, ControllerAction>
         {
             { XInputButton.A, ControllerAction.CycleStart },
@@ -124,6 +190,8 @@ namespace CNC.Core
 
         private void OnButtonPressed(object sender, ControllerButtonEventArgs e)
         {
+            EnsureLoaded();
+
             if (!Enabled)
                 return;   // editor is open - intentionally silent
 
@@ -232,6 +300,8 @@ namespace CNC.Core
         // Left stick -> X/Y, triggers -> Z (RT up, LT down). Proportional feed, jog-cancel on release.
         private void OnPolled(object sender, EventArgs e)
         {
+            EnsureLoaded();
+
             XInputGamepad pad = service.State;
 
             double x = ControllerService.Normalize(pad.sThumbLX, StickDeadzone);
