@@ -137,7 +137,8 @@ namespace CNC.Controls
 
         private void Clear_Click(object sender, RoutedEventArgs e)
         {
-            var row = (sender as Button)?.Tag as BindingRow;
+            var fe = sender as FrameworkElement;
+            var row = (fe?.Tag as BindingRow) ?? (fe?.DataContext as BindingRow);   // button Tag or menu-item DataContext
             if (row == null)
                 return;
 
@@ -759,6 +760,9 @@ namespace CNC.Controls
                 get { return Model.Key != Model.DefaultKey || Model.Modifiers != Model.DefaultModifiers; }
             }
 
+            /// <summary>True when a key is assigned (so Clear is meaningful).</summary>
+            public bool IsBound { get { return Model.Key != Key.None; } }
+
             public void ResetToDefault()
             {
                 Model.Key = Model.DefaultKey;
@@ -793,6 +797,7 @@ namespace CNC.Controls
             {
                 Notify(nameof(DisplayText));
                 Notify(nameof(IsChanged));
+                Notify(nameof(IsBound));
                 if (Group != null)
                     Group.Recompute();
             }

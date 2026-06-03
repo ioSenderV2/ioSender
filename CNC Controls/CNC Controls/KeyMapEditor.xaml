@@ -14,6 +14,7 @@
         <local:KeyMapGroupStateConverter x:Key="GroupState"/>
         <ContextMenu x:Key="RowMenu">
             <MenuItem Header="Reset to default" Click="ResetRow_Click" IsEnabled="{Binding IsChanged}"/>
+            <MenuItem Header="Clear (unbind)" Click="Clear_Click" IsEnabled="{Binding IsBound}"/>
         </ContextMenu>
         <ContextMenu x:Key="GroupMenu">
             <MenuItem Header="Expand all" Click="ExpandAll_Click"/>
@@ -83,18 +84,11 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTemplateColumn Header="Shortcut" Width="160">
+                            <DataGridTemplateColumn Header="Shortcut" Width="170">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{Binding DisplayText}" Style="{StaticResource BindingButton}"
                                                 Tag="{Binding}" Click="Binding_Click"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Content="Clear" Padding="6,2" Margin="2,1" Tag="{Binding}" Click="Clear_Click"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
