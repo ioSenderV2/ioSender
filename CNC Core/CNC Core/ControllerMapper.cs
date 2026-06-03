@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 
 namespace CNC.Core
 {
@@ -60,6 +61,7 @@ namespace CNC.Core
             service = controllerService;
             LoadDefaults();
             service.ButtonPressed += OnButtonPressed;
+            service.Polled += OnPolled;   // analog stick / trigger jogging
             service.Connected += (s, e) => service.Rumble(20000, 20000, 150);   // brief "found it" buzz
         }
 
@@ -209,6 +211,80 @@ namespace CNC.Core
             // stream write - otherwise the jog line never reaches the controller.
             string cmd = string.Format(CultureInfo.InvariantCulture, "$J=G91G21{0}{1}F{2}", axis, dist, Math.Ceiling(feed));
             grbl.ExecuteCommand(cmd);
+        }
+
+        // ---- analog stick / trigger jogging -----------------------------------------------------
+
+        private const short StickDeadzone = 7000;        // ~21% of full deflection
+        private const byte TriggerDeadzone = 40;
+        private const int JogSendEveryNthPoll = 6;       // ~10 Hz at a 60 Hz poll
+        private const double JogOverlap = 1.6;           // distance overlap so motion stays continuous
+        private const double DefaultMaxJogFeed = 1500d;  // used if the jog panel feed is unavailable
+
+        private int pollCounter = 0;
+        private bool analogJogging = false;
+
+        // Left stick -> X/Y, triggers -> Z (RT up, LT down). Proportional feed, jog-cancel on release.
+        private void OnPolled(object sender, EventArgs e)
+        {
+            XInputGamepad pad = service.State;
+
+            double x = ControllerService.Normalize(pad.sThumbLX, StickDeadzone);
+            double y = ControllerService.Normalize(pad.sThumbLY, StickDeadzone);
+            double z = ControllerService.NormalizeTrigger(pad.bRightTrigger, TriggerDeadzone)
+                     - ControllerService.NormalizeTrigger(pad.bLeftTrigger, TriggerDeadzone);
+
+            double mag = Math.Max(Math.Abs(x), Math.Max(Math.Abs(y), Math.Abs(z)));
+
+            if (!Enabled || !IsConnected || !CanJog || mag <= 0d)
+            {
+                StopAnalogJog();
+                return;
+            }
+
+            // Throttle the jog send rate and never queue on top of an un-drained serial line.
+            if (pollCounter++ % JogSendEveryNthPoll != 0)
+                return;
+            if (Comms.com.OutCount != 0)
+                return;
+
+            double maxFeed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
+            if (maxFeed <= 0d)
+                maxFeed = DefaultMaxJogFeed;
+
+            double feed = maxFeed * mag;
+            if (feed < 10d)
+                feed = 10d;
+
+            double interval = JogSendEveryNthPoll / 60d;             // seconds between sends
+            double baseDist = maxFeed / 60d * interval * JogOverlap; // mm at max feed per send
+
+            var sb = new StringBuilder("$J=G91G21");
+            AppendAxis(sb, "X", x * baseDist);
+            AppendAxis(sb, "Y", y * baseDist);
+            AppendAxis(sb, "Z", z * baseDist);
+            sb.Append("F").Append(((int)Math.Ceiling(feed)).ToString(CultureInfo.InvariantCulture));
+
+            grbl.ExecuteCommand(sb.ToString());
+            analogJogging = true;
+        }
+
+        private static void AppendAxis(StringBuilder sb, string axis, double dist)
+        {
+            if (Math.Abs(dist) < 0.0005d)
+                return;
+            sb.Append(axis).Append(dist.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+
+        private void StopAnalogJog()
+        {
+            pollCounter = 0;
+            if (analogJogging)
+            {
+                analogJogging = false;
+                if (Comms.com != null)
+                    Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL);
+            }
         }
     }
 }
