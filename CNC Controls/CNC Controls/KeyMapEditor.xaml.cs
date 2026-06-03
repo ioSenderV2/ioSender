@@ -303,7 +303,11 @@ namespace CNC.Controls
             model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
-                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b)));
+            {
+                var def = ControllerMapper.DefaultAction(b);
+                var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label) : a).ToList();
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
+            }
 
             gridController.ItemsSource = controllerRows;
 
@@ -711,6 +715,7 @@ namespace CNC.Controls
         {
             public XInputButton Button { get; }
             public string ButtonName { get; }
+            public List<ActionItem> Choices { get; }   // per-button: the default action is marked with '*'
 
             private ControllerAction action;
             public ControllerAction Action
@@ -726,11 +731,12 @@ namespace CNC.Controls
                 set { if (pressed != value) { pressed = value; Notify(nameof(Pressed)); } }
             }
 
-            public ControllerRow(XInputButton button, string buttonName, ControllerAction action)
+            public ControllerRow(XInputButton button, string buttonName, ControllerAction action, List<ActionItem> choices)
             {
                 Button = button;
                 ButtonName = buttonName;
                 this.action = action;
+                Choices = choices;
             }
 
             public event PropertyChangedEventHandler PropertyChanged;

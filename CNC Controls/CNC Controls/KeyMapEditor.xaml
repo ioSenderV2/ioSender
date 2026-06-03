@@ -182,7 +182,7 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox Margin="1" VerticalAlignment="Center"
-                                                  ItemsSource="{Binding DataContext.ActionItems, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  ItemsSource="{Binding Choices}"
                                                   DisplayMemberPath="Label" SelectedValuePath="Action"
                                                   SelectedValue="{Binding Action, Mode=TwoWay}"/>
                                     </DataTemplate>
