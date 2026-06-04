@@ -447,6 +447,24 @@ namespace CNC.GCode
             return ParseBlock(ref line, quiet, out lineNumber, out isComment);
         }
 
+        // Read a word value or expression at pos. If the controller evaluates expressions itself
+        // (ExpressionsSupported) we forward the line verbatim and must not reject it just because
+        // our own NGC evaluator cannot resolve a (typically controller-side) parameter; only a
+        // controller that cannot do the math itself makes an unresolved expression a hard error.
+        private double ReadWordValue(string block, ref int pos)
+        {
+            double value;
+
+            if (ngcexpr.ReadParameter(block, ref pos, out value) != NGCExpr.OpStatus.OK)
+            {
+                if (!ExpressionsSupported)
+                    throw new GCodeException(LibStrings.FindResource("ParserBadExpr"));
+                value = 0d;
+            }
+
+            return value;
+        }
+
         public bool ParseBlock(ref string line, bool quiet, out uint lineNumber, out bool isComment)
         {
             WordFlags wordFlags = 0, wordFlag = 0;
@@ -510,10 +528,7 @@ namespace CNC.GCode
                 if (char.ToUpperInvariant(block[pos]) == 'G')
                 {
                     ppos = pos++;
-                    if (ngcexpr.ReadParameter(block, ref pos, out value) != NGCExpr.OpStatus.OK)
-                    {
-                        throw new GCodeException(LibStrings.FindResource("ParserBadExpr"));
-                    }
+                    value = ReadWordValue(block, ref pos);
                     if (ngcexpr.WasExpression && !ExpressionsSupported)
                         replace.Add(new StrReplace(ppos + 1, pos, value.ToInvariantString()));
 
@@ -784,10 +799,7 @@ namespace CNC.GCode
                 {
                     #region M-code parsing
                     ppos = pos++;
-                    if (ngcexpr.ReadParameter(block, ref pos, out value) != NGCExpr.OpStatus.OK)
-                    {
-                        throw new GCodeException(LibStrings.FindResource("ParserBadExpr")); ;
-                    }
+                    value = ReadWordValue(block, ref pos);
                     if (ngcexpr.WasExpression && !ExpressionsSupported)
                         replace.Add(new StrReplace(ppos + 1, pos, value.ToInvariantString()));
 
@@ -914,10 +926,7 @@ namespace CNC.GCode
                     try
                     {
                         ppos = pos++;
-                        if (ngcexpr.ReadParameter(block, ref pos, out value) != NGCExpr.OpStatus.OK)
-                        {
-                            throw new GCodeException(LibStrings.FindResource("ParserBadExpr"));
-                        }
+                        value = ReadWordValue(block, ref pos);
                         if (ngcexpr.WasExpression && !ExpressionsSupported)
                             replace.Add(new StrReplace(ppos + 1, pos, value.ToInvariantString(NumFormat) + "(" + block.Substring(ppos + 1, pos - ppos - 1) + ")"));
 
