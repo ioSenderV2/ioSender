@@ -1,5 +1,6 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Auto detect text files and normalize to LF in the repo, and check them out as
+# LF too (eol=lf) so no editor/tool can reintroduce CRLF on a round-trip.
+* text=auto eol=lf
 
 # Custom for Visual Studio
 *.cs     diff=csharp
