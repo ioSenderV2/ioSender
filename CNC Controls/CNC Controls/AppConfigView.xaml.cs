@@ -104,6 +104,16 @@ namespace CNC.Controls
                 Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");
         }
 
+        private void btnEditMacros_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppConfig.Settings.Macros == null)
+                return;
+
+            var dlg = new MacroManagerDialog(AppConfig.Settings.Macros) { Owner = Window.GetWindow(this) };
+            dlg.ShowDialog();
+            AppConfig.Settings.Save();
+        }
+
         private void btnEditKeyMap_Click(object sender, RoutedEventArgs e)
         {
             if (Grbl.GrblViewModel.Keyboard == null)

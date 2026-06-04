@@ -400,6 +400,12 @@ namespace CNC.Controls
                         Base.Macros.Remove(macro);
                 }
 
+                // Migrate legacy macros (saved before the FKey element existed) to an explicit
+                // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
+                foreach (var macro in Base.Macros)
+                    if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
+                        macro.FKey = macro.Id;
+
                 ok = true;
             }
             catch

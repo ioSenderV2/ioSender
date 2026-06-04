@@ -409,6 +409,7 @@ namespace CNC.GCode
     public class Macro : ViewModelBase
     {
         string _name;
+        int _fkey;
 
         [XmlIgnore]
         public bool IsSession { get; set; }
@@ -417,6 +418,10 @@ namespace CNC.GCode
         public string Name { get { return _name; } set { _name = value;  OnPropertyChanged(); } }
         public bool ConfirmOnExecute { get; set; } = true;
         public string Code { get; set; }
+
+        /// <summary>Function key that runs this macro: 1-12 = F1-F12, 0 = none (see JobControl.FnKeyHandler).
+        /// Legacy configs without this element are migrated from <see cref="Id"/> on load.</summary>
+        public int FKey { get { return _fkey; } set { _fkey = value; OnPropertyChanged(); } }
     }
 
     public struct Point6D

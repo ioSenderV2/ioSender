@@ -448,8 +448,8 @@ namespace CNC.Controls
         {
             if(!model.IsJobRunning)
             {
-                int id = int.Parse(key.ToString().Substring(1));
-                var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.Id == id);
+                int fkey = int.Parse(key.ToString().Substring(1));
+                var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.FKey == fkey);
                 if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format("Run {0} macro?", macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
                 {
                     if(!Grbl.SendRealtimeCommand(macro.Code))
