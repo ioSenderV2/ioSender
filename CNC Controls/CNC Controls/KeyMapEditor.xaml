@@ -113,14 +113,18 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <Expander IsExpanded="{Binding Name, Converter={StaticResource GroupExpanded}, Mode=OneWay}"
-                                                              Expanded="Group_Expanded" Collapsed="Group_Collapsed"
+                                                    <!-- IsExpanded binds TwoWay to the per-group GroupRowState model (resolved
+                                                         from the group name), not to a one-way converter with Expanded/Collapsed
+                                                         handlers. The model is stable across virtualization, so scrolling - which
+                                                         tears down and regenerates the group container - re-reads the saved state
+                                                         instead of the regenerated header snapping back to collapsed. -->
+                                                    <Expander DataContext="{Binding Name, Converter={StaticResource GroupState}}"
+                                                              IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
                                                               Margin="0,2,0,0" Background="#FFF3F4F6"
                                                               BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1"
                                                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                                         <Expander.Header>
                                                             <StackPanel Orientation="Horizontal"
-                                                                        DataContext="{Binding Name, Converter={StaticResource GroupState}}"
                                                                         ContextMenu="{StaticResource GroupMenu}"
                                                                         ToolTip="{Binding Description}" ToolTipService.ShowOnDisabled="True">
                                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold">

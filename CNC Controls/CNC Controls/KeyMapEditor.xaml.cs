@@ -455,8 +455,10 @@ namespace CNC.Controls
 
         private void SetExpanded(bool expanded)
         {
-            foreach (var ex in FindVisualChildren<Expander>(grid))
-                ex.IsExpanded = expanded;
+            // Drive the model, not the visual tree - the TwoWay-bound Expanders follow, and the
+            // state sticks even for group containers that are currently virtualized out of view.
+            foreach (var gs in groupStates.Values)
+                gs.IsExpanded = expanded;
         }
 
         // Remembers which outline groups are collapsed, so the dialog looks the same next time
@@ -468,23 +470,6 @@ namespace CNC.Controls
             // Default collapsed (like the Load Folder outline); remembered once toggled this session.
             bool v;
             return name != null && groupExpanded.TryGetValue(name, out v) && v;
-        }
-
-        private void Group_Expanded(object sender, RoutedEventArgs e)
-        {
-            RecordGroup(sender, true);
-        }
-
-        private void Group_Collapsed(object sender, RoutedEventArgs e)
-        {
-            RecordGroup(sender, false);
-        }
-
-        private static void RecordGroup(object sender, bool expanded)
-        {
-            var name = ((sender as FrameworkElement)?.DataContext as CollectionViewGroup)?.Name as string;
-            if (name != null)
-                groupExpanded[name] = expanded;
         }
 
         private static bool IsHidden(string method)
@@ -891,6 +876,26 @@ namespace CNC.Controls
             {
                 get { return modified; }
                 private set { if (modified != value) { modified = value; Notify(nameof(Modified)); } }
+            }
+
+            /// <summary>Expanded state, backed by the session-static remembered map so it survives both
+            /// virtualization (scrolling regenerates the group container) and reopening the dialog.
+            /// Bound TwoWay from the group Expander; default (unseen group) is collapsed.</summary>
+            public bool IsExpanded
+            {
+                get
+                {
+                    bool v;
+                    return groupExpanded.TryGetValue(Name, out v) && v;
+                }
+                set
+                {
+                    if (value != IsExpanded)
+                    {
+                        groupExpanded[Name] = value;
+                        Notify(nameof(IsExpanded));
+                    }
+                }
             }
 
             public GroupRowState(string name, string description)
