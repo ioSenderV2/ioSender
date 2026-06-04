@@ -124,12 +124,43 @@ namespace CNC.Controls
             if (view == null)
                 return;
 
+            // Fresh outline starts fully collapsed; also avoids carrying stale section names forward.
+            groupExpanded.Clear();
+
             using (view.DeferRefresh())
             {
                 view.GroupDescriptions.Clear();
                 if (grouped)
                     view.GroupDescriptions.Add(new PropertyGroupDescription("Section"));
             }
+        }
+
+        // Remembers which toolpath sections are expanded so scrolling (which recycles the virtualized
+        // group containers) restores their state instead of snapping back to collapsed. Default
+        // (unseen section) is collapsed; remembered once toggled.
+        private static readonly Dictionary<string, bool> groupExpanded = new Dictionary<string, bool>();
+
+        public static bool IsToolpathGroupExpanded(string name)
+        {
+            bool v;
+            return name != null && groupExpanded.TryGetValue(name, out v) && v;
+        }
+
+        private void ToolpathGroup_Expanded(object sender, RoutedEventArgs e)
+        {
+            RecordGroup(sender, true);
+        }
+
+        private void ToolpathGroup_Collapsed(object sender, RoutedEventArgs e)
+        {
+            RecordGroup(sender, false);
+        }
+
+        private static void RecordGroup(object sender, bool expanded)
+        {
+            var name = ((sender as FrameworkElement)?.DataContext as CollectionViewGroup)?.Name as string;
+            if (name != null)
+                groupExpanded[name] = expanded;
         }
 
         private void StartSection_Click(object sender, RoutedEventArgs e)
@@ -249,6 +280,20 @@ namespace CNC.Controls
         public int Compare(GCodeBlock a, GCodeBlock b)
         {
             return (int)a.LineNum - (int)b.LineNum;
+        }
+    }
+
+    /// <summary>Maps a toolpath section name to its remembered expanded/collapsed state.</summary>
+    public class ToolpathGroupExpandedConverter : IValueConverter
+    {
+        public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return GCodeListControl.IsToolpathGroupExpanded(value as string);
+        }
+
+        public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new System.NotSupportedException();
         }
     }
 }

@@ -7,6 +7,9 @@
              mc:Ignorable="d"
              d:DesignHeight="335" d:DesignWidth="400"
              Loaded="UserControl_Loaded">
+    <UserControl.Resources>
+        <local:ToolpathGroupExpandedConverter x:Key="ToolpathGroupExpanded"/>
+    </UserControl.Resources>
     <DataGrid x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
               CanUserSortColumns="false" CanUserResizeRows="False" IsReadOnly="true" SelectionChanged="grdGCode_SelectionChanged"
               EnableRowVirtualization="True" ScrollViewer.CanContentScroll="True"
@@ -35,8 +38,13 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type GroupItem}">
                                     <!-- Groups default collapsed so the whole toolpath outline is visible after a
-                                         folder load; expand individually via the chevron. -->
-                                    <Expander IsExpanded="False" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1">
+                                         folder load; expand individually via the chevron. IsExpanded is bound to a
+                                         remembered per-section state (not hard-coded false) so scrolling - which
+                                         recycles the virtualized group container - restores the expanded state
+                                         instead of snapping it back to collapsed. -->
+                                    <Expander IsExpanded="{Binding Name, Converter={StaticResource ToolpathGroupExpanded}, Mode=OneWay}"
+                                              Expanded="ToolpathGroup_Expanded" Collapsed="ToolpathGroup_Collapsed"
+                                              Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1">
                                         <Expander.Header>
                                             <!-- Context menu lives on the header only (not the Expander) so gcode-line
                                                  right-clicks fall through to the DataGrid's line menu. -->
