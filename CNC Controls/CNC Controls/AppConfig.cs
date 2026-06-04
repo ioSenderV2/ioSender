@@ -214,7 +214,7 @@ namespace CNC.Controls
             KeypadAndUI
         }
 
-        private bool _kbEnable, _linkStepToUi = true;
+        private bool _kbEnable, _linkStepToUi = true, _defaultSpeedFast = false;
         private JogMode _jogMode = JogMode.UI;
 
         private double _fastFeedrate = 500d, _slowFeedrate = 200d, _stepFeedrate = 100d;
@@ -223,6 +223,8 @@ namespace CNC.Controls
         public JogMode Mode { get { return _jogMode; } set { _jogMode = value; OnPropertyChanged(); } }
         public bool KeyboardEnable { get { return _kbEnable; } set { _kbEnable = value; OnPropertyChanged(); } }
         public bool LinkStepJogToUI { get { return _linkStepToUi; } set { _linkStepToUi = value; OnPropertyChanged(); } }
+        // Default keyboard continuous-jog speed: false = Slow (Shift -> Fast), true = Fast (Shift -> Slow).
+        public bool DefaultSpeedFast { get { return _defaultSpeedFast; } set { _defaultSpeedFast = value; OnPropertyChanged(); } }
         public double FastFeedrate { get { return _fastFeedrate; } set { _fastFeedrate = value; OnPropertyChanged(); } }
         public double SlowFeedrate { get { return _slowFeedrate; } set { _slowFeedrate = value; OnPropertyChanged(); } }
         public double StepFeedrate { get { return _stepFeedrate; } set { _stepFeedrate = value; OnPropertyChanged(); } }
@@ -242,6 +244,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
+        private bool _autoSaveSettings = false, _promptOnSave = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -293,6 +296,39 @@ namespace CNC.Controls
         public JogConfig Jog { get; set; } = new JogConfig();
         public JogUIConfig JogUiMetric { get; set; } = new JogUIConfig(new int[4] { 5, 100, 500, 1000 }, new double[4] { .01d, .1d, 1d, 10d });
         public JogUIConfig JogUiImperial { get; set; } = new JogUIConfig(new int[4] { 5, 10, 50, 100 }, new double[4] { .001d, .01d, .1d, 1d });
+
+        // Configurable main page (ioSender XL), edited via the "Edit Main Page" dialog.
+        // MainPanels: ordered panel names filling the six main-page slots (col-major, [0,1,2]=left, [3,4,5]=right).
+        // FlyoutItems: ordered names (panels / offset codes / specials) shown as sidebar flyouts.
+        // Anything in neither list is unassigned (shown nowhere). Applied on restart.
+        // NOTE: serialized as CSV strings (MainPanelsCsv / FlyoutItemsCsv), NOT as List<string>.
+        // XmlSerializer APPENDS to a pre-initialized List<T> on load (defaults + saved), which silently
+        // discarded the user's edits; a string property is replaced cleanly, and a missing element still
+        // falls back to the initializer defaults for configs that predate the feature.
+        private List<string> _mainPanels = new List<string> { "Outline", "Spindle", "Coolant", "WorkParameters", "Feed", "Goto" };
+        private List<string> _flyoutItems = new List<string> { "Macros", "MachinePosition" };
+
+        [XmlIgnore]
+        public List<string> MainPanels { get { return _mainPanels; } set { _mainPanels = value ?? new List<string>(); } }
+        [XmlIgnore]
+        public List<string> FlyoutItems { get { return _flyoutItems; } set { _flyoutItems = value ?? new List<string>(); } }
+
+        public string MainPanelsCsv
+        {
+            get { return string.Join(",", _mainPanels); }
+            set { _mainPanels = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
+        public string FlyoutItemsCsv
+        {
+            get { return string.Join(",", _flyoutItems); }
+            set { _flyoutItems = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
+
+        // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)
+        public List<string> PinnedFlyouts { get; set; } = new List<string>();
+        // Settings:App autosave on tab-leave / close (opt-in); PromptOnSave shows a confirm/discard list of changes.
+        public bool AutoSaveSettings { get { return _autoSaveSettings; } set { _autoSaveSettings = value; OnPropertyChanged(); } }
+        public bool PromptOnSave { get { return _promptOnSave; } set { _promptOnSave = value; OnPropertyChanged(); } }
 
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();

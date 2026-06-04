@@ -231,7 +231,7 @@ namespace CNC.Core
         public string Reply { get; private set; }
         public bool IsOpen { get { return serialPort != null && serialPort.IsOpen; } }
         public bool IsClosing { get; private set; }
-        public int OutCount { get { return serialPort != null ? serialPort.BytesToWrite : 0; } }
+        public int OutCount { get { try { return IsOpen ? serialPort.BytesToWrite : 0; } catch { return 0; } } }
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 

@@ -36,9 +36,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Xml.Serialization;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -47,6 +53,7 @@ namespace CNC.Controls
     {
         private UIViewModel model;
         private GrblViewModel grblmodel;
+        private string settingsSnapshot;    // serialized Config captured when the tab is entered (for autosave/diff)
 
         public AppConfigView()
         {
@@ -72,6 +79,12 @@ namespace CNC.Controls
                 } else if (control is ICameraConfig && model.Camera != null && !model.Camera.HasCamera)
                     control.Visibility = Visibility.Collapsed;
             }
+
+            if (activate)
+                settingsSnapshot = SerializeConfig(AppConfig.Settings.Base);
+            else
+                AutoSaveOnLeave();
+
             grblmodel.Message = activate ? (string)FindResource("RestartMessage") : string.Empty;
         }
 
@@ -88,12 +101,24 @@ namespace CNC.Controls
                 DataContext = profile.Base;
                 xx.ItemsSource = model.ConfigControls;
                 model.ConfigControls.Add(new BasicConfigControl());
+                btnEditMainPage.Visibility = MainPanelRegistry.LayoutEnabled ? Visibility.Visible : Visibility.Collapsed;
                 if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.Keypad)
                     model.ConfigControls.Add(new JogUiConfigControl());
                 if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI)
                     model.ConfigControls.Add(new JogConfigControl());
                 model.ConfigControls.Add(new StripGCodeConfigControl());
+
+                UpdateSaveButtonVisibility();
+                AppConfig.Settings.Base.PropertyChanged += (s, e) => {
+                    if (e.PropertyName == nameof(Config.AutoSaveSettings))
+                        UpdateSaveButtonVisibility();
+                };
             }
+        }
+
+        private void UpdateSaveButtonVisibility()
+        {
+            btnSave.Visibility = AppConfig.Settings.Base.AutoSaveSettings ? Visibility.Collapsed : Visibility.Visible;
         }
 
         #endregion
@@ -123,5 +148,132 @@ namespace CNC.Controls
                 Grbl.GrblViewModel.Message = string.Format(LibStrings.FindResource("KeymappingsSaved"), filename);
             }
         }
+
+        private void btnEditMainPage_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new MainPageEditor() { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                AppConfig.Settings.Save();
+                Grbl.GrblViewModel.Message = "Main page layout saved - restart to apply.";
+            }
+        }
+
+        #region Autosave on tab-leave / close (opt-in)
+
+        private void AutoSaveOnLeave()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg == null || !cfg.AutoSaveSettings || settingsSnapshot == null)
+                return;
+
+            string current = SerializeConfig(cfg);
+            if (current == null || current == settingsSnapshot)
+                return;     // nothing changed
+
+            if (cfg.PromptOnSave)
+            {
+                var changes = new List<string>();
+                DiffObject(string.Empty, DeserializeConfig(settingsSnapshot), cfg, changes);
+
+                if (changes.Count > 0)
+                {
+                    var msg = "Save these setting changes?\n\n" + string.Join("\n", changes);
+                    if (MessageBox.Show(msg, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    {
+                        AppConfig.Settings.Save();
+                        settingsSnapshot = SerializeConfig(cfg);
+                    }
+                    else
+                        CopyScalars(DeserializeConfig(settingsSnapshot), cfg);   // discard edits
+                    return;
+                }
+            }
+
+            AppConfig.Settings.Save();
+            settingsSnapshot = current;
+        }
+
+        private static string SerializeConfig(Config c)
+        {
+            try
+            {
+                var xs = new XmlSerializer(typeof(Config));
+                using (var sw = new StringWriter())
+                {
+                    xs.Serialize(sw, c);
+                    return sw.ToString();
+                }
+            }
+            catch { return null; }
+        }
+
+        private static Config DeserializeConfig(string xml)
+        {
+            var xs = new XmlSerializer(typeof(Config));
+            using (var sr = new StringReader(xml))
+                return (Config)xs.Deserialize(sr);
+        }
+
+        private static bool IsScalar(Type t)
+        {
+            return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(double) || t == typeof(decimal);
+        }
+
+        // List scalar property differences (incl. nested Jog / JogUi config) as "Name: old -> new".
+        private static void DiffObject(string prefix, object oldO, object newO, List<string> changes)
+        {
+            if (oldO == null || newO == null)
+                return;
+
+            foreach (var p in oldO.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || p.GetIndexParameters().Length > 0 || Attribute.IsDefined(p, typeof(XmlIgnoreAttribute)))
+                    continue;
+
+                object ov, nv;
+                try { ov = p.GetValue(oldO); nv = p.GetValue(newO); } catch { continue; }
+
+                if (IsScalar(p.PropertyType))
+                {
+                    if (!Equals(ov, nv))
+                        changes.Add(string.Format("  {0}{1}: {2} → {3}", prefix, p.Name, ov, nv));
+                }
+                else if (p.PropertyType == typeof(JogConfig) || p.PropertyType == typeof(JogUIConfig))
+                    DiffObject(p.Name + ".", ov, nv, changes);
+                else if (p.PropertyType == typeof(string[]))
+                {
+                    var oa = ov as string[];
+                    var na = nv as string[];
+                    if (oa != null && na != null && !oa.SequenceEqual(na))
+                        changes.Add(string.Format("  {0}{1}: {2} → {3}", prefix, p.Name, string.Join(",", oa), string.Join(",", na)));
+                }
+            }
+        }
+
+        // Copy scalar property values from src into dst (used to discard unsaved edits on the live Config).
+        private static void CopyScalars(object src, object dst)
+        {
+            if (src == null || dst == null)
+                return;
+
+            foreach (var p in src.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || p.GetIndexParameters().Length > 0 || Attribute.IsDefined(p, typeof(XmlIgnoreAttribute)))
+                    continue;
+
+                if (IsScalar(p.PropertyType))
+                {
+                    if (p.CanWrite)
+                    {
+                        try { var v = p.GetValue(src); if (!Equals(v, p.GetValue(dst))) p.SetValue(dst, v); } catch { }
+                    }
+                }
+                else if (p.PropertyType == typeof(JogConfig) || p.PropertyType == typeof(JogUIConfig))
+                    CopyScalars(p.GetValue(src), p.GetValue(dst));
+            }
+        }
+
+        #endregion
     }
 }

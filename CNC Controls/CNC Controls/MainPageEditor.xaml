@@ -1,0 +1,61 @@
+<Window x:Class="CNC.Controls.MainPageEditor"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        Title="Edit Main Page" Height="430" Width="580" MinHeight="340" MinWidth="500"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+            <ListBox x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="3" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+
+            <TextBlock Grid.Column="2" Grid.Row="0" Text="Main page (top → bottom = slot order, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+            <ListBox x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+            <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                <Button x:Name="btnToMain" Content="&gt;" Width="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to main page"/>
+                <Button x:Name="btnFromMain" Content="&lt;" Width="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove from main page"/>
+            </StackPanel>
+            <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                <Button x:Name="btnMainUp" Content="▲" Width="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
+                <Button x:Name="btnMainDown" Content="▼" Width="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
+            </StackPanel>
+
+            <TextBlock Grid.Column="2" Grid.Row="2" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+            <ListBox x:Name="lstFlyouts" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+            <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                <Button x:Name="btnToFlyout" Content="&gt;" Width="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
+                <Button x:Name="btnFromFlyout" Content="&lt;" Width="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
+            </StackPanel>
+            <StackPanel Grid.Column="3" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                <Button x:Name="btnFlyUp" Content="▲" Width="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
+                <Button x:Name="btnFlyDown" Content="▼" Width="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock Text="Changes take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
+            <Button Content="OK" Width="80" IsDefault="True" Click="btnOK_Click" Margin="0,0,6,0"/>
+            <Button Content="Cancel" Width="80" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,43 @@
+<UserControl x:Class="CNC.Controls.PanelFlyout"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="130" d:DesignWidth="200" Width="200">
+    <UserControl.Resources>
+        <Style x:Key="FlyoutGlyphButton" TargetType="ButtonBase">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ButtonBase">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#33000000"/>
+                            </Trigger>
+                            <Trigger Property="ToggleButton.IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#553F7FBF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Border BorderBrush="DarkGray" BorderThickness="1" Background="#FFE5E5EA">
+        <Grid>
+            <ContentControl x:Name="host" Margin="4,10,4,10" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,4,0" Panel.ZIndex="10">
+                <ToggleButton x:Name="btnPin" Content="📌" FontSize="11" Width="17" Height="17" Style="{StaticResource FlyoutGlyphButton}"
+                              ToolTip="Pin (keep open when another flyout is opened)" Checked="btnPin_Changed" Unchecked="btnPin_Changed"/>
+                <Button x:Name="btnClose" Content="✕" FontSize="10" Width="15" Height="17" Style="{StaticResource FlyoutGlyphButton}"
+                        ToolTip="Close" Click="btn_Close"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

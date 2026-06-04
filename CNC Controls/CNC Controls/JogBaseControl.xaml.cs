@@ -103,6 +103,15 @@ namespace CNC.Controls
 
                 JogData.SetMetric(mode == "G21");
 
+                // If the user placed the "UI Jogging" slider panel (main page or flyout), it now
+                // provides the distance/feed selection - hide the in-panel radio selectors.
+                if (MainPanelRegistry.LayoutEnabled &&
+                     (AppConfig.Settings.Base.MainPanels.Contains("UIJogging") || AppConfig.Settings.Base.FlyoutItems.Contains("UIJogging")))
+                {
+                    selectorPanel.Visibility = Visibility.Collapsed;
+                    arrowPanel.Margin = new Thickness(5, 10, 5, 0);
+                }
+
                 if (!keyboardMappingsOk)
                 {
                     if (!GrblInfo.HasFirmwareJog || AppConfig.Settings.Jog.LinkStepJogToUI)
@@ -632,11 +641,14 @@ namespace CNC.Controls
 
         JogStep _jogStep = JogStep.Step1;
         JogFeed _jogFeed = JogFeed.Feed1;
+        JogStep _lastStep = JogStep.Step1;      // last discrete step, retained while in Continuous mode
+        private bool _metric = true;
         private double[] _distance = new double[5];
         private int[] _feedRate = new int[4];
 
         public void SetMetric(bool on)
         {
+            _metric = on;
             for (int i = 0; i < _feedRate.Length; i++)
             {
                 _distance[i] = on ? AppConfig.Settings.JogUiMetric.Distance[i] : AppConfig.Settings.JogUiImperial.Distance[i];
@@ -645,11 +657,17 @@ namespace CNC.Controls
                 OnPropertyChanged("Distance" + i.ToString());
             }
             _distance[(int)JogStep.Continuous] = -1d;
+            OnPropertyChanged(nameof(SelectedDistance));
+            OnPropertyChanged(nameof(SelectedFeedrate));
+            OnPropertyChanged(nameof(SelectedDistanceText));
+            OnPropertyChanged(nameof(SelectedFeedrateText));
+            OnPropertyChanged(nameof(DistanceHeader));
+            OnPropertyChanged(nameof(SpeedHeader));
         }
 
-        public JogStep StepSize { get { return _jogStep; } set { _jogStep = value; OnPropertyChanged(); OnPropertyChanged(nameof(Distance)); } }
+        public JogStep StepSize { get { return _jogStep; } set { _jogStep = value; OnPropertyChanged(); OnPropertyChanged(nameof(Distance)); OnPropertyChanged(nameof(DistanceIndex)); OnPropertyChanged(nameof(Continuous)); OnPropertyChanged(nameof(SelectedDistance)); OnPropertyChanged(nameof(SelectedDistanceText)); } }
         public double Distance { get { return _distance[(int)_jogStep]; } }
-        public JogFeed Feed { get { return _jogFeed; } set { _jogFeed = value; OnPropertyChanged(); OnPropertyChanged(nameof(FeedRate)); } }
+        public JogFeed Feed { get { return _jogFeed; } set { _jogFeed = value; OnPropertyChanged(); OnPropertyChanged(nameof(FeedRate)); OnPropertyChanged(nameof(FeedIndex)); OnPropertyChanged(nameof(SelectedFeedrate)); OnPropertyChanged(nameof(SelectedFeedrateText)); } }
         public double FeedRate { get { return _feedRate[(int)_jogFeed]; } }
 
         public int Feedrate0 { get { return _feedRate[0]; } }
@@ -661,6 +679,32 @@ namespace CNC.Controls
         public double Distance1 { get { return _distance[1]; } }
         public double Distance2 { get { return _distance[2]; } }
         public double Distance3 { get { return _distance[3]; } }
+
+        // Slider-friendly accessors: a 0-3 selector over the 4 presets, a Continuous toggle for distance,
+        // and read-only display values for the selected level (values are edited on the Settings:App tab).
+        public int DistanceIndex
+        {
+            get { return _jogStep == JogStep.Continuous ? (int)_lastStep : (int)_jogStep; }
+            set { _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, value)); StepSize = _lastStep; }
+        }
+        public bool Continuous
+        {
+            get { return _jogStep == JogStep.Continuous; }
+            set { StepSize = value ? JogStep.Continuous : _lastStep; }
+        }
+        public int FeedIndex
+        {
+            get { return (int)_jogFeed; }
+            set { Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, value)); }
+        }
+        public double SelectedDistance { get { return _distance[DistanceIndex]; } }
+        public int SelectedFeedrate { get { return _feedRate[FeedIndex]; } }
+        // Read-only readouts shown between the slider buttons - bare values; the unit lives in the header.
+        public string SelectedDistanceText { get { return SelectedDistance.ToString("0.0###"); } }
+        public string SelectedFeedrateText { get { return SelectedFeedrate.ToString(); } }
+        public bool IsMetric { get { return _metric; } }
+        public string DistanceHeader { get { return "Distance (" + (_metric ? "mm" : "in") + ")"; } }
+        public string SpeedHeader { get { return "Speed (" + (_metric ? "mm/min" : "in/min") + ")"; } }
 
         public void StepInc()
         {
@@ -683,6 +727,50 @@ namespace CNC.Controls
         {
             if (Feed != JogFeed.Feed0)
                 Feed -= 1;
+        }
+    }
+
+    // Backs the "Keyboard Jogging" panel: a single selector that sets the DEFAULT continuous keyboard-jog
+    // speed (Slow or Fast) used while an arrow key is held with no modifier; Shift then jogs at the other
+    // speed. The slider position IS the setting (Config.Jog.DefaultSpeedFast), pushed live into the handler.
+    // Bare value (the feed rate) is shown; the unit lives in the header and follows the UI jog panel.
+    public class KeyboardJogViewModel : ViewModelBase
+    {
+        private readonly KeypressHandler keyboard;
+
+        public KeyboardJogViewModel(KeypressHandler keyboard)
+        {
+            this.keyboard = keyboard;
+        }
+
+        public int SpeedIndex
+        {
+            get { return AppConfig.Settings.Jog.DefaultSpeedFast ? 1 : 0; }    // 0 = Slow, 1 = Fast
+            set
+            {
+                bool fast = value >= 1;
+                AppConfig.Settings.Jog.DefaultSpeedFast = fast;
+                if (keyboard != null)
+                    keyboard.DefaultSpeedFast = fast;       // take effect immediately
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedFeedrateText));
+            }
+        }
+
+        private double SelectedFeedrate
+        {
+            get { var j = AppConfig.Settings.Jog; return j.DefaultSpeedFast ? j.FastFeedrate : j.SlowFeedrate; }
+        }
+
+        public string SelectedFeedrateText { get { return SelectedFeedrate.ToString("0.###"); } }
+
+        public string SpeedHeader
+        {
+            get
+            {
+                bool metric = JogBaseControl.JogData == null || JogBaseControl.JogData.IsMetric;
+                return "Default speed (" + (metric ? "mm/min" : "in/min") + ")";
+            }
         }
     }
 }

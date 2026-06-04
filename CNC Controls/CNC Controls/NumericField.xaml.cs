@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
@@ -139,6 +140,43 @@ namespace CNC.Controls
         public void Clear()
         {
             data.Clear();
+        }
+
+        // Factory-default Config instance; the field's Value binding path is resolved against it
+        // to find a settings field's default value. Non-settings fields don't resolve -> no reset.
+        private static readonly Config defaultConfig = new Config();
+
+        private object GetDefaultValue()
+        {
+            var be = GetBindingExpression(ValueProperty);
+            string path = be?.ParentBinding?.Path?.Path;
+            if (string.IsNullOrEmpty(path))
+                return null;
+
+            object cur = defaultConfig;
+            foreach (var part in path.Split('.'))
+            {
+                if (cur == null)
+                    return null;
+                var pi = cur.GetType().GetProperty(part);
+                if (pi == null || pi.GetIndexParameters().Length > 0)
+                    return null;
+                cur = pi.GetValue(cur);
+            }
+            return cur is double || cur is int || cur is float || cur is decimal ? cur : null;
+        }
+
+        private void Data_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            // Only offer "Reset to default" for fields backed by a Config setting.
+            miReset.IsEnabled = !IsReadOnly && GetDefaultValue() != null;
+        }
+
+        private void ResetToDefault_Click(object sender, RoutedEventArgs e)
+        {
+            var def = GetDefaultValue();
+            if (def != null)
+                Value = Convert.ToDouble(def);
         }
     }
 }
