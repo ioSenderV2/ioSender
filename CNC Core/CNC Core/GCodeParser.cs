@@ -919,6 +919,16 @@ namespace CNC.GCode
                 }
                 else if (block[pos] == ';')
                     pos = block.Length;
+                else if ((block[pos] == 'O' || block[pos] == 'o') && pos + 1 < block.Length && block[pos + 1] == '<')
+                {
+                    // Named O-word (O<name> ...): this parser only handles numbered O-words. When the
+                    // controller evaluates expressions itself, forward the whole line to it verbatim
+                    // rather than mis-parsing the named label and any call arguments (which would run
+                    // off the end of the block). Without expression support we cannot handle it at all.
+                    if (!ExpressionsSupported)
+                        throw new GCodeException(LibStrings.FindResource("ParserBadExpr"));
+                    pos = block.Length;
+                }
                 else
                 {
                     #region Parse Word values

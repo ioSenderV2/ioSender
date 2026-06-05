@@ -317,17 +317,24 @@ namespace CNC.Core
                 {
                     bool ok = true;
                     var parser = new GCodeParser();
+                    parser.ExpressionsSupported = GrblInfo.ExpressionsSupported;   // pass NGC expressions/params through to the controller, as file streaming does
 
                     for (int i = 0; i < commands.Length; i++)
                     {
+                        string original = commands[i] = commands[i].Replace("\r", "");
                         try
                         {
-                            commands[i] = commands[i].Replace("\r", "");
                             parser.ParseBlock(ref commands[i], false);
                         }
                         catch (Exception e)
                         {
-                            if (!(ok = System.Windows.MessageBox.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, i + 1, commands[i]), "ioSender", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.Yes))
+                            // When the controller evaluates expressions itself its parser is
+                            // authoritative: forward a line ioSender cannot parse (e.g. a named
+                            // O-word subroutine call) rather than rejecting it. Otherwise keep the
+                            // previous prompt-to-continue behaviour.
+                            if (parser.ExpressionsSupported)
+                                commands[i] = original;
+                            else if (!(ok = System.Windows.MessageBox.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, i + 1, original), "ioSender", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.Yes))
                                 break;
                         }
                     }
