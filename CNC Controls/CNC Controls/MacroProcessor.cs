@@ -36,6 +36,12 @@
  *                         on any controller). 'param' is normalised to #<_name> form.
  *                         A bare (PROMPT) with no arguments is just a run confirmation.
  *
+ *   @<path>               If the macro body is a single line starting with '@', it is a
+ *                         reference to an external file: that file's current contents are
+ *                         loaded and run in its place, re-read on every run - so a macro can be
+ *                         developed by editing the file directly. The loaded contents are then
+ *                         processed normally (they may use the directives above).
+ *
  * Macros containing none of these directives run exactly as before (GrblViewModel.ExecuteMacro).
  */
 
@@ -43,6 +49,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -63,6 +70,12 @@ namespace CNC.Controls
 
             if (string.IsNullOrEmpty(name))
                 name = "Macro";
+
+            // A macro whose body is a single "@<path>" line is a reference to an external file;
+            // load and run that file's current contents (re-read every run, so the macro can be
+            // developed by editing the file - no copy/paste back into ioSender).
+            if (!ResolveFileReference(ref code, name))
+                return false;
 
             // Fast path: no directives -> identical to the previous behaviour.
             if (code.IndexOf("(PREREQ", StringComparison.OrdinalIgnoreCase) < 0 &&
@@ -189,6 +202,38 @@ namespace CNC.Controls
                 model.ExecuteMacro(buffer.ToString());
                 buffer.Clear();
             }
+        }
+
+        // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
+        // contents (re-read on every run). Relative paths resolve against the config folder.
+        // Returns false (after a message) if the file cannot be read.
+        private static bool ResolveFileReference(ref string code, string name)
+        {
+            string trimmed = code.TrimStart();
+            if (!trimmed.StartsWith("@"))
+                return true;
+
+            string path = trimmed.Substring(1);
+            int nl = path.IndexOfAny(new[] { '\r', '\n' });
+            if (nl >= 0)
+                path = path.Substring(0, nl);
+            path = path.Trim();
+
+            if (!Path.IsPathRooted(path))
+                path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+
+            try
+            {
+                code = File.ReadAllText(path);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("Macro \"{0}\" references a file that could not be read:\r\n\r\n{1}\r\n\r\n{2}", name, path, ex.Message),
+                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
         }
 
         // A single (PROMPT ...) input field.
