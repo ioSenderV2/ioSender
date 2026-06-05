@@ -25,22 +25,14 @@
         </Style>
     </UserControl.Resources>
     <Border BorderBrush="DarkGray" BorderThickness="1" CornerRadius="3" Background="#FFE5E5EA">
-        <Grid Width="315" Height="220">
-            <ItemsControl ItemsSource="{Binding Path=Macros, RelativeSource={RelativeSource AncestorType=UserControl}}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button Width="140" Height="25" Focusable="False" Margin="5 3 0 0" Content="{Binding Path=Name}" Tag="{Binding Path=Id}"  VerticalAlignment="Top" Click="button_Click">
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Height="180" Width="300" Margin="0,5,0,0" Orientation="Vertical" ItemWidth="145" VerticalAlignment="Top"  IsItemsHost="True"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
-            <TextBlock x:Uid="lbl_noMacrosDefined" Text="No macros defined, use Edit button to add." TextWrapping="Wrap" Visibility="{Binding Path=IsMessageVisible, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" Margin="0,80,0,0" Width="290" VerticalAlignment="Top"/>
-            <Button x:Uid="btn_edit" Content="Edit" Padding="5,0" MinWidth="60" Height="25" HorizontalAlignment="Right" Margin="0,0,8,8" VerticalAlignment="Bottom" Click="button_Edit" />
+        <Grid Width="315" Height="90">
+            <StackPanel Orientation="Horizontal" Margin="12,16,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <ComboBox x:Name="cbMacros" Width="190" Height="25" VerticalContentAlignment="Center"
+                          ItemsSource="{Binding Path=Macros, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          DisplayMemberPath="Name" ToolTip="Select a macro to run."/>
+                <Button x:Uid="btn_runMacro" Content="Run" MinWidth="60" Height="25" Margin="10,0,0,0" Click="button_Click" ToolTip="Run the selected macro."/>
+            </StackPanel>
+            <TextBlock x:Uid="lbl_noMacrosDefined" Text="No macros defined. Add them on the Settings: App page." TextWrapping="Wrap" Visibility="{Binding Path=IsMessageVisible, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,12" Width="290" TextAlignment="Center"/>
             <Button Content="×" Focusable="False" Style="{StaticResource SmallXButtonStyle}" VerticalContentAlignment="Top" HorizontalAlignment="Left" Margin="297,0,0,0" VerticalAlignment="Top" Width="14" Height="18" Click="btn_Close"/>
         </Grid>
     </Border>

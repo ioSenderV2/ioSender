@@ -452,6 +452,7 @@ namespace CNC.Controls
                 var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.FKey == fkey);
                 if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format("Run {0} macro?", macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
                 {
+                    AppConfig.Settings.RecordMacroRun(macro.Id);
                     if(!Grbl.SendRealtimeCommand(macro.Code))
                         model.ExecuteCommand(macro.Code);
                     return true;

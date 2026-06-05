@@ -71,7 +71,10 @@ namespace CNC.Controls
         {
             var macro = Macros.FirstOrDefault(o => o.Id == (int)(sender as Button).Tag);
             if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
+            {
+                AppConfig.Settings.RecordMacroRun(macro.Id);
                 (DataContext as GrblViewModel).ExecuteMacro(macro.Code);
+            }
         }
     }
 }

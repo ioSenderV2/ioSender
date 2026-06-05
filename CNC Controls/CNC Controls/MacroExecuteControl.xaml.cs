@@ -62,6 +62,19 @@ namespace CNC.Controls
         private void macroExecuteControl_Loaded(object sender, RoutedEventArgs e)
         {
             Macros = AppConfig.Settings.Macros;
+            Dispatcher.BeginInvoke(new System.Action(SelectInitialMacro), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        // Pre-select the most recently run macro (persisted, any entry point) if it still exists,
+        // otherwise the first macro.
+        private void SelectInitialMacro()
+        {
+            if (cbMacros == null || Macros == null || Macros.Count == 0)
+                return;
+
+            int lastId = AppConfig.Settings.LastMacroId;
+            CNC.GCode.Macro macro = lastId >= 0 ? Macros.FirstOrDefault(o => o.Id == lastId) : null;
+            cbMacros.SelectedItem = macro ?? Macros[0];
         }
 
         private void View_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -102,6 +115,8 @@ namespace CNC.Controls
         private void Macros_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             IsMessageVisible = (sender as ObservableCollection<CNC.GCode.Macro>).Count == 0 ? Visibility.Visible : Visibility.Hidden;
+            if (cbMacros != null && cbMacros.SelectedItem == null)
+                SelectInitialMacro();
         }
 
         public static readonly DependencyProperty IsMessageVisibleProperty = DependencyProperty.Register(nameof(IsMessageVisible), typeof(Visibility), typeof(MacroExecuteControl), new PropertyMetadata(Visibility.Visible));
@@ -113,21 +128,17 @@ namespace CNC.Controls
 
         private void button_Click(object sender, RoutedEventArgs e)
         {
-            CNC.GCode.Macro macro = Macros.FirstOrDefault(o => o.Id == (int)(sender as Button).Tag);
+            CNC.GCode.Macro macro = cbMacros.SelectedItem as CNC.GCode.Macro;
             if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
+            {
+                AppConfig.Settings.RecordMacroRun(macro.Id);
                 (DataContext as GrblViewModel).ExecuteMacro(macro.Code);
+            }
         }
 
         private void btn_Close(object sender, RoutedEventArgs e)
         {
             Visibility = Visibility.Hidden;
-        }
-
-        private void button_Edit(object sender, RoutedEventArgs e)
-        {
-            MacroEditor editor = new MacroEditor(Macros) {Owner = Application.Current.MainWindow};
-            editor.ShowDialog();
-            AppConfig.Settings.Save();
         }
     }
 }
