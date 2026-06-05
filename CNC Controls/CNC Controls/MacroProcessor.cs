@@ -63,7 +63,7 @@ namespace CNC.Controls
     public static class MacroProcessor
     {
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        public static bool Run(GrblViewModel model, string name, string code)
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -77,12 +77,14 @@ namespace CNC.Controls
             if (!ResolveFileReference(ref code, name))
                 return false;
 
-            // Fast path: no directives -> identical to the previous behaviour.
+            // Fast path: no directives -> identical to the previous behaviour (confirm if asked).
             if (code.IndexOf("(PREREQ", StringComparison.OrdinalIgnoreCase) < 0 &&
                  code.IndexOf("(MBOX", StringComparison.OrdinalIgnoreCase) < 0 &&
                   code.IndexOf("(WAITIDLE", StringComparison.OrdinalIgnoreCase) < 0 &&
                    code.IndexOf("(PROMPT", StringComparison.OrdinalIgnoreCase) < 0)
             {
+                if (confirm && !ConfirmRun(name))
+                    return false;
                 model.ExecuteMacro(code);
                 return true;
             }
@@ -137,6 +139,8 @@ namespace CNC.Controls
                 if (field != null && !fields.Any(f => f.Inner.Equals(field.Inner, StringComparison.OrdinalIgnoreCase)))
                     fields.Add(field);
             }
+            // An input prompt's OK/Cancel is itself the run confirmation, so a separate "Prompt to
+            // run" box would be redundant - only show that when there are no input prompts to gate on.
             if (fields.Count > 0)
             {
                 if (!ShowPromptDialog(name, fields))
@@ -147,6 +151,8 @@ namespace CNC.Controls
                     assignments.Append(field.Param).Append('=').Append(field.Value).Append('\n');
                 model.ExecuteMacro(assignments.ToString());
             }
+            else if (confirm && !ConfirmRun(name))
+                return false;
 
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
             var buffer = new StringBuilder();
@@ -202,6 +208,14 @@ namespace CNC.Controls
                 model.ExecuteMacro(buffer.ToString());
                 buffer.Clear();
             }
+        }
+
+        // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -
+        // so it can be skipped when an input (PROMPT) dialog already gates the run.
+        private static bool ConfirmRun(string name)
+        {
+            return MessageBox.Show(string.Format("Run {0} macro?", name), "ioSender",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         }
 
         // If 'code' is a single "@<path>" reference, replace it with the referenced file's current

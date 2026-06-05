@@ -70,8 +70,8 @@ namespace CNC.Controls
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             var macro = Macros.FirstOrDefault(o => o.Id == (int)(sender as Button).Tag);
-            if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
-                MacroProcessor.Run(DataContext as GrblViewModel, macro.Name, macro.Code);
+            if (macro != null)
+                MacroProcessor.Run(DataContext as GrblViewModel, macro.Name, macro.Code, macro.ConfirmOnExecute);
         }
     }
 }
