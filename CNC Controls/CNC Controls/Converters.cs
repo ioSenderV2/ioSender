@@ -58,6 +58,7 @@ namespace CNC.Controls
         public static GrblStateToColorConverter GrblStateToColorConverter = new GrblStateToColorConverter();
         public static EncoderModeToColorConverter EncoderModeToColorConverter = new EncoderModeToColorConverter();
         public static GrblStateToStringConverter GrblStateToStringConverter = new GrblStateToStringConverter();
+        public static GrblStateToTooltipConverter GrblStateToTooltipConverter = new GrblStateToTooltipConverter();
         public static BlocksToStringConverter BlocksToStringConverter = new BlocksToStringConverter();
         public static GrblStateToBooleanConverter GrblStateToBooleanConverter = new GrblStateToBooleanConverter();
         public static GrblStateToIsJoggingConverter GrblStateToIsJoggingConverter = new GrblStateToIsJoggingConverter();
@@ -94,6 +95,21 @@ namespace CNC.Controls
                 { GrblStates.Alarm, LibStrings.FindResource("StateAlarm") },
                 { GrblStates.Door, LibStrings.FindResource("StateDoor") },
                 { GrblStates.Sleep, LibStrings.FindResource("StateSleep") }
+            });
+
+        // Plain-language help shown as the State field tooltip, aimed at newcomers.
+        internal static Lazy<Dictionary<GrblStates, string>> grblStateHelp = new Lazy<Dictionary<GrblStates, string>>(() =>
+            new Dictionary<GrblStates, string> {
+                { GrblStates.Unknown, "Not connected, or the controller state is unknown." },
+                { GrblStates.Idle, "Ready - idle and waiting for commands." },
+                { GrblStates.Run, "Running - executing a program or commanded motion." },
+                { GrblStates.Hold, "Feed hold - motion is paused. Press Cycle Start to resume." },
+                { GrblStates.Jog, "Jogging - a manual move is in progress." },
+                { GrblStates.Home, "Homing - seeking the machine's reference (limit) switches." },
+                { GrblStates.Check, "Check mode - G-code is parsed and validated but not executed; no motion. Turn it off to cut for real." },
+                { GrblStates.Tool, "Tool change - waiting for a manual tool change; follow the prompt, then resume." },
+                { GrblStates.Door, "Safety door open - motion is suspended until the door is closed and you resume." },
+                { GrblStates.Sleep, "Sleep - the controller is parked. Reset to continue." }
             });
     }
 
@@ -409,6 +425,40 @@ namespace CNC.Controls
                 result = (result == string.Empty ? ((GrblState)value).State.ToString().ToUpper() : result) + (substate == -1 ? "" : (":" + substate.ToString()));
 
             return result;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Produces a plain-language tooltip for the State field; for an alarm it appends the
+    // controller's specific alarm message (e.g. "ALARM 4: Probe fail ...") so a newcomer can
+    // tell what the code means without looking it up.
+    public class GrblStateToTooltipConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (!(value is GrblState))
+                return null;
+
+            var gs = (GrblState)value;
+
+            string help;
+            if (!Converters.grblStateHelp.Value.TryGetValue(gs.State, out help))
+                help = gs.State.ToString();
+
+            if (gs.State == GrblStates.Alarm)
+            {
+                int code = gs.LastAlarm > 0 ? gs.LastAlarm : gs.Substate;
+                string msg;
+                GrblAlarms.List.TryGetValue(code, out msg);
+                help = "ALARM " + code + (string.IsNullOrEmpty(msg) ? "" : ": " + msg)
+                     + "\n\nThe machine is locked. Clear the cause, then Unlock ($X) - or Home if the position may be lost.";
+            }
+
+            return help;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
