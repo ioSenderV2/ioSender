@@ -115,8 +115,12 @@ namespace CNC.Controls
         private void btnView_Click(object sender, RoutedEventArgs e)
         {
             var macro = Selected;
-            if (macro != null)
-                LaunchEditor(WriteTempMacro(macro));
+            if (macro == null)
+                return;
+
+            // For an "@<path>" reference, open the referenced file directly.
+            string refPath = GetReferencedFilePath(macro.Code);
+            LaunchEditor(refPath ?? WriteTempMacro(macro));
         }
 
         private void btnEdit_Click(object sender, RoutedEventArgs e)
@@ -124,6 +128,25 @@ namespace CNC.Controls
             var macro = Selected;
             if (macro == null)
                 return;
+
+            // For an "@<path>" reference, edit the referenced file directly - the macro's Code
+            // stays the pointer and the file is re-read on each run, so there is no read-back.
+            string refPath = GetReferencedFilePath(macro.Code);
+            if (refPath != null)
+            {
+                try
+                {
+                    if (!File.Exists(refPath))
+                        File.WriteAllText(refPath, string.Empty);   // allow authoring a new referenced file
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Could not create the referenced macro file:\r\n\r\n" + refPath + "\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                LaunchEditor(refPath);
+                return;
+            }
 
             string path = WriteTempMacro(macro);
             if (!LaunchEditor(path))
@@ -160,6 +183,31 @@ namespace CNC.Controls
         private void btnClose_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        // If the macro is an "@<path>" reference, return the resolved file path (relative paths
+        // against the config folder); otherwise null. Mirrors MacroProcessor's run-time resolver.
+        private static string GetReferencedFilePath(string code)
+        {
+            if (string.IsNullOrEmpty(code))
+                return null;
+
+            string trimmed = code.TrimStart();
+            if (!trimmed.StartsWith("@"))
+                return null;
+
+            string path = trimmed.Substring(1);
+            int nl = path.IndexOfAny(new[] { '\r', '\n' });
+            if (nl >= 0)
+                path = path.Substring(0, nl);
+            path = path.Trim();
+            if (path.Length == 0)
+                return null;
+
+            if (!Path.IsPathRooted(path))
+                path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+
+            return path;
         }
 
         // Write the macro's G-code to a temp .txt named after the macro (so the editor's title is meaningful).
