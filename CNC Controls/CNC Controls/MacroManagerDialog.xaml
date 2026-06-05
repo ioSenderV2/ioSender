@@ -57,9 +57,9 @@
         <StackPanel Grid.Row="0" Grid.Column="1" Width="92" Margin="8,0,0,0">
             <Button x:Name="btnCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"/>
             <Button x:Name="btnView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
-                    ToolTip="Open the G-code in your default text editor (read-only)."/>
+                    ToolTip="Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."/>
             <Button x:Name="btnEdit" Content="Edit" Click="btnEdit_Click" Style="{StaticResource SideButton}"
-                    ToolTip="Edit the G-code in your default text editor; saved changes are read back."/>
+                    ToolTip="Edit the macro's definition - the inline G-code, or the @&lt;path&gt; reference line (to change or remove the path). Saved changes are read back."/>
             <Button x:Name="btnDelete" Content="Delete" Click="btnDelete_Click" Style="{StaticResource SideButton}"/>
         </StackPanel>
 

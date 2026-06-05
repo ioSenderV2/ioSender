@@ -2,10 +2,11 @@
  * MacroManagerDialog.xaml.cs - part of CNC Controls library
  *
  * Macro manager presented as a DataGrid (one row per macro: Name, Prompt-before-run,
- * and the F-key that runs it). Name and Prompt are edited in-line; View and Edit open
- * the macro's G-code in the user's default .txt editor (Notepad or whatever is
- * associated), and Edit reads the saved file back. Opened from the Settings:App page;
- * the caller persists on close.
+ * and the F-key that runs it). Name and Prompt are edited in-line. Edit opens the macro's
+ * stored definition (inline G-code, or the "@<path>" reference line) in the default .txt
+ * editor and reads it back; View opens what it points to - the referenced file for an
+ * "@<path>" macro (created if missing), otherwise the code (no read-back). Opened from the
+ * Settings:App page; the caller persists on close.
  *
  * The F-key column is derived from the macro Id (Id n is run by Fn, per
  * JobControl.FnKeyHandler) - it is shown read-only.
@@ -111,26 +112,16 @@ namespace CNC.Controls
             grdMacros.BeginEdit();   // let the user name it straight away
         }
 
-        // View: open the macro's G-code in the default .txt editor. Changes there are not read back.
+        // View: open what the macro points to. For an "@<path>" reference that's the referenced
+        // file itself (created if missing, so a new external macro can be authored); otherwise the
+        // macro's G-code. Edits made here are not read back into the macro - for a referenced file
+        // that's fine (the file is the live source, re-read on each run).
         private void btnView_Click(object sender, RoutedEventArgs e)
         {
             var macro = Selected;
             if (macro == null)
                 return;
 
-            // For an "@<path>" reference, open the referenced file directly.
-            string refPath = GetReferencedFilePath(macro.Code);
-            LaunchEditor(refPath ?? WriteTempMacro(macro));
-        }
-
-        private void btnEdit_Click(object sender, RoutedEventArgs e)
-        {
-            var macro = Selected;
-            if (macro == null)
-                return;
-
-            // For an "@<path>" reference, edit the referenced file directly - the macro's Code
-            // stays the pointer and the file is re-read on each run, so there is no read-back.
             string refPath = GetReferencedFilePath(macro.Code);
             if (refPath != null)
             {
@@ -145,8 +136,18 @@ namespace CNC.Controls
                     return;
                 }
                 LaunchEditor(refPath);
-                return;
             }
+            else
+                LaunchEditor(WriteTempMacro(macro));
+        }
+
+        // Edit: edit the macro's stored definition - the inline G-code, or the "@<path>" reference
+        // line itself (so the path can be changed, repointed, or converted back to inline). Read back.
+        private void btnEdit_Click(object sender, RoutedEventArgs e)
+        {
+            var macro = Selected;
+            if (macro == null)
+                return;
 
             string path = WriteTempMacro(macro);
             if (!LaunchEditor(path))
