@@ -1909,6 +1909,7 @@ namespace CNC.Core
         public static CoordinateSystem ToolLengtOffset { get; private set; } = new CoordinateSystem("TLO", "");
         public static CoordinateSystem ProbePosition { get; private set; } = new CoordinateSystem("PRB", "");
         public static bool ProbeSuccesful { get; private set; } = false;
+        public static int HomedMask { get; private set; } = -1;   // grblHAL sys.homed.mask from the $# [HOME:...] line; -1 = unknown / not fetched
 
         private static Action<string> dataReceived;
 
@@ -1947,6 +1948,7 @@ namespace CNC.Core
             dispatcher = Dispatcher.CurrentDispatcher;
             dataReceived += process;
             LatheMode = GrblParserState.LatheMode;
+            HomedMask = -1;     // fail-closed: only a fresh [HOME:...] line sets it
 
             model.Silent = true;
 
@@ -2107,6 +2109,15 @@ namespace CNC.Core
                                 ProbePosition.Parse(p[0]);
                                 ProbeSuccesful = p[1] == "1";
                             }
+                        }
+                        break;
+
+                    case "HOME":    // [HOME:<x>,<y>,<z>:<homed mask>] - grblHAL sys.homed.mask
+                        {
+                            int c = parameters.LastIndexOf(':');
+                            int mask;
+                            if (c >= 0 && int.TryParse(parameters.Substring(c + 1), out mask))
+                                HomedMask = mask;
                         }
                         break;
                 }
