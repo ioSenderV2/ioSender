@@ -16,13 +16,13 @@
                 <CheckBox x:Uid="lbl_enable" Content="Enable" IsChecked="{Binding Path=Jog.KeyboardEnable, Mode=TwoWay}" Margin="160,3,0,3"/>
                 <Image HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0" Source="Resources/StatusAnnotations_Warning_16xLG_color.png"/>
             </StackPanel>
-            <local:NumericField x:Uid="fld_fastFeedrate" Label="Fast feedrate:" Localization.Attributes = "$Content (Inherit)" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.FastFeedrate, Mode=TwoWay}"/>
-            <local:NumericField x:Uid="fld_fastDistance" Label="Fast distance:" ColonAt="160" Value="{Binding Path=Jog.FastDistance, Mode=TwoWay}" />
-            <local:NumericField x:Uid="fld_slowFeedrate" Label="Slow feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.SlowFeedrate, Mode=TwoWay}"/>
-            <local:NumericField x:Uid="fld_slowDistance" Label="Slow distance:" ColonAt="160" Value="{Binding Path=Jog.SlowDistance, Mode=TwoWay}" />
-            <local:NumericField x:Uid="fld_stepFeedrate" Label="Step feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.StepFeedrate, Mode=TwoWay}"/>
-            <CheckBox x:Uid="lbl_linkStepToUi" Content="Link step distance to UI jogging" IsChecked="{Binding Path=Jog.LinkStepJogToUI, Mode=TwoWay}" Margin="50,3,0,3"/>
-            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay}" IsEnabled="{Binding Path=Jog.LinkStepJogToUI, Converter={StaticResource BooleanNotConverter}}" />
+            <local:NumericField x:Uid="fld_fastFeedrate" Label="Fast feedrate:" Localization.Attributes = "$Content (Inherit)" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.FastFeedrate, Mode=TwoWay}" ToolTip="Feed rate for fast keyboard jogging (e.g. while holding the fast-jog modifier key) - for quickly crossing the table."/>
+            <local:NumericField x:Uid="fld_fastDistance" Label="Fast distance:" ColonAt="160" Value="{Binding Path=Jog.FastDistance, Mode=TwoWay}" ToolTip="How far each fast keyboard jog moves."/>
+            <local:NumericField x:Uid="fld_slowFeedrate" Label="Slow feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.SlowFeedrate, Mode=TwoWay}" ToolTip="Feed rate for normal/slow keyboard jogging - for careful positioning near the work."/>
+            <local:NumericField x:Uid="fld_slowDistance" Label="Slow distance:" ColonAt="160" Value="{Binding Path=Jog.SlowDistance, Mode=TwoWay}" ToolTip="How far each slow keyboard jog moves."/>
+            <local:NumericField x:Uid="fld_stepFeedrate" Label="Step feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.StepFeedrate, Mode=TwoWay}" ToolTip="Feed rate for single-step jogs - each keypress moves exactly one step distance."/>
+            <CheckBox x:Uid="lbl_linkStepToUi" Content="Link step distance to UI jogging" IsChecked="{Binding Path=Jog.LinkStepJogToUI, Mode=TwoWay}" Margin="50,3,0,3" ToolTip="Use the step size selected on the on-screen jog panel for keyboard step jogs too, instead of the fixed step distance below."/>
+            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay}" IsEnabled="{Binding Path=Jog.LinkStepJogToUI, Converter={StaticResource BooleanNotConverter}}" ToolTip="Fixed distance moved per step jog (used when 'Link step distance to UI jogging' is off)."/>
         </StackPanel>
     </GroupBox>
 </UserControl>
