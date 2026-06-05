@@ -207,8 +207,12 @@ namespace CNC.Controls
             if (path.Length == 0)
                 return null;
 
-            if (!Path.IsPathRooted(path))
-                path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+            try
+            {
+                if (!Path.IsPathRooted(path))
+                    path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+            }
+            catch { /* path has characters not valid for the filesystem - use it as typed */ }
 
             return path;
         }
@@ -277,8 +281,12 @@ namespace CNC.Controls
 
             if ((parameter as string) == "path")
             {
-                if (!Path.IsPathRooted(path))
-                    path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+                try
+                {
+                    if (!Path.IsPathRooted(path))
+                        path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+                }
+                catch { /* not a valid filesystem path - show it as typed */ }
                 return "References: " + path;
             }
 
