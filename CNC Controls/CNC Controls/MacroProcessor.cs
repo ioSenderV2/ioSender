@@ -219,11 +219,10 @@ namespace CNC.Controls
                 path = path.Substring(0, nl);
             path = path.Trim();
 
-            if (!Path.IsPathRooted(path))
-                path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
-
             try
             {
+                if (!Path.IsPathRooted(path))   // throws on a path with illegal characters
+                    path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
                 code = File.ReadAllText(path);
             }
             catch (Exception ex)
