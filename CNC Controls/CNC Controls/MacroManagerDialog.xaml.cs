@@ -20,6 +20,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Globalization;
 
 namespace CNC.Controls
 {
@@ -247,6 +249,45 @@ namespace CNC.Controls
             {
                 try { File.Delete(path); } catch { /* still open / already gone - leave it for the OS to clean */ }
             }
+        }
+    }
+
+    // For the macro grid's "File" column: when a macro's body is an "@<path>" reference, returns
+    // the file name for display (or, with ConverterParameter "path", the full resolved path for a
+    // tooltip); returns null for an inline macro so the cell stays blank.
+    public class MacroReferenceConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string code = value as string;
+            if (string.IsNullOrEmpty(code))
+                return null;
+
+            string trimmed = code.TrimStart();
+            if (!trimmed.StartsWith("@"))
+                return null;
+
+            string path = trimmed.Substring(1);
+            int nl = path.IndexOfAny(new[] { '\r', '\n' });
+            if (nl >= 0)
+                path = path.Substring(0, nl);
+            path = path.Trim();
+            if (path.Length == 0)
+                return null;
+
+            if ((parameter as string) == "path")
+            {
+                if (!Path.IsPathRooted(path))
+                    path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
+                return "References: " + path;
+            }
+
+            try { return Path.GetFileName(path); } catch { return path; }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 

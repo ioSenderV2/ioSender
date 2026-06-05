@@ -8,6 +8,7 @@
         Title="Edit Macros" Height="360" Width="520" MinHeight="240" MinWidth="420"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
+        <local:MacroReferenceConverter x:Key="MacroRef"/>
         <Style x:Key="SideButton" TargetType="Button">
             <Setter Property="Height" Value="24"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
@@ -31,6 +32,16 @@
                   SelectionChanged="grdMacros_SelectionChanged" CellEditEnding="grdMacros_CellEditEnding">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="150"/>
+                <DataGridTemplateColumn Header="File" Width="110" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Code, Converter={StaticResource MacroRef}}"
+                                       ToolTip="{Binding Code, Converter={StaticResource MacroRef}, ConverterParameter=path}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="3,0"
+                                       Foreground="#FF606060" FontStyle="Italic"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Prompt" Width="55" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
