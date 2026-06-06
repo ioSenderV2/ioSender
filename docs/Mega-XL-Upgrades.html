@@ -58,6 +58,7 @@ system, air assist, and probing.</p>
   <tbody>
     <tr><td>Vertical clearance</td><td>stock</td><td>+3&Prime; via Mark Smith riser kit</td></tr>
     <tr><td>Z assembly</td><td>stock Z</td><td>Mark Smith Z gantry (only V-wheels + X motor mount reused)</td></tr>
+    <tr><td>Spindle</td><td>DeWalt DWP611 (1&frac14;&nbsp;HP router)</td><td>2.2&nbsp;kW (3&nbsp;HP) &Phi;80&nbsp;mm water-cooled, ER20, 24k&nbsp;RPM, VFD-driven</td></tr>
     <tr><td>Stepper motors</td><td>generic open-loop steppers</td><td>all-in-one closed-loop steppers (driver integrated in motor)</td></tr>
     <tr><td>Limit / homing</td><td>mechanical limit switches</td><td>proximity sensors on every axis</td></tr>
     <tr><td>Probing</td><td>&mdash;</td><td>touch plate + 3D probe in parallel; grounded spindle (no tool clip)</td></tr>
@@ -73,6 +74,21 @@ system, air assist, and probing.</p>
   <li><strong>Mark Smith riser kit</strong> &mdash; adds <strong>3&Prime; of additional vertical (Z) clearance</strong>, allowing taller stock and longer tooling.</li>
   <li><strong>Mark Smith Z gantry</strong> &mdash; a <strong>complete replacement of the Z assembly</strong>. The only stock parts carried over are the <strong>four V-wheels</strong> and the <strong>X stepper motor mount</strong>; everything else is new.</li>
 </ul>
+
+<h2>Spindle &amp; cooling</h2>
+<p>The stock <strong>DeWalt DWP611</strong> (1&frac14;&nbsp;HP trim router) was replaced with a
+<strong>2.2&nbsp;kW (3&nbsp;HP) water-cooled spindle</strong> kit:</p>
+<ul>
+  <li><strong>Spindle</strong> &mdash; &Phi;80&nbsp;mm body, 220&nbsp;V, water-cooled, <strong>ER20 collet</strong>, up to <strong>24,000&nbsp;RPM at 400&nbsp;Hz</strong>.</li>
+  <li><strong>VFD</strong> &mdash; 2.2&nbsp;kW (3&nbsp;HP) inverter, fed from the 220&nbsp;V circuit through the E-stop and commanded by the breakout board's <strong>0&ndash;10&nbsp;V PWM</strong> speed signal (see Power distribution).</li>
+  <li><strong>Mount</strong> &mdash; 80&nbsp;mm spindle clamp on the new Z gantry.</li>
+</ul>
+<p><strong>Coolant loop.</strong> A pump circulates coolant through the spindle; the warmed
+coolant is cooled by the 12&nbsp;V fan (see the power tree) before returning. The pump is
+<strong>interlocked to the spindle</strong>: a <strong>VFD digital output</strong> drives the
+<strong>NO contact of a 110&nbsp;V relay</strong> that the pump is plugged into, so the pump
+runs whenever the VFD runs the spindle &mdash; the spindle can't be run dry. (This is separate
+from the breakout board's Mist relay, which handles air assist.)</p>
 
 <h2>Motors</h2>
 <p>The generic steppers that shipped with the Mega XL were replaced with
