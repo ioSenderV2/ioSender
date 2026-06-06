@@ -66,7 +66,7 @@ system, air assist, and probing.</p>
     <tr><td>Electronics enclosure</td><td>cramped stock steel box</td><td>custom 12&times;16&times;6&Prime; aluminum / plexiglass</td></tr>
     <tr><td>Power</td><td>stock</td><td>48&nbsp;V Meanwell system, E-stop, buck-derived 12&nbsp;V / 5&nbsp;V rails</td></tr>
     <tr><td>Air assist</td><td>none</td><td>Mist-relay 12&nbsp;V solenoid &rarr; 30&nbsp;PSI nozzle at the cut</td></tr>
-    <tr><td>Drag chains</td><td>stock 1.5</td><td>Y axis upsized to the next size to fit the full cable bundle</td></tr>
+    <tr><td>Drag chains</td><td>stock 1.5</td><td>Y axis upsized to 2&Prime; to fit the full cable bundle</td></tr>
     <tr><td>Dust collection</td><td>&mdash;</td><td>4&Prime; swivel + 5&prime; flex to a spindle dust shoe, on an overhead reel</td></tr>
   </tbody>
 </table>
@@ -157,8 +157,8 @@ connectors on the side of the enclosure</strong>: a <strong>female USB-A</strong
 <h2>Power distribution</h2>
 <p>A single <strong>220&nbsp;V, 20&nbsp;A branch circuit</strong> feeds the machine through a
 <strong>front-panel emergency-stop button</strong> (the E-stop breaks the 220&nbsp;V input, so
-it drops both the PSU and the spindle drive). The 220&nbsp;V powers a
-<strong>48&nbsp;V Meanwell power supply</strong> and the <strong>VFD</strong> (spindle drive).
+it drops both the PSU and the spindle drive). The 220&nbsp;V powers an
+<strong>800&nbsp;W 48&nbsp;V Meanwell power supply</strong> and the <strong>VFD</strong> (spindle drive).
 Everything else is derived from the 48&nbsp;V rail through two buck converters.</p>
 
 <div class="tree">
@@ -265,7 +265,7 @@ their drag chains rather than riding through them.</p>
 </table>
 
 <p>That Y bundle &mdash; one 12/4, three 18/6, and one 22/6 &mdash; would not fit the stock
-<strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger</strong>
+<strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger (2&Prime;)</strong>
 carrier.</p>
 
 <h2>Overhead umbilical &amp; dust collection</h2>
@@ -384,6 +384,58 @@ it when ordering from KHK / Misumi / SDP), or a <strong>keyless locking bushing<
 expands to grip both the shaft and the bore, letting you use almost any pinion of the right
 module on the 8&nbsp;mm shaft. The latter is handy here, since matching bore <em>and</em>
 gearing was the sticking point.</p>
+
+<h2>Bill of materials</h2>
+<table>
+  <thead><tr><th>Group</th><th>Item</th><th>Spec / source</th></tr></thead>
+  <tbody>
+    <tr><td>Machine</td><td>Mega&nbsp;V&nbsp;XL (Kickstarter edition)</td><td>base machine</td></tr>
+    <tr><td>Frame</td><td>Mark Smith riser kit</td><td>+3&Prime; Z clearance</td></tr>
+    <tr><td>Frame</td><td>Mark Smith Z gantry assembly</td><td>full Z replacement</td></tr>
+    <tr><td>Control</td><td>Teensy 4.1 + Teensy 4.x breakout board</td><td>grblHAL, Ethernet option</td></tr>
+    <tr><td>I/O</td><td>USB-A pass-through, panel mount</td><td>&nbsp;</td></tr>
+    <tr><td>I/O</td><td>Ethernet pass-through, panel mount</td><td>&nbsp;</td></tr>
+    <tr><td>I/O</td><td>E-stop button</td><td>breaks 220&nbsp;V input</td></tr>
+    <tr><td>Power</td><td>Meanwell 48&nbsp;V power supply</td><td>800&nbsp;W</td></tr>
+    <tr><td>Power</td><td>C20 panel-mount inlet</td><td>220&nbsp;V mains in</td></tr>
+    <tr><td>Power</td><td>Power relay accessory</td><td>110&nbsp;V pump relay &mdash; <a href="https://www.amazon.com/dp/B07Z6R1KP3">Amazon&nbsp;B07Z6R1KP3</a></td></tr>
+    <tr><td>Spindle</td><td>2.2&nbsp;kW 80&nbsp;mm water-cooled spindle + 2.2&nbsp;kW VFD kit</td><td>ER20, 24k&nbsp;RPM &mdash; <a href="https://www.amazon.com/dp/B073TRP92V">Amazon&nbsp;B073TRP92V</a></td></tr>
+    <tr><td>Spindle</td><td>Braking resistor</td><td>150&nbsp;W (&lt;6&nbsp;s stop)</td></tr>
+    <tr><td>Cooling</td><td>Submersible pump</td><td>110&nbsp;V</td></tr>
+    <tr><td>Cooling</td><td>Coolant reservoir</td><td>1&nbsp;gal container (holds the pump)</td></tr>
+    <tr><td>Cooling</td><td>Radiator with integrated 12&nbsp;V fan(s)</td><td>&nbsp;</td></tr>
+    <tr><td>Cooling</td><td>8&nbsp;mm clear tubing</td><td>25&prime; (coolant lines)</td></tr>
+    <tr><td>Cooling</td><td>Coolant mix</td><td>1&nbsp;qt antifreeze + &frac12;&nbsp;gal distilled water + a few drops of bleach</td></tr>
+    <tr><td>Motion</td><td>Z stepper (closed-loop)</td><td>1.2&nbsp;N&middot;m</td></tr>
+    <tr><td>Motion</td><td>X stepper (closed-loop)</td><td>2.0&nbsp;N&middot;m</td></tr>
+    <tr><td>Motion</td><td>Y + A steppers (closed-loop)</td><td>3.2&nbsp;N&middot;m each (&times;2)</td></tr>
+    <tr><td>Motion</td><td>Drag chain</td><td>2&Prime; (Y-axis upsize)</td></tr>
+    <tr><td>Sensing</td><td>Proximity sensors</td><td>&times;4 (limits / homing)</td></tr>
+    <tr><td>Sensing</td><td>3D mechanical probe</td><td>&nbsp;</td></tr>
+    <tr><td>Sensing</td><td>Toolsetter probe</td><td>&nbsp;</td></tr>
+    <tr><td>Air assist</td><td>1/4&Prime; black tubing</td><td>10&prime;</td></tr>
+    <tr><td>Air assist</td><td>Needle valve</td><td>&nbsp;</td></tr>
+    <tr><td>Air assist</td><td>Copper tubing</td><td>12&Prime;</td></tr>
+    <tr><td>Air assist</td><td>Swivel nozzle</td><td>1/8&Prime;</td></tr>
+    <tr><td>Air assist</td><td>Solenoid valve</td><td>12&nbsp;V, NC</td></tr>
+    <tr><td>Air assist</td><td>Pressure regulator</td><td>set 30&nbsp;PSI</td></tr>
+    <tr><td>Air assist</td><td>3D-printed nozzle bracket</td><td>bolts to Z; aims the air stream at the tool tip</td></tr>
+    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/3, 18/6</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+<strong>Not yet itemized</strong> (described in the build above but missing from this BOM):
+<ul style="margin:6px 0 0;">
+  <li><strong>Molex Mini-Fit Jr connectors</strong> &mdash; panel-mount + inline housings, pins and crimp terminals (count per the wiring schedule) &mdash; <em>still to be listed</em>.</li>
+  <li><strong>Enclosure</strong> &mdash; 2020 extrusion, 1/16&Prime; aluminum sheet (5 sides), 1/8&Prime; plexiglass top.</li>
+  <li><strong>Buck converters</strong> &mdash; 12&nbsp;V 3&nbsp;A and 5&nbsp;V 3&nbsp;A.</li>
+  <li><strong>Ferrules</strong> for the terminal-block connections.</li>
+  <li><strong>Touch plate</strong> (probe input in parallel with the 3D probe).</li>
+  <li><strong>Dust collection</strong> &mdash; 4&Prime; duct, 4&Prime; swivel, 5&prime; of 4&Prime; flex hose, dust shoe.</li>
+  <li><strong>Overhead service rig</strong> &mdash; spring retraction reel, 1&Prime; cable sleeve, 3D-printed sleeve cradle.</li>
+</ul>
+</div>
 
 </body>
 </html>
