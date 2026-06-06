@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mega XL - Custom Upgrades &amp; Build Notes</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    font-size: 11.5pt; line-height: 1.5; color: #1a1a1a;
+    max-width: 7.3in; margin: 0 auto; padding: 0 4px;
+  }
+  h1 { font-size: 22pt; margin: 0 0 2px; color: #14365c; }
+  h1 + .subtitle { font-style: italic; color: #555; margin: 0 0 18px; font-size: 12pt; }
+  h2 { font-size: 15pt; color: #14365c; border-bottom: 2px solid #d6e0ea;
+       padding-bottom: 3px; margin: 26px 0 10px; page-break-after: avoid; }
+  h3 { font-size: 12.5pt; color: #1f4e79; margin: 18px 0 6px; page-break-after: avoid; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 26px; }
+  li { margin: 5px 0; }
+  strong { color: #0f2e4f; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt;
+         background: #f1f4f7; padding: 1px 4px; border-radius: 3px; color: #1a3a5a; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10.5pt;
+          page-break-inside: avoid; }
+  th, td { border: 1px solid #cdd6df; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #eaf0f6; color: #14365c; }
+  .tree { background: #f6f8fa; border: 1px solid #dde3e9; border-radius: 5px;
+          padding: 12px 16px; page-break-inside: avoid; }
+  .tree ul { margin: 4px 0; padding-left: 22px; list-style: none; }
+  .tree > ul { padding-left: 4px; }
+  .tree li { position: relative; margin: 3px 0; }
+  .tree li::before { content: "\2514\2500"; color: #9bb0c4; margin-right: 6px; }
+  .tree > ul > li::before { content: ""; margin-right: 0; }
+  .rail { font-weight: bold; color: #0f2e4f; }
+  .flow { background: #f6f8fa; border: 1px solid #dde3e9; border-radius: 5px;
+          padding: 11px 15px; margin: 10px 0; font-weight: 500; color: #1a3a5a;
+          page-break-inside: avoid; }
+  hr { border: none; border-top: 1px solid #dde3e9; margin: 26px 0; }
+  .note { background: #fbf7e8; border-left: 4px solid #e0c14c; border-radius: 0 4px 4px 0;
+          padding: 8px 14px; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>Mega XL &mdash; custom upgrades &amp; build notes</h1>
+<p class="subtitle">Upgrades to a Kickstarter v1.0 Mega XL CNC router.</p>
+
+<p>This documents the changes made to a first-generation (Kickstarter v1.0) Mega XL: a
+taller, stiffer Z, closed-loop motors, all-proximity homing, and a complete electronics
+rebuild around a grblHAL controller in a custom enclosure with a proper 48&nbsp;V power
+system, air assist, and probing.</p>
+
+<h2>At a glance</h2>
+<table>
+  <thead><tr><th>Subsystem</th><th>Stock (v1.0)</th><th>Upgraded</th></tr></thead>
+  <tbody>
+    <tr><td>Vertical clearance</td><td>stock</td><td>+3&Prime; via Mark Smith riser kit</td></tr>
+    <tr><td>Z assembly</td><td>stock Z</td><td>Mark Smith Z gantry (only V-wheels + X motor mount reused)</td></tr>
+    <tr><td>Stepper motors</td><td>generic open-loop steppers</td><td>all-in-one closed-loop steppers (driver integrated in motor)</td></tr>
+    <tr><td>Limit / homing</td><td>mechanical limit switches</td><td>proximity sensors on every axis</td></tr>
+    <tr><td>Probing</td><td>&mdash;</td><td>touch plate + 3D probe in parallel; grounded spindle (no tool clip)</td></tr>
+    <tr><td>Controller</td><td>8-bit Arduino board</td><td>grblHAL Teensy 4.x (USB + Ethernet)</td></tr>
+    <tr><td>Electronics enclosure</td><td>cramped stock steel box</td><td>custom 12&times;16&times;6&Prime; aluminum / plexiglass</td></tr>
+    <tr><td>Power</td><td>stock</td><td>48&nbsp;V Meanwell system, E-stop, buck-derived 12&nbsp;V / 5&nbsp;V rails</td></tr>
+    <tr><td>Air assist</td><td>none</td><td>Mist-relay 12&nbsp;V solenoid &rarr; 30&nbsp;PSI nozzle at the cut</td></tr>
+  </tbody>
+</table>
+
+<h2>Frame &amp; mechanical</h2>
+<ul>
+  <li><strong>Mark Smith riser kit</strong> &mdash; adds <strong>3&Prime; of additional vertical (Z) clearance</strong>, allowing taller stock and longer tooling.</li>
+  <li><strong>Mark Smith Z gantry</strong> &mdash; a <strong>complete replacement of the Z assembly</strong>. The only stock parts carried over are the <strong>four V-wheels</strong> and the <strong>X stepper motor mount</strong>; everything else is new.</li>
+</ul>
+
+<h2>Motors</h2>
+<p>The generic steppers that shipped with the Mega XL were replaced with
+<strong>all-in-one closed-loop stepper motors</strong> &mdash; each motor has its stepper
+driver built into the motor body. This removes the separate driver boards, adds closed-loop
+position feedback (lost-step detection / alarm), and simplifies wiring to a single cable per
+motor.</p>
+<ul>
+  <li><strong>Individual enable</strong> per motor &mdash; each stepper's <code>EN</code> line is driven separately.</li>
+  <li>The motors' <strong><code>AL</code> (alarm) outputs are wire-OR'd together</strong> and fed to the controller's <strong><code>ST0</code> input</strong>, so a stall / lost-step fault on any motor signals the controller.</li>
+</ul>
+<p>All four axes are closed-loop. The machine is a <strong>dual-Y gantry</strong> &mdash; the
+two Y gantries are driven by ganged motors (<strong>Y + A</strong>), one per side.</p>
+<table>
+  <thead><tr><th>Axis</th><th>Holding torque</th><th>Drives</th></tr></thead>
+  <tbody>
+    <tr><td>Y + A</td><td>3.2 N&middot;m each</td><td>the two Y gantries (ganged)</td></tr>
+    <tr><td>X</td><td>2.0 N&middot;m</td><td>spindle carriage along the cross-beam (rack &amp; pinion)</td></tr>
+    <tr><td>Z</td><td>1.2 N&middot;m</td><td>Z</td></tr>
+  </tbody>
+</table>
+<p>All motors have an <strong>8 mm output shaft with a flat</strong>, with pinions/couplings
+retained by a grub screw on the flat. <em>Build note:</em> the stock Mega XL pinions were
+6 mm-bore and were <strong>reamed to 8 mm</strong> at a machine shop &mdash; this thinned the
+set-screw boss and reduced grub-screw thread engagement. See the
+<a href="#rp">rack-and-pinion maintenance</a> appendix.</p>
+
+<h2>Homing &amp; limit sensing</h2>
+<p>The Mark Smith Z gantry uses a <strong>proximity sensor</strong> as its limit switch. To
+keep one sensing scheme across the machine, <strong>all remaining stock mechanical limit
+switches were replaced with the same style of proximity sensor</strong>, so every axis homes
+on identical, non-contact hardware.</p>
+
+<h2>Probing</h2>
+<ul>
+  <li>The <strong>touch-plate input is wired in parallel with the primary probe input</strong>, alongside the <strong>3D mechanical probe</strong> &mdash; either device can trigger the same probe input.</li>
+  <li>The <strong>spindle mount is grounded</strong>, so the tool itself is at ground through the spindle. That completes the touch-plate circuit on contact &mdash; <strong>no alligator clip on the tool</strong> is required.</li>
+</ul>
+
+<h2>Controller &amp; electronics enclosure</h2>
+<ul>
+  <li>Discarded the <strong>cramped stock steel electronics enclosure</strong> and the
+  <strong>stock 8-bit Arduino controller board</strong>.</li>
+  <li>Control is now a <strong>grblHAL Teensy 4.x</strong> controller on a breakout board (32-bit).</li>
+  <li>Built a <strong>custom 12&Prime; &times; 16&Prime; &times; 6&Prime; enclosure</strong>:
+    <ul>
+      <li>Frame: <strong>2020 aluminum extrusion</strong>.</li>
+      <li>Five sides: <strong>0.0625&Prime; (1/16&Prime;) aluminum sheet</strong>.</li>
+      <li>Top: <strong>1/8&Prime; clear plexiglass</strong> (visibility into the electronics).</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>Connectivity</h2>
+<p>The Teensy 4.x supports Ethernet, and the breakout board has the <strong>Ethernet option
+installed</strong>. Both links to the Teensy are brought out as <strong>panel patch-through
+connectors on the side of the enclosure</strong>: a <strong>female USB-A</strong> jack and a
+<strong>female Ethernet (RJ45)</strong> jack.</p>
+
+<h2>Power distribution</h2>
+<p>A single <strong>220&nbsp;V, 20&nbsp;A branch circuit</strong> feeds the machine through a
+<strong>front-panel emergency-stop button</strong> (the E-stop breaks the 220&nbsp;V input, so
+it drops both the PSU and the spindle drive). The 220&nbsp;V powers a
+<strong>48&nbsp;V Meanwell power supply</strong> and the <strong>VFD</strong> (spindle drive).
+Everything else is derived from the 48&nbsp;V rail through two buck converters.</p>
+
+<div class="tree">
+<ul>
+  <li><span class="rail">220&nbsp;V, 20&nbsp;A</span> &rarr; front-panel E-stop &rarr;
+    <ul>
+      <li>48&nbsp;V Meanwell power supply</li>
+      <li>VFD (spindle drive)</li>
+    </ul>
+  </li>
+  <li><span class="rail">48&nbsp;V</span> (PSU output) &rarr;
+    <ul>
+      <li>4 &times; stepper motors</li>
+      <li>12&nbsp;V / 3&nbsp;A buck converter</li>
+      <li>5&nbsp;V / 3&nbsp;A buck converter</li>
+    </ul>
+  </li>
+  <li><span class="rail">12&nbsp;V</span> (buck) &rarr;
+    <ul>
+      <li>4 &times; proximity limit sensors</li>
+      <li>12&nbsp;V fan cooling the spindle coolant loop (runs while the spindle runs)</li>
+      <li>grblHAL Teensy 4.x breakout board, 12&nbsp;V input &mdash; the board uses 12&nbsp;V to generate the <strong>0&ndash;10&nbsp;V PWM spindle-speed signal</strong> to the VFD</li>
+    </ul>
+  </li>
+  <li><span class="rail">5&nbsp;V</span> (buck) &rarr;
+    <ul>
+      <li>breakout board 5&nbsp;V input &mdash; board logic power, <strong>separate from the Teensy</strong> (the Teensy is powered over USB)</li>
+      <li>3D probe</li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+<h2>Relay outputs &amp; air assist</h2>
+<p>The breakout board provides <strong>5 relay outputs</strong>, each <strong>jumper-selectable
+for 5&nbsp;V or 12&nbsp;V</strong>. Only the <strong>Mist</strong> output is in use, driving the
+air-assist nozzle:</p>
+
+<div class="flow">Mist relay &rarr; 12&nbsp;V solenoid valve (compressed-air inlet) &rarr; regulator @ 30&nbsp;PSI &rarr; needle valve at top of Z gantry &rarr; 1/8&Prime; copper airline &rarr; swivel nozzle aimed where the tool meets the stock</div>
+
+<h2>Connectors &amp; terminations</h2>
+<p><strong>Ferrules are crimped on all terminal-block connections</strong> &mdash; every
+stranded conductor landing on a terminal block is ferruled for a clean, captured, reliable
+termination.</p>
+<p>Enclosure pass-throughs use <strong>Molex Mini-Fit Jr panel-mount connectors</strong>. The
+choice was deliberate: with roughly 60 terminations to make, the builder had far more
+confidence producing <strong>~60 quality crimps</strong> than ~60 quality solder joints on
+aircraft-style connectors.</p>
+
+<h2>Cable &amp; wiring schedule</h2>
+<p>All runs use shielded cable.</p>
+
+<table>
+  <thead><tr><th>Cable</th><th>Run</th><th>Conductors</th></tr></thead>
+  <tbody>
+    <tr><td><strong>18/6 shielded</strong></td><td>enclosure &rarr; each stepper motor</td><td>6 (assignment depends on motor type &mdash; see below)</td></tr>
+    <tr><td><strong>22/3 shielded</strong></td><td>enclosure &rarr; Y-axis proximity switches</td><td><code>12V</code>, <code>Sig</code>, <code>GND</code></td></tr>
+    <tr><td><strong>22/6 shielded</strong></td><td>enclosure &rarr; X &amp; Z proximity sensors + 3D probe (shared)</td><td><code>12V</code>, <code>GND</code>, <code>XLim</code>, <code>ZLim</code>, <code>P</code>, <code>5V</code></td></tr>
+  </tbody>
+</table>
+
+<h3>18/6 stepper cable &mdash; conductor assignment</h3>
+<table>
+  <thead><tr><th>Conductor</th><th>Closed-loop stepper</th><th>Discrete (open-loop) stepper</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>48V</code></td><td><code>A+</code></td></tr>
+    <tr><td>2</td><td><code>GND</code></td><td><code>A-</code></td></tr>
+    <tr><td>3</td><td><code>DIR</code></td><td><code>B+</code></td></tr>
+    <tr><td>4</td><td><code>PUL</code></td><td><code>B-</code></td></tr>
+    <tr><td>5</td><td><code>EN</code></td><td><code>EN</code></td></tr>
+    <tr><td>6</td><td><code>AL</code></td><td><code>AL</code></td></tr>
+  </tbody>
+</table>
+<p><strong>All four axes on this build are closed-loop</strong>, so they all use the left-column
+assignment (<code>48V</code>/<code>GND</code>/<code>DIR</code>/<code>PUL</code>/<code>EN</code>/<code>AL</code>).
+<code>DIR</code>/<code>PUL</code> are direction/step to the integrated drives; <code>EN</code> = enable,
+<code>AL</code> = alarm. The discrete <code>A&plusmn;</code>/<code>B&plusmn;</code> column is kept
+for reference only &mdash; the same 18/6 cable would serve an open-loop motor if one were ever fitted.</p>
+
+<h2 id="rp">Rack-and-pinion drive &mdash; setup &amp; maintenance</h2>
+<p>X (and the Y/A gantry drives) run on rack and pinion. After ~10 hours the X pinion crept
+<strong>left</strong> under load. A closed-loop motor can't see slip <em>downstream</em> of its
+shaft encoder, so a pinion loosening on the shaft is invisible until a fixed reference (the
+toolsetter at G59.3) exposes it. With the bores reamed 6&rarr;8 mm the set-screw boss is thin
+and grub-screw grip is the weak point; X slips first because it takes the most direct cutting
+side-load, but the other reamed pinions carry the same risk.</p>
+
+<h3>Pinion-to-shaft &mdash; stop the slip</h3>
+<ol>
+  <li>Pull the pinion; confirm the grub screw seats on the shaft <strong>flat</strong> (not a round section), and check whether the screw marred the flat or only kissed it.</li>
+  <li><strong>Degrease</strong> shaft, bore, and screw threads &mdash; oil defeats both grip and threadlocker.</li>
+  <li>Use the <strong>longest grub screw</strong> the thinned boss will take, on the flat; add a second screw if there's room.</li>
+  <li><strong>Threadlocker:</strong> blue (242/243) is normally enough; with the reduced thread engagement here, <strong>red (271)</strong> is justified as insurance against back-out &mdash; just note removal then needs heat (~250&nbsp;&deg;C, easy on a bare pinion).</li>
+  <li>Torque to screw size (M3 ~1.0&ndash;1.4, M4 ~2.5&ndash;3, M5 ~5&ndash;6 N&middot;m); snug, don't strip the hex. Let red cure ~24 h before heavy cuts.</li>
+</ol>
+
+<h3>Pinion-to-rack mesh &amp; backlash</h3>
+<ol>
+  <li>Loosen the motor mount so the pinion can move toward / away from the rack.</li>
+  <li>Shim <strong>0.05&ndash;0.10 mm</strong> (feeler gauge, or ~0.1 mm folded paper) between a pinion tooth and the rack, push the pinion in against the shim, tighten the mount, remove the shim.</li>
+  <li>Check the mesh over the <strong>full travel</strong> &mdash; it should stay lightly meshed everywhere. Tight at one end + slack at the other means the rack isn't parallel to the axis; realign the rack first.</li>
+  <li>Confirm full tooth-width engagement (pinion not riding a tooth edge).</li>
+</ol>
+
+<h3>Verify</h3>
+<ol>
+  <li>By hand: smooth full travel, minimal lash; rock the gantry and feel for play at the pinion.</li>
+  <li>Dial indicator: commanded vs actual on small moves; reverse direction to read backlash (a few thou).</li>
+  <li>Re-run a heavy back-and-forth / cut loop with paint-pen <strong>witness marks</strong> (motor shaft &harr; pinion, and a pinion tooth &harr; a rack tooth) &mdash; no separation = fixed.</li>
+  <li>Confirm the <code>AL &rarr; ST0</code> alarm actually halts grblHAL (force a stall) so a real fault can't pass silently.</li>
+</ol>
+
+<h3>If it still creeps</h3>
+<p>A single grub screw &mdash; especially in a reamed, thin-wall boss &mdash; is marginal for
+rack-and-pinion loads. Durable fixes, in order: <strong>proper 8 mm-bore pinions</strong>
+(full set-screw boss) &rarr; <strong>clamp / split-hub pinion</strong> (grips the whole shaft,
+no set screw) &rarr; <strong>keyed shaft</strong>. Given the reamed pinions, the
+<strong>clamp-hub style is the recommended upgrade</strong> &mdash; it ends set-screw slip for good.</p>
+
+</body>
+</html>
