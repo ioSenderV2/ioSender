@@ -256,5 +256,62 @@ rack-and-pinion loads. Durable fixes, in order: <strong>proper 8 mm-bore pinions
 no set screw) &rarr; <strong>keyed shaft</strong>. Given the reamed pinions, the
 <strong>clamp-hub style is the recommended upgrade</strong> &mdash; it ends set-screw slip for good.</p>
 
+<h3>Sourcing a replacement pinion</h3>
+<p>Match the rack on three things, plus the bore:</p>
+<ul>
+  <li><strong>Module</strong> (tooth size) &mdash; <code>module = tooth&nbsp;pitch &divide; &pi;</code> (pitch 3.14&nbsp;mm = Mod&nbsp;1, 4.71&nbsp;mm = Mod&nbsp;1.5, 6.28&nbsp;mm = Mod&nbsp;2). Must match the rack exactly.</li>
+  <li><strong>Pressure angle</strong> &mdash; almost always <strong>20&deg;</strong>.</li>
+  <li><strong>Tooth count</strong> &mdash; match the original to keep steps/mm, or pick a new count and recalibrate <code>$100</code> (X steps/mm) in grblHAL.</li>
+  <li><strong>Bore</strong> &mdash; 8&nbsp;mm, ideally a <strong>clamp or keyed</strong> bore, not a bare set-screw boss.</li>
+</ul>
+<p>Sources that let you specify <em>module + 20&deg; + 8&nbsp;mm clamp/keyed bore</em>:
+<strong>KHK / QTC</strong> (khkgears.us, qtcgears.com &mdash; best for CNC rack &amp; pinion),
+<strong>SDP/SI</strong> (sdp-si.com), <strong>Misumi</strong> (configurable bore &amp; keyway),
+and <strong>McMaster-Carr</strong> (quick metric-module steel gears). Budget CNC rack-and-pinion
+sets are on Amazon / AliExpress (Mod&nbsp;1/1.5, 20T, often 8&nbsp;mm bore) with variable quality.</p>
+
+<h3>Clamp hub vs set-screw hub</h3>
+<p>A <strong>clamp (split) hub</strong> grips like a clamp-style shaft collar: a slit is sawn
+through the bore and a screw bridges it; tightening the screw squeezes the slit closed so the
+<strong>whole bore clamps the shaft 360&deg;</strong> &mdash; far more holding torque, no
+marring, and no dependence on a thin set-screw boss (exactly the reamed-pinion weakness).</p>
+
+<svg viewBox="0 0 720 340" width="100%" style="max-width:640px; display:block; margin:12px 0; border:1px solid #dde3e9; border-radius:6px; background:#fff;">
+  <text x="180" y="30" text-anchor="middle" font-family="Segoe UI, Arial" font-size="17" font-weight="bold" fill="#14365c">Set-screw bore</text>
+  <text x="540" y="30" text-anchor="middle" font-family="Segoe UI, Arial" font-size="17" font-weight="bold" fill="#14365c">Clamp bore</text>
+
+  <!-- set-screw hub -->
+  <circle cx="180" cy="175" r="82" fill="#e3eaf1" stroke="#5a6b7d" stroke-width="2.5"/>
+  <circle cx="180" cy="175" r="38" fill="#9fb0c0" stroke="#5a6b7d" stroke-width="2"/>
+  <line x1="160" y1="139" x2="200" y2="139" stroke="#3a4a5a" stroke-width="3"/>
+  <rect x="166" y="69" width="28" height="70" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="2"/>
+  <rect x="174" y="69" width="12" height="9" fill="#5a6b7d"/>
+  <line x1="166" y1="88" x2="194" y2="88" stroke="#8a99a8" stroke-width="1.5"/>
+  <line x1="166" y1="100" x2="194" y2="100" stroke="#8a99a8" stroke-width="1.5"/>
+  <line x1="166" y1="112" x2="194" y2="112" stroke="#8a99a8" stroke-width="1.5"/>
+  <line x1="166" y1="124" x2="194" y2="124" stroke="#8a99a8" stroke-width="1.5"/>
+  <circle cx="180" cy="139" r="5" fill="#c0392b"/>
+  <text x="180" y="288" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#444">point load on a flat</text>
+  <text x="180" y="307" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#c0392b">reamed boss = few threads = creeps</text>
+
+  <!-- clamp hub -->
+  <circle cx="540" cy="175" r="82" fill="#e3eaf1" stroke="#5a6b7d" stroke-width="2.5"/>
+  <circle cx="540" cy="175" r="44" fill="none" stroke="#2e8b57" stroke-width="3" stroke-dasharray="5 4"/>
+  <circle cx="540" cy="175" r="38" fill="#9fb0c0" stroke="#5a6b7d" stroke-width="2"/>
+  <rect x="536" y="93" width="8" height="44" fill="#ffffff" stroke="#5a6b7d" stroke-width="1.5"/>
+  <rect x="500" y="101" width="80" height="14" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="2"/>
+  <rect x="492" y="96" width="14" height="24" rx="2" fill="#5a6b7d"/>
+  <text x="540" y="86" text-anchor="middle" font-family="Segoe UI, Arial" font-size="17" fill="#2e8b57">&#8594;&#160;&#160;&#8592;</text>
+  <text x="540" y="288" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#444">slit + screw close the bore</text>
+  <text x="540" y="307" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#2e8b57">grips the shaft 360&deg; &mdash; no flat needed</text>
+</svg>
+
+<p>Two routes to a clamp mount: a pinion with an <strong>integral clamp bore</strong> (specify
+it when ordering from KHK / Misumi / SDP), or a <strong>keyless locking bushing</strong>
+(Trantorque GT, Fenner B-LOC, &hellip;) dropped inside a larger-bore pinion &mdash; the bushing
+expands to grip both the shaft and the bore, letting you use almost any pinion of the right
+module on the 8&nbsp;mm shaft. The latter is handy here, since matching bore <em>and</em>
+gearing was the sticking point.</p>
+
 </body>
 </html>
