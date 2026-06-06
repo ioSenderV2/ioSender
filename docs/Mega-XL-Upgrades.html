@@ -67,6 +67,7 @@ system, air assist, and probing.</p>
     <tr><td>Power</td><td>stock</td><td>48&nbsp;V Meanwell system, E-stop, buck-derived 12&nbsp;V / 5&nbsp;V rails</td></tr>
     <tr><td>Air assist</td><td>none</td><td>Mist-relay 12&nbsp;V solenoid &rarr; 30&nbsp;PSI nozzle at the cut</td></tr>
     <tr><td>Drag chains</td><td>stock 1.5</td><td>Y axis upsized to the next size to fit the full cable bundle</td></tr>
+    <tr><td>Dust collection</td><td>&mdash;</td><td>4&Prime; swivel + 5&prime; flex to a spindle dust shoe, on an overhead reel</td></tr>
   </tbody>
 </table>
 
@@ -83,13 +84,17 @@ system, air assist, and probing.</p>
   <li><strong>Spindle</strong> &mdash; &Phi;80&nbsp;mm body, 220&nbsp;V, water-cooled, <strong>ER20 collet</strong>, up to <strong>24,000&nbsp;RPM at 400&nbsp;Hz</strong>.</li>
   <li><strong>VFD</strong> &mdash; 2.2&nbsp;kW (3&nbsp;HP) inverter, fed from the 220&nbsp;V circuit through the E-stop and commanded by the breakout board's <strong>0&ndash;10&nbsp;V PWM</strong> speed signal (see Power distribution).</li>
   <li><strong>Mount</strong> &mdash; 80&nbsp;mm spindle clamp on the new Z gantry.</li>
+  <li><strong>Braking resistor</strong> &mdash; a 150&nbsp;W resistor on the VFD dissipates regen energy for a fast stop (spindle down in <strong>under 6&nbsp;s</strong>).</li>
 </ul>
-<p><strong>Coolant loop.</strong> A pump circulates coolant through the spindle; the warmed
-coolant is cooled by the 12&nbsp;V fan (see the power tree) before returning. The pump is
-<strong>interlocked to the spindle</strong>: a <strong>VFD digital output</strong> drives the
-<strong>NO contact of a 110&nbsp;V relay</strong> that the pump is plugged into, so the pump
-runs whenever the VFD runs the spindle &mdash; the spindle can't be run dry. (This is separate
-from the breakout board's Mist relay, which handles air assist.)</p>
+<p><strong>Coolant loop.</strong> A pump <strong>submerged in a 1-gallon reservoir</strong>
+circulates coolant through the spindle via <strong>two 8&nbsp;mm tubes</strong> (supply and
+return): <em>reservoir &rarr; pump &rarr; spindle &rarr; radiator &rarr; reservoir</em>. The
+radiator is cooled by the 12&nbsp;V fan (see the power tree). The pump is <strong>interlocked to
+the spindle</strong> &mdash; a <strong>VFD digital output</strong> drives the <strong>NO contact
+of a 110&nbsp;V relay</strong> the pump plugs into &mdash; so it runs whenever the spindle does
+and the spindle can't be run dry. (Separate from the breakout board's Mist relay, which handles
+air assist.) The coolant tubes, the air-assist line, and dust extraction all reach the spindle
+through the overhead umbilical (below).</p>
 
 <h2>Motors</h2>
 <p>The generic steppers that shipped with the Mega XL were replaced with
@@ -192,7 +197,7 @@ Everything else is derived from the 48&nbsp;V rail through two buck converters.<
 for 5&nbsp;V or 12&nbsp;V</strong>. Only the <strong>Mist</strong> output is in use, driving the
 air-assist nozzle:</p>
 
-<div class="flow">Mist relay &rarr; 12&nbsp;V solenoid valve (compressed-air inlet) &rarr; regulator @ 30&nbsp;PSI &rarr; needle valve at top of Z gantry &rarr; 1/8&Prime; copper airline &rarr; swivel nozzle aimed where the tool meets the stock</div>
+<div class="flow">Mist relay &rarr; 12&nbsp;V <strong>NC</strong> solenoid valve &rarr; regulator @ 30&nbsp;PSI &rarr; 1/4&Prime; tube (up the umbilical) &rarr; needle valve at top of Z gantry &rarr; 1/8&Prime; copper airline &rarr; swivel nozzle aimed where the tool meets the stock</div>
 
 <h2>Connectors &amp; terminations</h2>
 <p><strong>Ferrules are crimped on all terminal-block connections</strong> &mdash; every
@@ -262,6 +267,26 @@ their drag chains rather than riding through them.</p>
 <p>That Y bundle &mdash; one 12/4, three 18/6, and one 22/6 &mdash; would not fit the stock
 <strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger</strong>
 carrier.</p>
+
+<h2>Overhead umbilical &amp; dust collection</h2>
+<p>The spindle's services arrive from <strong>above</strong> rather than through a drag chain,
+on a <strong>ceiling-mounted spring retraction reel</strong> that takes up slack as the gantry
+moves.</p>
+<ul>
+  <li><strong>Umbilical:</strong> the two 8&nbsp;mm coolant tubes and a 1/4&Prime; compressed-air
+  tube run from the top of the Z gantry into a <strong>1&Prime; cable sleeve</strong>.</li>
+  <li><strong>Retraction reel:</strong> the sleeve hangs from a spring-loaded retraction reel on
+  the ceiling above the machine. A <strong>3D-printed cradle</strong> holds the sleeve and clips
+  to the reel hook, so the reel's pull-wire can't wrap and choke the sleeve while still allowing
+  free movement.</li>
+  <li><strong>Routing:</strong> the sleeve terminates at the <strong>back of the CNC</strong>,
+  where the coolant tubes join the pump outlet and the radiator inlet (radiator outlet returns to
+  the reservoir). The air tube comes from the pressure-regulator outlet, whose inlet is fed by the
+  12&nbsp;V NC Mist solenoid.</li>
+  <li><strong>Dust collection:</strong> alongside the umbilical, a <strong>4&Prime; duct</strong>
+  ends in a <strong>4&Prime; swivel</strong> feeding <strong>5&prime; of 4&Prime; flex hose</strong>
+  to a <strong>dust shoe</strong> on the spindle.</li>
+</ul>
 
 <h2 id="rp">Rack-and-pinion drive &mdash; setup &amp; maintenance</h2>
 <p>X (and the Y/A gantry drives) run on rack and pinion. After ~10 hours the X pinion crept
