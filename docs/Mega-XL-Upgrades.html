@@ -66,6 +66,7 @@ system, air assist, and probing.</p>
     <tr><td>Electronics enclosure</td><td>cramped stock steel box</td><td>custom 12&times;16&times;6&Prime; aluminum / plexiglass</td></tr>
     <tr><td>Power</td><td>stock</td><td>48&nbsp;V Meanwell system, E-stop, buck-derived 12&nbsp;V / 5&nbsp;V rails</td></tr>
     <tr><td>Air assist</td><td>none</td><td>Mist-relay 12&nbsp;V solenoid &rarr; 30&nbsp;PSI nozzle at the cut</td></tr>
+    <tr><td>Drag chains</td><td>stock 1.5</td><td>Y axis upsized to the next size to fit the full cable bundle</td></tr>
   </tbody>
 </table>
 
@@ -231,6 +232,36 @@ assignment (<code>48V</code>/<code>GND</code>/<code>DIR</code>/<code>PUL</code>/
 <code>DIR</code>/<code>PUL</code> are direction/step to the integrated drives; <code>EN</code> = enable,
 <code>AL</code> = alarm. The discrete <code>A&plusmn;</code>/<code>B&plusmn;</code> column is kept
 for reference only &mdash; the same 18/6 cable would serve an open-loop motor if one were ever fitted.</p>
+
+<h2>Drag chains (cable carriers)</h2>
+<p>Each axis's drag chain carries every cable that has to continue past it, so loading is
+cumulative toward the base of the motion chain. <strong>Y is the fullest</strong> &mdash;
+everything routes through the Y carrier first to reach the gantry, then the X carrier feeds the
+spindle carriage, while the opposite gantry rail (<strong>A</strong>) carries only its own
+stepper. The two limit-sensor drops that don't need to flex (A and Y) <strong>begin after</strong>
+their drag chains rather than riding through them.</p>
+
+<table>
+  <thead><tr><th>Drag chain</th><th>Cables carried</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A axis</strong><br>(opposite gantry rail)</td>
+      <td>1 &times; 18/6 (A stepper)<br><em>A limit (22/3) picks up after the chain</em></td>
+    </tr>
+    <tr>
+      <td><strong>X axis</strong><br>(spindle carriage)</td>
+      <td>1 &times; 12/4 (spindle power)<br>2 &times; 18/6 (X &amp; Z steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)</td>
+    </tr>
+    <tr>
+      <td><strong>Y axis</strong><br>(gantry &mdash; carries everything)</td>
+      <td>1 &times; 12/4 (spindle power)<br>3 &times; 18/6 (X, Z &amp; Y steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)<br><em>Y limit (22/3) picks up after the chain</em></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>That Y bundle &mdash; one 12/4, three 18/6, and one 22/6 &mdash; would not fit the stock
+<strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger</strong>
+carrier.</p>
 
 <h2 id="rp">Rack-and-pinion drive &mdash; setup &amp; maintenance</h2>
 <p>X (and the Y/A gantry drives) run on rack and pinion. After ~10 hours the X pinion crept
