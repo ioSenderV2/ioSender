@@ -219,6 +219,7 @@
       <DependentUpon>SDCardView.xaml</DependentUpon>
     </Compile>
     <Compile Include="SimulatorManager.cs" />
+    <Compile Include="ValidateProcessor.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SidebarItem.cs" />
     <Compile Include="SignalControl.xaml.cs">

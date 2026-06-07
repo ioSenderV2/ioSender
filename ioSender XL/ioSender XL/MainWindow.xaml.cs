@@ -365,8 +365,8 @@ namespace GCode_Sender
                 : System.Windows.Media.Color.FromRgb(0xE5, 0xE5, 0xE5)); // default gray
         }
 
-        // Right-click "Target" status item -> Validate. Only enabled while connected; launches the
-        // grblHAL validator (a separate process that exercises the controller's command responses).
+        // Right-click "Target" status item -> Validate. Only enabled while connected; exercises the
+        // connected controller's G-code command set in check mode and reports which features it accepts.
         private void targetContextMenu_Opened(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.ContextMenu cm && cm.Items.Count > 0 && cm.Items[0] is MenuItem mi)
@@ -375,25 +375,7 @@ namespace GCode_Sender
 
         private void validateMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string exe = SimulatorManager.FindExecutable("grblHAL_validator.exe");
-            if (exe == null)
-            {
-                MessageBox.Show("grblHAL_validator.exe not found (looked in the application folder and its 'simulator' subfolder).", "Validate", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
-                {
-                    WorkingDirectory = System.IO.Path.GetDirectoryName(exe),
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to launch validator:\n{ex.Message}", "Validate", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            ValidateProcessor.Run((GrblViewModel)DataContext);
         }
 
         private void AttachBasePropertyChangedHandler()
