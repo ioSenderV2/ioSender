@@ -184,4 +184,13 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <!-- Copy the bundled simulator (grblHAL_sim / grblHAL_validator) into <output>\simulator\ so the
+       connection dialog's Simulator tab finds it via AppDomain.BaseDirectory when running from the repo.
+       Mirrors the installed layout (simulator folder next to the exe). -->
+  <Target Name="CopySimulator" AfterTargets="Build">
+    <ItemGroup>
+      <SimulatorFiles Include="$(ProjectDir)..\..\simulator\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SimulatorFiles)" DestinationFolder="$(OutDir)simulator\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

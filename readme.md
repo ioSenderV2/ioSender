@@ -29,6 +29,8 @@ type in your computers IP address and click _Ok_ to connect.
 You can run gcode programs, jog, access settings etc. but _not_ use gcodes that needs input - e.g. probing.  
 The simulator can be stopped by typing \<Ctrl\>+C in the command window or by closing it.
 
+If you ship ioSender with a prebuilt simulator for convenience, include the simulator executable (named `simulator.exe` or equivalent) in the installer .zip so it is placed next to the ioSender executable. The connection dialog has a new "Simulator" tab which can optionally start a local simulator and connect to `127.0.0.1:<port>` (default port 23).
+
 ---
 
 Latest release is [2.0.47](https://github.com/terjeio/ioSender/releases/tag/2.0.47), see the [changelog](changelog.md) for details. 

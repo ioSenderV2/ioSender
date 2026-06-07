@@ -178,6 +178,14 @@ namespace GCode_Sender
         public ViewType ViewType { get { return ViewType.GRBL; } }
         public bool CanEnable { get { return true; } }
 
+        // Reset controller state so a fresh Connect (e.g. switching simulators) re-runs the handshake.
+        public void PrepareForReconnect()
+        {
+            initOK = null;
+            isBooted = false;
+            Controller = null;
+        }
+
         public void Activate(bool activate, ViewType chgMode)
         {
             if (activate)

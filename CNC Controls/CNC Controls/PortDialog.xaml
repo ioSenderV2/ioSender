@@ -4,9 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CNC.Controls"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         x:Uid="dlg_connection"
-        Title="Sender connection" Height="198" Width="400" Icon="App.ico" ResizeMode="NoResize">
+        Title="Sender connection" SizeToContent="Height" MinHeight="240" Width="450" Icon="App.ico" ResizeMode="NoResize">
     <Window.Resources>
         <Style x:Key="PortErrorStyle" TargetType="local:NumericTextBox">
             <Style.Triggers>
@@ -30,7 +31,11 @@
         </Style>
     </Window.Resources>
     <Grid Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
-        <TabControl x:Name="tab" Width="Auto" Height="125" Margin="5,0" VerticalAlignment="Top">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TabControl x:Name="tab" Grid.Row="0" Margin="5,5,5,0">
             <TabItem x:Uid="tab_serial" Header="Serial">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
@@ -66,7 +71,7 @@
                     <CheckBox x:Uid="lbl_websocket" Content="WebSocket" IsChecked="{Binding Path=IsWebSocket, Mode=TwoWay}" Margin="80,5,0,0"/>
                     <StackPanel Orientation="Horizontal" Margin="0,5">
                         <Label x:Uid="lbl_netPort" Content="Port:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="80"/>
-                        <local:NumericTextBox Style="{StaticResource PortErrorStyle}" Format="####0">
+                        <local:NumericTextBox Style="{StaticResource PortErrorStyle}" Width="120" Format="####0">
                             <local:NumericTextBox.Value>
                                 <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                     <Binding.ValidationRules>
@@ -78,11 +83,11 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
                         <Label x:Uid="lbl_ipAddress" Content="IP address:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="80"/>
-                        <TextBox Style="{StaticResource Ip4ErrorStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" VerticalContentAlignment="Bottom" Height="24" Width="95" MaxLength="15">
+                        <TextBox Style="{StaticResource Ip4ErrorStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" VerticalContentAlignment="Bottom" Height="24" Width="200" MaxLength="15">
                             <TextBox.Text>
                                 <Binding Path="IpAddress" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                     <Binding.ValidationRules>
-                                        <local:IP4ValueRule ValidatesOnTargetUpdated="True" />
+                                        <local:HostnameOrIPValueRule ValidatesOnTargetUpdated="True" />
                                     </Binding.ValidationRules>
                                 </Binding>
                             </TextBox.Text>
@@ -90,8 +95,46 @@
                     </StackPanel>
                 </StackPanel>
             </TabItem>
+            <TabItem x:Uid="tab_simulator" Header="Simulator">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="5,5,0,0">
+                        <Button x:Name="btnStartSimulator" Content="Start" MinWidth="90" Padding="6,2"/>
+                        <Button x:Name="btnStopSimulator" Content="Stop" MinWidth="90" Padding="6,2" Margin="5,0,0,0" IsEnabled="False"/>
+                        <TextBlock x:Name="txtSimulatorStatus" Text="Not running" VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Label x:Uid="lbl_simExe" Content="Executable:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
+                        <ComboBox IsEditable="True" MinWidth="250" VerticalContentAlignment="Center" Text="{Binding Path=SimulatorExe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                            <ComboBox.Items>
+                                <sys:String>grblHAL_sim.exe</sys:String>
+                                <sys:String>grblHAL_validator.exe</sys:String>
+                            </ComboBox.Items>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Label x:Uid="lbl_simPort" Content="Port:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90"/>
+                        <local:NumericTextBox Width="90" Format="####0">
+                            <local:NumericTextBox.Value>
+                                <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
+                                    <Binding.ValidationRules>
+                                        <local:NumericRangeRule Min="0" Max="65535" ValidatesOnTargetUpdated="True" />
+                                    </Binding.ValidationRules>
+                                </Binding>
+                            </local:NumericTextBox.Value>
+                        </local:NumericTextBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <Label x:Uid="lbl_simArgs" Content="Args:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
+                        <TextBox MinWidth="250" VerticalContentAlignment="Center" Text="{Binding Path=SimulatorArgs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <Label x:Uid="lbl_simAuto" Content="Auto-kill:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
+                        <CheckBox IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
         </TabControl>
-        <StackPanel Height="23" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,110,0,5">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,10">
             <Button x:Uid="btn_ok" x:Name="btnOk" Content="Ok" Height="23" Width="70" Click="btnOk_Click"/>
             <Button x:Uid="btn_cancel" x:Name="btnCancel" Content="Cancel" Margin="5,0,0,0" Height="23" Width="70" Click="btnCancel_Click"/>
         </StackPanel>

@@ -303,7 +303,7 @@ namespace CNC.Controls
                             UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
                             ValidatesOnDataErrors = true
                         };
-                        sbinding.ValidationRules.Add(new IP4ValueRule());
+                        sbinding.ValidationRules.Add(new HostnameOrIPValueRule());
                         wTextBox.Style = View.Resources["Ip4ErrorStyle"] as Style;
                         BindingOperations.SetBinding(wTextBox, TextBox.TextProperty, sbinding);
                     }
