@@ -11,6 +11,7 @@
         <system:String x:Uid="str_clearEStop" x:Key="ClearEStop">Clear E-Stop before &lt;Reset&gt;></system:String>
         <local:GrblStateToColorConverter x:Key="ToColorConverter" />
         <local:GrblStateToStringConverter x:Key="ToStringConverter" />
+        <local:GrblStateToTooltipConverter x:Key="ToTooltipConverter" />
         <local:HomedStateToColorConverter x:Key="HomedStateConverter" />
         <local:IsHomingEnabledConverter x:Key="HomingEnabledConverter" />
         <local:LogicalNotConverter x:Key="SleepEnabledConverter" />
@@ -52,6 +53,8 @@
             <TextBox x:Name="txtState" HorizontalAlignment="Left" MinHeight="24" Margin="2,0" TextWrapping="NoWrap" IsReadOnly="True" TextAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center" MinWidth="74"
                      Text="{Binding Path=GrblState, Converter={StaticResource ToStringConverter}}"
                      Background="{Binding Path=GrblState, Converter={StaticResource ToColorConverter}}"
+                     ToolTip="{Binding Path=GrblState, Converter={StaticResource ToTooltipConverter}}"
+                     ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="400"
              />
             <CheckBox x:Name="chkCheckMode" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center" Click="btn_Click"
                 IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}">
