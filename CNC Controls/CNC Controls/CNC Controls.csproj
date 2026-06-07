@@ -210,6 +210,7 @@
     <Compile Include="PIDLogView.xaml.cs">
       <DependentUpon>PIDLogView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="GrblFilesystems.cs" />
     <Compile Include="PipeServer.cs" />
     <Compile Include="PortDialog.xaml.cs">
       <DependentUpon>PortDialog.xaml</DependentUpon>
