@@ -49,9 +49,13 @@
   #bom td.ed { background:#fff6cf; cursor:pointer; }
   #bom td.ed:hover { background:#ffeea8; }
   #bom td.ed input { width:100%; box-sizing:border-box; font:inherit; text-align:right; border:1px solid #2456a6; border-radius:3px; padding:0 3px; }
+  #bom td.ed[data-k="desc"], #bom td.ed[data-k="src"] { text-align:left; }
+  #bom td.ed[data-k="desc"] input, #bom td.ed[data-k="src"] input { text-align:left; }
+  #bom td.ed[data-k="desc"]:empty::before { content:"add item\2026"; color:#b59a3a; font-style:italic; }
+  #bom td.ed[data-k="src"]:empty::before { content:"source\2026"; color:#b59a3a; font-style:italic; }
   #bom tr.grp td { background:#dbe4ee; font-weight:bold; color:#14365c; }
   #bom tr.total td { font-weight:bold; border-top:2px solid #b8c4d0; background:#f4f7fa; }
-  @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } }
+  @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } #bom td.ed[data-k="desc"]:empty::before, #bom td.ed[data-k="src"]:empty::before { content:""; } }
 </style>
 </head>
 <body>
@@ -639,17 +643,25 @@ gearing was the sticking point.</p>
     <tr><td>Mega&nbsp;V&nbsp;XL (Kickstarter edition) &mdash; base machine</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mark Smith riser kit (+3&Prime; Z clearance)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mark Smith Z gantry assembly</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Controller &amp; I/O</td></tr>
     <tr><td>Teensy 4.1 SOM (grblHAL controller)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Teensy 4.x breakout board (Ethernet option)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>USB-A pass-through, panel mount</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Ethernet pass-through, panel mount</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>E-stop button (breaks 220&nbsp;V)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Enclosure &mdash; 2020 aluminum extrusion</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Enclosure &mdash; 1/16&Prime; aluminum sheet (5 sides)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Enclosure &mdash; 1/8&Prime; plexiglass top</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Power</td></tr>
     <tr><td>Meanwell 48&nbsp;V power supply, 800&nbsp;W</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>C20 panel inlet &mdash; mains 220&nbsp;V</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>C20 panel inlet &mdash; VFD 220&nbsp;V</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Power relay accessory (110&nbsp;V pump relay)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td><a href="https://www.amazon.com/dp/B07Z6R1KP3">Amazon&nbsp;B07Z6R1KP3</a></td></tr>
+    <tr><td>Buck converter &mdash; 12&nbsp;V 3&nbsp;A</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Buck converter &mdash; 5&nbsp;V 3&nbsp;A</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Spindle &amp; cooling</td></tr>
     <tr><td>2.2&nbsp;kW 80&nbsp;mm water-cooled spindle + 2.2&nbsp;kW VFD kit (ER20, 24k&nbsp;RPM)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td><a href="https://www.amazon.com/dp/B073TRP92V">Amazon&nbsp;B073TRP92V</a></td></tr>
     <tr><td>Braking resistor, 150&nbsp;W</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
@@ -658,15 +670,19 @@ gearing was the sticking point.</p>
     <tr><td>Radiator with integrated 12&nbsp;V fan(s)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>8&nbsp;mm clear tubing (25&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Coolant mix &mdash; antifreeze + distilled water + bleach</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Motion</td></tr>
     <tr><td>Stepper, 1.2&nbsp;N&middot;m (Z)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Stepper, 2.0&nbsp;N&middot;m (X)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Stepper, 3.2&nbsp;N&middot;m (Y / A)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Drag chain, 2&Prime; (Y-axis upsize)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Sensing &amp; probing</td></tr>
     <tr><td>Proximity sensors (limits / homing)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>3D mechanical probe</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Toolsetter probe</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Touch plate (probe input, parallel with 3D probe)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Air assist</td></tr>
     <tr><td>1/4&Prime; black tubing (10&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Needle valve</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
@@ -675,6 +691,16 @@ gearing was the sticking point.</p>
     <tr><td>Solenoid valve, 12&nbsp;V NC</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Pressure regulator (30&nbsp;PSI)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>3D-printed nozzle bracket</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Dust collection &amp; overhead</td></tr>
+    <tr><td>4&Prime; dust duct</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>4&Prime; swivel fitting</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>4&Prime; flex hose (5&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Dust shoe (on spindle)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Spring retraction reel (ceiling)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>1&Prime; cable sleeve (umbilical)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>3D-printed sleeve cradle</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="grp"><td colspan="5">Cabling &amp; connectors</td></tr>
     <tr><td>Shielded cable, 18/6 (100&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Shielded cable, 22/6 (50&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
@@ -685,21 +711,12 @@ gearing was the sticking point.</p>
     <tr><td>Mini-Fit Jr 1&times;6 connectors (5 mated pairs)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mini-Fit Jr crimp terminals (~60)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>48&nbsp;V distribution terminal block</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Ferrules (terminal-block terminations)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td class="ed" data-k="desc"></td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr class="total"><td>Total</td><td class="num">&nbsp;</td><td class="num">&nbsp;</td><td class="num grand">$0.00</td><td>&nbsp;</td></tr>
   </tbody>
 </table>
 
-<div class="note">
-<strong>Not yet itemized</strong> (described in the build above but missing from this BOM):
-<ul style="margin:6px 0 0;">
-  <li><strong>Enclosure</strong> &mdash; 2020 extrusion, 1/16&Prime; aluminum sheet (5 sides), 1/8&Prime; plexiglass top.</li>
-  <li><strong>Buck converters</strong> &mdash; 12&nbsp;V 3&nbsp;A and 5&nbsp;V 3&nbsp;A.</li>
-  <li><strong>Ferrules</strong> for the terminal-block connections.</li>
-  <li><strong>Touch plate</strong> (probe input in parallel with the 3D probe).</li>
-  <li><strong>Dust collection</strong> &mdash; 4&Prime; duct, 4&Prime; swivel, 5&prime; of 4&Prime; flex hose, dust shoe.</li>
-  <li><strong>Overhead service rig</strong> &mdash; spring retraction reel, 1&Prime; cable sleeve, 3D-printed sleeve cradle.</li>
-</ul>
-</div>
 
 <script>
 (function(){
@@ -719,13 +736,16 @@ gearing was the sticking point.</p>
   function setDirty(d){ if(saveBtn){ saveBtn.disabled=!d; discardBtn.disabled=!d; } }
   function edit(cell){
     if(cell.querySelector('input')) return;
-    var orig=cell.textContent, isUnit=(cell.dataset.k==='unit'), done=false;
+    var orig=cell.textContent, kind=cell.dataset.k, done=false;
     var inp=document.createElement('input'); inp.type='text';
-    inp.value = isUnit ? num(orig).toFixed(2) : String(num(orig));
+    inp.value = kind==='qty' ? String(num(orig)) : (kind==='unit' ? num(orig).toFixed(2) : orig.trim());
     cell.textContent=''; cell.appendChild(inp); inp.focus(); inp.select();
     function finish(commit){
       if(done) return; done=true;
-      cell.textContent = commit ? (isUnit ? money(num(inp.value)) : String(num(inp.value))) : orig;
+      if(!commit) cell.textContent=orig;
+      else if(kind==='qty') cell.textContent=String(num(inp.value));
+      else if(kind==='unit') cell.textContent=money(num(inp.value));
+      else cell.textContent=inp.value;
       recalc(); setDirty(snap()!==saved);
     }
     inp.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); finish(true); } else if(ev.key==='Escape'){ ev.preventDefault(); finish(false); } });
@@ -744,6 +764,9 @@ gearing was the sticking point.</p>
   document.addEventListener('DOMContentLoaded',function(){
     if(!document.getElementById('bom')) return;
     saveBtn=document.getElementById('bomSave'); discardBtn=document.getElementById('bomDiscard');
+    document.querySelectorAll('#bom tbody tr').forEach(function(tr){
+      if(tr.querySelector('td.ed[data-k="qty"]')){ var s=tr.lastElementChild; if(s && !s.classList.contains('ed')){ s.classList.add('ed'); s.dataset.k='src'; if(s.textContent.trim()==='') s.textContent=''; } }
+    });
     cells().forEach(function(c){ c.addEventListener('dblclick',function(){ edit(c); }); });
     recalc(); saved=snap(); setDirty(false);
     saveBtn.addEventListener('click',save);
