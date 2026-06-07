@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 13 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-13 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 14 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-14 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -55,6 +55,7 @@
 <tr><td class="n">11</td><td>Macro Processor Enhancements</td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
 <tr><td class="n">12</td><td>Onboarding tooltips</td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td>Build documentation (Mega-XL notes + tool-change guide)</td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
+<tr><td class="n">14</td><td>Combined SD + LittleFS file browser</td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
 </table>
 </div>
 
@@ -474,6 +475,35 @@
   <li><strong>Mega-XL-Upgrades</strong> &mdash; build notes for an upgraded Kickstarter v1.0 Mega&nbsp;V&nbsp;XL: frame/spindle/motion/probing/power sections, a back-of-enclosure two-panel harness model (hand-built SVG diagrams), a cable &amp; wiring schedule, and an <strong>interactive bill-of-materials worksheet</strong> &mdash; an in-page editor (double-click to edit Qty / Unit / Description / Source, live extended &amp; category subtotals &amp; grand total, URL shortening, Save-to-download) plus a linked table of contents.</li>
 </ul>
 <p class="foot">The Mega-XL notes are specific to one machine and may be of limited upstream interest &mdash; they can be hosted separately or dropped from the PR. The repeatable tool-change guide is more generally applicable. The associated controller macros (<code>tc.macro</code>, <code>probe_tfl.macro</code>) and the ATC provisioning UI are intentionally <em>not</em> in this PR &mdash; they remain with the macro work, pending firmware support.</p>
+</div>
+</div>
+
+<!-- ============ PR 14 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 14</span>Combined SD + LittleFS file browser on the SD Card tab</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/sdcard-filesystems</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/sdcard-filesystems">https://github.com/stevenrwood/ioSender/compare/master...pr/sdcard-filesystems</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblFilesystems.cs</td><td class="num add">142</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">132</td><td class="num del">17</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">4</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">tests/GrblFilesystemsTests.cs</td><td class="num add">83</td><td class="num">0</td></tr>
+<tr><td class="mono">tests/README.md</td><td class="num add">22</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>The SD Card tab listed only one filesystem (the SD card, or whatever was the current filesystem). On grblHAL builds that have both an SD card and a LittleFS store, the other filesystem &mdash; and any macros on it &mdash; were invisible.</p>
+<p>This enumerates every mounted filesystem via <code>$FI</code> (<code>[FS:&lt;name&gt;@&lt;path&gt; size, free]</code>) and lists them together in one grid with a new <strong>Location</strong> column, plus a per-filesystem <strong>free-space banner</strong> above the list. <em>Run</em> / <em>Download&nbsp;and&nbsp;run</em> / <em>Delete</em> now target the file's own filesystem &mdash; a bare name on the root volume (unchanged single-SD behaviour) or an absolute path on a sub-mount such as <code>/littlefs</code>.</p>
+<ul>
+  <li><strong>Backward compatible:</strong> builds that don't implement <code>$FI</code> (or report nothing mounted, <code>error:65</code>) return no <code>[FS:&hellip;]</code> lines, and the view falls back to the original single-filesystem mount + <code>$F</code> listing untouched. An SD card with files in its root works exactly as before, now also showing free space.</li>
+  <li><strong>New <code>GrblFilesystems.cs</code></strong> holds pure, dependency-free helpers (mount-line parser, human-readable size, path qualification, free-space summary) and the <code>FsMount</code> model; the live <code>$FI</code>/<code>$F</code> querying lives in <code>GrblSDCard</code>.</li>
+  <li><strong>Unit tested:</strong> <code>tests/GrblFilesystemsTests.cs</code> exercises the pure helpers (29 assertions, run via the Framework <code>csc</code> &mdash; see <code>tests/README.md</code>; the app has no test project).</li>
+</ul>
+<p class="foot">Builds clean (CNC Controls and the full ioSender solution). Groundwork the paused ATC macro-provisioning work can reuse to target the <code>$FI</code>-discovered LittleFS path instead of a hardcoded one.</p>
 </div>
 </div>
 
