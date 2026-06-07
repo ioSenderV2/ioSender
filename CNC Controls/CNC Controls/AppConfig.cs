@@ -343,6 +343,12 @@ namespace CNC.Controls
         private bool? MPGactive = null;
         private Config _base = null;
 
+        // Startup connection parameters parsed from the command line by LoadConfig(), consumed later
+        // by OpenConnection() (the two are split so config loads synchronously before controls load,
+        // while the connection is deferred so the window paints first).
+        private bool _selectPort = false;
+        private string _startupPort = string.Empty, _startupBaud = string.Empty;
+
         public string FileName { get; private set; }
 
         private static readonly Lazy<AppConfig> settings = new Lazy<AppConfig>(() => new AppConfig());
@@ -492,11 +498,22 @@ namespace CNC.Controls
             Base.PortParams = port;
         }
 
+        // Combined load + open, kept for callers that connect synchronously at startup.
         public int SetupAndOpen(string appname, GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
         {
+            int status = LoadConfig(appname);
+            return status == 0 ? OpenConnection(appname, model, dispatcher) : status;
+        }
+
+        // Parse command-line args and load the config file (populates Base). Must run BEFORE any
+        // control Loaded handlers that read AppConfig.Settings.Base (e.g. JogControl), so call it
+        // synchronously at construction. Returns 1 on config error (caller should exit), else 0.
+        public int LoadConfig(string appname)
+        {
             int status = 0;
-            bool selectPort = false;
+            _selectPort = false;
             int jogMode = -1;
+            _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
 
             CNC.Core.Resources.Path = CNC.Core.Resources.ConfigPath = AppDomain.CurrentDomain.BaseDirectory;
@@ -536,7 +553,7 @@ namespace CNC.Controls
                         break;
 
                     case "-selectport":
-                        selectPort = true;
+                        _selectPort = true;
                         break;
 
                     case "-islegacy":
@@ -577,26 +594,28 @@ namespace CNC.Controls
             if (jogMode != -1)
                 Base.Jog.Mode = (JogConfig.JogMode)jogMode;
 
-            if (!string.IsNullOrEmpty(port))
-                selectPort = false;
+            _startupPort = port;
+            _startupBaud = baud;
 
-            if (!selectPort)
+            return status;
+        }
+
+        // Open the startup connection (the saved target, or via PortDialog when -selectport / no saved
+        // port), then run the controller handshake. Safe to defer to ApplicationIdle so the window
+        // paints first; LoadConfig() must already have populated Base.
+        public int OpenConnection(string appname, GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
+        {
+            int status = 0;
+            string port = _startupPort;
+
+            if (!string.IsNullOrEmpty(port))
+                _selectPort = false;
+
+            if (!_selectPort)
             {
                 if (!string.IsNullOrEmpty(port))
-                    setPort(port, baud);
-#if USEWEBSOCKET
-                if (Base.PortParams.ToLower().StartsWith("ws://"))
-                    new WebsocketStream(Base.PortParams, dispatcher);
-                else
-#endif
-                if (char.IsDigit(Base.PortParams[0])) // We have an IP address
-                    new TelnetStream(Base.PortParams, dispatcher);
-                else
-#if USEELTIMA
-                    new EltimaStream(Config.PortParams, Config.ResetDelay, dispatcher);
-#else
-                    new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
-#endif
+                    setPort(port, _startupBaud);
+                OpenStreamFor(model, dispatcher);
             }
 
             if ((Comms.com == null || !Comms.com.IsOpen) && string.IsNullOrEmpty(port))
@@ -610,23 +629,56 @@ namespace CNC.Controls
                 else
                 {
                     setPort(port, string.Empty);
-#if USEWEBSOCKET
-                    if (port.ToLower().StartsWith("ws://"))
-                        new WebsocketStream(Base.PortParams, dispatcher);
-                    else
-#endif
-                    if (char.IsDigit(port[0])) // We have an IP address
-                        new TelnetStream(Base.PortParams, dispatcher);
-                    else
-#if USEELTIMA
-                        new EltimaStream(Config.PortParams, Config.ResetDelay, dispatcher);
-#else
-                        new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
-#endif
+                    OpenStreamFor(model, dispatcher);
                     Save(CNC.Core.Resources.IniFile);
                 }
             }
 
+            return InitConnectedController(appname, model, status);
+        }
+
+        // Open the comms stream for the current Base.PortParams, picking the transport from the
+        // target string (ws:// / COMx / host:port). Shared by startup and the Connect menu item.
+        private void OpenStreamFor(GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
+        {
+            model.ConnectionTarget = Base.PortParams;
+#if USEWEBSOCKET
+            if (Base.PortParams.ToLower().StartsWith("ws://"))
+                new WebsocketStream(Base.PortParams, dispatcher);
+            else
+#endif
+            if (Base.PortParams.ToLower().StartsWith("com"))
+                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+            else if (Base.PortParams.Contains(":")) // host:port (IP or hostname)
+                new TelnetStream(Base.PortParams, dispatcher);
+            else
+#if USEELTIMA
+                new EltimaStream(Config.PortParams, Config.ResetDelay, dispatcher);
+#else
+                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+#endif
+        }
+
+        // Show the connection dialog and connect to the chosen target without reloading config.
+        // Used by the Connect menu item when the app is running but not connected.
+        public int Connect(string appname, GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
+        {
+            PortDialog portsel = new PortDialog();
+
+            string port = portsel.ShowDialog(Base.PortParams);
+            if (string.IsNullOrEmpty(port))
+                return 2;
+
+            setPort(port, string.Empty);
+            OpenStreamFor(model, dispatcher);
+            Save(CNC.Core.Resources.IniFile);
+
+            return InitConnectedController(appname, model, 0);
+        }
+
+        // Run the controller handshake (MPG detection, status reporting) once the stream is open.
+        private int InitConnectedController(string appname, GrblViewModel model, int status)
+        {
             if (Comms.com != null && Comms.com.IsOpen)
             {
                 Comms.com.DataReceived += model.DataReceived;

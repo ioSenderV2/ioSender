@@ -73,21 +73,23 @@ namespace GCode_Sender
             ui = this;
 //            GCodeViewer = viewer;
             Title = string.Format(Title, version);
-
-            int res;
-            if ((res = AppConfig.Settings.SetupAndOpen(Title, (GrblViewModel)DataContext, App.Current.Dispatcher)) != 0)
-                Environment.Exit(res);
-
             BaseWindowTitle = Title;
 
-            CNC.Core.Grbl.GrblViewModel = (GrblViewModel)DataContext;
-            GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
+            // Load config synchronously now - before any control Loaded handler (e.g. JogControl)
+            // reads AppConfig.Settings.Base. Only the connection is deferred (see CompleteStartup).
+            int cfg = AppConfig.Settings.LoadConfig(Title);
+            if (cfg != 0)
+            {
+                Environment.Exit(cfg);
+                return;
+            }
 
-            //       SDCardControl.FileSelected += new CNC_Controls.SDCardControl.FileSelectedHandler(SDCardControl_FileSelected);
+            if (DataContext is GrblViewModel viewModel)
+                CNC.Core.Grbl.GrblViewModel = viewModel;
 
-            new PipeServer(App.Current.Dispatcher);
+            new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
-            AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
+            AttachBasePropertyChangedHandler();
         }
 
         public string BaseWindowTitle { get; set; }
@@ -122,6 +124,24 @@ namespace GCode_Sender
         {
             MainPanelRegistry.LayoutEnabled = true; // ioSender XL: enable the "Main page layout" settings control
 
+            // Defer connection setup and all settings-dependent view initialization to ApplicationIdle
+            // so the main window paints before the (possibly blocking) connection dialog appears.
+            // SetupAndOpen() runs Load(), which populates AppConfig.Settings.Base; everything in
+            // CompleteStartup() depends on that (AppConfigView.Setup, FlyoutItems, Comms.com, ...),
+            // so it must run only after SetupAndOpen() has completed.
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new System.Action(CompleteStartup));
+        }
+
+        private void CompleteStartup()
+        {
+            // Config already loaded in the constructor; here we only open the connection (deferred so
+            // the main window paints first). res == 2: user cancelled / no connection - stay open
+            // (disconnected) so the user can connect later via the Connect menu item.
+            int res = AppConfig.Settings.OpenConnection(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
+            bool connected = res == 0;
+
+            GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
+
             if (AppConfig.Settings.Base.KeepWindowSize)
             {
                 if (AppConfig.Settings.Base.WindowWidth == -1)
@@ -136,7 +156,7 @@ namespace GCode_Sender
                         Top = 0d;
                 }
             }
-            saveWinSize = AppConfig.Settings.Base.KeepWindowSize;
+            saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
             var appconf = getView(getTab(ViewType.AppConfig));
 
             appconf.Setup(UIViewModel, AppConfig.Settings);
@@ -218,9 +238,12 @@ namespace GCode_Sender
             }
 
             UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
-            System.Threading.Thread.Sleep(50);
-            Comms.com.PurgeQueue();
-            UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+            if (connected)
+            {
+                System.Threading.Thread.Sleep(50);
+                Comms.com.PurgeQueue();
+                UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+            }
 
             // Restore preserved console preferences
             var gvm = DataContext as GrblViewModel;
@@ -352,6 +375,87 @@ namespace GCode_Sender
             About about = new About(BaseWindowTitle) { Owner = Application.Current.MainWindow };
             about.DataContext = DataContext;
             about.ShowDialog();
+        }
+
+        // Single item: "Connect..." when disconnected, "Reconnect..." when connected (which disconnects
+        // the current target first, then shows the connection dialog so the user can pick another).
+        private void menuFile_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            bool connected = Comms.com != null && Comms.com.IsOpen;
+            menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
+        }
+
+        private void connectMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
+            if (Comms.com != null && Comms.com.IsOpen)
+                Disconnect();
+
+            int res = AppConfig.Settings.Connect(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
+            if (res == 0 && Comms.com != null && Comms.com.IsOpen)
+            {
+                Comms.com.PurgeQueue();
+                // Activate the GRBL view to run the controller handshake (re-runs it after a disconnect
+                // because PrepareForReconnect() cleared its init state).
+                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
+                    grbl.Activate(true, ViewType.Startup);
+            }
+        }
+
+        private void Disconnect()
+        {
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
+
+            Comms.com.Close(); // explicit close - cancels auto-reconnect (see StreamComms.Close)
+
+            var model = (GrblViewModel)DataContext;
+            model.ConnectionTarget = null; // status bar -> "Not connected"
+            model.IsReady = false;
+
+            // Clear the GRBL view's controller state so the next Connect re-runs the handshake.
+            if (getView(getTab(ViewType.GRBL)) is JobView grbl)
+                grbl.PrepareForReconnect();
+        }
+
+        // Right-click "Target" status item -> Validate. Only enabled while connected; launches the
+        // grblHAL validator (a separate process that exercises the controller's command responses).
+        private void targetContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.ContextMenu cm && cm.Items.Count > 0 && cm.Items[0] is MenuItem mi)
+                mi.IsEnabled = Comms.com != null && Comms.com.IsOpen;
+        }
+
+        private void validateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string exe = SimulatorManager.FindExecutable("grblHAL_validator.exe");
+            if (exe == null)
+            {
+                MessageBox.Show("grblHAL_validator.exe not found (looked in the application folder and its 'simulator' subfolder).", "Validate", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
+                {
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exe),
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to launch validator:\n{ex.Message}", "Validate", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void AttachBasePropertyChangedHandler()
+        {
+            if (AppConfig.Settings.Base != null)
+            {
+                AppConfig.Settings.Base.PropertyChanged -= Base_PropertyChanged;
+                AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
+            }
         }
 
         private void Base_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

@@ -170,15 +170,23 @@ namespace CNC.Controls
         }
     }
 
-    public class IP4ValueRule : ValidationRule
+    public class HostnameOrIPValueRule : ValidationRule
     {
         public override ValidationResult Validate(object value, CultureInfo cultureInfo)
         {
-            string ip4address = (string)value;
+            string host = (string)value;
+
+            if (string.IsNullOrWhiteSpace(host))
+                return new ValidationResult(false, (string)LibStrings.FindResource("ValNotIPV4"));
 
             System.Net.IPAddress ip4;
-            if(!System.Net.IPAddress.TryParse(ip4address, out ip4))
-                return new ValidationResult(false, (string)LibStrings.FindResource("ValNotIPV4"));
+            if (System.Net.IPAddress.TryParse(host, out ip4))
+                return ValidationResult.ValidResult;
+
+            // Accept simple hostnames (letters, digits, hyphen, dot)
+            foreach (char c in host)
+                if (!(char.IsLetterOrDigit(c) || c == '.' || c == '-'))
+                    return new ValidationResult(false, (string)LibStrings.FindResource("ValNotIPV4"));
 
             return ValidationResult.ValidResult;
         }

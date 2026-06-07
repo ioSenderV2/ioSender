@@ -396,6 +396,13 @@ namespace CNC.Core
             private set { if (_isConnectionLost != value) { _isConnectionLost = value; OnPropertyChanged(); } }
         }
 
+        private string _connectionTarget = string.Empty;
+        public string ConnectionTarget
+        {
+            get { return _connectionTarget; }
+            set { if (_connectionTarget != value) { _connectionTarget = value; OnPropertyChanged(); } }
+        }
+
         // Wired (at connect, see AppConfig) to the active StreamComms' ConnectionLost/Reconnected
         // events. These fire on a background reconnect-timer thread, so marshal to the UI thread.
         public void OnConnectionLost()

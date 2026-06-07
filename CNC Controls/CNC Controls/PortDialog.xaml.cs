@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Diagnostics;
 using System.Windows;
 using CNC.Core;
 
@@ -52,6 +53,9 @@ namespace CNC.Controls
             InitializeComponent();
 
             DataContext = prop = new PortProperties();
+            btnStartSimulator.Click += btnStartSimulator_Click;
+            btnStopSimulator.Click += btnStopSimulator_Click;
+            UpdateSimulatorButtons();
         }
 
         private void CbxPorts_DropDownOpened(object sender, System.EventArgs e)
@@ -89,7 +93,7 @@ namespace CNC.Controls
 
                 if ((prop.IsWebSocket = orgport.ToLower().StartsWith("ws://")))
                     parsenet(orgport.Substring(5));
-                else if (char.IsDigit(orgport[0])) // We have an IP address
+                else if (orgport.IndexOf(':') > 0 && !orgport.ToLower().StartsWith("com")) // host:port (IP or hostname)
                     parsenet(orgport);
                 else
                 {
@@ -132,6 +136,10 @@ namespace CNC.Controls
             {
                 port = string.Format("{0}{1}:{2}", prop.IsWebSocket ? "ws://" : string.Empty, prop.IpAddress, prop.NetPort.ToString());
             }
+            else if (tab.SelectedIndex == 2)
+            {
+                port = string.Format("127.0.0.1:{0}", prop.NetPort.ToString());
+            }
             else if(prop.Com.Ports.Count > 0)
             {
                 port = prop.Com.SelectedPort + ":" + prop.Com.SelectedBaud + ",N,8,1" + handshake;
@@ -140,6 +148,87 @@ namespace CNC.Controls
             }
 
             Close();
+        }
+
+        private void btnStartSimulator_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryStartSimulator())
+            {
+                prop.SimulatorStarted = true;
+            }
+            else
+            {
+                prop.SimulatorStarted = false;
+            }
+
+            UpdateSimulatorButtons();
+        }
+
+        private void btnStopSimulator_Click(object sender, RoutedEventArgs e)
+        {
+            if (SimulatorManager.StopSimulator())
+                txtSimulatorStatus.Text = "Stopped";
+            else
+                txtSimulatorStatus.Text = "No simulator running";
+
+            prop.SimulatorStarted = false;
+            UpdateSimulatorButtons();
+        }
+
+        private bool TryStartSimulator()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates = new string[] {
+                System.IO.Path.Combine(baseDir, "simulator", prop.SimulatorExe),
+                System.IO.Path.Combine(baseDir, prop.SimulatorExe)
+            };
+
+            string found = null;
+            foreach (var c in candidates)
+            {
+                if (System.IO.File.Exists(c)) { found = c; break; }
+            }
+
+            if (found == null)
+            {
+                txtSimulatorStatus.Text = "Executable not found.";
+                MessageBox.Show($"Simulator executable not found. Tried:\n{candidates[0]}\n{candidates[1]}", "Simulator start failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            try
+            {
+                string args = $"-p {prop.NetPort}";
+                if (!string.IsNullOrWhiteSpace(prop.SimulatorArgs))
+                    args += " " + prop.SimulatorArgs;
+
+                if (SimulatorManager.StartSimulator(found, args, prop.AutoKillSimulator))
+                {
+                    txtSimulatorStatus.Text = "Running";
+                    MessageBox.Show($"Simulator started (minimized):\n{found}", "Simulator", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return true;
+                }
+                else
+                {
+                    txtSimulatorStatus.Text = "Failed to start";
+                    MessageBox.Show($"Failed to start simulator using '{found}' with args '{args}'.", "Simulator start failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                txtSimulatorStatus.Text = "Start error";
+                MessageBox.Show($"Error starting simulator:\n{ex.Message}", "Simulator start failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        private void UpdateSimulatorButtons()
+        {
+            bool running = prop.SimulatorStarted || SimulatorManager.IsSimulatorRunning;
+            btnStartSimulator.IsEnabled = !running;
+            btnStopSimulator.IsEnabled = running;
+            txtSimulatorStatus.Text = running ? "Running" : "Not running";
         }
 
         private void btnCancel_Click(object sender, RoutedEventArgs e)
@@ -151,8 +240,12 @@ namespace CNC.Controls
     class PortProperties : ViewModelBase
     {
         bool isWebSocket = false;
-        string ipAddress = "192.168.5.1";
+        string ipAddress = "grblHAL.local";
         int netport = 23;
+        bool simulatorStarted = false;
+        string simulatorExe = "grblHAL_sim.exe";
+        string simulatorArgs = string.Empty;
+        bool autoKillSimulator = true;
 
         public SerialPorts Com { get; private set; } = new SerialPorts();
         public bool IsWebSocket {
@@ -164,6 +257,10 @@ namespace CNC.Controls
                 OnPropertyChanged();
             }
         }
+        public bool SimulatorStarted { get { return simulatorStarted; } set { simulatorStarted = value; OnPropertyChanged(); } }
+        public string SimulatorExe { get { return simulatorExe; } set { simulatorExe = value; OnPropertyChanged(); } }
+        public string SimulatorArgs { get { return simulatorArgs; } set { simulatorArgs = value; OnPropertyChanged(); } }
+        public bool AutoKillSimulator { get { return autoKillSimulator; } set { autoKillSimulator = value; OnPropertyChanged(); } }
         public string IpAddress { get { return ipAddress; } set { ipAddress = value; OnPropertyChanged(); } }
         public int NetPort { get { return netport; } set { netport = value; OnPropertyChanged(); } }
     }
