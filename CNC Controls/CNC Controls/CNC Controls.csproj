@@ -224,6 +224,25 @@
     </Compile>
     <Compile Include="Settings.cs" />
     <Compile Include="SidebarItem.cs" />
+    <Compile Include="MainPanelRegistry.cs" />
+    <Compile Include="PanelFlyout.xaml.cs">
+      <DependentUpon>PanelFlyout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OffsetFlyout.xaml.cs">
+      <DependentUpon>OffsetFlyout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MainPageEditor.xaml.cs">
+      <DependentUpon>MainPageEditor.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="JogSlider.xaml.cs">
+      <DependentUpon>JogSlider.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UIJoggingControl.xaml.cs">
+      <DependentUpon>UIJoggingControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="KeyboardJoggingControl.xaml.cs">
+      <DependentUpon>KeyboardJoggingControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SignalControl.xaml.cs">
       <DependentUpon>SignalControl.xaml</DependentUpon>
     </Compile>
@@ -449,6 +468,30 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OutlineFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="PanelFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OffsetFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MainPageEditor.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="JogSlider.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UIJoggingControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="KeyboardJoggingControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

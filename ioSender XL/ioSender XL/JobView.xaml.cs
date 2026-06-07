@@ -61,13 +61,53 @@ namespace GCode_Sender
         private IInputElement focusedControl = null;
         private Controller Controller = null;
         private SidebarItem thcFlyout = null;
+        // References to dynamically-placed panels that code-behind needs for keyboard-jog focus gating.
+        private SpindleControl spindleControl = null;
+        private WorkParametersControl workParametersControl = null;
 
         public JobView()
         {
             InitializeComponent();
 
+            BuildMainPanels();
+
             DRO.DROEnabledChanged += DRO_DROEnabledChanged;
             DataContextChanged += View_DataContextChanged;
+        }
+
+        // Populate the six configurable main-page slots from Config.MainPanels (ioSender XL).
+        // Panels not placed here are shown as flyouts (see MainWindow). Applied on restart.
+        private void BuildMainPanels()
+        {
+            if (AppConfig.Settings.Base == null)   // config not loaded yet (ctor runs before SetupAndOpen) — defer
+            {
+                Dispatcher.BeginInvoke(new System.Action(BuildMainPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+
+            var slots = new ContentControl[] { slot0, slot1, slot2, slot3, slot4, slot5 };
+            var names = AppConfig.Settings.Base.MainPanels;
+            var placed = new System.Collections.Generic.HashSet<string>();
+
+            for (int s = 0, i = 0; s < slots.Length && names != null && i < names.Count; i++)
+            {
+                string name = names[i];
+                if (string.IsNullOrEmpty(name) || placed.Contains(name))
+                    continue;
+
+                var def = MainPanelRegistry.ByName(name);
+                if (def == null || !def.CanBeMainPanel || def.CreateMainPanel == null)
+                    continue;
+
+                var ctl = def.CreateMainPanel();
+                slots[s++].Content = ctl;
+                placed.Add(name);
+
+                if (ctl is SpindleControl sc)
+                    spindleControl = sc;
+                else if (ctl is WorkParametersControl wp)
+                    workParametersControl = wp;
+            }
         }
 
         private void View_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -237,6 +277,7 @@ namespace GCode_Sender
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = AppConfig.Settings.Jog.StepFeedrate;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowFeedrate;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastFeedrate;
+                model.Keyboard.DefaultSpeedFast = AppConfig.Settings.Jog.DefaultSpeedFast;
 
                 model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI;
 
@@ -300,8 +341,9 @@ namespace GCode_Sender
                 height = limitsControl.ActualHeight;
 
             limitsControl.Visibility = (dp.ActualHeight - t1.ActualHeight - t2.ActualHeight + limitsControl.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
-            coolantControl.Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
-            gotoControl.Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;
+            // Bottom-row slots auto-hide on short windows (generalizes the old Coolant/Goto hiding).
+            slot2.Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
+            slot5.Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;
         }
 
 #if ADD_CAMERA
@@ -490,7 +532,7 @@ namespace GCode_Sender
 
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || DRO.IsFocused || spindleControl.IsFocused || workParametersControl.IsFocused), this);
+            return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || DRO.IsFocused || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
 
 #endregion

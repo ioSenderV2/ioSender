@@ -53,6 +53,7 @@ namespace CNC.Core
         private int N_AXIS = 3;
         private bool preCancel = false, allowJog = true;
         private JogMode jogMode = JogMode.None;
+        private JogMode _notifiedJogMode = JogMode.None;
         private GrblViewModel grbl;
         private List<KeypressHandlerFn> handlers = new List<KeypressHandlerFn>();
         private List<HandlerFn> functions = new List<HandlerFn>();
@@ -235,6 +236,21 @@ namespace CNC.Core
         public bool CanJog2 { get { return grbl.GrblState.State == GrblStates.Idle || grbl.GrblState.State == GrblStates.Tool || grbl.GrblState.State == GrblStates.Jog; } }
         public bool CanJog { get { return allowJog && (grbl.GrblState.State == GrblStates.Idle || grbl.GrblState.State == GrblStates.Tool || grbl.GrblState.State == GrblStates.Jog); } }
         public bool IsJogging { get { return jogMode != JogMode.None || grbl.GrblState.State == GrblStates.Jog; } }
+
+        // Active keyboard-jog mode (Step/Slow/Fast/None); the jog panel slider live-tracks this.
+        public JogMode CurrentJogMode { get { return jogMode; } }
+        // Default continuous-jog speed (set from Config.Jog.DefaultSpeedFast): false = Slow (Shift -> Fast),
+        // true = Fast (Shift -> Slow). Pushed in from the Controls layer since CNC.Core can't see AppConfig.
+        public bool DefaultSpeedFast { get; set; } = false;
+        public event System.Action JogModeChanged;
+        private void NotifyJogModeChanged()
+        {
+            if (_notifiedJogMode != jogMode)
+            {
+                _notifiedJogMode = jogMode;
+                JogModeChanged?.Invoke();
+            }
+        }
 
         public bool SaveMappings (string filename)
         {
@@ -538,10 +554,9 @@ namespace CNC.Core
                     else if (IsContinuousJoggingEnabled)
                     {
                         preCancel = true;
-                        if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
-                            jogMode = JogMode.Fast;
-                        else
-                            jogMode = JogMode.Slow;
+                        // No modifier = the configured default speed; Shift = the other speed.
+                        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
+                        jogMode = (shift ? !DefaultSpeedFast : DefaultSpeedFast) ? JogMode.Fast : JogMode.Slow;
                     }
                     else
                     {
@@ -549,6 +564,8 @@ namespace CNC.Core
                             axisjog[i].Key = Key.None;
                         jogMode = JogMode.None;
                     }
+
+                    NotifyJogModeChanged();
 
                     if (jogMode != JogMode.None)
                     {
@@ -646,6 +663,7 @@ namespace CNC.Core
             while (Comms.com.OutCount != 0) ;
             Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL); // Cancel jog
             jogMode = JogMode.None;
+            NotifyJogModeChanged();
         }
 
         public void SendJogCommand(string command)

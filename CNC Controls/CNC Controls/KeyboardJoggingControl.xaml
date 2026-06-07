@@ -1,0 +1,25 @@
+<UserControl x:Class="CNC.Controls.KeyboardJoggingControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             Loaded="KeyboardJoggingControl_Loaded"
+             d:DesignHeight="80" d:DesignWidth="180">
+    <Grid x:Name="content" Margin="2,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- Header - centered between the top of the flyout and the slider -->
+        <Viewbox Grid.Row="0" Stretch="Uniform" StretchDirection="Both" Margin="14,1" VerticalAlignment="Center" MaxHeight="20">
+            <TextBlock Text="{Binding SpeedHeader}" Foreground="#FF57606A"/>
+        </Viewbox>
+        <!-- Slider - centered vertically in the flyout -->
+        <local:JogSlider Grid.Row="1" Maximum="1" Width="150" HorizontalAlignment="Center"
+                         SelectedIndex="{Binding SpeedIndex, Mode=TwoWay}" ValueText="{Binding SelectedFeedrateText}"
+                         ToolTip="Default held-arrow jog speed. Hold Shift to jog at the other speed."/>
+    </Grid>
+</UserControl>

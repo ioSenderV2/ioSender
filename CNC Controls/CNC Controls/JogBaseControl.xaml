@@ -47,7 +47,7 @@
                 <Binding Path="GrblState" Converter="{StaticResource IsJoggingConverter}"/>
             </MultiBinding>
         </Grid.IsEnabled>
-        <StackPanel>
+        <StackPanel x:Name="selectorPanel">
             <GroupBox x:Uid="grp_jogDistance" Header="Distance" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Width="105">
                 <StackPanel>
                     <RadioButton Tag="3" Content="{Binding Path=JogData.Distance3, RelativeSource={RelativeSource AncestorType=UserControl}}" IsChecked="{Binding Path=JogData.StepSize, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource EnumToCheckedConverter}, ConverterParameter=Step3}" HorizontalAlignment="Left" Margin="10,5,0,0" VerticalAlignment="Top" Click="distance_Click"/>
@@ -68,7 +68,7 @@
                 </StackPanel>
             </GroupBox>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="115,10,5,0" Width="Auto" Height="Auto">
+        <StackPanel x:Name="arrowPanel" Orientation="Horizontal" Margin="115,10,5,0" Width="Auto" Height="Auto">
             <StackPanel Orientation="Horizontal" Width="Auto" Height="Auto" Visibility="{Binding Path=LatheModeEnabled, Converter={StaticResource IsNotVisibleConverter}}">
                 <StackPanel VerticalAlignment="Center">
                     <local:JogButton Content="X-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>

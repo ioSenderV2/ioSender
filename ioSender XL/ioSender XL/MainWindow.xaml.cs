@@ -120,6 +120,8 @@ namespace GCode_Sender
 
         private void Window_Load(object sender, EventArgs e)
         {
+            MainPanelRegistry.LayoutEnabled = true; // ioSender XL: enable the "Main page layout" settings control
+
             if (AppConfig.Settings.Base.KeepWindowSize)
             {
                 if (AppConfig.Settings.Base.WindowWidth == -1)
@@ -159,11 +161,61 @@ namespace GCode_Sender
             UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
 
             xx.ItemsSource = UIViewModel.SidebarItems;
-            UIViewModel.SidebarItems.Add(new SidebarItem(macroControl));
-            UIViewModel.SidebarItems.Add(new SidebarItem(gotoControl));
-            UIViewModel.SidebarItems.Add(new SidebarItem(outlineFlyout));
-            UIViewModel.SidebarItems.Add(new SidebarItem(mposFlyout));
-//          UIViewModel.SidebarItems.Add(new SidebarItem(thcControl));
+
+            // Build sidebar flyouts from the user's FlyoutItems list (Edit Main Page dialog).
+            var seenFlyouts = new System.Collections.Generic.HashSet<string>();
+            foreach (var name in AppConfig.Settings.Base.FlyoutItems)
+            {
+                if (!seenFlyouts.Add(name))     // guard against duplicate entries
+                    continue;
+
+                var item = MainPanelRegistry.ByName(name);
+                if (item == null)
+                    continue;
+
+                UserControl flyout;
+                bool alreadyInCanvas = false;
+
+                switch (item.Kind)
+                {
+                    case PanelKind.Panel:
+                        flyout = new PanelFlyout(item.Name, item.Label, item.CreateMainPanel());
+                        break;
+                    case PanelKind.Offset:
+                        flyout = new OffsetFlyout(item.Name);
+                        break;
+                    case PanelKind.Special: // reuse the controls declared in MainWindow.xaml
+                        flyout = item.Name == "Macros" ? (UserControl)macroControl
+                               : item.Name == "MachinePosition" ? mposFlyout : null;
+                        alreadyInCanvas = true;
+                        break;
+                    default:
+                        flyout = null;
+                        break;
+                }
+
+                if (flyout == null || !(flyout is ISidebarControl))
+                    continue;
+
+                flyout.Visibility = Visibility.Hidden;
+
+                if (flyout is IPinnableFlyout pin)
+                {
+                    pin.Pinned = AppConfig.Settings.Base.PinnedFlyouts.Contains(name);
+                    pin.PinnedChanged += MainPanelFlyout_PinnedChanged;
+                }
+
+                if (!alreadyInCanvas)
+                {
+                    Canvas.SetRight(flyout, 22);
+                    sidebarCanvas.Children.Add(flyout);
+                }
+
+                UIViewModel.SidebarItems.Add(new SidebarItem((ISidebarControl)flyout));
+
+                if (flyout is IPinnableFlyout pinned && pinned.Pinned)   // reopen pinned flyouts on launch
+                    flyout.Visibility = Visibility.Visible;
+            }
 
             UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
             System.Threading.Thread.Sleep(50);
@@ -198,6 +250,21 @@ namespace GCode_Sender
             GCode.File.AddTransformer(typeof(ArcsToLines), (string)FindResource("MenuArcsToLines"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(GCodeCompress), (string)FindResource("MenuCompress"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(CNC.Controls.DragKnife.DragKnifeViewModel), (string)FindResource("MenuDragKnife"), UIViewModel.TransformMenuItems);
+        }
+
+        // Persist a flyout's pin state so it reopens (pinned) on next launch.
+        private void MainPanelFlyout_PinnedChanged(IPinnableFlyout flyout)
+        {
+            var pinned = AppConfig.Settings.Base.PinnedFlyouts;
+            if (flyout.Pinned)
+            {
+                if (!pinned.Contains(flyout.PanelName))
+                    pinned.Add(flyout.PanelName);
+            }
+            else
+                pinned.Remove(flyout.PanelName);
+
+            AppConfig.Settings.Save();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)

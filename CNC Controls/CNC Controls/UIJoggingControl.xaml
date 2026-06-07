@@ -1,0 +1,44 @@
+<UserControl x:Class="CNC.Controls.UIJoggingControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             Loaded="UIJoggingControl_Loaded"
+             d:DesignHeight="90" d:DesignWidth="200">
+    <Grid x:Name="content" Margin="2,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- Headers - centered between the top of the flyout and the slider -->
+        <Grid Grid.Row="0" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Viewbox Grid.Column="0" Stretch="Uniform" StretchDirection="Both" Margin="14,1" VerticalAlignment="Center" MaxHeight="20">
+                <TextBlock Text="{Binding DistanceHeader}" Foreground="#FF57606A"/>
+            </Viewbox>
+            <Viewbox Grid.Column="1" Stretch="Uniform" StretchDirection="Both" Margin="14,1" VerticalAlignment="Center" MaxHeight="20">
+                <TextBlock Text="{Binding SpeedHeader}" Foreground="#FF57606A"/>
+            </Viewbox>
+        </Grid>
+        <!-- Sliders - centered vertically in the flyout -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <local:JogSlider Grid.Column="0" Maximum="3" Margin="1,0"
+                             SelectedIndex="{Binding DistanceIndex, Mode=TwoWay}" ValueText="{Binding SelectedDistanceText}"/>
+            <local:JogSlider Grid.Column="1" Maximum="3" Margin="1,0"
+                             SelectedIndex="{Binding FeedIndex, Mode=TwoWay}" ValueText="{Binding SelectedFeedrateText}"/>
+        </Grid>
+        <!-- Continuous - centered between the slider and the bottom of the flyout -->
+        <CheckBox Grid.Row="2" Content="Continuous" FontSize="10" IsChecked="{Binding Continuous, Mode=TwoWay}"
+                  VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0"/>
+    </Grid>
+</UserControl>

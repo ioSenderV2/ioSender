@@ -20,8 +20,9 @@
     <DockPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
             <Button x:Uid="btn_saveSettings" x:Name="btnSave" Content="Save settings" Margin="5" Padding="5,0" Click="btnSave_Click" Style="{StaticResource ConfigButtonStyle}"/>
-            <Button x:Uid="btn_editKeyMap" x:Name="btnEditKeyMap" Content="Edit Key Mappings" Width="130" Margin="5" Padding="5,0" Click="btnEditKeyMap_Click" Style="{StaticResource ConfigButtonStyle}"/>
+            <Button x:Uid="btn_editKeyMap" x:Name="btnEditKeyMap" Content="Edit Key Bindings" Width="130" Margin="5" Padding="5,0" Click="btnEditKeyMap_Click" Style="{StaticResource ConfigButtonStyle}"/>
             <Button x:Uid="btn_editMacros" x:Name="btnEditMacros" Content="Edit Macros" Width="110" Margin="5" Padding="5,0" Click="btnEditMacros_Click" Style="{StaticResource ConfigButtonStyle}"/>
+            <Button x:Uid="btn_editMainPage" x:Name="btnEditMainPage" Content="Edit Main Page" Width="130" Margin="5" Padding="5,0" Click="btnEditMainPage_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed"/>
         </StackPanel>
         <ItemsControl x:Name="xx" DockPanel.Dock="Top">
             <ItemsControl.ItemsPanel>

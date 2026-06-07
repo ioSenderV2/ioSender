@@ -20,7 +20,17 @@
         <local:NumericTextBox x:Name="data" Grid.Column="1" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" Width="64"
             IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
             Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-            Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}">
+            Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+            ContextMenuOpening="Data_ContextMenuOpening">
+            <local:NumericTextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Command="Cut" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                    <MenuItem Command="Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                    <MenuItem Command="Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                    <Separator/>
+                    <MenuItem x:Name="miReset" Header="Reset to default" Click="ResetToDefault_Click"/>
+                </ContextMenu>
+            </local:NumericTextBox.ContextMenu>
         </local:NumericTextBox>
         <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto"/>
     </Grid>

@@ -64,12 +64,22 @@ namespace CNC.Controls
 
             this.view = view as UserControl;
 
-            Width = 75;
+            // Size the tab to its label (text length + pad) so labels aren't clipped, with a gap between
+            // tabs, and floor the flyout's open height to the tab length so each flyout matches its tab;
+            // the flyout content then distributes within that height. The tab height is also floored to
+            // minTab so a short-label flyout (e.g. an offset "G28") is still tall enough to hold its
+            // content plus the inside padding - otherwise it would render past its slot and the next
+            // flyout, drawn on top, would cover its bottom padding.
+            const double pad = 14, gap = 0, minTab = 46;
+            Width = System.Math.Max(MeasureLabel(view.MenuLabel) + pad, minTab);
             Height = 25;
             Focusable = false;
+            Margin = new Thickness(0, gap / 2, 0, gap / 2);
+            if (this.view != null)
+                this.view.MinHeight = Width;
 
-            Canvas.SetTop(this.view, top);
-            top += Width;
+            Canvas.SetTop(this.view, top + gap / 2);
+            top += Width + gap;
 
             try
             {
@@ -87,9 +97,18 @@ namespace CNC.Controls
             button_Click(this, null);
         }
 
+        // Rendered length of the (un-rotated) label text - becomes the tab's on-screen height once rotated.
+        private static double MeasureLabel(string text)
+        {
+            text = (text ?? string.Empty).Replace("_", string.Empty);
+            var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                new Typeface("Segoe UI"), 14.0, Brushes.Black, 1.0);
+            return ft.Width;
+        }
+
         private void button_Click(object sender, RoutedEventArgs e)
         {
-            if (last != null && last != view && last.IsVisible)
+            if (last != null && last != view && last.IsVisible && !(last is IPinnableFlyout pinned && pinned.Pinned))
                 last.Visibility = Visibility.Hidden;
 
             view.Visibility = view.IsVisible ? Visibility.Hidden : Visibility.Visible;
