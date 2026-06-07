@@ -116,6 +116,9 @@ two Y gantries are driven by ganged motors (<strong>Y + A</strong>), one per sid
     <tr><td>Z</td><td>1.2 N&middot;m</td><td>Z</td></tr>
   </tbody>
 </table>
+<p>The breakout board also provides a <strong>5th axis (B)</strong>. No rotary is fitted yet, but its
+<strong>step/dir/enable is wired through to the extension panel</strong> so one can be added later by
+plugging it in &mdash; see <a href="#harness">Back-of-enclosure harness &amp; connectors</a>.</p>
 <p>All motors have an <strong>8 mm output shaft with a flat</strong>, with pinions/couplings
 retained by a grub screw on the flat. <em>Build note:</em> the stock Mega XL pinions were
 6 mm-bore and were <strong>reamed to 8 mm</strong> at a machine shop &mdash; this thinned the
@@ -236,7 +239,9 @@ aircraft-style connectors.</p>
 assignment (<code>48V</code>/<code>GND</code>/<code>DIR</code>/<code>PUL</code>/<code>EN</code>/<code>AL</code>).
 <code>DIR</code>/<code>PUL</code> are direction/step to the integrated drives; <code>EN</code> = enable,
 <code>AL</code> = alarm. The discrete <code>A&plusmn;</code>/<code>B&plusmn;</code> column is kept
-for reference only &mdash; the same 18/6 cable would serve an open-loop motor if one were ever fitted.</p>
+for reference only &mdash; the same 18/6 cable would serve an open-loop motor if one were ever fitted.
+At the enclosure these device cables collapse onto a small set of keyed panel connectors &mdash; see
+<a href="#harness">Back-of-enclosure harness &amp; connectors</a>.</p>
 
 <h2>Drag chains (cable carriers)</h2>
 <p>Each axis's drag chain carries every cable that has to continue past it, so loading is
@@ -267,6 +272,175 @@ their drag chains rather than riding through them.</p>
 <p>That Y bundle &mdash; one 12/4, three 18/6, and one 22/6 &mdash; would not fit the stock
 <strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger (2&Prime;)</strong>
 carrier.</p>
+
+<h2 id="harness">Back-of-enclosure harness &amp; connectors</h2>
+<p>The control enclosure lives in a <strong>cabinet drawer</strong>. The only practical way to reach
+the back is to pull the drawer fully forward and connect the harness <strong>by feel</strong> &mdash; so
+the wiring was deliberately collapsed onto a <strong>few keyed Mini-Fit Jr sockets</strong> rather than
+many small connectors. Every socket is <strong>1&times;6 (single-row)</strong>: a linear row of pins is
+far easier to count and seat blind than a 2&times;3 grid.</p>
+
+<p><strong>The collapse.</strong> Two facts shrink the conductor count dramatically:</p>
+<ul>
+  <li><strong>GND is common</strong> (tied to the supply's V&minus;), so every device ground is the same
+  node &mdash; one shared ground instead of one per device.</li>
+  <li>Each closed-loop motor only needs <strong>DIR, PUL, EN</strong> unique &mdash; its 48&nbsp;V is its
+  own rail, GND is shared, and the five <strong><code>AL</code> alarms wire-OR into a single
+  <code>ST0</code></strong>.</li>
+</ul>
+<p>That takes the 5 stepper channels (X, Y, Z, A, and the provisioned B) from 30 conductors down to
+<strong>5&times;3 = 15 + shared GND + OR'd AL = 17</strong>, which fit <strong>three 1&times;6 sockets</strong>
+(one spare pin). Each motor's <strong>48&nbsp;V runs separately to a distribution terminal block</strong>
+at the panel &mdash; not through these signal sockets. The sensors and probes fill <strong>two more
+1&times;6 sockets</strong>. Net: <strong>five cables / five sockets</strong> to the controller (three 18/6
+for the steppers, two 22/6 for the low-current sensor lines), plus the 48&nbsp;V block and the common-ground
+tie.</p>
+
+<table>
+  <thead><tr><th>Socket (1&times;6)</th><th>Cable</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Stepper&nbsp;1</strong></td><td>18/6</td><td>X&nbsp;DIR</td><td>X&nbsp;PUL</td><td>X&nbsp;EN</td><td>Y&nbsp;DIR</td><td>Y&nbsp;PUL</td><td>Y&nbsp;EN</td></tr>
+    <tr><td><strong>Stepper&nbsp;2</strong></td><td>18/6</td><td>Z&nbsp;DIR</td><td>Z&nbsp;PUL</td><td>Z&nbsp;EN</td><td>A&nbsp;DIR</td><td>A&nbsp;PUL</td><td>A&nbsp;EN</td></tr>
+    <tr><td><strong>Stepper&nbsp;3</strong></td><td>18/6</td><td>B&nbsp;DIR</td><td>B&nbsp;PUL</td><td>B&nbsp;EN</td><td>GND</td><td>AL</td><td><em>spare</em></td></tr>
+    <tr><td><strong>Limits</strong></td><td>22/6</td><td>12V</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td></tr>
+    <tr><td><strong>Probes</strong></td><td>22/6</td><td>5V</td><td>3D</td><td>TS</td><td>TP</td><td>Mist</td><td><em>spare</em></td></tr>
+  </tbody>
+</table>
+<p><code>B</code> rows are the provisioned 5th-axis / rotary lines. <code>3D</code> = 3D probe,
+<code>TS</code> = toolsetter, <code>TP</code> = touch plate. The 12&nbsp;V fan is fed from the panel, not
+the probes socket; each motor's 48&nbsp;V and the common ground are distributed separately.</p>
+
+<svg viewBox="0 0 860 330" width="100%" style="max-width:760px;display:block;margin:14px 0;border:1px solid #dde3e9;border-radius:6px;background:#fff;font-family:'Segoe UI',Arial,sans-serif;">
+  <text x="120" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Devices</text>
+  <text x="405" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Collapse at the panel</text>
+  <text x="723" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Sockets &rarr; Teensy</text>
+
+  <!-- device boxes -->
+  <rect x="20" y="34" width="200" height="92" rx="5" fill="#eef3f8" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="120" y="54" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0f2e4f">5 stepper motors</text>
+  <text x="120" y="72" text-anchor="middle" font-size="11" fill="#444">X &middot; Y &middot; Z &middot; A &middot; B (future)</text>
+  <text x="120" y="92" text-anchor="middle" font-size="10" fill="#777">each: 48V GND DIR PUL EN AL</text>
+  <text x="120" y="110" text-anchor="middle" font-size="10" fill="#777">5&times; 18/6 cables</text>
+
+  <rect x="20" y="138" width="200" height="40" rx="5" fill="#eef3f8" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="120" y="156" text-anchor="middle" font-size="12" font-weight="bold" fill="#0f2e4f">5 limit prox</text>
+  <text x="120" y="171" text-anchor="middle" font-size="9.5" fill="#777">X Y Z A B &middot; 12V &middot; Sig &middot; GND</text>
+
+  <rect x="20" y="190" width="200" height="40" rx="5" fill="#eef3f8" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="120" y="208" text-anchor="middle" font-size="12" font-weight="bold" fill="#0f2e4f">Probes</text>
+  <text x="120" y="223" text-anchor="middle" font-size="9.5" fill="#777">3D TS TP &middot; 5V &middot; Sig &middot; GND</text>
+
+  <rect x="20" y="242" width="200" height="34" rx="5" fill="#eef3f8" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="120" y="263" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#0f2e4f">Mist relay &middot; 12V fan</text>
+
+  <!-- collapse boxes -->
+  <rect x="300" y="40" width="210" height="30" rx="4" fill="#fbe6e6" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="405" y="59" text-anchor="middle" font-size="11" fill="#922">48 V terminal block &rarr; motors</text>
+  <rect x="300" y="78" width="210" height="30" rx="4" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.5"/>
+  <text x="405" y="97" text-anchor="middle" font-size="11" fill="#1d4f9c">DIR / PUL / EN pass-through (15)</text>
+  <rect x="300" y="116" width="210" height="30" rx="4" fill="#fdebd0" stroke="#d68910" stroke-width="1.5"/>
+  <text x="405" y="135" text-anchor="middle" font-size="11" fill="#9a6209">common GND &middot; AL wire-OR &rarr; ST0</text>
+  <rect x="300" y="170" width="210" height="44" rx="4" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="405" y="190" text-anchor="middle" font-size="11" fill="#226b43">12V / 5V rails +</text>
+  <text x="405" y="206" text-anchor="middle" font-size="11" fill="#226b43">limit &amp; probe signals</text>
+
+  <!-- socket boxes -->
+  <rect x="600" y="38" width="248" height="28" rx="4" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.5"/>
+  <text x="724" y="56" text-anchor="middle" font-size="10.5" fill="#1d4f9c">STEP-1 (1&times;6): X&middot;Y DIR/PUL/EN</text>
+  <rect x="600" y="70" width="248" height="28" rx="4" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.5"/>
+  <text x="724" y="88" text-anchor="middle" font-size="10.5" fill="#1d4f9c">STEP-2 (1&times;6): Z&middot;A DIR/PUL/EN</text>
+  <rect x="600" y="102" width="248" height="28" rx="4" fill="#eef1f5" stroke="#2456a6" stroke-width="1.5"/>
+  <text x="724" y="120" text-anchor="middle" font-size="10" fill="#1d4f9c">STEP-3: B DIR/PUL/EN &middot; GND &middot; AL &middot; sp</text>
+  <rect x="600" y="146" width="248" height="28" rx="4" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="724" y="164" text-anchor="middle" font-size="10.5" fill="#226b43">LIMITS (1&times;6): 12V&middot;X&middot;Y&middot;Z&middot;A&middot;B</text>
+  <rect x="600" y="178" width="248" height="28" rx="4" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="724" y="196" text-anchor="middle" font-size="10" fill="#226b43">PROBES: 5V&middot;3D&middot;TS&middot;TP&middot;Mist&middot;sp</text>
+  <rect x="600" y="222" width="248" height="40" rx="4" fill="#dfe6ee" stroke="#14365c" stroke-width="2"/>
+  <text x="724" y="246" text-anchor="middle" font-size="12" font-weight="bold" fill="#14365c">Teensy 4.x breakout</text>
+
+  <!-- fan-out from steppers -->
+  <path d="M220 64 C265 64 270 55 300 55" fill="none" stroke="#c0392b" stroke-width="2"/>
+  <path d="M220 80 C265 80 270 93 300 93" fill="none" stroke="#2456a6" stroke-width="2"/>
+  <path d="M220 100 C265 100 270 131 300 131" fill="none" stroke="#d68910" stroke-width="2"/>
+  <!-- sensors/outputs to green node -->
+  <path d="M220 158 C265 158 270 186 300 186" fill="none" stroke="#2e8b57" stroke-width="2"/>
+  <path d="M220 210 C265 210 270 192 300 192" fill="none" stroke="#2e8b57" stroke-width="2"/>
+  <path d="M220 259 C265 259 270 200 300 200" fill="none" stroke="#2e8b57" stroke-width="2"/>
+  <!-- collapse to sockets -->
+  <path d="M510 93 C555 93 560 52 600 52" fill="none" stroke="#2456a6" stroke-width="2"/>
+  <path d="M510 93 C555 93 560 84 600 84" fill="none" stroke="#2456a6" stroke-width="2"/>
+  <path d="M510 93 C560 93 565 116 600 116" fill="none" stroke="#2456a6" stroke-width="2"/>
+  <path d="M510 131 C560 131 565 116 600 116" fill="none" stroke="#d68910" stroke-width="2"/>
+  <path d="M510 192 C555 192 560 160 600 160" fill="none" stroke="#2e8b57" stroke-width="2"/>
+  <path d="M510 192 C560 192 565 192 600 192" fill="none" stroke="#2e8b57" stroke-width="2"/>
+  <!-- sockets to teensy -->
+  <path d="M724 130 V146" fill="none" stroke="#9aa7b4" stroke-width="1.5"/>
+  <path d="M724 206 V222" fill="none" stroke="#9aa7b4" stroke-width="1.5"/>
+
+  <!-- legend -->
+  <line x1="24" y1="300" x2="50" y2="300" stroke="#c0392b" stroke-width="3"/><text x="55" y="304" font-size="10" fill="#444">48 V</text>
+  <line x1="100" y1="300" x2="126" y2="300" stroke="#2456a6" stroke-width="3"/><text x="131" y="304" font-size="10" fill="#444">DIR/PUL/EN</text>
+  <line x1="210" y1="300" x2="236" y2="300" stroke="#d68910" stroke-width="3"/><text x="241" y="304" font-size="10" fill="#444">GND &middot; AL&rarr;ST0</text>
+  <line x1="340" y1="300" x2="366" y2="300" stroke="#2e8b57" stroke-width="3"/><text x="371" y="304" font-size="10" fill="#444">12V/5V + sensor &amp; probe signals</text>
+</svg>
+
+<p class="subtitle" style="font-size:11pt;margin:2px 0 14px;">Harness collapse: many device wires &rarr; shared GND, wire-OR'd alarm and a 48&nbsp;V block &rarr; five 1&times;6 sockets into the controller.</p>
+
+<svg viewBox="0 0 820 380" width="100%" style="max-width:720px;display:block;margin:14px 0;border:1px solid #dde3e9;border-radius:6px;background:#fff;font-family:'Segoe UI',Arial,sans-serif;">
+  <text x="410" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Extension panel (rear) &mdash; connect by feel</text>
+  <rect x="20" y="30" width="780" height="335" rx="8" fill="#f2f4f7" stroke="#5a6b7d" stroke-width="2.5"/>
+
+  <!-- top I/O + 48V block -->
+  <rect x="44" y="48" width="74" height="42" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="81" y="73" text-anchor="middle" font-size="10.5" fill="#333">C20 220V</text>
+  <rect x="134" y="54" width="58" height="30" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="163" y="73" text-anchor="middle" font-size="10.5" fill="#333">USB-A</text>
+  <rect x="208" y="54" width="58" height="30" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="237" y="73" text-anchor="middle" font-size="10.5" fill="#333">RJ45</text>
+  <rect x="520" y="44" width="170" height="46" rx="3" fill="#fbe6e6" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="605" y="64" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#922">48 V distribution block</text>
+  <text x="605" y="80" text-anchor="middle" font-size="9.5" fill="#922">each motor's 48 V lands here</text>
+  <rect x="704" y="44" width="74" height="46" rx="3" fill="#eceff1" stroke="#333" stroke-width="1.5"/>
+  <text x="741" y="64" text-anchor="middle" font-size="10" fill="#222">common</text>
+  <text x="741" y="78" text-anchor="middle" font-size="10" fill="#222">GND bus</text>
+
+  <!-- STEP-1 -->
+  <text x="135" y="128" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4f9c">STEP-1</text>
+  <rect x="48" y="134" width="174" height="30" rx="6" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.5"/>
+  <circle cx="71" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="99" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="127" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="155" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="183" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="211" cy="149" r="6" fill="#fff" stroke="#2456a6"/>
+  <text x="71" y="180" text-anchor="middle" font-size="9" fill="#444">XD</text><text x="99" y="180" text-anchor="middle" font-size="9" fill="#444">XP</text><text x="127" y="180" text-anchor="middle" font-size="9" fill="#444">XE</text><text x="155" y="180" text-anchor="middle" font-size="9" fill="#444">YD</text><text x="183" y="180" text-anchor="middle" font-size="9" fill="#444">YP</text><text x="211" y="180" text-anchor="middle" font-size="9" fill="#444">YE</text>
+
+  <!-- STEP-2 -->
+  <text x="323" y="128" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4f9c">STEP-2</text>
+  <rect x="236" y="134" width="174" height="30" rx="6" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.5"/>
+  <circle cx="259" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="287" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="315" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="343" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="371" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="399" cy="149" r="6" fill="#fff" stroke="#2456a6"/>
+  <text x="259" y="180" text-anchor="middle" font-size="9" fill="#444">ZD</text><text x="287" y="180" text-anchor="middle" font-size="9" fill="#444">ZP</text><text x="315" y="180" text-anchor="middle" font-size="9" fill="#444">ZE</text><text x="343" y="180" text-anchor="middle" font-size="9" fill="#444">AD</text><text x="371" y="180" text-anchor="middle" font-size="9" fill="#444">AP</text><text x="399" y="180" text-anchor="middle" font-size="9" fill="#444">AE</text>
+
+  <!-- STEP-3 -->
+  <text x="511" y="128" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4f9c">STEP-3</text>
+  <rect x="424" y="134" width="174" height="30" rx="6" fill="#eef1f5" stroke="#2456a6" stroke-width="1.5"/>
+  <circle cx="447" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="475" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="503" cy="149" r="6" fill="#fff" stroke="#2456a6"/><circle cx="531" cy="149" r="6" fill="#fff" stroke="#333"/><circle cx="559" cy="149" r="6" fill="#fff" stroke="#d68910"/><circle cx="587" cy="149" r="6" fill="#fff" stroke="#999" stroke-dasharray="2 2"/>
+  <text x="447" y="180" text-anchor="middle" font-size="9" fill="#444">BD</text><text x="475" y="180" text-anchor="middle" font-size="9" fill="#444">BP</text><text x="503" y="180" text-anchor="middle" font-size="9" fill="#444">BE</text><text x="531" y="180" text-anchor="middle" font-size="9" fill="#222">GND</text><text x="559" y="180" text-anchor="middle" font-size="9" fill="#9a6209">AL</text><text x="587" y="180" text-anchor="middle" font-size="9" fill="#999">sp</text>
+
+  <!-- LIMITS -->
+  <text x="135" y="232" text-anchor="middle" font-size="11" font-weight="bold" fill="#226b43">LIMITS</text>
+  <rect x="48" y="238" width="174" height="30" rx="6" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <circle cx="71" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="99" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="127" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="155" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="183" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="211" cy="253" r="6" fill="#fff" stroke="#2e8b57"/>
+  <text x="71" y="284" text-anchor="middle" font-size="9" fill="#444">12V</text><text x="99" y="284" text-anchor="middle" font-size="9" fill="#444">X</text><text x="127" y="284" text-anchor="middle" font-size="9" fill="#444">Y</text><text x="155" y="284" text-anchor="middle" font-size="9" fill="#444">Z</text><text x="183" y="284" text-anchor="middle" font-size="9" fill="#444">A</text><text x="211" y="284" text-anchor="middle" font-size="9" fill="#444">B</text>
+
+  <!-- PROBES -->
+  <text x="323" y="232" text-anchor="middle" font-size="11" font-weight="bold" fill="#226b43">PROBES</text>
+  <rect x="236" y="238" width="174" height="30" rx="6" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <circle cx="259" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="287" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="315" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="343" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="371" cy="253" r="6" fill="#fff" stroke="#2e8b57"/><circle cx="399" cy="253" r="6" fill="#fff" stroke="#999" stroke-dasharray="2 2"/>
+  <text x="259" y="284" text-anchor="middle" font-size="9" fill="#444">5V</text><text x="287" y="284" text-anchor="middle" font-size="9" fill="#444">3D</text><text x="315" y="284" text-anchor="middle" font-size="9" fill="#444">TS</text><text x="343" y="284" text-anchor="middle" font-size="9" fill="#444">TP</text><text x="371" y="284" text-anchor="middle" font-size="9" fill="#444">Mist</text><text x="399" y="284" text-anchor="middle" font-size="9" fill="#999">sp</text>
+
+  <text x="698" y="216" text-anchor="middle" font-size="10.5" fill="#666">All sockets are single-row</text>
+  <text x="698" y="234" text-anchor="middle" font-size="10.5" fill="#666">1&times;6 Mini-Fit Jr &mdash; pins</text>
+  <text x="698" y="252" text-anchor="middle" font-size="10.5" fill="#666">in one line for blind,</text>
+  <text x="698" y="270" text-anchor="middle" font-size="10.5" fill="#666">by-feel seating.</text>
+  <text x="410" y="320" text-anchor="middle" font-size="9.5" fill="#888">D/P/E = DIR/PUL/EN &middot; sp = spare &middot; full pinout in the table above</text>
+</svg>
+<p class="subtitle" style="font-size:11pt;margin:2px 0 0;">Back-panel layout: the five 1&times;6 sockets plus the 48&nbsp;V block, common-ground bus and the USB/Ethernet/C20 pass-throughs.</p>
 
 <h2>Overhead umbilical &amp; dust collection</h2>
 <p>The spindle's services arrive from <strong>above</strong> rather than through a drag chain,
@@ -420,14 +594,16 @@ gearing was the sticking point.</p>
     <tr><td>Air assist</td><td>Solenoid valve</td><td>12&nbsp;V, NC</td></tr>
     <tr><td>Air assist</td><td>Pressure regulator</td><td>set 30&nbsp;PSI</td></tr>
     <tr><td>Air assist</td><td>3D-printed nozzle bracket</td><td>bolts to Z; aims the air stream at the tool tip</td></tr>
-    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/3, 18/6</td></tr>
+    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/3, 18/6, 12/4</td></tr>
+    <tr><td>Connectors</td><td>Mini-Fit Jr 1&times;6 connectors</td><td>5 mated pairs (5 panel headers + 5 cable receptacles)</td></tr>
+    <tr><td>Connectors</td><td>Mini-Fit Jr crimp terminals</td><td>~60 (&asymp;30 pins + 30 sockets)</td></tr>
+    <tr><td>Connectors</td><td>48&nbsp;V distribution terminal block</td><td>at the extension panel (each motor's 48&nbsp;V)</td></tr>
   </tbody>
 </table>
 
 <div class="note">
 <strong>Not yet itemized</strong> (described in the build above but missing from this BOM):
 <ul style="margin:6px 0 0;">
-  <li><strong>Molex Mini-Fit Jr connectors</strong> &mdash; panel-mount + inline housings, pins and crimp terminals (count per the wiring schedule) &mdash; <em>still to be listed</em>.</li>
   <li><strong>Enclosure</strong> &mdash; 2020 extrusion, 1/16&Prime; aluminum sheet (5 sides), 1/8&Prime; plexiglass top.</li>
   <li><strong>Buck converters</strong> &mdash; 12&nbsp;V 3&nbsp;A and 5&nbsp;V 3&nbsp;A.</li>
   <li><strong>Ferrules</strong> for the terminal-block connections.</li>
