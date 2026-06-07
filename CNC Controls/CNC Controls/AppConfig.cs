@@ -290,6 +290,7 @@ namespace CNC.Controls
         public CommandIgnoreState IgnoreM8 { get { return _ignoreM8; } set { _ignoreM8 = value; OnPropertyChanged(); } }
         public CommandIgnoreState IgnoreG61G64 { get { return _ignoreG61G64; } set { _ignoreG61G64 = value; OnPropertyChanged(); } }
         public ObservableCollection<CNC.GCode.Macro> Macros { get; set; } = new ObservableCollection<CNC.GCode.Macro>();
+        public int LastMacroId { get; set; } = -1;   // most recently run macro (any entry point); UI defaults to it
         public JogConfig Jog { get; set; } = new JogConfig();
         public JogUIConfig JogUiMetric { get; set; } = new JogUIConfig(new int[4] { 5, 100, 500, 1000 }, new double[4] { .01d, .1d, 1d, 10d });
         public JogUIConfig JogUiImperial { get; set; } = new JogUIConfig(new int[4] { 5, 10, 50, 100 }, new double[4] { .001d, .01d, .1d, 1d });
@@ -339,6 +340,7 @@ namespace CNC.Controls
         }
 
         public ObservableCollection<CNC.GCode.Macro> Macros { get { return Base == null ? null : Base.Macros; } }
+        public int LastMacroId { get { return Base == null ? -1 : Base.LastMacroId; } }
         public JogConfig Jog { get { return Base == null ? null : Base.Jog; } }
         public JogUIConfig JogUiMetric { get { return Base == null ? null : Base.JogUiMetric; } }
         public JogUIConfig JogUiImperial { get { return Base == null ? null : Base.JogUiImperial; } }
@@ -381,6 +383,17 @@ namespace CNC.Controls
             return configfile != null && Save(configfile);
         }
 
+        // Record the most recently run macro (from any entry point) and persist it, so the UI can
+        // default to it. No-op (and no save) if unchanged.
+        public void RecordMacroRun(int id)
+        {
+            if (Base != null && Base.LastMacroId != id)
+            {
+                Base.LastMacroId = id;
+                Save();
+            }
+        }
+
         public bool Load(string filename)
         {
             bool ok = false;
@@ -399,6 +412,12 @@ namespace CNC.Controls
                     if (macro.IsSession)
                         Base.Macros.Remove(macro);
                 }
+
+                // Migrate legacy macros (saved before the FKey element existed) to an explicit
+                // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
+                foreach (var macro in Base.Macros)
+                    if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
+                        macro.FKey = macro.Id;
 
                 ok = true;
             }

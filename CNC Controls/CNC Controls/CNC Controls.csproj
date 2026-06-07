@@ -179,6 +179,9 @@
       <DependentUpon>MacroEditor.xaml</DependentUpon>
     </Compile>
     <Compile Include="MacroProcessor.cs" />
+    <Compile Include="MacroManagerDialog.xaml.cs">
+      <DependentUpon>MacroManagerDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MacroExecuteControl.xaml.cs">
       <DependentUpon>MacroExecuteControl.xaml</DependentUpon>
     </Compile>
@@ -376,6 +379,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MacroEditor.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroManagerDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
