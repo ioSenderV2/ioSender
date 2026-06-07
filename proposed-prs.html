@@ -42,27 +42,27 @@
 
 <div class="toc">
 <table>
-<tr><td class="n">1</td><td>RP.Math build fix</td><td class="mono">pr/fix-rp-math-build</td><td class="sz">1 file · +6</td></tr>
-<tr><td class="n">2</td><td>Surface Motor Fault / Warning signals</td><td class="mono">pr/motor-signals</td><td class="sz">1 file · +2/−30</td></tr>
-<tr><td class="n">3</td><td>Console persistence + Key Mappings editor</td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
-<tr><td class="n">4</td><td>Connection-loss handling + auto-reconnect</td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
-<tr><td class="n">5</td><td>Stepper calibration (scratch) tab</td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
-<tr><td class="n">6</td><td>Load Folder + Fusion batch-post add-in</td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
-<tr><td class="n">7</td><td>High-DPI / large-text layout</td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
-<tr><td class="n">8</td><td>Xbox controller + Key Mappings editor polish</td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1324/−26</td></tr>
-<tr><td class="n">9</td><td>Configurable main page + flyouts + jog panels (XL)</td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1385/−33</td></tr>
-<tr><td class="n">10</td><td>Macro manager + run-only flyout</td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
-<tr><td class="n">11</td><td>Macro Processor Enhancements</td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
-<tr><td class="n">12</td><td>Onboarding tooltips</td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
-<tr><td class="n">13</td><td>Build documentation (Mega-XL notes + tool-change guide)</td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
-<tr><td class="n">14</td><td>Combined SD + LittleFS file browser</td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
-<tr><td class="n">15</td><td>USB / Ethernet / simulator connection support + Connect menu</td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +526/−58</td></tr>
+<tr><td class="n">1</td><td><a href="#pr1">RP.Math build fix</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz">1 file · +6</td></tr>
+<tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="mono">pr/motor-signals</td><td class="sz">1 file · +2/−30</td></tr>
+<tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
+<tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
+<tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
+<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
+<tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
+<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1324/−26</td></tr>
+<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1385/−33</td></tr>
+<tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
+<tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
+<tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
+<tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
+<tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +526/−58</td></tr>
 </table>
 </div>
 
 <!-- ============ PR 1 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 1</span>Reference RP.Math in CNC Core to fix GCodeEmulator build</h2>
+<h2 id="pr1"><span class="badge">PR 1</span>Reference RP.Math in CNC Core to fix GCodeEmulator build</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/fix-rp-math-build</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build</a></div>
@@ -79,7 +79,7 @@
 
 <!-- ============ PR 2 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 2</span>Surface Motor Fault and Motor Warning signals in Signals display</h2>
+<h2 id="pr2"><span class="badge">PR 2</span>Surface Motor Fault and Motor Warning signals in Signals display</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/motor-signals</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals</a></div>
@@ -96,7 +96,7 @@
 
 <!-- ============ PR 3 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 3</span>Persist console state and add an in-app Key Mappings editor</h2>
+<h2 id="pr3"><span class="badge">PR 3</span>Persist console state and add an in-app Key Mappings editor</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/keymapping_editor</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor</a></div>
@@ -134,7 +134,7 @@
 
 <!-- ============ PR 4 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 4</span>Fix unhandled exceptions on connection loss (e.g. SD card swap)</h2>
+<h2 id="pr4"><span class="badge">PR 4</span>Fix unhandled exceptions on connection loss (e.g. SD card swap)</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/connection-loss-reconnect</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect</a></div>
@@ -167,7 +167,7 @@
 
 <!-- ============ PR 5 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 5</span>Add Stepper calibration (scratch) tab to grbl:Settings</h2>
+<h2 id="pr5"><span class="badge">PR 5</span>Add Stepper calibration (scratch) tab to grbl:Settings</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/stepper-calibration-scratch</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch</a></div>
@@ -190,7 +190,7 @@
 
 <!-- ============ PR 6 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 6</span>Add "Load Folder": load a folder of per-toolpath .nc files as one outlined program</h2>
+<h2 id="pr6"><span class="badge">PR 6</span>Add "Load Folder": load a folder of per-toolpath .nc files as one outlined program</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/load-folder</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder</a></div>
@@ -233,7 +233,7 @@
 
 <!-- ============ PR 7 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 7</span>Improve high-DPI / large-text-size layout across the UI</h2>
+<h2 id="pr7"><span class="badge">PR 7</span>Improve high-DPI / large-text-size layout across the UI</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/highdpi-layout</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout</a></div>
@@ -279,7 +279,7 @@
 
 <!-- ============ PR 8 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 8</span>Native Xbox controller support (+ Key Mappings editor polish)</h2>
+<h2 id="pr8"><span class="badge">PR 8</span>Native Xbox controller support (+ Key Mappings editor polish)</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/xbox-mapping</code></div>
   <div><span class="label">Depends on</span>PR 3 (<code>pr/keymapping_editor</code>) — this branch is stacked on it; the figures below are the delta on top of PR 3.</div>
@@ -311,7 +311,7 @@
 
 <!-- ============ PR 9 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 9</span>Configurable main page + flyouts + jog panels (ioSender XL)</h2>
+<h2 id="pr9"><span class="badge">PR 9</span>Configurable main page + flyouts + jog panels (ioSender XL)</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/main-page-layout</code></div>
   <div><span class="label">Depends on</span>The integrated Key Mappings + Xbox base in <code>master</code> (PRs 3 &amp; 8); the figures below are the delta on top of that base.</div>
@@ -363,7 +363,7 @@
 
 <!-- ============ PR 10 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 10</span>Macro manager + run-only flyout</h2>
+<h2 id="pr10"><span class="badge">PR 10</span>Macro manager + run-only flyout</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/macro-editor</code></div>
   <div><span class="label">Depends on</span>The integrated base in <code>master</code> (the button sits next to PR 3's "Edit Key Bindings" on Settings:App); the figures below are the delta on top.</div>
@@ -396,7 +396,7 @@
 
 <!-- ============ PR 11 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 11</span>Macro Processor Enhancements</h2>
+<h2 id="pr11"><span class="badge">PR 11</span>Macro Processor Enhancements</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/macro-processor</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent of PR 10. The two are complementary: PR 10's manager <em>authors</em> macros, this <em>executes</em> them.</div>
@@ -430,7 +430,7 @@
 
 <!-- ============ PR 12 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 12</span>Onboarding tooltips</h2>
+<h2 id="pr12"><span class="badge">PR 12</span>Onboarding tooltips</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/onboarding-tooltips</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent. Aimed at users new to CNC.</div>
@@ -456,7 +456,7 @@
 
 <!-- ============ PR 13 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 13</span>Build documentation: Mega-XL upgrade notes + repeatable tool-change guide</h2>
+<h2 id="pr13"><span class="badge">PR 13</span>Build documentation: Mega-XL upgrade notes + repeatable tool-change guide</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/build-docs</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent. Documentation only — no code or build changes.</div>
@@ -481,7 +481,7 @@
 
 <!-- ============ PR 14 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 14</span>Combined SD + LittleFS file browser on the SD Card tab</h2>
+<h2 id="pr14"><span class="badge">PR 14</span>Combined SD + LittleFS file browser on the SD Card tab</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/sdcard-filesystems</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
@@ -510,7 +510,7 @@
 
 <!-- ============ PR 15 ============ -->
 <div class="pr">
-<h2><span class="badge">PR 15</span>USB / Ethernet / simulator connection support + Connect menu</h2>
+<h2 id="pr15"><span class="badge">PR 15</span>USB / Ethernet / simulator connection support + Connect menu</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/connect-simulator</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
