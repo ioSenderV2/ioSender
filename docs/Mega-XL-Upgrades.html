@@ -220,6 +220,8 @@ aircraft-style connectors.</p>
     <tr><td><strong>18/6 shielded</strong></td><td>enclosure &rarr; each stepper motor</td><td>6 (assignment depends on motor type &mdash; see below)</td></tr>
     <tr><td><strong>22/3 shielded</strong></td><td>enclosure &rarr; Y-axis proximity switches</td><td><code>12V</code>, <code>Sig</code>, <code>GND</code></td></tr>
     <tr><td><strong>22/6 shielded</strong></td><td>enclosure &rarr; X &amp; Z proximity sensors + 3D probe (shared)</td><td><code>12V</code>, <code>GND</code>, <code>XLim</code>, <code>ZLim</code>, <code>P</code>, <code>5V</code></td></tr>
+    <tr><td><strong>12/4 shielded</strong></td><td>VFD &rarr; spindle (3-phase motor power)</td><td><code>U</code>, <code>V</code>, <code>W</code>, <code>GND</code></td></tr>
+    <tr><td><strong>22/4 shielded</strong></td><td>breakout &rarr; VFD (control)</td><td><code>0&ndash;10V</code>, run, GND, spare</td></tr>
   </tbody>
 </table>
 
@@ -294,7 +296,10 @@ far easier to count and seat blind than a 2&times;3 grid.</p>
 at the panel &mdash; not through these signal sockets. The sensors and probes fill <strong>two more
 1&times;6 sockets</strong>. Net: <strong>five cables / five sockets</strong> to the controller (three 18/6
 for the steppers, two 22/6 for the low-current sensor lines), plus the 48&nbsp;V block and the common-ground
-tie.</p>
+tie. The <strong>48&nbsp;V terminal block and common-ground bus sit behind the panel</strong> &mdash;
+internal wiring, not on the connect-by-feel face. The spindle's <strong>VFD has its own C20 220&nbsp;V
+inlet</strong> on the panel and a <strong>22/4 control cable</strong> from the breakout (0&ndash;10&nbsp;V
+speed + run).</p>
 
 <table>
   <thead><tr><th>Socket (1&times;6)</th><th>Cable</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
@@ -312,7 +317,8 @@ the probes socket; each motor's 48&nbsp;V and the common ground are distributed 
 
 <svg viewBox="0 0 860 330" width="100%" style="max-width:760px;display:block;margin:14px 0;border:1px solid #dde3e9;border-radius:6px;background:#fff;font-family:'Segoe UI',Arial,sans-serif;">
   <text x="120" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Devices</text>
-  <text x="405" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Collapse at the panel</text>
+  <text x="405" y="18" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Collapse at the panel</text>
+  <text x="405" y="30" text-anchor="middle" font-size="8.5" font-style="italic" fill="#999">internal wiring &mdash; behind the panel</text>
   <text x="723" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Sockets &rarr; Teensy</text>
 
   <!-- device boxes -->
@@ -390,19 +396,26 @@ the probes socket; each motor's 48&nbsp;V and the common ground are distributed 
   <text x="410" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Extension panel (rear) &mdash; connect by feel</text>
   <rect x="20" y="30" width="780" height="335" rx="8" fill="#f2f4f7" stroke="#5a6b7d" stroke-width="2.5"/>
 
-  <!-- top I/O + 48V block -->
-  <rect x="44" y="48" width="74" height="42" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
-  <text x="81" y="73" text-anchor="middle" font-size="10.5" fill="#333">C20 220V</text>
-  <rect x="134" y="54" width="58" height="30" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
-  <text x="163" y="73" text-anchor="middle" font-size="10.5" fill="#333">USB-A</text>
-  <rect x="208" y="54" width="58" height="30" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
-  <text x="237" y="73" text-anchor="middle" font-size="10.5" fill="#333">RJ45</text>
-  <rect x="520" y="44" width="170" height="46" rx="3" fill="#fbe6e6" stroke="#c0392b" stroke-width="1.5"/>
-  <text x="605" y="64" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#922">48 V distribution block</text>
-  <text x="605" y="80" text-anchor="middle" font-size="9.5" fill="#922">each motor's 48 V lands here</text>
-  <rect x="704" y="44" width="74" height="46" rx="3" fill="#eceff1" stroke="#333" stroke-width="1.5"/>
-  <text x="741" y="64" text-anchor="middle" font-size="10" fill="#222">common</text>
-  <text x="741" y="78" text-anchor="middle" font-size="10" fill="#222">GND bus</text>
+  <!-- face connectors -->
+  <rect x="40" y="50" width="66" height="40" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="73" y="66" text-anchor="middle" font-size="9.5" fill="#333">C20</text>
+  <text x="73" y="80" text-anchor="middle" font-size="9" fill="#333">mains</text>
+  <rect x="114" y="50" width="66" height="40" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="147" y="66" text-anchor="middle" font-size="9.5" fill="#333">C20</text>
+  <text x="147" y="80" text-anchor="middle" font-size="9" fill="#333">VFD</text>
+  <rect x="190" y="54" width="56" height="32" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="218" y="74" text-anchor="middle" font-size="9.5" fill="#333">USB-A</text>
+  <rect x="254" y="54" width="56" height="32" rx="3" fill="#cfd8e2" stroke="#5a6b7d" stroke-width="1.5"/>
+  <text x="282" y="74" text-anchor="middle" font-size="9.5" fill="#333">RJ45</text>
+  <!-- behind-panel group (NOT on the accessible face) -->
+  <rect x="500" y="42" width="284" height="62" rx="5" fill="#f7f4ee" stroke="#999" stroke-width="1.3" stroke-dasharray="5 3"/>
+  <text x="642" y="56" text-anchor="middle" font-size="9.5" font-style="italic" fill="#888">behind the panel &mdash; not visible</text>
+  <rect x="510" y="62" width="176" height="34" rx="3" fill="#fcecec" stroke="#d98a86" stroke-width="1.2"/>
+  <text x="598" y="76" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#a4524d">48 V distribution block</text>
+  <text x="598" y="90" text-anchor="middle" font-size="8.5" fill="#a4524d">each motor's 48 V lands here</text>
+  <rect x="694" y="62" width="80" height="34" rx="3" fill="#eef0f1" stroke="#999" stroke-width="1.2"/>
+  <text x="734" y="77" text-anchor="middle" font-size="9" fill="#555">common</text>
+  <text x="734" y="89" text-anchor="middle" font-size="9" fill="#555">GND bus</text>
 
   <!-- STEP-1 -->
   <text x="135" y="128" text-anchor="middle" font-size="11" font-weight="bold" fill="#1d4f9c">STEP-1</text>
@@ -571,7 +584,8 @@ gearing was the sticking point.</p>
     <tr><td>I/O</td><td>Ethernet pass-through, panel mount</td><td>&nbsp;</td></tr>
     <tr><td>I/O</td><td>E-stop button</td><td>breaks 220&nbsp;V input</td></tr>
     <tr><td>Power</td><td>Meanwell 48&nbsp;V power supply</td><td>800&nbsp;W</td></tr>
-    <tr><td>Power</td><td>C20 panel-mount inlet</td><td>220&nbsp;V mains in</td></tr>
+    <tr><td>Power</td><td>C20 panel-mount inlet (mains)</td><td>220&nbsp;V mains in</td></tr>
+    <tr><td>Power</td><td>C20 panel-mount inlet (VFD)</td><td>220&nbsp;V to the spindle VFD</td></tr>
     <tr><td>Power</td><td>Power relay accessory</td><td>110&nbsp;V pump relay &mdash; <a href="https://www.amazon.com/dp/B07Z6R1KP3">Amazon&nbsp;B07Z6R1KP3</a></td></tr>
     <tr><td>Spindle</td><td>2.2&nbsp;kW 80&nbsp;mm water-cooled spindle + 2.2&nbsp;kW VFD kit</td><td>ER20, 24k&nbsp;RPM &mdash; <a href="https://www.amazon.com/dp/B073TRP92V">Amazon&nbsp;B073TRP92V</a></td></tr>
     <tr><td>Spindle</td><td>Braking resistor</td><td>150&nbsp;W (&lt;6&nbsp;s stop)</td></tr>
@@ -594,7 +608,7 @@ gearing was the sticking point.</p>
     <tr><td>Air assist</td><td>Solenoid valve</td><td>12&nbsp;V, NC</td></tr>
     <tr><td>Air assist</td><td>Pressure regulator</td><td>set 30&nbsp;PSI</td></tr>
     <tr><td>Air assist</td><td>3D-printed nozzle bracket</td><td>bolts to Z; aims the air stream at the tool tip</td></tr>
-    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/3, 18/6, 12/4</td></tr>
+    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/4, 22/3, 18/6, 12/4</td></tr>
     <tr><td>Connectors</td><td>Mini-Fit Jr 1&times;6 connectors</td><td>5 mated pairs (5 panel headers + 5 cable receptacles)</td></tr>
     <tr><td>Connectors</td><td>Mini-Fit Jr crimp terminals</td><td>~60 (&asymp;30 pins + 30 sockets)</td></tr>
     <tr><td>Connectors</td><td>48&nbsp;V distribution terminal block</td><td>at the extension panel (each motor's 48&nbsp;V)</td></tr>
