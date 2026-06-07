@@ -866,11 +866,50 @@ gearing was the sticking point.</p>
     }
     return null;
   }
+  // --- directive parsing/applying: the mechanical edits a script can do without judgment ---
+  function parseDirective(raw){
+    var s=(raw||'').trim(), phrase=null;
+    var m=/^Re:\s*"([^"]*)"\s*[—\-:]+\s*/i.exec(s);
+    if(m){ phrase=m[1]; s=s.slice(m[0].length).trim(); }
+    var r=/^replace\s+"([^"]*)"\s+with\s+"([\s\S]*)"\s*$/i.exec(s);
+    if(r) return {action:'replace', phrase:r[1], value:r[2]};
+    if(/^replace with:/i.test(s)) return {action:'replace', phrase:phrase, value:s.slice(s.indexOf(':')+1).trim()};
+    if(/^insert after:/i.test(s)) return {action:'insert', phrase:phrase, value:s.slice(s.indexOf(':')+1).trim()};
+    if(/^append:/i.test(s)) return {action:'append', phrase:phrase, value:s.slice(s.indexOf(':')+1).trim()};
+    var t=/^(?:typo|fix)\s*:?\s*([\s\S]+?)\s*(?:->|→|=>)\s*([\s\S]+)$/i.exec(s);
+    if(t) return {action:'replace', phrase:t[1].trim(), value:t[2].trim()};
+    if(/^delete\b/i.test(s)) return {action:'delete', phrase:phrase};
+    return {action:null};
+  }
+  function replaceText(el, find, repl){
+    if(!find) return false;
+    var w=document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false), n;
+    while((n=w.nextNode())){ var i=n.nodeValue.indexOf(find); if(i>=0){ n.nodeValue=n.nodeValue.slice(0,i)+repl+n.nodeValue.slice(i+find.length); return true; } }
+    if(el.textContent.indexOf(find)>=0){ el.textContent=el.textContent.replace(find, repl); return true; }
+    return false;
+  }
+  function applyDirective(el, d){
+    if(d.action==='replace'){ if(d.phrase) return replaceText(el, d.phrase, d.value); el.textContent=d.value; return true; }
+    if(d.action==='delete'){ if(d.phrase) return replaceText(el, d.phrase, ''); if(el.parentNode){ el.parentNode.removeChild(el); return true; } return false; }
+    if(d.action==='insert'){ if(!el.parentNode) return false; var p=document.createElement(el.tagName.toLowerCase()==='li'?'li':'p'); p.textContent=d.value; el.parentNode.insertBefore(p, el.nextSibling); return true; }
+    if(d.action==='append'){ el.textContent=el.textContent+' '+d.value; return true; }
+    return false;
+  }
+  function applyAll(){
+    var items=Array.prototype.slice.call(document.querySelectorAll('[data-comment]')), applied=0, left=[];
+    items.forEach(function(el){
+      var d=parseDirective(el.getAttribute('data-comment'));
+      var ok=d.action ? applyDirective(el,d) : false;
+      if(ok){ el.removeAttribute('data-comment'); applied++; }
+      else left.push(el.getAttribute('data-comment'));
+    });
+    return {applied:applied, left:left};
+  }
   Array.prototype.forEach.call(document.querySelectorAll('.rev-toolbar,.rev-pop'), function(n){ n.remove(); });
   document.body.classList.remove('rev-on');
   var on=false, pop=null;
   var bar=document.createElement('div'); bar.className='rev-toolbar';
-  bar.innerHTML='<span>📝 Review</span><button id="revTgl">Comment mode: off</button><span class="count" id="revCnt"></span><button id="revList">List</button><button id="revSave">Save</button>';
+  bar.innerHTML='<span>📝 Review</span><button id="revTgl">Comment mode: off</button><span class="count" id="revCnt"></span><button id="revList">List</button><button id="revApply">Apply edits</button><button id="revSave">Save</button>';
   document.body.appendChild(bar);
   var tgl=bar.querySelector('#revTgl'), cnt=bar.querySelector('#revCnt');
   function count(){ return document.querySelectorAll('[data-comment]').length; }
@@ -892,6 +931,12 @@ gearing was the sticking point.</p>
     if(!items.length){ alert('No comments yet.\n\nTurn Comment mode ON, then click any paragraph (optionally select a phrase first) to attach an edit instruction.'); return; }
     var lines=[]; Array.prototype.forEach.call(items, function(el,i){ lines.push((i+1)+'. ['+el.tagName.toLowerCase()+'] '+el.getAttribute('data-comment')); });
     alert(items.length+' comment(s):\n\n'+lines.join('\n\n'));
+  });
+  bar.querySelector('#revApply').addEventListener('click', function(){
+    if(!count()){ alert('No comments to apply.'); return; }
+    if(!confirm('Apply mechanical edits now?\n\nStructured directives (replace with: / delete / insert after: / typo: X -> Y) are applied. Free-form notes (reword, accuracy checks, …) are left in place for review.')) return;
+    var r=applyAll(); closePop(); refresh();
+    alert('Applied '+r.applied+' edit'+(r.applied===1?'':'s')+'.'+(r.left.length?('\n\nLeft '+r.left.length+' for review:\n\n• '+r.left.join('\n• ')):'\n\nNothing left for review.')+'\n\nClick Save to download the updated file.');
   });
   function openPop(el){
     closePop();
@@ -927,6 +972,9 @@ gearing was the sticking point.</p>
     if(el) openPop(el); else closePop();
   });
   refresh();
+  // Headless apply mode (tools/apply_doc_edits.py opens the file with ?apply): apply the mechanical
+  // directives, drop the toolbar, and leave unrecognised comments in place; the dumped DOM is the result.
+  if(/[?&]apply\b/i.test(location.search||'')){ applyAll(); if(bar) bar.remove(); closePop(); document.body.classList.remove('rev-on'); }
 })();
 </script>
 
