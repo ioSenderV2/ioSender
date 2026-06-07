@@ -276,30 +276,69 @@ their drag chains rather than riding through them.</p>
 carrier.</p>
 
 <h2 id="harness">Back-of-enclosure harness &amp; connectors</h2>
-<p>The control enclosure lives in a <strong>cabinet drawer</strong>. The only practical way to reach
-the back is to pull the drawer fully forward and connect the harness <strong>by feel</strong> &mdash; so
-the wiring was deliberately collapsed onto a <strong>few keyed Mini-Fit Jr sockets</strong> rather than
-many small connectors. Every socket is <strong>1&times;6 (single-row)</strong>: a linear row of pins is
-far easier to count and seat blind than a 2&times;3 grid.</p>
+<p>The wiring uses <strong>two panels</strong>. The <strong>extension panel</strong> is where the machine's
+device cables plug in &mdash; one socket per cable, sized to its conductor count. The <strong>back
+panel</strong> on the rear of the enclosure carries the collapsed result to the controller. Because the
+enclosure lives in a <strong>cabinet drawer</strong> and the back panel is connected <strong>by feel</strong>
+(drawer pulled forward, hand reaching in), the harness is squeezed down to just <strong>five single-row
+1&times;6 Mini-Fit Jr sockets</strong> there &mdash; few connectors, and a linear pin row is easy to count
+and seat blind.</p>
 
-<p><strong>The collapse.</strong> Two facts shrink the conductor count dramatically:</p>
-<ul>
-  <li><strong>GND is common</strong> (tied to the supply's V&minus;), so every device ground is the same
-  node &mdash; one shared ground instead of one per device.</li>
-  <li>Each closed-loop motor only needs <strong>DIR, PUL, EN</strong> unique &mdash; its 48&nbsp;V is its
-  own rail, GND is shared, and the five <strong><code>AL</code> alarms wire-OR into a single
-  <code>ST0</code></strong>.</li>
-</ul>
-<p>That takes the 5 stepper channels (X, Y, Z, A, and the provisioned B) from 30 conductors down to
-<strong>5&times;3 = 15 + shared GND + OR'd AL = 17</strong>, which fit <strong>three 1&times;6 sockets</strong>
-(one spare pin). Each motor's <strong>48&nbsp;V runs separately to a distribution terminal block</strong>
-at the panel &mdash; not through these signal sockets. The sensors and probes fill <strong>two more
-1&times;6 sockets</strong>. Net: <strong>five cables / five sockets</strong> to the controller (three 18/6
-for the steppers, two 22/6 for the low-current sensor lines), plus the 48&nbsp;V block and the common-ground
-tie. The <strong>48&nbsp;V terminal block and common-ground bus sit behind the panel</strong> &mdash;
-internal wiring, not on the connect-by-feel face. The spindle's <strong>VFD has its own C20 220&nbsp;V
-inlet</strong> on the panel and a <strong>22/4 control cable</strong> from the breakout (0&ndash;10&nbsp;V
-speed + run).</p>
+<h3>Extension panel &mdash; device cables plug in</h3>
+<p>Twelve sockets, one per device cable (50 conductors in):</p>
+<table>
+  <thead><tr><th>Socket</th><th>Size</th><th>Cable</th><th>Conductors</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Stepper X / Y / Z / A / B</strong></td><td>5&times; 6P</td><td>18/6</td><td><code>48V &middot; GND &middot; DIR &middot; PUL &middot; EN &middot; AL</code></td></tr>
+    <tr><td><strong>Y limit</strong></td><td>3P</td><td>22/3</td><td><code>12V &middot; Sig &middot; GND</code></td></tr>
+    <tr><td><strong>A limit</strong></td><td>3P</td><td>22/3</td><td><code>12V &middot; Sig &middot; GND</code></td></tr>
+    <tr><td><strong>X/Z limits + 3D probe</strong></td><td>6P</td><td>22/6</td><td><code>12V &middot; GND &middot; XL &middot; ZL &middot; 3D &middot; 5V</code></td></tr>
+    <tr><td><strong>Fan</strong></td><td>2P</td><td>&mdash;</td><td><code>12V &middot; GND</code></td></tr>
+    <tr><td><strong>Mist</strong></td><td>2P</td><td>&mdash;</td><td><code>Mist &middot; GND</code></td></tr>
+    <tr><td><strong>Touch plate</strong></td><td>2P</td><td>&mdash;</td><td><code>TP &middot; GND</code></td></tr>
+    <tr><td><strong>Toolsetter</strong></td><td>2P</td><td>&mdash;</td><td><code>TS &middot; GND</code></td></tr>
+  </tbody>
+</table>
+
+<svg viewBox="0 0 860 280" width="100%" style="max-width:760px;display:block;margin:12px 0;border:1px solid #dde3e9;border-radius:6px;background:#fff;font-family:'Segoe UI',Arial,sans-serif;">
+  <text x="430" y="20" text-anchor="middle" font-size="13" font-weight="bold" fill="#14365c">Extension panel &mdash; device cables plug in</text>
+  <rect x="20" y="30" width="820" height="236" rx="8" fill="#f2f4f7" stroke="#5a6b7d" stroke-width="2"/>
+  <text x="40" y="56" font-size="9.5" font-style="italic" fill="#888">Steppers (5&times; 6P)</text>
+  <rect x="39" y="62" width="150" height="32" rx="5" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.3"/><text x="114" y="82" text-anchor="middle" font-size="11" fill="#1d4f9c">X &middot; 6P</text>
+  <rect x="197" y="62" width="150" height="32" rx="5" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.3"/><text x="272" y="82" text-anchor="middle" font-size="11" fill="#1d4f9c">Y &middot; 6P</text>
+  <rect x="355" y="62" width="150" height="32" rx="5" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.3"/><text x="430" y="82" text-anchor="middle" font-size="11" fill="#1d4f9c">Z &middot; 6P</text>
+  <rect x="513" y="62" width="150" height="32" rx="5" fill="#e8f0fb" stroke="#2456a6" stroke-width="1.3"/><text x="588" y="82" text-anchor="middle" font-size="11" fill="#1d4f9c">A &middot; 6P</text>
+  <rect x="671" y="62" width="150" height="32" rx="5" fill="#eef1f5" stroke="#2456a6" stroke-width="1.3" stroke-dasharray="4 2"/><text x="746" y="82" text-anchor="middle" font-size="11" fill="#1d4f9c">B &middot; 6P</text>
+  <text x="40" y="130" font-size="9.5" font-style="italic" fill="#888">Limits &amp; X/Z+3D</text>
+  <rect x="39" y="136" width="120" height="32" rx="5" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.3"/><text x="99" y="156" text-anchor="middle" font-size="10.5" fill="#226b43">Y limit &middot; 3P</text>
+  <rect x="169" y="136" width="120" height="32" rx="5" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.3"/><text x="229" y="156" text-anchor="middle" font-size="10.5" fill="#226b43">A limit &middot; 3P</text>
+  <rect x="299" y="136" width="210" height="32" rx="5" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.3"/><text x="404" y="156" text-anchor="middle" font-size="10.5" fill="#226b43">X/Z lim + 3D &middot; 6P</text>
+  <text x="40" y="204" font-size="9.5" font-style="italic" fill="#888">Outputs &amp; probes (2P)</text>
+  <rect x="39" y="210" width="120" height="32" rx="5" fill="#eef1f5" stroke="#5a6b7d" stroke-width="1.3"/><text x="99" y="230" text-anchor="middle" font-size="10.5" fill="#555">Fan &middot; 2P</text>
+  <rect x="169" y="210" width="120" height="32" rx="5" fill="#eef1f5" stroke="#5a6b7d" stroke-width="1.3"/><text x="229" y="230" text-anchor="middle" font-size="10.5" fill="#555">Mist &middot; 2P</text>
+  <rect x="299" y="210" width="120" height="32" rx="5" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.3"/><text x="359" y="230" text-anchor="middle" font-size="10.5" fill="#226b43">Touch plate &middot; 2P</text>
+  <rect x="429" y="210" width="120" height="32" rx="5" fill="#e9f6ee" stroke="#2e8b57" stroke-width="1.3"/><text x="489" y="230" text-anchor="middle" font-size="10.5" fill="#226b43">Toolsetter &middot; 2P</text>
+  <text x="690" y="180" text-anchor="middle" font-size="10" fill="#777">Each connector matches</text>
+  <text x="690" y="196" text-anchor="middle" font-size="10" fill="#777">its cable's conductor</text>
+  <text x="690" y="212" text-anchor="middle" font-size="10" fill="#777">count &mdash; 6P / 3P / 2P.</text>
+</svg>
+
+<h3>Behind the panels &mdash; the remap</h3>
+<p>Between the two panels, each incoming conductor is routed to its designated back-panel socket and pin.
+The signals that tie together &mdash; the <strong>common ground</strong>, the five <strong><code>AL</code>
+alarms wire-OR'd to one <code>ST0</code></strong>, and the shared <strong>12&nbsp;V / 5&nbsp;V</strong>
+rails &mdash; are joined by <strong>daisy-chaining from the incoming crimp terminals</strong> (a jumper from
+one crimp to the next, not a bus bar). Each motor's <strong>48&nbsp;V splits off to a distribution terminal
+block</strong>; the spindle <strong>VFD has its own C20 220&nbsp;V inlet</strong> and a <strong>22/4 control
+cable</strong> from the breakout (0&ndash;10&nbsp;V speed + run).</p>
+
+<h3>Back panel &mdash; to the controller</h3>
+<p>The collapse: a closed-loop motor only needs <strong>DIR, PUL, EN</strong> unique (48&nbsp;V is its own
+rail, GND is shared, AL is wire-OR'd), so the 5 stepper channels go from 30 conductors to <strong>5&times;3
+= 15 + GND + AL = 17 &rarr; three 1&times;6 sockets</strong> (one spare pin). The sensors and probes fill
+<strong>two more 1&times;6 sockets</strong>. Net: <strong>five sockets / five cables</strong> to the
+controller (three 18/6, two 22/6); the <strong>48&nbsp;V terminal block and common-ground bus are behind
+the panel</strong>, not on the connect-by-feel face.</p>
 
 <table>
   <thead><tr><th>Socket (1&times;6)</th><th>Cable</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
@@ -319,7 +358,7 @@ the probes socket; each motor's 48&nbsp;V and the common ground are distributed 
   <text x="120" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Devices</text>
   <text x="405" y="18" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Collapse at the panel</text>
   <text x="405" y="30" text-anchor="middle" font-size="8.5" font-style="italic" fill="#999">internal wiring &mdash; behind the panel</text>
-  <text x="723" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Sockets &rarr; Teensy</text>
+  <text x="723" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Back panel &rarr; Teensy</text>
 
   <!-- device boxes -->
   <rect x="20" y="34" width="200" height="92" rx="5" fill="#eef3f8" stroke="#5a6b7d" stroke-width="1.5"/>
@@ -393,7 +432,7 @@ the probes socket; each motor's 48&nbsp;V and the common ground are distributed 
 <p class="subtitle" style="font-size:11pt;margin:2px 0 14px;">Harness collapse: many device wires &rarr; shared GND, wire-OR'd alarm and a 48&nbsp;V block &rarr; five 1&times;6 sockets into the controller.</p>
 
 <svg viewBox="0 0 820 380" width="100%" style="max-width:720px;display:block;margin:14px 0;border:1px solid #dde3e9;border-radius:6px;background:#fff;font-family:'Segoe UI',Arial,sans-serif;">
-  <text x="410" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Extension panel (rear) &mdash; connect by feel</text>
+  <text x="410" y="20" text-anchor="middle" font-size="14" font-weight="bold" fill="#14365c">Back panel (rear of enclosure) &mdash; connect by feel</text>
   <rect x="20" y="30" width="780" height="335" rx="8" fill="#f2f4f7" stroke="#5a6b7d" stroke-width="2.5"/>
 
   <!-- face connectors -->
