@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Pull Requests — ioSender</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1b1f23; font-size: 11pt; line-height: 1.45; }
+  h1 { font-size: 22pt; margin: 0 0 2px; }
+  h1 + .sub { color: #57606a; font-size: 10.5pt; margin-bottom: 18px; }
+  h2 { font-size: 14pt; margin: 0 0 6px; color: #0a3069; }
+  .pr { page-break-before: always; padding-top: 4px; }
+  .pr:first-of-type { page-break-before: avoid; }
+  .meta { border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 12px; margin: 8px 0 12px; background: #f6f8fa; }
+  .meta div { margin: 2px 0; }
+  .label { display: inline-block; width: 92px; color: #57606a; font-weight: 600; vertical-align: top; }
+  code, .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.7pt; }
+  a { color: #0969da; text-decoration: none; word-break: break-all; }
+  table.files { width: 100%; border-collapse: collapse; margin: 4px 0 12px; font-size: 9.5pt; }
+  table.files th { text-align: left; border-bottom: 1.5px solid #d0d7de; padding: 3px 6px; color: #57606a; }
+  table.files td { padding: 2px 6px; border-bottom: 1px solid #eaeef2; }
+  table.files td.num { text-align: right; font-family: Consolas, monospace; white-space: nowrap; }
+  .add { color: #1a7f37; } .del { color: #cf222e; }
+  .desc { margin-top: 6px; }
+  .desc p { margin: 6px 0; }
+  .desc ul { margin: 6px 0 6px 0; padding-left: 20px; }
+  .desc li { margin: 3px 0; }
+  .badge { display:inline-block; background:#0a3069; color:#fff; border-radius: 10px; padding: 1px 9px; font-size: 9pt; margin-right: 6px; }
+  .toc { border:1px solid #d0d7de; border-radius:6px; padding: 10px 14px; margin: 14px 0 0; }
+  .toc table { width:100%; border-collapse: collapse; font-size: 10pt; }
+  .toc td { padding: 3px 6px; border-bottom: 1px solid #eaeef2; }
+  .toc td.n { width: 22px; color:#57606a; }
+  .toc td.sz { text-align:right; white-space:nowrap; color:#57606a; font-family: Consolas, monospace; }
+  .foot { color:#57606a; font-size:9pt; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<h1>Proposed Pull Requests</h1>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 13 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-13 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+
+<div class="toc">
+<table>
+<tr><td class="n">1</td><td>RP.Math build fix</td><td class="mono">pr/fix-rp-math-build</td><td class="sz">1 file · +6</td></tr>
+<tr><td class="n">2</td><td>Surface Motor Fault / Warning signals</td><td class="mono">pr/motor-signals</td><td class="sz">1 file · +2/−30</td></tr>
+<tr><td class="n">3</td><td>Console persistence + Key Mappings editor</td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
+<tr><td class="n">4</td><td>Connection-loss handling + auto-reconnect</td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
+<tr><td class="n">5</td><td>Stepper calibration (scratch) tab</td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
+<tr><td class="n">6</td><td>Load Folder + Fusion batch-post add-in</td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
+<tr><td class="n">7</td><td>High-DPI / large-text layout</td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
+<tr><td class="n">8</td><td>Xbox controller + Key Mappings editor polish</td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1324/−26</td></tr>
+<tr><td class="n">9</td><td>Configurable main page + flyouts + jog panels (XL)</td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1385/−33</td></tr>
+<tr><td class="n">10</td><td>Macro manager + run-only flyout</td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
+<tr><td class="n">11</td><td>Macro Processor Enhancements</td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
+<tr><td class="n">12</td><td>Onboarding tooltips</td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
+<tr><td class="n">13</td><td>Build documentation (Mega-XL notes + tool-change guide)</td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
+</table>
+</div>
+
+<!-- ============ PR 1 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 1</span>Reference RP.Math in CNC Core to fix GCodeEmulator build</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/fix-rp-math-build</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">6</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>CNC Core compiles <code>GCodeEmulator.cs</code>, which uses the <code>RP.Math.Vector3</code> type, but the project file declared no reference to RP.Math. A clean build of CNC Core therefore fails to resolve the type.</p>
+<p>This adds the <code>RP.Math</code> and <code>RP.Math.Vector3</code> references using the <em>same</em> <code>HintPath</code> convention already used elsewhere in the solution — <code>CNC Controls.csproj</code> already references <code>RP.Math.Vector3</code> via <code>..\..\Vector-master\RP.Math.Vector3\bin\Release\</code>. The fix is six lines and purely additive; no code changes.</p>
+</div>
+</div>
+
+<!-- ============ PR 2 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 2</span>Surface Motor Fault and Motor Warning signals in Signals display</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/motor-signals</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SignalsControl.xaml</td><td class="num add">2</td><td class="num del">30</td></tr>
+</table>
+<div class="desc">
+<p>Removes the capability-gating <code>Style</code>s that prevented the Motor Fault (<strong>F</strong>) and Motor Warning (<strong>W</strong>) indicators from ever showing.</p>
+<p>grblHAL does not advertise these as <code>NEWOPT</code> capability tokens, so the visibility gates were effectively dead code — the LEDs were permanently hidden. Motor Fault / Warning are now always displayed alongside the other signal LEDs (H / S / P), turning red when the corresponding signal triggers. This surfaces the Motor Fault signal as intended, without requiring the firmware to advertise a capability flag.</p>
+</div>
+</div>
+
+<!-- ============ PR 3 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 3</span>Persist console state and add an in-app Key Mappings editor</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/keymapping_editor</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">16</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleWindow.xaml.cs</td><td class="num add">47</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml</td><td class="num add">115</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">606</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">111</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ShortcutKey.cs</td><td class="num add">136</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">69</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender/ioSender/MainWindow.xaml.cs</td><td class="num add">69</td><td class="num del">3</td></tr>
+</table>
+<div class="desc">
+<p>Persists the console's state across sessions and replaces the old App&nbsp;Settings <em>"Save key mappings"</em> button (which only dumped the current bindings to <code>KeyMap&lt;mode&gt;.xml</code> for hand-editing) with a proper in-app <strong>Edit Key Mappings</strong> dialog. Applies to both <strong>ioSender</strong> and <strong>ioSender XL</strong>.</p>
+<p><strong>Console persistence:</strong> the three console checkboxes (<em>Verbose</em>, <em>Filter out realtime responses</em>, <em>Show all realtime responses</em>), whether the floating console window is open, and that window's size/position (clamped to the visible desktop so it can never restore off-screen) are all remembered. A new <code>ConsoleShortcut</code> setting (default <code>Esc</code>) toggles the console; it is now a first-class action inside the mappings editor rather than a separate, ad-hoc tab. A shared <code>ShortcutKey</code> helper (parse / storage / display) is used by both main windows, and an <code>AppConfig.ConsoleShortcutChanged</code> event re-registers the key live without a restart.</p>
+<p><strong>Key Mappings editor</strong> (<code>KeyMapEditor</code>, modal so jog/realtime dispatch can't fire mid-capture):</p>
+<ul>
+  <li>One grouped, collapsible outline of every bindable action (grouped by function, like the Load Folder outline; groups remember their expansion per session). Click a row, press a combo to assign; right-click for <em>Reset to default</em> / <em>Clear</em>.</li>
+  <li>Bindings changed from the factory default are highlighted; group headers flag a modified group and offer <em>Expand all / Collapse all / Reset group</em>.</li>
+  <li>Per-axis jog keys are folded into the same list; rows and group headers carry tooltips.</li>
+  <li>A <em>No-numpad keys</em> preset remaps the NumPad jog/step/feed actions to <code>Ctrl+1–8</code> and <code>[ ] - =</code> for keyboards without a numeric keypad (Windows exposes no reliable API to detect numpad presence, so this is a user-triggered preset).</li>
+</ul>
+<p>The <code>KeypressHandler</code> gains an editor API (<code>GetActionBindings</code>/<code>GetJogBindings</code>/<code>Apply…</code>) over its existing function catalog, identifying bindings by reflection method name with a friendly-label map. Persistence still uses the existing <code>SaveMappings</code>/<code>LoadMappings</code>.</p>
+</div>
+</div>
+
+<!-- ============ PR 4 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 4</span>Fix unhandled exceptions on connection loss (e.g. SD card swap)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/connection-loss-reconnect</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">13</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Comms.cs</td><td class="num add">74</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/EltimaStream.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">13</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">45</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">179</td><td class="num del">42</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">105</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/WebsocketStream.cs</td><td class="num add">79</td><td class="num del">8</td></tr>
+</table>
+<div class="desc">
+<p>When the controller's serial/USB device disappears — for example a board that resets and re-enumerates when its SD card is removed or reinserted — the status-poll timer kept writing to the dead port. The write threw (an <code>IOException</code>, then an <code>InvalidOperationException</code>: "BaseStream only available when the port is open") on a <code>System.Timers.Timer</code> thread, and the unhandled exception terminated the whole process. Opening the SD card tab afterwards threw similarly from <code>PurgeQueue</code>.</p>
+<p><strong>Changes:</strong></p>
+<ul>
+  <li>Guard all stream writes (<code>IsOpen</code> + try/catch). A device-gone fault now closes the port and starts an auto-reconnect instead of crashing.</li>
+  <li>Add a shared, transport-agnostic <code>Reconnector</code> (used by serial, network and websocket) exposing <code>ConnectionLost</code> / <code>Reconnected</code> events. <code>GrblViewModel</code> handles them (stop/resume polling, show status); it is wired up at connect time in <code>AppConfig</code>.</li>
+  <li><strong>Serial:</strong> refactor open into a reusable <code>OpenPort()</code> that probes <code>GetPortNames()</code> and re-opens; publish the port only once it is actually open, to avoid a non-null-but-closed race; make <code>PurgeQueue</code> tolerant of a closed port; harden the receive handler against a port torn down mid-read.</li>
+  <li><strong>Telnet / websocket:</strong> guarded writes, loss detection (read returning 0 / <code>OnClose</code>) and reconnect via the same helper.</li>
+  <li>Wrap the poll-timer callback in try/catch as a last line of defence.</li>
+  <li>Guard the SD card view against acting on a closed connection.</li>
+</ul>
+</div>
+</div>
+
+<!-- ============ PR 5 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 5</span>Add Stepper calibration (scratch) tab to grbl:Settings</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/stepper-calibration-scratch</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml</td><td class="num add">92</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml.cs</td><td class="num add">486</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Adds a new tab to grbl:Settings for V-bit <em>scratch-line</em> steps/mm calibration over a long span — a more accurate alternative to the short jog-based calibration for the X and Y axes.</p>
+<p>It generates an <code>.nc</code> program that scratches paired lines (perpendicular to the calibrated axis) for several candidate steps/mm values. Because GRBL cannot change <code>$100</code>/<code>$101</code> mid-program, each candidate is simulated using the <em>commanded-distance trick</em>: the commanded distance <code>C = span &times; candidate / current</code>, so the machine physically travels the distance that the candidate steps/mm value <em>would</em> produce.</p>
+<p>The program is loaded into the job view (with an optional save to disk). After cutting, the user measures the actual spacings; the tab then computes and saves the corrected <code>$100</code>/<code>$101</code> from those measurements (an implied value per pair, averaged). The prolog mirrors the Load Folder convention. X/Y only — Z continues to use the existing jog wizard.</p>
+<p class="foot">Includes a small follow-up commit with high-DPI layout tweaks for the new tab.</p>
+</div>
+</div>
+
+<!-- ============ PR 6 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 6</span>Add "Load Folder": load a folder of per-toolpath .nc files as one outlined program</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/load-folder</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FolderPicker.cs</td><td class="num add">159</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FusionFolderLoader.cs</td><td class="num add">313</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">109</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">37</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">84</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">41</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+<tr><td class="mono">Fusion Addin/README.md</td><td class="num add">95</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/install-macos.sh</td><td class="num add">39</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/install-windows.ps1</td><td class="num add">40</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.manifest</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.py</td><td class="num add">292</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender/ioSender/MainWindow.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender/ioSender/MainWindow.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p><strong>File &gt; Load Folder</strong> reads a folder of per-operation files named <code>&lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc</code> (as produced by the companion Fusion 360 add-in) and assembles them in memory into a single program:</p>
+<ul>
+  <li>strips each file's header and program-end footer;</li>
+  <li>inserts a <code>G53 G0 Z0</code> safe-Z retract + <code>M6 T&lt;n&gt;</code> tool change before each toolpath, but only when the file does not already contain an <code>M6</code> (so any post works);</li>
+  <li>optionally restores rapid moves that Fusion Personal Use downgraded to <code>G1</code>;</li>
+  <li>shows the result as a collapsible per-toolpath outline (groups default collapsed, and stay expanded while scrolling);</li>
+  <li>adds <em>Start from this toolpath</em> and <em>Run just this toolpath</em> (the latter bounded to that section), each preceded by the <code>G90 G94 / G17 / G21</code> prolog.</li>
+</ul>
+<p>The new <code>FusionFolderLoader</code> is a faithful C# port of the add-in's combine / strip / rapid-restore rules; <code>FolderPicker</code> uses the modern <code>IFileOpenDialog</code> (<code>FOS_PICKFOLDERS</code>) for folder selection. <code>GCodeBlock</code> gains a <code>Section</code> tag for outline grouping and an optional <code>AddLineNumbers</code> gate; <code>GrblViewModel</code> gains <code>IsFolderView</code> and a one-shot <code>RunToBlock</code> end-bound consumed by <code>CycleStart</code>.</p>
+<p><strong>Companion Fusion 360 add-in (<code>ioSenderBatchPost</code>):</strong> a standalone add-in (no external framework) that posts every operation in every setup to its own <code>&lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc</code> file in a chosen folder — the input for Load Folder. Combining, tool-change insertion and rapid restoration are intentionally left to ioSender, so the add-in only posts. A post-processor dropdown (default <code>grbl.cps</code>) selects which post Fusion runs per operation. Ships with <code>install-windows.ps1</code> / <code>install-macos.sh</code> and a README. Fusion auto-discovers it once copied, but it must be enabled once via <em>Scripts and Add-Ins</em>.</p>
+<p class="foot">Note: the <code>Fusion Addin/</code> folder is an optional companion tool; the maintainer may prefer to host it separately. It can be dropped from the PR if so.</p>
+</div>
+</div>
+
+<!-- ============ PR 7 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 7</span>Improve high-DPI / large-text-size layout across the UI</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/highdpi-layout</code></div>
+  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls Camera/.../ConfigControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls Lathe/.../ConfigControl.xaml</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls Probing/.../ProbingView.xaml</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls Probing/.../ProbingView.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../BasicConfigControl.xaml</td><td class="num add">4</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/.../CoordValueSetControl.xaml</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/.../FeedControl.xaml</td><td class="num add">5</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/.../GotoBaseControl.xaml</td><td class="num add">5</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/.../GotoControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../JogBaseControl.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/.../LEDControl.xaml</td><td class="num add">4</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/.../NumericField.xaml</td><td class="num add">6</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/.../NumericField.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../OutlineBaseControl.xaml</td><td class="num add">8</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/.../OutlineControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../OutlineFlyout.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../OverrideControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/.../SpindleControl.xaml</td><td class="num add">8</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/.../StatusControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/.../StepperCalibrationWizard.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/.../StripGCodeConfigControl.xaml</td><td class="num add">15</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/.../ToolView.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/.../TrinamicView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/.../WorkParametersControl.xaml</td><td class="num add">18</td><td class="num del">18</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender/ioSender/JobView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Makes the UI usable at 125–150% Windows text scaling by replacing fixed control heights/widths with auto-sizing plus <code>MinWidth</code>/<code>MinHeight</code>, so labels and fields grow with the font instead of clipping or overlapping. Changes are layout-only — no behavioural changes.</p>
+<ul>
+  <li><strong>Shared controls:</strong> the <code>NumericField</code> label column now auto-sizes (<code>MinWidth = ColonAt</code>) with a <code>SharedSizeGroup</code> so labels align in any container that sets <code>Grid.IsSharedSizeScope</code>. <code>CoordValueSetControl</code>, <code>StatusControl</code>, <code>LEDControl</code> (dropped a hard <code>MaxHeight</code>) and <code>OverrideControl</code> no longer pin <code>Height</code>/<code>Width</code>; the <strong>Spindle</strong> group switches its fixed <code>Width=250</code> to <code>MinWidth</code> so the RPM field is no longer clipped at larger text sizes.</li>
+  <li><strong>grbl:Settings config controls</strong> (Basic / StripGCode / Lathe / Camera) and both Stepper calibration tabs auto-size their rows and the Axis dropdown; the Probing view auto-sizes its left panel with shared-size label alignment.</li>
+  <li><strong>Main window</strong> (JobView XL + ioSender): right-panel grid / columns / panels auto-size instead of fixed 515 / 250 px, and each panel control (WorkParameters, Spindle, Coolant, Outline, Feed, Goto) auto-sizes.</li>
+</ul>
+</div>
+</div>
+
+<!-- ============ PR 8 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 8</span>Native Xbox controller support (+ Key Mappings editor polish)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/xbox-mapping</code></div>
+  <div><span class="label">Depends on</span>PR 3 (<code>pr/keymapping_editor</code>) — this branch is stacked on it; the figures below are the delta on top of PR 3.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/keymapping_editor...pr/xbox-mapping">https://github.com/stevenrwood/ioSender/compare/pr/keymapping_editor...pr/xbox-mapping</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/XInput.cs</td><td class="num add">160</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerService.cs</td><td class="num add">186</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerMapper.cs</td><td class="num add">408</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">16</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">23</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml</td><td class="num add">166</td><td class="num del">22</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">357</td><td class="num del">4</td></tr>
+</table>
+<div class="desc">
+<p>Adds first-class game-controller support with <strong>zero new dependencies</strong> — the project uses no NuGet, so the controller is read via native <strong>XInput</strong> P/Invoke (<code>xinput1_4.dll</code>, falling back to <code>xinput9_1_0.dll</code>). A ~60&nbsp;Hz <code>DispatcherTimer</code> poll layer runs in parallel to the keyboard handler.</p>
+<ul>
+  <li><strong>Interop / service:</strong> <code>XInput.cs</code> wraps the gamepad state and vibration structs; <code>ControllerService.cs</code> scans all four slots, edge-detects button down/up, and exposes Connected/Disconnected events, deadzone/normalize helpers and rumble.</li>
+  <li><strong>Button map:</strong> <code>ControllerMapper.cs</code> dispatches a default, fully re-mappable button map to machine actions (A = Cycle Start, B = Feed Hold, X = Spindle Stop, Y = Home, Back = Reset, Start = Unlock, D-pad = step-jog X/Y). Actions route through the same <code>GrblViewModel.ExecuteCommand</code> path as the on-screen buttons and are gated to a live connection in Idle/Jog/Tool states (with a status message when ignored). A short rumble confirms connection.</li>
+  <li><strong>Analog jog:</strong> the left stick proportionally jogs X/Y and the triggers jog Z, via throttled overlapping <code>$J=</code> moves (jog-cancel on release) so motion stays smooth; speed scales with stick deflection. Enable, left-stick deadzone, max-feed multiple of the Jog panel feed, and per-axis invert are user-configurable. The button map and analog settings persist to <code>ControllerMap.xml</code>.</li>
+  <li><strong>Controller tab</strong> in the Key Mappings editor: live press indicator, per-button action dropdowns (each button's default marked with a leading <code>*</code>), <em>Restore Defaults</em> (enabled only when modified), machine-direction-aware tooltips, and the analog-jog settings — machine dispatch is paused while the dialog is open. New <code>JogDistanceProvider</code>/<code>JogFeedProvider</code> hooks let controller jog match the on-screen Jog panel's current step and feed.</li>
+</ul>
+<p>The same branch also carries the keyboard-tab polish (changed-binding highlight with per-row/group reset, <em>Clear</em> moved into the row menu, column sizing, and the grouped outline now keeps a section expanded while scrolling instead of collapsing it). The branch is fully LF-normalized, so the counts above are the real diff — no line-ending noise.</p>
+</div>
+</div>
+
+<!-- ============ PR 9 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 9</span>Configurable main page + flyouts + jog panels (ioSender XL)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/main-page-layout</code></div>
+  <div><span class="label">Depends on</span>The integrated Key Mappings + Xbox base in <code>master</code> (PRs 3 &amp; 8); the figures below are the delta on top of that base.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/main-page-layout">https://github.com/stevenrwood/ioSender/compare/master...pr/main-page-layout</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">37</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">2</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">152</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">43</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">90</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogSlider.xaml</td><td class="num add">66</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogSlider.xaml.cs</td><td class="num add">51</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml</td><td class="num add">25</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml.cs</td><td class="num add">34</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">61</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">146</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPanelRegistry.cs</td><td class="num add">100</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml</td><td class="num add">11</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml.cs</td><td class="num add">38</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml</td><td class="num add">41</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">114</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PanelFlyout.xaml</td><td class="num add">43</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PanelFlyout.xaml.cs</td><td class="num add">80</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SidebarItem.cs</td><td class="num add">23</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml</td><td class="num add">44</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml.cs</td><td class="num add">29</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">22</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">8</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">45</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">72</td><td class="num del">5</td></tr>
+</table>
+<div class="desc">
+<p><strong>ioSender XL only.</strong> Makes the crowded right-hand panel area configurable instead of fixed. A new <strong>Edit Main Page</strong> dialog (beside <em>Edit Key Bindings</em>) is a shuttle editor with three buckets — <em>Available</em>, <em>Main page</em> (up to six slots), and <em>Flyouts</em> — so each named panel can be placed on the main page or as a pinnable right-edge flyout, or left off entirely to reclaim space. Nothing is auto-assigned.</p>
+<ul>
+  <li><strong>Flyouts</strong> share a flush, tab-height border and distribute their content vertically; each has a pin (stays open when another flyout opens, and persists across launches) and a close button.</li>
+  <li><strong>Per-offset flyouts</strong> (G28 / G30 / G54..G59.3 / G92) are tiny <em>Go</em> buttons (tooltip shows the live coordinates; G28/G30 also get a <em>Set</em> = <code>G28.1</code>/<code>G30.1</code>) so several can be pinned beside the jog panel.</li>
+  <li><strong>Jog panels</strong> — UI jogging (distance + speed) and keyboard default-speed — become assignable panels rendered as compact sliders with a read-only value; Settings:App stays the editor. The jog-arrow radios are hidden only when the UI jog panel is assigned.</li>
+  <li><strong>Settings:App</strong> gains opt-in autosave (with a discard prompt) and a <em>Reset to default</em> context-menu entry on numeric fields; the old <em>Edit Key Mappings</em> button is renamed <strong>Edit Key Bindings</strong>.</li>
+</ul>
+<p>Layout choices persist (panels / flyouts / pins serialized as CSV to sidestep the <code>XmlSerializer</code> list-append quirk). Also includes robustness fixes: a resilient <code>SerialStream.OutCount</code> that no longer throws on a dropped port, and a deferred main-panel build so startup can't race the config load.</p>
+</div>
+</div>
+
+<!-- ============ PR 10 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 10</span>Macro manager + run-only flyout</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/macro-editor</code></div>
+  <div><span class="label">Depends on</span>The integrated base in <code>master</code> (the button sits next to PR 3's "Edit Key Bindings" on Settings:App); the figures below are the delta on top.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/macro-editor">https://github.com/stevenrwood/ioSender/compare/master...pr/macro-editor</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroManagerDialog.xaml.cs</td><td class="num add">308</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroManagerDialog.xaml</td><td class="num add">81</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroExecuteControl.xaml.cs</td><td class="num add">19</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroExecuteControl.xaml</td><td class="num add">8</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCode.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">3</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroToolbarControl.xaml.cs</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Adds an <strong>Edit Macros</strong> button to the Settings:App page opening a macro manager — a DataGrid with one row per macro, in the spirit of Fusion's <em>Scripts and Add-Ins</em> dialog — and reworks the on-screen macro flyout for running.</p>
+<ul>
+  <li><strong>Name</strong> and a <strong>Prompt</strong> (confirm-before-run) flag are edited in-line; an assignable <strong>Key</strong> column (F1&ndash;F12) sets the function key (keys are unique; <em>Create</em> auto-assigns the first free one); a <strong>File</strong> column shows the referenced file for <code>@&lt;path&gt;</code> macros (full path on hover), blank for inline.</li>
+  <li><strong>Edit</strong> edits the macro's definition (inline G-code, or the <code>@&lt;path&gt;</code> reference line) and reads it back; <strong>View</strong> opens what it points to — the referenced file for an <code>@&lt;path&gt;</code> macro (created if missing, to author a new one), otherwise the code. <strong>Create</strong>/<strong>Delete</strong> add and remove rows.</li>
+  <li>The <strong>macro flyout</strong> is now run-only: a macro-name dropdown plus a <strong>Run</strong> button (the Edit button is gone — editing lives in the manager). It pre-selects the most recently run macro, persisted in <code>Config.LastMacroId</code> and updated from every run path (flyout, toolbar, F-keys), falling back to the first.</li>
+</ul>
+<p>The macro's function key is decoupled from its <code>Id</code> via a new <code>Macro.FKey</code> field (legacy configs migrated on load: <code>Id n</code> keeps <code>Fn</code>). The <code>@&lt;path&gt;</code> <em>run-time</em> resolution — loading and running the referenced file, with directive processing — is provided by <strong>PR 11</strong>; this PR adds the manager/flyout support for authoring, viewing, and repointing references.</p>
+</div>
+</div>
+
+<!-- ============ PR 11 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 11</span>Macro Processor Enhancements</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/macro-processor</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent of PR 10. The two are complementary: PR 10's manager <em>authors</em> macros, this <em>executes</em> them.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/macro-processor">https://github.com/stevenrwood/ioSender/compare/master...pr/macro-processor</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">582</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroToolbarControl.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroExecuteControl.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">1</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeParser.cs</td><td class="num add">31</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/NGCExpr.cs</td><td class="num add">22</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">9</td><td class="num del">2</td></tr>
+</table>
+<div class="desc">
+<p>A sender-side <strong>macro pre-processor</strong> (<code>MacroProcessor.Run</code>) that interprets parenthesised directives before the remaining lines are streamed to the controller. All macro entry points &mdash; the top toolbar, the on-screen macro flyout, and the F-key handler &mdash; now route through it (previously the toolbar called <code>ExecuteMacro</code> directly and silently ignored every directive).</p>
+<p>Directives, each a no-op the controller would treat as a comment, interpreted by the sender instead:</p>
+<ul>
+  <li><strong><code>(PREREQ, cond, …)</code></strong> &mdash; require machine state <em>before</em> anything streams; if unmet the macro aborts with a message and nothing is sent. Conditions: <code>homed</code>, <code>idle</code>, <code>tlo</code>, <code>noalarm</code>, <code>connected</code>; stored positions / work offsets <code>g28</code>, <code>g30</code>, <code>g92</code>, <code>g54</code>&ndash;<code>g59.3</code> (&ldquo;set&rdquo; if any axis offset is non-zero, read fresh from <code>$#</code>); and any other token is required to be a controller <code>$I</code> build option (<code>NEWOPT</code>, e.g. <code>EXPR</code>), matched exactly and case-sensitively. <code>homed</code> reads grblHAL&rsquo;s live <code>sys.homed.mask</code> from <code>$#</code> rather than the change-based status <code>H:</code> cache, which can stay stale after a position-loss alarm.</li>
+  <li><strong><code>(MBOX, [buttons,] message)</code></strong> &mdash; modal hold; <code>OK</code>/<code>OKCANCEL</code>/<code>YESNO</code>, Cancel/No aborts the rest.</li>
+  <li><strong><code>(WAITIDLE)</code></strong> &mdash; hold streaming until the controller finishes what was sent and returns to Idle &mdash; needed after a controller-side job such as <code>$F=&lt;file&gt;</code>, which acks immediately and drops sender input while it runs.</li>
+  <li><strong><code>(PROMPT param, default [, label])</code></strong> &mdash; collect input values in a single up-front dialog and bind them two ways: assign the globals on the controller (so <code>$F=</code> files can read them) and substitute the references in the streamed body.</li>
+  <li><strong><code>@&lt;path&gt;</code></strong> &mdash; a macro whose body is a single <code>@&lt;path&gt;</code> line is a reference to an external file: that file's current contents are loaded and run in its place, re-read on every run &mdash; so a macro can be developed by editing the file directly. The loaded contents go through the same directive pipeline. (PR 10 adds the manager/flyout support for authoring and repointing these references.)</li>
+</ul>
+<p>Supporting core changes so macros stream cleanly to an NGC-capable controller, all in the spirit of &ldquo;don&rsquo;t reject what the controller can evaluate&rdquo;: <code>ExecuteMacro</code> now inherits the controller&rsquo;s expression support (as file streaming already did) and forwards verbatim any line its own parser cannot handle; <code>GCodeParser</code> recognises <strong>named O-word subroutine calls</strong> (<code>O&lt;name&gt; CALL […]</code>) and forwards them to the controller, which resolves the named sub from its filesystem; and the <code>$#</code> <code>[HOME:…:mask]</code> homed-axes mask is parsed for the authoritative <code>homed</code> check.</p>
+</div>
+</div>
+
+<!-- ============ PR 12 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 12</span>Onboarding tooltips</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/onboarding-tooltips</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent. Aimed at users new to CNC.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/onboarding-tooltips">https://github.com/stevenrwood/ioSender/compare/master...pr/onboarding-tooltips</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">50</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StatusControl.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StripGCodeConfigControl.xaml</td><td class="num add">10</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogUiConfigControl.xaml</td><td class="num add">10</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogConfigControl.xaml</td><td class="num add">7</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+</table>
+<div class="desc">
+<p>Tooltips aimed at users new to CNC, where ioSender's UI is otherwise terse.</p>
+<ul>
+  <li><strong>State field</strong> &mdash; a context-aware tooltip explains the current controller state in plain language (Idle, Run, Hold, Check, Tool, Door, &hellip;). For an <strong>alarm</strong> it appends the controller's specific message &mdash; e.g. <code>ALARM 4: Probe fail &hellip;</code>, pulled from the <code>GrblAlarms</code> enumeration loaded at connect &mdash; plus how to recover, so a bare <code>ALARM:4</code> is self-explanatory instead of a code to look up. (A new <code>GrblStateToTooltipConverter</code> drives a <code>ToolTip</code> binding on the State box.)</li>
+  <li><strong>Settings:App</strong> &mdash; a &ldquo;what it does and why it&rsquo;s useful&rdquo; tooltip on each application setting (the grbl settings page already self-documents in its right-hand pane, so it&rsquo;s left alone). Keyboard jogging (fast/slow/step feed &amp; distance, link-step-to-UI), UI jogging (the four distance and four speed presets, noting distance and speed are selected <em>independently</em>), and GCode command stripping (M6/M7/M8/G61-G64, for machines lacking the matching hardware). Also fixes the &ldquo;Keep MDI focus&rdquo; tooltip (it had been copy-pasted from the buffering option) and the circular &ldquo;Send comments&rdquo; one.</li>
+</ul>
+</div>
+</div>
+
+<!-- ============ PR 13 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 13</span>Build documentation: Mega-XL upgrade notes + repeatable tool-change guide</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/build-docs</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent. Documentation only — no code or build changes.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/build-docs">https://github.com/stevenrwood/ioSender/compare/master...pr/build-docs</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">docs/Mega-XL-Upgrades.html</td><td class="num add">840</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/Mega-XL-Upgrades.pdf</td><td class="num">bin</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/Repeatable-Tool-Change.html</td><td class="num add">419</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/Repeatable-Tool-Change.pdf</td><td class="num">bin</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Two self-contained HTML documents (each rendered to a companion PDF), added under a new <code>docs/</code> folder. Purely additive; touches no source.</p>
+<ul>
+  <li><strong>Repeatable-Tool-Change</strong> &mdash; a turnkey, novice-friendly tool-change guide built around a <strong>G59.3 fixed toolsetter</strong> and a <code>T&lt;n&gt;</code>/<code>M6</code> flow, with a top-down machine travel diagram (color-coded paths). Aimed at the goal of repeatable, hands-off tool changes for users new to CNC.</li>
+  <li><strong>Mega-XL-Upgrades</strong> &mdash; build notes for an upgraded Kickstarter v1.0 Mega&nbsp;V&nbsp;XL: frame/spindle/motion/probing/power sections, a back-of-enclosure two-panel harness model (hand-built SVG diagrams), a cable &amp; wiring schedule, and an <strong>interactive bill-of-materials worksheet</strong> &mdash; an in-page editor (double-click to edit Qty / Unit / Description / Source, live extended &amp; category subtotals &amp; grand total, URL shortening, Save-to-download) plus a linked table of contents.</li>
+</ul>
+<p class="foot">The Mega-XL notes are specific to one machine and may be of limited upstream interest &mdash; they can be hosted separately or dropped from the PR. The repeatable tool-change guide is more generally applicable. The associated controller macros (<code>tc.macro</code>, <code>probe_tfl.macro</code>) and the ATC provisioning UI are intentionally <em>not</em> in this PR &mdash; they remain with the macro work, pending firmware support.</p>
+</div>
+</div>
+
+</body>
+</html>
