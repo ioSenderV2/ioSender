@@ -56,6 +56,7 @@
 <tr><td class="n">12</td><td>Onboarding tooltips</td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td>Build documentation (Mega-XL notes + tool-change guide)</td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td>Combined SD + LittleFS file browser</td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
+<tr><td class="n">15</td><td>USB / Ethernet / simulator connection support + Connect menu</td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +526/−58</td></tr>
 </table>
 </div>
 
@@ -504,6 +505,43 @@
   <li><strong>Unit tested:</strong> <code>tests/GrblFilesystemsTests.cs</code> exercises the pure helpers (29 assertions, run via the Framework <code>csc</code> &mdash; see <code>tests/README.md</code>; the app has no test project).</li>
 </ul>
 <p class="foot">Builds clean (CNC Controls and the full ioSender solution). Groundwork the paused ATC macro-provisioning work can reuse to target the <code>$FI</code>-discovered LittleFS path instead of a hardcoded one.</p>
+</div>
+</div>
+
+<!-- ============ PR 15 ============ -->
+<div class="pr">
+<h2><span class="badge">PR 15</span>USB / Ethernet / simulator connection support + Connect menu</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/connect-simulator</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/connect-simulator">https://github.com/stevenrwood/ioSender/compare/master...pr/connect-simulator</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">122</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">99</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">81</td><td class="num del">29</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">49</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">16</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">12</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ioSender XL.csproj</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">simulator/README.md</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">readme.md</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Adds first-class connection setup to the sender: pick USB (serial), Ethernet (<code>host:port</code>, now accepting hostnames as well as IPv4), or a local grblHAL <strong>simulator</strong> from a new tab in the connection dialog, and (re)connect at any time from a menu.</p>
+<ul>
+  <li><strong>Simulator tab:</strong> start/stop a bundled grblHAL simulator (launched minimized, window titled by the executable name, with a confirmation), then connect to <code>127.0.0.1:&lt;port&gt;</code>. The executable is located in a <code>simulator</code> sub-folder next to the app (a build step copies it there from the repo; binaries are not committed). Right-clicking the <strong>Target</strong> status item offers <em>Validate controller</em>, which launches <code>grblHAL_validator</code>.</li>
+  <li><strong>Connect / Reconnect:</strong> a <code>File &gt; Connect&hellip;</code> item opens the dialog; while connected it becomes <em>Reconnect&hellip;</em> (disconnects, then re-opens the dialog so a different target can be chosen). The app now stays open when started without a connection instead of exiting, so the menu is reachable.</li>
+  <li><strong>Status bar</strong> shows the current connection target (<code>GrblViewModel.ConnectionTarget</code>).</li>
+  <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control's <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
+</ul>
+<p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. The simulator / validator binaries come from the grblHAL Simulator build artifacts and are not committed (see <code>simulator/README.md</code>).</p>
 </div>
 </div>
 
