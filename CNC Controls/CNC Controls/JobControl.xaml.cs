@@ -450,10 +450,9 @@ namespace CNC.Controls
             {
                 int id = int.Parse(key.ToString().Substring(1));
                 var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.Id == id);
-                if (macro != null && (!macro.ConfirmOnExecute || MessageBox.Show(string.Format("Run {0} macro?", macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes))
+                if (macro != null)
                 {
-                    if(!Grbl.SendRealtimeCommand(macro.Code))
-                        model.ExecuteCommand(macro.Code);
+                    MacroProcessor.Run(model, macro.Name, macro.Code, macro.ConfirmOnExecute);
                     return true;
                 }
             }

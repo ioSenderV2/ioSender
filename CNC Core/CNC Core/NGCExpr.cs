@@ -1464,6 +1464,21 @@ namespace CNC.Core
                     value = 0d;
                     break;
 
+                case NamedParam.abs_x:
+                case NamedParam.abs_y:
+                case NamedParam.abs_z:
+                case NamedParam.abs_a:
+                case NamedParam.abs_b:
+                case NamedParam.abs_c:
+                    value = machine.GetPosition(param - NamedParam.abs_x);
+                    break;
+
+                case NamedParam.abs_u:
+                case NamedParam.abs_v:
+                case NamedParam.abs_w:
+                    value = 0d;
+                    break;
+
                 case NamedParam.current_tool:
                     value = machine.Tool;
                     break;
@@ -1481,6 +1496,13 @@ namespace CNC.Core
                     break;
 
                 default:
+                    // The remaining named parameters (homed_state, homed_axes, probe_state, active_probe,
+                    // toolsetter_state, call_level, tool_table_size, free_memory and the override/feed_hold
+                    // values stubbed to 0 above) are live controller-runtime values not known to this
+                    // parse-time machine model. Return NaN so the caller leaves the expression untouched
+                    // and forwards it to the controller for evaluation - see GCodeParser.ReadWordValue,
+                    // which only treats an unresolved parameter as an error when the controller itself
+                    // cannot evaluate expressions (ExpressionsSupported == false).
                     value = double.NaN;
                     break;
             }
