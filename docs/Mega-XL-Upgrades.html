@@ -55,7 +55,7 @@
   #bom td.ed[data-k="src"]:empty::before { content:"source\2026"; color:#b59a3a; font-style:italic; }
   #bom tr.grp td { background:#dbe4ee; font-weight:bold; color:#14365c; }
   #bom tr.total td { font-weight:bold; border-top:2px solid #b8c4d0; background:#f4f7fa; }
-  @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } #bom td.ed[data-k="desc"]:empty::before, #bom td.ed[data-k="src"]:empty::before { content:""; } }
+  @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } #bom td.ed[data-k="desc"] { background:transparent; } #bom td.ed[data-k="desc"]:empty::before, #bom td.ed[data-k="src"]:empty::before { content:""; } }
 </style>
 </head>
 <body>
@@ -768,7 +768,7 @@ gearing was the sticking point.</p>
     if(!document.getElementById('bom')) return;
     saveBtn=document.getElementById('bomSave'); discardBtn=document.getElementById('bomDiscard');
     document.querySelectorAll('#bom tbody tr').forEach(function(tr){
-      if(tr.querySelector('td.ed[data-k="qty"]')){ var s=tr.lastElementChild; if(s && !s.classList.contains('ed')){ s.classList.add('ed'); s.dataset.k='src'; if(s.textContent.trim()==='') s.textContent=''; } }
+      if(tr.querySelector('td.ed[data-k="qty"]')){ var f=tr.firstElementChild; if(f && !f.classList.contains('ed')){ f.classList.add('ed'); f.dataset.k='desc'; } var s=tr.lastElementChild; if(s && !s.classList.contains('ed')){ s.classList.add('ed'); s.dataset.k='src'; if(s.textContent.trim()==='') s.textContent=''; } }
     });
     cells().forEach(function(c){ c.addEventListener('dblclick',function(ev){ ev.preventDefault(); edit(c); }); });
     recalc(); saved=snap(); setDirty(false);
