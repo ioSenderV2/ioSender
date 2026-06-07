@@ -94,7 +94,7 @@ system, air assist, and probing.</p>
 <strong>2.2&nbsp;kW (3&nbsp;HP) water-cooled spindle</strong> kit:</p>
 <ul>
   <li><strong>Spindle</strong> &mdash; &Phi;80&nbsp;mm body, 220&nbsp;V, water-cooled, <strong>ER20 collet</strong>, up to <strong>24,000&nbsp;RPM at 400&nbsp;Hz</strong>.</li>
-  <li><strong>VFD</strong> &mdash; 2.2&nbsp;kW (3&nbsp;HP) inverter, fed from the 220&nbsp;V circuit through the E-stop and commanded by the breakout board's <strong>0&ndash;10&nbsp;V PWM</strong> speed signal (see Power distribution).</li>
+  <li><strong>VFD</strong> &mdash; 2.2&nbsp;kW (3&nbsp;HP) inverter, fed from the <strong>single-phase 220&nbsp;V</strong> circuit through the E-stop; it generates the <strong>3-phase output to the spindle</strong> and is commanded by the breakout board's <strong>0&ndash;10&nbsp;V PWM</strong> speed signal (see Power distribution).</li>
   <li><strong>Mount</strong> &mdash; 80&nbsp;mm spindle clamp on the new Z gantry.</li>
   <li><strong>Braking resistor</strong> &mdash; a 150&nbsp;W resistor on the VFD dissipates regen energy for a fast stop (spindle down in <strong>under 6&nbsp;s</strong>).</li>
 </ul>
@@ -172,8 +172,11 @@ connectors on the side of the enclosure</strong>: a <strong>female USB-A</strong
 <h2>Power distribution</h2>
 <p>A single <strong>220&nbsp;V, 20&nbsp;A branch circuit</strong> feeds the machine through a
 <strong>front-panel emergency-stop button</strong> (the E-stop breaks the 220&nbsp;V input, so
-it drops both the PSU and the spindle drive). The 220&nbsp;V powers an
-<strong>800&nbsp;W 48&nbsp;V Meanwell power supply</strong> and the <strong>VFD</strong> (spindle drive).
+it drops both the PSU and the spindle drive). Building power arrives as <strong>12/3 from the breaker
+panel to a junction box</strong>, then via an <strong>extension-cord pigtail</strong> to the panel C20 and
+the E-stop input; a second pigtail carries the E-stop output to the VFD. This is <strong>single-phase
+220&nbsp;V</strong> (residential); the VFD generates the 3-phase output to the spindle. The 220&nbsp;V powers
+an <strong>800&nbsp;W 48&nbsp;V Meanwell power supply</strong> and the <strong>VFD</strong>.
 Everything else is derived from the 48&nbsp;V rail through two buck converters.</p>
 
 <div class="tree">
@@ -677,7 +680,8 @@ gearing was the sticking point.</p>
     <tr><td>Shielded cable, 22/6 (50&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Shielded cable, 22/4 (10&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Shielded cable, 22/3 (25&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
-    <tr><td>12/3 cable &mdash; VFD 220&nbsp;V power feed, 10&prime; (extension cord, plug removed)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>12/3 cable &mdash; mains feed (breaker panel &rarr; junction box)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>12/3 extension-cord pigtail &mdash; E-stop power (junction&rarr;E-stop, E-stop&rarr;VFD)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>12/3 cable &mdash; VFD &rarr; spindle, 3-phase (U/V/W, through drag chains)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mini-Fit Jr 1&times;6 connectors (5 mated pairs)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mini-Fit Jr crimp terminals (~60)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
