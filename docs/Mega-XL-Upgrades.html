@@ -40,6 +40,18 @@
   hr { border: none; border-top: 1px solid #dde3e9; margin: 26px 0; }
   .note { background: #fbf7e8; border-left: 4px solid #e0c14c; border-radius: 0 4px 4px 0;
           padding: 8px 14px; margin: 10px 0; }
+  /* editable BOM */
+  .bom-toolbar { display:flex; gap:8px; align-items:center; margin:10px 0 4px; }
+  .bom-toolbar button { padding:4px 16px; font-size:11pt; border:1px solid #b8c4d0; border-radius:4px; background:#eef3f8; color:#14365c; cursor:pointer; }
+  .bom-toolbar button:disabled { opacity:.4; cursor:default; }
+  .bom-toolbar .hint { font-size:10pt; color:#888; font-style:italic; }
+  #bom td.num, #bom th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #bom td.ed { background:#fff6cf; cursor:pointer; }
+  #bom td.ed:hover { background:#ffeea8; }
+  #bom td.ed input { width:100%; box-sizing:border-box; font:inherit; text-align:right; border:1px solid #2456a6; border-radius:3px; padding:0 3px; }
+  #bom tr.grp td { background:#dbe4ee; font-weight:bold; color:#14365c; }
+  #bom tr.total td { font-weight:bold; border-top:2px solid #b8c4d0; background:#f4f7fa; }
+  @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } }
 </style>
 </head>
 <body>
@@ -612,45 +624,59 @@ module on the 8&nbsp;mm shaft. The latter is handy here, since matching bore <em
 gearing was the sticking point.</p>
 
 <h2>Bill of materials</h2>
-<table>
-  <thead><tr><th>Group</th><th>Item</th><th>Spec / source</th></tr></thead>
+<div class="bom-toolbar">
+  <button id="bomSave" disabled>Save</button>
+  <button id="bomDiscard" disabled>Discard</button>
+  <span class="hint">Double-click a highlighted Qty or Unit-price cell to edit (Enter to keep, Esc to cancel). Save downloads the updated HTML &mdash; drop it into <code>docs\</code> to replace this file.</span>
+</div>
+<table id="bom">
+  <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Extended</th><th>Source</th></tr></thead>
   <tbody>
-    <tr><td>Machine</td><td>Mega&nbsp;V&nbsp;XL (Kickstarter edition)</td><td>base machine</td></tr>
-    <tr><td>Frame</td><td>Mark Smith riser kit</td><td>+3&Prime; Z clearance</td></tr>
-    <tr><td>Frame</td><td>Mark Smith Z gantry assembly</td><td>full Z replacement</td></tr>
-    <tr><td>Control</td><td>Teensy 4.1 + Teensy 4.x breakout board</td><td>grblHAL, Ethernet option</td></tr>
-    <tr><td>I/O</td><td>USB-A pass-through, panel mount</td><td>&nbsp;</td></tr>
-    <tr><td>I/O</td><td>Ethernet pass-through, panel mount</td><td>&nbsp;</td></tr>
-    <tr><td>I/O</td><td>E-stop button</td><td>breaks 220&nbsp;V input</td></tr>
-    <tr><td>Power</td><td>Meanwell 48&nbsp;V power supply</td><td>800&nbsp;W</td></tr>
-    <tr><td>Power</td><td>C20 panel-mount inlet (mains)</td><td>220&nbsp;V mains in</td></tr>
-    <tr><td>Power</td><td>C20 panel-mount inlet (VFD)</td><td>220&nbsp;V to the spindle VFD</td></tr>
-    <tr><td>Power</td><td>Power relay accessory</td><td>110&nbsp;V pump relay &mdash; <a href="https://www.amazon.com/dp/B07Z6R1KP3">Amazon&nbsp;B07Z6R1KP3</a></td></tr>
-    <tr><td>Spindle</td><td>2.2&nbsp;kW 80&nbsp;mm water-cooled spindle + 2.2&nbsp;kW VFD kit</td><td>ER20, 24k&nbsp;RPM &mdash; <a href="https://www.amazon.com/dp/B073TRP92V">Amazon&nbsp;B073TRP92V</a></td></tr>
-    <tr><td>Spindle</td><td>Braking resistor</td><td>150&nbsp;W (&lt;6&nbsp;s stop)</td></tr>
-    <tr><td>Cooling</td><td>Submersible pump</td><td>110&nbsp;V</td></tr>
-    <tr><td>Cooling</td><td>Coolant reservoir</td><td>1&nbsp;gal container (holds the pump)</td></tr>
-    <tr><td>Cooling</td><td>Radiator with integrated 12&nbsp;V fan(s)</td><td>&nbsp;</td></tr>
-    <tr><td>Cooling</td><td>8&nbsp;mm clear tubing</td><td>25&prime; (coolant lines)</td></tr>
-    <tr><td>Cooling</td><td>Coolant mix</td><td>1&nbsp;qt antifreeze + &frac12;&nbsp;gal distilled water + a few drops of bleach</td></tr>
-    <tr><td>Motion</td><td>Z stepper (closed-loop)</td><td>1.2&nbsp;N&middot;m</td></tr>
-    <tr><td>Motion</td><td>X stepper (closed-loop)</td><td>2.0&nbsp;N&middot;m</td></tr>
-    <tr><td>Motion</td><td>Y + A steppers (closed-loop)</td><td>3.2&nbsp;N&middot;m each (&times;2)</td></tr>
-    <tr><td>Motion</td><td>Drag chain</td><td>2&Prime; (Y-axis upsize)</td></tr>
-    <tr><td>Sensing</td><td>Proximity sensors</td><td>&times;4 (limits / homing)</td></tr>
-    <tr><td>Sensing</td><td>3D mechanical probe</td><td>&nbsp;</td></tr>
-    <tr><td>Sensing</td><td>Toolsetter probe</td><td>&nbsp;</td></tr>
-    <tr><td>Air assist</td><td>1/4&Prime; black tubing</td><td>10&prime;</td></tr>
-    <tr><td>Air assist</td><td>Needle valve</td><td>&nbsp;</td></tr>
-    <tr><td>Air assist</td><td>Copper tubing</td><td>12&Prime;</td></tr>
-    <tr><td>Air assist</td><td>Swivel nozzle</td><td>1/8&Prime;</td></tr>
-    <tr><td>Air assist</td><td>Solenoid valve</td><td>12&nbsp;V, NC</td></tr>
-    <tr><td>Air assist</td><td>Pressure regulator</td><td>set 30&nbsp;PSI</td></tr>
-    <tr><td>Air assist</td><td>3D-printed nozzle bracket</td><td>bolts to Z; aims the air stream at the tool tip</td></tr>
-    <tr><td>Cabling</td><td>Shielded cable</td><td>22/6, 22/4, 22/3, 18/6, 12/4</td></tr>
-    <tr><td>Connectors</td><td>Mini-Fit Jr 1&times;6 connectors</td><td>5 mated pairs (5 panel headers + 5 cable receptacles)</td></tr>
-    <tr><td>Connectors</td><td>Mini-Fit Jr crimp terminals</td><td>~60 (&asymp;30 pins + 30 sockets)</td></tr>
-    <tr><td>Connectors</td><td>48&nbsp;V distribution terminal block</td><td>at the extension panel (each motor's 48&nbsp;V)</td></tr>
+    <tr class="grp"><td colspan="5">Machine &amp; frame</td></tr>
+    <tr><td>Mega&nbsp;V&nbsp;XL (Kickstarter edition) &mdash; base machine</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Mark Smith riser kit (+3&Prime; Z clearance)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Mark Smith Z gantry assembly</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Controller &amp; I/O</td></tr>
+    <tr><td>Teensy 4.1 + Teensy 4.x breakout board (grblHAL, Ethernet)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>USB-A pass-through, panel mount</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Ethernet pass-through, panel mount</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>E-stop button (breaks 220&nbsp;V)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Power</td></tr>
+    <tr><td>Meanwell 48&nbsp;V power supply, 800&nbsp;W</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>C20 panel inlet &mdash; mains 220&nbsp;V</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>C20 panel inlet &mdash; VFD 220&nbsp;V</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Power relay accessory (110&nbsp;V pump relay)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td><a href="https://www.amazon.com/dp/B07Z6R1KP3">Amazon&nbsp;B07Z6R1KP3</a></td></tr>
+    <tr class="grp"><td colspan="5">Spindle &amp; cooling</td></tr>
+    <tr><td>2.2&nbsp;kW 80&nbsp;mm water-cooled spindle + 2.2&nbsp;kW VFD kit (ER20, 24k&nbsp;RPM)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td><a href="https://www.amazon.com/dp/B073TRP92V">Amazon&nbsp;B073TRP92V</a></td></tr>
+    <tr><td>Braking resistor, 150&nbsp;W</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Submersible pump, 110&nbsp;V</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Coolant reservoir, 1&nbsp;gal</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Radiator with integrated 12&nbsp;V fan(s)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>8&nbsp;mm clear tubing (25&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Coolant mix &mdash; antifreeze + distilled water + bleach</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Motion</td></tr>
+    <tr><td>Stepper, 1.2&nbsp;N&middot;m (Z)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Stepper, 2.0&nbsp;N&middot;m (X)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Stepper, 3.2&nbsp;N&middot;m (Y / A)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Drag chain, 2&Prime; (Y-axis upsize)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Sensing &amp; probing</td></tr>
+    <tr><td>Proximity sensors (limits / homing)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>3D mechanical probe</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Toolsetter probe</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Air assist</td></tr>
+    <tr><td>1/4&Prime; black tubing (10&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Needle valve</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Copper tubing (12&Prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Swivel nozzle, 1/8&Prime;</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Solenoid valve, 12&nbsp;V NC</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Pressure regulator (30&nbsp;PSI)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>3D-printed nozzle bracket</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="grp"><td colspan="5">Cabling &amp; connectors</td></tr>
+    <tr><td>Shielded cable &mdash; 22/6, 22/4, 22/3, 18/6, 12/4</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Mini-Fit Jr 1&times;6 connectors (5 mated pairs)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>Mini-Fit Jr crimp terminals (~60)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>48&nbsp;V distribution terminal block</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr class="total"><td>Total</td><td class="num">&nbsp;</td><td class="num">&nbsp;</td><td class="num grand">$0.00</td><td>&nbsp;</td></tr>
   </tbody>
 </table>
 
@@ -665,6 +691,57 @@ gearing was the sticking point.</p>
   <li><strong>Overhead service rig</strong> &mdash; spring retraction reel, 1&Prime; cable sleeve, 3D-printed sleeve cradle.</li>
 </ul>
 </div>
+
+<script>
+(function(){
+  function num(s){ var n=parseFloat(String(s).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+  function money(n){ return '$'+n.toFixed(2); }
+  var saved='', saveBtn, discardBtn;
+  function cells(){ return document.querySelectorAll('#bom td.ed'); }
+  function snap(){ var a=[]; cells().forEach(function(c){ a.push(c.textContent.trim()); }); return a.join('|'); }
+  function recalc(){
+    var grand=0;
+    document.querySelectorAll('#bom tbody tr').forEach(function(tr){
+      var q=tr.querySelector('td.ed[data-k="qty"]'), u=tr.querySelector('td.ed[data-k="unit"]'), e=tr.querySelector('td.ext');
+      if(q&&u&&e){ var x=num(q.textContent)*num(u.textContent); e.textContent=money(x); grand+=x; }
+    });
+    var g=document.querySelector('#bom .grand'); if(g){ g.textContent=money(grand); }
+  }
+  function setDirty(d){ if(saveBtn){ saveBtn.disabled=!d; discardBtn.disabled=!d; } }
+  function edit(cell){
+    if(cell.querySelector('input')) return;
+    var orig=cell.textContent, isUnit=(cell.dataset.k==='unit'), done=false;
+    var inp=document.createElement('input'); inp.type='text';
+    inp.value = isUnit ? num(orig).toFixed(2) : String(num(orig));
+    cell.textContent=''; cell.appendChild(inp); inp.focus(); inp.select();
+    function finish(commit){
+      if(done) return; done=true;
+      cell.textContent = commit ? (isUnit ? money(num(inp.value)) : String(num(inp.value))) : orig;
+      recalc(); setDirty(snap()!==saved);
+    }
+    inp.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); finish(true); } else if(ev.key==='Escape'){ ev.preventDefault(); finish(false); } });
+    inp.addEventListener('blur',function(){ finish(true); });
+  }
+  function save(){
+    cells().forEach(function(c){ var i=c.querySelector('input'); if(i){ i.blur(); } });
+    setDirty(false); saved=snap();
+    var html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+    a.download='Mega-XL-Upgrades.html'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+  }
+  function discard(){ var v=saved.split('|'), i=0; cells().forEach(function(c){ c.textContent=v[i++]; }); recalc(); setDirty(false); }
+  document.addEventListener('DOMContentLoaded',function(){
+    if(!document.getElementById('bom')) return;
+    saveBtn=document.getElementById('bomSave'); discardBtn=document.getElementById('bomDiscard');
+    cells().forEach(function(c){ c.addEventListener('dblclick',function(){ edit(c); }); });
+    recalc(); saved=snap(); setDirty(false);
+    saveBtn.addEventListener('click',save);
+    discardBtn.addEventListener('click',discard);
+  });
+})();
+</script>
 
 </body>
 </html>
