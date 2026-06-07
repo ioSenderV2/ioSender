@@ -65,6 +65,20 @@
   .toc a { color:#2456a6; text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   @media print { .bom-toolbar { display:none; } #bom td.ed { background:#fbf6df; } #bom td.ed[data-k="desc"] { background:transparent; } #bom td.ed[data-k="desc"]:empty::before, #bom td.ed[data-k="src"]:empty::before { content:""; } }
+  /* --- review / comment layer --- */
+  .rev-toolbar { position:fixed; top:0; right:0; z-index:2000; background:#14365c; color:#fff; padding:6px 12px; border-bottom-left-radius:8px; box-shadow:0 1px 8px rgba(0,0,0,.35); font:13px/1.3 "Segoe UI",Arial,sans-serif; display:flex; gap:10px; align-items:center; }
+  .rev-toolbar button { font:inherit; padding:3px 12px; border:0; border-radius:4px; cursor:pointer; background:#dbe4ee; color:#14365c; }
+  .rev-toolbar button.on { background:#ffd23f; }
+  .rev-toolbar .count { font-weight:bold; min-width:88px; }
+  body.rev-on p:hover, body.rev-on li:hover, body.rev-on h2:hover, body.rev-on h3:hover, body.rev-on h4:hover, body.rev-on td:hover, body.rev-on th:hover, body.rev-on figcaption:hover, body.rev-on caption:hover { outline:2px dashed #2456a6; outline-offset:2px; cursor:text; }
+  [data-comment] { background:#fff6cf; box-shadow:inset 3px 0 0 #e0a800; }
+  [data-comment]::after { content:" \01F4AC"; font-size:.85em; }
+  .rev-pop { position:absolute; z-index:2001; background:#fffbe6; border:1px solid #e0a800; border-radius:6px; padding:10px; box-shadow:0 3px 14px rgba(0,0,0,.3); width:340px; font:13px/1.4 "Segoe UI",Arial,sans-serif; color:#222; }
+  .rev-pop .lbl { font-weight:bold; color:#14365c; margin-bottom:5px; }
+  .rev-pop textarea { width:100%; box-sizing:border-box; height:80px; font:inherit; resize:vertical; }
+  .rev-pop .row { display:flex; gap:6px; justify-content:flex-end; margin-top:8px; }
+  .rev-pop .row .sp { margin-right:auto; }
+  @media print { .rev-toolbar, .rev-pop { display:none !important; } [data-comment] { background:transparent; box-shadow:none; } [data-comment]::after { content:""; } }
 </style>
 </head>
 <body>
@@ -836,5 +850,84 @@ gearing was the sticking point.</p>
 </script>
 
 
+
+<script>
+/* Review / comment layer: attach edit instructions to passages, Save downloads the annotated HTML. */
+(function(){
+  if(!document.body) return;
+  var SEL = 'p,li,h2,h3,h4,figcaption,caption,td,th,blockquote';
+  function commentable(node){
+    while(node && node !== document.body){
+      if(node.nodeType === 1){
+        if(node.closest('#bom') || node.closest('.rev-toolbar') || node.closest('.rev-pop') || node.closest('.bom-toolbar') || node.closest('.toc')) return null;
+        if(node.matches(SEL)) return node;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.rev-toolbar,.rev-pop'), function(n){ n.remove(); });
+  document.body.classList.remove('rev-on');
+  var on=false, pop=null;
+  var bar=document.createElement('div'); bar.className='rev-toolbar';
+  bar.innerHTML='<span>📝 Review</span><button id="revTgl">Comment mode: off</button><span class="count" id="revCnt"></span><button id="revList">List</button><button id="revSave">Save</button>';
+  document.body.appendChild(bar);
+  var tgl=bar.querySelector('#revTgl'), cnt=bar.querySelector('#revCnt');
+  function count(){ return document.querySelectorAll('[data-comment]').length; }
+  function refresh(){ var c=count(); cnt.textContent=c+' comment'+(c===1?'':'s'); }
+  function closePop(){ if(pop){ pop.remove(); pop=null; } }
+  tgl.addEventListener('click', function(){ on=!on; document.body.classList.toggle('rev-on',on); tgl.textContent='Comment mode: '+(on?'ON':'off'); tgl.classList.toggle('on',on); closePop(); });
+  bar.querySelector('#revSave').addEventListener('click', function(){
+    closePop();
+    var clone=document.documentElement.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll('.rev-toolbar,.rev-pop'), function(x){ x.remove(); });
+    var cb=clone.querySelector('body'); if(cb) cb.classList.remove('rev-on');
+    var html='<!DOCTYPE html>\n'+clone.outerHTML;
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+    a.download='Mega-XL-Upgrades.html'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+  });
+  bar.querySelector('#revList').addEventListener('click', function(){
+    var items=document.querySelectorAll('[data-comment]');
+    if(!items.length){ alert('No comments yet.\n\nTurn Comment mode ON, then click any paragraph (optionally select a phrase first) to attach an edit instruction.'); return; }
+    var lines=[]; Array.prototype.forEach.call(items, function(el,i){ lines.push((i+1)+'. ['+el.tagName.toLowerCase()+'] '+el.getAttribute('data-comment')); });
+    alert(items.length+' comment(s):\n\n'+lines.join('\n\n'));
+  });
+  function openPop(el){
+    closePop();
+    var sel = window.getSelection ? String(window.getSelection()).trim() : '';
+    var existing = el.getAttribute('data-comment') || '';
+    pop=document.createElement('div'); pop.className='rev-pop';
+    var lbl=document.createElement('div'); lbl.className='lbl'; lbl.textContent='Edit instruction for this <'+el.tagName.toLowerCase()+'>:';
+    var ta=document.createElement('textarea');
+    ta.value = existing ? existing : (sel ? 'Re: "'+sel+'" — ' : '');
+    ta.placeholder='e.g. replace with: ...   /   fix typo: X → Y   /   delete this sentence';
+    var row=document.createElement('div'); row.className='row';
+    var del=document.createElement('button'); del.className='sp'; del.textContent='Delete';
+    var cancel=document.createElement('button'); cancel.textContent='Cancel';
+    var ok=document.createElement('button'); ok.textContent='Save comment'; ok.style.background='#ffd23f';
+    if(!existing) del.style.visibility='hidden';
+    row.appendChild(del); row.appendChild(cancel); row.appendChild(ok);
+    pop.appendChild(lbl); pop.appendChild(ta); pop.appendChild(row);
+    document.body.appendChild(pop);
+    var r=el.getBoundingClientRect();
+    var left=window.pageXOffset+Math.max(8, Math.min(r.left, document.documentElement.clientWidth-360));
+    pop.style.top=(window.pageYOffset+r.bottom+6)+'px'; pop.style.left=left+'px';
+    ta.focus(); ta.selectionStart=ta.selectionEnd=ta.value.length;
+    function commit(){ var v=ta.value.trim(); if(v) el.setAttribute('data-comment',v); else el.removeAttribute('data-comment'); closePop(); refresh(); }
+    ok.addEventListener('click', commit);
+    del.addEventListener('click', function(){ el.removeAttribute('data-comment'); closePop(); refresh(); });
+    cancel.addEventListener('click', closePop);
+    ta.addEventListener('keydown', function(e){ if(e.key==='Escape'){ e.preventDefault(); closePop(); } else if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); commit(); } });
+  }
+  document.addEventListener('mouseup', function(ev){
+    if(!on) return;
+    if(ev.target.closest('.rev-pop') || ev.target.closest('.rev-toolbar')) return;
+    var el=commentable(ev.target);
+    if(el) openPop(el); else closePop();
+  });
+  refresh();
+})();
+</script>
 
 </body></html>
