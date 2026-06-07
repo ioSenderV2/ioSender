@@ -46,7 +46,8 @@
   .bom-toolbar button:disabled { opacity:.4; cursor:default; }
   .bom-toolbar .hint { font-size:10pt; color:#888; font-style:italic; }
   #bom td.num, #bom th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  #bom td.ed { background:#fff6cf; cursor:pointer; }
+  #bom td.ed { background:#fff6cf; cursor:pointer; -webkit-user-select:none; user-select:none; }
+  #bom td.ed input { -webkit-user-select:text; user-select:text; }
   #bom td.ed:hover { background:#ffeea8; }
   #bom td.ed input { width:100%; box-sizing:border-box; font:inherit; text-align:right; border:1px solid #2456a6; border-radius:3px; padding:0 3px; }
   #bom td.ed[data-k="desc"], #bom td.ed[data-k="src"] { text-align:left; }
@@ -739,7 +740,10 @@ gearing was the sticking point.</p>
     var orig=cell.textContent, kind=cell.dataset.k, done=false;
     var inp=document.createElement('input'); inp.type='text';
     inp.value = kind==='qty' ? String(num(orig)) : (kind==='unit' ? num(orig).toFixed(2) : orig.trim());
-    cell.textContent=''; cell.appendChild(inp); inp.focus(); inp.select();
+    cell.textContent=''; cell.appendChild(inp);
+    try { var sel=window.getSelection(); if(sel) sel.removeAllRanges(); } catch(e){}
+    inp.focus(); inp.select();
+    setTimeout(function(){ if(!done && document.activeElement!==inp){ inp.focus(); inp.select(); } }, 0);
     function finish(commit){
       if(done) return; done=true;
       if(!commit) cell.textContent=orig;
@@ -767,7 +771,7 @@ gearing was the sticking point.</p>
     document.querySelectorAll('#bom tbody tr').forEach(function(tr){
       if(tr.querySelector('td.ed[data-k="qty"]')){ var s=tr.lastElementChild; if(s && !s.classList.contains('ed')){ s.classList.add('ed'); s.dataset.k='src'; if(s.textContent.trim()==='') s.textContent=''; } }
     });
-    cells().forEach(function(c){ c.addEventListener('dblclick',function(){ edit(c); }); });
+    cells().forEach(function(c){ c.addEventListener('dblclick',function(ev){ ev.preventDefault(); edit(c); }); });
     recalc(); saved=snap(); setDirty(false);
     saveBtn.addEventListener('click',save);
     discardBtn.addEventListener('click',discard);
