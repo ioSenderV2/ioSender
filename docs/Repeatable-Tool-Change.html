@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repeatable tool changes for ioSender + grblHAL</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    font-size: 11.5pt; line-height: 1.5; color: #1a1a1a;
+    max-width: 7.3in; margin: 0 auto; padding: 0 4px;
+  }
+  h1 { font-size: 22pt; margin: 0 0 2px; color: #14365c; }
+  h1 + .subtitle { font-style: italic; color: #555; margin: 0 0 18px; font-size: 12pt; }
+  h2 { font-size: 15pt; color: #14365c; border-bottom: 2px solid #d6e0ea;
+       padding-bottom: 3px; margin: 26px 0 10px; page-break-after: avoid; }
+  h3 { font-size: 12.5pt; color: #1f4e79; margin: 18px 0 6px; page-break-after: avoid; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 26px; }
+  li { margin: 4px 0; }
+  strong { color: #0f2e4f; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt;
+         background: #f1f4f7; padding: 1px 4px; border-radius: 3px; color: #b5360b; }
+  pre { background: #f6f8fa; border: 1px solid #dde3e9; border-radius: 5px;
+        padding: 10px 12px; overflow-x: auto; page-break-inside: avoid; }
+  pre code { background: none; padding: 0; color: #1a3a5a; font-size: 10pt; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10.5pt;
+          page-break-inside: avoid; }
+  th, td { border: 1px solid #cdd6df; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #eaf0f6; color: #14365c; }
+  blockquote { margin: 10px 0; padding: 8px 14px; background: #fbf7e8;
+               border-left: 4px solid #e0c14c; border-radius: 0 4px 4px 0; }
+  blockquote p { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid #dde3e9; margin: 26px 0; }
+  .lead { font-size: 12pt; }
+  .closing { font-style: italic; color: #14365c; text-align: center;
+             margin-top: 24px; padding-top: 14px; border-top: 1px solid #dde3e9; }
+  h2 { page-break-before: auto; }
+</style>
+</head>
+<body>
+
+<h1>Repeatable tool changes for ioSender + grblHAL</h1>
+<p class="subtitle">A turnkey tool-change and work-setup package for CNC newcomers.</p>
+
+<p class="lead">This package turns the fiddliest, most error-prone parts of running a job &mdash;
+setting work zero and getting tool lengths right &mdash; into two things you can do
+without thinking:</p>
+
+<ol>
+  <li><strong>Start a job:</strong> install the 3D probe, press OK a couple of times. The
+  machine finds the corner of your stock and sets work zero by itself.</li>
+  <li><strong>Change a tool mid-job:</strong> when the program calls for a new tool, the
+  machine parks, says <em>&ldquo;Swap to T3, press cycle start&rdquo;</em>, you change the bit and
+  press cycle start. The machine measures the new tool and carries on.</li>
+</ol>
+
+<p>That&rsquo;s it. No paper shims, no &ldquo;jog down until it just touches&rdquo;, no re-zeroing Z
+every time you change a bit.</p>
+
+<h2>Why you want this</h2>
+
+<p>The single biggest reason is <strong>repeatability</strong>: <em>your second run matches your first.</em></p>
+
+<p>On a bare machine, every tool change means you manually re-establish how far the
+new tool sticks out &mdash; usually by jogging down onto the work and eyeballing it.
+Do that ten times in a job and small errors creep in: a step in a surface, a
+pocket that&rsquo;s 0.2&nbsp;mm too deep, a scrapped part. Do the same job next week and the
+numbers are different again.</p>
+
+<p>This package removes the human from that loop:</p>
+
+<ul>
+  <li>A <strong>toolsetter</strong> (a touch puck bolted to your table) measures every tool
+  against the <em>same fixed point</em>, every time. Because the machine is <strong>homed</strong>,
+  that point is in the same place after a power cycle, tomorrow, next month.</li>
+  <li>The <strong>first tool</strong> of a session (your 3D probe) sets the reference. Every tool
+  after it is automatically offset relative to that reference, so Z is
+  consistent across all tools and all sessions &mdash; with <strong>no manual touch-off, ever.</strong></li>
+  <li>A <strong>3D probe</strong> finds the corner of your stock and sets X, Y and Z work zero by
+  touching it, instead of you nudging the bit up to an edge by eye.</li>
+</ul>
+
+<p>The payoff: setup is faster, mistakes are rarer, and you can re-run a job and
+trust the result. Your job action shrinks to <strong>change the bit and press a button.</strong></p>
+
+<h2>The big idea, in one picture</h2>
+
+<figure style="margin:16px 0; text-align:center;">
+<svg viewBox="0 0 1480 1600" width="100%" style="max-width:690px; font-family:'Segoe UI',Arial,sans-serif;" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar-blue" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1565C0"/></marker>
+    <marker id="ar-green" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2E7D32"/></marker>
+    <marker id="ar-orange" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#E65100"/></marker>
+    <marker id="ar-purple" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6A1B9A"/></marker>
+    <marker id="ar-gray" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#555"/></marker>
+    <pattern id="spoilgrid" width="61" height="61" patternUnits="userSpaceOnUse">
+      <path d="M61 0 H0 V61" fill="none" stroke="#d8c8a0" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- orientation -->
+  <text x="740" y="48" text-anchor="middle" font-size="26" font-weight="bold" fill="#14365c">BACK &middot; home corner</text>
+  <g stroke="#555" stroke-width="2.5" fill="#555">
+    <line x1="62" y1="330" x2="62" y2="250" marker-end="url(#ar-gray)"/>
+    <line x1="62" y1="330" x2="142" y2="330" marker-end="url(#ar-gray)"/>
+    <text x="50" y="245" text-anchor="middle" font-size="22">Y</text>
+    <text x="150" y="337" font-size="22">X</text>
+    <text x="40" y="365" font-size="16" stroke="none">home: X left, Y back, Z up</text>
+  </g>
+
+  <!-- table frame -->
+  <rect x="130" y="80" width="1219" height="1219" fill="#fafafa" stroke="#888" stroke-width="2"/>
+
+  <!-- Y gantry rails (left & right) -->
+  <rect x="130" y="80" width="60" height="1219" fill="#cfd8dc" stroke="#90a4ae"/>
+  <rect x="1289" y="80" width="60" height="1219" fill="#cfd8dc" stroke="#90a4ae"/>
+  <text x="160" y="700" text-anchor="middle" font-size="18" fill="#5b6b73" transform="rotate(-90 160 700)">Y gantry</text>
+  <text x="1319" y="700" text-anchor="middle" font-size="18" fill="#5b6b73" transform="rotate(-90 1319 700)">Y gantry</text>
+  <!-- X gantry beam (shown at home, fully back) -->
+  <rect x="190" y="80" width="1099" height="69" fill="#b0bec5" stroke="#78909c"/>
+  <text x="760" y="123" text-anchor="middle" font-size="20" fill="#48565d">X gantry (at home)</text>
+  <!-- spindle / Z carriage at home (X fully left) + 3D probe -->
+  <rect x="200" y="80" width="112" height="96" fill="#90a4ae" stroke="#607d8b"/>
+  <circle cx="256" cy="130" r="13" fill="#e53935" stroke="#7f1414" stroke-width="2"/>
+  <line x1="256" y1="143" x2="256" y2="160" stroke="#7f1414" stroke-width="3"/>
+  <text x="330" y="135" font-size="18" fill="#7f1414">spindle + 3D probe</text>
+
+  <!-- spoilboard 36 in wide, front access strip ahead of it -->
+  <rect x="282" y="285" width="914" height="914" fill="#e8d9b5" stroke="#b8a878" stroke-width="2"/>
+  <rect x="282" y="285" width="914" height="914" fill="url(#spoilgrid)" stroke="none"/>
+  <text x="739" y="360" text-anchor="middle" font-size="24" fill="#9a8d63">spoilboard (36 in &times; 36 in)</text>
+  <rect x="130" y="1199" width="1219" height="100" fill="#f6f1e3" stroke="#c9bfa0" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="145" y="1285" font-size="18" fill="#9a8f6a">front access strip (~100 mm) &mdash; reachable, ahead of the board</text>
+
+  <!-- locating fences (L) + rectangular stock at front-left -->
+  <rect x="330" y="1181" width="280" height="9" fill="#546e7a"/>
+  <rect x="330" y="934" width="9" height="256" fill="#546e7a"/>
+  <text x="470" y="1215" text-anchor="middle" font-size="16" fill="#3f5560">locating fences</text>
+  <rect x="340" y="939" width="250" height="240" fill="#e0b878" stroke="#a9742f" stroke-width="2"/>
+  <text x="465" y="1055" text-anchor="middle" font-size="22" fill="#7a5320">stock</text>
+  <text x="465" y="1082" text-anchor="middle" font-size="15" fill="#8a6a3a">(probe: spoilboard, top, left, front)</text>
+
+  <!-- position markers -->
+  <!-- G28 (20 mm off the stock's front-left corner) -->
+  <line x1="305" y1="1199" x2="335" y2="1199" stroke="#222" stroke-width="2"/>
+  <line x1="320" y1="1184" x2="320" y2="1214" stroke="#222" stroke-width="2"/>
+  <circle cx="320" cy="1199" r="5" fill="#222"/>
+  <text x="312" y="1178" text-anchor="end" font-size="23" font-weight="bold" fill="#222">G28</text>
+  <!-- G30 (park / tool swap) -->
+  <line x1="1017" y1="1249" x2="1047" y2="1249" stroke="#222" stroke-width="2"/>
+  <line x1="1032" y1="1234" x2="1032" y2="1264" stroke="#222" stroke-width="2"/>
+  <circle cx="1032" cy="1249" r="5" fill="#222"/>
+  <text x="1032" y="1190" text-anchor="middle" font-size="23" font-weight="bold" fill="#222">G30</text>
+  <text x="1032" y="1212" text-anchor="middle" font-size="16" fill="#444">park / swap</text>
+  <!-- G59.3 (toolsetter puck) -->
+  <circle cx="1141" cy="1249" r="15" fill="#bdbdbd" stroke="#555" stroke-width="2"/>
+  <circle cx="1141" cy="1249" r="5" fill="#222"/>
+  <text x="1200" y="1238" text-anchor="start" font-size="23" font-weight="bold" fill="#222">G59.3</text>
+  <text x="1200" y="1260" text-anchor="start" font-size="16" fill="#444">toolsetter</text>
+
+  <!-- travel legs (dotted, color-coded, see legend) -->
+  <line x1="256" y1="160" x2="1028" y2="1245" stroke="#1565C0" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-blue)" fill="none"/>
+  <path d="M1032,1249 Q676,1320 326,1201" stroke="#2E7D32" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-green)" fill="none"/>
+  <path d="M320,1199 Q731,1118 1133,1245" stroke="#E65100" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-orange)" fill="none"/>
+  <path d="M1141,1249 Q1090,1292 1040,1257" stroke="#6A1B9A" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-purple)" fill="none"/>
+
+  <!-- step badges -->
+  <g font-size="22" font-weight="bold" fill="#fff" text-anchor="middle">
+    <circle cx="640" cy="690" r="18" fill="#1565C0"/><text x="640" y="698">1</text>
+    <circle cx="676" cy="1276" r="18" fill="#2E7D32"/><text x="676" y="1284">2</text>
+    <circle cx="731" cy="1168" r="18" fill="#E65100"/><text x="731" y="1176">3</text>
+    <circle cx="1086" cy="1274" r="18" fill="#6A1B9A"/><text x="1086" y="1282">4</text>
+  </g>
+
+  <!-- legend -->
+  <text x="130" y="1360" font-size="25" font-weight="bold" fill="#14365c">Probe-and-park sequence (from home):</text>
+  <g font-size="21" fill="#333">
+    <line x1="140" y1="1396" x2="206" y2="1396" stroke="#1565C0" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-blue)"/>
+    <text x="220" y="1403"><tspan font-weight="bold">1 &middot; Home &rarr; G30</tspan> &mdash; rapid to park; operator installs the 3D probe.</text>
+    <line x1="140" y1="1446" x2="206" y2="1446" stroke="#2E7D32" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-green)"/>
+    <text x="220" y="1453"><tspan font-weight="bold">2 &middot; G30 &rarr; G28</tspan> &mdash; probe spoilboard, stock top, left &amp; front faces &rarr; set G54 work zero.</text>
+    <line x1="140" y1="1496" x2="206" y2="1496" stroke="#E65100" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-orange)"/>
+    <text x="220" y="1503"><tspan font-weight="bold">3 &middot; G28 &rarr; G59.3</tspan> &mdash; probe the toolsetter puck with the 3D probe &rarr; set the TLO reference.</text>
+    <line x1="140" y1="1546" x2="206" y2="1546" stroke="#6A1B9A" stroke-width="3.5" stroke-dasharray="10 7" marker-end="url(#ar-purple)"/>
+    <text x="220" y="1553"><tspan font-weight="bold">4 &middot; G59.3 &rarr; G30</tspan> &mdash; return to park and wait; operator starts the milling job.</text>
+  </g>
+</svg>
+<figcaption style="font-size:10pt; color:#666; margin-top:4px;">Top-down view (48&Prime; &times; 48&Prime; machine). Z parks high throughout; rapids shown as dotted legs.</figcaption>
+</figure>
+
+<p>Two probes, two jobs:</p>
+
+<ul>
+  <li>The <strong>3D probe</strong> answers <em>&ldquo;where is my stock?&rdquo;</em> (work zero).</li>
+  <li>The <strong>toolsetter</strong> answers <em>&ldquo;how long is this tool?&rdquo;</em> (tool length), and keeps
+  every tool consistent with the reference.</li>
+</ul>
+
+<p>Homing ties it together: it&rsquo;s what makes &ldquo;the same fixed point&rdquo; actually be the
+same point every time you turn the machine on.</p>
+
+<h2>What you need</h2>
+
+<p><strong>Hardware</strong></p>
+<ul>
+  <li>A <strong>3D touch probe</strong> (edge/corner finder) wired to the controller&rsquo;s main probe input.</li>
+  <li>A <strong>toolsetter / tool-length puck</strong> (a normally-closed touch switch) wired to
+  the controller&rsquo;s toolsetter input, bolted somewhere permanent on the table.</li>
+  <li>A machine with <strong>working homing</strong> (limit switches / sensors).</li>
+</ul>
+
+<p><strong>Firmware (grblHAL)</strong></p>
+<ul>
+  <li>Built with <strong>expression support</strong> (<code>EXPR</code>), a <strong>filesystem</strong> (LittleFS and/or
+  SD card), and <strong>macro tool-change</strong> support (so <code>M6</code> runs <code>tc.macro</code>).</li>
+  <li>A <strong>tool table configured</strong> (<code>N_TOOLS &gt; 0</code>) &mdash; the reserved probe tool number
+  is derived from it.</li>
+  <li><code>$22</code> (homing-on-startup) enabled is strongly recommended &mdash; it&rsquo;s the primary
+  safety net that stops the machine moving before it&rsquo;s homed.</li>
+</ul>
+
+<p>ioSender ships the two controller-side macros this package needs
+(<code>tc.macro</code>, <code>probe_tfl.macro</code>) and can install them for you (see setup).</p>
+
+<h2>One-time setup</h2>
+
+<p>You do this once. After that, day-to-day use is just the everyday workflow below.</p>
+
+<h3>1. Mount the toolsetter</h3>
+<p>Bolt the toolsetter puck somewhere it will live permanently and where any tool
+can reach it without hitting a clamp or fixture. Its location is fixed forever
+after &mdash; that permanence is what makes tool lengths repeatable.</p>
+
+<h3>2. Teach the machine three positions</h3>
+<p>These are stored machine positions the macros rapid to. Set each by jogging the
+spindle to the spot, then storing it. You only do this once (re-do only if you
+move the toolsetter or your work-holding corner).</p>
+
+<table>
+  <thead><tr><th>Position</th><th>What it is</th><th>How to set it</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>G59.3</strong></td>
+      <td>Directly over the toolsetter puck, at a safe height where the longest tool clears the puck on the way in.</td>
+      <td>Jog over the puck at safe Z, then in the MDI: <code>G10 L20 P9 X0 Y0 Z0</code> (or use ioSender&rsquo;s Offsets view to set coordinate system <strong>G59.3</strong>).</td>
+    </tr>
+    <tr>
+      <td><strong>G30</strong></td>
+      <td>The tool-swap / park position &mdash; somewhere comfortable to reach the spindle, near the top of Z. Usually near the toolsetter.</td>
+      <td>Jog there, then in the MDI: <code>G30.1</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>G28</strong></td>
+      <td>The corner-probe approach: just outside the front-left corner of where your stock sits, 10&ndash;30&nbsp;mm clear in both X and Y, with open air below the probe down to the spoilboard.</td>
+      <td>Jog there, then in the MDI: <code>G28.1</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p><strong>Tip:</strong> If you always place stock against the same corner stop or fixture,
+  <code>G28</code> can stay set forever too. If your stock position varies, re-set <code>G28</code>
+  before Start Job so it lands just outside the new corner.</p>
+</blockquote>
+
+<h3>3. Install the controller macros</h3>
+<p>In ioSender: <strong>File &rarr; Controller macros&hellip;</strong>. The dialog lists the bundled
+macros and whether each is already on the controller. Click <strong>Upload all
+missing</strong> to copy them into the controller&rsquo;s persistent LittleFS store.</p>
+
+<blockquote>
+  <p>These are <strong>example</strong> macros &mdash; they assume the positions and probe geometry
+  described here. Read &ldquo;Adapting to your machine&rdquo; below before your first real
+  run, especially if your probe or wiring differs.</p>
+</blockquote>
+
+<p>If you tick <strong>&ldquo;Offer to install missing macros when I connect&rdquo;</strong>, ioSender will
+prompt you automatically on future connections whenever something&rsquo;s missing.</p>
+
+<h3>4. Reserve the top tool number in your CAM</h3>
+<p>The <strong>highest tool number</strong> &mdash; <code>T</code> = your configured tool count (<code>N_TOOLS</code>) &mdash; is
+reserved as the <strong>reference-probe sentinel</strong>: it tells the tool-change macro &ldquo;the
+3D probe is in the spindle.&rdquo; The macros read this number at runtime
+(<code>#&lt;_tool_table_size&gt;</code>), so it adapts to your machine automatically &mdash; on a
+controller built with <code>N_TOOLS = 8</code> the reserved number is <code>T8</code>, with
+<code>N_TOOLS = 32</code> it&rsquo;s <code>T32</code>. <strong>Never assign that top number to a real cutting
+tool</strong> in your CAM/post; use lower numbers for cutters.</p>
+
+<h3>5. Create the Start Job macro</h3>
+<p>Create an ioSender macro called <strong>Start Job</strong> whose body is a reference to the
+bundled <code>start_job.macro</code> file (a single <code>@&lt;path-to&gt;/start_job.macro</code> line). This
+lets you edit the file and re-run without copy/paste. (See ioSender&rsquo;s macro
+manager.)</p>
+
+<h2>Everyday workflow</h2>
+
+<h3>Starting a job</h3>
+<ol>
+  <li>Home the machine (or have it homed on startup).</li>
+  <li>Run the <strong>Start Job</strong> macro. It will:
+    <ul>
+      <li>Check prerequisites (homed, idle, <code>G28</code>/<code>G30</code>/<code>G59.3</code> set, expressions
+      available) and stop safely if anything&rsquo;s missing.</li>
+      <li>Ask for your <strong>3D probe tip radius</strong>.</li>
+      <li>Park at <code>G30</code> and ask you to <strong>install the 3D probe</strong>.</li>
+      <li>Rapid to <code>G28</code> and probe the <strong>front-left corner</strong> of your stock &mdash; setting
+      X, Y and Z work zero (<code>G54</code>) automatically.</li>
+      <li>Park at <code>G30</code> and ask you to <strong>leave the probe in the spindle</strong>.</li>
+      <li>Touch the probe on the toolsetter to record the <strong>reference</strong> the rest of
+      the job measures against.</li>
+    </ul>
+  </li>
+  <li>You now have work zero set and the tool-length reference established, with the
+  probe still in the spindle, parked at <code>G30</code>.</li>
+</ol>
+
+<h3>Running the program</h3>
+<p>Load your cutting program and run it. The <strong>first</strong> <code>M6</code> (tool change) does the
+real work for you:</p>
+<ol>
+  <li>Spindle and coolant stop; Z lifts to a safe height.</li>
+  <li>The machine parks at <code>G30</code> and shows <strong>&ldquo;Swap to T3, press cycle start&rdquo;</strong>.</li>
+  <li>You <strong>remove the probe, install tool T3</strong>, and press <strong>cycle start</strong>.</li>
+  <li>The machine moves over the toolsetter (<code>G59.3</code>), measures the new tool, and
+  applies the right length offset automatically.</li>
+  <li>It returns to <code>G30</code> and the program continues cutting.</li>
+</ol>
+
+<p>Every subsequent tool change is the same three steps: <strong>swap the bit, press
+cycle start, walk away.</strong> Z stays correct across every tool because each one is
+measured against the same reference.</p>
+
+<h2>What the safety gates do</h2>
+<p>The Start Job macro refuses to run &mdash; with a clear message &mdash; unless:</p>
+<ul>
+  <li>the machine is <strong>homed</strong> (so all those stored positions mean what they should),</li>
+  <li>the controller is <strong>idle</strong>,</li>
+  <li><code>G28</code>, <code>G30</code> and <code>G59.3</code> are <strong>set</strong>, and</li>
+  <li>the firmware supports <strong>expressions</strong>.</li>
+</ul>
+<p>This is deliberate: the macros rapid to stored positions, so if those positions
+aren&rsquo;t set, the macro stops <em>before</em> moving rather than rapiding somewhere
+unexpected. Homing-on-startup (<code>$22</code>) backs this up at the firmware level.</p>
+
+<h2>How it works under the hood <span style="font-weight:normal;font-size:11pt;color:#666">(optional reading)</span></h2>
+<p>You don&rsquo;t need this to use the package, but here&rsquo;s what&rsquo;s actually happening.</p>
+
+<p><strong>The reference tool.</strong> The 3D probe runs as the <strong>top tool number</strong>
+(<code>T</code> = N_TOOLS). When <code>tc.macro</code> sees the selected tool equal to
+<code>#&lt;_tool_table_size&gt;</code>, it knows the probe is in the spindle: it skips the swap
+prompt, probes the puck through the <em>main probe input</em> (the sensitive 3D-probe
+stylus, not the puck&rsquo;s switch), and stores the probe&rsquo;s measured puck height as the
+session reference (<code>#&lt;_tlo_ref&gt;</code>). No offset is applied for the reference itself.</p>
+
+<p><strong>Each later tool.</strong> For any other tool number, <code>tc.macro</code> parks at <code>G30</code>,
+prompts the swap, and then moves to <code>G59.3</code> to probe the puck through the
+<em>toolsetter input</em> (the puck&rsquo;s normally-closed switch fires when the rigid tool
+pushes on it). It then applies a dynamic tool-length offset:</p>
+
+<pre><code>G43.1 Z[ this_tool_puck_Z  &minus;  reference_puck_Z ]</code></pre>
+
+<p>So every tool is expressed as a difference from the reference tool. Because the
+puck is fixed and the machine is homed, those differences are consistent run to
+run &mdash; that&rsquo;s the repeatability.</p>
+
+<p><strong>Work zero.</strong> <code>probe_tfl.macro</code> probes the spoilboard, the stock top, and the
+left and front faces near the front-left corner, then sets <code>G54</code> X/Y/Z. It adapts
+its probe heights to the measured stock thickness, and corrects X/Y by the probe
+tip radius you entered.</p>
+
+<p><strong>The three positions.</strong>
+<code>G59.3</code> = over the puck (toolsetter), <code>G30</code> = tool-swap / park, <code>G28</code> = corner
+approach. <code>G53 Z-5</code> (just below the top of travel) is used as the safe transit height.</p>
+
+<h2>Troubleshooting</h2>
+<ul>
+  <li><strong>&ldquo;Start Job aborts immediately.&rdquo;</strong> Read the message &mdash; usually a position
+  (<code>G28</code>/<code>G30</code>/<code>G59.3</code>) isn&rsquo;t set, or the machine isn&rsquo;t homed. Re-do the
+  one-time setup step for whatever it names.</li>
+  <li><strong>The corner probe misses / crashes into stock.</strong> <code>G28</code> is probably too close
+  to (or inside) the stock corner. It must sit 10&ndash;30&nbsp;mm <em>outside</em> the corner in
+  both X and Y with clear air below. Re-set <code>G28</code>.</li>
+  <li><strong>Tool change probes the wrong spot.</strong> Re-check <code>G59.3</code> &mdash; it must be centered
+  over the puck at a height the longest tool clears on the way in.</li>
+  <li><strong>Tool lengths look off by a constant.</strong> Make sure Start Job ran first (it sets
+  the reference). Running a program&rsquo;s <code>M6</code> without a reference set means there&rsquo;s
+  nothing to offset against.</li>
+  <li><strong>Macros aren&rsquo;t found by the controller.</strong> Confirm they&rsquo;re present:
+  <strong>File &rarr; Controller macros&hellip;</strong> should show them as installed (LittleFS). Some
+  controllers only pick up a newly-installed <code>tc.macro</code> after a reboot.</li>
+</ul>
+
+<h2>Adapting to your machine</h2>
+<p>The bundled macros are a known-good <em>starting point</em>, not a universal config.
+Before trusting them on your machine, check the assumptions:</p>
+<ul>
+  <li><strong>Probe geometry.</strong> <code>probe_tfl.macro</code> assumes a probe with an 8&nbsp;mm-tall,
+  2&nbsp;mm-diameter tip that flares to 4&nbsp;mm above. A different stylus may need the
+  probe heights adjusted.</li>
+  <li><strong>Probe wiring / inputs.</strong> It assumes the 3D probe is on the main probe input
+  and the toolsetter on the toolsetter input, with correct polarity (<code>$6</code>).</li>
+  <li><strong>Work-holding corner.</strong> The corner routine probes the <strong>front-left</strong> corner.
+  If you reference a different corner, the probe directions need changing.</li>
+  <li><strong>Stock thickness.</strong> Reliable side-probing needs stock at least ~3&nbsp;mm thick.</li>
+  <li><strong>Tool table.</strong> The reserved probe tool is the top slot, so the controller needs
+  a tool table (<code>N_TOOLS &gt; 0</code>).</li>
+</ul>
+<p>To change any of these you edit the macro files and re-upload them via
+<strong>File &rarr; Controller macros&hellip;</strong> (remove the old copy, then upload the edited one).
+The on-machine copies live in LittleFS so they survive power cycles and firmware
+updates.</p>
+
+<p class="closing">Reserve the top tool number (= N_TOOLS) for the probe. Home before you start.
+Then: change the bit, press the button.</p>
+
+</body>
+</html>
