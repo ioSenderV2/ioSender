@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System.Collections.Generic;
 using System.Data;
 using System.Windows;
 using System.Windows.Controls;
@@ -76,6 +77,8 @@ namespace CNC.Controls
                 if (Comms.com == null || !Comms.com.IsOpen)
                 {
                     GrblSDCard.Clear();
+                    if (txtFreeSpace != null)
+                        txtFreeSpace.Text = string.Empty;
                     (DataContext as GrblViewModel).Message = (string)FindResource("NoConnection");
                     return;
                 }
@@ -88,9 +91,11 @@ namespace CNC.Controls
                 if (GrblInfo.HasSDCard && (DataContext as GrblViewModel).SDCardMountStatus == SDState.Undetected)
                 {
                     GrblSDCard.Clear();
+                    if (txtFreeSpace != null)
+                        txtFreeSpace.Text = string.Empty;
                     (DataContext as GrblViewModel).Message = (string)FindResource("NoCard");
                 } else
-                    GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+                    ReloadFiles();
             }
             else
                 (DataContext as GrblViewModel).Message = string.Empty;
@@ -178,6 +183,21 @@ namespace CNC.Controls
             return filename.ToLower().EndsWith(".macro");
         }
 
+        // Controller path for $F= / $FD= / $F<= on the selected row's filesystem (bare name on the
+        // root volume - unchanged single-SD behaviour - or an absolute path on a sub-mount).
+        private static string TargetName(DataRow row)
+        {
+            return GrblFilesystems.QualifiedName(row["Path"] as string, (string)row["Name"]);
+        }
+
+        // (Re)list the controller files and refresh the free-space banner.
+        private void ReloadFiles()
+        {
+            GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+            if (txtFreeSpace != null)
+                txtFreeSpace.Text = GrblSDCard.FreeSpace;
+        }
+
         private void DownloadRun_Click(object sender, RoutedEventArgs e)
         {
             if (currentFile != null && (int)currentFile["Size"] > 0 && !isMacro((string)currentFile["Name"]) && MessageBox.Show(string.Format((string)FindResource("DownloandRun"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
@@ -203,7 +223,7 @@ namespace CNC.Controls
                             response => AddBlock(response),
                             a => model.OnResponseReceived += a,
                             a => model.OnResponseReceived -= a,
-                            400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + (string)currentFile["Name"]));
+                            400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
                     }).Start();
 
                     while (res == null)
@@ -220,7 +240,7 @@ namespace CNC.Controls
                     Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_REWIND);
 
                 FileSelected?.Invoke("SDCard:" + (string)currentFile["Name"], Rewind);
-                Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + (string)currentFile["Name"]);
+                Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + TargetName(currentFile));
 
                 Rewind = false;
             }
@@ -311,7 +331,7 @@ namespace CNC.Controls
                 if(!(GrblInfo.UploadProtocol == "FTP" && !ok))
                     model.Message = (string)FindResource(ok ? "TransferDone" : "TransferAborted");
 
-                GrblSDCard.Load(model, ViewAll);
+                ReloadFiles();
             }
         }
 
@@ -328,15 +348,15 @@ namespace CNC.Controls
 
         private void ViewAll_Click(object sender, RoutedEventArgs e)
         {
-            GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+            ReloadFiles();
         }
 
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (MessageBox.Show(string.Format((string)FindResource("DeleteFile"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
             {
-                if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_UNLINK + (string)currentFile["Name"]))
-                    GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+                if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_UNLINK + TargetName(currentFile)))
+                    ReloadFiles();
             }
         }
 
@@ -352,8 +372,8 @@ namespace CNC.Controls
                                      MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else if((int)currentFile["Size"] == -1) {
-                    if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_RUN + (string)currentFile["Name"]))
-                        GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+                    if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_RUN + TargetName(currentFile)))
+                        ReloadFiles();
                 }
                 else
                 {
@@ -381,7 +401,7 @@ namespace CNC.Controls
                         Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_REWIND);
                     }
                     FileSelected?.Invoke("SDCard:" + (string)currentFile["Name"], Rewind);
-                    Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + (string)currentFile["Name"]);
+                    Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + TargetName(currentFile));
                     Rewind = false;
                 }
             }
@@ -393,6 +413,10 @@ namespace CNC.Controls
         private static DataTable data;
         private static int id = 0;
         private static GrblViewModel grbl;
+        private static string curLocation = string.Empty, curPath = string.Empty;
+
+        // One-line free-space banner across the mounted filesystems (set on each Load).
+        public static string FreeSpace { get; private set; }
 
         static GrblSDCard()
         {
@@ -403,7 +427,11 @@ namespace CNC.Controls
             data.Columns.Add("Name", typeof(string));
             data.Columns.Add("Size", typeof(int));
             data.Columns.Add("Invalid", typeof(bool));
+            data.Columns.Add("Location", typeof(string));  // which filesystem the file lives on (SD / littlefs)
+            data.Columns.Add("Path", typeof(string));       // that filesystem's mount path, for $F=/$FD=/$F<=
             data.PrimaryKey = new DataColumn[] { data.Columns["Id"] };
+
+            FreeSpace = string.Empty;
         }
 
         public static DataView Files { get { return data.DefaultView; } }
@@ -412,22 +440,112 @@ namespace CNC.Controls
         public static void Clear()
         {
             data.Clear();
+            FreeSpace = string.Empty;
         }
 
         public static void Load(GrblViewModel model, bool ViewAll)
         {
-            bool? res = null;
-            CancellationToken cancellationToken = new CancellationToken();
-
             grbl = model;
 
             data.Clear();
+            FreeSpace = string.Empty;
+            id = 0;
 
             // No point talking to the controller if the link is down or reconnecting - this
             // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
             // The user-facing message is set by the caller (SDCardView.Activate).
             if (Comms.com == null || !Comms.com.IsOpen)
                 return;
+
+            // Prefer $FI: it enumerates every mounted filesystem (SD and/or LittleFS) so they can
+            // be shown together with a Location column and per-FS free space. Builds that do not
+            // implement $FI (or that report nothing mounted) return no [FS:...] lines; in that case
+            // fall back to the original single-filesystem listing so behaviour is unchanged.
+            var mounts = GetMounts(model);
+
+            if (mounts.Count > 0)
+            {
+                FreeSpace = GrblFilesystems.FreeSpaceSummary(mounts);
+
+                foreach (var mount in mounts)
+                    ListMount(model, mount.Name, mount.Path, ViewAll);
+
+                // Leave the controller's working directory back at the root.
+                Grbl.WaitForResponse("$CWD=/");
+            }
+            else
+                LegacyLoad(model, ViewAll);
+
+            data.AcceptChanges();
+        }
+
+        // Enumerate mounted filesystems via $FI. Empty list => $FI unsupported or nothing mounted
+        // (error:65), which steers Load() to the legacy single-filesystem path.
+        private static List<FsMount> GetMounts(GrblViewModel model)
+        {
+            var mounts = new List<FsMount>();
+            bool? res = null;
+            var ct = new CancellationToken();
+
+            Comms.com.PurgeQueue();
+            model.Silent = true;
+
+            new Thread(() =>
+            {
+                res = WaitFor.AckResponse<string>(
+                    ct,
+                    response => { var fs = GrblFilesystems.ParseMountLine(response); if (fs != null) mounts.Add(fs); },
+                    a => model.OnResponseReceived += a,
+                    a => model.OnResponseReceived -= a,
+                    1500, () => Comms.com.WriteCommand("$FI"));
+            }).Start();
+
+            while (res == null)
+                EventUtils.DoEvents();
+
+            model.Silent = false;
+
+            return mounts;
+        }
+
+        // List one filesystem by changing to its mount path ($CWD) and issuing $F / $F+. Each file
+        // is tagged with its Location/Path so run/delete/download can target the right filesystem.
+        private static void ListMount(GrblViewModel model, string location, string path, bool ViewAll)
+        {
+            Grbl.WaitForResponse("$CWD=" + (path.Length > 1 ? path.TrimEnd('/') : path));
+
+            bool? res = null;
+            var ct = new CancellationToken();
+
+            Comms.com.PurgeQueue();
+            curLocation = location;
+            curPath = path;
+            model.Silent = true;
+
+            new Thread(() =>
+            {
+                res = WaitFor.AckResponse<string>(
+                    ct,
+                    response => Process(response),
+                    a => model.OnResponseReceived += a,
+                    a => model.OnResponseReceived -= a,
+                    2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR));
+            }).Start();
+
+            while (res == null)
+                EventUtils.DoEvents();
+
+            model.Silent = false;
+        }
+
+        // Original single-filesystem listing: mount the SD card if needed, then $F the current FS.
+        private static void LegacyLoad(GrblViewModel model, bool ViewAll)
+        {
+            bool? res = null;
+            CancellationToken cancellationToken = new CancellationToken();
+
+            curLocation = GrblInfo.HasSDCard ? "SD" : string.Empty;
+            curPath = string.Empty;
 
             if (GrblInfo.HasSDCard && grbl.SDCardMountStatus == SDState.Unmounted)
             {
@@ -451,7 +569,6 @@ namespace CNC.Controls
             {
                 Comms.com.PurgeQueue();
 
-                id = 0;
                 res = null;
                 model.Silent = true;
 
@@ -469,8 +586,6 @@ namespace CNC.Controls
                     EventUtils.DoEvents();
 
                 model.Silent = false;
-
-                data.AcceptChanges();
             }
         }
 
@@ -507,7 +622,7 @@ namespace CNC.Controls
                             break;
                     }
                 }
-                GrblSDCard.data.Rows.Add(new object[] { id++, "", filename, filesize, invalid });
+                GrblSDCard.data.Rows.Add(new object[] { id++, "", filename, filesize, invalid, curLocation, curPath });
             }
             else if (data == "error:62" || data == "error:64")
                 grbl.SDCardMountStatus = SDState.Unmounted;
