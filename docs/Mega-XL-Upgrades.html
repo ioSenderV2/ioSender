@@ -235,7 +235,7 @@ aircraft-style connectors.</p>
     <tr><td><strong>18/6 shielded</strong></td><td>enclosure &rarr; each stepper motor</td><td>6 (assignment depends on motor type &mdash; see below)</td></tr>
     <tr><td><strong>22/3 shielded</strong></td><td>enclosure &rarr; Y-axis proximity switches</td><td><code>12V</code>, <code>Sig</code>, <code>GND</code></td></tr>
     <tr><td><strong>22/6 shielded</strong></td><td>enclosure &rarr; X &amp; Z proximity sensors + 3D probe (shared)</td><td><code>12V</code>, <code>GND</code>, <code>XLim</code>, <code>ZLim</code>, <code>P</code>, <code>5V</code></td></tr>
-    <tr><td><strong>12/3</strong></td><td>VFD &rarr; spindle (3-phase)</td><td><code>U</code>, <code>V</code>, <code>W</code></td></tr>
+    <tr><td><strong>Spindle lead</strong></td><td>VFD &rarr; spindle (3-phase, with the spindle kit)</td><td><code>U</code>, <code>V</code>, <code>W</code></td></tr>
     <tr><td><strong>22/4 shielded</strong></td><td>breakout &rarr; VFD (control)</td><td><code>0&ndash;10V</code>, run, GND, spare</td></tr>
   </tbody>
 </table>
@@ -277,16 +277,16 @@ their drag chains rather than riding through them.</p>
     </tr>
     <tr>
       <td><strong>X axis</strong><br>(spindle carriage)</td>
-      <td>1 &times; 12/3 (spindle power)<br>2 &times; 18/6 (X &amp; Z steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)</td>
+      <td>1 &times; spindle lead (3-phase)<br>2 &times; 18/6 (X &amp; Z steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)</td>
     </tr>
     <tr>
       <td><strong>Y axis</strong><br>(gantry &mdash; carries everything)</td>
-      <td>1 &times; 12/3 (spindle power)<br>3 &times; 18/6 (X, Z &amp; Y steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)<br><em>Y limit (22/3) picks up after the chain</em></td>
+      <td>1 &times; spindle lead (3-phase)<br>3 &times; 18/6 (X, Z &amp; Y steppers)<br>1 &times; 22/6 (X &amp; Z limits + 3D probe)<br><em>Y limit (22/3) picks up after the chain</em></td>
     </tr>
   </tbody>
 </table>
 
-<p>That Y bundle &mdash; one 12/3, three 18/6, and one 22/6 &mdash; would not fit the stock
+<p>That Y bundle &mdash; the spindle lead, three 18/6, and one 22/6 &mdash; would not fit the stock
 <strong>1.5</strong> drag chain, so the Y axis was moved up to the <strong>next size larger (2&Prime;)</strong>
 carrier.</p>
 
@@ -680,9 +680,8 @@ gearing was the sticking point.</p>
     <tr><td>Shielded cable, 22/6 (50&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Shielded cable, 22/4 (10&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Shielded cable, 22/3 (25&prime;)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
-    <tr><td>12/3 cable &mdash; mains feed (breaker panel &rarr; junction box)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
-    <tr><td>12/3 extension-cord pigtail &mdash; E-stop power (junction&rarr;E-stop, E-stop&rarr;VFD)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
-    <tr><td>12/3 cable &mdash; VFD &rarr; spindle, 3-phase (U/V/W, through drag chains)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>12/3 pigtail (extension cord) &mdash; mains in to E-stop (joins the breaker-panel circuit)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
+    <tr><td>12/3 pigtail (extension cord) &mdash; E-stop out to VFD</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mini-Fit Jr 1&times;6 connectors (5 mated pairs)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>Mini-Fit Jr crimp terminals (~60)</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
     <tr><td>48&nbsp;V distribution terminal block</td><td class="num ed" data-k="qty">0</td><td class="num ed" data-k="unit">$0.00</td><td class="num ext">$0.00</td><td>&nbsp;</td></tr>
