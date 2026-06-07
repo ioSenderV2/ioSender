@@ -21,10 +21,11 @@ Anything else (reword, "is this right?", etc.) needs judgement and is LEFT IN
 PLACE as a comment for manual/LLM follow-up; the script lists those.
 
 Usage:
-    python tools/apply_doc_edits.py [annotated.html] [--commit] [--no-pdf] [--out PATH]
+    python tools/apply_doc_edits.py [annotated.html] [--commit] [--push] [--no-pdf] [--out PATH]
 
     annotated.html   path to the saved copy (default: newest in ~/Downloads)
     --commit         git add + commit docs/Mega-XL-Upgrades.{html,pdf} if changed
+    --push           git push afterwards (implies --commit; only if a commit was made)
     --no-pdf         skip re-rendering the PDF
     --out PATH       write to PATH instead of docs/Mega-XL-Upgrades.html (for testing)
 """
@@ -111,7 +112,8 @@ def left_directives(text):
 
 def main():
     argv = sys.argv[1:]
-    do_commit = "--commit" in argv
+    do_push = "--push" in argv
+    do_commit = "--commit" in argv or do_push   # pushing implies committing
     no_pdf = "--no-pdf" in argv
     out = DEFAULT_DOC
     if "--out" in argv:
@@ -163,16 +165,28 @@ def main():
                               f"--print-to-pdf={pdf}", file_uri(out)])
         print(f"Rendered -> {pdf.relative_to(REPO) if str(pdf).startswith(str(REPO)) else pdf}")
 
+    committed = False
     if do_commit:
         paths = [str(out)] + ([str(pdf)] if not no_pdf else [])
         subprocess.run(["git", "add"] + paths, cwd=REPO)
         staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO)
         if staged.returncode != 0:
             msg = f"docs: apply {applied} review edit(s) to Mega-XL doc"
-            subprocess.run(["git", "commit", "-m", msg], cwd=REPO)
-            print(f"Committed: {msg}")
+            if subprocess.run(["git", "commit", "-m", msg], cwd=REPO).returncode == 0:
+                committed = True
+                print(f"Committed: {msg}")
         else:
             print("Nothing changed on disk; no commit made.")
+
+    if do_push:
+        if committed:
+            if subprocess.run(["git", "push"], cwd=REPO).returncode == 0:
+                print("Pushed.")
+            else:
+                print("Push failed — if this branch has no upstream, set one once with "
+                      "`git push -u <remote> <branch>`.")
+        else:
+            print("Nothing committed; nothing to push.")
     return 0
 
 
