@@ -47,6 +47,15 @@ namespace CNC.Controls
         private const int AckTimeout = 4000;    // ms to wait for a single line's ok/error
         private static bool _running = false;
 
+        // Motion-test geometry, set by ComputeGeometry() before each run. The motion tests use moves
+        // large enough to show a real toolpath in the 3D viewer, but bounded to the homed soft-limit
+        // envelope so they never trip a soft-limit alarm in check mode (check mode DOES enforce soft
+        // limits). _anchor parks the planned position at the envelope centre before each motion test.
+        private static double _scale = 10.0;    // linear move size, mm
+        private static int _rotary = 10;        // rotary move size, degrees
+        private static int _feed = 500;         // feed for G1/G2/G3
+        private static string _anchor = null;   // "G53 G0 X.. Y.. Z.." to the envelope centre, or null
+
         // Bedrock modal set-up applied after entering check mode and re-applied after every
         // recovery reset. Every line here must be universally supported (so it never itself
         // errors and re-latches the parser): mm, units/min, XY plane, G54, no TLO, relative moves.
@@ -104,6 +113,7 @@ namespace CNC.Controls
             // G10/G92 writes the test makes (verified against the controller), so this snapshot is
             // what lets us put the work offsets / tool table back exactly afterwards.
             var snapshot = TakeSnapshot(model);
+            ComputeGeometry();
             var tests = BuildTests(model, snapshot.G92IsZero);
             bool startedHomed = model.HomedState == HomedState.Homed;
             bool unhomedDuringRun = false, aborted = false, completed = false, enteredCheck = false;
@@ -158,7 +168,11 @@ namespace CNC.Controls
             }
 
             if (completed)
+            {
+                LoadIntoViewer(tests);      // render the toolpath now - doing it before the stream makes
+                                            // every DoEvents pump during streaming heavy (live 3D scene)
                 ShowResults(model, tests, snapshot, aborted, startedHomed && unhomedDuringRun);
+            }
 
             return true;
         }
@@ -223,6 +237,9 @@ namespace CNC.Controls
             foreach (var line in ModalPrefix)
                 if (SendAndAwaitAck(model, line, AckTimeout) != "ok")
                     return false;
+            // Park at the envelope centre so the bounded motion-test moves stay inside soft limits.
+            if (_anchor != null && SendAndAwaitAck(model, _anchor, AckTimeout) != "ok")
+                return false;
             return true;
         }
 
@@ -432,24 +449,76 @@ namespace CNC.Controls
         // reports the matching capability so unsupported features are not tested (and so cannot be
         // reported as failures). The modal set-up prefix is NOT included here - it is applied
         // separately (and re-applied on recovery) by ApplyPrefix.
+        // Format a coordinate for a g-code line (invariant decimal, trimmed).
+        private static string Num(double v) => System.Math.Round(v, 3).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+        // The X travel for an axis ($13x), as a positive magnitude (0 if not configured).
+        private static double AxisTravel(int axis) => System.Math.Abs(GrblSettings.GetDouble((GrblSetting)((int)GrblSetting.MaxTravelBase + axis)));
+
+        // Size the motion-test moves to the machine: big enough to see in the 3D view (~100 mm) but
+        // bounded to ~a quarter of the smallest travel so a centred excursion always stays in soft
+        // limits. Build the G53 anchor that parks the planned position at the envelope centre.
+        private static void ComputeGeometry()
+        {
+            double minTravel = 0.0;
+            for (int i = 0; i < System.Math.Min(3, GrblInfo.NumAxes); i++)
+            {
+                double tr = AxisTravel(i);
+                if (tr > 0.0)
+                    minTravel = minTravel == 0.0 ? tr : System.Math.Min(minTravel, tr);
+            }
+            _scale = minTravel <= 0.0 ? 10.0 : System.Math.Max(2.0, System.Math.Min(100.0, minTravel * 0.25));
+            _feed = (int)System.Math.Max(100.0, _scale * 12.0);
+
+            var sb = new StringBuilder("G53 G0");
+            bool any = false;
+            for (int i = 0; i < System.Math.Min(3, GrblInfo.NumAxes); i++)
+            {
+                double tr = AxisTravel(i);
+                if (tr > 0.0) { sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(-tr / 2.0)); any = true; }
+            }
+            _anchor = any ? sb.ToString() : null;
+        }
+
+        // Load the generated test into GCode.File so the 3D viewer renders its toolpath. AddBlock
+        // silently drops lines ioSender's parser rejects (crash-safe) - only the motion lines need to
+        // render. The streaming itself uses the Test list, not this buffer, so dropped lines still run.
+        private static void LoadIntoViewer(List<Test> tests)
+        {
+            try
+            {
+                GCode.File.AddLineNumbers = false;
+                GCode.File.AddBlock("Validate controller", CNC.Core.Action.New);
+                foreach (var test in tests)
+                    GCode.File.AddBlock(test.Code);
+                GCode.File.AddBlock("", CNC.Core.Action.End);
+            }
+            catch { /* best-effort render; validation runs regardless */ }
+        }
+
         private static List<Test> BuildTests(GrblViewModel model, bool g92IsZero)
         {
             var t = new List<Test>();
 
             void Add(string cat, string feature, string code) => t.Add(new Test { Category = cat, Feature = feature, Code = code });
             void Helper(string code) => t.Add(new Test { Helper = true, Feature = code, Code = code });
+            // Motion-producing test: re-anchor to the envelope centre first, so each move is a bounded
+            // "spoke" that stays inside soft limits regardless of where the previous test left things.
+            void Motion(string cat, string feature, string code) { if (_anchor != null) Helper(_anchor); Add(cat, feature, code); }
+            string F = "F" + _feed;
+            double s = _scale;
 
-            // --- Motion ---
-            Add("Motion", "G0 rapid", "G0 X0.01");
-            Add("Motion", "G1 feed", "G1 X0.01 F100");
-            Add("Motion", "G2 arc (IJK)", "G2 X0 Y0 I0.5 J0 F100");
-            Add("Motion", "G3 arc (R)", "G3 X0.5 Y0 R0.5 F100");
+            // --- Motion --- (bounded "spoke" moves from the envelope centre, sized for the 3D view)
+            Motion("Motion", "G0 rapid", "G0 X-" + Num(s) + " Y-" + Num(s));
+            Motion("Motion", "G1 feed", "G1 X-" + Num(s) + " Y" + Num(s) + " " + F);
+            Motion("Motion", "G2 arc (IJK)", "G2 X0 Y0 I-" + Num(s) + " J0 " + F);      // full circle, radius s
+            Motion("Motion", "G3 arc (R)", "G3 X-" + Num(s) + " Y-" + Num(s) + " R" + Num(s) + " " + F);
 
             // --- Rotary axes (one per axis beyond XYZ) ---
             for (int i = 3; i < GrblInfo.NumAxes; i++)
             {
                 string letter = GrblInfo.AxisIndexToLetter(i);
-                Add("Rotary axes", letter + " axis word", "G0 " + letter + "0.01");
+                Motion("Rotary axes", letter + " axis word", "G0 " + letter + _rotary);
             }
 
             // --- Predefined positions (tested early, while the machine is still homed - a recovery
@@ -458,9 +527,9 @@ namespace CNC.Controls
             //     the controller's stored G28/G30 positions and there is no g-code to restore an
             //     arbitrary value, so testing them could not be made non-destructive. The go-to forms
             //     below write nothing (no motion in check mode). ---
-            Add("Predefined positions", "G28 (go to G28)", "G28");
-            Add("Predefined positions", "G30 (go to G30)", "G30");
-            Add("Predefined positions", "G53 (machine coords)", "G53 G0 X0");
+            Motion("Predefined positions", "G28 (go to G28)", "G28");
+            Motion("Predefined positions", "G30 (go to G30)", "G30");
+            Motion("Predefined positions", "G53 (machine coords)", "G53 G0 X0");
 
             // --- Planes / arc distance / feed mode / units ---
             Add("Planes", "G18 (ZX plane)", "G18");
