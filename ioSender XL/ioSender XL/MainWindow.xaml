@@ -96,7 +96,21 @@
             </StatusBarItem>
             <Separator Grid.Column="3" />
             <StatusBarItem Grid.Column="4">
-                <TextBlock x:Uid="lbl_connectionTarget" Text="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}" TextWrapping="NoWrap" Padding="2,0">
+                <TextBlock x:Uid="lbl_connectionTarget" Text="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <!-- green when a target is connected, red when not -->
+                            <Setter Property="Foreground" Value="ForestGreen"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="{x:Null}">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
                     <TextBlock.ContextMenu>
                         <ContextMenu Opened="targetContextMenu_Opened">
                             <MenuItem Header="_Validate controller..." Click="validateMenuItem_Click"/>

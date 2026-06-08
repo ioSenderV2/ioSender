@@ -130,8 +130,16 @@ namespace CNC.Controls
             return port;
         }
 
+        // Exposed so the caller can persist whether this connection is the bundled simulator (and how to
+        // launch it) - used to auto-start the simulator on a later startup auto-reconnect to the same target.
+        public bool IsSimulatorConnection { get; private set; }
+        public string SelectedSimulatorExe { get { return prop.SimulatorExe; } }
+        public string SelectedSimulatorArgs { get { return prop.SimulatorArgs; } }
+
         private void btnOk_Click(object sender, RoutedEventArgs e)
         {
+            IsSimulatorConnection = tab.SelectedIndex == 2;
+
             if (tab.SelectedIndex == 1)
             {
                 port = string.Format("{0}{1}:{2}", prop.IsWebSocket ? "ws://" : string.Empty, prop.IpAddress, prop.NetPort.ToString());
