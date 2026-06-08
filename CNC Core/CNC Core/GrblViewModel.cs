@@ -389,7 +389,7 @@ namespace CNC.Core
             private set { if (_isConnectionLost != value) { _isConnectionLost = value; OnPropertyChanged(); } }
         }
 
-        private string _connectionTarget = string.Empty;
+        private string _connectionTarget = null;
         public string ConnectionTarget
         {
             get { return _connectionTarget; }

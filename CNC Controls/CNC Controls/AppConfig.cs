@@ -261,6 +261,11 @@ namespace CNC.Controls
         public int PollInterval { get { return _pollInterval < 100 ? 100 : _pollInterval; } set { _pollInterval = value; OnPropertyChanged(); } }
         public string PortParams { get; set; } = "COMn:115200,N,8,1";
         public int ResetDelay { get; set; } = 2000;
+        // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch
+        // it first (a 127.0.0.1:port target is otherwise indistinguishable from a real network controller).
+        public bool StartSimulator { get; set; } = false;
+        public string SimulatorExe { get; set; } = "grblHAL_sim.exe";
+        public string SimulatorArgs { get; set; } = string.Empty;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -573,6 +578,7 @@ namespace CNC.Controls
 
                 else
                 {
+                    PersistSimulatorChoice(portsel);
                     setPort(port, string.Empty);
                     OpenStreamFor(model, dispatcher);
                     Save(CNC.Core.Resources.IniFile);
@@ -586,7 +592,7 @@ namespace CNC.Controls
         // target string (ws:// / COMx / host:port). Shared by startup and the Connect menu item.
         private void OpenStreamFor(GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
         {
-            model.ConnectionTarget = Base.PortParams;
+            EnsureSimulatorRunning();   // launch the bundled simulator first if the saved target is it
 #if USEWEBSOCKET
             if (Base.PortParams.ToLower().StartsWith("ws://"))
                 new WebsocketStream(Base.PortParams, dispatcher);
@@ -602,6 +608,48 @@ namespace CNC.Controls
 #else
                 new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
 #endif
+            // Report the target only once the link is actually open (drives the green/red target box).
+            model.ConnectionTarget = (Comms.com != null && Comms.com.IsOpen) ? Base.PortParams : null;
+        }
+
+        // Auto-start the bundled simulator (silently - no dialog) when the saved target is it, so a
+        // startup auto-reconnect to a simulator target brings the simulator up first. No-op if it is
+        // already running or not flagged as a simulator connection.
+        private void EnsureSimulatorRunning()
+        {
+            if (!Base.StartSimulator || SimulatorManager.IsSimulatorRunning)
+                return;
+
+            string exe = SimulatorManager.FindExecutable(string.IsNullOrWhiteSpace(Base.SimulatorExe) ? "grblHAL_sim.exe" : Base.SimulatorExe);
+            if (exe == null)
+                return;     // not bundled - fall through; the connect attempt simply fails as before
+
+            int netport = 23;
+            int sep = Base.PortParams.LastIndexOf(':');
+            if (sep >= 0)
+                int.TryParse(Base.PortParams.Substring(sep + 1), out netport);
+
+            string args = "-p " + netport;
+            if (!string.IsNullOrWhiteSpace(Base.SimulatorArgs))
+                args += " " + Base.SimulatorArgs;
+
+            // StartSimulator returns once the process exists; the simulator binds its listening port
+            // right at startup, so a short settle delay is enough before the stream is opened. (A
+            // test-connect probe is avoided so it can't consume the simulator's single accept slot.)
+            if (SimulatorManager.StartSimulator(exe, args, true))
+                System.Threading.Thread.Sleep(1200);
+        }
+
+        // Persist whether the chosen connection is the bundled simulator (and how to launch it) so a
+        // later startup auto-reconnect to the same target can bring the simulator up first.
+        private void PersistSimulatorChoice(PortDialog portsel)
+        {
+            Base.StartSimulator = portsel.IsSimulatorConnection;
+            if (portsel.IsSimulatorConnection)
+            {
+                Base.SimulatorExe = portsel.SelectedSimulatorExe;
+                Base.SimulatorArgs = portsel.SelectedSimulatorArgs;
+            }
         }
 
         // Show the connection dialog and connect to the chosen target without reloading config.
@@ -614,6 +662,7 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(port))
                 return 2;
 
+            PersistSimulatorChoice(portsel);
             setPort(port, string.Empty);
             OpenStreamFor(model, dispatcher);
             Save(CNC.Core.Resources.IniFile);
