@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 14 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-14 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 16 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PR 16 stacks on PR 15) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -56,7 +56,8 @@
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +526/−58</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +596/−57</td></tr>
+<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">3 files · +827/−21</td></tr>
 </table>
 </div>
 
@@ -520,10 +521,10 @@
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">122</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">99</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">81</td><td class="num del">29</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">107</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">129</td><td class="num del">28</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">49</td><td class="num del">6</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">16</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">30</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">12</td><td class="num del">4</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/ioSender XL.csproj</td><td class="num add">9</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
@@ -536,12 +537,40 @@
 <div class="desc">
 <p>Adds first-class connection setup to the sender: pick USB (serial), Ethernet (<code>host:port</code>, now accepting hostnames as well as IPv4), or a local grblHAL <strong>simulator</strong> from a new tab in the connection dialog, and (re)connect at any time from a menu.</p>
 <ul>
-  <li><strong>Simulator tab:</strong> start/stop a bundled grblHAL simulator (launched minimized, window titled by the executable name, with a confirmation), then connect to <code>127.0.0.1:&lt;port&gt;</code>. The executable is located in a <code>simulator</code> sub-folder next to the app (a build step copies it there from the repo; binaries are not committed). Right-clicking the <strong>Target</strong> status item offers <em>Validate controller</em>, which launches <code>grblHAL_validator</code>.</li>
+  <li><strong>Simulator tab:</strong> start/stop a bundled grblHAL simulator (launched minimized, window titled by the executable name, with a confirmation), then connect to <code>127.0.0.1:&lt;port&gt;</code>. The executable is located in a <code>simulator</code> sub-folder next to the app (a build step copies it there from the repo; binaries are not committed). Right-clicking the <strong>Target</strong> status item offers a <em>Validate controller</em> action (a stub here that launches <code>grblHAL_validator</code>; replaced by the in-app validator in <a href="#pr16">PR 16</a>).</li>
   <li><strong>Connect / Reconnect:</strong> a <code>File &gt; Connect&hellip;</code> item opens the dialog; while connected it becomes <em>Reconnect&hellip;</em> (disconnects, then re-opens the dialog so a different target can be chosen). The app now stays open when started without a connection instead of exiting, so the menu is reachable.</li>
-  <li><strong>Status bar</strong> shows the current connection target (<code>GrblViewModel.ConnectionTarget</code>).</li>
+  <li><strong>Status bar</strong> shows the current connection target (<code>GrblViewModel.ConnectionTarget</code>), now coloured <span style="color:#2e7d32;font-weight:600">green</span> when connected and <span style="color:#c62828;font-weight:600">red</span> when not.</li>
+  <li><strong>Auto-start on reconnect:</strong> when the saved target is the simulator the app launches the bundled simulator before connecting (silently &mdash; no confirmation popup), so a startup auto-reconnect to a simulator target brings it up automatically. The choice is remembered (a <code>StartSimulator</code> setting), since a <code>127.0.0.1:&lt;port&gt;</code> target is otherwise indistinguishable from a real network controller.</li>
   <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control's <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
 </ul>
 <p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. The simulator / validator binaries come from the grblHAL Simulator build artifacts and are not committed (see <code>simulator/README.md</code>).</p>
+</div>
+</div>
+
+<!-- ============ PR 16 ============ -->
+<div class="pr">
+<h2 id="pr16"><span class="badge">PR 16</span>Validate controller (check-mode g-code conformance test)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/validate</code></div>
+  <div><span class="label">Depends on</span>Stacked on <code>pr/connect-simulator</code> (PR 15).</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/validate">https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/validate</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">823</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">3</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Replaces the placeholder <em>Validate controller</em> action (PR 15) with a real, in-app conformance test: it streams a g-code program tailored to the connected controller's reported capabilities and reports which commands it accepts &mdash; without moving the machine.</p>
+<ul>
+  <li><strong>Capability-tailored test:</strong> generated from <code>$I</code> build options, axis count, <code>$32</code> mode, tool count, aux-I/O counts and the work coordinate systems present, so a feature the firmware was never built with is not tested (and cannot be reported as a false failure).</li>
+  <li><strong>Check mode, no motion:</strong> streamed in <code>$C</code> check mode and parsed only &mdash; the machine never moves, so homing and a clear envelope are not required. One feature per line, so an <code>error:N</code> pinpoints exactly which command the controller rejected.</li>
+  <li><strong>Robust against grbl's check-mode behaviour:</strong> a check-mode error <em>latches</em> the parser (every later line then errors), so the run recovers on each error &mdash; reset, re-enter check mode (unlocking first if the reset re-alarmed a homed machine), re-apply the modal set-up &mdash; then resumes, always re-confirming check mode before sending another line so a test line can never reach the controller as real motion.</li>
+  <li><strong>Non-destructive:</strong> check mode <em>commits</em> <code>G10</code>/<code>G92</code> writes, so the run snapshots and restores the work offsets / tool table and avoids the un-restorable writes (<code>G28.1</code>/<code>G30.1</code>, and <code>G92</code> when an offset is active). Machine settings (<code>$$</code>) are never written.</li>
+  <li><strong>Results window:</strong> grouped by category with a pass/fail marker per feature, the error code and message for failures, the pre-run parameter snapshot, and a Copy-to-clipboard button. The controller is left in <code>Idle</code> with check mode off.</li>
+</ul>
+<p class="foot">Right-click the <strong>Target</strong> status item &rarr; <em>Validate controller</em>. Builds clean on <code>pr/connect-simulator</code>; the only failures on a stock grblHAL are commands it genuinely does not implement (e.g. <code>G90.1</code>, <code>G61.1</code>, <code>G64</code>, <code>M52</code>; <code>M56</code> needs parking-override enabled).</p>
 </div>
 </div>
 
