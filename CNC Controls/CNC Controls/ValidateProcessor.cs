@@ -106,42 +106,51 @@ namespace CNC.Controls
             var snapshot = TakeSnapshot(model);
             var tests = BuildTests(model, snapshot.G92IsZero);
             bool startedHomed = model.HomedState == HomedState.Homed;
-            bool unhomedDuringRun = false, aborted = false, completed = false;
+            bool unhomedDuringRun = false, aborted = false, completed = false, enteredCheck = false;
 
             try
             {
                 if (!EnterCheckMode(model))
                     MessageBox.Show("The controller did not enter check mode ($C) - validation aborted.",
                         "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
-                else if (!ApplyPrefix(model))
-                    MessageBox.Show("The controller rejected a basic set-up command - validation aborted.",
-                        "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                 else
                 {
-                    int n = 0;
-                    foreach (var test in tests)
+                    enteredCheck = true;
+                    if (!ApplyPrefix(model))
+                        MessageBox.Show("The controller rejected a basic set-up command - validation aborted.",
+                            "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    else
                     {
-                        model.Message = string.Format("Validating controller... ({0}/{1})", ++n, tests.Count);
-                        test.Response = SendAndAwaitAck(model, test.Code, AckTimeout);
-
-                        // A check-mode error latches the parser: recover before the next line, or every
-                        // remaining line would falsely report an error. Recovery resets the parser, which
-                        // can drop a homed machine into an alarm - track that for the report.
-                        if (!test.Passed && !Recover(model, ref unhomedDuringRun))
+                        int n = 0;
+                        foreach (var test in tests)
                         {
-                            aborted = true;     // could not get back into check mode - stop safely
-                            break;
+                            model.Message = string.Format("Validating controller... ({0}/{1})", ++n, tests.Count);
+                            test.Response = SendAndAwaitAck(model, test.Code, AckTimeout);
+
+                            // A check-mode error latches the parser: recover before the next line, or every
+                            // remaining line would falsely report an error. Recovery resets the parser, which
+                            // can drop a homed machine into an alarm - track that for the report.
+                            if (!test.Passed && !Recover(model, ref unhomedDuringRun))
+                            {
+                                aborted = true;     // could not get back into check mode - stop safely
+                                break;
+                            }
                         }
+                        completed = true;
                     }
-                    completed = true;
                 }
             }
             finally
             {
-                // Always leave check mode and restore the snapshot - this is what keeps the run
-                // non-destructive. Done here (before the modal results window) and in a finally so it
-                // still runs if a test threw or the user closed the app mid-run.
-                if (model.IsCheckMode)
+                // Leave check mode and restore the snapshot - this is what keeps the run non-destructive.
+                // Gate the exit on what the code KNOWS, not on model.IsCheckMode: that flag is driven by
+                // status reports and lags, so right after a recovery re-enters check mode it can still read
+                // false and skip the exit - which would leave the controller stuck in $C. Whenever we
+                // entered check mode and were not aborted mid-recovery, we are definitely still in it.
+                // (An aborted recovery already reset the controller out of check mode.)
+                if (enteredCheck && !aborted)
+                    ExitCheckMode(model);
+                else if (enteredCheck && model.IsCheckMode)
                     ExitCheckMode(model);
                 RestoreNvram(model, snapshot);
                 model.Message = busyMessage;
@@ -193,10 +202,18 @@ namespace CNC.Controls
         }
 
         // Disable check mode (also soft-resets the parser); pump the UI until the controller leaves it.
+        // If $C does not clear it within the timeout, force a soft reset as a guaranteed fallback so the
+        // controller is never left stuck in check mode.
         private static void ExitCheckMode(GrblViewModel model)
         {
             Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
             WaitForState(model, s => s != GrblStates.Check && s != GrblStates.Unknown, 3000);
+
+            if (model.IsCheckMode)
+            {
+                Comms.com.WriteByte(GrblConstants.CMD_RESET);
+                WaitForState(model, s => s != GrblStates.Check && s != GrblStates.Unknown, 3000);
+            }
         }
 
         // Apply the bedrock modal set-up. Returns false if any line is rejected (should never happen -
