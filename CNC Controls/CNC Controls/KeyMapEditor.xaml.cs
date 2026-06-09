@@ -278,7 +278,7 @@ namespace CNC.Controls
             // the same key in different contexts (e.g. Start job vs Start probe on Alt+R) are fine.
             var dups = rows
                 .Where(r => r.Model.Key != Key.None)
-                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + " " + (r.Model.Context ?? "null"))
+                .GroupBy(r => ShortcutKey.ToDisplayString(r.Model.Key, r.Model.Modifiers) + "\0" + (r.Model.Context ?? "null"))
                 .Where(g => g.Count() > 1)
                 .Select(g => ShortcutKey.ToDisplayString(g.First().Model.Key, g.First().Model.Modifiers))
                 .Distinct()
