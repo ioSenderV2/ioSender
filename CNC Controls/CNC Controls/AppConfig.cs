@@ -274,6 +274,8 @@ namespace CNC.Controls
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
         public double WindowHeight { get; set; } = 660;
+        public double WindowLeft { get; set; } = double.NaN;   // NaN = never saved -> use the default placement
+        public double WindowTop { get; set; } = double.NaN;
         public int OutlineFeedRate { get; set; } = 500;
         public int MaxBufferSize { get { return _maxBufferSize < 300 ? 300 : _maxBufferSize; } set { _maxBufferSize = value; OnPropertyChanged(); } }
         public string Editor { get; set; } = "notepad.exe";

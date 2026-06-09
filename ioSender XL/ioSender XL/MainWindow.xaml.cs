@@ -146,10 +146,23 @@ namespace GCode_Sender
                 {
                     Width = Math.Max(Math.Min(AppConfig.Settings.Base.WindowWidth, SystemParameters.PrimaryScreenWidth), MinWidth);
                     Height = Math.Max(Math.Min(AppConfig.Settings.Base.WindowHeight, SystemParameters.PrimaryScreenHeight), MinHeight);
-                    if (Left + Width > SystemParameters.PrimaryScreenWidth)
-                        Left = 0d;
-                    if (Top + Height > SystemParameters.PrimaryScreenHeight)
-                        Top = 0d;
+
+                    // Restore the saved position when it lands on a connected monitor; otherwise fall back to
+                    // the old clamp so a window saved on a now-disconnected screen can't open off-screen.
+                    double savedLeft = AppConfig.Settings.Base.WindowLeft, savedTop = AppConfig.Settings.Base.WindowTop;
+                    if (!double.IsNaN(savedLeft) && !double.IsNaN(savedTop) && IsOnScreen(savedLeft, savedTop, Width, Height))
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual;
+                        Left = savedLeft;
+                        Top = savedTop;
+                    }
+                    else
+                    {
+                        if (Left + Width > SystemParameters.PrimaryScreenWidth)
+                            Left = 0d;
+                        if (Top + Height > SystemParameters.PrimaryScreenHeight)
+                            Top = 0d;
+                    }
                 }
             }
             saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
@@ -231,10 +244,38 @@ namespace GCode_Sender
             }
         }
 
+        // True if a window placed at (left, top) of the given size would have a grabbable strip of its title
+        // bar on some connected monitor (the whole virtual desktop), so a position saved on a screen that is
+        // no longer attached is rejected rather than opening the window off-screen.
+        private static bool IsOnScreen(double left, double top, double width, double height)
+        {
+            double vx = SystemParameters.VirtualScreenLeft, vy = SystemParameters.VirtualScreenTop;
+            double vr = vx + SystemParameters.VirtualScreenWidth, vb = vy + SystemParameters.VirtualScreenHeight;
+            const double grab = 120;   // keep at least this much of the title bar reachable
+            return top >= vy - 1 && top < vb - 20 && left + width > vx + grab && left < vr - grab;
+        }
+
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (CNC.Core.Grbl.GrblViewModel.IsSDCardJob || !(e.Cancel = !menuFile.IsEnabled))
             {
+                // Remember window placement for next launch (size is also tracked live in Window_SizeChanged;
+                // position has no live handler, so capture it here). Use RestoreBounds when maximized so we
+                // store the un-maximized rectangle, and re-maximize via WindowWidth == -1.
+                if (saveWinSize)
+                {
+                    bool maximized = WindowState == WindowState.Maximized;
+                    Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
+                    AppConfig.Settings.Base.WindowLeft = b.Left;
+                    AppConfig.Settings.Base.WindowTop = b.Top;
+                    if (!maximized)
+                    {
+                        AppConfig.Settings.Base.WindowWidth = b.Width;
+                        AppConfig.Settings.Base.WindowHeight = b.Height;
+                    }
+                    AppConfig.Settings.Save();
+                }
+
                 UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
 
                 if (UIViewModel.Console != null)
@@ -409,10 +450,20 @@ namespace GCode_Sender
         {
             if(e.PropertyName == nameof(Config.KeepWindowSize))
             {
-                if((sender as Config).KeepWindowSize)
+                // Keep the live save flag in sync with the checkbox - it was only ever set at startup, so
+                // enabling the option mid-session previously did nothing until a restart.
+                saveWinSize = (sender as Config).KeepWindowSize;
+                if(saveWinSize)
                 {
-                    AppConfig.Settings.Base.WindowWidth = Width;
-                    AppConfig.Settings.Base.WindowHeight = Height;
+                    // Capture (and persist) the current placement the moment it's enabled so THIS window's
+                    // size and position are remembered, not just whatever it is at the next close.
+                    bool maximized = WindowState == WindowState.Maximized;
+                    Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
+                    AppConfig.Settings.Base.WindowWidth = maximized ? -1 : b.Width;
+                    AppConfig.Settings.Base.WindowHeight = maximized ? -1 : b.Height;
+                    AppConfig.Settings.Base.WindowLeft = b.Left;
+                    AppConfig.Settings.Base.WindowTop = b.Top;
+                    AppConfig.Settings.Save();
                 }
             }
         }
