@@ -28,7 +28,7 @@
             <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="3,0,5,0" Foreground="#FF888888"/>
             <TextBox x:Name="txtInput" Tag="MDI" FontFamily="Consolas" FontSize="11" Height="22"
-                     VerticalContentAlignment="Center" KeyDown="txtInput_KeyDown"
+                     VerticalContentAlignment="Center"
                      ToolTip="Enter a command (MDI). Up/Down recalls history, Esc clears."/>
         </DockPanel>
         <TextBox IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
