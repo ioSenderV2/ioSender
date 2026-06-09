@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 19 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-19 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 21 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-21 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -61,6 +61,8 @@
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
+<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">2 files · +162/−52</td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">6 files · +686/−1</td></tr>
 </table>
 </div>
 
@@ -656,6 +658,61 @@
   <li><strong>No jog conflict:</strong> the keyboard-jog handler jogs whenever a key is <em>mapped</em> to jog (Up/Down are by default) <em>before</em> its per-key text-box guard, so the prompt's arrows would otherwise move the machine. <code>ProcessKeypress</code> now forces no-jog when the focused element is a <code>TextBox</code> tagged <code>"MDI"</code>, and the prompt is tagged accordingly &mdash; uniformly exempting both the MDI strip's edit box and the console prompt.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator: commands echo + execute, auto-focus, history recall (Up/Down step through prior commands), and an A/B test confirming Up jogs the DRO when a non-input element is focused but does not when the console prompt is focused. Keys are handled in <code>PreviewKeyDown</code> so the arrows reach the prompt rather than being consumed by the TextBox.</p>
+</div>
+</div>
+
+<!-- ============ PR 20 ============ -->
+<div class="pr">
+<h2 id="pr20"><span class="badge">PR 20</span>3D view &mdash; Ctrl+click to jog + per-axis orientation</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/click-to-jog</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/click-to-jog">master&hellip;pr/click-to-jog</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">160</td><td class="num del">52</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p><strong>Ctrl+left-click</strong> in the 3D or top-down (XY) view jogs the machine to the clicked XY position &mdash; a quick coarse-positioning aid that complements the jog buttons (park over a corner to set work zero, check alignment, touch-screen rigs).</p>
+<ul>
+  <li><strong>Safe by construction:</strong> the move always retracts <strong>Z to the top of travel first</strong>, then rapids to the new XY, so the traverse can never plough through stock or fixtures. Only X/Y move; plain left-drag still rotates the camera.</li>
+  <li><strong>How it maps:</strong> the click ray is intersected with the work Z=0 plane (HelixToolkit <code>UnProject</code>) to recover an XY target, converted to machine coordinates (<code>MPos = WPos + WCO</code>), clamped to the soft-limit travel exactly as the jog limiter does, and emitted as two queued <code>$J=G53</code> jogs at the controller's max rate (<code>$110-$112</code>) so it moves at rapid speed.</li>
+  <li><strong>Guarded:</strong> requires homed + idle + max travel set + soft limits (<code>$20</code>) on, with a status-bar reason when a prerequisite is missing. Gated by a <code>GCodeViewerConfig.ClickToJog</code> setting (default on).</li>
+  <li><strong>Orientation fix (prerequisite):</strong> the rendered machine frame &mdash; work envelope, floor grid and crosshair &mdash; now honors the <code>$23</code> homing-direction mask + force-set-origin <em>per axis</em>, so the view matches any home corner (e.g. top-back-left, X+/Y&minus;/Z&minus;) instead of assuming +X/+Y. Standard +X/+Y/&minus;Z machines render identically to before.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (CNC GCodeViewer chain). Verified on the author's machine: Ctrl+click retracts Z then rapids to the clicked XY at the configured max rate, and the envelope/grid orient to the real home corner.</p>
+</div>
+</div>
+
+<!-- ============ PR 21 ============ -->
+<div class="pr">
+<h2 id="pr21"><span class="badge">PR 21</span>grbl:Settings &mdash; Machine Setup Wizard</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/machine-setup-wizard</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/machine-setup-wizard">master&hellip;pr/machine-setup-wizard</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">433</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">217</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>A guided, first-run <strong>Machine Setup Wizard</strong> tab in grbl:Settings that configures the machine-description settings a fresh controller needs &mdash; so a new machine can be described without hunting through the <code>$</code> list. Auto-selected when the machine looks unconfigured (<code>$130-$132</code> all zero).</p>
+<ul>
+  <li><strong>Seven steps, nothing written until review:</strong> Welcome &rarr; Travel limits &rarr; Home corner &rarr; Limit sensors &rarr; Homing &rarr; Soft limits &rarr; Review &amp; apply. The final page lists the <code>$n: current &rarr; new</code> changes, then writes them with <code>GrblSettings.Save()</code>.</li>
+  <li><strong>Travel:</strong> the entered <em>physical</em> travel is stored to <code>$130-$132</code> reduced by twice the homing pull-off, reserving clearance at both ends.</li>
+  <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>); Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">PR 20</a>).</li>
+  <li><strong>Limit sensors:</strong> live per-axis dots driven by the controller's real-time signal report so you press each switch and watch it register; normally-open is the default, normally-closed ticks set <code>$5</code>; hard limits set <code>$21</code>.</li>
+  <li><strong>Capability-gated:</strong> reads <code>NEWOPT</code> / <code>NumAxes</code> / force-set-origin to show only the relevant questions and axes. A "Start over" button re-reads the controller and resets.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut.</p>
 </div>
 </div>
 
