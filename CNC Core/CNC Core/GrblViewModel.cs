@@ -441,6 +441,26 @@ namespace CNC.Core
         public ObservableCollection<string> ResponseLog { get; private set; } = new ObservableCollection<string>();
         public ObservableCollection<string> CommandLog { get; private set; } = new ObservableCollection<string>();
 
+        // Shared command history for the MDI strip and the console prompt, newest first.
+        // Both call AddMDIHistory() when a command is sent so the two share one list.
+        public ObservableCollection<string> MDIHistory { get; private set; } = new ObservableCollection<string>();
+
+        public void AddMDIHistory(string command)
+        {
+            if (string.IsNullOrEmpty(command))
+                return;
+
+            int idx = MDIHistory.IndexOf(command);
+            if (idx == 0)               // already newest - nothing to do
+                return;
+            if (idx > 0)                // seen before - move to front
+                MDIHistory.RemoveAt(idx);
+            MDIHistory.Insert(0, command);
+
+            while (MDIHistory.Count > 200)
+                MDIHistory.RemoveAt(MDIHistory.Count - 1);
+        }
+
         public ProgramLimits ProgramLimits { get; private set; } = new ProgramLimits();
         public string MDI { get { return _mdiCommand; } private set { _mdiCommand = value; OnPropertyChanged(); _mdiCommand = string.Empty; } }
         public string MDIText { get { return _mdiText; } set { _mdiText = value; OnPropertyChanged(); } }
