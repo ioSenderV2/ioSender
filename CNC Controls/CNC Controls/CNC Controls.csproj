@@ -257,6 +257,9 @@
     <Compile Include="StatusControl.xaml.cs">
       <DependentUpon>StatusControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MachineSetupWizard.xaml.cs">
+      <DependentUpon>MachineSetupWizard.xaml</DependentUpon>
+    </Compile>
     <Compile Include="StepperCalibrationWizard.xaml.cs">
       <DependentUpon>StepperCalibrationWizard.xaml</DependentUpon>
     </Compile>
@@ -530,6 +533,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="StatusControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MachineSetupWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

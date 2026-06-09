@@ -58,9 +58,33 @@ namespace CNC.Controls
         public ViewType ViewType { get { return ViewType.GRBLConfig; } }
         public bool CanEnable { get { return DataContext is GrblViewModel ? (DataContext as GrblViewModel).SystemCommandsAllowed : true; } }
 
+        private bool wizardAutoShown = false;
+
         public void Activate(bool activate, ViewType chgMode)
         {
+            // First time the settings view is opened on an unconfigured machine, jump straight to the
+            // Machine Setup Wizard. Selecting the tab raises tab_SelectionChanged, which activates it.
+            if (activate && !wizardAutoShown && MachineIsUnconfigured())
+            {
+                wizardAutoShown = true;
+                var wizard = getTab(GrblConfigType.MachineSetup);
+                if (wizard != null && tabConfig.SelectedItem != wizard)
+                {
+                    tabConfig.SelectedItem = wizard;
+                    return;
+                }
+            }
+
             getView(tabConfig.SelectedItem == null ? tabConfig.Items[0] as TabItem : tabConfig.SelectedItem as TabItem)?.Activate(activate);
+        }
+
+        // Heuristic: we've talked to a controller (version known) but no travel has been set ($130-$132 all 0).
+        private static bool MachineIsUnconfigured()
+        {
+            return !string.IsNullOrEmpty(GrblInfo.Version)
+                && GrblSettings.GetDouble(GrblSetting.MaxTravelBase) <= 0d
+                && GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 1) <= 0d
+                && GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2) <= 0d;
         }
 
         public void CloseFile()

@@ -53,6 +53,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
@@ -318,6 +319,7 @@ namespace CNC.Controls.Viewer
             {
                 model = DataContext as GrblViewModel;
                 AppConfig.Settings.GCodeViewer.PropertyChanged += GCodeViewer_PropertyChanged;
+                viewport.PreviewMouseLeftButtonDown += Viewport_PreviewMouseLeftButtonDown;
                 Configure();
             }
         }
@@ -485,6 +487,120 @@ namespace CNC.Controls.Viewer
         private void viewport_Drop(object sender, DragEventArgs e)
         {
             GCode.File.Drop(sender, e);
+        }
+
+        // Ctrl + left-click in the 3D / top-down (XY) view jogs the machine to the clicked XY position.
+        // For safety the move always retracts Z to the top of travel first, then rapids to the new XY, so the
+        // traverse can never plough through stock or fixtures. Plain left-drag still rotates the camera.
+        private void Viewport_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (model == null || Keyboard.Modifiers != ModifierKeys.Control || !AppConfig.Settings.GCodeViewer.ClickToJog)
+                return;
+
+            // Only the views where a single screen point maps unambiguously to an XY target are pickable.
+            if (!(Machine.RenderMode == RenderMode.Mode3D || Machine.RenderMode == RenderMode.Mode2DXY))
+                return;
+
+            e.Handled = true;   // consume the gesture so HelixToolkit does not also start a camera rotate
+
+            JogToScreenPoint(e.GetPosition(viewport));
+        }
+
+        private bool JogToScreenPoint(Point screenPoint)
+        {
+            // Intersect the pick ray with the work Z=0 plane to recover an XY target (work coordinates, mm).
+            Point3D? hit = Viewport3DHelper.UnProject(viewport.Viewport, screenPoint, new Point3D(0d, 0d, 0d), new Vector3D(0d, 0d, 1d));
+            if (hit == null)
+                return false;
+
+            // Prerequisites: homed (so machine coordinates are valid), idle, and max travel ($130-$132)
+            // configured so the absolute (G53) jog has soft-limit extents to clamp against.
+            if (model.HomedState != HomedState.Homed)
+            {
+                model.Message = "Click to jog: home the machine first.";
+                return false;
+            }
+
+            if (model.IsJobRunning ||
+                 !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool))
+            {
+                model.Message = "Click to jog: the machine must be idle.";
+                return false;
+            }
+
+            if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d)
+            {
+                model.Message = "Click to jog: set max travel ($130-$132) first.";
+                return false;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1)
+            {
+                model.Message = "Click to jog: enable soft limits ($20=1) first.";
+                return false;
+            }
+
+            Position wco = new Position(model.WorkPositionOffset, model.UnitFactor);
+
+            // Work -> machine: MPos = WPos + WCO. Clamp each axis to the reachable travel.
+            double mx = ClampToTravel(0, hit.Value.X + wco.X);
+            double my = ClampToTravel(1, hit.Value.Y + wco.Y);
+            double mtop = ClampToTravel(2, double.MaxValue);   // fully retracted toward the home/top end
+
+            // Jog at the machine's max rate so the move is effectively a rapid - grblHAL caps each axis to its
+            // own $110-$112 limit, so commanding the fastest involved axis rate yields the quickest legal move.
+            double zFeed = RapidFeed(2);
+            double xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
+
+            // Retract Z to the top first, then rapid to the new XY - the two jogs queue and run back-to-back.
+            model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+            model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
+
+            return true;
+        }
+
+        // Per-axis max feed rate ($110-$112), used as the jog feed so click-to-jog moves at rapid speed.
+        // Falls back to the configured fast-jog feed if the controller has not reported a max rate.
+        private double RapidFeed(int axis)
+        {
+            double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis);
+
+            return rate > 0d ? rate : AppConfig.Settings.Jog.FastFeedrate;
+        }
+
+        // Clamp an absolute machine-axis target to the safe travel range, mirroring the jog limiter in
+        // JogBaseControl so click-to-jog respects soft limits / homing pull-off exactly as the jog buttons do.
+        private double ClampToTravel(int axis, double position)
+        {
+            double maxTravel = GrblInfo.MaxTravel.Values[axis];
+            double clearance = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
+
+            if (GrblInfo.ForceSetOrigin)
+            {
+                if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis)))
+                {
+                    if (position > 0d)
+                        position = 0d;
+                    else if (position < -maxTravel + clearance)
+                        position = -maxTravel + clearance;
+                }
+                else
+                {
+                    if (position < 0d)
+                        position = 0d;
+                    else if (position > maxTravel - clearance)
+                        position = maxTravel - clearance;
+                }
+            }
+            else
+            {
+                if (position > -clearance)
+                    position = -clearance;
+                else if (position < -(maxTravel - clearance))
+                    position = -(maxTravel - clearance);
+            }
+
+            return position;
         }
 
         private void MouseWheel_Preview(object sender, System.Windows.Input.MouseWheelEventArgs e)
@@ -715,16 +831,34 @@ namespace CNC.Controls.Viewer
             catch { /* best-effort scene; the view simply stays empty if something is not ready */ }
         }
 
+        // +1: this axis travels in the +world direction away from the machine origin (home), -1: -world direction.
+        // Derived from the $23 homing direction mask + force-set-origin exactly as the jog limiter does
+        // (JogBaseControl), so the rendered machine frame (envelope, grid, crosshair) matches the real machine
+        // regardless of which corner is home. Without force-set-origin grbl keeps all travel negative (MPos <= 0).
+        private double AxisDir(int axis)
+        {
+            if (GrblInfo.ForceSetOrigin)
+                return GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis)) ? 1d : -1d;
+
+            return -1d;
+        }
+
+        // Lower (min-world) corner of the machine travel envelope on one axis, in work coordinates.
+        private double EnvelopeMin(int axis, double wco)
+        {
+            return AxisDir(axis) > 0d ? -wco : -GrblInfo.MaxTravel.Values[axis] - wco;
+        }
+
         private void AddWorkEnvelope()
         {
             Position workPositionOffset = new Position(model.WorkPositionOffset, model.UnitFactor);
 
             if (isLatheMode == true)
                 workEnvelope.BoundingBox = new Rect3D(-workPositionOffset.X, 0d, -GrblInfo.MaxTravel.Z - workPositionOffset.Z, GrblInfo.MaxTravel.X, 0d, GrblInfo.MaxTravel.Z);
-            else if(GrblInfo.ForceSetOrigin)
-                workEnvelope.BoundingBox = new Rect3D(-workPositionOffset.X, -workPositionOffset.Y, -GrblInfo.MaxTravel.Z - workPositionOffset.Z, GrblInfo.MaxTravel.X, GrblInfo.MaxTravel.Y, GrblInfo.MaxTravel.Z);
             else
-                workEnvelope.BoundingBox = new Rect3D(-GrblInfo.MaxTravel.X - workPositionOffset.X, -GrblInfo.MaxTravel.Y - workPositionOffset.Y, -GrblInfo.MaxTravel.Z - workPositionOffset.Z, GrblInfo.MaxTravel.X, GrblInfo.MaxTravel.Y, GrblInfo.MaxTravel.Z);
+                workEnvelope.BoundingBox = new Rect3D(
+                    EnvelopeMin(0, workPositionOffset.X), EnvelopeMin(1, workPositionOffset.Y), EnvelopeMin(2, workPositionOffset.Z),
+                    GrblInfo.MaxTravel.X, GrblInfo.MaxTravel.Y, GrblInfo.MaxTravel.Z);
         }
 
         private void AnimateTool()
@@ -769,60 +903,32 @@ namespace CNC.Controls.Viewer
             Position position = new Position(model.Position, model.UnitFactor);
             Position workPositionOffset = new Position(model.WorkPositionOffset, model.UnitFactor);
 
+            // Travel extents (work coords) per axis, oriented per the real machine - see AxisDir/EnvelopeMin.
+            double xMin = EnvelopeMin(0, workPositionOffset.X), xMax = xMin + GrblInfo.MaxTravel.X;
+            double yMin = EnvelopeMin(1, workPositionOffset.Y), yMax = yMin + GrblInfo.MaxTravel.Y;
+            double zMin = EnvelopeMin(2, workPositionOffset.Z), zMax = zMin + GrblInfo.MaxTravel.Z;
+
             switch (Machine.RenderMode)
             {
                 case RenderMode.Mode3D:
-                    if (GrblInfo.ForceSetOrigin)
-                    {
-                        positionPoints.Add(new Point3D(-workPositionOffset.X, position.Y, position.Z));
-                        positionPoints.Add(new Point3D(positionPoints.Last().X + GrblInfo.MaxTravel.X, position.Y, position.Z));
-                        positionPoints.Add(new Point3D(position.X, -workPositionOffset.Y, position.Z));
-                    }
-                    else
-                    {
-                        positionPoints.Add(new Point3D(-GrblInfo.MaxTravel.X - workPositionOffset.X, position.Y, position.Z + .05d));
-                        positionPoints.Add(new Point3D(positionPoints.Last().X + GrblInfo.MaxTravel.X, position.Y, position.Z + .05d));
-                        positionPoints.Add(new Point3D(position.X, -GrblInfo.MaxTravel.Y - workPositionOffset.Y, position.Z + .05d));
-                    }
-                    positionPoints.Add(new Point3D(position.X, positionPoints.Last().Y + GrblInfo.MaxTravel.Y, position.Z + .05d));
-                    positionPoints.Add(new Point3D(position.X, position.Y, -GrblInfo.MaxTravel.Z - workPositionOffset.Z));
-                    positionPoints.Add(new Point3D(position.X, position.Y, positionPoints.Last().Z + GrblInfo.MaxTravel.Z + .05d));
-                break;
+                    addLine(new Point3D(xMin, position.Y, position.Z), new Point3D(xMax, position.Y, position.Z));
+                    addLine(new Point3D(position.X, yMin, position.Z), new Point3D(position.X, yMax, position.Z));
+                    addLine(new Point3D(position.X, position.Y, zMin), new Point3D(position.X, position.Y, zMax));
+                    break;
 
                 case RenderMode.Mode2DXY:
-                    if (GrblInfo.ForceSetOrigin)
-                    {
-                        positionPoints.Add(new Point3D(-workPositionOffset.X, position.Y, 0d));
-                        positionPoints.Add(new Point3D(positionPoints.Last().X + GrblInfo.MaxTravel.X, position.Y, 0d));
-                        positionPoints.Add(new Point3D(position.X, -workPositionOffset.Y, 0d));
-                    }
-                    else
-                    {
-                        positionPoints.Add(new Point3D(-GrblInfo.MaxTravel.X - workPositionOffset.X, position.Y, 0d));
-                        positionPoints.Add(new Point3D(positionPoints.Last().X + GrblInfo.MaxTravel.X, position.Y, 0d));
-                        positionPoints.Add(new Point3D(position.X, -GrblInfo.MaxTravel.Y - workPositionOffset.Y, 0d));
-                    }
-                    positionPoints.Add(new Point3D(position.X, positionPoints.Last().Y + GrblInfo.MaxTravel.Y, 0d));
+                    addLine(new Point3D(xMin, position.Y, 0d), new Point3D(xMax, position.Y, 0d));
+                    addLine(new Point3D(position.X, yMin, 0d), new Point3D(position.X, yMax, 0d));
                     break;
 
                 case RenderMode.Mode2DXZ:
-                    if (GrblInfo.ForceSetOrigin)
-                        positionPoints.Add(new Point3D(-workPositionOffset.X, 0d, position.Z));
-                    else
-                        positionPoints.Add(new Point3D(-GrblInfo.MaxTravel.X - workPositionOffset.X, 0d, position.Z));
-                    positionPoints.Add(new Point3D(positionPoints.Last().X + GrblInfo.MaxTravel.X, 0d, position.Z));
-                    positionPoints.Add(new Point3D(position.X, 0d, -GrblInfo.MaxTravel.Z - workPositionOffset.Z));
-                    positionPoints.Add(new Point3D(position.X, 0d, positionPoints.Last().Z + GrblInfo.MaxTravel.Z));
+                    addLine(new Point3D(xMin, 0d, position.Z), new Point3D(xMax, 0d, position.Z));
+                    addLine(new Point3D(position.X, 0d, zMin), new Point3D(position.X, 0d, zMax));
                     break;
 
                 case RenderMode.Mode2DYZ:
-                    if (GrblInfo.ForceSetOrigin)
-                        positionPoints.Add(new Point3D(0d, -workPositionOffset.Y, position.Z));
-                    else
-                        positionPoints.Add(new Point3D(0d, -GrblInfo.MaxTravel.Y - workPositionOffset.Y, position.Z));
-                    positionPoints.Add(new Point3D(0d, positionPoints.Last().Y + GrblInfo.MaxTravel.Y, position.Z));
-                    positionPoints.Add(new Point3D(0d, position.Y, -GrblInfo.MaxTravel.Z - workPositionOffset.Z));
-                    positionPoints.Add(new Point3D(0d, model.Position.Y, positionPoints.Last().Z + GrblInfo.MaxTravel.Z));
+                    addLine(new Point3D(0d, yMin, position.Z), new Point3D(0d, yMax, position.Z));
+                    addLine(new Point3D(0d, position.Y, zMin), new Point3D(0d, position.Y, zMax));
                     break;
             }
 
@@ -1018,20 +1124,22 @@ namespace CNC.Controls.Viewer
                     case RenderMode.Mode2DXY:
                         lengthDirection = new Vector3D(1d, 0d, 0d);
                         normal = new Vector3D(0d, 0d, 1d);
-                        if (model.HomedState != HomedState.Homed || GrblInfo.ForceSetOrigin)
+                        // Before homing WCO is not meaningful - keep the legacy +/+ placement; once homed
+                        // lay the grid out per-axis so it sits under the real travel (see AxisDir).
+                        if (model.HomedState != HomedState.Homed)
                             gridOffset = new Point3D(gridWidth / 2d, gridHeight / 2d, programLimits.MinZ);
                         else
-                            gridOffset = new Point3D(-gridWidth / 2d, -gridHeight / 2d, programLimits.MinZ);
+                            gridOffset = new Point3D(AxisDir(0) * gridWidth / 2d, AxisDir(1) * gridHeight / 2d, programLimits.MinZ);
                         break;
 
                     case RenderMode.Mode2DXZ:
                         gridHeight = gridsz(GrblInfo.MaxTravel.Z);
                         lengthDirection = new Vector3D(1d, 0d, 0d);
                         normal = new Vector3D(0d, 1d, 0d);
-                        if (model.HomedState != HomedState.Homed || GrblInfo.ForceSetOrigin)
+                        if (model.HomedState != HomedState.Homed)
                             gridOffset = new Point3D(gridWidth / 2d, 0d, -gridHeight / 2d);
                         else
-                            gridOffset = new Point3D(-gridWidth / 2d, 0d, -gridHeight / 2d);
+                            gridOffset = new Point3D(AxisDir(0) * gridWidth / 2d, 0d, -gridHeight / 2d);
                         break;
 
                     default:
@@ -1039,10 +1147,10 @@ namespace CNC.Controls.Viewer
                         gridHeight = gridsz(GrblInfo.MaxTravel.Z);
                         lengthDirection = new Vector3D(0d, 1d, 0d);
                         normal = new Vector3D(1d, 0d, 0d);
-                        if (model.HomedState != HomedState.Homed ||  GrblInfo.ForceSetOrigin)
+                        if (model.HomedState != HomedState.Homed)
                             gridOffset = new Point3D(0d, gridWidth / 2d, -gridHeight / 2d);
                         else
-                            gridOffset = new Point3D(0d, -gridWidth / 2d, -gridHeight / 2d);
+                            gridOffset = new Point3D(0d, AxisDir(1) * gridWidth / 2d, -gridHeight / 2d);
                         break;
                 }
 

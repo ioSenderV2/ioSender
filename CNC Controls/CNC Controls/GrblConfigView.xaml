@@ -8,6 +8,9 @@
              d:DesignHeight="515" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
     <TabControl x:Name="tabConfig" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+        <TabItem x:Uid="tab_machineSetup" x:Name="tabMachineSetup" Header="Machine Setup Wizard">
+            <local:MachineSetupWizard x:Name="machineSetupWizard"/>
+        </TabItem>
         <TabItem x:Uid="tab_basicConfig" x:Name="tabBasicConfig" Header="Basic settings">
             <local:GrblConfigControl x:Name="basicConfig"/>
         </TabItem>

@@ -138,6 +138,7 @@ namespace CNC.Controls
         private double _minDistance = 0.05d, _toolDiameter = 3d;
         private bool _showGrid = true, _showAxes = true, _showBoundingBox = false, _showViewCube = true, _showCoordSystem = false, _showWorkEnvelope = false;
         private bool _showTextOverlay = false, _renderExecuted = false, _blackBackground = false, _scaleTool = true;
+        private bool _clickToJog = true;
         Color _cutMotion = Colors.Black, _rapidMotion = Colors.LightPink, _retractMotion = Colors.Green, _toolOrigin = Colors.Green, _grid = Colors.Gray, _highlight = Colors.Crimson;
 
         [XmlIgnore]
@@ -156,6 +157,7 @@ namespace CNC.Controls
         public bool ShowTextOverlay { get { return _showTextOverlay; } set { _showTextOverlay = value; OnPropertyChanged(); } }
         public bool ShowCoordinateSystem { get { return _showCoordSystem; } set { _showCoordSystem = value; OnPropertyChanged(); } }
         public bool RenderExecuted { get { return _renderExecuted; } set { _renderExecuted = value; OnPropertyChanged(); } }
+        public bool ClickToJog { get { return _clickToJog; } set { _clickToJog = value; OnPropertyChanged(); } }
         public bool BlackBackground { get { return _blackBackground; } set { _blackBackground = value; OnPropertyChanged(); } }
         public Color CutMotionColor { get { return _cutMotion; } set { _cutMotion = value; OnPropertyChanged(); } }
         public Color RapidMotionColor { get { return _rapidMotion; } set { _rapidMotion = value; OnPropertyChanged(); } }
