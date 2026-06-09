@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -51,17 +52,26 @@ namespace CNC.Controls
     /// </summary>
     public partial class ConsoleControl : UserControl
     {
-        // -1 = not navigating history (editing a fresh line); otherwise an index into CommandLog.
+        // The prompt keeps its own command history (newest last). The view-model CommandLog is
+        // not a reliable source for this - it is not populated for commands entered here - so
+        // recall is driven from this list, appended in the send handler below.
+        private readonly List<string> history = new List<string>();
+        // -1 = not navigating history (editing a fresh line); otherwise an index into history.
         private int historyIndex = -1;
 
         public ConsoleControl()
         {
             InitializeComponent();
+
+            // Handle keys in the tunnelling PreviewKeyDown (with handledEventsToo) so Up/Down
+            // reach us before the TextBox/keyboard-navigation consumes them - a plain bubbling
+            // KeyDown never sees the arrows on a focused single-line TextBox.
+            txtInput.AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(txtInput_KeyDown), true);
         }
 
         // Terminal-style prompt: route the typed line through the same MDI command the global
-        // MDI strip uses (it echoes the command into ResponseLog), and recall the shared
-        // CommandLog history with Up/Down.
+        // MDI strip uses (it echoes the command into ResponseLog), recording it in this prompt's
+        // own history; Up/Down recall it.
         private void txtInput_KeyDown(object sender, KeyEventArgs e)
         {
             var model = DataContext as GrblViewModel;
@@ -79,6 +89,8 @@ namespace CNC.Controls
                             if (model.GrblError != 0)
                                 model.ExecuteCommand("");   // clear a pending error first, as the MDI strip does
                             model.MDICommand.Execute(cmd);
+                            if (history.Count == 0 || history[history.Count - 1] != cmd)
+                                history.Add(cmd);
                             tb.Clear();
                             historyIndex = -1;
                         }
@@ -106,18 +118,17 @@ namespace CNC.Controls
 
         private void RecallHistory(TextBox tb, int direction)
         {
-            var log = (DataContext as GrblViewModel)?.CommandLog;
-            if (log == null || log.Count == 0)
+            if (history.Count == 0)
                 return;
 
-            // CommandLog appends newest last; start "past the end" (empty line) so the first
+            // history appends newest last; start "past the end" (empty line) so the first
             // Up recalls the most recent command.
             if (historyIndex == -1)
-                historyIndex = log.Count;
+                historyIndex = history.Count;
 
-            historyIndex = Math.Max(0, Math.Min(historyIndex + direction, log.Count));
+            historyIndex = Math.Max(0, Math.Min(historyIndex + direction, history.Count));
 
-            tb.Text = historyIndex == log.Count ? string.Empty : log[historyIndex];
+            tb.Text = historyIndex == history.Count ? string.Empty : history[historyIndex];
             tb.CaretIndex = tb.Text.Length;
         }
 
