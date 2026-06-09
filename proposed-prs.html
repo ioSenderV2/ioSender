@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 17 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 18 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PR 18 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -59,6 +59,7 @@
 <tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">15 files · +627/−58</td></tr>
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1177/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
+<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
 </table>
 </div>
 
@@ -599,6 +600,31 @@
   <li><strong>Takes effect immediately:</strong> the live "save" flag was only set at startup, so toggling the option mid-session did nothing until a restart. It now updates live and captures + persists the current placement the instant the option is enabled.</li>
 </ul>
 <p class="foot">Builds clean on <code>pr/connect-simulator</code>. Stacked there because the size/position restore lives in that branch's <code>CompleteStartup</code>; the underlying <code>KeepWindowSize</code> option is from <code>master</code>.</p>
+</div>
+</div>
+
+<!-- ============ PR 18 ============ -->
+<div class="pr">
+<h2 id="pr18"><span class="badge">PR 18</span>grbl:Settings &mdash; highlight changed settings + revert</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/grbl-settings</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/grbl-settings">https://github.com/stevenrwood/ioSender/compare/master...pr/grbl-settings</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">65</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">40</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">32</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Orca/PrusaSlicer-style indication of which controller <code>$</code> settings you have changed, on the grbl:Settings <strong>Basic</strong> tab. Settings whose value differs from the value read at session start &mdash; and any setting group that contains one &mdash; are shown bold/orange, so changes are visible at a glance across the whole tree. Applies to both the grblHAL settings tree and the classic-grbl grid.</p>
+<ul>
+  <li><strong>Revert from a right-click menu:</strong> <em>Revert to value at startup</em> on a setting, and <em>Revert all in group to value at startup</em> on a group node.</li>
+  <li><strong>Three baselines, cleanly separated:</strong> <code>GrblSettingDetails</code> now tracks the current value, the frozen <em>startup</em> value (drives the <code>IsModified</code> highlight) and the <em>loaded</em> controller value (drives the <code>IsDirty</code> needs-write state). Making <code>IsDirty</code> mean "differs from the controller" rather than "changed" fixes a spurious "settings changed, save now?" prompt when reverting an edit back to the controller value.</li>
+  <li><strong>Live group highlight:</strong> <code>GrblSettingGroup</code> implements <code>INotifyPropertyChanged</code> so a group's marker updates as its settings change.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator. Per-setting "revert to factory default" is intentionally deferred &mdash; grblHAL exposes no per-setting default (only the global <code>$RST=$</code> reset-all), so factory revert would need a future firmware-side snapshot of as-flashed values.</p>
 </div>
 </div>
 
