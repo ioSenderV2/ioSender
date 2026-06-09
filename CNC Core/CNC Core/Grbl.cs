@@ -2572,14 +2572,26 @@ namespace CNC.Core
         }
     }
 
-    public class GrblSettingGroup
+    public class GrblSettingGroup : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
         public int Id { get; set; }
         public int ParentId { get; set; }
         public string Name { get; set; }
         public IEnumerable<GrblSettingDetails> Settings
         {
             get { return GrblSettings.Settings.Where(x => x.GroupId == Id); }
+        }
+
+        // True when any contained setting differs from its startup value; drives the
+        // group-level "modified" highlight. Re-raised via RaiseModifiedChanged() by the
+        // settings as they change.
+        public bool IsModified { get { return Settings.Any(x => x.IsModified); } }
+
+        internal void RaiseModifiedChanged()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsModified)));
         }
 
         public GrblSettingGroup (string data)
@@ -2763,6 +2775,8 @@ namespace CNC.Core
         };
 
         private string _value, _description = null;
+        private string _startup = null;
+        private string _loaded = null;
         internal bool Silent = true;
 
         public GrblSettingDetails(string data)
@@ -2795,10 +2809,17 @@ namespace CNC.Core
                 if (_value != value)
                 {
                     _value = value;
-                    if ((IsDirty = !Silent))
+                    if (!Silent)
                     {
+                        // Dirty means "differs from the value on the controller" (needs a write),
+                        // not merely "changed" - so reverting an edit back to the controller value
+                        // (e.g. RevertToStartup with no intervening Save) clears dirty and won't
+                        // trigger a spurious "settings changed, save now?" prompt.
+                        IsDirty = _loaded == null || _value != _loaded;
                         OnPropertyChanged();
                         OnPropertyChanged(nameof(FormattedValue));
+                        OnPropertyChanged(nameof(IsModified));
+                        NotifyGroup();
                     }
                 }
             }
@@ -2905,6 +2926,43 @@ namespace CNC.Core
         }
 
         public bool IsDirty { get; internal set; } = false;
+
+        // Value read from the controller at session startup (first load), frozen.
+        // Not updated by Save or Reload, so RevertToStartup() restores the session-start value.
+        public string StartupValue { get { return _startup; } }
+
+        // True when the current value differs from the startup value. Independent of IsDirty
+        // (which tracks unsaved-since-last-write); drives the "modified" highlight in the UI.
+        public bool IsModified { get { return _startup != null && _value != _startup; } }
+
+        // Captures the current value as the startup baseline. Called once on first load.
+        internal void SetStartupBaseline()
+        {
+            _startup = _value;
+            OnPropertyChanged(nameof(IsModified));
+            NotifyGroup();
+        }
+
+        // Captures the current value as the controller baseline - the value known to be on the
+        // controller. Set on every (re)load and after a successful Save; drives the IsDirty
+        // (needs-write) comparison in the Value setter.
+        internal void SetLoadedBaseline()
+        {
+            _loaded = _value;
+        }
+
+        // Restores the value to the session-start value, staged as a normal (dirty) edit so
+        // it is written to the controller on the next Save - matching manual-edit behaviour.
+        public void RevertToStartup()
+        {
+            if (IsModified)
+                Value = _startup;
+        }
+
+        private void NotifyGroup()
+        {
+            GrblSettingGroups.Get(GroupId)?.RaiseModifiedChanged();
+        }
     }
 
     public static class GrblSettings
@@ -3154,6 +3212,8 @@ namespace CNC.Core
                     }
 
                     setting.IsDirty = setting.HasErrors;
+                    if (!setting.HasErrors)
+                        setting.SetLoadedBaseline();    // controller now holds this value
                 }
             }
 
@@ -3312,6 +3372,9 @@ namespace CNC.Core
 
                     setting.Value = valuepair[1];
                     setting.Silent = setting.IsDirty = false;
+                    setting.SetLoadedBaseline();
+                    if (setting.StartupValue == null)
+                        setting.SetStartupBaseline();
                 }
             }
         }

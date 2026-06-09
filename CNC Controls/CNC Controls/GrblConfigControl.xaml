@@ -60,6 +60,20 @@
             <Setter Property="Padding" Value="5,0" />
             <Setter Property="VerticalAlignment" Value="Top" />
         </Style>
+        <!-- Highlight for settings/groups whose value differs from the value at startup -->
+        <Style x:Key="ModifiedTextStyle" TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsModified}" Value="True">
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="Foreground" Value="#E07B00" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Row context menu for the classic-grbl DataGrid (kept out of the row Style, which
+             cannot host event handlers). DataContext resolves to the row's GrblSettingDetails. -->
+        <ContextMenu x:Key="SettingRowMenu">
+            <MenuItem Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
+        </ContextMenu>
     </UserControl.Resources>
     <DockPanel>
         <Grid>
@@ -72,15 +86,25 @@
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type cnccore:GrblSettingGroup}" ItemsSource="{Binding Settings}" >
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Name}" />
+                            <StackPanel.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Revert all in group to value at startup" IsEnabled="{Binding IsModified}" Click="groupRevertStartup_Click" />
+                                </ContextMenu>
+                            </StackPanel.ContextMenu>
+                            <TextBlock Text="{Binding Name}" Style="{StaticResource ModifiedTextStyle}" />
                         </StackPanel>
                     </HierarchicalDataTemplate>
                     <DataTemplate DataType="{x:Type cnccore:GrblSettingDetails}" >
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Id}" Margin="0,0,5,0" />
-                            <TextBlock Text="{Binding Name, StringFormat=\{0\}:}" />
-                            <TextBlock Text="{Binding FormattedValue}" Margin="5,0"/>
-                            <TextBlock Text="{Binding Unit}" />
+                            <StackPanel.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
+                                </ContextMenu>
+                            </StackPanel.ContextMenu>
+                            <TextBlock Text="{Binding Id}" Margin="0,0,5,0" Style="{StaticResource ModifiedTextStyle}" />
+                            <TextBlock Text="{Binding Name, StringFormat=\{0\}:}" Style="{StaticResource ModifiedTextStyle}" />
+                            <TextBlock Text="{Binding FormattedValue}" Margin="5,0" Style="{StaticResource ModifiedTextStyle}" />
+                            <TextBlock Text="{Binding Unit}" Style="{StaticResource ModifiedTextStyle}" />
                         </StackPanel>
                     </DataTemplate>
                 </TreeView.Resources>
@@ -89,6 +113,17 @@
         <DataGrid x:Name="dgrSettings" DockPanel.Dock="Left" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Left" Margin="10,10" VerticalAlignment="Stretch" Width="390"
                   SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False" Visibility="Collapsed"
                   CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" CanUserAddRows="False" SelectionChanged="dgrSettings_SelectionChanged">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="ContextMenu" Value="{StaticResource SettingRowMenu}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsModified}" Value="True">
+                            <Setter Property="FontWeight" Value="Bold" />
+                            <Setter Property="Foreground" Value="#E07B00" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn x:Uid="hdr_settingId" Header="Id" Binding="{Binding Id}" Width="50"/>
                 <DataGridTextColumn x:Uid="hdr_settingValue" Header="Value" Binding="{Binding Value}" Width="70"/>
