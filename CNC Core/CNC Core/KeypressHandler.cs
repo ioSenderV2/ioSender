@@ -455,6 +455,13 @@ namespace CNC.Core
             bool isJogging = IsJogging, jogkeyPressed = false;
             JogKey jogKey = null;
 
+            // Focus in an MDI-tagged text box (the MDI strip's edit box, the Console command
+            // prompt) must never jog - let its arrow keys drive command history/caret instead.
+            // Keys mapped to jog (e.g. Up/Down) otherwise jog before the per-key TextBox check
+            // below ever runs, so gate the whole pass on it here.
+            if (allowJog && Keyboard.FocusedElement is System.Windows.Controls.TextBox mdiBox && (mdiBox.Tag as string) == "MDI")
+                allowJog = false;
+
             if (e.IsUp && isJogging)
             {
                 bool cancel = !allowJog;
