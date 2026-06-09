@@ -376,6 +376,38 @@ namespace CNC.Controls
             if (e.AddedItems.Count == 1)
                 ShowSetting(e.AddedItems[0] as GrblSettingDetails, true);
         }
+
+        private void settingRevertStartup_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is GrblSettingDetails setting)
+                RevertSetting(setting);
+        }
+
+        private void groupRevertStartup_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is GrblSettingGroup group)
+            {
+                foreach (var setting in new List<GrblSettingDetails>(group.Settings))
+                    RevertSetting(setting);
+            }
+        }
+
+        private void RevertSetting(GrblSettingDetails setting)
+        {
+            if (setting == null || !setting.IsModified)
+                return;
+
+            // The currently displayed widget holds an uncommitted edit; commit it first so the
+            // revert isn't immediately overwritten when the widget is torn down/reassigned.
+            if (curSetting != null && curSetting.Setting == setting)
+                curSetting.Assign();
+
+            setting.RevertToStartup();
+
+            // Refresh the editor pane if the reverted setting is the one being shown.
+            if (curSetting != null && curSetting.Setting == setting)
+                ShowSetting(setting, false);
+        }
         #endregion
 
         private void treeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
