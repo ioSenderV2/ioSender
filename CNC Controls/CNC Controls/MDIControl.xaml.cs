@@ -51,8 +51,6 @@ namespace CNC.Controls
         public MDIControl()
         {
             InitializeComponent();
-
-            Commands = new ObservableCollection<string>();
         }
 
         public new bool IsFocused { get { return txtMDI.IsKeyboardFocusWithin; } }
@@ -64,21 +62,14 @@ namespace CNC.Controls
             set { SetValue(CommandProperty, value); }
         }
 
-        public static readonly DependencyProperty CommandsProperty = DependencyProperty.Register(nameof(Commands), typeof(ObservableCollection<string>), typeof(MDIControl));
-        public ObservableCollection<string> Commands
-        {
-            get { return (ObservableCollection<string>)GetValue(CommandsProperty); }
-            set { SetValue(CommandsProperty, value); }
-        }
-
         private void OnDataContextPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (sender is GrblViewModel) switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.MDIText):
-                    var txt = (sender as GrblViewModel).MDIText;
-                    if (!string.IsNullOrEmpty(txt) && !Commands.Contains(txt))
-                        Commands.Insert(0, txt);
+                    var model = sender as GrblViewModel;
+                    var txt = model.MDIText;
+                    model.AddMDIHistory(txt);
                     Command = txt;
                     break;
             }
@@ -90,8 +81,7 @@ namespace CNC.Controls
             {
                 string cmd = (sender as ComboBox).Text;
                 var model = DataContext as GrblViewModel;
-                if (!string.IsNullOrEmpty(cmd) && (Commands.Count == 0 || Commands[0] != cmd))
-                    Commands.Insert(0, cmd);
+                model.AddMDIHistory(cmd);
                 if (model.GrblError != 0)
                     model.ExecuteCommand("");
                 model.MDICommand.Execute(cmd);
@@ -114,8 +104,7 @@ namespace CNC.Controls
             if ((DataContext as GrblViewModel).GrblError != 0)
                 (DataContext as GrblViewModel).ExecuteCommand("");
 
-            if (!string.IsNullOrEmpty(Command) && !Commands.Contains(Command))
-                Commands.Insert(0, Command);
+            (DataContext as GrblViewModel).AddMDIHistory(Command);
         }
 
         private void MDIControl_Loaded(object sender, RoutedEventArgs e)

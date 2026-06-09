@@ -38,7 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -52,11 +51,8 @@ namespace CNC.Controls
     /// </summary>
     public partial class ConsoleControl : UserControl
     {
-        // The prompt keeps its own command history (newest last). The view-model CommandLog is
-        // not a reliable source for this - it is not populated for commands entered here - so
-        // recall is driven from this list, appended in the send handler below.
-        private readonly List<string> history = new List<string>();
-        // -1 = not navigating history (editing a fresh line); otherwise an index into history.
+        // -1 = not navigating history (editing a fresh line); otherwise an index into the shared
+        // GrblViewModel.MDIHistory (newest first), which both this prompt and the MDI strip feed.
         private int historyIndex = -1;
 
         public ConsoleControl()
@@ -70,8 +66,8 @@ namespace CNC.Controls
         }
 
         // Terminal-style prompt: route the typed line through the same MDI command the global
-        // MDI strip uses (it echoes the command into ResponseLog), recording it in this prompt's
-        // own history; Up/Down recall it.
+        // MDI strip uses (it echoes the command into ResponseLog), recording it in the shared
+        // MDIHistory; Up/Down recall it.
         private void txtInput_KeyDown(object sender, KeyEventArgs e)
         {
             var model = DataContext as GrblViewModel;
@@ -89,8 +85,7 @@ namespace CNC.Controls
                             if (model.GrblError != 0)
                                 model.ExecuteCommand("");   // clear a pending error first, as the MDI strip does
                             model.MDICommand.Execute(cmd);
-                            if (history.Count == 0 || history[history.Count - 1] != cmd)
-                                history.Add(cmd);
+                            model.AddMDIHistory(cmd);
                             tb.Clear();
                             historyIndex = -1;
                         }
@@ -99,12 +94,12 @@ namespace CNC.Controls
                     break;
 
                 case Key.Up:
-                    RecallHistory(tb, -1);
+                    RecallHistory(tb, true);
                     e.Handled = true;
                     break;
 
                 case Key.Down:
-                    RecallHistory(tb, 1);
+                    RecallHistory(tb, false);
                     e.Handled = true;
                     break;
 
@@ -116,19 +111,18 @@ namespace CNC.Controls
             }
         }
 
-        private void RecallHistory(TextBox tb, int direction)
+        private void RecallHistory(TextBox tb, bool older)
         {
-            if (history.Count == 0)
+            var hist = (DataContext as GrblViewModel)?.MDIHistory;
+            if (hist == null || hist.Count == 0)
                 return;
 
-            // history appends newest last; start "past the end" (empty line) so the first
-            // Up recalls the most recent command.
-            if (historyIndex == -1)
-                historyIndex = history.Count;
+            // hist[0] is the most recent. Up steps to older entries; Down steps back toward the
+            // (empty) edit line. historyIndex == -1 is the fresh line.
+            historyIndex = older ? Math.Min(historyIndex + 1, hist.Count - 1)
+                                 : Math.Max(historyIndex - 1, -1);
 
-            historyIndex = Math.Max(0, Math.Min(historyIndex + direction, history.Count));
-
-            tb.Text = historyIndex == history.Count ? string.Empty : history[historyIndex];
+            tb.Text = historyIndex < 0 ? string.Empty : hist[historyIndex];
             tb.CaretIndex = tb.Text.Length;
         }
 
