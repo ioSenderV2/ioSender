@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 18 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PR 18 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 19 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-19 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -60,6 +60,7 @@
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1177/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
+<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">2 files · +93/−2</td></tr>
 </table>
 </div>
 
@@ -625,6 +626,31 @@
   <li><strong>Live group highlight:</strong> <code>GrblSettingGroup</code> implements <code>INotifyPropertyChanged</code> so a group's marker updates as its settings change.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator. Per-setting "revert to factory default" is intentionally deferred &mdash; grblHAL exposes no per-setting default (only the global <code>$RST=$</code> reset-all), so factory revert would need a future firmware-side snapshot of as-flashed values.</p>
+</div>
+</div>
+
+<!-- ============ PR 19 ============ -->
+<div class="pr">
+<h2 id="pr19"><span class="badge">PR 19</span>Console &mdash; inline terminal-style command prompt</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/mdi-console</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/mdi-console">https://github.com/stevenrwood/ioSender/compare/master...pr/mdi-console</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">77</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">16</td><td class="num del">2</td></tr>
+</table>
+<div class="desc">
+<p>Makes the <strong>Console</strong> tab read like a traditional terminal by adding a command input line at the bottom, while keeping the global single-line MDI strip for the other tabs (3D&nbsp;View, Program). A natural answer to "why is MDI a separate strip instead of a console prompt?" &mdash; now it can be both.</p>
+<ul>
+  <li><strong>Reuses the MDI plumbing:</strong> Enter routes the line through the existing <code>MDICommand</code>, which already echoes the command into the console's <code>ResponseLog</code> &mdash; so the typed command and its response read inline like a shell. No view-model, MDI-strip or <code>JobView</code> changes.</li>
+  <li><strong>Shared history:</strong> Up/Down recall the same <code>CommandLog</code> the MDI strip feeds, so command history is shared across both; Esc clears the line.</li>
+  <li><strong>Same guards, auto-focus:</strong> the prompt is locked out while a job runs (same as the MDI strip) and grabs focus when the console becomes visible (tab switch or the pop-out console window) so it's ready to type into.</li>
+  <li><strong>Pop-out for free:</strong> the prompt is self-contained in <code>ConsoleControl</code>, so the detachable console window (which hosts the same control) gets it too.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator (commands echo + execute, history recall, auto-focus). The arrow-key keyboard-jog handler already ignores keys while a <code>TextBox</code> has focus, so Up/Down drive history here rather than jogging.</p>
 </div>
 </div>
 
