@@ -60,7 +60,7 @@
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1177/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
-<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">3 files · +111/−2</td></tr>
+<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
 </table>
 </div>
 
@@ -639,15 +639,18 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">88</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">82</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">20</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">16</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MDIControl.xaml.cs</td><td class="num add">5</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MDIControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
 </table>
 <div class="desc">
 <p>Makes the <strong>Console</strong> tab read like a traditional terminal by adding a command input line at the bottom, while keeping the global single-line MDI strip for the other tabs (3D&nbsp;View, Program). A natural answer to "why is MDI a separate strip instead of a console prompt?" &mdash; now it can be both.</p>
 <ul>
-  <li><strong>Reuses the MDI plumbing:</strong> Enter routes the line through the existing <code>MDICommand</code>, which already echoes the command into the console's <code>ResponseLog</code> &mdash; so the typed command and its response read inline like a shell. No view-model, MDI-strip or <code>JobView</code> changes.</li>
-  <li><strong>Command history:</strong> Up/Down recall previously entered commands (the prompt keeps its own history list &mdash; the view-model <code>CommandLog</code> is not populated for prompt entries); Esc clears the line.</li>
+  <li><strong>Reuses the MDI plumbing:</strong> Enter routes the line through the existing <code>MDICommand</code>, which already echoes the command into the console's <code>ResponseLog</code> &mdash; so the typed command and its response read inline like a shell. No <code>JobView</code> changes.</li>
+  <li><strong>Shared command history:</strong> a single <code>GrblViewModel.MDIHistory</code> (newest first) is fed by both the MDI strip and the console prompt and surfaced in both &mdash; the strip's dropdown binds to it and the prompt recalls it with Up/Down (Esc clears). A command entered in either place is recallable in the other. (The view-model <code>CommandLog</code> is not populated for these entries, so it is not used.)</li>
   <li><strong>Same guards, auto-focus:</strong> the prompt is locked out while a job runs (same as the MDI strip) and grabs focus when the console becomes visible (tab switch or the pop-out console window) so it's ready to type into.</li>
   <li><strong>Pop-out for free:</strong> the prompt is self-contained in <code>ConsoleControl</code>, so the detachable console window (which hosts the same control) gets it too.</li>
   <li><strong>No jog conflict:</strong> the keyboard-jog handler jogs whenever a key is <em>mapped</em> to jog (Up/Down are by default) <em>before</em> its per-key text-box guard, so the prompt's arrows would otherwise move the machine. <code>ProcessKeypress</code> now forces no-jog when the focused element is a <code>TextBox</code> tagged <code>"MDI"</code>, and the prompt is tagged accordingly &mdash; uniformly exempting both the MDI strip's edit box and the console prompt.</li>
