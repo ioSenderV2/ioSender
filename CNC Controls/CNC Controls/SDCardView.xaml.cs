@@ -492,12 +492,14 @@ namespace CNC.Controls
 
             new Thread(() =>
             {
-                res = WaitFor.AckResponse<string>(
+                // A worker exception must still set res, or the res==null pump below spins forever.
+                try { res = WaitFor.AckResponse<string>(
                     ct,
                     response => { var fs = GrblFilesystems.ParseMountLine(response); if (fs != null) mounts.Add(fs); },
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
-                    1500, () => Comms.com.WriteCommand("$FI"));
+                    1500, () => Comms.com.WriteCommand("$FI")); }
+                catch { res = false; }
             }).Start();
 
             while (res == null)
@@ -524,12 +526,14 @@ namespace CNC.Controls
 
             new Thread(() =>
             {
-                res = WaitFor.AckResponse<string>(
+                // A worker exception must still set res, or the res==null pump below spins forever.
+                try { res = WaitFor.AckResponse<string>(
                     ct,
                     response => Process(response),
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
-                    2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR));
+                    2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR)); }
+                catch { res = false; }
             }).Start();
 
             while (res == null)

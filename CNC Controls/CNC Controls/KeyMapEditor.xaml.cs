@@ -926,7 +926,6 @@ namespace CNC.Controls
         }
     }
 
-    /// <summary>Maps an outline group name to its remembered expanded/collapsed state.</summary>
     /// <summary>Maps an outline group name to its live GroupRowState (for header change-indication / reset).</summary>
     public class KeyMapGroupStateConverter : IValueConverter
     {

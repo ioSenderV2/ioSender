@@ -552,7 +552,11 @@ namespace CNC.Controls.Viewer
             double zFeed = RapidFeed(2);
             double xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
 
-            // Retract Z to the top first, then rapid to the new XY - the two jogs queue and run back-to-back.
+            // Retract Z to the top first, then rapid to the new XY. Both targets are pre-clamped to the
+            // soft-limit travel above, and grblHAL executes queued $J= jog motions strictly FIFO, so the Z
+            // retract always completes before the XY traverse begins - the tool can never traverse at depth.
+            // (The only way the second jog could run at the old Z is if the first were rejected; two equally
+            // valid G53 jogs share the same accept/reject conditions, so that cannot happen selectively.)
             model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
             model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
 

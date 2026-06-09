@@ -77,8 +77,15 @@ namespace CNC.Controls
 
                 if (autoKill)
                 {
+                    // Attach once - remove first so repeated start/stop cycles don't stack duplicate handlers.
+                    AppDomain.CurrentDomain.ProcessExit -= CurrentDomain_ProcessExit;
                     AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-                    try { System.Windows.Application.Current.Exit += Current_Exit; } catch { }
+                    try
+                    {
+                        System.Windows.Application.Current.Exit -= Current_Exit;
+                        System.Windows.Application.Current.Exit += Current_Exit;
+                    }
+                    catch { }
                 }
 
                 return true;

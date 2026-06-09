@@ -8,8 +8,8 @@
  * "@<path>" macro (created if missing), otherwise the code (no read-back). Opened from the
  * Settings:App page; the caller persists on close.
  *
- * The F-key column is derived from the macro Id (Id n is run by Fn, per
- * JobControl.FnKeyHandler) - it is shown read-only.
+ * The F-key that runs each macro is selectable per row (editable F1-F12 dropdown,
+ * kept unique); legacy macros without one migrate from their Id (Id n -> Fn) on load.
  *
  */
 
