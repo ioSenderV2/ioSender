@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 16 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PR 16 stacks on PR 15) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 17 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -50,14 +50,15 @@
 <tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
 <tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
 <tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1324/−26</td></tr>
-<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1385/−33</td></tr>
+<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1467/−52</td></tr>
 <tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
 <tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">14 files · +596/−57</td></tr>
-<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">3 files · +827/−21</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">15 files · +627/−58</td></tr>
+<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1177/−37</td></tr>
+<tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 </table>
 </div>
 
@@ -320,7 +321,7 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">37</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">119</td><td class="num del">20</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">2</td><td class="num del">1</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">152</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">2</td><td class="num">0</td></tr>
@@ -520,9 +521,10 @@
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">122</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">134</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">107</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">129</td><td class="num del">28</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">134</td><td class="num del">28</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">49</td><td class="num del">6</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">30</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">12</td><td class="num del">4</td></tr>
@@ -542,6 +544,7 @@
   <li><strong>Status bar</strong> shows the current connection target (<code>GrblViewModel.ConnectionTarget</code>), now coloured <span style="color:#2e7d32;font-weight:600">green</span> when connected and <span style="color:#c62828;font-weight:600">red</span> when not.</li>
   <li><strong>Auto-start on reconnect:</strong> when the saved target is the simulator the app launches the bundled simulator before connecting (silently &mdash; no confirmation popup), so a startup auto-reconnect to a simulator target brings it up automatically. The choice is remembered (a <code>StartSimulator</code> setting), since a <code>127.0.0.1:&lt;port&gt;</code> target is otherwise indistinguishable from a real network controller.</li>
   <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control's <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
+  <li><strong>Simulator robustness &amp; speed:</strong> <code>SimulatorManager</code> reaps any stale instances of the managed simulator before launching (stopping the debugger bypasses the exit cleanup, leaving a zombie that holds the single accept slot and hangs the next connect). A <code>SimulatorSpeedup</code> setting passes the simulator's <code>-t</code> pacing flag (1&nbsp;=&nbsp;real-machine speed, 0&nbsp;=&nbsp;as-fast-as-host). And <code>TelnetStream.ReadComplete</code> captures the stream into a local and bails when closing, so an intentional <code>Close()</code> races to a clean stop instead of an NRE on the in-flight async read.</li>
 </ul>
 <p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. The simulator / validator binaries come from the grblHAL Simulator build artifacts and are not committed (see <code>simulator/README.md</code>).</p>
 </div>
@@ -557,7 +560,8 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">823</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">1092</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">81</td><td class="num del">16</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">3</td><td class="num del">21</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
@@ -568,9 +572,33 @@
   <li><strong>Check mode, no motion:</strong> streamed in <code>$C</code> check mode and parsed only &mdash; the machine never moves, so homing and a clear envelope are not required. One feature per line, so an <code>error:N</code> pinpoints exactly which command the controller rejected.</li>
   <li><strong>Robust against grbl's check-mode behaviour:</strong> a check-mode error <em>latches</em> the parser (every later line then errors), so the run recovers on each error &mdash; reset, re-enter check mode (unlocking first if the reset re-alarmed a homed machine), re-apply the modal set-up &mdash; then resumes, always re-confirming check mode before sending another line so a test line can never reach the controller as real motion.</li>
   <li><strong>Non-destructive:</strong> check mode <em>commits</em> <code>G10</code>/<code>G92</code> writes, so the run snapshots and restores the work offsets / tool table and avoids the un-restorable writes (<code>G28.1</code>/<code>G30.1</code>, and <code>G92</code> when an offset is active). Machine settings (<code>$$</code>) are never written.</li>
-  <li><strong>Results window:</strong> grouped by category with a pass/fail marker per feature, the error code and message for failures, the pre-run parameter snapshot, and a Copy-to-clipboard button. The controller is left in <code>Idle</code> with check mode off.</li>
+  <li><strong>Progress &amp; results:</strong> a small non-modal panel shows a live pass/fail tally and the current test as it streams; on completion a <em>View Summary</em> button opens the full report (grouped by category, error code/message per failure, the pre-run parameter snapshot, Copy-to-clipboard). The controller is left in <code>Idle</code> with check mode off.</li>
+  <li><strong>3D visualization:</strong> the passed bounded-motion features are assembled into a runnable program (absolute <code>G90</code> moves at a fast feed) and loaded into the buffer, so the user can press Cycle&nbsp;Start and watch the toolpath run in the 3D view via the normal job path. The viewer also gains an <em>always-active machine scene</em> (work envelope, axes and a live tool cone shown when homed even with no program loaded), plus fixes to the tool/executed-trail animation subscription and a bounded executed-trail advance (an out-of-range block was an unbounded spin).</li>
 </ul>
 <p class="foot">Right-click the <strong>Target</strong> status item &rarr; <em>Validate controller</em>. Builds clean on <code>pr/connect-simulator</code>; the only failures on a stock grblHAL are commands it genuinely does not implement (e.g. <code>G90.1</code>, <code>G61.1</code>, <code>G64</code>, <code>M52</code>; <code>M56</code> needs parking-override enabled).</p>
+</div>
+</div>
+
+<!-- ============ PR 17 ============ -->
+<div class="pr">
+<h2 id="pr17"><span class="badge">PR 17</span>Restore main window position across launches</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/window-restore</code></div>
+  <div><span class="label">Depends on</span>Stacked on <code>pr/connect-simulator</code> (PR 15) &mdash; the restore runs in its <code>CompleteStartup</code>.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/window-restore">https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/window-restore</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">58</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>The "Restore last window size on startup" option restored only the window <em>size</em>; the position was discarded (clamped to the top-left). This persists the position too.</p>
+<ul>
+  <li><strong>Position persisted:</strong> new <code>WindowLeft</code>/<code>WindowTop</code> settings, saved on close (using <code>RestoreBounds</code> when maximized so the un-maximized rectangle is stored) and restored on startup &mdash; but only when the saved rectangle lands on a currently-connected monitor (checked against the whole virtual desktop), so a window saved on a since-removed screen can't open off-screen.</li>
+  <li><strong>Takes effect immediately:</strong> the live "save" flag was only set at startup, so toggling the option mid-session did nothing until a restart. It now updates live and captures + persists the current placement the instant the option is enabled.</li>
+</ul>
+<p class="foot">Builds clean on <code>pr/connect-simulator</code>. Stacked there because the size/position restore lives in that branch's <code>CompleteStartup</code>; the underlying <code>KeepWindowSize</code> option is from <code>master</code>.</p>
 </div>
 </div>
 
