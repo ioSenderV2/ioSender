@@ -32,6 +32,18 @@ namespace CNC.Controls
 
                 string name = System.IO.Path.GetFileNameWithoutExtension(path);
 
+                // Reap stale instances of the managed simulator before launching. Our normal cleanup
+                // (KillStarted via Application.Exit / ProcessExit) does NOT run when the VS debugger is
+                // stopped, so a previous debug session leaves the simulator alive - and it still holds
+                // the listen port. A fresh launch then cannot bind, and the connect lands on that zombie,
+                // which has already served its single client and never responds, hanging startup. Killing
+                // leftover copies of our own bundled exe first guarantees a clean single instance.
+                if (autoKill)
+                {
+                    foreach (var p in Process.GetProcessesByName(name))
+                        try { p.Kill(); p.WaitForExit(2000); } catch { }
+                }
+
                 // Snapshot existing instances so we can identify the one we launch below.
                 var existing = new System.Collections.Generic.HashSet<int>();
                 foreach (var p in Process.GetProcessesByName(name))

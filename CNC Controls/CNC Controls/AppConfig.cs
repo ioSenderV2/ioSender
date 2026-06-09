@@ -266,6 +266,10 @@ namespace CNC.Controls
         public bool StartSimulator { get; set; } = false;
         public string SimulatorExe { get; set; } = "grblHAL_sim.exe";
         public string SimulatorArgs { get; set; } = string.Empty;
+        // grblHAL_sim "-t" speedup: how fast simulated time runs vs real time. 1 = real time (machine speed),
+        // 2/4/... = that many times faster, 0 = as fast as the host can (motion finishes near-instantly).
+        // Edit in App.config; not exposed in Settings:App yet.
+        public double SimulatorSpeedup { get; set; } = 1.0;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -629,7 +633,8 @@ namespace CNC.Controls
             if (sep >= 0)
                 int.TryParse(Base.PortParams.Substring(sep + 1), out netport);
 
-            string args = "-p " + netport;
+            string args = "-p " + netport +
+                          " -t " + Base.SimulatorSpeedup.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (!string.IsNullOrWhiteSpace(Base.SimulatorArgs))
                 args += " " + Base.SimulatorArgs;
 
