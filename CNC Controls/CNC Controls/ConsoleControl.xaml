@@ -4,10 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
-             mc:Ignorable="d" 
-             d:DesignHeight="331" d:DesignWidth="400">
+             mc:Ignorable="d"
+             d:DesignHeight="331" d:DesignWidth="400"
+             IsVisibleChanged="ConsoleControl_IsVisibleChanged">
     <UserControl.Resources>
         <local:StringCollectionToTextConverter x:Key="OcToString" />
+        <local:LogicalNotConverter x:Key="BooleanConverter" />
     </UserControl.Resources>
     <!--> <GroupBox Header="Console" HorizontalAlignment="Center" VerticalAlignment="Top" Width="394" Height="328"> <\!-->
     <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
@@ -16,6 +18,18 @@
             <CheckBox x:Uid="lbl_filterRT" Content="Filter out realtime responses" IsChecked="{Binding Path=ResponseLogFilterRT}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
             <CheckBox x:Uid="lbl_showAll" Content="Show all realtime responses" IsChecked="{Binding Path=ResponseLogShowRTAll}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
             <Button x:Uid="btn_clear" Content="Clear" HorizontalAlignment="Right" Margin="0,5,5,0" VerticalAlignment="Top" Height="22" Width="75" Click="btn_Clear"/>
+        </DockPanel>
+        <!-- Inline terminal-style command prompt. Shares the MDI plumbing: Enter routes through
+             MDICommand (which echoes the command into ResponseLog above), Up/Down recall the
+             shared CommandLog history, and the input is locked out while a job is running - same
+             as the global MDI strip. The strip is kept for the other tabs. -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="5,3,5,2"
+                   IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
+            <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                       VerticalAlignment="Center" Margin="3,0,5,0" Foreground="#FF888888"/>
+            <TextBox x:Name="txtInput" FontFamily="Consolas" FontSize="11" Height="22"
+                     VerticalContentAlignment="Center" KeyDown="txtInput_KeyDown"
+                     ToolTip="Enter a command (MDI). Up/Down recalls history, Esc clears."/>
         </DockPanel>
         <TextBox IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                  local:TextBoxUtilities.AlwaysScrollToEnd="True" FontSize="10" FontFamily="Verdana"
