@@ -269,10 +269,16 @@ namespace CNC.Controls
         public bool StartSimulator { get; set; } = false;
         public string SimulatorExe { get; set; } = "grblHAL_sim.exe";
         public string SimulatorArgs { get; set; } = string.Empty;
+        // grblHAL_sim "-t" speedup: how fast simulated time runs vs real time. 1 = real time (machine speed),
+        // 2/4/... = that many times faster, 0 = as fast as the host can (motion finishes near-instantly).
+        // Edit in App.config; not exposed in Settings:App yet.
+        public double SimulatorSpeedup { get; set; } = 1.0;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
         public double WindowHeight { get; set; } = 660;
+        public double WindowLeft { get; set; } = double.NaN;   // NaN = never saved -> use the default placement
+        public double WindowTop { get; set; } = double.NaN;
         public int OutlineFeedRate { get; set; } = 500;
         public int MaxBufferSize { get { return _maxBufferSize < 300 ? 300 : _maxBufferSize; } set { _maxBufferSize = value; OnPropertyChanged(); } }
         public string Editor { get; set; } = "notepad.exe";
@@ -405,19 +411,42 @@ namespace CNC.Controls
                 Base = new Config();
 
             XmlSerializer xs = new XmlSerializer(typeof(Config));
+            string tmp = filename + ".tmp";
 
             try
             {
-                FileStream fsout = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
-                using (fsout)
+                // Write atomically: serialize to a sibling temp file, then swap it into place. Writing
+                // straight to the live file with FileMode.Create truncates it to zero the instant it
+                // opens, so an interrupted serialize, a killed process, or a OneDrive sync lock mid-write
+                // leaves a 0-byte config - which is exactly how the real config got destroyed. With this,
+                // the live file is only ever replaced by a fully-written one.
+                using (FileStream fsout = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                    xs.Serialize(fsout, Base);   // any failure throws here, before the swap - live file untouched
+
+                if (File.Exists(filename))
                 {
-                    xs.Serialize(fsout, Base);
-                    configfile = filename;
-                    ok = true;
+                    // Swap in the new file and keep the previous good copy as <name>.bak. That rolling
+                    // backup is what Load() recovers from if the live file is ever found empty or unreadable.
+                    string bak = filename + ".bak";
+                    try { File.Replace(tmp, filename, bak); }   // atomic: live -> .bak, tmp -> live
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        // Fallback where Replace is unsupported (some sync placeholders): preserve the
+                        // current file as the backup, then overwrite from the fully-written temp file.
+                        try { File.Copy(filename, bak, true); } catch { /* best effort */ }
+                        File.Copy(tmp, filename, true);
+                        File.Delete(tmp);
+                    }
                 }
+                else
+                    File.Move(tmp, filename);    // first save - nothing to replace
+
+                configfile = filename;
+                ok = true;
             }
             catch (Exception e)
             {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave the temp for inspection */ }
                 MessageBox.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
 
@@ -443,33 +472,72 @@ namespace CNC.Controls
 
         public bool Load(string filename)
         {
+            // Try the live config first. If it is missing, 0 bytes, or otherwise unreadable - an
+            // interrupted save or a sync truncation can leave it empty - fall back to the rolling backup
+            // Save() keeps. Recovering the last good copy avoids losing the user's settings AND the
+            // destructive "create new?" prompt that a false "invalid" used to trigger.
+            if (TryLoad(filename))
+                return true;
+
+            string bak = filename + ".bak";
+            if (TryLoad(bak))
+            {
+                configfile = filename;                                  // keep writing to the real path
+                try { File.Copy(bak, filename, true); } catch { /* leave .bak as the source of truth */ }
+                return true;
+            }
+
+            return false;
+        }
+
+        // Deserialize one config file into Base, tolerating a transient unreadable / 0-length state by
+        // retrying briefly. Returns false (Base untouched) if the file is absent or never becomes parseable.
+        private bool TryLoad(string filename)
+        {
+            if (!File.Exists(filename))
+                return false;
+
             bool ok = false;
             XmlSerializer xs = new XmlSerializer(typeof(Config));
 
-            try
+            // The file can be momentarily unreadable at startup - build output still flushing, sync/AV
+            // holding it open, a previous instance closing, or a save still in flight - so retry a few
+            // times before giving up rather than declaring a good config invalid on the first hiccup.
+            for (int attempt = 0; attempt < 6 && !ok; attempt++)
             {
-                StreamReader reader = new StreamReader(filename);
-                Base = (Config)xs.Deserialize(reader);
-                reader.Close();
-                configfile = filename;
-
-                // temp hack...
-                foreach (var macro in Base.Macros)
+                try
                 {
-                    if (macro.IsSession)
-                        Base.Macros.Remove(macro);
+                    // A 0-length file is not a config, it is a save that was interrupted or not yet
+                    // flushed. Don't hand it to the deserializer (it would just throw a vague error) -
+                    // treat it as a transient and let Load() fall back to the backup if it persists.
+                    if (new FileInfo(filename).Length == 0L)
+                        throw new IOException("config file is empty");
+
+                    using (StreamReader reader = new StreamReader(filename))
+                        Base = (Config)xs.Deserialize(reader);
+                    configfile = filename;
+
+                    // Drop any session-only macros that leaked into the saved file. Iterate a COPY:
+                    // removing from the live collection while enumerating it throws, which would have
+                    // made a valid config look invalid (the very false-negative this guards against).
+                    foreach (var macro in new List<CNC.GCode.Macro>(Base.Macros))
+                        if (macro.IsSession)
+                            Base.Macros.Remove(macro);
+
+                    // Migrate legacy macros (saved before the FKey element existed) to an explicit
+                    // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
+                    foreach (var macro in Base.Macros)
+                        if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
+                            macro.FKey = macro.Id;
+
+                    ok = true;
                 }
-
-                // Migrate legacy macros (saved before the FKey element existed) to an explicit
-                // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
-                foreach (var macro in Base.Macros)
-                    if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
-                        macro.FKey = macro.Id;
-
-                ok = true;
-            }
-            catch
-            {
+                catch
+                {
+                    // Back off and retry; a genuinely malformed file fails every attempt and returns false.
+                    if (attempt + 1 < 6)
+                        Thread.Sleep(150);
+                }
             }
 
             return ok;
@@ -580,6 +648,17 @@ namespace CNC.Controls
             {
                 if (MessageBox.Show(LibStrings.FindResource("CreateConfig"), appname, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
+                    // Never silently destroy an existing non-empty config: if Load failed but a file is
+                    // present (a transient lock that outlasted the retries, or genuine corruption), copy
+                    // it aside before overwriting so the user's settings are recoverable.
+                    try
+                    {
+                        string ini = CNC.Core.Resources.IniFile;
+                        if (File.Exists(ini) && new FileInfo(ini).Length > 0)
+                            File.Copy(ini, ini + ".bak", true);
+                    }
+                    catch { /* best effort - do not block startup on a backup failure */ }
+
                     if (!Save(CNC.Core.Resources.IniFile))
                     {
                         MessageBox.Show(LibStrings.FindResource("CreateConfigFail"), appname);
@@ -589,6 +668,9 @@ namespace CNC.Controls
                 else
                     return 1;
             }
+
+            if (Base == null)   // Load failed and no usable config was created - cannot continue safely
+                return 1;
 
             Base.Themes.Add("Standard", LibStrings.FindResource("ThemeDefault"));
             Base.Themes.Add("Black", LibStrings.FindResource("ThemeBlack"));
@@ -684,9 +766,10 @@ namespace CNC.Controls
             if (sep >= 0)
                 int.TryParse(Base.PortParams.Substring(sep + 1), out netport);
 
-            string args = "-p " + netport;
+            string args = "-p " + netport +
+                          " -t " + Base.SimulatorSpeedup.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (!string.IsNullOrWhiteSpace(Base.SimulatorArgs))
-                args += " " + Base.SimulatorArgs;
+                args += " " + Base.SimulatorArgs;   // appended last, so a manual -t here overrides the config value
 
             // StartSimulator returns once the process exists; the simulator binds its listening port
             // right at startup, so a short settle delay is enough before the stream is opened. (A

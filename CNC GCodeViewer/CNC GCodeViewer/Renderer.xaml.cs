@@ -253,6 +253,7 @@ namespace CNC.Controls.Viewer
         private double gridHeight = 200d;
         private double[] offsets = new double[6] { 0d, 0d, 0d, 0d, 0d, 0d };
         private bool _animateSubscribed = false, zoomSubscribed = false, renderExecuted = false, toolAutoScale = false;
+        private bool machineSceneActive = false;     // work-envelope + tool shown without a loaded program
         private bool? isLatheMode = null;
         private int cutCount;
 
@@ -323,25 +324,35 @@ namespace CNC.Controls.Viewer
 
         private void Renderer_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (Machine.ToolMode != ToolVisualizerType.None)
+            if ((bool)e.NewValue)
             {
-                if ((bool)e.NewValue)
-                {
-                    if (!_animateSubscribed)
-                        model.PropertyChanged += Model_PropertyChanged;
-                    _animateSubscribed = true;
-                }
-                else if (_animateSubscribed)
-                {
-                    _animateSubscribed = false;
-                    model.PropertyChanged += Model_PropertyChanged;
-                }
+                EnsureAnimateSubscribed();
+                ShowMachineScene(true);   // bring up the envelope + tool the moment the view is shown (no-op with a program)
+            }
+            else if (_animateSubscribed)
+            {
+                model.PropertyChanged -= Model_PropertyChanged;   // was '+=' here - a real leak/no-op on hide
+                _animateSubscribed = false;
+            }
+        }
+
+        // Wire up the model-change handler that drives the live tool cone (Position) and the executed-trail
+        // animation (BlockExecuting). Must be robust to ordering: IsVisibleChanged can fire before Configure()
+        // has set ToolMode (leaving the view visible but never subscribed - which made the validate replay and
+        // the tool cone do nothing), and a program can load after the view is already visible. So this is
+        // idempotent and called from IsVisibleChanged, Configure() and Render().
+        private void EnsureAnimateSubscribed()
+        {
+            if (!_animateSubscribed && IsVisible && model != null && Machine.ToolMode != ToolVisualizerType.None)
+            {
+                model.PropertyChanged += Model_PropertyChanged;
+                _animateSubscribed = true;
             }
         }
 
         private void Machine_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (!IsJobLoaded)
+            if (!IsJobLoaded && !machineSceneActive)   // also honour show-flag/tool changes in the program-free scene
                 return;
 
             switch (e.PropertyName) {
@@ -437,7 +448,14 @@ namespace CNC.Controls.Viewer
             switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.Position):
+                    if (!IsJobLoaded && !machineSceneActive)
+                        ShowMachineScene(true);   // first motion (e.g. homing seek) with no program - bring the scene up
                     AnimateTool();
+                    break;
+
+                case nameof(GrblViewModel.HomedState):
+                    if (!IsJobLoaded)
+                        ShowMachineScene(false);   // re-place grid origin / envelope on home, keep the camera
                     break;
 
                 case nameof(GrblViewModel.LatheMode):
@@ -547,6 +565,8 @@ namespace CNC.Controls.Viewer
             Machine.CanRestoreView = AppConfig.Settings.GCodeViewer.ViewMode >= 0;
             if(Machine.ToolMode != (ToolVisualizerType)AppConfig.Settings.GCodeViewer.ToolVisualizer)
                 Machine.ToolMode = (ToolVisualizerType)AppConfig.Settings.GCodeViewer.ToolVisualizer;
+
+            EnsureAnimateSubscribed();   // ToolMode is now known; subscribe if IsVisibleChanged fired too early
         }
 
         public void SaveView ()
@@ -656,6 +676,45 @@ namespace CNC.Controls.Viewer
             RefreshView(((GrblViewModel)DataContext).ProgramLimits);
         }
 
+        // Render the machine scene - work envelope, axes/grid and a live tool cone - WITHOUT a loaded
+        // program, so the 3D view is useful (and the head animates while homing/jogging) before any g-code
+        // is opened. The only program-derived input the scene needs is the bounding box; here we substitute
+        // the machine travel envelope (GrblInfo.MaxTravel) for the program's ProgramLimits. No-op while a
+        // program is loaded (Render owns the scene then) or before travel/tool are known.
+        public void ShowMachineScene(bool fitCamera)
+        {
+            if (IsJobLoaded || model == null || !IsVisible || tool == null || Machine.ToolMode == ToolVisualizerType.None)
+                return;
+            if (GrblInfo.MaxTravel.X <= 0d && GrblInfo.MaxTravel.Y <= 0d && GrblInfo.MaxTravel.Z <= 0d)
+                return;   // travel not known yet (settings not read) - nothing to frame
+
+            try
+            {
+                var bbox = new ProgramLimits();
+                bbox.MinX = -GrblInfo.MaxTravel.X; bbox.MaxX = 0d;
+                bbox.MinY = -GrblInfo.MaxTravel.Y; bbox.MaxY = 0d;
+                bbox.MinZ = -GrblInfo.MaxTravel.Z; bbox.MaxZ = 0d;
+
+                ClearViewport();
+                tokens = null;
+                isLatheMode = null;            // let showAdorners recompute orientation
+                machineSceneActive = true;     // so AnimateTool / Machine_PropertyChanged run program-free
+
+                showAdorners(bbox);            // axes, grid, work envelope (machine travel + model state)
+
+                // showAdorners re-asserts ToolMode (which adds the cone via Machine_PropertyChanged); make
+                // sure the cone is in the viewport regardless.
+                if (Machine.ToolMode == ToolVisualizerType.Cone && !viewport.Children.Contains(tool))
+                    viewport.Children.Add(tool);
+
+                if (fitCamera)
+                    RefreshView(bbox);         // frame the whole envelope (also calls AnimateTool)
+                else
+                    AnimateTool();
+            }
+            catch { /* best-effort scene; the view simply stays empty if something is not ready */ }
+        }
+
         private void AddWorkEnvelope()
         {
             Position workPositionOffset = new Position(model.WorkPositionOffset, model.UnitFactor);
@@ -674,7 +733,7 @@ namespace CNC.Controls.Viewer
 
             Machine.SetToolPosition(position.X, position.Y, position.Z);
 
-            if (IsJobLoaded) switch (Machine.ToolMode)
+            if (IsJobLoaded || machineSceneActive) switch (Machine.ToolMode)
             {
                 case ToolVisualizerType.Cone:
                     ShowConeTool();
@@ -827,9 +886,11 @@ namespace CNC.Controls.Viewer
             }
             else if (job != null && block > 0)
             {
-                while (job.Current.Token.LineNumber < block)
+                // Stop at end-of-program: if `block` is past the last token (an unreachable line number)
+                // MoveNext() returns false but Current stays put, so testing only LineNumber < block spins
+                // forever. Bounding the advance on MoveNext() makes an out-of-range block a no-op, not a hang.
+                while (job.Current.Token.LineNumber < block && job.MoveNext())
                 {
-                    job.MoveNext();
                     point0 = job.Current.Start;
 
                     switch (job.Current.Token.Command)
@@ -1093,6 +1154,10 @@ namespace CNC.Controls.Viewer
             ClearViewport();
 
             this.tokens = tokens;
+            if (IsJobLoaded)
+                machineSceneActive = false;   // a real program is taking over the scene
+            EnsureAnimateSubscribed();   // a program may have loaded after the view became visible; make sure
+                                         // the executed-trail handler is wired before we evaluate the flag below
             renderExecuted = RenderExecuted && !Machine.HighlightColor.Equals(Machine.CutMotionColor) && _animateSubscribed;
 
             cutCount = 0;

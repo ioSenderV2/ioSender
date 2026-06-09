@@ -286,9 +286,16 @@ namespace CNC.Core
             bool failed = false;
             byte[] buffer = (byte[])iar.AsyncState;
 
+            // Close() disposes and nulls ipstream while this read may still be in flight. Capture the
+            // field once into a local so an intentional close races to a clean stop instead of throwing
+            // a NullReferenceException when EndRead dereferences a field that just became null.
+            NetworkStream stream = ipstream;
+            if (closing || stream == null)
+                return;
+
             try
             {
-                bytesAvailable = ipstream.EndRead(iar);
+                bytesAvailable = stream.EndRead(iar);
             }
             catch
             {
@@ -326,8 +333,12 @@ namespace CNC.Core
 
             try
             {
-                if (ipstream != null && ipserver.Connected)
-                    ipstream.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
+                // Same close race as above: re-read both fields into locals and bail if a close slipped
+                // in, so we never dereference a nulled ipserver while re-arming the read.
+                NetworkStream s = ipstream;
+                TcpClient server = ipserver;
+                if (!closing && s != null && server != null && server.Connected)
+                    s.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
             }
             catch
             {

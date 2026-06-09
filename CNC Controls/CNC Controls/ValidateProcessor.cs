@@ -38,6 +38,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -45,6 +46,7 @@ namespace CNC.Controls
     public static class ValidateProcessor
     {
         private const int AckTimeout = 4000;    // ms to wait for a single line's ok/error
+        private const int VisualizeFeed = 6000;  // mm/min feed for the loaded "passed moves" visualization job
         private static bool _running = false;
 
         // Motion-test geometry, set by ComputeGeometry() before each run. The motion tests use moves
@@ -55,6 +57,7 @@ namespace CNC.Controls
         private static int _rotary = 10;        // rotary move size, degrees
         private static int _feed = 500;         // feed for G1/G2/G3
         private static string _anchor = null;   // "G53 G0 X.. Y.. Z.." to the envelope centre, or null
+        private static double[] _center = null; // per-axis envelope-centre machine coord (NaN if no travel)
 
         // Bedrock modal set-up applied after entering check mode and re-applied after every
         // recovery reset. Every line here must be universally supported (so it never itself
@@ -72,6 +75,7 @@ namespace CNC.Controls
 
             public string Response;     // "ok", "error:N" or null (timeout), filled in during the run
             public bool Passed { get { return Response == "ok"; } }
+            public GCodeBlock ViewerBlock;  // the matching block in GCode.File (for live 3D highlight), or null
         }
 
         /// <summary>
@@ -118,6 +122,12 @@ namespace CNC.Controls
             bool startedHomed = model.HomedState == HomedState.Homed;
             bool unhomedDuringRun = false, aborted = false, completed = false, enteredCheck = false;
 
+            // Small non-modal progress panel (bottom-right): live pass/fail tally and current test, with a
+            // "View Summary" button that enables when the run finishes. Streaming stays off-screen and fast.
+            int featureTotal = tests.Count(x => !x.Helper), passCount = 0, failCount = 0;
+            var progress = new ValidateProgress(featureTotal);
+            progress.Show();
+
             try
             {
                 if (!EnterCheckMode(model))
@@ -134,8 +144,18 @@ namespace CNC.Controls
                         int n = 0;
                         foreach (var test in tests)
                         {
-                            model.Message = string.Format("Validating controller... ({0}/{1})", ++n, tests.Count);
                             test.Response = SendAndAwaitAck(model, test.Code, AckTimeout);
+
+                            // Tally and report each feature test's verdict as it completes (helper set-up/
+                            // restore lines stream silently, leaving the last feature result visible).
+                            if (!test.Helper)
+                            {
+                                n++;
+                                if (test.Passed) passCount++; else failCount++;
+                                model.Message = string.Format("Test {0} of {1} - {2} - {3}",
+                                    n, featureTotal, test.Feature, test.Passed ? "PASS" : "FAIL");
+                                progress.Update(n, passCount, failCount);
+                            }
 
                             // A check-mode error latches the parser: recover before the next line, or every
                             // remaining line would falsely report an error. Recovery resets the parser, which
@@ -169,12 +189,86 @@ namespace CNC.Controls
 
             if (completed)
             {
-                LoadIntoViewer(tests);      // render the toolpath now - doing it before the stream makes
-                                            // every DoEvents pump during streaming heavy (live 3D scene)
-                ShowResults(model, tests, snapshot, aborted, startedHomed && unhomedDuringRun);
+                bool unhomed = startedHomed && unhomedDuringRun;
+
+                // Load the passed bounded moves into the program buffer (does NOT start them) so the user
+                // can Cycle Start and watch the toolpath run in 3D via the normal job path.
+                var job = BuildSafeJob(tests);
+                bool loaded = job.Count > ModalPrefix.Length && LoadProgram(job, "Validate - passed moves") > 0;
+
+                string status = (aborted ? "Completed (stopped early)" : "Completed")
+                              + (loaded ? " - passed moves loaded, press Cycle Start to view in 3D." : ".");
+
+                // Enable "View Summary" on the (non-modal) panel - the user opens the full report when ready.
+                progress.SetCompleted(status, () => ShowResults(model, tests, snapshot, aborted, unhomed));
             }
+            else
+                progress.Close();   // could not even start (check mode / prefix failed) - nothing to summarise
 
             return true;
+        }
+
+        // Small non-modal progress panel shown bottom-right during a validation run: live "Test n of M",
+        // a pass/fail tally, and a "View Summary" button that stays disabled until the run completes.
+        private class ValidateProgress
+        {
+            private readonly Window win;
+            private readonly TextBlock testLine, tally;
+            private readonly Button summary;
+            private readonly int total;
+
+            public ValidateProgress(int total)
+            {
+                this.total = total;
+
+                testLine = new TextBlock { Text = "Starting...", Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap };
+                tally = new TextBlock { Text = "Pass: 0    Fail: 0" };
+                summary = new Button { Content = "View Summary", IsEnabled = false, MinWidth = 110,
+                    HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+
+                var panel = new StackPanel { Margin = new Thickness(12) };
+                panel.Children.Add(testLine);
+                panel.Children.Add(tally);
+                panel.Children.Add(summary);
+
+                win = new Window {
+                    Title = "Validating controller",
+                    Content = panel,
+                    SizeToContent = SizeToContent.Height,
+                    Width = 230,
+                    ResizeMode = ResizeMode.NoResize,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    ShowInTaskbar = false,
+                    Topmost = true
+                };
+                if (Application.Current?.MainWindow != null && Application.Current.MainWindow.IsVisible)
+                    win.Owner = Application.Current.MainWindow;
+
+                // Park it in the bottom-right of the work area so it doesn't cover the 3D view / DRO.
+                win.Loaded += (s, e) => {
+                    var wa = SystemParameters.WorkArea;
+                    win.Left = wa.Right - win.ActualWidth - 16;
+                    win.Top = wa.Bottom - win.ActualHeight - 16;
+                };
+            }
+
+            public void Show() => win.Show();
+
+            public void Update(int testNum, int pass, int fail)
+            {
+                testLine.Text = string.Format("Test {0} of {1}", testNum, total);
+                tally.Text = string.Format("Pass: {0}    Fail: {1}", pass, fail);
+            }
+
+            // Run finished: show the final status and enable the summary button.
+            public void SetCompleted(string status, System.Action onViewSummary)
+            {
+                testLine.Text = status;
+                summary.IsEnabled = true;
+                summary.Click += (s, e) => { win.Close(); onViewSummary(); };   // dismiss the panel, then show the report
+            }
+
+            public void Close() => win.Close();
         }
 
         // Why the validation cannot run, or null if it can. (An un-homed machine is handled by Run
@@ -332,8 +426,14 @@ namespace CNC.Controls
                 }
             }).Start();
 
+            // Pump the UI for responses, but yield ~1 ms each spin. With the validate program loaded in
+            // the 3D viewer a tight DoEvents busy-loop re-renders the live scene continuously and slows
+            // the run to minutes; the short sleep lets the render/response work through cheaply.
             while (!done)
+            {
                 EventUtils.DoEvents();
+                Thread.Sleep(1);
+            }
 
             return ack;
         }
@@ -470,30 +570,130 @@ namespace CNC.Controls
             _scale = minTravel <= 0.0 ? 10.0 : System.Math.Max(2.0, System.Math.Min(100.0, minTravel * 0.25));
             _feed = (int)System.Math.Max(100.0, _scale * 12.0);
 
+            _center = new double[GrblInfo.NumAxes];
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+                _center[i] = double.NaN;
+
             var sb = new StringBuilder("G53 G0");
             bool any = false;
             for (int i = 0; i < System.Math.Min(3, GrblInfo.NumAxes); i++)
             {
                 double tr = AxisTravel(i);
-                if (tr > 0.0) { sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(-tr / 2.0)); any = true; }
+                if (tr > 0.0)
+                {
+                    _center[i] = -tr / 2.0;
+                    sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i]));
+                    any = true;
+                }
             }
             _anchor = any ? sb.ToString() : null;
         }
 
-        // Load the generated test into GCode.File so the 3D viewer renders its toolpath. AddBlock
-        // silently drops lines ioSender's parser rejects (crash-safe) - only the motion lines need to
-        // render. The streaming itself uses the Test list, not this buffer, so dropped lines still run.
-        private static void LoadIntoViewer(List<Test> tests)
+        // Assemble a SAFE, runnable program from the motion features that passed, for the user to Cycle
+        // Start and watch in 3D. Only the bounded "spoke" moves (Motion + Rotary categories) are included,
+        // each kept inside soft limits by the same G53 re-anchor to the work-area centre used during the
+        // test. Predefined-position tests (G28/G30), machine-coord moves and all non-motion ops (spindle,
+        // coolant, tool change, overrides) are excluded - running those as real motion could be unsafe.
+        private static List<string> BuildSafeJob(List<Test> tests)
+        {
+            var lines = new List<string>();
+            // ABSOLUTE (G90) variant of the prefix. The test streams relative (G91) moves re-anchored with
+            // G53 machine coords; the 3D emulator renders that offset from the live tool position, so the
+            // toolpath and the head don't line up. Re-emitting the same geometry as plain absolute moves in
+            // the work system makes the drawn path and the head agree. (Assumes the work offset is ~zero,
+            // which it is for a homed machine with G54 at machine origin - the validate norm.)
+            lines.Add("G21"); lines.Add("G94"); lines.Add("G17"); lines.Add("G54"); lines.Add("G49"); lines.Add("G90");
+            // Run the visualisation fast: drop the per-move F500 (see StripFeed) and set one high modal feed.
+            // grbl clamps it to each axis max rate, so it is safe on real hardware and traces quickly on the sim.
+            lines.Add("F" + VisualizeFeed);
+
+            string absAnchor = BuildAbsoluteAnchor();   // "G0 X<cx> Y<cy> Z<cz>" to the envelope centre
+
+            for (int i = 0; i < tests.Count; i++)
+            {
+                var t = tests[i];
+                if (!t.Passed || (t.Category != "Motion" && t.Category != "Rotary axes"))
+                    continue;
+                if (absAnchor != null && i > 0 && tests[i - 1].Helper && tests[i - 1].Code == _anchor)
+                    lines.Add(absAnchor);
+                lines.Add(ToAbsolute(StripFeed(t.Code)));   // relative-from-centre -> absolute
+            }
+
+            if (absAnchor != null && lines.Count > 7)        // 6 prefix + 1 feed
+                lines.Add(absAnchor);                        // park back at centre when the run ends
+
+            return lines;
+        }
+
+        // "G0 X<cx> Y<cy> Z<cz>" rapid to the envelope centre in absolute coords, or null if no travel.
+        private static string BuildAbsoluteAnchor()
+        {
+            if (_center == null)
+                return null;
+            var sb = new StringBuilder("G0");
+            bool any = false;
+            for (int i = 0; i < _center.Length; i++)
+                if (!double.IsNaN(_center[i])) { sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i])); any = true; }
+            return any ? sb.ToString() : null;
+        }
+
+        // Convert one relative (G91) test move into an absolute (G90) move: each axis word becomes
+        // centre + relative; arc-centre offsets (I/J/K), radius (R) and the motion word (Gn) pass through
+        // unchanged (they are frame-independent). Axes without a known centre (e.g. rotary, no travel) are
+        // emitted as-is, which is correct when the axis starts at zero.
+        private static readonly System.Text.RegularExpressions.Regex WordRx =
+            new System.Text.RegularExpressions.Regex(@"([A-Za-z])\s*([-+]?[0-9]*\.?[0-9]+)");
+
+        private static string ToAbsolute(string relCode)
+        {
+            var sb = new StringBuilder();
+            foreach (System.Text.RegularExpressions.Match m in WordRx.Matches(relCode))
+            {
+                char letter = char.ToUpperInvariant(m.Groups[1].Value[0]);
+                int axis = AxisLetterToIndex(letter);
+                if (sb.Length > 0) sb.Append(' ');
+                if (axis >= 0 && _center != null && axis < _center.Length && !double.IsNaN(_center[axis]))
+                {
+                    double rel = double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    sb.Append(letter).Append(Num(_center[axis] + rel));
+                }
+                else
+                    sb.Append(letter).Append(m.Groups[2].Value);   // Gn / I / J / K / R / centre-less axis
+            }
+            return sb.ToString();
+        }
+
+        private static int AxisLetterToIndex(char letter)
+        {
+            switch (letter)
+            {
+                case 'X': return 0; case 'Y': return 1; case 'Z': return 2;
+                case 'A': return 3; case 'B': return 4; case 'C': return 5;
+                case 'U': return 6; case 'V': return 7; case 'W': return 8;
+                default: return -1;
+            }
+        }
+
+        // Remove a trailing feed word ("... F500") so the move uses the job's fast modal feed instead.
+        private static string StripFeed(string code)
+        {
+            int f = code.IndexOf(" F");
+            return f >= 0 ? code.Substring(0, f) : code;
+        }
+
+        // Load a set of g-code lines into the program buffer (and the 3D view) as a runnable program -
+        // the same New/Add/End path g-code generators use. Returns the line count loaded.
+        private static int LoadProgram(List<string> lines, string name)
         {
             try
             {
-                GCode.File.AddLineNumbers = false;
-                GCode.File.AddBlock("Validate controller", CNC.Core.Action.New);
-                foreach (var test in tests)
-                    GCode.File.AddBlock(test.Code);
+                GCode.File.AddBlock(name, CNC.Core.Action.New);
+                foreach (var line in lines)
+                    GCode.File.AddBlock(line);
                 GCode.File.AddBlock("", CNC.Core.Action.End);
+                return lines.Count;
             }
-            catch { /* best-effort render; validation runs regardless */ }
+            catch { return 0; }
         }
 
         private static List<Test> BuildTests(GrblViewModel model, bool g92IsZero)
