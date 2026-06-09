@@ -393,18 +393,37 @@ namespace CNC.Controls
 
             XmlSerializer xs = new XmlSerializer(typeof(Config));
 
+            string tmp = filename + ".tmp";
+
             try
             {
-                FileStream fsout = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
-                using (fsout)
+                // Write atomically: serialize to a sibling temp file, then swap it into place. Writing
+                // straight to the live file with FileMode.Create truncates it to zero the instant it opens,
+                // so an interrupted serialize, a killed process, or a sync lock mid-write leaves a 0-byte
+                // config. With this, the live file is only ever replaced by a fully-written one.
+                using (FileStream fsout = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                    xs.Serialize(fsout, Base);   // any failure throws here, before the swap - live file untouched
+
+                if (File.Exists(filename))
                 {
-                    xs.Serialize(fsout, Base);
-                    configfile = filename;
-                    ok = true;
+                    string bak = filename + ".bak";
+                    try { File.Replace(tmp, filename, bak); }   // atomic: live -> .bak, tmp -> live
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        try { File.Copy(filename, bak, true); } catch { /* best effort */ }
+                        File.Copy(tmp, filename, true);
+                        File.Delete(tmp);
+                    }
                 }
+                else
+                    File.Move(tmp, filename);    // first save - nothing to replace
+
+                configfile = filename;
+                ok = true;
             }
             catch (Exception e)
             {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave the temp for inspection */ }
                 MessageBox.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
 
@@ -419,27 +438,58 @@ namespace CNC.Controls
 
         public bool Load(string filename)
         {
+            // Try the live config; if it is missing, 0 bytes, or otherwise unreadable - an interrupted save
+            // or a sync truncation can leave it empty - fall back to the rolling backup Save() keeps, so the
+            // user's settings are recovered instead of triggering the destructive "create new?" prompt.
+            if (TryLoad(filename))
+                return true;
+
+            string bak = filename + ".bak";
+            if (TryLoad(bak))
+            {
+                configfile = filename;                                  // keep writing to the real path
+                try { File.Copy(bak, filename, true); } catch { /* leave .bak as the source of truth */ }
+                return true;
+            }
+
+            return false;
+        }
+
+        // Deserialize one config file into Base, tolerating a transient unreadable / 0-length state by
+        // retrying briefly. Returns false (Base untouched) if the file is absent or never becomes parseable.
+        private bool TryLoad(string filename)
+        {
+            if (!File.Exists(filename))
+                return false;
+
             bool ok = false;
             XmlSerializer xs = new XmlSerializer(typeof(Config));
 
-            try
+            for (int attempt = 0; attempt < 6 && !ok; attempt++)
             {
-                StreamReader reader = new StreamReader(filename);
-                Base = (Config)xs.Deserialize(reader);
-                reader.Close();
-                configfile = filename;
-
-                // temp hack...
-                foreach (var macro in Base.Macros)
+                try
                 {
-                    if (macro.IsSession)
-                        Base.Macros.Remove(macro);
-                }
+                    // A 0-length file is not a config - it is a save that was interrupted or not yet flushed.
+                    if (new FileInfo(filename).Length == 0L)
+                        throw new IOException("config file is empty");
 
-                ok = true;
-            }
-            catch
-            {
+                    using (StreamReader reader = new StreamReader(filename))
+                        Base = (Config)xs.Deserialize(reader);
+                    configfile = filename;
+
+                    // Drop session-only macros. Iterate a COPY: removing from the live collection while
+                    // enumerating it throws, which would make a valid config look invalid.
+                    foreach (var macro in new List<CNC.GCode.Macro>(Base.Macros))
+                        if (macro.IsSession)
+                            Base.Macros.Remove(macro);
+
+                    ok = true;
+                }
+                catch
+                {
+                    if (attempt + 1 < 6)
+                        Thread.Sleep(150);   // back off and retry; a malformed file fails every attempt
+                }
             }
 
             return ok;
@@ -539,6 +589,16 @@ namespace CNC.Controls
             {
                 if (MessageBox.Show(LibStrings.FindResource("CreateConfig"), appname, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
+                    // Never silently destroy an existing non-empty config: if Load failed but a file is
+                    // present, copy it aside before overwriting so the user's settings are recoverable.
+                    try
+                    {
+                        string ini = CNC.Core.Resources.IniFile;
+                        if (File.Exists(ini) && new FileInfo(ini).Length > 0)
+                            File.Copy(ini, ini + ".bak", true);
+                    }
+                    catch { /* best effort - do not block startup on a backup failure */ }
+
                     if (!Save(CNC.Core.Resources.IniFile))
                     {
                         MessageBox.Show(LibStrings.FindResource("CreateConfigFail"), appname);
@@ -548,6 +608,9 @@ namespace CNC.Controls
                 else
                     return 1;
             }
+
+            if (Base == null)   // Load failed and no usable config was created - cannot continue safely
+                return 1;
 
             Base.Themes.Add("Standard", LibStrings.FindResource("ThemeDefault"));
             Base.Themes.Add("Black", LibStrings.FindResource("ThemeBlack"));
