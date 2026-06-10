@@ -3215,6 +3215,13 @@ namespace CNC.Core
                     if (!setting.HasErrors)
                         setting.SetLoadedBaseline();    // controller now holds this value
                 }
+
+                // Re-derive GrblInfo from the now-current settings (max travel, homing direction, step
+                // resolution, ...) so consumers that cache them - the 3D-view machine frame and the
+                // click-to-jog soft-limit clamp - reflect changes made here (e.g. by the Machine Setup
+                // Wizard) instead of the values read at connect.
+                if (Grbl.GrblViewModel != null)
+                    GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
             }
 
             return ok;
