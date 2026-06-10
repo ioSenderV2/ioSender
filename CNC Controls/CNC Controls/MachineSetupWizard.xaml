@@ -91,7 +91,26 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 2: Home corner -->
+            <!-- 2: Max rate -->
+            <Grid x:Name="stepMaxRate" Visibility="Collapsed">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                               Text="Maximum feed rate for each axis ($110-$112), in mm/min (deg/min for rotary axes). Pre-filled with reasonable defaults for typical CNC steppers - lower for the vertical Z - so adjust to your machine's real rapid capability."/>
+                    <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Style="{StaticResource AxisRow}">
+                                    <TextBlock Text="{Binding Letter}" Style="{StaticResource AxisLetter}"/>
+                                    <TextBox Width="90" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+                                    <TextBlock Text="mm/min" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
+
+            <!-- 3: Home corner -->
             <Grid x:Name="stepHome" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
@@ -119,7 +138,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 3: Limit sensors -->
+            <!-- 4: Limit sensors -->
             <Grid x:Name="stepLimits" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
                     <CheckBox Content="My machine has limit switches" Margin="0,0,0,8"
@@ -145,7 +164,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 4: Homing -->
+            <!-- 5: Homing -->
             <Grid x:Name="stepHoming" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
                     <CheckBox Content="Enable homing ($22)" Margin="0,0,0,8"
@@ -173,7 +192,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 5: Soft limits -->
+            <!-- 6: Soft limits -->
             <Grid x:Name="stepSoftLimits" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
                     <CheckBox Content="Enable soft limits ($20)"
@@ -183,7 +202,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 6: Review & apply -->
+            <!-- 7: Review & apply -->
             <Grid x:Name="stepReview" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

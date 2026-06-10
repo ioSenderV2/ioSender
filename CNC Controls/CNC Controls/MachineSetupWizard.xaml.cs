@@ -25,7 +25,7 @@ namespace CNC.Controls
     // One row per machine axis - holds the user's answers and the live limit-switch state.
     public class AxisSetup : ViewModelBase
     {
-        private double _maxTravel;
+        private double _maxTravel, _maxRate;
         private bool _homeAtMin, _limitNormallyClosed, _limitActive;
 
         public AxisSetup(string letter, int index)
@@ -39,6 +39,10 @@ namespace CNC.Controls
         public int Bit { get { return 1 << Index; } }
 
         public double MaxTravel { get { return _maxTravel; } set { _maxTravel = value; OnPropertyChanged(); } }
+        // Max feed rate ($110-$112), mm/min (deg/min for rotaries).
+        public double MaxRate { get { return _maxRate; } set { _maxRate = value; OnPropertyChanged(); } }
+        // Sensible starting rate for typical CNC steppers: slower vertical Z/W, faster horizontals, deg/min for rotaries.
+        public double DefaultMaxRate { get { return (Letter == "A" || Letter == "B" || Letter == "C") ? 3600d : ((Letter == "Z" || Letter == "W") ? 500d : 2000d); } }
         // Home switch at the minimum (negative) end of travel -> machine travels positive ($23 bit set).
         public bool HomeAtMin { get { return _homeAtMin; } set { _homeAtMin = value; OnPropertyChanged(); } }
         public bool LimitNormallyClosed { get { return _limitNormallyClosed; } set { _limitNormallyClosed = value; OnPropertyChanged(); } }
@@ -132,7 +136,7 @@ namespace CNC.Controls
                 BuildAxes();
                 LoadCurrentSettings();
                 if (steps == null)
-                    steps = new Grid[] { stepWelcome, stepTravel, stepHome, stepLimits, stepHoming, stepSoftLimits, stepReview };
+                    steps = new Grid[] { stepWelcome, stepTravel, stepMaxRate, stepHome, stepLimits, stepHoming, stepSoftLimits, stepReview };
                 GoToStep(0);
 
                 if (!_subscribed && model != null)
@@ -196,6 +200,8 @@ namespace CNC.Controls
             {
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
                 axis.MaxTravel = stored > 0d ? stored + 2d * Setup.HomingPulloff : 0d;
+                double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
+                axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
             }
@@ -268,6 +274,7 @@ namespace CNC.Controls
             string[] titles = {
                 "Welcome",
                 "Travel limits",
+                "Max rate",
                 "Home corner",
                 "Limit sensors",
                 "Homing",
@@ -355,6 +362,7 @@ namespace CNC.Controls
             {
                 double stored = Math.Max(0d, axis.MaxTravel - 2d * Setup.HomingPulloff);
                 targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
+                targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
             }
 
             targets[GrblSetting.HomingDirMask] =
