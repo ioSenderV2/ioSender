@@ -53,6 +53,7 @@ namespace CNC.Controls
     public class MachineSetupModel : ViewModelBase
     {
         private bool _hasLimitSwitches = true, _hardLimits = true, _homingEnable = true, _softLimits = true;
+        private bool _forceSetOrigin = true;
         private double _homingPulloff = 1d, _homingFeed = 25d, _homingSeek = 500d;
         private int _homingDebounce = 250;
 
@@ -61,6 +62,9 @@ namespace CNC.Controls
         public bool HasLimitSwitches { get { return _hasLimitSwitches; } set { _hasLimitSwitches = value; OnPropertyChanged(); } }
         public bool HardLimitsEnable { get { return _hardLimits; } set { _hardLimits = value; OnPropertyChanged(); } }
         public bool HomingEnable { get { return _homingEnable; } set { _homingEnable = value; OnPropertyChanged(); } }
+        // $22 bit 3 (grblHAL): set machine origin to 0 at home, letting axes travel positive per $23 - required
+        // for the home-corner choice to take effect and for the 3D view to orient to the real home corner.
+        public bool ForceSetOrigin { get { return _forceSetOrigin; } set { _forceSetOrigin = value; OnPropertyChanged(); } }
         public bool SoftLimitsEnable { get { return _softLimits; } set { _softLimits = value; OnPropertyChanged(); } }
 
         public double HomingPulloff { get { return _homingPulloff; } set { _homingPulloff = value; OnPropertyChanged(); } }
@@ -179,7 +183,12 @@ namespace CNC.Controls
         {
             // Load homing parameters first - the travel field shows physical travel, which is the stored
             // soft-limit travel plus the pull-off clearance reserved at each end (see BuildTargets).
-            Setup.HomingEnable = GrblSettings.GetInteger(GrblSetting.HomingEnable) == 1;
+            // $22 is a bit-field on grblHAL (bit0 enable, bit3 force-set-origin); test bits, don't compare to 1.
+            int homingFlags = GrblSettings.GetInteger(GrblSetting.HomingEnable);
+            if (homingFlags < 0) homingFlags = 0;
+            Setup.HomingEnable = (homingFlags & 0x01) != 0;
+            if (GrblInfo.IsGrblHAL)
+                Setup.ForceSetOrigin = (homingFlags & 0x08) != 0;
             Setup.SoftLimitsEnable = GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1;
             Setup.HardLimitsEnable = GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) == 1;
             Setup.HasLimitSwitches = Setup.HardLimitsEnable || GrblInfo.HomingEnabled;
@@ -377,7 +386,17 @@ namespace CNC.Controls
 
             if (GrblInfo.HomingEnabled)
             {
-                targets[GrblSetting.HomingEnable] = Setup.HomingEnable ? "1" : "0";
+                // $22 is a bit-field on grblHAL (bit0 enable, bit3 force-set-origin, plus single-axis/init-lock/
+                // ... bits) - read-modify-write only the two bits we own so the rest survive. Classic grbl: 0/1.
+                if (GrblInfo.IsGrblHAL)
+                {
+                    int flags = GrblSettings.GetInteger(GrblSetting.HomingEnable);
+                    if (flags < 0) flags = 0;
+                    flags = (flags & ~0x09) | (Setup.HomingEnable ? 0x01 : 0) | (Setup.ForceSetOrigin ? 0x08 : 0);
+                    targets[GrblSetting.HomingEnable] = flags.ToString();
+                }
+                else
+                    targets[GrblSetting.HomingEnable] = Setup.HomingEnable ? "1" : "0";
                 targets[GrblSetting.HomingPulloff] = Setup.HomingPulloff.ToInvariantString();
                 targets[GrblSetting.HomingFeedRate] = Setup.HomingFeed.ToInvariantString();
                 targets[GrblSetting.HomingSeekRate] = Setup.HomingSeek.ToInvariantString();

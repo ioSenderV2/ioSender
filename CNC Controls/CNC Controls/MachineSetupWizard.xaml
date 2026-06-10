@@ -167,8 +167,12 @@
             <!-- 5: Homing -->
             <Grid x:Name="stepHoming" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
-                    <CheckBox Content="Enable homing ($22)" Margin="0,0,0,8"
+                    <CheckBox Content="Enable homing ($22)" Margin="0,0,0,4"
                               IsChecked="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                    <CheckBox Content="Force set origin at home ($22 bit 3)" Margin="0,0,0,2"
+                              IsChecked="{Binding Setup.ForceSetOrigin, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8" MaxWidth="560" HorizontalAlignment="Left"
+                               Text="Sets machine zero at the home corner so each axis can travel positive per its homing direction (grblHAL). Required for your Home corner choice - and the 3D-view orientation - to match the real machine. Reconnect after applying so it is picked up."/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
