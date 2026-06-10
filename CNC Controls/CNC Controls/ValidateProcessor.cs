@@ -75,7 +75,6 @@ namespace CNC.Controls
 
             public string Response;     // "ok", "error:N" or null (timeout), filled in during the run
             public bool Passed { get { return Response == "ok"; } }
-            public GCodeBlock ViewerBlock;  // the matching block in GCode.File (for live 3D highlight), or null
         }
 
         /// <summary>
