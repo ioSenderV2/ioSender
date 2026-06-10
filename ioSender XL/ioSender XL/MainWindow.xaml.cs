@@ -685,6 +685,7 @@ namespace GCode_Sender
             {
                 // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
                 PreviewKeyDown += MainWindow_PreviewKeyDown;
+                PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
                 // Re-register live when the shortcut is changed in the Key Mappings editor.
                 AppConfig.ConsoleShortcutChanged += registerConsoleShortcut;
                 consoleShortcutHooked = true;
@@ -699,7 +700,25 @@ namespace GCode_Sender
             {
                 openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
                 e.Handled = true;
+                return;
             }
+
+            // Keep keyboard jogging alive on the Job page even when focus has drifted out of the Job view
+            // (a flyout, side panel or the menu). The Job view only sees keys through its own OnPreviewKeyDown,
+            // which requires focus inside its tree; this window-level preview always fires, so forward jog keys
+            // when the Job view is the current view but is not focused. Skip if focus is in any text input
+            // (typing) - the Job view's own handler covers the focused case, including its MDI/DRO gates.
+            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin
+                 && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
+                e.Handled = jobView.ProcessKeyPreview(e);
+        }
+
+        private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            // Mirror the key-down forwarding so a continuous jog started while the Job view was unfocused still
+            // receives its key-up and stops. No text-input guard here: an in-progress jog must always cancel.
+            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin)
+                e.Handled = jobView.ProcessKeyPreview(e);
         }
 
         private static ICNCView getView(TabItem tab)

@@ -538,7 +538,10 @@ namespace GCode_Sender
                 base.OnPreviewKeyDown(e);
         }
 
-        protected bool ProcessKeyPreview(KeyEventArgs e)
+        // Public so MainWindow can forward jog keys here when focus has drifted out of the Job view
+        // (e.g. into a flyout or side panel) - otherwise OnPreviewKeyDown never fires and jogging "dies"
+        // until the view is re-focused. The allowJog gate (focus in MDI/DRO/spindle/work-params) still applies.
+        public bool ProcessKeyPreview(KeyEventArgs e)
         {
             return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || DRO.IsFocused || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
