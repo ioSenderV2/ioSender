@@ -49,19 +49,19 @@
 <tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
 <tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
 <tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
-<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1324/−26</td></tr>
+<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1323/−26</td></tr>
 <tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1467/−52</td></tr>
 <tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
 <tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
-<tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +384/−19</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">15 files · +627/−58</td></tr>
-<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1177/−37</td></tr>
+<tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +388/−19</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">15 files · +634/−58</td></tr>
+<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
-<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">2 files · +162/−52</td></tr>
+<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">2 files · +166/−52</td></tr>
 <tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">6 files · +686/−1</td></tr>
 </table>
 </div>
@@ -301,7 +301,7 @@
 <tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">23</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml</td><td class="num add">166</td><td class="num del">22</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">357</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">356</td><td class="num del">4</td></tr>
 </table>
 <div class="desc">
 <p>Adds first-class game-controller support with <strong>zero new dependencies</strong> — the project uses no NuGet, so the controller is read via native <strong>XInput</strong> P/Invoke (<code>xinput1_4.dll</code>, falling back to <code>xinput9_1_0.dll</code>). A ~60&nbsp;Hz <code>DispatcherTimer</code> poll layer runs in parallel to the keyboard handler.</p>
@@ -496,7 +496,7 @@
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblFilesystems.cs</td><td class="num add">142</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">132</td><td class="num del">17</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">136</td><td class="num del">17</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">4</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 <tr><td class="mono">tests/GrblFilesystemsTests.cs</td><td class="num add">83</td><td class="num">0</td></tr>
@@ -525,7 +525,7 @@
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">134</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">141</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">107</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">134</td><td class="num del">28</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
@@ -564,7 +564,7 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">1092</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">1091</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">81</td><td class="num del">16</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">3</td><td class="num del">21</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
@@ -671,7 +671,7 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">160</td><td class="num del">52</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">164</td><td class="num del">52</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
