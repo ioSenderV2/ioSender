@@ -185,9 +185,6 @@
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,16,0">
                             <CheckBox Content="My machine has limit switches"
                                       IsChecked="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                            <CheckBox Content="Enable hard limits ($21)" Margin="0,6,0,0"
-                                      IsEnabled="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                      IsChecked="{Binding Setup.HardLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <CheckBox Content="Enable homing ($22)" Margin="0,6,0,0"
                                       IsChecked="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <CheckBox Content="Force set origin at home ($22 bit 3)" Margin="20,2,0,0"
@@ -196,7 +193,7 @@
                             <CheckBox Content="Enable soft limits ($20)" Margin="0,6,0,0"
                                       IsChecked="{Binding Setup.SoftLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,6,0,0"
-                                       Text="Force-set-origin places machine zero at the home corner so each axis travels positive - needed for the home-corner choice and the 3D view to match the real machine (reconnect after applying). Soft limits require homing and enable click-to-jog."/>
+                                       Text="Hard limits ($21) are enabled automatically when your machine has limit switches - change that later in Basic settings if needed. Force-set-origin places machine zero at the home corner so each axis travels positive - needed for the home-corner choice and the 3D view to match the real machine (reconnect after applying). Soft limits require homing and enable click-to-jog."/>
                         </StackPanel>
 
                         <!-- right: homing rates -->

@@ -193,8 +193,10 @@ namespace CNC.Controls
             if (GrblInfo.IsGrblHAL)
                 Setup.ForceSetOrigin = (homingFlags & 0x08) != 0;
             Setup.SoftLimitsEnable = GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1;
-            Setup.HardLimitsEnable = GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) == 1;
-            Setup.HasLimitSwitches = Setup.HardLimitsEnable || GrblInfo.HomingEnabled;
+            // Hard limits default ON for machines with switches (the wizard no longer asks - users tweak it in
+            // Basic settings). Detect "has switches" from the controller's current homing/hard-limit state.
+            Setup.HasLimitSwitches = GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) == 1 || GrblInfo.HomingEnabled;
+            Setup.HardLimitsEnable = true;
 
             double pulloff = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
             if (pulloff > 0d) Setup.HomingPulloff = pulloff;
