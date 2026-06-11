@@ -1036,7 +1036,25 @@ namespace CNC.Core
         public static int SerialBufferSize { get; private set; } = 128;
         public static int PlanBufferSize { get; private set; } = 16;
         public static bool ReportProbeResult { get; internal set; } = false;
-        public static bool ForceSetOrigin { get; private set; } = false;
+        private static bool _forceSetOrigin = false;
+        // True when machine zero is set AT the home corner (axes travel positive per $23). On grblHAL this is
+        // the LIVE $22 bit3 runtime setting - read on every access so a re-parse of $I (whose OPT 'Z' flag is
+        // absent on some builds, e.g. the simulator, even when bit3 is set) cannot stomp it back to false. The
+        // OPT-derived value is only a fallback before settings are read / on classic grbl.
+        public static bool ForceSetOrigin
+        {
+            get
+            {
+                if (IsGrblHAL && GrblSettings.IsLoaded)
+                {
+                    int v = GrblSettings.GetInteger(GrblSetting.HomingEnable);
+                    if (v >= 0)
+                        return (v & 0x08) != 0;
+                }
+                return _forceSetOrigin;
+            }
+            private set { _forceSetOrigin = value; }
+        }
         public static bool ExpressionsSupported { get; private set; } = false;
         public static int NumAxes
         {
@@ -1218,13 +1236,6 @@ namespace CNC.Core
             model.GrblState = model.GrblState; // Temporary hack to enable the Home button when homing is enabled
 
             HomingDirection = (AxisFlags)GrblSettings.GetInteger(GrblSetting.HomingDirMask);
-
-            // Runtime force-set-origin = $22 bit3 on grblHAL (machine zero AT home, axes travel positive per
-            // $23). Detect it from the SETTING, not the OPT 'Z' capability flag in $I: some builds (notably the
-            // simulator) honor $22 bit3 without advertising 'Z', and the 3D renderer / jog limiter need the real
-            // runtime state to orient the machine frame to the home corner.
-            if (IsGrblHAL)
-                ForceSetOrigin = (GrblSettings.GetInteger(GrblSetting.HomingEnable) & 0x08) != 0;
 
             if (AxisFlags == AxisFlags.None)
             {
