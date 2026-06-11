@@ -307,6 +307,12 @@ namespace CNC.Controls
             if (x != null) x.HomeAtMin = corner == "FL" || corner == "BL";   // left  = X min
             if (y != null) y.HomeAtMin = corner == "FL" || corner == "FR";   // front = Y min
 
+            // Picking a home corner only takes visible effect with force-set-origin on (grblHAL): it puts
+            // machine zero AT the chosen corner so the homing-direction ($23) choice and the 3D view match.
+            // With it off, grblHAL keeps zero at the max corner regardless of $23 and the choice does nothing.
+            if (GrblInfo.IsGrblHAL)
+                Setup.ForceSetOrigin = true;
+
             HighlightCorner(corner);
             UpdateHomeCornerText();
         }
