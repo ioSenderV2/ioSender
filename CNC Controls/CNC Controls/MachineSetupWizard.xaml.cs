@@ -192,9 +192,15 @@ namespace CNC.Controls
                 return false;
 
             _restoringSelection = true;
-            cbxManufacturer.SelectedItem = mfr;   // each assignment drives the next dropdown's ItemsSource
+            // Populate each child's ItemsSource explicitly (don't rely on the SelectionChanged cascade, whose
+            // ItemsSource/SelectedItem timing can drop the selection) then select, and apply the preset directly
+            // so all values seed even if a SelectionChanged didn't fire.
+            cbxManufacturer.SelectedItem = mfr;
+            cbxProduct.ItemsSource = mfr.Products;
             cbxProduct.SelectedItem = prod;
+            cbxModel.ItemsSource = prod.Models;
             cbxModel.SelectedItem = mdl;
+            ApplyPreset(mdl);
             _restoringSelection = false;
             return true;
         }
