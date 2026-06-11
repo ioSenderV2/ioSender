@@ -93,24 +93,24 @@
                     <!-- 2. Home position -->
                     <GroupBox Grid.Column="1" Header="2 · Home position" Padding="8" VerticalAlignment="Top">
                         <StackPanel Orientation="Vertical">
-                            <Canvas Width="330" Height="210" HorizontalAlignment="Left" Background="Transparent"
+                            <Canvas Width="330" Height="150" HorizontalAlignment="Left" Background="Transparent"
                                     ToolTip="Click the top corner where your machine homes (looking down from above the front; Z homes at the top).">
                                 <!-- box: front face -->
-                                <Polygon Points="70,140 230,140 230,190 70,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
+                                <Polygon Points="70,70 230,70 230,120 70,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
                                 <!-- box: right face -->
-                                <Polygon Points="230,140 270,90 270,140 230,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
+                                <Polygon Points="230,70 270,20 270,70 230,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
                                 <!-- box: top face -->
-                                <Polygon Points="70,140 230,140 270,90 110,90" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
+                                <Polygon Points="70,70 230,70 270,20 110,20" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
                                 <!-- axis hints -->
-                                <Line X1="70" Y1="205" X2="120" Y2="205" Stroke="#FF3060C0" StrokeThickness="2"/>
-                                <TextBlock Canvas.Left="124" Canvas.Top="197" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
-                                <Line X1="55" Y1="150" X2="80" Y2="115" Stroke="#FF2E8B57" StrokeThickness="2"/>
-                                <TextBlock Canvas.Left="40" Canvas.Top="98" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
+                                <Line X1="70" Y1="135" X2="120" Y2="135" Stroke="#FF3060C0" StrokeThickness="2"/>
+                                <TextBlock Canvas.Left="124" Canvas.Top="127" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
+                                <Line X1="55" Y1="80" X2="80" Y2="45" Stroke="#FF2E8B57" StrokeThickness="2"/>
+                                <TextBlock Canvas.Left="40" Canvas.Top="28" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
                                 <!-- corner markers (top face) -->
-                                <Ellipse x:Name="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="131" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
-                                <Ellipse x:Name="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="131" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
-                                <Ellipse x:Name="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="81" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
-                                <Ellipse x:Name="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="81" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
+                                <Ellipse x:Name="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="61" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
+                                <Ellipse x:Name="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="61" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
+                                <Ellipse x:Name="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="11" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
+                                <Ellipse x:Name="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="11" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
                             </Canvas>
                         </StackPanel>
                     </GroupBox>
