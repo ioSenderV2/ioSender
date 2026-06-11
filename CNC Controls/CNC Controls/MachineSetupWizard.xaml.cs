@@ -133,7 +133,9 @@ namespace CNC.Controls
                 LoadCurrentSettings();
 
                 // Machine choice is required input - restore the last machine the user picked (persisted across
-                // runs), else default to a generic 3-axis CNC. Leave an existing pick alone on re-entry.
+                // runs), else default to a generic 3-axis CNC. Restoring only re-selects the dropdowns; it does
+                // NOT re-seed catalog values - the fields keep the controller's actual settings (the machine's
+                // real NVRAM), which LoadCurrentSettings just read. Leave an existing pick alone on re-entry.
                 if (cbxManufacturer.SelectedItem == null)
                     RestoreOrDefaultMachine();
 
@@ -193,14 +195,15 @@ namespace CNC.Controls
 
             _restoringSelection = true;
             // Populate each child's ItemsSource explicitly (don't rely on the SelectionChanged cascade, whose
-            // ItemsSource/SelectedItem timing can drop the selection) then select, and apply the preset directly
-            // so all values seed even if a SelectionChanged didn't fire.
+            // ItemsSource/SelectedItem timing can drop the selection) then select. We do NOT seed catalog values
+            // here - restoring keeps the controller's actual settings (Model_Changed skips ApplyPreset while
+            // _restoringSelection is set); the catalog only seeds on a fresh user pick.
             cbxManufacturer.SelectedItem = mfr;
             cbxProduct.ItemsSource = mfr.Products;
             cbxProduct.SelectedItem = prod;
             cbxModel.ItemsSource = prod.Models;
             cbxModel.SelectedItem = mdl;
-            ApplyPreset(mdl);
+            PresetNote = mdl.Note ?? string.Empty;   // show the machine's note without overwriting field values
             _restoringSelection = false;
             return true;
         }
@@ -302,9 +305,13 @@ namespace CNC.Controls
 
         private void Model_Changed(object sender, SelectionChangedEventArgs e)
         {
+            // A real user pick seeds catalog starting values; a restore only re-selects the machine and keeps
+            // the controller's actual settings (its real NVRAM) loaded by LoadCurrentSettings.
+            if (_restoringSelection)
+                return;
             ApplyPreset(cbxModel.SelectedItem as MachineModel);
-            if (!_restoringSelection && cbxModel.SelectedItem != null)
-                SaveSelectedMachine();   // remember a real user pick for next run
+            if (cbxModel.SelectedItem != null)
+                SaveSelectedMachine();   // remember the pick for next run
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
