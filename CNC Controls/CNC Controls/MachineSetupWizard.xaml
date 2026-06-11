@@ -61,9 +61,10 @@
 
                 <!-- Top row: Machine (left) | Home position (right) -->
                 <Grid>
+                    <!-- Machine capped at 3/5 of the row, Home position gets the remaining 2/5. -->
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="360"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="3*"/>
+                        <ColumnDefinition Width="2*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- 1. Machine -->
@@ -92,9 +93,8 @@
                     <!-- 2. Home position -->
                     <GroupBox Grid.Column="1" Header="2 · Home position" Padding="8" VerticalAlignment="Top">
                         <StackPanel Orientation="Vertical">
-                            <TextBlock TextWrapping="Wrap" Foreground="Gray" MaxWidth="330" Margin="0,0,0,4"
-                                       Text="Click the top corner where your machine homes (looking down from above the front; Z homes at the top)."/>
-                            <Canvas Width="330" Height="210" HorizontalAlignment="Left">
+                            <Canvas Width="330" Height="210" HorizontalAlignment="Left" Background="Transparent"
+                                    ToolTip="Click the top corner where your machine homes (looking down from above the front; Z homes at the top).">
                                 <!-- box: front face -->
                                 <Polygon Points="70,140 230,140 230,190 70,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
                                 <!-- box: right face -->
@@ -112,8 +112,6 @@
                                 <Ellipse x:Name="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="81" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
                                 <Ellipse x:Name="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="81" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
                             </Canvas>
-                            <TextBlock Text="{Binding HomeCornerText, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                       FontWeight="Bold" Foreground="#FF1F3A5F" Margin="0,2,0,0" TextWrapping="Wrap" MaxWidth="330"/>
                         </StackPanel>
                     </GroupBox>
                 </Grid>
