@@ -255,6 +255,7 @@ namespace CNC.Controls.Viewer
         private double[] offsets = new double[6] { 0d, 0d, 0d, 0d, 0d, 0d };
         private bool _animateSubscribed = false, zoomSubscribed = false, renderExecuted = false, toolAutoScale = false;
         private bool machineSceneActive = false;     // work-envelope + tool shown without a loaded program
+        private string _sceneSignature = null;        // grbl geometry the machine scene was last drawn for
         private bool? isLatheMode = null;
         private int cutCount;
 
@@ -451,8 +452,13 @@ namespace CNC.Controls.Viewer
             switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.Position):
-                    if (!IsJobLoaded && !machineSceneActive)
-                        ShowMachineScene(true);   // first motion (e.g. homing seek) with no program - bring the scene up
+                    if (!IsJobLoaded)
+                    {
+                        if (!machineSceneActive)
+                            ShowMachineScene(true);   // first motion (e.g. homing seek) with no program - bring the scene up
+                        else if (_sceneSignature != MachineSceneSignature())
+                            ShowMachineScene(false);  // grbl geometry changed (e.g. after a settings apply) - re-orient
+                    }
                     AnimateTool();
                     break;
 
@@ -833,8 +839,19 @@ namespace CNC.Controls.Viewer
                     RefreshView(bbox);         // frame the whole envelope (also calls AnimateTool)
                 else
                     AnimateTool();
+
+                _sceneSignature = MachineSceneSignature();   // remember the geometry this scene was drawn for
             }
             catch { /* best-effort scene; the view simply stays empty if something is not ready */ }
+        }
+
+        // The grbl geometry that determines how the machine scene is oriented/sized (envelope, grid, tool).
+        // When this changes - e.g. the user applies $22 (force-set-origin), $23 (home dir) or $130-132 (travel)
+        // in the wizard - the scene must be re-drawn even though machineSceneActive is already set.
+        private string MachineSceneSignature()
+        {
+            return string.Format("{0}|{1}|{2}|{3}|{4}", GrblInfo.ForceSetOrigin, (int)GrblInfo.HomingDirection,
+                                  GrblInfo.MaxTravel.X, GrblInfo.MaxTravel.Y, GrblInfo.MaxTravel.Z);
         }
 
         // +1: this axis travels in the +world direction away from the machine origin (home), -1: -world direction.
