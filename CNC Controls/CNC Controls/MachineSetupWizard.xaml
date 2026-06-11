@@ -38,14 +38,6 @@
             <Setter Property="Foreground" Value="#FF1F3A5F"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
-        <!-- In-cell editor: borderless box so the axis table reads like a form, single-click to type. -->
-        <Style x:Key="CellBox" TargetType="TextBox">
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="HorizontalContentAlignment" Value="Right"/>
-            <Setter Property="Padding" Value="4,0"/>
-        </Style>
     </UserControl.Resources>
 
     <Grid Margin="10" d:DataContext="{d:DesignInstance Type=local:MachineSetupWizard}">
@@ -81,7 +73,7 @@
                             <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                        Margin="0,0,0,8" TextWrapping="Wrap"/>
 
-                            <TextBlock Text="Start from a machine (optional)" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Start from your machine" Style="{StaticResource SectionHeader}"/>
                             <WrapPanel Orientation="Horizontal">
                                 <ComboBox x:Name="cbxManufacturer" Width="170" Margin="0,0,6,4" MinHeight="22"
                                           ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
@@ -91,20 +83,8 @@
                             </WrapPanel>
                             <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                        TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>
-
-                            <TextBlock Text="Work area (custom)" Style="{StaticResource SectionHeader}" Margin="0,10,0,4"/>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="X" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox Width="70" VerticalContentAlignment="Center"
-                                         Text="{Binding AxisX.MaxTravel, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                                <TextBlock Text="×" VerticalAlignment="Center" Margin="8,0"/>
-                                <TextBlock Text="Y" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBox Width="70" VerticalContentAlignment="Center"
-                                         Text="{Binding AxisY.MaxTravel, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                                <TextBlock Text="mm" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                            </StackPanel>
-                            <TextBlock Foreground="Gray" TextWrapping="Wrap" Margin="0,3,0,0"
-                                       Text="Quick entry for the X/Y travel - the same values appear (with Z) in the axis table below."/>
+                            <TextBlock Foreground="Gray" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."/>
                         </StackPanel>
                     </GroupBox>
 
@@ -142,63 +122,55 @@
                     <StackPanel Orientation="Vertical">
                         <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,6"
                                    Text="Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches. The Live dot lights when grbl sees that limit input."/>
-                        <DataGrid x:Name="dgAxes" AutoGenerateColumns="False" HeadersVisibility="Column"
-                                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
-                                  CanUserReorderColumns="False" GridLinesVisibility="Horizontal"
-                                  SelectionMode="Single" SelectionUnit="Cell" Background="Transparent"
-                                  ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                            <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="Axis" Width="50">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Letter}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Travel limit (mm)" Width="120">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding MaxTravel, UpdateSourceTrigger=PropertyChanged}"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Rate limit (mm/min)" Width="130">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Steps/mm" Width="100">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Invert dir ($3)" Width="100">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding InvertDirection}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="NC limit ($5)" Width="100">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding LimitNormallyClosed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Live" Width="50">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Border Style="{StaticResource LimitDot}"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <!-- Plain row grid (not a DataGrid) so every numeric cell is a live, single-click textbox. -->
+                        <StackPanel Orientation="Vertical">
+                            <Grid Margin="0,0,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="50"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Axis" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Travel (mm)" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="Rate (mm/min)" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="Steps/mm" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="Invert dir ($3)" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="5" Text="NC limit ($5)" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="6" Text="Live" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Grid>
+                            <Separator Margin="0,0,0,2"/>
+                            <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="50"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="130"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="50"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Letter}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBox Grid.Column="1" Margin="2,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"
+                                                     Text="{Binding MaxTravel, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBox Grid.Column="2" Margin="2,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"
+                                                     Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBox Grid.Column="3" Margin="2,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"
+                                                     Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <CheckBox Grid.Column="4" IsChecked="{Binding InvertDirection}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <CheckBox Grid.Column="5" IsChecked="{Binding LimitNormallyClosed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="6" Style="{StaticResource LimitDot}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
 

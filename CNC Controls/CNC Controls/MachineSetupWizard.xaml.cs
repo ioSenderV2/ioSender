@@ -110,14 +110,6 @@ namespace CNC.Controls
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
         public List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
 
-        // X / Y axis objects surfaced for the Machine section's quick "work area" boxes; they bind to the same
-        // AxisSetup instances shown in the table, so the two stay in lock-step. Refreshed after BuildAxes.
-        public static readonly DependencyProperty AxisXProperty = DependencyProperty.Register(nameof(AxisX), typeof(AxisSetup), typeof(MachineSetupWizard), new PropertyMetadata(null));
-        public AxisSetup AxisX { get { return (AxisSetup)GetValue(AxisXProperty); } set { SetValue(AxisXProperty, value); } }
-
-        public static readonly DependencyProperty AxisYProperty = DependencyProperty.Register(nameof(AxisY), typeof(AxisSetup), typeof(MachineSetupWizard), new PropertyMetadata(null));
-        public AxisSetup AxisY { get { return (AxisSetup)GetValue(AxisYProperty); } set { SetValue(AxisYProperty, value); } }
-
         public static readonly DependencyProperty PresetNoteProperty = DependencyProperty.Register(nameof(PresetNote), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string PresetNote { get { return (string)GetValue(PresetNoteProperty); } set { SetValue(PresetNoteProperty, value); } }
 
@@ -167,9 +159,6 @@ namespace CNC.Controls
             Setup.Axes.Clear();
             foreach (var axis in model.Axes)
                 Setup.Axes.Add(new AxisSetup(axis.Letter, axis.Index));
-
-            AxisX = GetAxis("X");
-            AxisY = GetAxis("Y");
 
             var caps = new List<string>();
             caps.Add(GrblInfo.IsGrblHAL ? "grblHAL" : "Grbl");
