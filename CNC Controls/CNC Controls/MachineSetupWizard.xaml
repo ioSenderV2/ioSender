@@ -181,19 +181,25 @@
                             <ColumnDefinition Width="Auto" MinWidth="220"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- left: enable toggles -->
+                        <!-- left: enable toggles (each input carries its own explanation as a tooltip) -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,16,0">
                             <CheckBox Content="My machine has limit switches"
+                                      ToolTipService.ShowDuration="20000"
+                                      ToolTip="Tick if your axes have limit/home switches wired. With switches, hard limits ($21) are enabled automatically (change that later in Basic settings) and homing becomes available."
                                       IsChecked="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <CheckBox Content="Enable homing ($22)" Margin="0,6,0,0"
+                                      ToolTipService.ShowDuration="20000"
+                                      ToolTip="Run a homing cycle on connect to find machine zero using the limit switches. Required for soft limits, force-set-origin and click-to-jog."
                                       IsChecked="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <CheckBox Content="Force set origin at home ($22 bit 3)" Margin="20,2,0,0"
+                                      ToolTipService.ShowDuration="20000"
+                                      ToolTip="After homing, set machine zero at the home corner so each axis travels positive per its homing direction. Needed for the home-corner choice and the 3D view to match the real machine - reconnect after applying."
                                       IsEnabled="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                       IsChecked="{Binding Setup.ForceSetOrigin, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                             <CheckBox Content="Enable soft limits ($20)" Margin="0,6,0,0"
+                                      ToolTipService.ShowDuration="20000"
+                                      ToolTip="Stop any move that would exceed the travel you entered, with a clean controlled stop. Requires homing; also enables click-to-jog in the 3D view."
                                       IsChecked="{Binding Setup.SoftLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                            <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,6,0,0"
-                                       Text="Hard limits ($21) are enabled automatically when your machine has limit switches - change that later in Basic settings if needed. Force-set-origin places machine zero at the home corner so each axis travels positive - needed for the home-corner choice and the 3D view to match the real machine (reconnect after applying). Soft limits require homing and enable click-to-jog."/>
                         </StackPanel>
 
                         <!-- right: homing rates -->
@@ -208,14 +214,30 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Pull-off / back-off ($27):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                            <TextBox  Grid.Row="0" Grid.Column="1" Width="80" Text="{Binding Setup.HomingPulloff, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Locate feed rate ($24):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                            <TextBox  Grid.Row="1" Grid.Column="1" Width="80" Text="{Binding Setup.HomingFeed, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Seek rate ($25):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                            <TextBox  Grid.Row="2" Grid.Column="1" Width="80" Text="{Binding Setup.HomingSeek, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Debounce ms ($26):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                            <TextBox  Grid.Row="3" Grid.Column="1" Width="80" Text="{Binding Setup.HomingDebounce, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Pull-off / back-off ($27):" VerticalAlignment="Center" Margin="0,3,10,3"
+                                       ToolTipService.ShowDuration="20000"
+                                       ToolTip="Distance each axis backs off the switch after it trips, in mm. Also the clearance reserved at both ends of travel."/>
+                            <TextBox  Grid.Row="0" Grid.Column="1" Width="80" ToolTipService.ShowDuration="20000"
+                                      ToolTip="Distance each axis backs off the switch after it trips, in mm. Also the clearance reserved at both ends of travel."
+                                      Text="{Binding Setup.HomingPulloff, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Locate feed rate ($24):" VerticalAlignment="Center" Margin="0,3,10,3"
+                                       ToolTipService.ShowDuration="20000"
+                                       ToolTip="Slow feed for the second, precise approach to the switch (mm/min). Lower gives more repeatable homing."/>
+                            <TextBox  Grid.Row="1" Grid.Column="1" Width="80" ToolTipService.ShowDuration="20000"
+                                      ToolTip="Slow feed for the second, precise approach to the switch (mm/min). Lower gives more repeatable homing."
+                                      Text="{Binding Setup.HomingFeed, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Seek rate ($25):" VerticalAlignment="Center" Margin="0,3,10,3"
+                                       ToolTipService.ShowDuration="20000"
+                                       ToolTip="Fast feed for the first approach that finds the switch (mm/min)."/>
+                            <TextBox  Grid.Row="2" Grid.Column="1" Width="80" ToolTipService.ShowDuration="20000"
+                                      ToolTip="Fast feed for the first approach that finds the switch (mm/min)."
+                                      Text="{Binding Setup.HomingSeek, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Debounce ms ($26):" VerticalAlignment="Center" Margin="0,3,10,3"
+                                       ToolTipService.ShowDuration="20000"
+                                       ToolTip="Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."/>
+                            <TextBox  Grid.Row="3" Grid.Column="1" Width="80" ToolTipService.ShowDuration="20000"
+                                      ToolTip="Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."
+                                      Text="{Binding Setup.HomingDebounce, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                         </Grid>
                     </Grid>
                 </GroupBox>
