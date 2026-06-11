@@ -125,11 +125,16 @@ namespace CNC.Controls
                     {
                         // Mega V homes BACK-LEFT: Y switch is positive (back) but X is the exception and homes
                         // negative (left). Carve King / Power Route follow the common front-left convention.
-                        P("Mega V",
-                            M("Mega V 2 (19×19)",      A(483,483,152), homingDir: BL, fso: true, note: "Leadscrew; grbl or Masso option. Homes back-left. " + VERIFY),
-                            M("Mega V 2 XL (35×35)",   A(889,889,152), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY),
-                            M("Mega V 2 Full Sheet",   A(1219,2438,152), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY),
-                            M("Mega V Pro (25×25)",    A(635,635,140), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY)),
+                        P("Mega V (original)",
+                            M("Mega V 19×19",            A(483,483,152), homingDir: BL, fso: true, note: "Kickstarter edition, leadscrew. Homes back-left. " + VERIFY),
+                            M("Mega V XL 35×35",         A(889,889,152), homingDir: BL, fso: true, note: "Kickstarter edition. Homes back-left. " + VERIFY),
+                            M("Mega V Full Sheet (4×8)", A(1219,2438,152), homingDir: BL, fso: true, note: "Kickstarter edition. Homes back-left. " + VERIFY)),
+                        P("Mega V2",
+                            M("Mega V2 19×19",           A(483,483,152), homingDir: BL, fso: true, note: "Updated version; grbl or Masso option. Homes back-left. " + VERIFY),
+                            M("Mega V2 XL 35×35",        A(889,889,152), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY),
+                            M("Mega V2 Full Sheet (4×8)", A(1219,2438,152), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY)),
+                        P("Mega V Pro",
+                            M("Mega V Pro (25×25)",      A(635,635,140), homingDir: BL, fso: true, note: "Homes back-left. " + VERIFY)),
                         P("Carve King",
                             M("Carve King 2 (17×17)",  A(432,432,102), homingDir: FL, fso: true, note: "Uno + grbl, leadscrew. " + VERIFY),
                             M("Carve King (original)", A(255,255,80), homingDir: FL, fso: true, note: "Discontinued. " + VERIFY)),
