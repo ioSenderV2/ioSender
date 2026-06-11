@@ -818,10 +818,15 @@ namespace CNC.Controls.Viewer
 
             try
             {
+                // Frame the travel envelope oriented to the real home corner (same EnvelopeMin/AxisDir the work
+                // envelope uses) - NOT a fixed all-negative box. With force-set-origin the envelope sits on the
+                // positive side ([0..travel]); a hardcoded [-travel..0] camera box framed the wrong region and
+                // made the home corner look mirrored (e.g. back-left rendered as back-right).
+                Position wco = new Position(model.WorkPositionOffset, model.UnitFactor);
                 var bbox = new ProgramLimits();
-                bbox.MinX = -GrblInfo.MaxTravel.X; bbox.MaxX = 0d;
-                bbox.MinY = -GrblInfo.MaxTravel.Y; bbox.MaxY = 0d;
-                bbox.MinZ = -GrblInfo.MaxTravel.Z; bbox.MaxZ = 0d;
+                bbox.MinX = EnvelopeMin(0, wco.X); bbox.MaxX = bbox.MinX + GrblInfo.MaxTravel.X;
+                bbox.MinY = EnvelopeMin(1, wco.Y); bbox.MaxY = bbox.MinY + GrblInfo.MaxTravel.Y;
+                bbox.MinZ = EnvelopeMin(2, wco.Z); bbox.MaxZ = bbox.MinZ + GrblInfo.MaxTravel.Z;
 
                 ClearViewport();
                 tokens = null;
