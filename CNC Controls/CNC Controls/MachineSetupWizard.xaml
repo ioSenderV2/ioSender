@@ -5,30 +5,23 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
-             d:DesignHeight="520" d:DesignWidth="980">
+             d:DesignHeight="640" d:DesignWidth="980">
     <UserControl.Resources>
         <!-- Live limit-switch indicator: grey when idle, green when the input is asserted. -->
         <Style x:Key="LimitDot" TargetType="Border">
-            <Setter Property="Width" Value="16"/>
-            <Setter Property="Height" Value="16"/>
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="CornerRadius" Value="7"/>
             <Setter Property="Background" Value="#FFCCCCCC"/>
             <Setter Property="BorderBrush" Value="Gray"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding LimitActive}" Value="True">
                     <Setter Property="Background" Value="LimeGreen"/>
                 </DataTrigger>
             </Style.Triggers>
-        </Style>
-        <Style x:Key="AxisRow" TargetType="StackPanel">
-            <Setter Property="Orientation" Value="Horizontal"/>
-            <Setter Property="Margin" Value="0,3"/>
-        </Style>
-        <Style x:Key="AxisLetter" TargetType="TextBlock">
-            <Setter Property="Width" Value="28"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <!-- Clickable home-corner marker on the box. -->
         <Style x:Key="CornerDot" TargetType="Ellipse">
@@ -38,6 +31,20 @@
             <Setter Property="Stroke" Value="#FF444444"/>
             <Setter Property="StrokeThickness" Value="2"/>
             <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#FF1F3A5F"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <!-- In-cell editor: borderless box so the axis table reads like a form, single-click to type. -->
+        <Style x:Key="CellBox" TargetType="TextBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="4,0"/>
         </Style>
     </UserControl.Resources>
 
@@ -50,207 +57,223 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,8">
-            <TextBlock Text="{Binding StepNumber, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}" Foreground="Gray" FontSize="11"/>
-            <TextBlock Text="{Binding StepTitle, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="Machine setup" FontSize="18" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray"
+                       Text="Describe your machine on one page. Nothing is sent to the controller until you press Apply."/>
             <Separator Margin="0,4"/>
         </StackPanel>
 
-        <!-- Step content -->
-        <Grid Grid.Row="1">
+        <!-- Scrollable body -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical">
 
-            <!-- 0: Welcome -->
-            <Grid x:Name="stepWelcome">
-                <StackPanel Orientation="Vertical">
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,10"
-                               Text="This wizard sets the grbl settings that describe your machine - travel limits, home corner, limit sensors, homing and soft limits. Nothing is written until the final Review &amp; apply step."/>
-                    <TextBlock Text="Detected firmware:" FontWeight="Bold" Margin="0,6,0,0"/>
-                    <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}" Margin="0,2" TextWrapping="Wrap"/>
+                <!-- Top row: Machine (left) | Home position (right) -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="360"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Start from a machine preset (optional):" FontWeight="Bold" Margin="0,14,0,2"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                        <ComboBox x:Name="cbxManufacturer" Width="180" Margin="0,0,6,0" MinHeight="22"
-                                  ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                  SelectionChanged="Manufacturer_Changed"/>
-                        <ComboBox x:Name="cbxProduct" Width="200" Margin="0,0,6,0" MinHeight="22" SelectionChanged="Product_Changed"/>
-                        <ComboBox x:Name="cbxModel" Width="260" MinHeight="22" SelectionChanged="Model_Changed"/>
+                    <!-- 1. Machine -->
+                    <GroupBox Grid.Column="0" Header="1 · Machine" Padding="8" Margin="0,0,8,0" VerticalAlignment="Top">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Detected firmware" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                       Margin="0,0,0,8" TextWrapping="Wrap"/>
+
+                            <TextBlock Text="Start from a machine (optional)" Style="{StaticResource SectionHeader}"/>
+                            <WrapPanel Orientation="Horizontal">
+                                <ComboBox x:Name="cbxManufacturer" Width="170" Margin="0,0,6,4" MinHeight="22"
+                                          ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                          SelectionChanged="Manufacturer_Changed"/>
+                                <ComboBox x:Name="cbxProduct" Width="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
+                                <ComboBox x:Name="cbxModel" Width="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                       TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>
+
+                            <TextBlock Text="Work area (custom)" Style="{StaticResource SectionHeader}" Margin="0,10,0,4"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="X" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox Width="70" VerticalContentAlignment="Center"
+                                         Text="{Binding AxisX.MaxTravel, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                                <TextBlock Text="×" VerticalAlignment="Center" Margin="8,0"/>
+                                <TextBlock Text="Y" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox Width="70" VerticalContentAlignment="Center"
+                                         Text="{Binding AxisY.MaxTravel, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                                <TextBlock Text="mm" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
+                            <TextBlock Foreground="Gray" TextWrapping="Wrap" Margin="0,3,0,0"
+                                       Text="Quick entry for the X/Y travel - the same values appear (with Z) in the axis table below."/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- 2. Home position -->
+                    <GroupBox Grid.Column="1" Header="2 · Home position" Padding="8" VerticalAlignment="Top">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock TextWrapping="Wrap" Foreground="Gray" MaxWidth="330" Margin="0,0,0,4"
+                                       Text="Click the top corner where your machine homes (looking down from above the front; Z homes at the top)."/>
+                            <Canvas Width="330" Height="210" HorizontalAlignment="Left">
+                                <!-- box: front face -->
+                                <Polygon Points="70,140 230,140 230,190 70,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
+                                <!-- box: right face -->
+                                <Polygon Points="230,140 270,90 270,140 230,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
+                                <!-- box: top face -->
+                                <Polygon Points="70,140 230,140 270,90 110,90" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
+                                <!-- axis hints -->
+                                <Line X1="70" Y1="205" X2="120" Y2="205" Stroke="#FF3060C0" StrokeThickness="2"/>
+                                <TextBlock Canvas.Left="124" Canvas.Top="197" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
+                                <Line X1="55" Y1="150" X2="80" Y2="115" Stroke="#FF2E8B57" StrokeThickness="2"/>
+                                <TextBlock Canvas.Left="40" Canvas.Top="98" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
+                                <!-- corner markers (top face) -->
+                                <Ellipse x:Name="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="131" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
+                                <Ellipse x:Name="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="131" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
+                                <Ellipse x:Name="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="81" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
+                                <Ellipse x:Name="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="81" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
+                            </Canvas>
+                            <TextBlock Text="{Binding HomeCornerText, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                       FontWeight="Bold" Foreground="#FF1F3A5F" Margin="0,2,0,0" TextWrapping="Wrap" MaxWidth="330"/>
+                        </StackPanel>
+                    </GroupBox>
+                </Grid>
+
+                <!-- 3. Axis information -->
+                <GroupBox Header="3 · Axis information" Padding="8" Margin="0,8,0,0">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,6"
+                                   Text="Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches. The Live dot lights when grbl sees that limit input."/>
+                        <DataGrid x:Name="dgAxes" AutoGenerateColumns="False" HeadersVisibility="Column"
+                                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                                  CanUserReorderColumns="False" GridLinesVisibility="Horizontal"
+                                  SelectionMode="Single" SelectionUnit="Cell" Background="Transparent"
+                                  ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Axis" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Letter}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Travel limit (mm)" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding MaxTravel, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Rate limit (mm/min)" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Steps/mm" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Style="{StaticResource CellBox}" Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Invert dir ($3)" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding InvertDirection}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="NC limit ($5)" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding LimitNormallyClosed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Live" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource LimitDot}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </StackPanel>
-                    <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                               TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,3,0,0" MaxWidth="640" HorizontalAlignment="Left"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0" MaxWidth="640" HorizontalAlignment="Left"
-                               Text="A preset just pre-fills the fields with published starting values - you still confirm every step. Steps/mm and the home corner can be build-specific, so check those."/>
+                </GroupBox>
 
-                    <Border Background="#FFEFF4FF" BorderBrush="#FFB8CCE4" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,12,0,0" HorizontalAlignment="Left">
-                        <TextBlock TextWrapping="Wrap" Foreground="#FF1F3A5F" MaxWidth="640"
-                                   Text="You can change any of these later in Basic settings. Each value is only sent to the controller when you press Apply on the last page."/>
-                    </Border>
-                </StackPanel>
-            </Grid>
-
-            <!-- 1: Travel limits -->
-            <Grid x:Name="stepTravel" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                               Text="Enter the physical travel of each axis in millimetres. The stored soft-limit travel ($130-$132) is reduced by twice the homing pull-off, reserving clearance at both ends."/>
-                    <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Style="{StaticResource AxisRow}">
-                                    <TextBlock Text="{Binding Letter}" Style="{StaticResource AxisLetter}"/>
-                                    <TextBox Width="90" Text="{Binding MaxTravel, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-                                    <TextBlock Text="mm" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Grid>
-
-            <!-- 2: Steps/mm & max rate -->
-            <Grid x:Name="stepMaxRate" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                               Text="Steps/mm ($100-$102) and maximum feed rate ($110-$112) per axis. Steps/mm comes from your drive (a preset fills it, or fine-tune later on the Stepper calibration tab); max rate is mm/min (deg/min for rotaries), pre-filled with stepper-friendly defaults. A steps/mm of 0 (unknown) is left untouched."/>
-                    <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Style="{StaticResource AxisRow}">
-                                    <TextBlock Text="{Binding Letter}" Style="{StaticResource AxisLetter}"/>
-                                    <TextBox Width="80" Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-                                    <TextBlock Text="steps/mm" VerticalAlignment="Center" Margin="5,0,14,0"/>
-                                    <TextBox Width="80" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
-                                    <TextBlock Text="mm/min" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Grid>
-
-            <!-- 3: Home corner -->
-            <Grid x:Name="stepHome" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                               Text="Click the top corner where your machine homes. The view looks down on the table from above the front (Z homes at the top of the gantry). This sets the homing directions ($23) and orients the 3D view."/>
-                    <Canvas Width="360" Height="230" HorizontalAlignment="Left" Margin="10,0">
-                        <!-- box: front face -->
-                        <Polygon Points="70,140 230,140 230,190 70,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
-                        <!-- box: right face -->
-                        <Polygon Points="230,140 270,90 270,140 230,190" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
-                        <!-- box: top face -->
-                        <Polygon Points="70,140 230,140 270,90 110,90" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
-                        <!-- axis hints -->
-                        <Line X1="70" Y1="205" X2="120" Y2="205" Stroke="#FF3060C0" StrokeThickness="2"/>
-                        <TextBlock Canvas.Left="124" Canvas.Top="197" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
-                        <Line X1="55" Y1="150" X2="80" Y2="115" Stroke="#FF2E8B57" StrokeThickness="2"/>
-                        <TextBlock Canvas.Left="40" Canvas.Top="98" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
-                        <!-- corner markers (top face): FL/FR back-left/back-right etc. -->
-                        <Ellipse x:Name="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="131" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
-                        <Ellipse x:Name="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="131" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
-                        <Ellipse x:Name="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="81" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
-                        <Ellipse x:Name="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="81" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
-                    </Canvas>
-                    <TextBlock Text="{Binding HomeCornerText, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                               FontWeight="Bold" Foreground="#FF1F3A5F" Margin="10,4,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
-            </Grid>
-
-            <!-- 4: Limit sensors -->
-            <Grid x:Name="stepLimits" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <CheckBox Content="My machine has limit switches" Margin="0,0,0,8"
-                              IsChecked="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                    <StackPanel Orientation="Vertical"
-                                IsEnabled="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="Most mechanical limit and proximity switches are normally-open (NO) - leave those unticked. To spot a normally-closed (NC) switch: with nothing pressed its dot is already green - tick NC ($5) for those. Press each switch to confirm grbl sees it (the dot toggles)."/>
-                        <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Style="{StaticResource AxisRow}">
-                                        <TextBlock Text="{Binding Letter}" Style="{StaticResource AxisLetter}"/>
-                                        <Border Style="{StaticResource LimitDot}" Margin="0,0,10,0"/>
-                                        <CheckBox Content="normally-closed (NC)" IsChecked="{Binding LimitNormallyClosed}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <CheckBox Content="Enable hard limits ($21)" Margin="0,8,0,0"
-                                  IsChecked="{Binding Setup.HardLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Grid>
-
-            <!-- 5: Homing -->
-            <Grid x:Name="stepHoming" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <CheckBox Content="Enable homing ($22)" Margin="0,0,0,4"
-                              IsChecked="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                    <CheckBox Content="Force set origin at home ($22 bit 3)" Margin="0,0,0,2"
-                              IsChecked="{Binding Setup.ForceSetOrigin, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8" MaxWidth="560" HorizontalAlignment="Left"
-                               Text="Sets machine zero at the home corner so each axis can travel positive per its homing direction (grblHAL). Required for your Home corner choice - and the 3D-view orientation - to match the real machine. Reconnect after applying so it is picked up."/>
+                <!-- 4. Homing & limits -->
+                <GroupBox Header="4 · Homing &amp; limits" Padding="8" Margin="0,8,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto" MinWidth="220"/>
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Pull-off / back-off ($27):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                        <TextBox  Grid.Row="0" Grid.Column="1" Width="80" Text="{Binding Setup.HomingPulloff, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Locate feed rate ($24):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                        <TextBox  Grid.Row="1" Grid.Column="1" Width="80" Text="{Binding Setup.HomingFeed, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Seek rate ($25):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                        <TextBox  Grid.Row="2" Grid.Column="1" Width="80" Text="{Binding Setup.HomingSeek, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Debounce ms ($26):" VerticalAlignment="Center" Margin="0,3,10,3"/>
-                        <TextBox  Grid.Row="3" Grid.Column="1" Width="80" Text="{Binding Setup.HomingDebounce, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+
+                        <!-- left: enable toggles -->
+                        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,16,0">
+                            <CheckBox Content="My machine has limit switches"
+                                      IsChecked="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <CheckBox Content="Enable hard limits ($21)" Margin="0,6,0,0"
+                                      IsEnabled="{Binding Setup.HasLimitSwitches, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                      IsChecked="{Binding Setup.HardLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <CheckBox Content="Enable homing ($22)" Margin="0,6,0,0"
+                                      IsChecked="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <CheckBox Content="Force set origin at home ($22 bit 3)" Margin="20,2,0,0"
+                                      IsEnabled="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                      IsChecked="{Binding Setup.ForceSetOrigin, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <CheckBox Content="Enable soft limits ($20)" Margin="0,6,0,0"
+                                      IsChecked="{Binding Setup.SoftLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,6,0,0"
+                                       Text="Force-set-origin places machine zero at the home corner so each axis travels positive - needed for the home-corner choice and the 3D view to match the real machine (reconnect after applying). Soft limits require homing and enable click-to-jog."/>
+                        </StackPanel>
+
+                        <!-- right: homing rates -->
+                        <Grid Grid.Column="1" IsEnabled="{Binding Setup.HomingEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Pull-off / back-off ($27):" VerticalAlignment="Center" Margin="0,3,10,3"/>
+                            <TextBox  Grid.Row="0" Grid.Column="1" Width="80" Text="{Binding Setup.HomingPulloff, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Locate feed rate ($24):" VerticalAlignment="Center" Margin="0,3,10,3"/>
+                            <TextBox  Grid.Row="1" Grid.Column="1" Width="80" Text="{Binding Setup.HomingFeed, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Seek rate ($25):" VerticalAlignment="Center" Margin="0,3,10,3"/>
+                            <TextBox  Grid.Row="2" Grid.Column="1" Width="80" Text="{Binding Setup.HomingSeek, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Debounce ms ($26):" VerticalAlignment="Center" Margin="0,3,10,3"/>
+                            <TextBox  Grid.Row="3" Grid.Column="1" Width="80" Text="{Binding Setup.HomingDebounce, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
+                        </Grid>
                     </Grid>
-                </StackPanel>
-            </Grid>
+                </GroupBox>
 
-            <!-- 6: Soft limits -->
-            <Grid x:Name="stepSoftLimits" Visibility="Collapsed">
-                <StackPanel Orientation="Vertical">
-                    <CheckBox Content="Enable soft limits ($20)"
-                              IsChecked="{Binding Setup.SoftLimitsEnable, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-                    <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,6,0,0"
-                               Text="Soft limits keep moves inside the travel you entered. They require homing and are needed for click-to-jog in the 3D view."/>
-                </StackPanel>
-            </Grid>
-
-            <!-- 7: Review & apply -->
-            <Grid x:Name="stepReview" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6"
-                           Text="These settings will be written to the controller. Review, then press Apply."/>
-                <DataGrid Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
-                          ItemsSource="{Binding Changes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Setting" Binding="{Binding Setting}" Width="80"/>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                        <DataGridTextColumn Header="Current" Binding="{Binding OldValue}" Width="120"/>
-                        <DataGridTextColumn Header="New" Binding="{Binding NewValue}" Width="120"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-        </Grid>
+                <!-- Pending changes (preview) -->
+                <Expander x:Name="expReview" Header="Preview pending changes" Margin="0,8,0,0" Expanded="Review_Expanded">
+                    <DataGrid AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MaxHeight="200" Margin="0,4,0,0"
+                              ItemsSource="{Binding Changes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Setting" Binding="{Binding Setting}" Width="80"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Current" Binding="{Binding OldValue}" Width="120"/>
+                            <DataGridTextColumn Header="New" Binding="{Binding NewValue}" Width="120"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
 
         <!-- Footer -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="btnRestart" Content="Start over" Width="80" Margin="0,0,20,0" Click="Restart_Click"
-                    ToolTip="Discard answers and re-read current settings from the controller."/>
-            <Button x:Name="btnBack" Content="Back" Width="80" Margin="0,0,6,0" Click="Back_Click"
-                    IsEnabled="{Binding CanBack, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-            <Button x:Name="btnNext" Content="Next" Width="80" Margin="0,0,6,0" Click="Next_Click"
-                    IsEnabled="{Binding CanNext, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
-            <Button x:Name="btnApply" Content="Apply" Width="80" Click="Apply_Click" Visibility="Collapsed"/>
+            <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
+            <Button x:Name="btnReload" Content="Reload" Width="90" Margin="0,0,6,0" Click="Reload_Click"
+                    ToolTip="Discard edits and re-read the current settings from the controller."/>
+            <Button x:Name="btnApply" Content="Apply" Width="90" Click="Apply_Click"
+                    ToolTip="Write the changed settings to the controller."/>
         </StackPanel>
     </Grid>
 </UserControl>

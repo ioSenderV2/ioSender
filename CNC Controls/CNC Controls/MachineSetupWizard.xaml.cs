@@ -1,10 +1,12 @@
 /*
  * MachineSetupWizard.xaml.cs - part of CNC Controls library
  *
- * Machine Setup Wizard: a guided first-run configuration of the machine-description grbl settings
- * (travel, home corner, limit sensors, homing, soft limits). Reads firmware capabilities
- * (NEWOPT / NumAxes / force-set-origin) to gate the questions, then writes the resulting $n
- * settings via GrblSettings.Save().
+ * Machine Setup Wizard: a single-page configuration of the machine-description grbl settings
+ * (work area / travel, home corner, per-axis steps/mm, max rate, direction & limit inversion,
+ * homing and soft limits). Reads firmware capabilities (NEWOPT / NumAxes / force-set-origin) to
+ * gate the questions, then writes the resulting $n settings via GrblSettings.Save(). Everything is
+ * visible at once - pick a machine to seed the fields, click the home corner, fill the axis table,
+ * preview the pending $ writes, then Apply.
  *
  */
 
@@ -26,7 +28,7 @@ namespace CNC.Controls
     public class AxisSetup : ViewModelBase
     {
         private double _maxTravel, _maxRate, _stepsPerMm;
-        private bool _homeAtMin, _limitNormallyClosed, _limitActive;
+        private bool _homeAtMin, _invertDirection, _limitNormallyClosed, _limitActive;
 
         public AxisSetup(string letter, int index)
         {
@@ -47,6 +49,8 @@ namespace CNC.Controls
         public double DefaultMaxRate { get { return (Letter == "A" || Letter == "B" || Letter == "C") ? 3600d : ((Letter == "Z" || Letter == "W") ? 500d : 2000d); } }
         // Home switch at the minimum (negative) end of travel -> machine travels positive ($23 bit set).
         public bool HomeAtMin { get { return _homeAtMin; } set { _homeAtMin = value; OnPropertyChanged(); } }
+        // Reverse this axis' motor direction ($3 direction-invert mask).
+        public bool InvertDirection { get { return _invertDirection; } set { _invertDirection = value; OnPropertyChanged(); } }
         public bool LimitNormallyClosed { get { return _limitNormallyClosed; } set { _limitNormallyClosed = value; OnPropertyChanged(); } }
         // Live: this axis' limit input is currently asserted (updated from GrblViewModel.Signals).
         public bool LimitActive { get { return _limitActive; } set { _limitActive = value; OnPropertyChanged(); } }
@@ -89,8 +93,6 @@ namespace CNC.Controls
     public partial class MachineSetupWizard : UserControl, IGrblConfigTab
     {
         private GrblViewModel model = null;
-        private Grid[] steps;
-        private int _currentStep = 0;
         private bool _subscribed = false;
 
         public MachineSetupWizard()
@@ -106,31 +108,24 @@ namespace CNC.Controls
         #region Dependency properties bound from XAML
 
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
-        public System.Collections.Generic.List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
+        public List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
+
+        // X / Y axis objects surfaced for the Machine section's quick "work area" boxes; they bind to the same
+        // AxisSetup instances shown in the table, so the two stay in lock-step. Refreshed after BuildAxes.
+        public static readonly DependencyProperty AxisXProperty = DependencyProperty.Register(nameof(AxisX), typeof(AxisSetup), typeof(MachineSetupWizard), new PropertyMetadata(null));
+        public AxisSetup AxisX { get { return (AxisSetup)GetValue(AxisXProperty); } set { SetValue(AxisXProperty, value); } }
+
+        public static readonly DependencyProperty AxisYProperty = DependencyProperty.Register(nameof(AxisY), typeof(AxisSetup), typeof(MachineSetupWizard), new PropertyMetadata(null));
+        public AxisSetup AxisY { get { return (AxisSetup)GetValue(AxisYProperty); } set { SetValue(AxisYProperty, value); } }
 
         public static readonly DependencyProperty PresetNoteProperty = DependencyProperty.Register(nameof(PresetNote), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string PresetNote { get { return (string)GetValue(PresetNoteProperty); } set { SetValue(PresetNoteProperty, value); } }
-
-        public static readonly DependencyProperty StepTitleProperty = DependencyProperty.Register(nameof(StepTitle), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
-        public string StepTitle { get { return (string)GetValue(StepTitleProperty); } set { SetValue(StepTitleProperty, value); } }
-
-        public static readonly DependencyProperty StepNumberProperty = DependencyProperty.Register(nameof(StepNumber), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
-        public string StepNumber { get { return (string)GetValue(StepNumberProperty); } set { SetValue(StepNumberProperty, value); } }
 
         public static readonly DependencyProperty CapabilitiesProperty = DependencyProperty.Register(nameof(Capabilities), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string Capabilities { get { return (string)GetValue(CapabilitiesProperty); } set { SetValue(CapabilitiesProperty, value); } }
 
         public static readonly DependencyProperty HomeCornerTextProperty = DependencyProperty.Register(nameof(HomeCornerText), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata("No corner selected."));
         public string HomeCornerText { get { return (string)GetValue(HomeCornerTextProperty); } set { SetValue(HomeCornerTextProperty, value); } }
-
-        public static readonly DependencyProperty CanBackProperty = DependencyProperty.Register(nameof(CanBack), typeof(bool), typeof(MachineSetupWizard), new PropertyMetadata(false));
-        public bool CanBack { get { return (bool)GetValue(CanBackProperty); } set { SetValue(CanBackProperty, value); } }
-
-        public static readonly DependencyProperty CanNextProperty = DependencyProperty.Register(nameof(CanNext), typeof(bool), typeof(MachineSetupWizard), new PropertyMetadata(true));
-        public bool CanNext { get { return (bool)GetValue(CanNextProperty); } set { SetValue(CanNextProperty, value); } }
-
-        public static readonly DependencyProperty IsReviewProperty = DependencyProperty.Register(nameof(IsReview), typeof(bool), typeof(MachineSetupWizard), new PropertyMetadata(false));
-        public bool IsReview { get { return (bool)GetValue(IsReviewProperty); } set { SetValue(IsReviewProperty, value); } }
 
         public ObservableCollection<SettingChange> Changes { get; } = new ObservableCollection<SettingChange>();
 
@@ -145,9 +140,6 @@ namespace CNC.Controls
             {
                 BuildAxes();
                 LoadCurrentSettings();
-                if (steps == null)
-                    steps = new Grid[] { stepWelcome, stepTravel, stepMaxRate, stepHome, stepLimits, stepHoming, stepSoftLimits, stepReview };
-                GoToStep(0);
 
                 if (!_subscribed && model != null)
                 {
@@ -176,6 +168,9 @@ namespace CNC.Controls
             foreach (var axis in model.Axes)
                 Setup.Axes.Add(new AxisSetup(axis.Letter, axis.Index));
 
+            AxisX = GetAxis("X");
+            AxisY = GetAxis("Y");
+
             var caps = new List<string>();
             caps.Add(GrblInfo.IsGrblHAL ? "grblHAL" : "Grbl");
             caps.Add(string.Format("{0} axes ({1})", GrblInfo.NumAxes, string.Join("", Setup.Axes.Select(a => a.Letter))));
@@ -187,9 +182,9 @@ namespace CNC.Controls
 
         private void LoadCurrentSettings()
         {
-            // Load homing parameters first - the travel field shows physical travel, which is the stored
-            // soft-limit travel plus the pull-off clearance reserved at each end (see BuildTargets).
-            // $22 is a bit-field on grblHAL (bit0 enable, bit3 force-set-origin); test bits, don't compare to 1.
+            // The travel field shows physical travel, which is the stored soft-limit travel plus the pull-off
+            // clearance reserved at each end (see BuildTargets). $22 is a bit-field on grblHAL (bit0 enable,
+            // bit3 force-set-origin); test bits, don't compare to 1.
             int homingFlags = GrblSettings.GetInteger(GrblSetting.HomingEnable);
             if (homingFlags < 0) homingFlags = 0;
             Setup.HomingEnable = (homingFlags & 0x01) != 0;
@@ -208,6 +203,7 @@ namespace CNC.Controls
             int debounce = GrblSettings.GetInteger(GrblSetting.HomingDebounceDelay);
             if (debounce > 0) Setup.HomingDebounce = debounce;
 
+            int dirMask = GrblSettings.GetInteger(GrblSetting.DirInvertMask);
             int limitMask = GrblSettings.GetInteger(GrblSetting.LimitPinsInvertMask);
             int homeMask = GrblSettings.GetInteger(GrblSetting.HomingDirMask);
 
@@ -219,6 +215,7 @@ namespace CNC.Controls
                 axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
                 double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
                 axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
+                axis.InvertDirection = (dirMask & axis.Bit) != 0;
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
             }
@@ -255,7 +252,7 @@ namespace CNC.Controls
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
-        // still confirms each step. The travel field is PHYSICAL travel, so add back the 2x pull-off the stored
+        // still confirms each value. The travel field is PHYSICAL travel, so add back the 2x pull-off the stored
         // $130-$132 reserves; the home corner is only a suggestion (most hobby machines home front-left).
         private void ApplyPreset(MachineModel p)
         {
@@ -330,66 +327,11 @@ namespace CNC.Controls
                 return;
             }
 
-            string xs = x.HomeAtMin ? "left (X min)" : "right (X max)";
-            string ys = y.HomeAtMin ? "front (Y min)" : "back (Y max)";
             HomeCornerText = string.Format("Home: {0}, {1}, Z top.   X homes at {2}, Y homes at {3}.",
                 y.HomeAtMin ? "front" : "back", x.HomeAtMin ? "left" : "right",
                 x.HomeAtMin ? "min" : "max", y.HomeAtMin ? "min" : "max");
 
             HighlightCorner((y.HomeAtMin ? "F" : "B") + (x.HomeAtMin ? "L" : "R"));
-        }
-
-        #endregion
-
-        #region Step navigation
-
-        private void GoToStep(int step)
-        {
-            _currentStep = Math.Max(0, Math.Min(steps.Length - 1, step));
-
-            for (int i = 0; i < steps.Length; i++)
-                steps[i].Visibility = i == _currentStep ? Visibility.Visible : Visibility.Collapsed;
-
-            string[] titles = {
-                "Welcome",
-                "Travel limits",
-                "Steps/mm && max rate",
-                "Home corner",
-                "Limit sensors",
-                "Homing",
-                "Soft limits",
-                "Review && apply"
-            };
-
-            StepTitle = titles[_currentStep];
-            StepNumber = string.Format("Step {0} of {1}", _currentStep + 1, steps.Length);
-            CanBack = _currentStep > 0;
-            IsReview = _currentStep == steps.Length - 1;
-            CanNext = true;
-
-            btnNext.Visibility = IsReview ? Visibility.Collapsed : Visibility.Visible;
-            btnApply.Visibility = IsReview ? Visibility.Visible : Visibility.Collapsed;
-
-            if (IsReview)
-                BuildReview();
-        }
-
-        private void Back_Click(object sender, RoutedEventArgs e)
-        {
-            GoToStep(_currentStep - 1);
-        }
-
-        // Start over: discard any answers, re-read the controller's current settings and return to step 1.
-        private void Restart_Click(object sender, RoutedEventArgs e)
-        {
-            BuildAxes();
-            LoadCurrentSettings();
-            GoToStep(0);
-        }
-
-        private void Next_Click(object sender, RoutedEventArgs e)
-        {
-            GoToStep(_currentStep + 1);
         }
 
         #endregion
@@ -446,6 +388,8 @@ namespace CNC.Controls
                     targets[GrblSetting.TravelResolutionBase + axis.Index] = axis.StepsPerMm.ToInvariantString();
             }
 
+            targets[GrblSetting.DirInvertMask] =
+                ApplyAxisBits(GrblSettings.GetInteger(GrblSetting.DirInvertMask), a => a.InvertDirection).ToString();
             targets[GrblSetting.HomingDirMask] =
                 ApplyAxisBits(GrblSettings.GetInteger(GrblSetting.HomingDirMask), a => a.HomeAtMin).ToString();
 
@@ -480,6 +424,7 @@ namespace CNC.Controls
             return targets;
         }
 
+        // Recompute the pending-change list (the diff between target values and what the controller holds now).
         private void BuildReview()
         {
             Changes.Clear();
@@ -499,17 +444,39 @@ namespace CNC.Controls
                         NewValue = kv.Value
                     });
             }
+        }
 
-            CanNext = false;   // review is the last step
+        private void Review_Expanded(object sender, RoutedEventArgs e)
+        {
+            BuildReview();
+            txtStatus.Text = string.Format("{0} pending change(s).", Changes.Count);
+        }
+
+        // Reload: discard any edits and re-read the controller's current settings.
+        private void Reload_Click(object sender, RoutedEventArgs e)
+        {
+            BuildAxes();
+            LoadCurrentSettings();
+            cbxManufacturer.SelectedItem = null;
+            PresetNote = string.Empty;
+            Changes.Clear();
+            txtStatus.Text = "Reloaded from controller.";
         }
 
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
+            BuildReview();
+
             if (Changes.Count == 0)
             {
-                model.Message = "Machine setup: nothing changed.";
+                txtStatus.Text = "Nothing changed.";
+                if (model != null)
+                    model.Message = "Machine setup: nothing changed.";
                 return;
             }
+
+            // Keep the preview in sync so the user sees exactly what is being written.
+            expReview.IsExpanded = true;
 
             foreach (var kv in BuildTargets())
             {
@@ -520,11 +487,18 @@ namespace CNC.Controls
 
             if (GrblSettings.Save())
             {
-                model.Message = string.Format("Machine setup: applied {0} setting(s).", Changes.Count);
-                BuildReview();
+                int n = Changes.Count;
+                txtStatus.Text = string.Format("Applied {0} setting(s).", n);
+                if (model != null)
+                    model.Message = string.Format("Machine setup: applied {0} setting(s).", n);
+                BuildReview();   // should now be empty
             }
             else
-                model.Message = "Machine setup: failed to write settings.";
+            {
+                txtStatus.Text = "Failed to write settings.";
+                if (model != null)
+                    model.Message = "Machine setup: failed to write settings.";
+            }
         }
 
         #endregion
