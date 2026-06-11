@@ -69,12 +69,13 @@
                     <!-- 1. Machine -->
                     <GroupBox Grid.Column="0" Header="1 · Machine" Padding="8" Margin="0,0,8,0" VerticalAlignment="Top">
                         <StackPanel Orientation="Vertical">
-                            <TextBlock Text="Detected firmware" Style="{StaticResource SectionHeader}"/>
-                            <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                       Margin="0,0,0,8" TextWrapping="Wrap"/>
-
-                            <TextBlock Text="Start from your machine" Style="{StaticResource SectionHeader}"/>
-                            <WrapPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left" Text="Start from your machine" Style="{StaticResource SectionHeader}" VerticalAlignment="Center"/>
+                                <Button DockPanel.Dock="Right" x:Name="btnFirmwareInfo" Content="Firmware info…" MinWidth="100" Height="22"
+                                        VerticalAlignment="Center" Click="FirmwareInfo_Click"
+                                        ToolTip="Show the controller's $I build/version information."/>
+                            </DockPanel>
+                            <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
                                 <ComboBox x:Name="cbxManufacturer" Width="170" Margin="0,0,6,4" MinHeight="22"
                                           ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                           SelectionChanged="Manufacturer_Changed"/>
@@ -134,13 +135,13 @@
                                     <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="50"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Axis" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Travel (mm)" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="Rate (mm/min)" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="3" Text="Steps/mm" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="4" Text="Invert dir ($3)" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="5" Text="NC limit ($5)" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="6" Text="Live" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="0" Text="Axis" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="1" Text="Travel (mm)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="2" Text="Rate (mm/min)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="3" Text="Steps/mm" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="4" Text="Invert dir ($3)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="5" Text="NC limit ($5)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="6" Text="Live" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
                             </Grid>
                             <Separator Margin="0,0,0,2"/>
                             <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">

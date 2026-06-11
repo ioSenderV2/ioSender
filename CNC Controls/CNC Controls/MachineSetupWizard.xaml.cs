@@ -94,6 +94,7 @@ namespace CNC.Controls
     {
         private GrblViewModel model = null;
         private bool _subscribed = false;
+        private Window _fwInfoWindow = null;
 
         public MachineSetupWizard()
         {
@@ -113,9 +114,6 @@ namespace CNC.Controls
         public static readonly DependencyProperty PresetNoteProperty = DependencyProperty.Register(nameof(PresetNote), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string PresetNote { get { return (string)GetValue(PresetNoteProperty); } set { SetValue(PresetNoteProperty, value); } }
 
-        public static readonly DependencyProperty CapabilitiesProperty = DependencyProperty.Register(nameof(Capabilities), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
-        public string Capabilities { get { return (string)GetValue(CapabilitiesProperty); } set { SetValue(CapabilitiesProperty, value); } }
-
         public static readonly DependencyProperty HomeCornerTextProperty = DependencyProperty.Register(nameof(HomeCornerText), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata("No corner selected."));
         public string HomeCornerText { get { return (string)GetValue(HomeCornerTextProperty); } set { SetValue(HomeCornerTextProperty, value); } }
 
@@ -133,6 +131,11 @@ namespace CNC.Controls
                 BuildAxes();
                 LoadCurrentSettings();
 
+                // Machine choice is required input - default to a generic 3-axis CNC with limit switches on first
+                // open. Leave an existing pick alone when the user comes back to the tab.
+                if (cbxManufacturer.SelectedItem == null)
+                    SelectDefaultMachine();
+
                 if (!_subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
@@ -140,10 +143,15 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
             }
-            else if (_subscribed && model != null)
+            else
             {
-                model.PropertyChanged -= Model_PropertyChanged;
-                _subscribed = false;
+                if (_subscribed && model != null)
+                {
+                    model.PropertyChanged -= Model_PropertyChanged;
+                    _subscribed = false;
+                }
+                if (_fwInfoWindow != null)
+                    _fwInfoWindow.Close();
             }
         }
 
@@ -159,14 +167,19 @@ namespace CNC.Controls
             Setup.Axes.Clear();
             foreach (var axis in model.Axes)
                 Setup.Axes.Add(new AxisSetup(axis.Letter, axis.Index));
+        }
 
-            var caps = new List<string>();
-            caps.Add(GrblInfo.IsGrblHAL ? "grblHAL" : "Grbl");
-            caps.Add(string.Format("{0} axes ({1})", GrblInfo.NumAxes, string.Join("", Setup.Axes.Select(a => a.Letter))));
-            caps.Add(GrblInfo.HomingEnabled ? "homing supported" : "homing NOT in firmware");
-            if (GrblInfo.ForceSetOrigin)
-                caps.Add("force-set-origin");
-            Capabilities = string.Join("  -  ", caps);
+        // Default the cascading selectors to "Generic / custom" -> "3-axis CNC" -> "With limit switches".
+        // Setting each level in order drives the SelectionChanged handlers that populate the next.
+        private void SelectDefaultMachine()
+        {
+            if (cbxManufacturer.Items.Count == 0)
+                return;
+            cbxManufacturer.SelectedIndex = 0;
+            if (cbxProduct.Items.Count > 0)
+                cbxProduct.SelectedIndex = 0;
+            if (cbxModel.Items.Count > 0)
+                cbxModel.SelectedIndex = 0;
         }
 
         private void LoadCurrentSettings()
@@ -441,13 +454,13 @@ namespace CNC.Controls
             txtStatus.Text = string.Format("{0} pending change(s).", Changes.Count);
         }
 
-        // Reload: discard any edits and re-read the controller's current settings.
+        // Reload: discard any edits, re-read the controller's settings and return to the generic default.
         private void Reload_Click(object sender, RoutedEventArgs e)
         {
             BuildAxes();
             LoadCurrentSettings();
-            cbxManufacturer.SelectedItem = null;
-            PresetNote = string.Empty;
+            cbxManufacturer.SelectedIndex = -1;   // force the change events so the default is re-applied
+            SelectDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
         }
@@ -488,6 +501,85 @@ namespace CNC.Controls
                 if (model != null)
                     model.Message = "Machine setup: failed to write settings.";
             }
+        }
+
+        #endregion
+
+        #region Firmware info ($I)
+
+        // Format the cached $I response (parsed into GrblInfo at connect) as a simple label: value list.
+        private string BuildFirmwareInfo()
+        {
+            var sb = new System.Text.StringBuilder();
+            string axes = string.Join("", Setup.Axes.Select(a => a.Letter));
+
+            sb.AppendLine("Firmware:         " + GrblInfo.Firmware + (GrblInfo.IsGrblHAL ? " (grblHAL)" : ""));
+            if (!string.IsNullOrEmpty(GrblInfo.Version)) sb.AppendLine("Version:          " + GrblInfo.Version);
+            if (GrblInfo.Build > 0) sb.AppendLine("Build:            " + GrblInfo.Build);
+            if (!string.IsNullOrEmpty(GrblInfo.Identity)) sb.AppendLine("Board / identity: " + GrblInfo.Identity);
+            sb.AppendLine("Axes:             " + GrblInfo.NumAxes + (string.IsNullOrEmpty(axes) ? "" : " (" + axes + ")"));
+            if (!string.IsNullOrEmpty(GrblInfo.Options)) sb.AppendLine("Options (OPT):    " + GrblInfo.Options);
+            if (!string.IsNullOrEmpty(GrblInfo.NewOptions)) sb.AppendLine("Options (NEWOPT): " + GrblInfo.NewOptions);
+            if (!string.IsNullOrEmpty(GrblInfo.TrinamicDrivers)) sb.AppendLine("Trinamic drivers: " + GrblInfo.TrinamicDrivers);
+            sb.AppendLine("Serial RX buffer: " + GrblInfo.SerialBufferSize);
+            sb.AppendLine("Planner buffer:   " + GrblInfo.PlanBufferSize);
+
+            var caps = new List<string>();
+            if (GrblInfo.HomingEnabled) caps.Add("homing");
+            if (GrblInfo.ForceSetOrigin) caps.Add("force-set-origin");
+            if (GrblInfo.HasSDCard) caps.Add("SD card");
+            if (GrblInfo.HasProbe) caps.Add("probe");
+            if (GrblInfo.HasATC) caps.Add("ATC");
+            if (GrblInfo.HasFS) caps.Add("flash FS");
+            if (GrblInfo.ExpressionsSupported) caps.Add("expressions");
+            if (caps.Count > 0) sb.AppendLine("Capabilities:     " + string.Join(", ", caps));
+
+            return sb.ToString().TrimEnd();
+        }
+
+        // Non-modal popup so the user can read $I while filling the form. Reuse the open window on repeat clicks.
+        private void FirmwareInfo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_fwInfoWindow != null)
+            {
+                _fwInfoWindow.Activate();
+                return;
+            }
+
+            var text = new TextBox
+            {
+                Text = BuildFirmwareInfo(),
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = new FontFamily("Consolas"),
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Margin = new Thickness(10)
+            };
+            var close = new Button { Content = "Close", Width = 80, Margin = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Right };
+
+            var panel = new DockPanel();
+            DockPanel.SetDock(close, Dock.Bottom);
+            panel.Children.Add(close);
+            panel.Children.Add(text);
+
+            var win = new Window
+            {
+                Title = "Firmware information ($I)",
+                Width = 540,
+                Height = 360,
+                Content = panel,
+                Owner = Window.GetWindow(this),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false
+            };
+            close.Click += (s, ev) => win.Close();
+            win.Closed += (s, ev) => _fwInfoWindow = null;
+
+            _fwInfoWindow = win;
+            win.Show();   // non-modal
         }
 
         #endregion

@@ -68,9 +68,15 @@ namespace CNC.Controls
             {
                 return new List<MachineManufacturer>
                 {
-                    new MachineManufacturer { Name = "Custom / not listed", Products = new List<MachineProduct>
+                    new MachineManufacturer { Name = "Generic / custom", Products = new List<MachineProduct>
                     {
-                        P("(enter everything manually)", M("Custom", null))
+                        P("3-axis CNC",
+                            M("With limit switches (homing)", null, homing: true,
+                              note: "Generic 3-axis machine with limit switches - homing and limits on. Enter your travel and steps/mm in the axis table."),
+                            M("Without limit switches", null, homing: false,
+                              note: "Generic 3-axis machine, no limit switches - homing off. Enter your travel and steps/mm in the axis table."),
+                            M("Custom (enter everything manually)", null,
+                              note: "Nothing is pre-filled - set every value yourself."))
                     }},
 
                     new MachineManufacturer { Name = "Carbide3D", Products = new List<MachineProduct>
