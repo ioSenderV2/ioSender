@@ -109,6 +109,10 @@ namespace CNC.Controls
 
         #region Dependency properties bound from XAML
 
+        // Raised when the user presses Apply with a machine specified (settings written + remembered). The
+        // shell uses this to leave the first-run "set up your machine" gate and return to the normal UI.
+        public static event System.Action SetupApplied;
+
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
         public List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
 
@@ -306,12 +310,11 @@ namespace CNC.Controls
         private void Model_Changed(object sender, SelectionChangedEventArgs e)
         {
             // A real user pick seeds catalog starting values; a restore only re-selects the machine and keeps
-            // the controller's actual settings (its real NVRAM) loaded by LoadCurrentSettings.
+            // the controller's actual settings (its real NVRAM) loaded by LoadCurrentSettings. The pick is
+            // remembered (LastMachine) only once the user commits it with Apply - see Apply_Click.
             if (_restoringSelection)
                 return;
             ApplyPreset(cbxModel.SelectedItem as MachineModel);
-            if (cbxModel.SelectedItem != null)
-                SaveSelectedMachine();   // remember the pick for next run
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
@@ -567,6 +570,11 @@ namespace CNC.Controls
                 if (model != null)
                     model.Message = string.Format("Machine setup: applied {0} setting(s).", n);
                 BuildReview();   // should now be empty
+
+                // The machine is now fully specified - remember it for next run and let the shell know setup is
+                // done (first-run gating switches back to the normal UI on this event).
+                SaveSelectedMachine();
+                SetupApplied?.Invoke();
             }
             else
             {

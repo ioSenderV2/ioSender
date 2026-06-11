@@ -78,11 +78,17 @@ namespace CNC.Controls
             getView(tabConfig.SelectedItem == null ? tabConfig.Items[0] as TabItem : tabConfig.SelectedItem as TabItem)?.Activate(activate);
         }
 
-        // Heuristic: we've talked to a controller (version known) but no travel has been set ($130-$132 all 0).
-        private static bool MachineIsUnconfigured()
+        // We've talked to a controller (version known) and the machine has not been set up via the wizard yet -
+        // either no machine has been saved (first run) or travel ($130-$132) is still all zero.
+        public static bool MachineIsUnconfigured()
         {
-            return !string.IsNullOrEmpty(GrblInfo.Version)
-                && GrblSettings.GetDouble(GrblSetting.MaxTravelBase) <= 0d
+            if (string.IsNullOrEmpty(GrblInfo.Version))
+                return false;
+
+            if (AppConfig.Settings.Base != null && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                return true;   // no machine picked/applied via the wizard yet
+
+            return GrblSettings.GetDouble(GrblSetting.MaxTravelBase) <= 0d
                 && GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 1) <= 0d
                 && GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2) <= 0d;
         }

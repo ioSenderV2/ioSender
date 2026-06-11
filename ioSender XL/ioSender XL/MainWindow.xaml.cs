@@ -286,6 +286,65 @@ namespace GCode_Sender
             GCode.File.AddTransformer(typeof(ArcsToLines), (string)FindResource("MenuArcsToLines"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(GCodeCompress), (string)FindResource("MenuCompress"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(CNC.Controls.DragKnife.DragKnifeViewModel), (string)FindResource("MenuDragKnife"), UIViewModel.TransformMenuItems);
+
+            // First-run gate: with no machine saved yet, jump to the Machine Setup Wizard once the controller is
+            // ready, then return to the normal UI when the user presses Apply (see ForceMachineSetupIfNeeded).
+            if (connected)
+                ForceMachineSetupIfNeeded();
+        }
+
+        private bool _machineSetupForced = false;
+
+        // On first run (no machine saved) wait for the controller to report version + settings, then bring the
+        // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
+        private void ForceMachineSetupIfNeeded()
+        {
+            if (_machineSetupForced || !string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                return;
+
+            int tries = 0;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            timer.Tick += (s, e) =>
+            {
+                bool ready = !string.IsNullOrEmpty(GrblInfo.Version) && GrblSettings.IsLoaded;
+                if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report
+                    return;
+                timer.Stop();
+                if (ready && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                    ShowMachineSetupWizard();
+            };
+            timer.Start();
+        }
+
+        private void ShowMachineSetupWizard()
+        {
+            _machineSetupForced = true;
+
+            CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
+            CNC.Controls.MachineSetupWizard.SetupApplied += OnMachineSetupApplied;
+
+            TabItem tab = getTab(ViewType.GRBLConfig);
+            if (tab != null)
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;   // GrblConfigView.Activate auto-selects the Machine Setup Wizard sub-tab
+            }
+
+            MessageBox.Show(this,
+                "Welcome! No machine is configured yet.\n\nPick your machine (or choose Custom and enter it by hand) and press Apply to finish setup. The normal screen opens once you do.",
+                "Set up your machine", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // The wizard's Apply fired - machine is specified, return to the normal (Grbl) view.
+        private void OnMachineSetupApplied()
+        {
+            CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                TabItem grbl = getTab(ViewType.GRBL);
+                if (grbl != null)
+                    tabMode.SelectedItem = grbl;
+            }));
         }
 
         // Persist a flyout's pin state so it reopens (pinned) on next launch.
