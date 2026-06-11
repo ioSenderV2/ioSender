@@ -94,6 +94,7 @@ namespace CNC.Controls
     {
         private GrblViewModel model = null;
         private bool _subscribed = false;
+        private bool _restoringSelection = false;   // suppress persisting while we drive the dropdowns in code
         private Window _fwInfoWindow = null;
 
         public MachineSetupWizard()
@@ -131,10 +132,10 @@ namespace CNC.Controls
                 BuildAxes();
                 LoadCurrentSettings();
 
-                // Machine choice is required input - default to a generic 3-axis CNC with limit switches on first
-                // open. Leave an existing pick alone when the user comes back to the tab.
+                // Machine choice is required input - restore the last machine the user picked (persisted across
+                // runs), else default to a generic 3-axis CNC. Leave an existing pick alone on re-entry.
                 if (cbxManufacturer.SelectedItem == null)
-                    SelectDefaultMachine();
+                    RestoreOrDefaultMachine();
 
                 if (!_subscribed && model != null)
                 {
@@ -169,17 +170,60 @@ namespace CNC.Controls
                 Setup.Axes.Add(new AxisSetup(axis.Letter, axis.Index));
         }
 
+        // Restore the machine persisted from a previous run, else fall back to the generic default.
+        private void RestoreOrDefaultMachine()
+        {
+            string saved = AppConfig.Settings.Base != null ? AppConfig.Settings.Base.LastMachine : null;
+            if (!string.IsNullOrEmpty(saved) && TrySelectMachine(saved))
+                return;
+            SelectDefaultMachine();
+        }
+
+        // Select Manufacturer/Product/Model by name ("mfr|product|model"); returns false if not found.
+        private bool TrySelectMachine(string path)
+        {
+            var parts = path.Split('|');
+            if (parts.Length != 3)
+                return false;
+            var mfr = Manufacturers.FirstOrDefault(m => m.Name == parts[0]);
+            var prod = mfr != null ? mfr.Products.FirstOrDefault(p => p.Name == parts[1]) : null;
+            var mdl = prod != null ? prod.Models.FirstOrDefault(m => m.Name == parts[2]) : null;
+            if (mdl == null)
+                return false;
+
+            _restoringSelection = true;
+            cbxManufacturer.SelectedItem = mfr;   // each assignment drives the next dropdown's ItemsSource
+            cbxProduct.SelectedItem = prod;
+            cbxModel.SelectedItem = mdl;
+            _restoringSelection = false;
+            return true;
+        }
+
         // Default the cascading selectors to "Generic / custom" -> "3-axis CNC" -> "With limit switches".
         // Setting each level in order drives the SelectionChanged handlers that populate the next.
         private void SelectDefaultMachine()
         {
             if (cbxManufacturer.Items.Count == 0)
                 return;
+            _restoringSelection = true;
             cbxManufacturer.SelectedIndex = 0;
             if (cbxProduct.Items.Count > 0)
                 cbxProduct.SelectedIndex = 0;
             if (cbxModel.Items.Count > 0)
                 cbxModel.SelectedIndex = 0;
+            _restoringSelection = false;
+        }
+
+        // Persist the user's machine pick so it is restored next run (only for real user selections).
+        private void SaveSelectedMachine()
+        {
+            var mfr = cbxManufacturer.SelectedItem as MachineManufacturer;
+            var prod = cbxProduct.SelectedItem as MachineProduct;
+            var mdl = cbxModel.SelectedItem as MachineModel;
+            if (mfr == null || prod == null || mdl == null || AppConfig.Settings.Base == null)
+                return;
+            AppConfig.Settings.Base.LastMachine = mfr.Name + "|" + prod.Name + "|" + mdl.Name;
+            AppConfig.Settings.Save();
         }
 
         private void LoadCurrentSettings()
@@ -253,6 +297,8 @@ namespace CNC.Controls
         private void Model_Changed(object sender, SelectionChangedEventArgs e)
         {
             ApplyPreset(cbxModel.SelectedItem as MachineModel);
+            if (!_restoringSelection && cbxModel.SelectedItem != null)
+                SaveSelectedMachine();   // remember a real user pick for next run
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
@@ -281,6 +327,12 @@ namespace CNC.Controls
 
             if (p.Homing.HasValue)
                 Setup.HomingEnable = p.Homing.Value;
+
+            // Catalog home corner ($23) and force-set-origin ($22 bit3) - most of these machines home to a
+            // fixed corner the user won't change, so seed both. Force-set-origin makes the chosen corner the
+            // machine zero (needed for it to take effect on grblHAL); Carbide-style machines leave it off.
+            if (p.ForceSetOrigin.HasValue)
+                Setup.ForceSetOrigin = p.ForceSetOrigin.Value;
 
             if (p.HomingDirMask >= 0)
             {
@@ -467,8 +519,8 @@ namespace CNC.Controls
         {
             BuildAxes();
             LoadCurrentSettings();
-            cbxManufacturer.SelectedIndex = -1;   // force the change events so the default is re-applied
-            SelectDefaultMachine();
+            cbxManufacturer.SelectedIndex = -1;   // force the change events so the machine is re-applied
+            RestoreOrDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
         }
