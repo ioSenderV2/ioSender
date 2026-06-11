@@ -541,6 +541,20 @@ namespace CNC.Controls
             txtStatus.Text = "Reloaded from controller.";
         }
 
+        // Forget the remembered machine so the first-run setup wizard reappears on the next launch. Does NOT
+        // change any controller settings - it only clears the app's record of which machine was chosen.
+        private void Forget_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppConfig.Settings.Base != null)
+            {
+                AppConfig.Settings.Base.LastMachine = string.Empty;
+                AppConfig.Settings.Save();
+            }
+            cbxManufacturer.SelectedIndex = -1;
+            SelectDefaultMachine();
+            txtStatus.Text = "Machine forgotten - the setup wizard will reappear next launch.";
+        }
+
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
             BuildReview();
