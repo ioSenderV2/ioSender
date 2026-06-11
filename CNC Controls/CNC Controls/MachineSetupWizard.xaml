@@ -65,6 +65,16 @@
                                Text="This wizard sets the grbl settings that describe your machine - travel limits, home corner, limit sensors, homing and soft limits. Nothing is written until the final Review &amp; apply step."/>
                     <TextBlock Text="Detected firmware:" FontWeight="Bold" Margin="0,6,0,0"/>
                     <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}" Margin="0,2" TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Start from a machine preset (optional):" FontWeight="Bold" Margin="0,14,0,2"/>
+                    <ComboBox x:Name="cbxPreset" Width="320" HorizontalAlignment="Left" SelectedIndex="0"
+                              ItemsSource="{Binding Presets, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                              SelectionChanged="Preset_SelectionChanged"/>
+                    <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                               TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,3,0,0" MaxWidth="640" HorizontalAlignment="Left"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0" MaxWidth="640" HorizontalAlignment="Left"
+                               Text="A preset just pre-fills the fields with published starting values - you still confirm every step. Steps/mm and the home corner can be build-specific, so check those."/>
+
                     <Border Background="#FFEFF4FF" BorderBrush="#FFB8CCE4" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,12,0,0" HorizontalAlignment="Left">
                         <TextBlock TextWrapping="Wrap" Foreground="#FF1F3A5F" MaxWidth="640"
                                    Text="You can change any of these later in Basic settings. Each value is only sent to the controller when you press Apply on the last page."/>
@@ -91,17 +101,19 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 2: Max rate -->
+            <!-- 2: Steps/mm & max rate -->
             <Grid x:Name="stepMaxRate" Visibility="Collapsed">
                 <StackPanel Orientation="Vertical">
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                               Text="Maximum feed rate for each axis ($110-$112), in mm/min (deg/min for rotary axes). Pre-filled with reasonable defaults for typical CNC steppers - lower for the vertical Z - so adjust to your machine's real rapid capability."/>
+                               Text="Steps/mm ($100-$102) and maximum feed rate ($110-$112) per axis. Steps/mm comes from your drive (a preset fills it, or fine-tune later on the Stepper calibration tab); max rate is mm/min (deg/min for rotaries), pre-filled with stepper-friendly defaults. A steps/mm of 0 (unknown) is left untouched."/>
                     <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Style="{StaticResource AxisRow}">
                                     <TextBlock Text="{Binding Letter}" Style="{StaticResource AxisLetter}"/>
-                                    <TextBox Width="90" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+                                    <TextBox Width="80" Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
+                                    <TextBlock Text="steps/mm" VerticalAlignment="Center" Margin="5,0,14,0"/>
+                                    <TextBox Width="80" Text="{Binding MaxRate, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/>
                                     <TextBlock Text="mm/min" VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </DataTemplate>

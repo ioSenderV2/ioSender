@@ -25,7 +25,7 @@ namespace CNC.Controls
     // One row per machine axis - holds the user's answers and the live limit-switch state.
     public class AxisSetup : ViewModelBase
     {
-        private double _maxTravel, _maxRate;
+        private double _maxTravel, _maxRate, _stepsPerMm;
         private bool _homeAtMin, _limitNormallyClosed, _limitActive;
 
         public AxisSetup(string letter, int index)
@@ -39,6 +39,8 @@ namespace CNC.Controls
         public int Bit { get { return 1 << Index; } }
 
         public double MaxTravel { get { return _maxTravel; } set { _maxTravel = value; OnPropertyChanged(); } }
+        // Steps/mm ($100-$102) - deterministic from the drive; the value a machine preset is most useful for.
+        public double StepsPerMm { get { return _stepsPerMm; } set { _stepsPerMm = value; OnPropertyChanged(); } }
         // Max feed rate ($110-$112), mm/min (deg/min for rotaries).
         public double MaxRate { get { return _maxRate; } set { _maxRate = value; OnPropertyChanged(); } }
         // Sensible starting rate for typical CNC steppers: slower vertical Z/W, faster horizontals, deg/min for rotaries.
@@ -82,6 +84,51 @@ namespace CNC.Controls
         public string NewValue { get; set; }
     }
 
+    // A starting-point preset for a known machine. Arrays are X,Y,Z; null = "leave the current value".
+    // These SEED the wizard fields - the user still confirms every step. Sourced starting points, not
+    // guarantees: steps/mm can vary with microstepping/belt upgrades, and the home corner is build-specific.
+    public class MachinePreset
+    {
+        public string Name { get; set; }
+        public double[] StepsPerMm { get; set; }   // $100-$102
+        public double[] MaxRate { get; set; }      // $110-$112 (mm/min)
+        public double[] Travel { get; set; }       // $130-$132 (stored, mm)
+        public int HomingDirMask { get; set; } = -1;   // $23 suggestion; -1 = leave
+        public bool? Homing { get; set; }              // $22 enable suggestion; null = leave
+        public string Note { get; set; }
+        public override string ToString() { return Name; }   // ComboBox display
+
+        // Sourced shortlist (see research). First entry is the no-op "Custom" default.
+        public static System.Collections.Generic.List<MachinePreset> List
+        {
+            get
+            {
+                return new System.Collections.Generic.List<MachinePreset>
+                {
+                    new MachinePreset { Name = "Custom / not listed (enter manually)" },
+                    new MachinePreset { Name = "Sienci LongMill MK2 — 30×30",
+                        StepsPerMm = new[]{ 200d, 200d, 200d }, MaxRate = new[]{ 4000d, 4000d, 3000d },
+                        Travel = new[]{ 810d, 855d, 120d }, HomingDirMask = 3, Homing = false,
+                        Note = "Sienci-published (original LongBoard; MK2.5/SuperLongBoard differ)." },
+                    new MachinePreset { Name = "Carbide3D Shapeoko 3 — XXL",
+                        StepsPerMm = new[]{ 40d, 40d, 320d }, Travel = new[]{ 838d, 838d, 95d },
+                        Note = "Belt X/Y (~40 steps/mm); confirm Z steps/mm and exact travel for your unit." },
+                    new MachinePreset { Name = "Inventables X-Carve — 1000mm (pre-2021)",
+                        StepsPerMm = new[]{ 40d, 40d, 188.95d }, MaxRate = new[]{ 8000d, 8000d, 500d },
+                        Travel = new[]{ 750d, 750d, 100d },
+                        Note = "2021 upgrade kit (9mm belts / extended Z) changes $100/$101/$102/$132." },
+                    new MachinePreset { Name = "BobsCNC Evolution 4",
+                        StepsPerMm = new[]{ 80d, 80d, 400d }, Travel = new[]{ 610d, 610d, 85d }, Homing = false,
+                        Note = "Ships without limit switches - no homing." },
+                    new MachinePreset { Name = "Generic CNC 3018 / Genmitsu 3018-PROVer",
+                        StepsPerMm = new[]{ 800d, 800d, 800d }, MaxRate = new[]{ 1000d, 1000d, 800d },
+                        Travel = new[]{ 299d, 179d, 44d },
+                        Note = "Steps/mm vary by board/microstepping (also 400 or 1600 seen) - verify." },
+                };
+            }
+        }
+    }
+
     #endregion
 
     public partial class MachineSetupWizard : UserControl, IGrblConfigTab
@@ -104,6 +151,10 @@ namespace CNC.Controls
         #region Dependency properties bound from XAML
 
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
+        public System.Collections.Generic.List<MachinePreset> Presets { get; } = MachinePreset.List;
+
+        public static readonly DependencyProperty PresetNoteProperty = DependencyProperty.Register(nameof(PresetNote), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
+        public string PresetNote { get { return (string)GetValue(PresetNoteProperty); } set { SetValue(PresetNoteProperty, value); } }
 
         public static readonly DependencyProperty StepTitleProperty = DependencyProperty.Register(nameof(StepTitle), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string StepTitle { get { return (string)GetValue(StepTitleProperty); } set { SetValue(StepTitleProperty, value); } }
@@ -211,6 +262,8 @@ namespace CNC.Controls
                 axis.MaxTravel = stored > 0d ? stored + 2d * Setup.HomingPulloff : 0d;
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
                 axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+                double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
+                axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
             }
@@ -221,6 +274,45 @@ namespace CNC.Controls
                 z.HomeAtMin = false;
 
             UpdateHomeCornerText();
+        }
+
+        private void Preset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyPreset((sender as ComboBox)?.SelectedItem as MachinePreset);
+        }
+
+        // Seed the wizard fields from a machine preset (X/Y/Z only). Everything stays editable and the user
+        // still confirms each step. The travel field is PHYSICAL travel, so add back the 2x pull-off the stored
+        // $130-$132 reserves; the home corner is only a suggestion (most hobby machines home front-left).
+        private void ApplyPreset(MachinePreset p)
+        {
+            if (p == null)
+                return;
+            PresetNote = p.Note ?? string.Empty;
+
+            foreach (var axis in Setup.Axes)
+            {
+                if (axis.Index > 2)
+                    continue;   // presets cover X/Y/Z
+                int i = axis.Index;
+                if (p.StepsPerMm != null && i < p.StepsPerMm.Length) axis.StepsPerMm = p.StepsPerMm[i];
+                if (p.MaxRate != null && i < p.MaxRate.Length) axis.MaxRate = p.MaxRate[i];
+                if (p.Travel != null && i < p.Travel.Length) axis.MaxTravel = p.Travel[i] + 2d * Setup.HomingPulloff;
+            }
+
+            if (p.Homing.HasValue)
+                Setup.HomingEnable = p.Homing.Value;
+
+            if (p.HomingDirMask >= 0)
+            {
+                foreach (var axis in Setup.Axes)
+                    if (axis.Index <= 2)
+                        axis.HomeAtMin = (p.HomingDirMask & axis.Bit) != 0;
+                var z = GetAxis("Z");
+                if (z != null)
+                    z.HomeAtMin = false;   // Z homes at top
+                UpdateHomeCornerText();
+            }
         }
 
         #endregion
@@ -283,7 +375,7 @@ namespace CNC.Controls
             string[] titles = {
                 "Welcome",
                 "Travel limits",
-                "Max rate",
+                "Steps/mm && max rate",
                 "Home corner",
                 "Limit sensors",
                 "Homing",
@@ -372,6 +464,8 @@ namespace CNC.Controls
                 double stored = Math.Max(0d, axis.MaxTravel - 2d * Setup.HomingPulloff);
                 targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
                 targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
+                if (axis.StepsPerMm > 0d)   // only write steps/mm when known (current value or a preset) - never clobber with 0
+                    targets[GrblSetting.TravelResolutionBase + axis.Index] = axis.StepsPerMm.ToInvariantString();
             }
 
             targets[GrblSetting.HomingDirMask] =
