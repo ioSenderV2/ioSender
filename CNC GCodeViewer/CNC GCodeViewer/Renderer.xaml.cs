@@ -428,8 +428,9 @@ namespace CNC.Controls.Viewer
                     }
                     break;
 
-                case nameof(Machine.ShowWorkEnvelope):             
-                    Machine.WorkEnvelope = Machine.ShowWorkEnvelope && tokens != null ? workEnvelope : null;
+                case nameof(Machine.ShowWorkEnvelope):
+                    // Also honour the toggle in the program-free machine scene (tokens == null there).
+                    Machine.WorkEnvelope = Machine.ShowWorkEnvelope && (tokens != null || machineSceneActive) ? workEnvelope : null;
                     break;
 
                 case nameof(Machine.ShowJobEnvelope):
@@ -803,7 +804,8 @@ namespace CNC.Controls.Viewer
         // program is loaded (Render owns the scene then) or before travel/tool are known.
         public void ShowMachineScene(bool fitCamera)
         {
-            if (IsJobLoaded || model == null || !IsVisible || tool == null || Machine.ToolMode == ToolVisualizerType.None)
+            // Render the envelope/axes/grid even with no tool visualizer selected; only the cone needs a tool.
+            if (IsJobLoaded || model == null || !IsVisible || tool == null)
                 return;
             if (GrblInfo.MaxTravel.X <= 0d && GrblInfo.MaxTravel.Y <= 0d && GrblInfo.MaxTravel.Z <= 0d)
                 return;   // travel not known yet (settings not read) - nothing to frame

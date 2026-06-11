@@ -1219,6 +1219,13 @@ namespace CNC.Core
 
             HomingDirection = (AxisFlags)GrblSettings.GetInteger(GrblSetting.HomingDirMask);
 
+            // Runtime force-set-origin = $22 bit3 on grblHAL (machine zero AT home, axes travel positive per
+            // $23). Detect it from the SETTING, not the OPT 'Z' capability flag in $I: some builds (notably the
+            // simulator) honor $22 bit3 without advertising 'Z', and the 3D renderer / jog limiter need the real
+            // runtime state to orient the machine frame to the home corner.
+            if (IsGrblHAL)
+                ForceSetOrigin = (GrblSettings.GetInteger(GrblSetting.HomingEnable) & 0x08) != 0;
+
             if (AxisFlags == AxisFlags.None)
             {
                 int i = 0;
