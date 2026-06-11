@@ -84,51 +84,6 @@ namespace CNC.Controls
         public string NewValue { get; set; }
     }
 
-    // A starting-point preset for a known machine. Arrays are X,Y,Z; null = "leave the current value".
-    // These SEED the wizard fields - the user still confirms every step. Sourced starting points, not
-    // guarantees: steps/mm can vary with microstepping/belt upgrades, and the home corner is build-specific.
-    public class MachinePreset
-    {
-        public string Name { get; set; }
-        public double[] StepsPerMm { get; set; }   // $100-$102
-        public double[] MaxRate { get; set; }      // $110-$112 (mm/min)
-        public double[] Travel { get; set; }       // $130-$132 (stored, mm)
-        public int HomingDirMask { get; set; } = -1;   // $23 suggestion; -1 = leave
-        public bool? Homing { get; set; }              // $22 enable suggestion; null = leave
-        public string Note { get; set; }
-        public override string ToString() { return Name; }   // ComboBox display
-
-        // Sourced shortlist (see research). First entry is the no-op "Custom" default.
-        public static System.Collections.Generic.List<MachinePreset> List
-        {
-            get
-            {
-                return new System.Collections.Generic.List<MachinePreset>
-                {
-                    new MachinePreset { Name = "Custom / not listed (enter manually)" },
-                    new MachinePreset { Name = "Sienci LongMill MK2 — 30×30",
-                        StepsPerMm = new[]{ 200d, 200d, 200d }, MaxRate = new[]{ 4000d, 4000d, 3000d },
-                        Travel = new[]{ 810d, 855d, 120d }, HomingDirMask = 3, Homing = false,
-                        Note = "Sienci-published (original LongBoard; MK2.5/SuperLongBoard differ)." },
-                    new MachinePreset { Name = "Carbide3D Shapeoko 3 — XXL",
-                        StepsPerMm = new[]{ 40d, 40d, 320d }, Travel = new[]{ 838d, 838d, 95d },
-                        Note = "Belt X/Y (~40 steps/mm); confirm Z steps/mm and exact travel for your unit." },
-                    new MachinePreset { Name = "Inventables X-Carve — 1000mm (pre-2021)",
-                        StepsPerMm = new[]{ 40d, 40d, 188.95d }, MaxRate = new[]{ 8000d, 8000d, 500d },
-                        Travel = new[]{ 750d, 750d, 100d },
-                        Note = "2021 upgrade kit (9mm belts / extended Z) changes $100/$101/$102/$132." },
-                    new MachinePreset { Name = "BobsCNC Evolution 4",
-                        StepsPerMm = new[]{ 80d, 80d, 400d }, Travel = new[]{ 610d, 610d, 85d }, Homing = false,
-                        Note = "Ships without limit switches - no homing." },
-                    new MachinePreset { Name = "Generic CNC 3018 / Genmitsu 3018-PROVer",
-                        StepsPerMm = new[]{ 800d, 800d, 800d }, MaxRate = new[]{ 1000d, 1000d, 800d },
-                        Travel = new[]{ 299d, 179d, 44d },
-                        Note = "Steps/mm vary by board/microstepping (also 400 or 1600 seen) - verify." },
-                };
-            }
-        }
-    }
-
     #endregion
 
     public partial class MachineSetupWizard : UserControl, IGrblConfigTab
@@ -151,7 +106,7 @@ namespace CNC.Controls
         #region Dependency properties bound from XAML
 
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
-        public System.Collections.Generic.List<MachinePreset> Presets { get; } = MachinePreset.List;
+        public System.Collections.Generic.List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
 
         public static readonly DependencyProperty PresetNoteProperty = DependencyProperty.Register(nameof(PresetNote), typeof(string), typeof(MachineSetupWizard), new PropertyMetadata(string.Empty));
         public string PresetNote { get { return (string)GetValue(PresetNoteProperty); } set { SetValue(PresetNoteProperty, value); } }
@@ -276,26 +231,49 @@ namespace CNC.Controls
             UpdateHomeCornerText();
         }
 
-        private void Preset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        // Cascading Manufacturer -> Product -> Model selector. Picking a model seeds the fields.
+        private void Manufacturer_Changed(object sender, SelectionChangedEventArgs e)
         {
-            ApplyPreset((sender as ComboBox)?.SelectedItem as MachinePreset);
+            var m = cbxManufacturer.SelectedItem as MachineManufacturer;
+            cbxProduct.ItemsSource = m?.Products;
+            cbxProduct.SelectedItem = null;
+            cbxModel.ItemsSource = null;
+            cbxModel.SelectedItem = null;
+            PresetNote = string.Empty;
         }
 
-        // Seed the wizard fields from a machine preset (X/Y/Z only). Everything stays editable and the user
+        private void Product_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            var p = cbxProduct.SelectedItem as MachineProduct;
+            cbxModel.ItemsSource = p?.Models;
+            cbxModel.SelectedItem = null;
+        }
+
+        private void Model_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyPreset(cbxModel.SelectedItem as MachineModel);
+        }
+
+        // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
         // still confirms each step. The travel field is PHYSICAL travel, so add back the 2x pull-off the stored
         // $130-$132 reserves; the home corner is only a suggestion (most hobby machines home front-left).
-        private void ApplyPreset(MachinePreset p)
+        private void ApplyPreset(MachineModel p)
         {
             if (p == null)
                 return;
+            if (!p.Grbl)   // catalogued for reference but not a grbl controller - nothing to seed
+            {
+                PresetNote = p.Note ?? "Not a grbl controller - this wizard configures grbl settings only.";
+                return;
+            }
             PresetNote = p.Note ?? string.Empty;
 
             foreach (var axis in Setup.Axes)
             {
                 if (axis.Index > 2)
-                    continue;   // presets cover X/Y/Z
+                    continue;   // catalog covers X/Y/Z
                 int i = axis.Index;
-                if (p.StepsPerMm != null && i < p.StepsPerMm.Length) axis.StepsPerMm = p.StepsPerMm[i];
+                if (p.StepsPerMm != null && i < p.StepsPerMm.Length && p.StepsPerMm[i] > 0d) axis.StepsPerMm = p.StepsPerMm[i];
                 if (p.MaxRate != null && i < p.MaxRate.Length) axis.MaxRate = p.MaxRate[i];
                 if (p.Travel != null && i < p.Travel.Length) axis.MaxTravel = p.Travel[i] + 2d * Setup.HomingPulloff;
             }

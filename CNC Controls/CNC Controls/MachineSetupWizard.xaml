@@ -67,9 +67,13 @@
                     <TextBlock Text="{Binding Capabilities, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}" Margin="0,2" TextWrapping="Wrap"/>
 
                     <TextBlock Text="Start from a machine preset (optional):" FontWeight="Bold" Margin="0,14,0,2"/>
-                    <ComboBox x:Name="cbxPreset" Width="320" HorizontalAlignment="Left" SelectedIndex="0"
-                              ItemsSource="{Binding Presets, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                              SelectionChanged="Preset_SelectionChanged"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <ComboBox x:Name="cbxManufacturer" Width="180" Margin="0,0,6,0" MinHeight="22"
+                                  ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                  SelectionChanged="Manufacturer_Changed"/>
+                        <ComboBox x:Name="cbxProduct" Width="200" Margin="0,0,6,0" MinHeight="22" SelectionChanged="Product_Changed"/>
+                        <ComboBox x:Name="cbxModel" Width="260" MinHeight="22" SelectionChanged="Model_Changed"/>
+                    </StackPanel>
                     <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,3,0,0" MaxWidth="640" HorizontalAlignment="Left"/>
                     <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0" MaxWidth="640" HorizontalAlignment="Left"
