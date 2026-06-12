@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 21 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-21 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 22 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-22 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -56,13 +56,14 @@
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +388/−19</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">15 files · +634/−58</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">16 files · +779/−62</td></tr>
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
-<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">2 files · +166/−52</td></tr>
-<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">6 files · +686/−1</td></tr>
+<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1194/−1</td></tr>
+<tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz">2 files · +23/−1</td></tr>
 </table>
 </div>
 
@@ -524,16 +525,17 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">141</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">107</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">232</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">134</td><td class="num del">28</td></tr>
-<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">49</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">131</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">68</td><td class="num del">6</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">30</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ioSender XL.csproj</td><td class="num add">12</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">12</td><td class="num del">4</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/ioSender XL.csproj</td><td class="num add">9</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/HelperClasses.cs</td><td class="num add">8</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">7</td><td class="num">0</td></tr>
 <tr><td class="mono">simulator/README.md</td><td class="num add">5</td><td class="num">0</td></tr>
 <tr><td class="mono">readme.md</td><td class="num add">2</td><td class="num">0</td></tr>
@@ -549,6 +551,7 @@
   <li><strong>Auto-start on reconnect:</strong> when the saved target is the simulator the app launches the bundled simulator before connecting (silently &mdash; no confirmation popup), so a startup auto-reconnect to a simulator target brings it up automatically. The choice is remembered (a <code>StartSimulator</code> setting), since a <code>127.0.0.1:&lt;port&gt;</code> target is otherwise indistinguishable from a real network controller.</li>
   <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control's <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
   <li><strong>Simulator robustness &amp; speed:</strong> <code>SimulatorManager</code> reaps any stale instances of the managed simulator before launching (stopping the debugger bypasses the exit cleanup, leaving a zombie that holds the single accept slot and hangs the next connect). A <code>SimulatorSpeedup</code> setting passes the simulator's <code>-t</code> pacing flag (1&nbsp;=&nbsp;real-machine speed, 0&nbsp;=&nbsp;as-fast-as-host). And <code>TelnetStream.ReadComplete</code> captures the stream into a local and bails when closing, so an intentional <code>Close()</code> races to a clean stop instead of an NRE on the in-flight async read.</li>
+  <li><strong>&ldquo;My Machine&rdquo; profile:</strong> <code>SimulatorManager.BuildMyMachineEeprom</code> can mirror a real controller's current <code>$</code> settings into a private <code>MyMachine.DAT</code> EEPROM image by driving a throwaway headless simulator and replaying the settings into it. The Simulator tab then offers a <em>My Machine</em> option that boots the simulator against that image, so connecting to the simulator reproduces the real machine's context (travel, homing, axis setup) rather than the generic default.</li>
 </ul>
 <p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. The simulator / validator binaries come from the grblHAL Simulator build artifacts and are not committed (see <code>simulator/README.md</code>).</p>
 </div>
@@ -672,6 +675,9 @@
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">164</td><td class="num del">52</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">26</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/RenderControl.xaml</td><td class="num add">11</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeEmulator.cs</td><td class="num add">3</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
@@ -680,7 +686,8 @@
   <li><strong>Safe by construction:</strong> the move always retracts <strong>Z to the top of travel first</strong>, then rapids to the new XY, so the traverse can never plough through stock or fixtures. Only X/Y move; plain left-drag still rotates the camera.</li>
   <li><strong>How it maps:</strong> the click ray is intersected with the work Z=0 plane (HelixToolkit <code>UnProject</code>) to recover an XY target, converted to machine coordinates (<code>MPos = WPos + WCO</code>), clamped to the soft-limit travel exactly as the jog limiter does, and emitted as two queued <code>$J=G53</code> jogs at the controller's max rate (<code>$110-$112</code>) so it moves at rapid speed.</li>
   <li><strong>Guarded:</strong> requires homed + idle + max travel set + soft limits (<code>$20</code>) on, with a status-bar reason when a prerequisite is missing. Gated by a <code>GCodeViewerConfig.ClickToJog</code> setting (default on).</li>
-  <li><strong>Orientation fix (prerequisite):</strong> the rendered machine frame &mdash; work envelope, floor grid and crosshair &mdash; now honors the <code>$23</code> homing-direction mask + force-set-origin <em>per axis</em>, so the view matches any home corner (e.g. top-back-left, X+/Y&minus;/Z&minus;) instead of assuming +X/+Y. Standard +X/+Y/&minus;Z machines render identically to before.</li>
+  <li><strong>Orientation fix (prerequisite):</strong> the rendered machine frame &mdash; work envelope, floor grid and crosshair &mdash; now honors the <code>$23</code> homing-direction mask + force-set-origin <em>per axis</em>, so the view matches any home corner (e.g. top-back-left, X+/Y&minus;/Z&minus;) instead of assuming +X/+Y. Standard +X/+Y/&minus;Z machines render identically to before. <code>GrblInfo.ForceSetOrigin</code> now reads the live <code>$22</code> bit&nbsp;3 rather than the <code>$I</code> <code>OPT</code> &lsquo;Z&rsquo; flag (absent on some builds, e.g. the simulator), so the orientation is correct even when the option string omits it. The camera bounding box in the always-on machine scene is derived from the same per-axis envelope, fixing a mirrored home corner in the 3D view.</li>
+  <li><strong>Toolbar tidy-up:</strong> the 3D-view toolbar tooltips now show on disabled buttons and are reworded for consistency, the <em>save view</em> button is no longer needlessly gated, and the <em>show job envelope</em> button enables only with a file loaded. A null-tokens guard in <code>GCodeEmulator</code> avoids a crash when the machine scene renders with no program loaded.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC GCodeViewer chain). Verified on the author's machine: Ctrl+click retracts Z then rapids to the clicked XY at the configured max rate, and the envelope/grid orient to the real home corner.</p>
 </div>
@@ -696,23 +703,50 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">433</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">217</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">24</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">682</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">273</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineCatalog.cs</td><td class="num add">194</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">30</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">8</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
 </table>
 <div class="desc">
-<p>A guided, first-run <strong>Machine Setup Wizard</strong> tab in grbl:Settings that configures the machine-description settings a fresh controller needs &mdash; so a new machine can be described without hunting through the <code>$</code> list. Auto-selected when the machine looks unconfigured (<code>$130-$132</code> all zero).</p>
+<p>A guided, first-run <strong>Machine Setup Wizard</strong> tab in grbl:Settings that configures the machine-description settings a fresh controller needs &mdash; so a new machine can be described without hunting through the <code>$</code> list. Auto-selected when the machine looks unconfigured (no remembered machine, or <code>$130-$132</code> all zero).</p>
 <ul>
-  <li><strong>Seven steps, nothing written until review:</strong> Welcome &rarr; Travel limits &rarr; Home corner &rarr; Limit sensors &rarr; Homing &rarr; Soft limits &rarr; Review &amp; apply. The final page lists the <code>$n: current &rarr; new</code> changes, then writes them with <code>GrblSettings.Save()</code>.</li>
-  <li><strong>Travel:</strong> the entered <em>physical</em> travel is stored to <code>$130-$132</code> reduced by twice the homing pull-off, reserving clearance at both ends.</li>
-  <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>); Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">PR 20</a>).</li>
-  <li><strong>Limit sensors:</strong> live per-axis dots driven by the controller's real-time signal report so you press each switch and watch it register; normally-open is the default, normally-closed ticks set <code>$5</code>; hard limits set <code>$21</code>.</li>
-  <li><strong>Capability-gated:</strong> reads <code>NEWOPT</code> / <code>NumAxes</code> / force-set-origin to show only the relevant questions and axes. A "Start over" button re-reads the controller and resets.</li>
+  <li><strong>Single page, nothing written until applied:</strong> the whole machine description is laid out on one page &mdash; machine selector, a clickable home-position picture, a per-axis table, and the remaining homing &amp; limits questions &mdash; so it reads at a glance instead of an eight-step click-through. <em>Apply</em> writes the changes via <code>GrblSettings.Save()</code>.</li>
+  <li><strong>Machine catalog:</strong> a built-in catalog (<code>MachineCatalog.cs</code>) of common hobby machines as manufacturer&nbsp;&rarr;&nbsp;product&nbsp;&rarr;&nbsp;model drop-downs (or a custom X&times;Y), each carrying a sensible home corner and force-set-origin default; the first entry is a generic XYZ machine with limit switches. Picking a model pre-fills the page, which the user then confirms or tweaks.</li>
+  <li><strong>Axis table:</strong> an editable per-axis grid &mdash; travel limit (<code>$130-$132</code>), max rate (<code>$110-$112</code>), steps/mm (<code>$100-$102</code>), invert direction (<code>$3</code>) and normally-closed limit (<code>$5</code>) &mdash; edited in place.</li>
+  <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>) and auto-enables force-set-origin (<code>$22</code> bit&nbsp;3) on grblHAL; Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">PR 20</a>).</li>
+  <li><strong>Homing &amp; limits:</strong> hard limits (<code>$21</code>) default on, with the remaining global questions as a short list and the explanatory help moved into per-input tooltips. A right-justified <em>Firmware Info</em> button shows the live <code>$I</code> build output in a non-modal dialog.</li>
+  <li><strong>Remembered &amp; forgettable:</strong> the chosen machine is saved (<code>AppConfig.LastMachine</code>) and restored next launch &mdash; keeping the live controller values over the catalog preset on restore &mdash; and a <em>Forget machine</em> button clears it so the wizard reappears next time.</li>
 </ul>
-<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut.</p>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller and the bundled simulator; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut. The first-run gate that forces the wizard to the foreground until a machine is applied, and the &ldquo;copy this machine into the simulator&rsquo;s My Machine profile&rdquo; action, depend on connection-side plumbing and ride along in the integration branch rather than this stand-alone PR.</p>
+</div>
+</div>
+
+<!-- ============ PR 22 ============ -->
+<div class="pr">
+<h2 id="pr22"><span class="badge">PR 22</span>Keyboard jog &mdash; keep active when Job-view focus drifts</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/keyboard-jog-focus</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/keyboard-jog-focus">master&hellip;pr/keyboard-jog-focus</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Keyboard jogging only fired through <code>JobView.OnPreviewKeyDown</code>, which needs keyboard focus inside the Job view's tree. Interacting with a flyout, side panel or menu moves focus out, so the arrow keys stopped jogging until the view was re-focused (e.g. by switching tabs). This keeps jog alive on the Job page wherever focus has drifted.</p>
+<ul>
+  <li><strong>Window-level forwarding:</strong> the existing <code>MainWindow</code> tunneling <code>PreviewKeyDown</code> (always fires) forwards jog keys to <code>JobView.ProcessKeyPreview</code> when the Job view is the current view but is not keyboard-focused. The focused case is unchanged &mdash; <code>JobView</code> still handles it, including its MDI/DRO/spindle/work-params jog gates.</li>
+  <li><strong>Skips text input:</strong> forwarding is suppressed when focus is in any <code>TextBoxBase</code>, so typing in the MDI strip or console prompt never jogs.</li>
+  <li><strong>Clean stop:</strong> a mirrored <code>PreviewKeyUp</code> forwards the key-up too, so a continuous jog started while the view was unfocused still receives its release and stops (no text-input guard here &mdash; an in-progress jog must always cancel).</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (the full ioSender solution). Two-file change reusing the console-shortcut <code>PreviewKeyDown</code> hook already on <code>master</code>; <code>ProcessKeyPreview</code> is promoted to <code>public</code> so the window can forward into it.</p>
 </div>
 </div>
 
