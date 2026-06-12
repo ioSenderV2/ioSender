@@ -28,6 +28,12 @@ namespace CNC.Controls
         // Windows executables (grblHAL_sim.exe + grblHAL_validator.exe). We replicate that request directly.
         public const string WebBuilderUrl = "https://svn.io-engineering.com:8443/builder";
 
+        // Prebuilt, patched (homing-capable) simulator published by CI from the Simulator fork as a stable
+        // "sim-latest" release asset. Preferred over the web builder (which compiles a stock upstream sim that
+        // cannot home). Change the owner here if the fork lives elsewhere.
+        public const string SimulatorReleaseUrl =
+            "https://github.com/stevenrwood/Simulator/releases/download/sim-latest/grblHAL_sim.exe";
+
         // User-editable build definition (a "Save selection" JSON exported from the web builder, Simulator/WIN64).
         // Shipped in the simulator folder so the feature set can be changed without a rebuild; a built-in copy is
         // used if the file is missing. To match a different feature set, re-export it from the web builder.
@@ -60,11 +66,82 @@ namespace CNC.Controls
             return DefaultBuildTemplate;
         }
 
-        // Download the simulator from the grblHAL Web Builder: POST the build definition, receive the .zip of
-        // compiled executables, and extract them into the "simulator" subfolder so FindExecutable then locates
-        // grblHAL_sim.exe. Blocking (a build can take seconds to minutes) - call from a background thread.
-        // Returns false with a reason on failure (no network, server error, or a build report on a 422).
+        // Obtain the simulator. Prefer a prebuilt release asset (a patched, homing-capable build published by CI
+        // from the Simulator fork); fall back to building a stock one via the grblHAL Web Builder when no release
+        // is available. Blocking (a web-builder build can take minutes) - call from a background thread.
         public static bool DownloadSimulator(out string error)
+        {
+            string relErr;
+            if (DownloadFromRelease(out relErr))
+            {
+                error = null;
+                return true;
+            }
+
+            string webErr;
+            if (DownloadFromWebBuilder(out webErr))
+            {
+                error = null;
+                return true;
+            }
+
+            error = "Release download: " + relErr + Environment.NewLine + "Web builder: " + webErr;
+            return false;
+        }
+
+        // GET the prebuilt grblHAL_sim.exe release asset and install it into the simulator subfolder. Returns
+        // false (e.g. "no release found" on a 404) so the caller can fall back to the web builder.
+        private static bool DownloadFromRelease(out string error)
+        {
+            error = null;
+            try
+            {
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(SimulatorReleaseUrl);
+                req.Method = "GET";
+                req.UserAgent = "ioSender";   // GitHub asset downloads expect a User-Agent
+                req.Timeout = req.ReadWriteTimeout = 2 * 60 * 1000;
+
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                {
+                    if (resp.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        error = "the release server returned " + (int)resp.StatusCode + ".";
+                        return false;
+                    }
+                    byte[] bytes;
+                    using (var src = resp.GetResponseStream())
+                    using (var ms = new System.IO.MemoryStream())
+                    {
+                        src.CopyTo(ms);
+                        bytes = ms.ToArray();
+                    }
+                    // Sanity-check it is a Windows executable ('MZ') before installing it.
+                    if (bytes.Length < 2 || bytes[0] != (byte)'M' || bytes[1] != (byte)'Z')
+                    {
+                        error = "the release asset was not an executable.";
+                        return false;
+                    }
+                    string dir = SimulatorDir();
+                    System.IO.Directory.CreateDirectory(dir);
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, SimulatorExeName), bytes);
+                    return true;
+                }
+            }
+            catch (System.Net.WebException wex)
+            {
+                error = "no release found (" + wex.Message + ").";
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // Build the simulator from the grblHAL Web Builder: POST the build definition, receive the .zip of
+        // compiled executables, and extract grblHAL_sim.exe into the "simulator" subfolder so FindExecutable then
+        // locates it. Blocking (a build can take seconds to minutes). Returns false with a reason on failure
+        // (no network, server error, or a build report on a 422).
+        private static bool DownloadFromWebBuilder(out string error)
         {
             error = null;
             try

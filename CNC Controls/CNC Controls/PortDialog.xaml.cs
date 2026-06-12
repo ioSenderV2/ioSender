@@ -97,8 +97,15 @@ namespace CNC.Controls
                     prop.SimulatorExe = AppConfig.Settings.Base.SimulatorExe;
                 prop.SimulatorArgs = AppConfig.Settings.Base.SimulatorArgs ?? string.Empty;
             }
-            chkUseMyMachine.IsChecked = !string.IsNullOrEmpty(prop.SimulatorArgs)
+            // Default to the "My Machine" profile when its EEPROM image exists - the common case is that the
+            // sim should mirror the user's real machine. A saved choice (args already carrying it) still wins;
+            // otherwise it defaults on whenever MyMachine.DAT is present (populate it with "Copy to simulator"
+            // in the Machine Setup Wizard while connected to the real controller).
+            string myMachinePath = SimulatorManager.MyMachineEepromPath();
+            bool myMachineInArgs = !string.IsNullOrEmpty(prop.SimulatorArgs)
                 && prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) >= 0;
+            chkUseMyMachine.IsChecked = myMachineInArgs
+                || (!string.IsNullOrEmpty(myMachinePath) && System.IO.File.Exists(myMachinePath));
             UpdateSimulatorButtons();   // re-evaluate now the saved exe name is applied (offers Download if absent)
 
             if (!string.IsNullOrEmpty(orgport)) {
