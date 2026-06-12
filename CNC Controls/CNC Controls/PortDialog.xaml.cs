@@ -89,6 +89,16 @@ namespace CNC.Controls
 
         public string ShowDialog(string orgport)
         {
+            // Reflect (and round-trip) the saved simulator launch settings, and the "My Machine" toggle.
+            if (AppConfig.Settings.Base != null)
+            {
+                if (!string.IsNullOrWhiteSpace(AppConfig.Settings.Base.SimulatorExe))
+                    prop.SimulatorExe = AppConfig.Settings.Base.SimulatorExe;
+                prop.SimulatorArgs = AppConfig.Settings.Base.SimulatorArgs ?? string.Empty;
+            }
+            chkUseMyMachine.IsChecked = !string.IsNullOrEmpty(prop.SimulatorArgs)
+                && prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) >= 0;
+
             if (!string.IsNullOrEmpty(orgport)) {
 
                 if ((prop.IsWebSocket = orgport.ToLower().StartsWith("ws://")))
@@ -156,6 +166,20 @@ namespace CNC.Controls
             }
 
             Close();
+        }
+
+        // "My Machine" profile: toggle the -e MyMachine.DAT argument into the simulator launch args (which are
+        // persisted), so the simulator boots from the EEPROM mirrored from the user's real controller.
+        private void chkUseMyMachine_Checked(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(prop.SimulatorArgs) || prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) < 0)
+                prop.SimulatorArgs = (string.IsNullOrWhiteSpace(prop.SimulatorArgs) ? string.Empty : prop.SimulatorArgs.Trim() + " ") + "-e " + SimulatorManager.MyMachineEepromName;
+        }
+
+        private void chkUseMyMachine_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(prop.SimulatorArgs))
+                prop.SimulatorArgs = prop.SimulatorArgs.Replace("-e " + SimulatorManager.MyMachineEepromName, string.Empty).Replace("  ", " ").Trim();
         }
 
         private void btnStartSimulator_Click(object sender, RoutedEventArgs e)

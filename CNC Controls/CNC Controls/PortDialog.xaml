@@ -128,6 +128,12 @@
                         <TextBox MinWidth="250" VerticalContentAlignment="Center" Text="{Binding Path=SimulatorArgs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <Label Content="My Machine:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
+                        <CheckBox x:Name="chkUseMyMachine" VerticalAlignment="Center" Content="Boot from my machine's mirrored settings"
+                                  Checked="chkUseMyMachine_Checked" Unchecked="chkUseMyMachine_Unchecked"
+                                  ToolTip="Starts the simulator from MyMachine.DAT. Create/refresh it with 'Copy to simulator' in the Machine Setup Wizard while connected to your real machine."/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
                         <Label x:Uid="lbl_simAuto" Content="Auto-kill:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
                         <CheckBox IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
                     </StackPanel>

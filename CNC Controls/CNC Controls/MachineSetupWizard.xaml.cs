@@ -541,6 +541,26 @@ namespace CNC.Controls
             txtStatus.Text = "Reloaded from controller.";
         }
 
+        // Mirror the controller's current settings into the bundled simulator's "My Machine" EEPROM, so a later
+        // simulator connection boots with the same context as this real machine. Runs off the UI thread (it
+        // briefly drives a headless simulator instance).
+        private async void CopyToSim_Click(object sender, RoutedEventArgs e)
+        {
+            var cmds = GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
+            if (cmds.Count == 0)
+            {
+                txtStatus.Text = "No settings to copy - read settings from the controller first.";
+                return;
+            }
+
+            btnCopyToSim.IsEnabled = false;
+            txtStatus.Text = "Copying settings to the simulator...";
+            string err = null;
+            bool ok = await System.Threading.Tasks.Task.Run(() => SimulatorManager.BuildMyMachineEeprom(cmds, out err));
+            btnCopyToSim.IsEnabled = true;
+            txtStatus.Text = ok ? "Copied to simulator (My Machine)." : ("Copy to simulator failed - " + err);
+        }
+
         // Forget the remembered machine so the first-run setup wizard reappears on the next launch. Does NOT
         // change any controller settings - it only clears the app's record of which machine was chosen.
         private void Forget_Click(object sender, RoutedEventArgs e)
