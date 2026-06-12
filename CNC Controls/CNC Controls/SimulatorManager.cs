@@ -23,6 +23,149 @@ namespace CNC.Controls
             return null;
         }
 
+        // The grblHAL Web Builder build endpoint. "Generate and download firmware" in the browser is a plain
+        // POST of a build-definition JSON to this URL; for the Simulator driver it returns a .zip of the compiled
+        // Windows executables (grblHAL_sim.exe + grblHAL_validator.exe). We replicate that request directly.
+        public const string WebBuilderUrl = "https://svn.io-engineering.com:8443/builder";
+
+        // User-editable build definition (a "Save selection" JSON exported from the web builder, Simulator/WIN64).
+        // Shipped in the simulator folder so the feature set can be changed without a rebuild; a built-in copy is
+        // used if the file is missing. To match a different feature set, re-export it from the web builder.
+        public const string BuildTemplateName = "sim-build.json";
+
+        private const string DefaultBuildTemplate =
+            "{\"driver\":\"Simulator\",\"URL\":\"https://github.com/grblHAL/Simulator\",\"board\":\"WIN64\"," +
+            "\"symbols\":[\"PROBE_ENABLE=1\",\"ACCELERATION_TICKS_PER_SECOND=100\",\"CONTROL_ENABLE=70\"]," +
+            "\"docker_instance\":\"\"}";
+
+        // The app folder's "simulator" subfolder - where FindExecutable looks first and where a download installs to.
+        public static string SimulatorDir()
+        {
+            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "simulator");
+        }
+
+        private static string ReadBuildTemplate()
+        {
+            try
+            {
+                string path = System.IO.Path.Combine(SimulatorDir(), BuildTemplateName);
+                if (System.IO.File.Exists(path))
+                {
+                    string s = System.IO.File.ReadAllText(path);
+                    if (!string.IsNullOrWhiteSpace(s))
+                        return s;
+                }
+            }
+            catch { }
+            return DefaultBuildTemplate;
+        }
+
+        // Download the simulator from the grblHAL Web Builder: POST the build definition, receive the .zip of
+        // compiled executables, and extract them into the "simulator" subfolder so FindExecutable then locates
+        // grblHAL_sim.exe. Blocking (a build can take seconds to minutes) - call from a background thread.
+        // Returns false with a reason on failure (no network, server error, or a build report on a 422).
+        public static bool DownloadSimulator(out string error)
+        {
+            error = null;
+            try
+            {
+                byte[] payload = System.Text.Encoding.UTF8.GetBytes(ReadBuildTemplate());
+
+                // The builder serves TLS on a non-standard port; ensure TLS 1.2 is permitted on .NET 4.6.2.
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(WebBuilderUrl);
+                req.Method = "POST";
+                req.ContentType = "application/json";
+                req.Accept = "application/octet-stream";
+                req.Timeout = req.ReadWriteTimeout = 6 * 60 * 1000;   // builds can take minutes on a cold cache
+                req.ContentLength = payload.Length;
+                using (var rs = req.GetRequestStream())
+                    rs.Write(payload, 0, payload.Length);
+
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                {
+                    if (resp.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        error = "the build server returned " + (int)resp.StatusCode + ".";
+                        return false;
+                    }
+                    byte[] zip;
+                    using (var src = resp.GetResponseStream())
+                    using (var ms = new System.IO.MemoryStream())
+                    {
+                        src.CopyTo(ms);
+                        zip = ms.ToArray();
+                    }
+                    return ExtractSimulator(zip, out error);
+                }
+            }
+            catch (System.Net.WebException wex)
+            {
+                // A failed build (HTTP 422) returns a plain-text build report in the response body - surface it.
+                error = wex.Message;
+                try
+                {
+                    if (wex.Response != null)
+                        using (var s = wex.Response.GetResponseStream())
+                        using (var r = new System.IO.StreamReader(s))
+                        {
+                            string report = r.ReadToEnd();
+                            if (!string.IsNullOrWhiteSpace(report))
+                                error = "the build failed:\n\n" + report.Trim();
+                        }
+                }
+                catch { }
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        public const string SimulatorExeName = "grblHAL_sim.exe";
+
+        // Install the simulator executable from the downloaded build archive. The web builder bundles the
+        // validator (grblHAL_validator.exe) alongside it; we don't use that, so only the simulator is kept.
+        private static bool ExtractSimulator(byte[] zipBytes, out string error)
+        {
+            error = null;
+            try
+            {
+                string dir = SimulatorDir();
+                System.IO.Directory.CreateDirectory(dir);
+
+                int extracted = 0;
+                using (var ms = new System.IO.MemoryStream(zipBytes))
+                using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read))
+                {
+                    foreach (var entry in zip.Entries)
+                    {
+                        if (!string.Equals(entry.Name, SimulatorExeName, StringComparison.OrdinalIgnoreCase))
+                            continue;   // skip the validator and any other archive members
+
+                        string dest = System.IO.Path.Combine(dir, entry.Name);
+                        using (var es = entry.Open())
+                        using (var fs = new System.IO.FileStream(dest, System.IO.FileMode.Create, System.IO.FileAccess.Write))
+                            es.CopyTo(fs);
+                        extracted++;
+                    }
+                }
+
+                if (extracted == 0)
+                {
+                    error = "the downloaded archive did not contain " + SimulatorExeName + ".";
+                    return false;
+                }
+                return true;
+            }
+            catch (System.IO.IOException ioex)
+            {
+                // Most likely the existing exe is locked by a running simulator - tell the user how to clear it.
+                error = "could not write the simulator (is it currently running?):\n" + ioex.Message;
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
         public static bool StartSimulator(string path, string args, bool autoKill)
         {
             try
