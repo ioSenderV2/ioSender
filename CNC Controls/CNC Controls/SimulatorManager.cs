@@ -137,5 +137,96 @@ namespace CNC.Controls
             }
             catch { }
         }
+
+        // The bundled simulator EEPROM that mirrors the user's real machine ("My Machine" profile), kept next
+        // to the simulator exe so the build's *.DAT exclusion leaves it untouched. Null if the sim isn't bundled.
+        public const string MyMachineEepromName = "MyMachine.DAT";
+
+        public static string MyMachineEepromPath()
+        {
+            string exe = FindExecutable("grblHAL_sim.exe");
+            return exe == null ? null : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), MyMachineEepromName);
+        }
+
+        // Build MyMachine.DAT by replaying the given "$id=value" settings into a throwaway, headless instance of
+        // the bundled simulator: it serializes them into its NVRAM file exactly as real grblHAL would, so the
+        // simulator then boots with the same context as the real controller. Settings the sim doesn't support
+        // are simply rejected and skipped. Returns false (with a reason) on failure.
+        public static bool BuildMyMachineEeprom(System.Collections.Generic.IList<string> settingCommands, out string error)
+        {
+            error = null;
+            string exe = FindExecutable("grblHAL_sim.exe");
+            if (exe == null) { error = "the bundled simulator was not found."; return false; }
+            if (settingCommands == null || settingCommands.Count == 0) { error = "no settings to copy."; return false; }
+
+            string eeprom = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), MyMachineEepromName);
+            Process sim = null;
+            try
+            {
+                try { if (System.IO.File.Exists(eeprom)) System.IO.File.Delete(eeprom); } catch { }   // start from defaults
+
+                int port = FreeTcpPort();
+                var psi = new ProcessStartInfo(exe, string.Format("-e \"{0}\" -p {1}", eeprom, port))
+                {
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exe),
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                sim = Process.Start(psi);
+
+                System.Net.Sockets.TcpClient client = null;
+                for (int i = 0; i < 50 && client == null; i++)
+                {
+                    try { client = new System.Net.Sockets.TcpClient("127.0.0.1", port); }
+                    catch { System.Threading.Thread.Sleep(100); }   // wait for the sim to bind its listener
+                }
+                if (client == null) { error = "could not connect to the bundled simulator."; return false; }
+
+                using (client)
+                using (var stream = client.GetStream())
+                {
+                    byte[] buf = new byte[4096];
+                    DrainStream(stream, buf, 400);   // consume the startup banner
+                    foreach (var cmd in settingCommands)
+                    {
+                        byte[] b = System.Text.Encoding.ASCII.GetBytes(cmd + "\r\n");
+                        stream.Write(b, 0, b.Length);
+                        DrainStream(stream, buf, 50);   // wait for ok/error per setting
+                    }
+                    System.Threading.Thread.Sleep(250);   // let the final NVRAM write flush to disk
+                }
+                return System.IO.File.Exists(eeprom);
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+            finally
+            {
+                try { if (sim != null && !sim.HasExited) { sim.Kill(); sim.WaitForExit(2000); } } catch { }
+            }
+        }
+
+        private static int FreeTcpPort()
+        {
+            var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            l.Start();
+            int port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+            l.Stop();
+            return port;
+        }
+
+        private static void DrainStream(System.Net.Sockets.NetworkStream stream, byte[] buf, int ms)
+        {
+            var end = DateTime.UtcNow.AddMilliseconds(ms);
+            while (DateTime.UtcNow < end)
+            {
+                try
+                {
+                    if (stream.DataAvailable)
+                        stream.Read(buf, 0, buf.Length);
+                    else
+                        System.Threading.Thread.Sleep(10);
+                }
+                catch { break; }
+            }
+        }
     }
 }

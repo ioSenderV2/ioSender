@@ -7,7 +7,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         x:Uid="dlg_connection"
-        Title="Sender connection" SizeToContent="Height" MinHeight="240" Width="450" Icon="App.ico" ResizeMode="NoResize">
+        Title="Sender connection" SizeToContent="WidthAndHeight" MinHeight="240" MinWidth="450" Icon="App.ico" ResizeMode="NoResize">
     <Window.Resources>
         <Style x:Key="PortErrorStyle" TargetType="local:NumericTextBox">
             <Style.Triggers>
@@ -96,42 +96,61 @@
                 </StackPanel>
             </TabItem>
             <TabItem x:Uid="tab_simulator" Header="Simulator">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="5,5,0,0">
+                <!-- Shared-size label column so labels (incl. "My Machine:") size to content and align, and the
+                     window (SizeToContent) grows to fit the row contents - presentable at any DPI / font scale. -->
+                <Grid Margin="5,5,5,8" Grid.IsSharedSizeScope="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="simlbl"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="btnStartSimulator" Content="Start" MinWidth="90" Padding="6,2"/>
                         <Button x:Name="btnStopSimulator" Content="Stop" MinWidth="90" Padding="6,2" Margin="5,0,0,0" IsEnabled="False"/>
-                        <TextBlock x:Name="txtSimulatorStatus" Text="Not running" VerticalAlignment="Center" Margin="10,0,0,0" />
+                        <TextBlock x:Name="txtSimulatorStatus" Text="Not running" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,5">
-                        <Label x:Uid="lbl_simExe" Content="Executable:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
-                        <ComboBox IsEditable="True" MinWidth="250" VerticalContentAlignment="Center" Text="{Binding Path=SimulatorExe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <ComboBox.Items>
-                                <sys:String>grblHAL_sim.exe</sys:String>
-                                <sys:String>grblHAL_validator.exe</sys:String>
-                            </ComboBox.Items>
-                        </ComboBox>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,5">
-                        <Label x:Uid="lbl_simPort" Content="Port:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90"/>
-                        <local:NumericTextBox Width="90" Format="####0">
-                            <local:NumericTextBox.Value>
-                                <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
-                                    <Binding.ValidationRules>
-                                        <local:NumericRangeRule Min="0" Max="65535" ValidatesOnTargetUpdated="True" />
-                                    </Binding.ValidationRules>
-                                </Binding>
-                            </local:NumericTextBox.Value>
-                        </local:NumericTextBox>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <Label x:Uid="lbl_simArgs" Content="Args:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
-                        <TextBox MinWidth="250" VerticalContentAlignment="Center" Text="{Binding Path=SimulatorArgs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <Label x:Uid="lbl_simAuto" Content="Auto-kill:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="90" VerticalAlignment="Center"/>
-                        <CheckBox IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
+
+                    <Label x:Uid="lbl_simExe" Grid.Row="1" Grid.Column="0" Content="Executable:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" IsEditable="True" MinWidth="250" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalContentAlignment="Center"
+                              Text="{Binding Path=SimulatorExe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                        <ComboBox.Items>
+                            <sys:String>grblHAL_sim.exe</sys:String>
+                            <sys:String>grblHAL_validator.exe</sys:String>
+                        </ComboBox.Items>
+                    </ComboBox>
+
+                    <Label x:Uid="lbl_simPort" Grid.Row="2" Grid.Column="0" Content="Port:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <local:NumericTextBox Grid.Row="2" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,4,0,0" Format="####0">
+                        <local:NumericTextBox.Value>
+                            <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
+                                <Binding.ValidationRules>
+                                    <local:NumericRangeRule Min="0" Max="65535" ValidatesOnTargetUpdated="True" />
+                                </Binding.ValidationRules>
+                            </Binding>
+                        </local:NumericTextBox.Value>
+                    </local:NumericTextBox>
+
+                    <Label x:Uid="lbl_simArgs" Grid.Row="3" Grid.Column="0" Content="Args:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" MinWidth="250" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalContentAlignment="Center"
+                             Text="{Binding Path=SimulatorArgs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <Label Grid.Row="4" Grid.Column="0" Content="My Machine:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <CheckBox x:Name="chkUseMyMachine" Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
+                              Content="Boot from my machine's mirrored settings"
+                              Checked="chkUseMyMachine_Checked" Unchecked="chkUseMyMachine_Unchecked"
+                              ToolTip="Starts the simulator from MyMachine.DAT. Create/refresh it with 'Copy to simulator' in the Machine Setup Wizard while connected to your real machine."/>
+
+                    <Label x:Uid="lbl_simAuto" Grid.Row="5" Grid.Column="0" Content="Auto-kill:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,4,0,0" IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </Grid>
             </TabItem>
         </TabControl>
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,10">

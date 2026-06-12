@@ -189,7 +189,10 @@
        Mirrors the installed layout (simulator folder next to the exe). -->
   <Target Name="CopySimulator" AfterTargets="Build">
     <ItemGroup>
-      <SimulatorFiles Include="$(ProjectDir)..\..\simulator\**\*" />
+      <!-- Exclude *.DAT: EEPROM.DAT is the simulator's runtime NVRAM (the user's machine settings). Copying
+           it would clobber the configured settings in the output folder on every build. The sim recreates it
+           on first run if absent. -->
+      <SimulatorFiles Include="$(ProjectDir)..\..\simulator\**\*" Exclude="$(ProjectDir)..\..\simulator\**\*.DAT" />
     </ItemGroup>
     <Copy SourceFiles="@(SimulatorFiles)" DestinationFolder="$(OutDir)simulator\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>

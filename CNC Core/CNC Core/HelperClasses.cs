@@ -307,7 +307,10 @@ namespace CNC.Core
         public static bool SingleEvent<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
             var q = new BlockingCollection<TEvent>();
-            Action<TEvent> add = item => q.TryAdd(item);
+            // A DataReceived callback already in-flight on the comms thread can fire this after the finally
+            // block has unsubscribed and disposed q - swallow the resulting ObjectDisposedException (the wait
+            // is already over, so the late item is irrelevant).
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
             subscribe(add);
             try
             {
@@ -330,7 +333,10 @@ namespace CNC.Core
         public static bool AckResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
             var q = new BlockingCollection<TEvent>();
-            Action<TEvent> add = item => q.TryAdd(item);
+            // A DataReceived callback already in-flight on the comms thread can fire this after the finally
+            // block has unsubscribed and disposed q - swallow the resulting ObjectDisposedException (the wait
+            // is already over, so the late item is irrelevant).
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
             subscribe(add);
             try
             {
