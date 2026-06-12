@@ -1,5 +1,18 @@
-Place a prebuilt simulator executable named `simulator.exe` (or `grblHAL_sim.exe`) in the application folder or inside the installer .zip so the installer puts it next to the ioSender executable.
+This folder is where ioSender looks for the bundled grblHAL simulator (`grblHAL_sim.exe`),
+next to the application executable. **No binary is committed to this repository.**
 
-If the user selects the "Simulator" tab in the connection dialog and checks "Start simulator executable (if available)", ioSender will attempt to start `simulator.exe` from the application directory and then connect to `127.0.0.1:<port>` (default port 23).
+There are two ways the executable gets here:
 
-This repository does not include a binary; include a prebuilt simulator from the grblHAL Simulator build artifacts when creating an installer zip.
+1. **Download from the connection dialog (recommended).** When `grblHAL_sim.exe` is not
+   found, the *Simulator* tab shows a **Download** button. It posts the build definition in
+   `sim-build.json` to the grblHAL Web Builder, then extracts `grblHAL_sim.exe` from the
+   returned archive into this folder. To change the simulator's compiled feature set, export a
+   new "Save selection" JSON from the web builder (Simulator driver, Windows board) and replace
+   `sim-build.json`.
+
+2. **Place it manually.** Drop a prebuilt `grblHAL_sim.exe` here (or next to the ioSender
+   executable), e.g. from the grblHAL Simulator build artifacts or your own build.
+
+Once present, the *Simulator* tab can start it and connect to `127.0.0.1:<port>` (default 23).
+Per-machine settings are supplied at runtime via the EEPROM image (`-e`), not baked into the
+build, so the same downloaded executable works for any machine.

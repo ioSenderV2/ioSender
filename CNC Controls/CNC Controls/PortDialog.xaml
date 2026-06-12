@@ -115,6 +115,8 @@
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="btnStartSimulator" Content="Start" MinWidth="90" Padding="6,2"/>
                         <Button x:Name="btnStopSimulator" Content="Stop" MinWidth="90" Padding="6,2" Margin="5,0,0,0" IsEnabled="False"/>
+                        <Button x:Name="btnDownloadSimulator" Content="Download" MinWidth="90" Padding="6,2" Margin="5,0,0,0" Visibility="Collapsed"
+                                ToolTip="Download the grblHAL simulator from the web builder and install it in the application's 'simulator' folder."/>
                         <TextBlock x:Name="txtSimulatorStatus" Text="Not running" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </StackPanel>
 

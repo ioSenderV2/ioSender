@@ -55,6 +55,7 @@ namespace CNC.Controls
             DataContext = prop = new PortProperties();
             btnStartSimulator.Click += btnStartSimulator_Click;
             btnStopSimulator.Click += btnStopSimulator_Click;
+            btnDownloadSimulator.Click += btnDownloadSimulator_Click;
             UpdateSimulatorButtons();
         }
 
@@ -98,6 +99,7 @@ namespace CNC.Controls
             }
             chkUseMyMachine.IsChecked = !string.IsNullOrEmpty(prop.SimulatorArgs)
                 && prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) >= 0;
+            UpdateSimulatorButtons();   // re-evaluate now the saved exe name is applied (offers Download if absent)
 
             if (!string.IsNullOrEmpty(orgport)) {
 
@@ -255,12 +257,44 @@ namespace CNC.Controls
             }
         }
 
+        // Fetch the simulator from the grblHAL web builder when it isn't bundled. Runs off the UI thread (the
+        // build + download can take a while), then re-evaluates so Start becomes available and Download hides.
+        private async void btnDownloadSimulator_Click(object sender, RoutedEventArgs e)
+        {
+            if (SimulatorManager.IsSimulatorRunning)
+                SimulatorManager.StopSimulator();   // release any lock on the exe we are about to overwrite
+
+            btnDownloadSimulator.IsEnabled = false;
+            txtSimulatorStatus.Text = "Downloading simulator from the grblHAL web builder...";
+            string err = null;
+            bool ok = await System.Threading.Tasks.Task.Run(() => SimulatorManager.DownloadSimulator(out err));
+            btnDownloadSimulator.IsEnabled = true;
+
+            if (ok)
+                txtSimulatorStatus.Text = "Simulator downloaded.";
+            else
+                MessageBox.Show("Could not download the simulator:\n\n" + err +
+                    "\n\nYou can also build it manually at the grblHAL Web Builder (Simulator driver, Windows board) " +
+                    "and place grblHAL_sim.exe in the application's 'simulator' folder.",
+                    "Download simulator", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            UpdateSimulatorButtons();
+        }
+
         private void UpdateSimulatorButtons()
         {
             bool running = prop.SimulatorStarted || SimulatorManager.IsSimulatorRunning;
-            btnStartSimulator.IsEnabled = !running;
+            bool found = SimulatorManager.FindExecutable(
+                string.IsNullOrWhiteSpace(prop.SimulatorExe) ? "grblHAL_sim.exe" : prop.SimulatorExe) != null;
+
+            btnStartSimulator.IsEnabled = !running && found;
             btnStopSimulator.IsEnabled = running;
-            txtSimulatorStatus.Text = running ? "Running" : "Not running";
+            btnDownloadSimulator.Visibility = found ? Visibility.Collapsed : Visibility.Visible;
+
+            if (running)
+                txtSimulatorStatus.Text = "Running";
+            else
+                txtSimulatorStatus.Text = found ? "Not running" : "Executable not found - click Download";
         }
 
         private void btnCancel_Click(object sender, RoutedEventArgs e)
