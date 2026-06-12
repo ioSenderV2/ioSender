@@ -478,7 +478,10 @@ namespace CNC.Controls
                 targets[GrblSetting.HardLimitsEnable] = Setup.HardLimitsEnable ? "1" : "0";
             }
 
-            if (GrblInfo.HomingEnabled)
+            // Write the homing settings when the user wants homing (Setup.HomingEnable) OR it is already on -
+            // NOT only when the controller currently has it enabled. On a fresh machine (the wizard's main use
+            // case) homing starts off, so gating on the live state would refuse to ever turn it on.
+            if (Setup.HomingEnable || GrblInfo.HomingEnabled)
             {
                 // $22 is a bit-field on grblHAL (bit0 enable, bit3 force-set-origin, plus single-axis/init-lock/
                 // ... bits) - read-modify-write only the two bits we own so the rest survive. Classic grbl: 0/1.
@@ -497,7 +500,10 @@ namespace CNC.Controls
                 targets[GrblSetting.HomingDebounceDelay] = Setup.HomingDebounce.ToString();
             }
 
-            targets[GrblSetting.SoftLimitsEnable] = Setup.SoftLimitsEnable ? "1" : "0";
+            // grblHAL rejects soft limits ($20=1) unless homing is enabled (error:10), so only request them when
+            // homing will be on. The two-pass write in Apply_Click also guarantees $22 is sent before $20.
+            bool willHome = Setup.HomingEnable || GrblInfo.HomingEnabled;
+            targets[GrblSetting.SoftLimitsEnable] = (Setup.SoftLimitsEnable && willHome) ? "1" : "0";
 
             return targets;
         }
@@ -590,14 +596,53 @@ namespace CNC.Controls
             // Keep the preview in sync so the user sees exactly what is being written.
             expReview.IsExpanded = true;
 
-            foreach (var kv in BuildTargets())
+            var targets = BuildTargets();
+
+            // grblHAL rejects $20=1 (soft limits) unless homing ($22) is already enabled, and GrblSettings.Save()
+            // writes dirty settings in ascending id order ($20 before $22). So apply everything EXCEPT soft limits
+            // first (which enables homing), then soft limits in a second pass once homing is on.
+            string softLimits = null;
+            foreach (var kv in targets)
             {
+                if (kv.Key == GrblSetting.SoftLimitsEnable) { softLimits = kv.Value; continue; }
                 var detail = GrblSettings.Get(kv.Key);
                 if (detail != null)
                     detail.Value = kv.Value;
             }
 
-            if (GrblSettings.Save())
+            bool ok = GrblSettings.Save();
+
+            if (softLimits != null)
+            {
+                var sd = GrblSettings.Get(GrblSetting.SoftLimitsEnable);
+                if (sd != null)
+                {
+                    sd.Value = softLimits;
+                    bool ok2 = GrblSettings.Save();   // separate pass: homing is enabled now, so $20=1 is accepted
+                    ok = ok && ok2;
+                }
+            }
+
+            // Collect any settings the controller rejected (Save records each error: reply on the setting), so we
+            // can tell the user exactly which $ setting failed and why - not just "failed to write settings".
+            var failures = new System.Collections.Generic.List<string>();
+            foreach (var kv in targets)
+            {
+                var detail = GrblSettings.Get(kv.Key);
+                if (detail == null || !detail.HasErrors)
+                    continue;
+
+                string reason = null;
+                var errs = detail.GetErrors(string.Empty);
+                if (errs != null)
+                    foreach (var er in errs) { reason = er?.ToString(); break; }
+
+                failures.Add("$" + (int)kv.Key + "=" + kv.Value
+                    + (string.IsNullOrEmpty(detail.Name) ? string.Empty : "  (" + detail.Name + ")")
+                    + (string.IsNullOrEmpty(reason) ? string.Empty : "  -> " + reason));
+            }
+
+            if (ok && failures.Count == 0)
             {
                 int n = Changes.Count;
                 txtStatus.Text = string.Format("Applied {0} setting(s).", n);
@@ -612,9 +657,17 @@ namespace CNC.Controls
             }
             else
             {
-                txtStatus.Text = "Failed to write settings.";
+                int failed = failures.Count;
+                txtStatus.Text = failed > 0
+                    ? string.Format("Failed to write {0} setting(s) - see details.", failed)
+                    : "Failed to write settings.";
                 if (model != null)
-                    model.Message = "Machine setup: failed to write settings.";
+                    model.Message = "Machine setup: failed to write " + (failed > 0 ? failed + " setting(s)." : "settings.");
+
+                string detail = failures.Count > 0
+                    ? "The controller rejected these settings:\n\n" + string.Join("\n", failures)
+                    : "The controller rejected the settings write (no specific error was reported).";
+                MessageBox.Show(detail, "Machine setup - settings rejected", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
