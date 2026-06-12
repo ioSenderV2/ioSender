@@ -56,7 +56,7 @@
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +388/−19</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">16 files · +779/−62</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">17 files · +973/−62</td></tr>
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
@@ -525,11 +525,11 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">232</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">375</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">165</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">134</td><td class="num del">28</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">131</td><td class="num del">2</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">114</td><td class="num del">14</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">68</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">70</td><td class="num del">6</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">30</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/ioSender XL.csproj</td><td class="num add">12</td><td class="num">0</td></tr>
@@ -537,10 +537,11 @@
 <tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/HelperClasses.cs</td><td class="num add">8</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">7</td><td class="num">0</td></tr>
-<tr><td class="mono">simulator/README.md</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">simulator/README.md</td><td class="num add">18</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">readme.md</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">simulator/sim-build.json</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
 <p>Adds first-class connection setup to the sender: pick USB (serial), Ethernet (<code>host:port</code>, now accepting hostnames as well as IPv4), or a local grblHAL <strong>simulator</strong> from a new tab in the connection dialog, and (re)connect at any time from a menu.</p>
@@ -552,8 +553,9 @@
   <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control's <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
   <li><strong>Simulator robustness &amp; speed:</strong> <code>SimulatorManager</code> reaps any stale instances of the managed simulator before launching (stopping the debugger bypasses the exit cleanup, leaving a zombie that holds the single accept slot and hangs the next connect). A <code>SimulatorSpeedup</code> setting passes the simulator's <code>-t</code> pacing flag (1&nbsp;=&nbsp;real-machine speed, 0&nbsp;=&nbsp;as-fast-as-host). And <code>TelnetStream.ReadComplete</code> captures the stream into a local and bails when closing, so an intentional <code>Close()</code> races to a clean stop instead of an NRE on the in-flight async read.</li>
   <li><strong>&ldquo;My Machine&rdquo; profile:</strong> <code>SimulatorManager.BuildMyMachineEeprom</code> can mirror a real controller's current <code>$</code> settings into a private <code>MyMachine.DAT</code> EEPROM image by driving a throwaway headless simulator and replaying the settings into it. The Simulator tab then offers a <em>My Machine</em> option that boots the simulator against that image, so connecting to the simulator reproduces the real machine's context (travel, homing, axis setup) rather than the generic default.</li>
+  <li><strong>Download the simulator on demand:</strong> when <code>grblHAL_sim.exe</code> is not present, the Simulator tab shows a <em>Download</em> button that fetches it straight from the <strong>grblHAL Web Builder</strong> &mdash; no browser. <code>SimulatorManager.DownloadSimulator</code> POSTs the build definition in <code>simulator/sim-build.json</code> (a &ldquo;Save selection&rdquo; export for the Simulator&nbsp;/&nbsp;Windows target, shipped as an editable resource with a built-in fallback) to the builder's <code>/builder</code> endpoint, then extracts <code>grblHAL_sim.exe</code> from the returned archive into the <code>simulator</code> folder (TLS&nbsp;1.2 forced for the non-standard port; a failed build's text report is surfaced). The validator the builder bundles alongside is discarded. The build carries the firmware feature set only &mdash; per-machine settings still come from the <code>-e</code> EEPROM at runtime, so one download serves any machine.</li>
 </ul>
-<p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. The simulator / validator binaries come from the grblHAL Simulator build artifacts and are not committed (see <code>simulator/README.md</code>).</p>
+<p class="foot">Builds clean (CNC Controls and the full ioSender solution) off <code>master</code>. No simulator binary is committed: the <em>Download</em> button fetches it from the web builder, or place a prebuilt <code>grblHAL_sim.exe</code> manually (see <code>simulator/README.md</code>).</p>
 </div>
 </div>
 
