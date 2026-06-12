@@ -231,6 +231,7 @@
     <Compile Include="StatusControl.xaml.cs">
       <DependentUpon>StatusControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MachineCatalog.cs" />
     <Compile Include="MachineSetupWizard.xaml.cs">
       <DependentUpon>MachineSetupWizard.xaml</DependentUpon>
     </Compile>

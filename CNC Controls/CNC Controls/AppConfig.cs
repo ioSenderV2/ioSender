@@ -278,6 +278,8 @@ namespace CNC.Controls
         public bool ConsoleShowRTAll { get; set; } = false;
         public bool ConsoleWindowOpen { get; set; } = false;
         public string ConsoleShortcut { get; set; } = "Esc";
+        // Last machine picked in the Machine Setup Wizard ("Manufacturer|Product|Model"), restored next run.
+        public string LastMachine { get; set; } = string.Empty;
         public double ConsoleWindowLeft { get; set; } = double.NaN;
         public double ConsoleWindowTop { get; set; } = double.NaN;
         public double ConsoleWindowWidth { get; set; } = double.NaN;
