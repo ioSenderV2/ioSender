@@ -1036,7 +1036,25 @@ namespace CNC.Core
         public static int SerialBufferSize { get; private set; } = 128;
         public static int PlanBufferSize { get; private set; } = 16;
         public static bool ReportProbeResult { get; internal set; } = false;
-        public static bool ForceSetOrigin { get; private set; } = false;
+        private static bool _forceSetOrigin = false;
+        // True when machine zero is set AT the home corner (axes travel positive per $23). On grblHAL this is
+        // the LIVE $22 bit3 runtime setting - read on every access so a re-parse of $I (whose OPT 'Z' flag is
+        // absent on some builds, e.g. the simulator, even when bit3 is set) cannot stomp it back to false. The
+        // OPT-derived value is only a fallback before settings are read / on classic grbl.
+        public static bool ForceSetOrigin
+        {
+            get
+            {
+                if (IsGrblHAL && GrblSettings.IsLoaded)
+                {
+                    int v = GrblSettings.GetInteger(GrblSetting.HomingEnable);
+                    if (v >= 0)
+                        return (v & 0x08) != 0;
+                }
+                return _forceSetOrigin;
+            }
+            private set { _forceSetOrigin = value; }
+        }
         public static bool ExpressionsSupported { get; private set; } = false;
         public static int NumAxes
         {
@@ -3144,6 +3162,13 @@ namespace CNC.Core
 
                     setting.IsDirty = setting.HasErrors;
                 }
+
+                // Re-derive GrblInfo from the now-current settings (max travel, homing direction, step
+                // resolution, ...) so consumers that cache them - the 3D-view machine frame and the
+                // click-to-jog soft-limit clamp - reflect changes made here (e.g. by the Machine Setup
+                // Wizard) instead of the values read at connect.
+                if (Grbl.GrblViewModel != null)
+                    GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
             }
 
             return ok;

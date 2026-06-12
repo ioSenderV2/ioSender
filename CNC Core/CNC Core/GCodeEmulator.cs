@@ -121,6 +121,9 @@ namespace CNC.Core
 
         private IEnumerable<RunAction> run(List<GCodeToken> Tokens)
         {
+            if (Tokens == null)   // program-free render (e.g. work-envelope-only scene) - nothing to emulate
+                yield break;
+
             bool addSub = false, skipping = false;
             double value;
             int pos = 0;
