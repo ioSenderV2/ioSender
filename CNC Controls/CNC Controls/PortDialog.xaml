@@ -125,7 +125,6 @@
                               Text="{Binding Path=SimulatorExe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                         <ComboBox.Items>
                             <sys:String>grblHAL_sim.exe</sys:String>
-                            <sys:String>grblHAL_validator.exe</sys:String>
                         </ComboBox.Items>
                     </ComboBox>
 
