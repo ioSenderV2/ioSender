@@ -32,7 +32,9 @@
 
     <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Menu IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
-            <MenuItem x:Uid="mnu_file" x:Name="menuFile" Header="_File">
+            <MenuItem x:Uid="mnu_file" x:Name="menuFile" Header="_File" SubmenuOpened="menuFile_SubmenuOpened">
+                <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
+                <Separator/>
                 <MenuItem x:Uid="mnu_load" Header="_Load" Click="fileOpenMenuItem_Click"/>
                 <MenuItem x:Uid="mnu_loadFolder" Header="Load _Folder..." Click="fileOpenFolderMenuItem_Click"/>
                 <MenuItem x:Uid="mnu_save" x:Name="menuSaveFile" Header="_Save" IsEnabled="false" Click="fileSaveMenuItem_Click"/>
@@ -72,6 +74,8 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                     </Grid>
                 </ItemsPanelTemplate>
@@ -97,6 +101,30 @@
             <Separator Grid.Column="5" />
             <StatusBarItem Grid.Column="6">
                 <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
+            </StatusBarItem>
+            <Separator Grid.Column="7" />
+            <StatusBarItem Grid.Column="8">
+                <TextBlock x:Uid="lbl_connectionTarget" Text="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <!-- green when a target is connected, red when not -->
+                            <Setter Property="Foreground" Value="ForestGreen"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="{x:Null}">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                    <TextBlock.ContextMenu>
+                        <ContextMenu Opened="targetContextMenu_Opened">
+                            <MenuItem Header="_Validate controller..." Click="validateMenuItem_Click"/>
+                        </ContextMenu>
+                    </TextBlock.ContextMenu>
+                </TextBlock>
             </StatusBarItem>
         </StatusBar>
         <Canvas IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,34,0,0">

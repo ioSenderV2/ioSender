@@ -73,21 +73,24 @@ namespace GCode_Sender
             ui = this;
 //            GCodeViewer = viewer;
             Title = string.Format(Title, version);
-
-            int res;
-            if ((res = AppConfig.Settings.SetupAndOpen(Title, (GrblViewModel)DataContext, App.Current.Dispatcher)) != 0)
-                Environment.Exit(res);
-
             BaseWindowTitle = Title;
 
+            // Load config synchronously now - before any control Loaded handler reads AppConfig.Settings.Base.
+            // Only the connection is deferred (see CompleteStartup), so the window paints before the dialog.
+            int cfg = AppConfig.Settings.LoadConfig(Title);
+            if (cfg != 0)
+            {
+                Environment.Exit(cfg);
+                return;
+            }
+
             CNC.Core.Grbl.GrblViewModel = (GrblViewModel)DataContext;
-            GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
 
             //       SDCardControl.FileSelected += new CNC_Controls.SDCardControl.FileSelectedHandler(SDCardControl_FileSelected);
 
             new PipeServer(App.Current.Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
-            AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
+            AttachBasePropertyChangedHandler();
         }
 
         public string BaseWindowTitle { get; set; }
@@ -120,6 +123,21 @@ namespace GCode_Sender
 
         private void Window_Load(object sender, EventArgs e)
         {
+            // Defer connection setup and all settings-dependent view initialization to ApplicationIdle so the
+            // main window paints before the (possibly blocking) connection dialog appears. Config itself is
+            // already loaded (constructor); only the connection + comms-dependent setup is deferred here.
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new System.Action(CompleteStartup));
+        }
+
+        private void CompleteStartup()
+        {
+            // Open the connection (deferred so the window paints first). res == 2: user cancelled / no
+            // connection - stay open (disconnected) so the user can connect later via the Connect menu item.
+            int res = AppConfig.Settings.OpenConnection(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
+            bool connected = res == 0;
+
+            GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
+
             if (AppConfig.Settings.Base.KeepWindowSize)
             {
                 if (AppConfig.Settings.Base.WindowWidth == -1)
@@ -128,13 +146,26 @@ namespace GCode_Sender
                 {
                     Width = Math.Max(Math.Min(AppConfig.Settings.Base.WindowWidth, SystemParameters.PrimaryScreenWidth), MinWidth);
                     Height = Math.Max(Math.Min(AppConfig.Settings.Base.WindowHeight, SystemParameters.PrimaryScreenHeight), MinHeight);
-                    if (Left + Width > SystemParameters.PrimaryScreenWidth)
-                        Left = 0d;
-                    if (Top + Height > SystemParameters.PrimaryScreenHeight)
-                        Top = 0d;
+
+                    // Restore the saved position when it lands on a connected monitor; otherwise fall back to
+                    // the old clamp so a window saved on a now-disconnected screen can't open off-screen.
+                    double savedLeft = AppConfig.Settings.Base.WindowLeft, savedTop = AppConfig.Settings.Base.WindowTop;
+                    if (!double.IsNaN(savedLeft) && !double.IsNaN(savedTop) && IsOnScreen(savedLeft, savedTop, Width, Height))
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual;
+                        Left = savedLeft;
+                        Top = savedTop;
+                    }
+                    else
+                    {
+                        if (Left + Width > SystemParameters.PrimaryScreenWidth)
+                            Left = 0d;
+                        if (Top + Height > SystemParameters.PrimaryScreenHeight)
+                            Top = 0d;
+                    }
                 }
             }
-            saveWinSize = AppConfig.Settings.Base.KeepWindowSize;
+            saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
             var appconf = getView(getTab(ViewType.AppConfig));
 
             appconf.Setup(UIViewModel, AppConfig.Settings);
@@ -168,9 +199,12 @@ namespace GCode_Sender
 //            UIViewModel.SidebarItems.Add(new SidebarItem(thcControl));
 
             UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
-            System.Threading.Thread.Sleep(50);
-            Comms.com.PurgeQueue();
-            UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+            if (connected)
+            {
+                System.Threading.Thread.Sleep(50);
+                Comms.com.PurgeQueue();
+                UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+            }
 
             // Restore preserved console preferences
             var gvm = DataContext as GrblViewModel;
@@ -200,6 +234,85 @@ namespace GCode_Sender
             GCode.File.AddTransformer(typeof(ArcsToLines), (string)FindResource("MenuArcsToLines"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(GCodeCompress), (string)FindResource("MenuCompress"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(CNC.Controls.DragKnife.DragKnifeViewModel), (string)FindResource("MenuDragKnife"), UIViewModel.TransformMenuItems);
+
+            // First-run gate: with no machine saved yet, jump to the Machine Setup Wizard once the controller is
+            // ready, then return to the normal UI when the user presses Apply (see ForceMachineSetupIfNeeded).
+            if (connected)
+                ForceMachineSetupIfNeeded();
+        }
+
+        private bool _machineSetupForced = false;
+
+        // On first run (no machine saved) wait for the controller to report version + settings, then bring the
+        // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
+        private void ForceMachineSetupIfNeeded()
+        {
+            if (_machineSetupForced || !string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                return;
+
+            int tries = 0;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            timer.Tick += (s, e) =>
+            {
+                bool ready = !string.IsNullOrEmpty(GrblInfo.Version) && GrblSettings.IsLoaded;
+                if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report
+                    return;
+                timer.Stop();
+                if (ready && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                    ShowMachineSetupWizard();
+            };
+            timer.Start();
+        }
+
+        private void ShowMachineSetupWizard()
+        {
+            _machineSetupForced = true;
+
+            CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
+            CNC.Controls.MachineSetupWizard.SetupApplied += OnMachineSetupApplied;
+
+            TabItem tab = getTab(ViewType.GRBLConfig);
+            if (tab != null)
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;   // GrblConfigView.Activate auto-selects the Machine Setup Wizard sub-tab
+            }
+
+            MessageBox.Show(this,
+                "Welcome! No machine is configured yet.\n\nPick your machine (or choose Custom and enter it by hand) and press Apply to finish setup. The normal screen opens once you do.",
+                "Set up your machine", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // The wizard's Apply fired - machine is specified, return to the normal (Grbl) view.
+        private void OnMachineSetupApplied()
+        {
+            CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                TabItem grbl = getTab(ViewType.GRBL);
+                if (grbl == null)
+                    return;
+                tabMode.SelectedItem = grbl;
+                // Move keyboard focus onto the Job view (off the wizard's text inputs) so keyboard jogging is
+                // live again after setup - otherwise keys land in whatever box last had focus (e.g. the MDI/
+                // console prompt) instead of jogging. Deferred to Input priority so it runs after the tab switch.
+                Dispatcher.BeginInvoke(DispatcherPriority.Input, new System.Action(() =>
+                {
+                    if (getView(grbl) is UserControl jv)
+                        jv.Focus();
+                }));
+            }));
+        }
+
+        // True if a window placed at (left, top) of the given size would have a grabbable strip of its title bar
+        // on some connected monitor (the whole virtual desktop), so a position saved on a screen that is no longer
+        // attached is rejected rather than opening the window off-screen.
+        private static bool IsOnScreen(double left, double top, double width, double height)
+        {
+            double vx = SystemParameters.VirtualScreenLeft, vy = SystemParameters.VirtualScreenTop;
+            double vr = vx + SystemParameters.VirtualScreenWidth, vb = vy + SystemParameters.VirtualScreenHeight;
+            const double grab = 120;   // keep at least this much of the title bar reachable
+            return top >= vy - 1 && top < vb - 20 && left + width > vx + grab && left < vr - grab;
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -216,6 +329,23 @@ namespace GCode_Sender
         {
             if (CNC.Core.Grbl.GrblViewModel.IsSDCardJob || !(e.Cancel = !menuFile.IsEnabled))
             {
+                // Remember window placement for next launch (size is also tracked live in Window_SizeChanged;
+                // position has no live handler, so capture it here). Use RestoreBounds when maximized so we
+                // store the un-maximized rectangle, and re-maximize via WindowWidth == -1.
+                if (saveWinSize)
+                {
+                    bool maximized = WindowState == WindowState.Maximized;
+                    Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
+                    AppConfig.Settings.Base.WindowLeft = b.Left;
+                    AppConfig.Settings.Base.WindowTop = b.Top;
+                    if (!maximized)
+                    {
+                        AppConfig.Settings.Base.WindowWidth = b.Width;
+                        AppConfig.Settings.Base.WindowHeight = b.Height;
+                    }
+                    AppConfig.Settings.Save();
+                }
+
                 UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
 
                 if (UIViewModel.Console != null)
@@ -289,14 +419,87 @@ namespace GCode_Sender
             about.ShowDialog();
         }
 
+        // Single item: "Connect..." when disconnected, "Reconnect..." when connected (which disconnects
+        // the current target first, then shows the connection dialog so the user can pick another).
+        private void menuFile_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            bool connected = Comms.com != null && Comms.com.IsOpen;
+            menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
+        }
+
+        private void connectMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
+            if (Comms.com != null && Comms.com.IsOpen)
+                Disconnect();
+
+            int res = AppConfig.Settings.Connect(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
+            if (res == 0 && Comms.com != null && Comms.com.IsOpen)
+            {
+                Comms.com.PurgeQueue();
+                // Activate the GRBL view to run the controller handshake (re-runs it after a disconnect
+                // because PrepareForReconnect() cleared its init state).
+                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
+                    grbl.Activate(true, ViewType.Startup);
+            }
+        }
+
+        private void Disconnect()
+        {
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
+
+            Comms.com.Close(); // explicit close - cancels auto-reconnect (see StreamComms.Close)
+
+            var model = (GrblViewModel)DataContext;
+            model.ConnectionTarget = null; // status bar -> "Not connected"
+            model.IsReady = false;
+
+            // Clear the GRBL view's controller state so the next Connect re-runs the handshake.
+            if (getView(getTab(ViewType.GRBL)) is JobView grbl)
+                grbl.PrepareForReconnect();
+        }
+
+        // Right-click "Target" status item -> Validate. Only enabled while connected; exercises the connected
+        // controller's G-code command set in check mode and reports which features it accepts.
+        private void targetContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.ContextMenu cm && cm.Items.Count > 0 && cm.Items[0] is MenuItem mi)
+                mi.IsEnabled = Comms.com != null && Comms.com.IsOpen;
+        }
+
+        private void validateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ValidateProcessor.Run((GrblViewModel)DataContext);
+        }
+
+        private void AttachBasePropertyChangedHandler()
+        {
+            if (AppConfig.Settings.Base != null)
+            {
+                AppConfig.Settings.Base.PropertyChanged -= Base_PropertyChanged;
+                AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
+            }
+        }
+
         private void Base_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if(e.PropertyName == nameof(Config.KeepWindowSize))
             {
-                if((sender as Config).KeepWindowSize)
+                // Keep the live save flag in sync with the checkbox - it was only ever set at startup, so
+                // enabling the option mid-session previously did nothing until a restart.
+                saveWinSize = (sender as Config).KeepWindowSize;
+                if(saveWinSize)
                 {
-                    AppConfig.Settings.Base.WindowWidth = Width;
-                    AppConfig.Settings.Base.WindowHeight = Height;
+                    // Capture (and persist) the current placement the moment it's enabled so THIS window's
+                    // size and position are remembered, not just whatever it is at the next close.
+                    bool maximized = WindowState == WindowState.Maximized;
+                    Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
+                    AppConfig.Settings.Base.WindowWidth = maximized ? -1 : b.Width;
+                    AppConfig.Settings.Base.WindowHeight = maximized ? -1 : b.Height;
+                    AppConfig.Settings.Base.WindowLeft = b.Left;
+                    AppConfig.Settings.Base.WindowTop = b.Top;
+                    AppConfig.Settings.Save();
                 }
             }
         }
@@ -483,6 +686,7 @@ namespace GCode_Sender
             {
                 // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
                 PreviewKeyDown += MainWindow_PreviewKeyDown;
+                PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
                 // Re-register live when the shortcut is changed in the Key Mappings editor.
                 AppConfig.ConsoleShortcutChanged += registerConsoleShortcut;
                 consoleShortcutHooked = true;
@@ -497,7 +701,25 @@ namespace GCode_Sender
             {
                 openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
                 e.Handled = true;
+                return;
             }
+
+            // Keep keyboard jogging alive on the Job page even when focus has drifted out of the Job view
+            // (a flyout, side panel or the menu). The Job view only sees keys through its own OnPreviewKeyDown,
+            // which requires focus inside its tree; this window-level preview always fires, so forward jog keys
+            // when the Job view is the current view but is not focused. Skip if focus is in any text input
+            // (typing) - the Job view's own handler covers the focused case, including its MDI/DRO gates.
+            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin
+                 && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
+                e.Handled = jobView.ProcessKeyPreview(e);
+        }
+
+        private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            // Mirror the key-down forwarding so a continuous jog started while the Job view was unfocused still
+            // receives its key-up and stops. No text-input guard here: an in-progress jog must always cancel.
+            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin)
+                e.Handled = jobView.ProcessKeyPreview(e);
         }
 
         private static ICNCView getView(TabItem tab)

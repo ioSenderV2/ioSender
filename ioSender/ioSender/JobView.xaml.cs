@@ -178,6 +178,14 @@ namespace GCode_Sender
         public ViewType ViewType { get { return ViewType.GRBL; } }
         public bool CanEnable { get { return true; } }
 
+        // Reset controller state so a fresh Connect (e.g. switching simulators) re-runs the handshake.
+        public void PrepareForReconnect()
+        {
+            initOK = null;
+            isBooted = false;
+            Controller = null;
+        }
+
         public void Activate(bool activate, ViewType chgMode)
         {
             if (activate)
@@ -477,7 +485,10 @@ namespace GCode_Sender
                 base.OnPreviewKeyDown(e);
         }
 
-        protected bool ProcessKeyPreview(KeyEventArgs e)
+        // Public so MainWindow can forward jog keys here when focus has drifted out of the Job view
+        // (e.g. into a flyout, side panel or the menu) - otherwise OnPreviewKeyDown never fires and jogging
+        // "dies" until the view is re-focused. The allowJog gate (focus in MDI/DRO/spindle/work-params) still applies.
+        public bool ProcessKeyPreview(KeyEventArgs e)
         {
             bool claimed = model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || DRO.IsFocused || spindleControl.IsFocused || workParametersControl.IsFocused), this);
 /*

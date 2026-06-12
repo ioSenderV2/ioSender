@@ -342,8 +342,17 @@ namespace GCode_Sender
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
                 TabItem grbl = getTab(ViewType.GRBL);
-                if (grbl != null)
-                    tabMode.SelectedItem = grbl;
+                if (grbl == null)
+                    return;
+                tabMode.SelectedItem = grbl;
+                // Move keyboard focus onto the Job view (off the wizard's text inputs) so keyboard jogging is
+                // live again after setup - otherwise keys land in whatever box last had focus (e.g. the MDI/
+                // console prompt) instead of jogging. Deferred to Input priority so it runs after the tab switch.
+                Dispatcher.BeginInvoke(DispatcherPriority.Input, new System.Action(() =>
+                {
+                    if (getView(grbl) is UserControl jv)
+                        jv.Focus();
+                }));
             }));
         }
 
