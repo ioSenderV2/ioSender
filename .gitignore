@@ -26,3 +26,13 @@ obj/
 # =========================
 # Operating System Files
 # =========================
+
+# Local build / runtime artifacts
+*.csproj.user
+*.code-workspace
+__pycache__/
+EEPROM.DAT
+MyMachine.DAT
+simulator/EEPROM.DAT
+simulator/MyMachine.DAT
+scene_debug.log
