@@ -246,7 +246,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
-        private bool _autoSaveSettings = false, _promptOnSave = false;
+        private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -264,6 +264,10 @@ namespace CNC.Controls
             }
         }
         public int PollInterval { get { return _pollInterval < 100 ? 100 : _pollInterval; } set { _pollInterval = value; OnPropertyChanged(); } }
+        // Go-To safety: lift Z to machine top, traverse X/Y, then descend Z - so a Go To (WCS origin, G28, G30)
+        // clears any fixtures/stock standing up in Z instead of cutting a diagonal. Needs homing + soft limits;
+        // falls back to a single move otherwise.
+        public bool SafeGotoZ { get { return _safeGotoZ; } set { _safeGotoZ = value; OnPropertyChanged(); } }
         public string PortParams { get; set; } = "COMn:115200,N,8,1";
         public int ResetDelay { get; set; } = 2000;
         // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch

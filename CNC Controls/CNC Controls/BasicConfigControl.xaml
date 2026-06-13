@@ -28,6 +28,7 @@
             <CheckBox x:Uid="lbl_addLineNumbers" Content='Add line numbers' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=AddLineNumbers, Mode=TwoWay}" ToolTip="Add linenumbers if the controller is configured to report them."/>
             <CheckBox x:Uid="lbl_autoSaveSettings" Content='Auto-save settings on exit' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveSettings, Mode=TwoWay}" ToolTip="Save App settings automatically when leaving this tab or closing, instead of using the Save settings button."/>
             <CheckBox x:Uid="lbl_promptOnSave" Content='Prompt before auto-saving' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="25,0,0,0" IsChecked="{Binding Path=PromptOnSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveSettings}" ToolTip="Show a confirm/discard list of changed settings before auto-saving."/>
+            <CheckBox x:Uid="lbl_safeGotoZ" Content='Safe Z on Go To' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=SafeGotoZ, Mode=TwoWay}" ToolTip="When going to a work-coordinate origin (G54-G59.3), G28 or G30, first lift Z to machine top, then move X/Y, then descend - so the move clears any fixtures or stock standing up in Z. Requires homing and soft limits ($20) on; otherwise a single move is used."/>
         </StackPanel>
     </GroupBox>
 </UserControl>
