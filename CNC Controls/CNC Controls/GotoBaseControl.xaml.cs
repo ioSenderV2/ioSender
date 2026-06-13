@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
+using CNC.GCode;
 using System.Collections.ObjectModel;
 
 namespace CNC.Controls
@@ -59,17 +60,42 @@ namespace CNC.Controls
 
         private void button_Click(object sender, RoutedEventArgs e)
         {
-            if((string)(sender as Button).Tag == "G5x") {
-                var cs = GrblWorkParameters.GetCoordinateSystem(CoordinateSystem);
-                if (cs != null)
-                {
-                    var pos = cs.ToString(GrblInfo.AxisFlags);
+            var model = DataContext as GrblViewModel;
+            if (model == null)
+                return;
 
-                    (DataContext as GrblViewModel).ExecuteCommand("G53G0" + pos);
-                }
+            string tag = (string)(sender as Button).Tag;
+
+            // Resolve the target machine position: the selected work-coordinate origin (G54-G59.3) for the
+            // "G5x" button, or the G28/G30 secondary home for those buttons.
+            CoordinateSystem cs = GrblWorkParameters.GetCoordinateSystem(tag == "G5x" ? CoordinateSystem : tag);
+
+            // Safe Z: lift Z to machine top first, traverse X/Y (and any rotaries), then descend Z - so the move
+            // clears any fixtures or stock standing up in Z instead of cutting a diagonal through them. Requires
+            // homing (machine coordinates valid) and soft limits ($20, so the moves are envelope-checked) and a
+            // known target; otherwise fall back to the single move.
+            if (AppConfig.Settings.Base.SafeGotoZ && cs != null && model.HomedState == HomedState.Homed
+                 && GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1
+                 && GrblInfo.AxisFlags.HasFlag(AxisFlags.Z))
+            {
+                // Machine Z0 is the homed top (already top-minus-pull-off with force-set-origin), the highest
+                // point reachable without re-tripping the Z limit.
+                string planar = cs.ToString(GrblInfo.AxisFlags & ~AxisFlags.Z);
+                model.ExecuteCommand("G53G0Z0");
+                if (!string.IsNullOrEmpty(planar))
+                    model.ExecuteCommand("G53G0" + planar);
+                model.ExecuteCommand("G53G0" + cs.ToString(AxisFlags.Z));
+                return;
+            }
+
+            // Fallback: original single (coordinated) move.
+            if (tag == "G5x")
+            {
+                if (cs != null)
+                    model.ExecuteCommand("G53G0" + cs.ToString(GrblInfo.AxisFlags));
             }
             else
-                (DataContext as GrblViewModel).ExecuteCommand((string)(sender as Button).Tag);
+                model.ExecuteCommand(tag);
         }
 
         private void CoordinateSystems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
