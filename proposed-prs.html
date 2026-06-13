@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 22 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-22 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 23 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-23 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -64,6 +64,7 @@
 <tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
 <tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1247/−1</td></tr>
 <tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz">2 files · +23/−1</td></tr>
+<tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz">3 files · +40/−8</td></tr>
 </table>
 </div>
 
@@ -750,6 +751,31 @@
   <li><strong>Clean stop:</strong> a mirrored <code>PreviewKeyUp</code> forwards the key-up too, so a continuous jog started while the view was unfocused still receives its release and stops (no text-input guard here &mdash; an in-progress jog must always cancel).</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (the full ioSender solution). Two-file change reusing the console-shortcut <code>PreviewKeyDown</code> hook already on <code>master</code>; <code>ProcessKeyPreview</code> is promoted to <code>public</code> so the window can forward into it.</p>
+</div>
+</div>
+
+<!-- ============ PR 23 ============ -->
+<div class="pr">
+<h2 id="pr23"><span class="badge">PR 23</span>Go To &mdash; optional safe-Z (lift, traverse, descend)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/safe-z-goto</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/safe-z-goto">master&hellip;pr/safe-z-goto</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GotoBaseControl.xaml.cs</td><td class="num add">34</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>A <strong>Go To</strong> a work-coordinate origin (G54&ndash;G59.3), <code>G28</code> or <code>G30</code> was a single coordinated rapid &mdash; a straight diagonal in machine space that can drag Z through clamps, fixtures or tall stock on the way. This adds an optional safe-Z decomposition so the traverse always happens clear of anything standing up in Z.</p>
+<ul>
+  <li><strong>Three-phase move:</strong> with <em>Safe Z on Go To</em> enabled, each Go To becomes <code>G53 G0 Z0</code> (retract to machine top), then <code>G53 G0 X&hellip;Y&hellip;</code> (traverse at the safe height), then <code>G53 G0 Z&hellip;</code> (descend to the target). Machine <code>Z0</code> is the homed top &mdash; already top-minus-pull-off with force-set-origin &mdash; so it never re-trips the Z limit, and it needs no configured clearance height (it clears anything that physically fits under the gantry).</li>
+  <li><strong>All Go To targets:</strong> applies uniformly to the selected work origin and to G28/G30, read from the same <code>$#</code>-populated coordinate table the work-origin button already used (so G28/G30 get true X/Y-then-Z, not a firmware diagonal). Rotary axes travel with X/Y; only Z is separated.</li>
+  <li><strong>Guarded, with a clean fallback:</strong> gated on the <em>Safe Z on Go To</em> option (Settings:App&nbsp;&rarr;&nbsp;Main, default on), the machine being <strong>homed</strong> (machine coordinates valid) and <strong>soft limits</strong> (<code>$20</code>) on so the three rapids are envelope-checked. If any is missing it falls back to the original single coordinated move &mdash; no behaviour change for unhomed/soft-limits-off setups.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (both apps). The setting lives in the Base app config so it shows in the always-present Main settings panel regardless of jog mode; grbl's junction deviation (~0.01&nbsp;mm) means the corners are effectively full stops, so no dwell is needed between phases.</p>
 </div>
 </div>
 
