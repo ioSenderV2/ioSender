@@ -2807,6 +2807,7 @@ namespace CNC.Core
                         IsDirty = _loaded == null || _value != _loaded;
                         OnPropertyChanged();
                         OnPropertyChanged(nameof(FormattedValue));
+                        OnPropertyChanged(nameof(BitfieldLabels));
                         OnPropertyChanged(nameof(IsModified));
                         NotifyGroup();
                     }
@@ -2851,6 +2852,33 @@ namespace CNC.Core
                 }
 
                 return _value;
+            }
+        }
+
+        // For BITFIELD/XBITFIELD settings, the set flags decoded to their labels (one per line) for use as a
+        // tooltip - the display value stays numeric. Null for other data types or when nothing is set, so the
+        // binding leaves the tooltip off. Bit i maps to Format.Split(',')[i], matching the settings editor
+        // (Widget.cs, Tag = 1 << i, "N/A" entries skipped).
+        public string BitfieldLabels
+        {
+            get
+            {
+                if (_value == null || (DataType != DataTypes.BITFIELD && DataType != DataTypes.XBITFIELD))
+                    return null;
+
+                if (!int.TryParse(_value, out int mask) || mask == 0)
+                    return null;
+
+                string[] labels = Format.Split(',');
+                string res = string.Empty;
+
+                for (int i = 0; i < labels.Length; i++)
+                {
+                    if ((mask & (1 << i)) != 0 && labels[i] != "N/A")
+                        res += (res.Length == 0 ? string.Empty : "\n") + labels[i].Trim();
+                }
+
+                return res == string.Empty ? null : res;
             }
         }
 
