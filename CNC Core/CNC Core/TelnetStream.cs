@@ -86,7 +86,21 @@ namespace CNC.Core
 
             if (parameter.Length == 2) try
             {
-                ipserver = new TcpClient(parameter[0], int.Parse(parameter[1]));
+                // Connect with a short timeout. The synchronous TcpClient(host, port) constructor blocks on the
+                // OS connect timeout (~21s) when the host is unreachable - e.g. while the controller is rebooting -
+                // which stalls the reconnect retry loop so long it looks like it gave up. Cap it so each retry is
+                // quick and we reconnect within ~a second of the controller coming back.
+                var client = new TcpClient();
+                var ar = client.BeginConnect(parameter[0], int.Parse(parameter[1]), null, null);
+                if (!ar.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(3000)) || !client.Connected)
+                {
+                    try { client.Close(); } catch { }
+                    ipserver = null;
+                    ipstream = null;
+                    return false;
+                }
+                client.EndConnect(ar);
+                ipserver = client;
                 ipserver.NoDelay = true;
                 ipstream = ipserver.GetStream();
                 ipstream.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
@@ -152,14 +166,13 @@ namespace CNC.Core
 
         public void PurgeQueue()
         {
-            try
-            {
-                while (ipstream != null && ipstream.DataAvailable)
-                    ipstream.ReadByte();
-            }
-            catch { }
+            // Do NOT read ipstream directly here. A continuous async BeginRead (ReadComplete) is always in
+            // flight, and a second, synchronous read on the same NetworkStream is illegal - the two race and
+            // drop bytes. During a YModem transfer (PurgeQueue runs before every block) this lost the per-block
+            // ACKs, so blocks timed out and retried to CAN: 0-byte files and multi-minute uploads. The async
+            // reader already drains the socket into 'input'; clearing that buffer is the correct, race-free purge.
             Reply = string.Empty;
-            if (!EventMode)
+            lock (input)
                 input.Clear();
         }
 
@@ -189,12 +202,18 @@ namespace CNC.Core
             return c;
         }
 
+        // Write synchronously, NOT WriteAsync. YModem sends three back-to-back WriteBytes per block
+        // (header, payload, CRC); un-awaited WriteAsync calls overlap, and a second write while the first
+        // is still pending throws "a write is already in progress" - swallowed by the catch, silently
+        // dropping the payload/CRC. The controller then never sees a complete block, never ACKs, and the
+        // transfer times out and CANs (0-byte files). Synchronous Write serialises the bytes correctly;
+        // on a local/normal connection it returns as soon as the OS buffers them.
         public void WriteByte(byte data)
         {
             try
             {
                 if (ipstream != null && IsOpen)
-                    ipstream.WriteAsync(new byte[1] { data }, 0, 1);
+                    ipstream.Write(new byte[1] { data }, 0, 1);
             }
             catch (Exception ex)
             {
@@ -207,7 +226,7 @@ namespace CNC.Core
             try
             {
                 if (ipstream != null && IsOpen)
-                    ipstream.WriteAsync(bytes, 0, len);
+                    ipstream.Write(bytes, 0, len);
             }
             catch (Exception ex)
             {
@@ -286,9 +305,16 @@ namespace CNC.Core
             bool failed = false;
             byte[] buffer = (byte[])iar.AsyncState;
 
+            // Close() disposes and nulls ipstream while this read may still be in flight. Capture the
+            // field once into a local so an intentional close races to a clean stop instead of throwing
+            // a NullReferenceException when EndRead dereferences a field that just became null.
+            NetworkStream stream = ipstream;
+            if (closing || stream == null)
+                return;
+
             try
             {
-                bytesAvailable = ipstream.EndRead(iar);
+                bytesAvailable = stream.EndRead(iar);
             }
             catch
             {
@@ -326,8 +352,12 @@ namespace CNC.Core
 
             try
             {
-                if (ipstream != null && ipserver.Connected)
-                    ipstream.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
+                // Same close race as above: re-read both fields into locals and bail if a close slipped
+                // in, so we never dereference a nulled ipserver while re-arming the read.
+                NetworkStream s = ipstream;
+                TcpClient server = ipserver;
+                if (!closing && s != null && server != null && server.Connected)
+                    s.BeginRead(buffer, 0, buffer.Length, ReadComplete, buffer);
             }
             catch
             {

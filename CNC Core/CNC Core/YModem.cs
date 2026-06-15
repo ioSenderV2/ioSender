@@ -157,12 +157,15 @@ namespace CNC.Core
 
             new Thread(() =>
             {
+            // Generous per-packet ACK timeouts: writing each block to a used/fragmented flash filesystem
+            // (e.g. littlefs garbage collection) can take several seconds, and too short a wait makes the
+            // transfer retry/abort mid-file - leaving a truncated, hard-to-delete file. 10s to open, 5s per block.
             wait = WaitFor.SingleEvent<int>(
                 cancellationToken,
                 s => GetByte(s),
                 a => Comms.com.ByteReceived += a,
                 a => Comms.com.ByteReceived -= a,
-                packetNum == 0 ? 8000 : 2000, () => Comms.com.WriteBytes(crc, 2));
+                packetNum == 0 ? 10000 : 5000, () => Comms.com.WriteBytes(crc, 2));
             }).Start();
 
             while (wait == null)
