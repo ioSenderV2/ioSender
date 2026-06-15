@@ -557,6 +557,13 @@ namespace GCode_Sender
                 // because PrepareForReconnect() cleared its init state).
                 if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
                     grbl.Activate(true, ViewType.Startup);
+
+                // A menu (re)connect can target a different controller than startup did (e.g. simulator ->
+                // real machine), so re-run the first-run wizard gate + ATC macro check against the now-
+                // connected controller. Startup only runs these from CompleteStartup; without this a target
+                // switch skips provisioning (no Start Job seed, no upload prompt) even though $I now reports
+                // a different (ATC) controller. ForceMachineSetupIfNeeded polls for the new $I/settings.
+                ForceMachineSetupIfNeeded();
             }
         }
 
