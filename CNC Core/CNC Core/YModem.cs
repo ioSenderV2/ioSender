@@ -82,15 +82,22 @@ namespace CNC.Core
 
             if (TransferInitalPacket(remoteName ?? Path.GetFileName(path), fileStream) == TransferState.ACK)
             {
+                // Always send 128-byte (SOH) blocks, never 1024-byte (STX). grblHAL's YModem receiver buffers
+                // into a ring of RX_BUFFER_SIZE (1024) whose usable capacity is 1023 bytes - so a full 1024-byte
+                // STX packet (hdr 3 + payload 1024 + crc 2 = 1029) cannot fit. Over a slow serial link the
+                // firmware drains byte-by-byte and never fills, but over telnet the whole block arrives in a TCP
+                // burst faster than the foreground loop drains it -> buffer overflow -> corrupt packet -> the
+                // transfer stalls/retries. 128-byte blocks (133 bytes on the wire) fit with margin and are
+                // reliable on any transport. (More blocks = more round-trips, but these files are small.)
                 do
                 {
                     packetNum++;
-                    if (bytesRemaining < 1024)
+                    if (bytesRemaining < 128)
                         ClearPayload();
-                    bytes = fileStream.Read(payload, 0, 1024);
+                    bytes = fileStream.Read(payload, 0, 128);
                     bytesRemaining -= bytes;
                     DataTransferred?.Invoke(fileStream.Length, fileStream.Length - bytesRemaining);
-                    state = TransferPacket(bytes <= 128 ? 128 : 1024);
+                    state = TransferPacket(128);
                 } while (bytesRemaining > 0 && state == TransferState.ACK);
 
                 if(state == TransferState.ACK)
