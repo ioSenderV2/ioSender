@@ -55,11 +55,11 @@
 <tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
-<tr><td class="n">14</td><td><a href="#pr14">Combined SD + LittleFS file browser</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">6 files · +388/−19</td></tr>
+<tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">8 files · +819/−131</td></tr>
 <tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">17 files · +1056/−62</td></tr>
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
-<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +137/−7</td></tr>
+<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +166/−7</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
 <tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
 <tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1247/−1</td></tr>
@@ -489,7 +489,7 @@
 
 <!-- ============ PR 14 ============ -->
 <div class="pr">
-<h2 id="pr14"><span class="badge">PR 14</span>Combined SD + LittleFS file browser on the SD Card tab</h2>
+<h2 id="pr14"><span class="badge">PR 14</span>SD + LittleFS file browser &amp; file manager on the SD Card tab</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/sdcard-filesystems</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
@@ -497,22 +497,29 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">505</td><td class="num del">111</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblFilesystems.cs</td><td class="num add">142</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">136</td><td class="num del">17</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">4</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 <tr><td class="mono">tests/GrblFilesystemsTests.cs</td><td class="num add">83</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">43</td><td class="num del">13</td></tr>
 <tr><td class="mono">tests/README.md</td><td class="num add">22</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">19</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/YModem.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
 <p>The SD Card tab listed only one filesystem (the SD card, or whatever was the current filesystem). On grblHAL builds that have both an SD card and a LittleFS store, the other filesystem &mdash; and any macros on it &mdash; were invisible.</p>
-<p>This enumerates every mounted filesystem via <code>$FI</code> (<code>[FS:&lt;name&gt;@&lt;path&gt; size, free]</code>) and lists them together in one grid with a new <strong>Location</strong> column, plus a per-filesystem <strong>free-space banner</strong> above the list. <em>Run</em> / <em>Download&nbsp;and&nbsp;run</em> / <em>Delete</em> now target the file's own filesystem &mdash; a bare name on the root volume (unchanged single-SD behaviour) or an absolute path on a sub-mount such as <code>/littlefs</code>.</p>
+<p>This enumerates every mounted filesystem via <code>$FI</code> (<code>[FS:&lt;name&gt;@&lt;path&gt; size, free]</code>) and lists them together in one grid with a new <strong>Location</strong> column, plus a per-filesystem <strong>free-space banner</strong> above the list. The right-click menu is reworked from <em>Run</em>&nbsp;/&nbsp;<em>Download&nbsp;and&nbsp;run</em>&nbsp;/&nbsp;<em>Delete</em> into a small <strong>file manager</strong>, and file operations target the file's own filesystem &mdash; a bare name on the root volume (unchanged single-SD behaviour) or an absolute path on a sub-mount such as <code>/littlefs</code>.</p>
 <ul>
+  <li><strong>File manager menu:</strong> <em>View</em> / <em>Edit</em> / <em>Create</em> (new content, or from a local file) open the file in Notepad &mdash; Edit and Create write the result back to the controller when Notepad closes; <em>Load</em> and <em>Load&nbsp;and&nbsp;run</em> bring the program into ioSender; <em>Copy&nbsp;to</em> / <em>Move&nbsp;to</em> transfer a file to another mounted filesystem (submenus built live from the mounts); <em>Delete</em>. Actions are enabled only for a real selected file.</li>
+  <li><strong>Empty filesystems are visible:</strong> a mount with no files gets a placeholder row so it can still be selected as an upload / copy target; the listing's re-entrant <code>Load()</code> is guarded (it pumps the dispatcher while waiting on the controller, so an overlapping refresh could corrupt the shared table).</li>
+  <li><strong>Correct attribution under nested mounts:</strong> a root <code>$F</code> recurses into sub-mounts, so an SD-root listing also returned the <code>/littlefs/*</code> files; each result is now attributed to its deepest containing mount, so files are not duplicated under (and mis-pathed on) the parent filesystem.</li>
+  <li><strong>Upload to any filesystem:</strong> <code>UploadLocalFile</code> targets a chosen filesystem via <code>$CWD</code> (the FTP path is built from the explicit destination, not the possibly-stale <code>FsCwd</code>), and upload is allowed on a LittleFS-only controller (no SD card present, so no SD mount status to require).</li>
+  <li><strong>Upload reliability:</strong> <code>TelnetStream</code> now writes <em>synchronously</em> &mdash; overlapped <code>WriteAsync</code> calls silently dropped a YModem block's payload/CRC &mdash; and <code>PurgeQueue</code> clears the async-read buffer instead of racing a second synchronous read on the same stream (which lost per-block ACKs, producing 0-byte files and multi-minute uploads); plus a bounded connect timeout so a reconnect retries quickly. YModem per-block ACK timeouts are raised (10&nbsp;s open / 5&nbsp;s block) to ride out flash-filesystem GC stalls.</li>
   <li><strong>Backward compatible:</strong> builds that don't implement <code>$FI</code> (or report nothing mounted, <code>error:65</code>) return no <code>[FS:&hellip;]</code> lines, and the view falls back to the original single-filesystem mount + <code>$F</code> listing untouched. An SD card with files in its root works exactly as before, now also showing free space.</li>
   <li><strong>New <code>GrblFilesystems.cs</code></strong> holds pure, dependency-free helpers (mount-line parser, human-readable size, path qualification, free-space summary) and the <code>FsMount</code> model; the live <code>$FI</code>/<code>$F</code> querying lives in <code>GrblSDCard</code>.</li>
   <li><strong>Unit tested:</strong> <code>tests/GrblFilesystemsTests.cs</code> exercises the pure helpers (29 assertions, run via the Framework <code>csc</code> &mdash; see <code>tests/README.md</code>; the app has no test project).</li>
 </ul>
-<p class="foot">Builds clean (CNC Controls and the full ioSender solution). Groundwork the paused ATC macro-provisioning work can reuse to target the <code>$FI</code>-discovered LittleFS path instead of a hardcoded one.</p>
+<p class="foot">Builds clean (CNC Controls and the full ioSender solution). Also the groundwork (and the reliable LittleFS upload path) that the ATC macro-provisioning work reuses to target the <code>$FI</code>-discovered LittleFS path instead of a hardcoded one.</p>
 </div>
 </div>
 
@@ -622,8 +629,8 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">65</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">40</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">93</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">41</td><td class="num del">5</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">32</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
@@ -632,6 +639,7 @@
   <li><strong>Revert from a right-click menu:</strong> <em>Revert to value at startup</em> on a setting, and <em>Revert all in group to value at startup</em> on a group node.</li>
   <li><strong>Three baselines, cleanly separated:</strong> <code>GrblSettingDetails</code> now tracks the current value, the frozen <em>startup</em> value (drives the <code>IsModified</code> highlight) and the <em>loaded</em> controller value (drives the <code>IsDirty</code> needs-write state). Making <code>IsDirty</code> mean "differs from the controller" rather than "changed" fixes a spurious "settings changed, save now?" prompt when reverting an edit back to the controller value.</li>
   <li><strong>Live group highlight:</strong> <code>GrblSettingGroup</code> implements <code>INotifyPropertyChanged</code> so a group's marker updates as its settings change.</li>
+  <li><strong>Bitfield flag tooltip:</strong> <code>BITFIELD</code>/<code>XBITFIELD</code> settings still display numerically, but hovering the value now shows the set flags decoded to their labels (one per line, <code>N/A</code> entries skipped) via a new <code>GrblSettingDetails.BitfieldLabels</code> property &mdash; so you can see which options a bitfield enables without opening the editor.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator. Per-setting "revert to factory default" is intentionally deferred &mdash; grblHAL exposes no per-setting default (only the global <code>$RST=$</code> reset-all), so factory revert would need a future firmware-side snapshot of as-flashed values.</p>
 </div>
