@@ -326,11 +326,15 @@ namespace CNC.Core
                         // A named O-word flow statement (O<name> CALL/SUB/RETURN/...) must reach the controller
                         // verbatim: the block parser collapses the inter-token space (O<cal> CALL -> O<cal>CALL),
                         // which the controller rejects with "error:81 - Unknown flow statement". The controller
-                        // evaluates these itself, so skip local parsing and forward the original line unchanged
-                        // (this is how they ran when the macro was streamed via $F=).
+                        // evaluates these itself, so skip local parsing and forward the line as file streaming
+                        // would. ParseBlock normally strips comments; since we bypass it we must strip them here
+                        // too - a leaked ";"/"(...)" comment on the O-word line also trips error:81.
                         string trimmed = original.TrimStart();
                         if (parser.ExpressionsSupported && trimmed.Length > 1 && (trimmed[0] == 'O' || trimmed[0] == 'o') && trimmed[1] == '<')
+                        {
+                            commands[i] = StripGCodeComments(original).TrimEnd();
                             continue;
+                        }
 
                         try
                         {
@@ -365,6 +369,26 @@ namespace CNC.Core
         {
             if (macro != null && macro != string.Empty)
                 ExecuteMacro(macro.Split('\n'));
+        }
+
+        // Strip g-code comments from a single block: everything from the first ';' (line comment) and any
+        // '(...)' groups. Used when forwarding an O-word call line unparsed, so a trailing comment does not
+        // reach the controller (which would otherwise fault the line). Square-bracket '[...]' expression
+        // arguments are NOT comments and are preserved.
+        private static string StripGCodeComments(string s)
+        {
+            int sc = s.IndexOf(';');
+            if (sc >= 0)
+                s = s.Substring(0, sc);
+
+            int open;
+            while ((open = s.IndexOf('(')) >= 0)
+            {
+                int close = s.IndexOf(')', open + 1);
+                s = close >= 0 ? s.Remove(open, close - open + 1) : s.Substring(0, open);
+            }
+
+            return s;
         }
 
         private bool canExecuteStartFromBlock(int block)
