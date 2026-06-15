@@ -1,0 +1,45 @@
+; start_job.macro - one-button stock setup (ioSender-side macro).
+;
+; Runs through ioSender's MacroProcessor (line-by-line via MDI), referenced by the
+; "Start Job" macro entry as @start_job.macro and re-read on every run - edit this
+; file directly to change the sequence. NOT provisioned to the controller's littlefs;
+; cal.macro / probe_tfl.macro / tc.macro still live there and are resolved by the
+; O<...> CALL and M6 T8 lines below.
+;
+; The operator install-probe hold is an (MBOX) ioSender dialog, not a firmware M0:
+; an M0 here deadlocked ioSender on cycle-start resume. (WAITIDLE) holds streaming
+; until each controller-side step finishes before the next MDI line is sent.
+;
+; Prerequisites assume the machine is already homed (home it first - this macro does
+; NOT run $H) and that G28 / G30 / G59.3 are set to valid machine positions and the
+; probe macros are present and callable (ATC=1).
+;
+; Sequence: park (G30) -> install probe -> approach (G28) -> load probe radius (cal)
+; -> probe TFL corner & set G54 (probe_tfl) -> reference TLO with probe (M6 T8).
+; Reserve T8 in CAM - it is the sentinel that tells tc.macro to take the reference path.
+
+(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)
+
+G49                ; clear any residual TLO from a prior session
+G30                ; rapid to the probe-install (foam bin) position
+(WAITIDLE)         ; let the rapid finish so the machine is parked before the operator is prompted
+
+(MBOX, OKCANCEL, Install 3D probe and seat it fully, then click OK. Cancel aborts the job.)
+
+G28                ; rapid to the corner-probe approach position
+(WAITIDLE)         ; at the approach position before the probe routine runs
+
+#<_tlo_ref> = 0    ; reset the TLO reference global (controller-side parameter)
+
+O<cal> CALL                          ; load #<_probe_radius> (cal.macro on littlefs)
+(WAITIDLE)         ; cal.macro is a controller subroutine; let it finish so #<_probe_radius> is set before it is read
+
+O<probe_tfl> CALL [#<_probe_radius>] ; probe the TFL corner, set G54 origin (probe_tfl.macro on littlefs)
+(WAITIDLE)         ; probing motion + G54 set must finish before the reference tool-change
+
+(MBOX, OK, Reference: leave the probe in the spindle. Click OK to set the TLO reference at G30.)
+
+M6 T8              ; T8 sentinel -> tc.macro reference path: probe puck, store probe machine-Z as TLO ref, park at G30
+(WAITIDLE)         ; M6/tc.macro runs a full probe cycle on the controller; finish it before declaring done
+
+(MBOX, OK, Setup complete. Load your cutting program; the first M6 will prompt for a tool swap.)

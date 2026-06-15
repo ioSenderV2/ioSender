@@ -1087,6 +1087,9 @@ namespace CNC.Core
         public static int NumTools { get; private set; } = 0;
         public static int NumFans { get; private set; } = 0;
         public static bool HasATC { get; private set; }
+        // ATC is required (an ATC is configured) but its tc.macro is not present yet ($I [NEWOPT:...] "ATC=0").
+        // Drives auto-provisioning of the ATC support macros; once installed the firmware reports ATC (=1).
+        public static bool AtcMacrosRequired { get; private set; }
         public static bool HasEnums { get; private set; }
         public static bool HasSettingDescriptions { get; private set; }
         public static bool HasSimpleProbeProtect { get { return _probeProtect & IsGrblHAL && Build >= 20200924; } internal set { _probeProtect = value; } }
@@ -1095,6 +1098,7 @@ namespace CNC.Core
         public static bool HasFS { get; private set; }
         public static bool HasSDCard { get; private set; }
         public static string UploadProtocol { get; private set; } = string.Empty;
+        public static bool HasYModem { get; private set; }   // "YM" advertised: can stream files to $CWD over the link
         public static string IpAddress { get; private set; } = string.Empty;
         public static bool HasPIDLog { get; private set; }
         public static bool HasProbe { get { return Probes.Count != 0; } }
@@ -1444,13 +1448,21 @@ namespace CNC.Core
 
                     case "NEWOPT":
                         NewOptions = valuepair[1];
+                        HasATC = AtcMacrosRequired = HasYModem = false;   // re-evaluated from this $I's flags below
                         string[] s2 = valuepair[1].Split(',');
                         foreach (string value in s2)
                         {
                             if (value.StartsWith("TMC="))
                                 TrinamicDrivers = value.Substring(4);
                             else if (value.StartsWith("ATC="))
-                                HasATC = true;
+                            {
+                                // ATC=1: tc.macro present, ATC functional. ATC=0: ATC needed but tc.macro
+                                // missing - flag for provisioning rather than treating ATC as ready.
+                                if (value.Substring(4) == "0")
+                                    AtcMacrosRequired = true;
+                                else
+                                    HasATC = true;
+                            }
                             else if (value.StartsWith("PROBES="))
                             {
                                 UpdateProbes((Probes)int.Parse(value.Substring(7)));
@@ -1501,6 +1513,7 @@ namespace CNC.Core
                                         break;
 
                                     case "YM":
+                                        HasYModem = true;
                                         if (UploadProtocol == string.Empty)
                                             UploadProtocol = "YModem";
                                         break;
@@ -2836,6 +2849,7 @@ namespace CNC.Core
                         IsDirty = _loaded == null || _value != _loaded;
                         OnPropertyChanged();
                         OnPropertyChanged(nameof(FormattedValue));
+                        OnPropertyChanged(nameof(BitfieldLabels));
                         OnPropertyChanged(nameof(IsModified));
                         NotifyGroup();
                     }
@@ -2880,6 +2894,33 @@ namespace CNC.Core
                 }
 
                 return _value;
+            }
+        }
+
+        // For BITFIELD/XBITFIELD settings, the set flags decoded to their labels (one per line) for use as a
+        // tooltip - the display value stays numeric. Null for other data types or when nothing is set, so the
+        // binding leaves the tooltip off. Bit i maps to Format.Split(',')[i], matching the settings editor
+        // (Widget.cs, Tag = 1 << i, "N/A" entries skipped).
+        public string BitfieldLabels
+        {
+            get
+            {
+                if (_value == null || (DataType != DataTypes.BITFIELD && DataType != DataTypes.XBITFIELD))
+                    return null;
+
+                if (!int.TryParse(_value, out int mask) || mask == 0)
+                    return null;
+
+                string[] labels = Format.Split(',');
+                string res = string.Empty;
+
+                for (int i = 0; i < labels.Length; i++)
+                {
+                    if ((mask & (1 << i)) != 0 && labels[i] != "N/A")
+                        res += (res.Length == 0 ? string.Empty : "\n") + labels[i].Trim();
+                }
+
+                return res == string.Empty ? null : res;
             }
         }
 

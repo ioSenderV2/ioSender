@@ -83,7 +83,10 @@ namespace CNC.Controls
                     return;
                 }
 
-                CanUpload = GrblInfo.UploadProtocol != string.Empty && (DataContext as GrblViewModel).SDCardMountStatus != SDState.Undetected;
+                // Allow upload to any mounted filesystem: an SD card must be present (mounted), but a LittleFS-only
+                // controller (HasFS without HasSDCard) has no SD mount status, so don't require one there.
+                CanUpload = GrblInfo.UploadProtocol != string.Empty && GrblInfo.HasFS
+                            && (!GrblInfo.HasSDCard || (DataContext as GrblViewModel).SDCardMountStatus != SDState.Undetected);
                 CanDelete = GrblInfo.Build >= 20210421;
                 CanViewAll = GrblInfo.Build >= 20230312;
                 CanRewind = GrblInfo.IsGrblHAL;
@@ -198,57 +201,254 @@ namespace CNC.Controls
                 txtFreeSpace.Text = GrblSDCard.FreeSpace;
         }
 
-        private void DownloadRun_Click(object sender, RoutedEventArgs e)
+        private void Load_Click(object sender, RoutedEventArgs e) { LoadFile(false); }
+        private void LoadRun_Click(object sender, RoutedEventArgs e) { LoadFile(true); }
+
+        // Download the selected file into ioSender's program view; when run, also start it on the controller
+        // (after a confirm, since it moves the machine).
+        private void LoadFile(bool run)
         {
-            if (currentFile != null && (int)currentFile["Size"] > 0 && !isMacro((string)currentFile["Name"]) && MessageBox.Show(string.Format((string)FindResource("DownloandRun"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+            if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker || (int)currentFile["Size"] <= 0)
+                return;
+
+            if (run && MessageBox.Show(string.Format((string)FindResource("DownloandRun"), (string)currentFile["Name"]), "ioSender",
+                                        MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
+                return;
+
+            var model = DataContext as GrblViewModel;
+
+            using (new UIUtils.WaitCursor())
             {
-                var model = DataContext as GrblViewModel;
+                bool? res = null;
+                CancellationToken cancellationToken = new CancellationToken();
 
-                using (new UIUtils.WaitCursor())
+                Comms.com.PurgeQueue();
+
+                model.SuspendProcessing = true;
+                model.Message = string.Format((string)FindResource("Downloading"), (string)currentFile["Name"]);
+
+                GCode.File.AddBlock((string)currentFile["Name"], CNC.Core.Action.New);
+
+                new Thread(() =>
                 {
-                    bool? res = null;
-                    CancellationToken cancellationToken = new CancellationToken();
+                    res = WaitFor.AckResponse<string>(
+                        cancellationToken,
+                        response => AddBlock(response),
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
+                }).Start();
 
-                    Comms.com.PurgeQueue();
+                while (res == null)
+                    EventUtils.DoEvents();
 
-                    model.SuspendProcessing = true;
-                    model.Message = string.Format((string)FindResource("Downloading"), (string)currentFile["Name"]);
+                model.SuspendProcessing = false;
 
-                    GCode.File.AddBlock((string)currentFile["Name"], CNC.Core.Action.New);
+                GCode.File.AddBlock(string.Empty, CNC.Core.Action.End);
+            }
 
-                    new Thread(() =>
-                    {
-                        res = WaitFor.AckResponse<string>(
-                            cancellationToken,
-                            response => AddBlock(response),
-                            a => model.OnResponseReceived += a,
-                            a => model.OnResponseReceived -= a,
-                            400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
-                    }).Start();
+            model.Message = string.Empty;
 
-                    while (res == null)
-                        EventUtils.DoEvents();
+            if (Rewind)
+                Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_REWIND);
 
-                    model.SuspendProcessing = false;
-
-                    GCode.File.AddBlock(string.Empty, CNC.Core.Action.End);
-                }
-
-                model.Message = string.Empty;
-
-                if (Rewind)
-                    Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_REWIND);
-
-                FileSelected?.Invoke("SDCard:" + (string)currentFile["Name"], Rewind);
+            FileSelected?.Invoke("SDCard:" + (string)currentFile["Name"], Rewind);
+            if (run)
                 Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + TargetName(currentFile));
 
-                Rewind = false;
+            Rewind = false;
+        }
+
+        // ---- View / Edit / Create: hand the text-file app (Notepad) a copy of the content. ----------------
+
+        private void View_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker)
+                return;
+            OpenInEditor((string)currentFile["Name"], ReadFileContent(currentFile), false, null);
+        }
+
+        private void Edit_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker)
+                return;
+            OpenInEditor((string)currentFile["Name"], ReadFileContent(currentFile), true, currentFile["Path"] as string);
+        }
+
+        private void CreateNew_Click(object sender, RoutedEventArgs e)
+        {
+            string name = PromptFileName("Create file", "new.nc");
+            if (string.IsNullOrEmpty(name))
+                return;
+            // New file goes to the selected row's filesystem, else the root volume.
+            string destPath = currentFile != null ? currentFile["Path"] as string : "/";
+            OpenInEditor(name, string.Empty, true, destPath);
+        }
+
+        private void CreateFromFile_Click(object sender, RoutedEventArgs e)
+        {
+            Upload_Click(sender, e);   // pick a local file and upload it (to the selected row's filesystem)
+        }
+
+        // Read a controller file's full text content via $F<= (dump). Pumps events like the download path.
+        private string ReadFileContent(DataRow row)
+        {
+            var model = DataContext as GrblViewModel;
+            var sb = new System.Text.StringBuilder();
+            bool? res = null;
+            CancellationToken ct = new CancellationToken();
+
+            using (new UIUtils.WaitCursor())
+            {
+                Comms.com.PurgeQueue();
+                model.SuspendProcessing = true;
+                model.Message = string.Format((string)FindResource("Downloading"), (string)row["Name"]);
+
+                new Thread(() =>
+                {
+                    res = WaitFor.AckResponse<string>(
+                        ct,
+                        response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[")) sb.AppendLine(response); },
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(row)));
+                }).Start();
+
+                while (res == null)
+                    EventUtils.DoEvents();
+
+                model.SuspendProcessing = false;
             }
+
+            model.Message = string.Empty;
+            return sb.ToString();
+        }
+
+        // Write content to a temp file and open it in Notepad. When block is true (Edit/Create) wait off-thread
+        // for Notepad to close, then upload the (edited) temp to destPath and reload; View just opens it.
+        private void OpenInEditor(string fileName, string content, bool block, string destPath)
+        {
+            string baseName = System.IO.Path.GetFileName(fileName);   // controller names may carry a leading '/'
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ioSenderFiles");
+
+            string temp;
+            try
+            {
+                System.IO.Directory.CreateDirectory(dir);
+                temp = System.IO.Path.Combine(dir, baseName);
+                System.IO.File.WriteAllText(temp, content ?? string.Empty);
+            }
+            catch (System.Exception ex) { (DataContext as GrblViewModel).Message = ex.Message; return; }
+
+            if (!block)
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", "\"" + temp + "\"") { UseShellExecute = false }); }
+                catch (System.Exception ex) { (DataContext as GrblViewModel).Message = ex.Message; }
+                return;
+            }
+
+            var model = DataContext as GrblViewModel;
+            model.Message = string.Format("Editing {0} - close Notepad to save...", baseName);
+
+            new Thread(() =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", "\"" + temp + "\"") { UseShellExecute = false }).WaitForExit(); }
+                catch { }
+
+                Dispatcher.Invoke(() =>
+                {
+                    UploadLocalFile(temp, destPath);
+                    try { System.IO.File.Delete(temp); } catch { }
+                    ReloadFiles();
+                });
+            }).Start();
+        }
+
+        // Copy (or move) the selected file to another mounted filesystem: read it, upload to the destination,
+        // and for a move delete the source. Same base name on the destination.
+        private void CopyOrMove(DataRow row, FsMount dest, bool move)
+        {
+            if (row == null || dest == null)
+                return;
+
+            string content = ReadFileContent(row);
+            string baseName = System.IO.Path.GetFileName((string)row["Name"]);
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ioSenderFiles");
+            bool ok = false;
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(dir);
+                string temp = System.IO.Path.Combine(dir, baseName);
+                System.IO.File.WriteAllText(temp, content);
+                ok = UploadLocalFile(temp, dest.Path);
+                try { System.IO.File.Delete(temp); } catch { }
+            }
+            catch (System.Exception ex) { (DataContext as GrblViewModel).Message = ex.Message; }
+
+            if (ok && move)
+                Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_UNLINK + TargetName(row));
+
+            ReloadFiles();
+        }
+
+        // Minimal modal text prompt (no input dialog exists in the app).
+        private string PromptFileName(string title, string initial)
+        {
+            var dlg = new Window {
+                Title = title, Width = 320, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Window.GetWindow(this)
+            };
+            var panel = new StackPanel { Margin = new Thickness(10) };
+            var box = new TextBox { Text = initial ?? string.Empty, Margin = new Thickness(0, 0, 0, 8) };
+            var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var ok = new Button { Content = "OK", Width = 70, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
+            var cancel = new Button { Content = "Cancel", Width = 70, IsCancel = true };
+            string result = null;
+            ok.Click += (s, e) => { result = box.Text.Trim(); dlg.DialogResult = true; };
+            btns.Children.Add(ok); btns.Children.Add(cancel);
+            panel.Children.Add(box); panel.Children.Add(btns);
+            dlg.Content = panel;
+            box.Focus(); box.SelectAll();
+            return dlg.ShowDialog() == true && !string.IsNullOrEmpty(result) ? result : null;
+        }
+
+        // Enable the file actions only for a real selected file (not an empty-mount placeholder), and rebuild
+        // the Copy To / Move To submenus from the currently mounted filesystems.
+        private void ctxMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            bool isFile = currentFile != null && (string)currentFile["Dir"] != GrblSDCard.EmptyMountMarker;
+
+            mnuView.IsEnabled = mnuEdit.IsEnabled = mnuLoad.IsEnabled = mnuLoadRun.IsEnabled = isFile;
+            mnuCopyTo.IsEnabled = mnuMoveTo.IsEnabled = mnuDelete.IsEnabled = isFile;
+
+            BuildCopyMoveSubmenu(mnuCopyTo, false);
+            BuildCopyMoveSubmenu(mnuMoveTo, true);
+        }
+
+        private void BuildCopyMoveSubmenu(MenuItem parent, bool move)
+        {
+            parent.Items.Clear();
+
+            string srcPath = currentFile != null ? currentFile["Path"] as string : null;
+            DataRow row = currentFile;
+
+            foreach (FsMount fs in GrblSDCard.Mounts)
+            {
+                if (fs.Path == srcPath)   // skip the file's own filesystem
+                    continue;
+                var item = new MenuItem { Header = fs.Name, Tag = fs };
+                item.Click += (s, ev) => CopyOrMove(row, (FsMount)((MenuItem)s).Tag, move);
+                parent.Items.Add(item);
+            }
+
+            if (parent.Items.Count == 0)
+                parent.Items.Add(new MenuItem { Header = "(no other filesystem)", IsEnabled = false });
         }
 
         private void Upload_Click(object sender, RoutedEventArgs e)
         {
-            bool ok = false;
             string filename = string.Empty;
             OpenFileDialog file = new OpenFileDialog();
 
@@ -261,78 +461,123 @@ namespace CNC.Controls
 
             if (filename != string.Empty)
             {
-                GrblViewModel model = DataContext as GrblViewModel;
-
-                model.Message = (string)FindResource("Uploading");
-
-                if (GrblInfo.UploadProtocol == "FTP")
-                {
-                    if (GrblInfo.IpAddress == string.Empty)
-                        model.Message = (string)FindResource("NoConnection");
-                    else using(new UIUtils.WaitCursor())
-                    {
-                        model.Message = (string)FindResource("Uploading");
-
-                        if (GrblInfo.Build > 20260308)
-                        {
-                            bool? res = null;
-                            CancellationToken cancellationToken = new CancellationToken();
-
-                            Comms.com.PurgeQueue();
-
-                            new Thread(() =>
-                            {
-                                res = WaitFor.AckResponse<string>(
-                                    cancellationToken,
-                                    null,
-                                    a => model.OnResponseReceived += a,
-                                    a => model.OnResponseReceived -= a,
-                                    300, () => Comms.com.WriteCommand(GrblConstants.CMD_FS_PWD));
-                            }).Start();
-
-                            while (res == null)
-                                EventUtils.DoEvents();
-                        }
-
-                        try
-                        {
-                            using (WebClient client = new WebClient())
-                            {
-                                int port = GrblSettings.GetInteger(grblHALSetting.FtpPort0);
-                                if(port == -1)
-                                    port = GrblSettings.GetInteger(grblHALSetting.FtpPort1);
-                                if (port == -1)
-                                    port = GrblSettings.GetInteger(grblHALSetting.FtpPort2);
-                                string path = string.Format("{0}{1}{2}", model.FsCwd, model.FsCwd.EndsWith("/") ? "" : "/", System.IO.Path.GetFileName(filename));
-
-                                client.Credentials = new NetworkCredential("grblHAL", "grblHAL");
-                                client.UploadFile(string.Format("ftp://{0}:{1}{2}", GrblInfo.IpAddress, port == -1 ? 21 : port, path), WebRequestMethods.Ftp.UploadFile, filename);
-                                ok = true;
-                            }
-                        }
-                        catch (WebException ex)
-                        {
-                            model.Message = ex.Message.ToString() + " " + ((FtpWebResponse)ex.Response).StatusDescription;
-                        }
-                        catch (System.Exception ex)
-                        {
-                            model.Message = ex.Message.ToString();
-                        }
-                    }
-                }
-                else
-                {
-                    model.Message = (string)FindResource("Uploading");
-                    YModem ymodem = new YModem();
-                    ymodem.DataTransferred += Ymodem_DataTransferred;
-                    ok = ymodem.Upload(filename);
-                }
-
-                if(!(GrblInfo.UploadProtocol == "FTP" && !ok))
-                    model.Message = (string)FindResource(ok ? "TransferDone" : "TransferAborted");
-
+                UploadLocalFile(filename, currentFile != null ? currentFile["Path"] as string : null);
                 ReloadFiles();
             }
+        }
+
+        // Upload a local file to the controller, targeting destPath's filesystem (root if null/"/"); the
+        // controller file name is the local base name. Sets status messages and returns success; the caller
+        // reloads. Reused by Upload / Edit-save / Create / Copy / Move.
+        // Upload any missing ATC support macros to the controller filesystem, then refresh the listing so they
+        // show. Reuses this tab's UploadLocalFile so the transfer (target filesystem, FTP/YModem) is the proven
+        // path. Driven by the prompt in MainWindow.CheckAtcMacros after the user accepts.
+        public AtcMacros.ProvisionResult ProvisionAtcMacros(System.Func<AtcMacros.UpdateReason, bool> confirmUpload)
+        {
+            // Use the authoritative shared view model, NOT this view's DataContext: when provisioning runs at
+            // connect the SD Card tab may not have been realized yet, so DataContext is still null and
+            // EnsureProvisioned(null, ...) returns Skipped - which is why the prompt only appeared after the tab
+            // was opened. Grbl.GrblViewModel is always set once connected.
+            GrblViewModel model = Grbl.GrblViewModel;
+            try
+            {
+                var result = AtcMacros.EnsureProvisioned(model, UploadLocalFile, confirmUpload);
+                ReloadFiles();
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                // Never let a provisioning hiccup reach the app's global handler (its modal error box pumps the
+                // dispatcher and can turn one fault into a cascade); surface it on the status bar instead.
+                if (model != null)
+                    model.Message = "ATC macro upload failed: " + ex.Message;
+                return AtcMacros.ProvisionResult.Failed;
+            }
+        }
+
+        private bool UploadLocalFile(string localPath, string destPath)
+        {
+            GrblViewModel model = Grbl.GrblViewModel ?? DataContext as GrblViewModel;   // provisioning can run before this view is realized
+            bool ok = false;
+
+            model.Message = (string)FindResource("Uploading");
+
+            // $CWD makes both the FTP path (re-queried via PWD below) and the YModem write land on the chosen
+            // filesystem; the caller's ReloadFiles restores the root afterwards.
+            if (!string.IsNullOrEmpty(destPath) && destPath != "/")
+                Grbl.WaitForResponse("$CWD=" + destPath.TrimEnd('/'));
+
+            if (GrblInfo.UploadProtocol == "FTP")
+            {
+                if (GrblInfo.IpAddress == string.Empty)
+                    model.Message = (string)FindResource("NoConnection");
+                else using(new UIUtils.WaitCursor())
+                {
+                    model.Message = (string)FindResource("Uploading");
+
+                    if (GrblInfo.Build > 20260308)
+                    {
+                        bool? res = null;
+                        CancellationToken cancellationToken = new CancellationToken();
+
+                        Comms.com.PurgeQueue();
+
+                        new Thread(() =>
+                        {
+                            res = WaitFor.AckResponse<string>(
+                                cancellationToken,
+                                null,
+                                a => model.OnResponseReceived += a,
+                                a => model.OnResponseReceived -= a,
+                                300, () => Comms.com.WriteCommand(GrblConstants.CMD_FS_PWD));
+                        }).Start();
+
+                        while (res == null)
+                            EventUtils.DoEvents();
+                    }
+
+                    try
+                    {
+                        using (WebClient client = new WebClient())
+                        {
+                            int port = GrblSettings.GetInteger(grblHALSetting.FtpPort0);
+                            if(port == -1)
+                                port = GrblSettings.GetInteger(grblHALSetting.FtpPort1);
+                            if (port == -1)
+                                port = GrblSettings.GetInteger(grblHALSetting.FtpPort2);
+                            // Build the FTP path from the explicit destination filesystem when known ($CWD was
+                            // issued to it above), falling back to FsCwd. FsCwd is only refreshed by the PWD
+                            // re-query above on newer builds, so relying on it alone uploaded to the stale root
+                            // (e.g. the absent SD "/") on older firmware - "directory not found".
+                            string dir = string.IsNullOrEmpty(destPath) ? model.FsCwd : destPath;
+                            string path = string.Format("{0}{1}{2}", dir, dir.EndsWith("/") ? "" : "/", System.IO.Path.GetFileName(localPath));
+
+                            client.Credentials = new NetworkCredential("grblHAL", "grblHAL");
+                            client.UploadFile(string.Format("ftp://{0}:{1}{2}", GrblInfo.IpAddress, port == -1 ? 21 : port, path), WebRequestMethods.Ftp.UploadFile, localPath);
+                            ok = true;
+                        }
+                    }
+                    catch (WebException ex)
+                    {
+                        model.Message = ex.Message.ToString() + " " + ((FtpWebResponse)ex.Response).StatusDescription;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        model.Message = ex.Message.ToString();
+                    }
+                }
+            }
+            else
+            {
+                YModem ymodem = new YModem();
+                ymodem.DataTransferred += Ymodem_DataTransferred;
+                ok = ymodem.Upload(localPath);
+            }
+
+            if(!(GrblInfo.UploadProtocol == "FTP" && !ok))
+                model.Message = (string)FindResource(ok ? "TransferDone" : "TransferAborted");
+
+            return ok;
         }
 
         private void Ymodem_DataTransferred(long size, long transferred)
@@ -353,6 +598,9 @@ namespace CNC.Controls
 
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
+            if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker)
+                return;
+
             if (MessageBox.Show(string.Format((string)FindResource("DeleteFile"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
             {
                 if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_UNLINK + TargetName(currentFile)))
@@ -362,7 +610,7 @@ namespace CNC.Controls
 
         private void RunFile()
         {
-            if (currentFile != null)
+            if (currentFile != null && (string)currentFile["Dir"] != GrblSDCard.EmptyMountMarker)
             {
                 (DataContext as GrblViewModel).Message = string.Empty;
 
@@ -418,6 +666,13 @@ namespace CNC.Controls
         // One-line free-space banner across the mounted filesystems (set on each Load).
         public static string FreeSpace { get; private set; }
 
+        // Dir-column marker for an empty-filesystem placeholder row (a mount with no files), so the browser
+        // can show it and use it as an upload target while run/delete skip it.
+        public const string EmptyMountMarker = "fs";
+
+        // Filesystems reported by the last $FI (for the Copy To / Move To submenus). Empty on legacy single-FS.
+        public static List<FsMount> Mounts { get; private set; } = new List<FsMount>();
+
         static GrblSDCard()
         {
             data = new DataTable("Filelist");
@@ -443,40 +698,69 @@ namespace CNC.Controls
             FreeSpace = string.Empty;
         }
 
+        private static bool _loading;
+
         public static void Load(GrblViewModel model, bool ViewAll)
         {
-            grbl = model;
-
-            data.Clear();
-            FreeSpace = string.Empty;
-            id = 0;
-
-            // No point talking to the controller if the link is down or reconnecting - this
-            // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
-            // The user-facing message is set by the caller (SDCardView.Activate).
-            if (Comms.com == null || !Comms.com.IsOpen)
+            // Load pumps the dispatcher (EventUtils.DoEvents) while waiting on the controller, so a refresh
+            // queued meanwhile - tab activation, ATC provisioning - can re-enter and clear/rebuild the shared
+            // DataTable mid-listing. That corrupted the parse state and cascaded into unhandled exceptions
+            // (and a stack overflow via the modal error handler). Ignore re-entrant calls.
+            if (_loading)
                 return;
+            _loading = true;
 
-            // Prefer $FI: it enumerates every mounted filesystem (SD and/or LittleFS) so they can
-            // be shown together with a Location column and per-FS free space. Builds that do not
-            // implement $FI (or that report nothing mounted) return no [FS:...] lines; in that case
-            // fall back to the original single-filesystem listing so behaviour is unchanged.
-            var mounts = GetMounts(model);
-
-            if (mounts.Count > 0)
+            try
             {
-                FreeSpace = GrblFilesystems.FreeSpaceSummary(mounts);
+                grbl = model;
 
-                foreach (var mount in mounts)
-                    ListMount(model, mount.Name, mount.Path, ViewAll);
+                data.Clear();
+                FreeSpace = string.Empty;
+                id = 0;
 
-                // Leave the controller's working directory back at the root.
-                Grbl.WaitForResponse("$CWD=/");
+                // No point talking to the controller if the link is down or reconnecting - this
+                // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
+                // The user-facing message is set by the caller (SDCardView.Activate).
+                if (Comms.com == null || !Comms.com.IsOpen)
+                    return;
+
+                // Prefer $FI: it enumerates every mounted filesystem (SD and/or LittleFS) so they can
+                // be shown together with a Location column and per-FS free space. Builds that do not
+                // implement $FI (or that report nothing mounted) return no [FS:...] lines; in that case
+                // fall back to the original single-filesystem listing so behaviour is unchanged.
+                var mounts = GetMounts(model);
+                Mounts = mounts;
+
+                if (mounts.Count > 0)
+                {
+                    FreeSpace = GrblFilesystems.FreeSpaceSummary(mounts);
+
+                    foreach (var mount in mounts)
+                    {
+                        int before = data.Rows.Count;
+                        ListMount(model, mount.Name, mount.Path, ViewAll);
+                        if (data.Rows.Count == before)
+                            // Empty filesystem: add a non-file placeholder so the mount stays visible and can be
+                            // selected as an upload target. Marked via the (hidden, otherwise unused) Dir column so
+                            // run/delete skip it (see SDCardView), and Upload targets its mount path.
+                            data.Rows.Add(new object[] { id++, EmptyMountMarker, "(no files)", 0, false, mount.Name, mount.Path });
+                    }
+
+                    // Leave the working directory on a valid mount. Restoring to "/" errors (error:63 - Directory
+                    // not found) when the root filesystem isn't mounted - e.g. SD enabled but no card inserted, with
+                    // littlefs at /littlefs - so only use "/" when a mount actually lives there.
+                    string cwd = mounts.Exists(m => m.Path == "/") ? "/" : mounts[0].Path;
+                    Grbl.WaitForResponse("$CWD=" + (cwd.Length > 1 ? cwd.TrimEnd('/') : cwd));
+                }
+                else
+                    LegacyLoad(model, ViewAll);
+
+                data.AcceptChanges();
             }
-            else
-                LegacyLoad(model, ViewAll);
-
-            data.AcceptChanges();
+            finally
+            {
+                _loading = false;
+            }
         }
 
         // Enumerate mounted filesystems via $FI. Empty list => $FI unsupported or nothing mounted
@@ -626,6 +910,23 @@ namespace CNC.Controls
                             break;
                     }
                 }
+
+                // $F at a root filesystem recurses into nested mounts, so a file can be reported while
+                // listing an ancestor - e.g. on a board with the SD card at "/" and LittleFS at
+                // "/littlefs", the SD listing returns the /littlefs/* files too. Attribute each file to
+                // its deepest containing mount; skip it here otherwise, so it isn't duplicated under (and
+                // mis-pathed on) the parent filesystem - the SD card should show "/..." paths, not
+                // "/littlefs/...". Mounts is empty on the legacy single-FS path, so that is unaffected.
+                string owner = curPath;
+                foreach (var m in GrblSDCard.Mounts)
+                {
+                    if (m.Path.Length > owner.Length &&
+                         filename.StartsWith(m.Path.TrimEnd('/') + "/", System.StringComparison.OrdinalIgnoreCase))
+                        owner = m.Path;
+                }
+                if (owner != curPath)
+                    return;
+
                 GrblSDCard.data.Rows.Add(new object[] { id++, "", filename, filesize, invalid, curLocation, curPath });
             }
             else if (data == "error:62" || data == "error:64")

@@ -116,6 +116,7 @@ namespace GCode_Sender
             {
                 model = (GrblViewModel)e.NewValue;
                 model.PropertyChanged += OnDataContextPropertyChanged;
+                model.ReconnectInit += OnReconnectInit;
                 DataContextChanged -= View_DataContextChanged;
                 //          model.OnGrblReset += Model_OnGrblReset;
             }
@@ -224,6 +225,20 @@ namespace GCode_Sender
             initOK = null;
             isBooted = false;
             Controller = null;
+        }
+
+        // Auto-reconnect re-established the link (e.g. after a $REBOOT). Re-run the handshake so refreshed
+        // capabilities ($I: ATC, tool count, ...) replace the pre-reboot values. Mark init as pending; the
+        // GrblState handler re-runs InitSystem once the controller reports a non-Alarm state, and we also try
+        // immediately in case it comes back idle (no state change to trigger the handler).
+        private void OnReconnectInit()
+        {
+            initOK = false;
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                if (initOK == false && model.GrblState.State != GrblStates.Alarm)
+                    initOK = InitSystem();
+            }), DispatcherPriority.ApplicationIdle);
         }
 
         public void Activate(bool activate, ViewType chgMode)
@@ -461,7 +476,7 @@ namespace GCode_Sender
             else
                 MainWindow.ShowView(false, ViewType.LatheWizards);
 
-            if (GrblInfo.HasSDCard)
+            if (GrblInfo.HasFS)   // any mounted filesystem (SD card and/or LittleFS), not just SD
                 MainWindow.EnableView(true, ViewType.SDCard);
             else
                 MainWindow.ShowView(false, ViewType.SDCard);

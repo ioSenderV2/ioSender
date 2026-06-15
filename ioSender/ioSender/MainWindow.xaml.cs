@@ -247,8 +247,7 @@ namespace GCode_Sender
         // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
         private void ForceMachineSetupIfNeeded()
         {
-            if (_machineSetupForced || !string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
-                return;
+            bool needWizard = !_machineSetupForced && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine);
 
             int tries = 0;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -258,10 +257,58 @@ namespace GCode_Sender
                 if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report
                     return;
                 timer.Stop();
-                if (ready && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
-                    ShowMachineSetupWizard();
+                if (!ready)
+                    return;
+                if (needWizard && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                    ShowMachineSetupWizard();   // ATC macro check runs once the user presses Apply (OnMachineSetupApplied)
+                else
+                    CheckAtcMacros();           // machine already set up - check for missing ATC macros now
             };
             timer.Start();
+        }
+
+        // If the controller reports an ATC configured but its tc.macro is missing (NEWOPT "ATC=0"), bring up the
+        // SD Card tab and offer to upload the ATC support macros. Called after the machine-setup-wizard check has
+        // settled so it never competes with the first-run wizard.
+        private void CheckAtcMacros()
+        {
+            if (!GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
+                return;
+
+            // Seed the ioSender-side "Start Job" macro (runs through MacroProcessor, not on littlefs).
+            // Idempotent; runs whether or not the littlefs ATC macros need uploading.
+            CNC.Controls.AtcMacros.SeedStartJobMacro();
+
+            TabItem tab = getTab(ViewType.SDCard);
+            // Reference the SD Card view by its x:Name: it is created at window load, whereas getView() walks the
+            // logical tree and returns null until the tab has been selected once - which is why the prompt only
+            // appeared after manually opening the SD Card tab.
+            var sd = SDCardView;
+            if (tab == null || sd == null)
+                return;
+
+            // The check is quiet; the confirm callback brings the SD Card tab forward and asks only when a macro
+            // is missing or out of date - an up-to-date controller is left untouched (no tab switch, no prompt).
+            CNC.Controls.AtcMacros.ProvisionResult result = sd.ProvisionAtcMacros(reason =>
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;
+                string msg = reason == CNC.Controls.AtcMacros.UpdateReason.Outdated
+                    ? "The Automatic Tool Change macros on the controller are out of date.\n\nUpdate?"
+                    : "Automatic Tool Change macro missing.\n\nUpload?";
+                return MessageBox.Show(this, msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+            });
+
+            // A reboot is only needed when ATC was off: the firmware scans for tc.macro at mount/boot, so a fresh
+            // install must reboot to come online. An in-place content update with ATC already on is picked up on
+            // the next tool change - no reboot.
+            if (result == CNC.Controls.AtcMacros.ProvisionResult.Uploaded && GrblInfo.AtcMacrosRequired)
+            {
+                if (MessageBox.Show(this,
+                        "ATC macros are installed but the controller must reboot to enable the tool changer.\n\nReboot now?",
+                        "Tool change macros", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    Comms.com.WriteCommand("$REBOOT");
+            }
         }
 
         private void ShowMachineSetupWizard()
@@ -300,6 +347,7 @@ namespace GCode_Sender
                 {
                     if (getView(grbl) is UserControl jv)
                         jv.Focus();
+                    CheckAtcMacros();   // after returning to the normal view, offer to upload ATC macros if needed
                 }));
             }));
         }

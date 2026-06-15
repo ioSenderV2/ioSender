@@ -322,6 +322,16 @@ namespace CNC.Core
                     for (int i = 0; i < commands.Length; i++)
                     {
                         string original = commands[i] = commands[i].Replace("\r", "");
+
+                        // A named O-word flow statement (O<name> CALL/SUB/RETURN/...) must reach the controller
+                        // verbatim: the block parser collapses the inter-token space (O<cal> CALL -> O<cal>CALL),
+                        // which the controller rejects with "error:81 - Unknown flow statement". The controller
+                        // evaluates these itself, so skip local parsing and forward the original line unchanged
+                        // (this is how they ran when the macro was streamed via $F=).
+                        string trimmed = original.TrimStart();
+                        if (parser.ExpressionsSupported && trimmed.Length > 1 && (trimmed[0] == 'O' || trimmed[0] == 'o') && trimmed[1] == '<')
+                            continue;
+
                         try
                         {
                             parser.ParseBlock(ref commands[i], false);
@@ -416,6 +426,11 @@ namespace CNC.Core
             });
         }
 
+        // Raised (on the UI thread) after the link is re-established, so a view can re-run the controller
+        // handshake - the reconnect may follow a controller reboot ($REBOOT) that changed its reported
+        // capabilities ($I), and resuming polling alone would keep the stale pre-reboot values.
+        public event System.Action ReconnectInit;
+
         public void OnReconnected()
         {
             RunOnUIThread(() =>
@@ -425,6 +440,7 @@ namespace CNC.Core
                     Poller.SetState(PollInterval);
                 var msg = LibStrings.FindResource("Reconnected");
                 Message = msg == string.Empty ? "Connection re-established." : msg;
+                ReconnectInit?.Invoke();
             });
         }
 

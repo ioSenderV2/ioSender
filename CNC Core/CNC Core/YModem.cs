@@ -62,6 +62,15 @@ namespace CNC.Core
 
         public bool Upload (string path)
         {
+            return Upload(path, null);
+        }
+
+        // Upload local file <path>, telling the controller to store it as <remoteName> (sent verbatim in the
+        // YModem block 0 name field, which the firmware passes to vfs_open). remoteName may be an absolute path
+        // (e.g. "/littlefs/tc.macro") to target a specific filesystem, or a bare name to write to the current
+        // working directory. Null => use the local file's base name (legacy behaviour).
+        public bool Upload (string path, string remoteName)
+        {
             TransferState state = TransferState.NAK;
             FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
             long bytesRemaining = fileStream.Length;
@@ -71,7 +80,7 @@ namespace CNC.Core
 
             ClearPayload();
 
-            if (TransferInitalPacket(path, fileStream) == TransferState.ACK)
+            if (TransferInitalPacket(remoteName ?? Path.GetFileName(path), fileStream) == TransferState.ACK)
             {
                 do
                 {
@@ -99,10 +108,10 @@ namespace CNC.Core
             return state == TransferState.ACK;
         }
 
-        private TransferState TransferInitalPacket (string path, FileStream fileStream)
+        private TransferState TransferInitalPacket (string remoteName, FileStream fileStream)
         {
             int i, j = 0;
-            char[] fileName = (Path.GetFileName(path)).ToCharArray(), fileSize = fileStream.Length.ToString().ToCharArray();
+            char[] fileName = remoteName.ToCharArray(), fileSize = fileStream.Length.ToString().ToCharArray();
 
             for (i = 0; i < fileName.Length; i++)
                 payload[j++] = (byte)fileName[i];
@@ -157,12 +166,15 @@ namespace CNC.Core
 
             new Thread(() =>
             {
+            // Generous per-packet ACK timeouts: writing each block to a used/fragmented flash filesystem
+            // (littlefs garbage collection) can take several seconds, and too short a wait makes the transfer
+            // retry/abort mid-file - leaving a truncated, hard-to-delete file. 10s to open, 5s per data block.
             wait = WaitFor.SingleEvent<int>(
                 cancellationToken,
                 s => GetByte(s),
                 a => Comms.com.ByteReceived += a,
                 a => Comms.com.ByteReceived -= a,
-                packetNum == 0 ? 8000 : 2000, () => Comms.com.WriteBytes(crc, 2));
+                packetNum == 0 ? 10000 : 5000, () => Comms.com.WriteBytes(crc, 2));
             }).Start();
 
             while (wait == null)
