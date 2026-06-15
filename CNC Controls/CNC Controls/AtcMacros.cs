@@ -111,8 +111,29 @@ namespace CNC.Controls
                 if (model.GrblState.State == GrblStates.Alarm)
                     Grbl.WaitForResponse(GrblConstants.CMD_UNLOCK);
 
+                // Remove any stray copies of these files that live OUTSIDE the littlefs target - e.g. on an SD
+                // card mounted at "/" from an earlier mis-targeted upload. They are ours by name, and a stray
+                // "/name.macro" on the SD root can shadow the intended "/littlefs/name.macro" (the firmware's
+                // named-sub resolution falls back to "/<name>.macro"). Unlink raw ($FD=) to bypass the parser's
+                // underscore-filename mangling.
+                string targetPrefix = destPath.TrimEnd('/') + "/";
+                foreach (DataRowView rv in GrblSDCard.Files)
+                {
+                    if ((string)rv.Row["Dir"] == GrblSDCard.EmptyMountMarker)
+                        continue;
+                    string full = (string)rv.Row["Name"];
+                    string bn = Path.GetFileName(full);
+                    bool ours = ChecksumFile.Equals(bn, StringComparison.OrdinalIgnoreCase)
+                                || Required.Any(r => r.Equals(bn, StringComparison.OrdinalIgnoreCase));
+                    if (ours && !full.StartsWith(targetPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + full);
+                        Comms.com.AwaitAck();
+                    }
+                }
+
                 // (Re)write the full set - macros are small and this is rare - then refresh the checksum sidecar.
-                bool wrote = false, allWritten = true, useAbsolute = true, cwdSet = false;
+                bool wrote = false, allWritten = true;
                 foreach (string name in Required)
                 {
                     string content = ReadEmbedded(name);
@@ -123,7 +144,7 @@ namespace CNC.Controls
                     }
 
                     bool ok = GrblInfo.HasYModem
-                                ? YModemWrite(model, name, content, destPath, present.Contains(name), ref useAbsolute, ref cwdSet)
+                                ? YModemWrite(model, name, content, destPath, present.Contains(name))
                                 : WriteFile(name, content, destPath, upload);
                     if (ok)
                         wrote = true;
@@ -138,7 +159,7 @@ namespace CNC.Controls
                     // return "<hash>ok" and never match - making it re-prompt on every connect.
                     string sumContent = embeddedSum + "\n";
                     bool sumOk = GrblInfo.HasYModem
-                                    ? YModemWrite(model, ChecksumFile, sumContent, destPath, present.Contains(ChecksumFile), ref useAbsolute, ref cwdSet)
+                                    ? YModemWrite(model, ChecksumFile, sumContent, destPath, present.Contains(ChecksumFile))
                                     : WriteFile(ChecksumFile, sumContent, destPath, upload);
                     if (!sumOk)
                         allWritten = false;
@@ -288,7 +309,7 @@ namespace CNC.Controls
         // tries the absolute path (<destPath>/<name>) so the firmware's vfs_open lands it on littlefs directly;
         // if that is refused, fall back to $CWD=<destPath> + a bare name and stay relative for the rest. YModem
         // writes wherever $CWD points and bypasses the FTP server entirely.
-        static bool YModemWrite(GrblViewModel model, string name, string content, string destPath, bool fileExists, ref bool useAbsolute, ref bool cwdSet)
+        static bool YModemWrite(GrblViewModel model, string name, string content, string destPath, bool fileExists)
         {
             string dir = Path.Combine(Path.GetTempPath(), "ioSenderMacros");
             string temp;
@@ -300,42 +321,39 @@ namespace CNC.Controls
             }
             catch { return false; }
 
+            // Always write to the ABSOLUTE target path so the firmware's vfs_open routes the file to the
+            // littlefs mount regardless of $CWD. A bare (relative) name resolves against $CWD instead, and
+            // when an SD card is mounted at "/" that is the SD root - so a relative write leaks the macro onto
+            // the card (seen as 0-byte /tc.macro etc. duplicated off /littlefs). Absolute-only removes that
+            // ambiguity entirely; the firmware we target (and the simulator) both honour the path. No bare-name
+            // $CWD fallback - if a controller ever refused absolute vfs paths the correct fix would be to set
+            // AND verify $CWD first, never an unguarded relative write.
             string baseDir = string.IsNullOrEmpty(destPath) ? string.Empty : destPath.TrimEnd('/');
+            string target = baseDir + "/" + name;   // e.g. /littlefs/tc.macro
 
             try
             {
                 model.Message = "Installing " + name + "...";
 
-                // Delete any existing copy first: a YModem write over an already-present littlefs file stalls the
-                // stream (vfs_open "w" truncate path), so we create a fresh file instead. Only when it actually
-                // exists - deleting an absent file returns "error:61 File delete failed", which would otherwise
-                // surface in the status line (and set GrblError) on a first-time upload to an empty filesystem.
-                // Send it raw (WriteCommand+AwaitAck), NOT via the MDI path: that runs the line through the
-                // g-code parser, which - with NGC expressions enabled - mangles a filename containing an
-                // underscore (e.g. probe_tfl.macro) into an invalid expression and the controller rejects it
-                // with "error:71 - Unknown operation found in expression". A $FD= system command must bypass it.
-                if (fileExists)
+                // Retry: a YModem write over an existing file truncates-in-place and can stall the stream, and a
+                // dropped ACK leaves a 0-byte file - so unlink any existing/partial copy first and re-upload a
+                // fresh file. Unlink raw (WriteCommand+AwaitAck), NOT via the MDI path: that runs the line through
+                // the g-code parser, which - with NGC expressions enabled - mangles an underscore filename (e.g.
+                // probe_tfl.macro) into "error:71 - Unknown operation found in expression". $FD= bypasses it.
+                // Skip the unlink only on the first attempt to a known-absent file (avoids a cosmetic error:61).
+                for (int attempt = 0; attempt < 3; attempt++)
                 {
-                    Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + baseDir + "/" + name);
-                    Comms.com.AwaitAck();
-                }
+                    if (fileExists || attempt > 0)
+                    {
+                        Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + target);
+                        Comms.com.AwaitAck();
+                    }
 
-                if (useAbsolute)
-                {
-                    bool absOk = new YModem().Upload(temp, baseDir + "/" + name);   // e.g. /littlefs/tc.macro
-                    if (absOk)
+                    if (new YModem().Upload(temp, target))
                         return true;
-                    useAbsolute = false;   // absolute path refused once - switch to $CWD + relative for the rest
                 }
 
-                if (!cwdSet)
-                {
-                    Grbl.WaitForResponse("$CWD=" + (baseDir == string.Empty ? "/" : baseDir));
-                    cwdSet = true;
-                }
-
-                bool relOk = new YModem().Upload(temp, name);   // relative to $CWD
-                return relOk;
+                return false;
             }
             catch { return false; }
             finally { try { File.Delete(temp); } catch { } }
