@@ -36,7 +36,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TabControl x:Name="tab" Grid.Row="0" Margin="5,5,5,0">
-            <TabItem x:Uid="tab_serial" Header="Serial">
+            <TabItem x:Uid="tab_serial" x:Name="tabSerial" Header="Serial">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                         <Label x:Uid="lbl_serialPort" Content="Port:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="80" VerticalAlignment="Center"/>
@@ -66,7 +66,7 @@
                     </StackPanel>
                 </StackPanel>
             </TabItem>
-            <TabItem x:Uid="tab_network" Header="Network">
+            <TabItem x:Uid="tab_network" x:Name="tabNetwork" Header="Network">
                 <StackPanel>
                     <CheckBox x:Uid="lbl_websocket" Content="WebSocket" IsChecked="{Binding Path=IsWebSocket, Mode=TwoWay}" Margin="80,5,0,0"/>
                     <StackPanel Orientation="Horizontal" Margin="0,5">
@@ -95,7 +95,7 @@
                     </StackPanel>
                 </StackPanel>
             </TabItem>
-            <TabItem x:Uid="tab_simulator" Header="Simulator">
+            <TabItem x:Uid="tab_simulator" x:Name="tabSimulator" Header="Simulator">
                 <!-- Shared-size label column so labels (incl. "My Machine:") size to content and align, and the
                      window (SizeToContent) grows to fit the row contents - presentable at any DPI / font scale. -->
                 <Grid Margin="5,5,5,8" Grid.IsSharedSizeScope="True">

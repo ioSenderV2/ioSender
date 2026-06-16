@@ -134,6 +134,8 @@ namespace GCode_Sender
             int res = AppConfig.Settings.OpenConnection(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
             bool connected = res == 0;
 
+            UpdateSimulatorTint();   // pale-yellow background when the startup target is the simulator
+
             GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
 
             if (AppConfig.Settings.Base.KeepWindowSize)
@@ -329,6 +331,8 @@ namespace GCode_Sender
                 if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
                     grbl.Activate(true, ViewType.Startup);
             }
+
+            UpdateSimulatorTint();
         }
 
         private void Disconnect()
@@ -345,6 +349,20 @@ namespace GCode_Sender
             // Clear the GRBL view's controller state so the next Connect re-runs the handshake.
             if (getView(getTab(ViewType.GRBL)) is JobView grbl)
                 grbl.PrepareForReconnect();
+
+            UpdateSimulatorTint();
+        }
+
+        // Tint the whole window pale yellow while connected to the simulator (Base.StartSimulator is set to
+        // the chosen target's sim-ness on each connect) so a virtual machine is unmistakable at a glance -
+        // the gray the app normally shows IS this window background, seen through the transparent content.
+        // Restored to the default gray on a real target or when disconnected. Called from every connect path.
+        private void UpdateSimulatorTint()
+        {
+            bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
+            Background = new System.Windows.Media.SolidColorBrush(sim
+                ? System.Windows.Media.Color.FromRgb(0xF7, 0xEF, 0xA8)   // pale yellow = simulator
+                : System.Windows.Media.Color.FromRgb(0xE5, 0xE5, 0xE5)); // default gray
         }
 
         // Right-click "Target" status item -> Validate. Only enabled while connected; launches the

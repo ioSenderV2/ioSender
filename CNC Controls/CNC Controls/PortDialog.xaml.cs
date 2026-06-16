@@ -144,9 +144,30 @@ namespace CNC.Controls
                 }
             }
 
+            HighlightActiveConnection(orgport);
+
             ShowDialog();
 
             return port;
+        }
+
+        // Open on - and green-tint - the tab for the active/current connection, so the transport in use is
+        // obvious and a reconnect starts on the right tab. "Active" means a real target has been configured
+        // (Base.PortParams is not the unset "COMn..." placeholder); with none, the default tab is left as-is.
+        // The simulator and a plain localhost network target both look like host:port, so Base.StartSimulator
+        // disambiguates them.
+        private void HighlightActiveConnection(string orgport)
+        {
+            if (string.IsNullOrWhiteSpace(orgport) || orgport.ToLower().StartsWith("comn"))
+                return;   // no configured target yet - keep the default tab, no highlight
+
+            var active = (AppConfig.Settings.Base != null && AppConfig.Settings.Base.StartSimulator) ? tabSimulator
+                       : orgport.ToLower().StartsWith("com") ? tabSerial
+                       : tabNetwork;   // ws:// or host:port
+
+            tab.SelectedItem = active;
+            active.Foreground = System.Windows.Media.Brushes.ForestGreen;
+            active.FontWeight = FontWeights.Bold;
         }
 
         // Exposed so the caller can persist whether this connection is the bundled simulator (and how to
