@@ -277,6 +277,7 @@ namespace CNC.Core
         private void OnMessage(object sender, MessageEventArgs e)
         {
             int pos = 0;
+            System.Collections.Generic.List<string> replies = null;
 
             lock (input)
             {
@@ -287,17 +288,24 @@ namespace CNC.Core
 
                 if (EventMode)
                 {
+                    // Extract under the lock, dispatch after releasing it - a synchronous Dispatcher.Invoke while
+                    // holding lock(input) deadlocks against a UI-thread PurgeQueue / Write (see TelnetStream).
                     while (input.Length > 0 && (pos = gp()) > 0)
                     {
-                        Reply = input.ToString(0, pos - 1);
+                        (replies ?? (replies = new System.Collections.Generic.List<string>())).Add(input.ToString(0, pos - 1));
                         input.Remove(0, pos + 1);
-                        state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                        if (Reply.Length != 0 && DataReceived != null)
-                            Dispatcher.Invoke(DataReceived, Reply);
                     }
                 }
                 else
                     ByteReceived?.Invoke(ReadByte());
+            }
+
+            if (replies != null) foreach (string reply in replies)
+            {
+                Reply = reply;
+                state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                if (Reply.Length != 0 && DataReceived != null)
+                    Dispatcher.Invoke(DataReceived, Reply);
             }
         }
     }

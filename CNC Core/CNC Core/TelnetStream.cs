@@ -330,6 +330,7 @@ namespace CNC.Core
             }
 
             int pos = 0;
+            System.Collections.Generic.List<string> replies = null;
 
             lock (input)
             {
@@ -337,17 +338,27 @@ namespace CNC.Core
 
                 if (EventMode)
                 {
+                    // Extract complete replies under the lock, but DISPATCH them after releasing it (below).
+                    // DataReceived is marshalled to the UI thread with a synchronous Dispatcher.Invoke, and a
+                    // UI-thread PurgeQueue / Write also takes lock(input). Invoking while holding the lock
+                    // deadlocks: the UI thread blocks on the lock while this thread blocks on the UI thread
+                    // (seen as a frozen UI with a modal macro dialog up while polling continues).
                     while (input.Length > 0 && (pos = gp()) > 0)
                     {
-                        Reply = input.ToString(0, pos - 1);
+                        (replies ?? (replies = new System.Collections.Generic.List<string>())).Add(input.ToString(0, pos - 1));
                         input.Remove(0, pos + 1);
-                        state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                        if (Reply.Length != 0 && DataReceived != null)
-                            Dispatcher.Invoke(DataReceived, Reply);
                     }
                 }
                 else
                     ByteReceived?.Invoke(ReadByte());
+            }
+
+            if (replies != null) foreach (string reply in replies)
+            {
+                Reply = reply;
+                state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                if (Reply.Length != 0 && DataReceived != null)
+                    Dispatcher.Invoke(DataReceived, Reply);
             }
 
             try
