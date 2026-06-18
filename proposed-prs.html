@@ -38,7 +38,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 23 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-23 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 25 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>)</div>
 
 <div class="toc">
 <table>
@@ -65,6 +65,8 @@
 <tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1247/−1</td></tr>
 <tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz">2 files · +23/−1</td></tr>
 <tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz">3 files · +40/−8</td></tr>
+<tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz">2 files · +29/−10</td></tr>
+<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz">12 files · +792/−10</td></tr>
 </table>
 </div>
 
@@ -785,6 +787,64 @@
   <li><strong>Guarded, with a clean fallback:</strong> gated on the <em>Safe Z on Go To</em> option (Settings:App&nbsp;&rarr;&nbsp;Main, default on), the machine being <strong>homed</strong> (machine coordinates valid) and <strong>soft limits</strong> (<code>$20</code>) on so the three rapids are envelope-checked. If any is missing it falls back to the original single coordinated move &mdash; no behaviour change for unhomed/soft-limits-off setups.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (both apps). The setting lives in the Base app config so it shows in the always-present Main settings panel regardless of jog mode; grbl's junction deviation (~0.01&nbsp;mm) means the corners are effectively full stops, so no dwell is needed between phases.</p>
+</div>
+</div>
+
+<!-- ============ PR 24 ============ -->
+<div class="pr">
+<h2 id="pr24"><span class="badge">PR 24</span>comms &mdash; fix telnet/websocket UI deadlock</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/telnet-deadlock-fix</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/telnet-deadlock-fix">master&hellip;pr/telnet-deadlock-fix</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">17</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/WebsocketStream.cs</td><td class="num add">12</td><td class="num del">4</td></tr>
+</table>
+<div class="desc">
+<p>Over a telnet or websocket connection the UI could freeze whenever a modal message box (e.g. a macro <code>M0</code>/MBOX hold) was open while polling continued &mdash; a lock-ordering <strong>deadlock</strong> between the read callback and the UI thread.</p>
+<ul>
+  <li><strong>The deadlock:</strong> <code>ReadComplete</code> ran a synchronous <code>Dispatcher.Invoke(DataReceived)</code> <em>while holding</em> <code>lock(input)</code>. The UI thread's <code>PurgeQueue</code> also takes <code>lock(input)</code>, so once the dispatcher was busy (a modal pumping its own message loop) the read callback waited on the UI thread while the UI thread waited on the lock &mdash; a classic cyclic wait that hung the app.</li>
+  <li><strong>The fix:</strong> extract the complete replies from the buffer <em>under</em> the lock, then release it <em>before</em> dispatching them to <code>DataReceived</code>. The serial and Eltima streams already dispatched after releasing the lock (via <code>BeginInvoke</code>); this brings telnet/websocket in line.</li>
+</ul>
+<p class="foot">Builds clean off upstream <code>master</code> (2.0.47); a pure comms-layer fix, no UI or feature change. Surfaced while testing the ATC Start Job sequence (PR 25), whose install-probe MBOX hold kept an active telnet poll &mdash; exactly the deadlock window.</p>
+</div>
+</div>
+
+<!-- ============ PR 25 ============ -->
+<div class="pr">
+<h2 id="pr25"><span class="badge">PR 25</span>ATC tool-change macro provisioning (Install ATC + Start Job)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/atc-macros</code></div>
+  <div><span class="label">Depends on</span>Stacked on <code>pr/sdcard-filesystems</code> (PR 14, for the SD&nbsp;Card tab's filesystem upload). Runtime: the Start&nbsp;Job macro's directives + <code>O&lt;cal&gt;&nbsp;CALL</code> forwarding need <code>pr/macro-processor</code> (PR 11).</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/sdcard-filesystems...pr/atc-macros">pr/sdcard-filesystems&hellip;pr/atc-macros</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">369</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">80</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">14</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/YModem.cs</td><td class="num add">14</td><td class="num del">5</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender/ioSender/JobView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/tc.macro</td><td class="num add">105</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/probe_tfl.macro</td><td class="num add">140</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/start_job.macro</td><td class="num add">45</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/cal.macro</td><td class="num add">3</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Turnkey <strong>repeatable tool change</strong> for ATC controllers: ioSender ships the controller-side tool-change macro set and installs it to the controller's persistent <strong>LittleFS</strong>, then seeds an ioSender-side &ldquo;Start Job&rdquo; macro that drives the home&nbsp;&rarr;&nbsp;set-WCS&nbsp;&rarr;&nbsp;reference-toolsetter&nbsp;&rarr;&nbsp;run sequence. The novice only sets <code>G28</code>/<code>G30</code>/<code>G59.3</code> and supplies a 3D probe + toolsetter.</p>
+<ul>
+  <li><strong>Embedded macros + provisioning:</strong> <code>AtcMacros.cs</code> carries <code>cal</code>/<code>probe_tfl</code>/<code>tc.macro</code> as embedded resources and uploads them to <code>/littlefs</code> over <strong>YModem</strong> (absolute <code>/littlefs/&lt;name&gt;</code> path so they land on the right filesystem even with an SD card mounted at root; a <code>atc.sum</code> SHA-256 sidecar detects drift / re-installs).</li>
+  <li><strong>Explicit &ldquo;Install ATC macros&rdquo; button</strong> on the SD&nbsp;Card tab is the <em>only</em> provisioning trigger &mdash; user-initiated, re-verifying the filesystem each click. Auto-on-connect/auto-on-show were removed after proving fragile against controller-I/O timing (could wedge the link or hang on close).</li>
+  <li><strong><code>$I</code> capability parsing</strong> (<code>Grbl.cs</code>): <code>ATC=1</code>&nbsp;&rarr;&nbsp;<code>HasATC</code>, <code>ATC=0</code>&nbsp;&rarr;&nbsp;<code>AtcMacrosRequired</code> (an ATC is configured but its <code>tc.macro</code> is missing &mdash; prompt to install + reboot), <code>YM</code>&nbsp;&rarr;&nbsp;<code>HasYModem</code>. A 2-arg <code>YModem.Upload(path, remoteName)</code> overload targets an absolute remote path.</li>
+  <li><strong>Start Job macro</strong> (both apps): seeded on connect to an ATC controller (<code>@start_job.macro</code>, run line-by-line through the macro pre-processor). The controller-side macros it <code>CALL</code>s stay on LittleFS, resolved by <code>O&lt;cal&gt; CALL</code> / <code>M6</code>.</li>
+</ul>
+<p class="foot">Builds clean in Release for both apps; the full Start Job sequence was verified end-to-end on hardware (2026-06-18). Kept self-contained on PR&nbsp;14 by seeding the Start Job macro without an auto function-key (that nicety needs PR&nbsp;10's <code>Macro.FKey</code>); assign one in the Macro manager if wanted. The <code>O&lt;cal&gt; CALL</code> error:81 fix lives in PR&nbsp;11 (label/keyword gap-close) plus a firmware-side macro-search-path fix.</p>
 </div>
 </div>
 
