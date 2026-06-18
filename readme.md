@@ -14,7 +14,7 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a stack of proposed enhancements, each kept as a **clean, single-feature branch** (`pr/*`) that diffs against `master` so it can be reviewed — and picked up — independently.
 
-**See [`proposed-prs.html`](proposed-prs.html) for the full list** (open it in a browser): every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes.
+**See [`Proposed-PRs.pdf`](Proposed-PRs.pdf) for the full list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`proposed-prs.html`](proposed-prs.html) if you'd rather open it in a browser.)
 
 Branch model:
 - `master` = the upstream release plus PRs 1&ndash;8 already integrated.
