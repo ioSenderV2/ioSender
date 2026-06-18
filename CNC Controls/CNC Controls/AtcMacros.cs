@@ -26,9 +26,10 @@ namespace CNC.Controls
         // because grblHAL resolves their O<...> CALL / M6 references from its own filesystem.
         static readonly string[] Required = { "cal.macro", "probe_tfl.macro", "tc.macro" };
 
-        // The controller (by reported version) we have already verified this app run - so InitSystem's repeated
-        // calls (reconnect, soft reset) don't re-list the filesystem every time. A different controller re-checks.
-        static string _checkedFor;
+        // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
+        // YModem upload), so a queued UI event can re-enter it before it returns - mutually recursing with the SD
+        // Card tab's on-show check (or the macro-run dependency check) and overflowing the stack. Bail on re-entry.
+        static bool _provisioning;
 
         // Sidecar file storing the checksum of the macro set last written by ioSender, so a later run can tell
         // whether the controller's copies are out of date with this install's embedded macros. The ".sum"
@@ -58,15 +59,15 @@ namespace CNC.Controls
         // FTP server here cannot); otherwise the supplied upload delegate (the SD Card tab's FTP path) is used.
         public static ProvisionResult EnsureProvisioned(GrblViewModel model, Func<string, string, bool> upload, Func<UpdateReason, bool> confirmUpload)
         {
+            if (_provisioning)
+                return ProvisionResult.Skipped;   // re-entrancy guard - see _provisioning
+            _provisioning = true;
             try
             {
                 // Runs whenever an ATC is configured: "ATC=0" (tc.macro missing) or "ATC=1" (present, but its
                 // content may be out of date with a newer ioSender).
                 if (model == null || upload == null || !GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC)
                      || Comms.com == null || !Comms.com.IsOpen)
-                    return ProvisionResult.Skipped;
-
-                if (_checkedFor == GrblInfo.Version)   // already handled for this controller this run
                     return ProvisionResult.Skipped;
 
                 // Enumerate current files across every mount (also refreshes the SD Card tab's cache).
@@ -94,10 +95,7 @@ namespace CNC.Controls
                 bool stale = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != embeddedSum;
 
                 if (!missing && !stale)
-                {
-                    _checkedFor = GrblInfo.Version;   // present and current - nothing to do
-                    return ProvisionResult.UpToDate;
-                }
+                    return ProvisionResult.UpToDate;   // present and current - nothing to do
 
                 bool accepted = confirmUpload == null || confirmUpload(missing ? UpdateReason.Missing : UpdateReason.Outdated);
                 if (!accepted)
@@ -149,7 +147,7 @@ namespace CNC.Controls
                     if (ok)
                         wrote = true;
                     else
-                        allWritten = false;                         // leave _checkedFor unset so we retry later
+                        allWritten = false;                         // a write failed - reported as Failed so the user can retry
                 }
 
                 if (wrote && allWritten)
@@ -170,14 +168,15 @@ namespace CNC.Controls
                 if (wrote)
                     GrblSDCard.Load(model, false);   // refresh the listing (also restores $CWD to a valid mount)
 
-                if (allWritten)
-                    _checkedFor = GrblInfo.Version;   // everything in place and recorded; stop checking this run
-
                 return wrote ? ProvisionResult.Uploaded : ProvisionResult.Failed;
             }
             catch
             {
                 return ProvisionResult.Failed;   // best-effort; never break the connect flow
+            }
+            finally
+            {
+                _provisioning = false;
             }
         }
 
@@ -210,6 +209,8 @@ namespace CNC.Controls
             Comms.com.PurgeQueue();
             model.SuspendProcessing = true;
 
+            // IsBackground so an unresponsive controller (WaitFor never returns) can't keep the process alive and
+            // hang ioSender on close - a foreground worker here is exactly what wedged shutdown before.
             new System.Threading.Thread(() =>
             {
                 try { res = WaitFor.AckResponse<string>(
@@ -219,9 +220,12 @@ namespace CNC.Controls
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + path)); }
                 catch { res = false; }
-            }).Start();
+            }) { IsBackground = true }.Start();
 
-            while (res == null)
+            // Hard wall-clock cap so the UI thread can't spin forever if the controller never answers; on timeout
+            // we return what little was read (empty), which reads as "missing/stale" and just re-prompts an upload.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (res == null && sw.ElapsedMilliseconds < 3000)
                 EventUtils.DoEvents();
 
             model.SuspendProcessing = false;

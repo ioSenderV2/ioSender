@@ -428,6 +428,12 @@ namespace GCode_Sender
             else
                 MainWindow.ShowView(false, ViewType.SDCard);
 
+            // On an ATC controller, seed the ioSender-side "Start Job" macro so it is available to run. The
+            // controller-side macros it CALLs (cal/probe_tfl/tc) are installed explicitly from the SD Card tab's
+            // "Install ATC" button - provisioning is never automatic (controller-I/O timing proved too fragile).
+            if (GrblInfo.HasFS && (GrblInfo.HasATC || GrblInfo.AtcMacrosRequired))
+                CNC.Controls.AtcMacros.SeedStartJobMacro();
+
             if (GrblInfo.NumTools > 0)
                 MainWindow.EnableView(true, ViewType.Tools);
             else
