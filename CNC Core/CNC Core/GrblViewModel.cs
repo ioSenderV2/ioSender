@@ -322,6 +322,36 @@ namespace CNC.Core
                     for (int i = 0; i < commands.Length; i++)
                     {
                         string original = commands[i] = commands[i].Replace("\r", "");
+
+                        // A named O-word flow statement (O<name> CALL/SUB/RETURN/...) is evaluated by the
+                        // controller itself, so forward it as the controller's own file reader would see it
+                        // rather than letting the local block parser rewrite it. Two things matter:
+                        //  - the flow keyword must sit IMMEDIATELY after the O<name> label: grblHAL keeps
+                        //    interior spaces (only leading whitespace is stripped) and its flow parser reads
+                        //    the keyword at the byte right after '>' with no gap-skipping (ngc_flowctrl.c
+                        //    read_command), so "O<cal> CALL" lands on the space and faults as
+                        //    "error:81 - Unknown flow statement". Close that gap -> "O<cal>CALL".
+                        //  - strip comments: ParseBlock would, and we bypass it; a trailing ";"/"(...)" left
+                        //    on the line would be parsed as call arguments.
+                        // The label case is left as-is (the controller upper-cases it) and any "[expr]" call
+                        // arguments after the keyword are preserved (a space there is fine - the arg reader
+                        // skips it).
+                        string trimmed = original.TrimStart();
+                        if (parser.ExpressionsSupported && trimmed.Length > 1 && (trimmed[0] == 'O' || trimmed[0] == 'o') && trimmed[1] == '<')
+                        {
+                            string line = StripGCodeComments(original).TrimEnd();
+                            int gt = line.IndexOf('>');
+                            if (gt >= 0)
+                            {
+                                int k = gt + 1;
+                                while (k < line.Length && (line[k] == ' ' || line[k] == '\t'))
+                                    k++;
+                                line = line.Substring(0, gt + 1) + line.Substring(k);
+                            }
+                            commands[i] = line;
+                            continue;
+                        }
+
                         try
                         {
                             parser.ParseBlock(ref commands[i], false);
@@ -355,6 +385,24 @@ namespace CNC.Core
         {
             if (macro != null && macro != string.Empty)
                 ExecuteMacro(macro.Split('\n'));
+        }
+
+        // Strip g-code comments: everything from a ';' to end of line, and any '(...)' spans (an unterminated
+        // '(' drops the rest of the line). Used on the named O-word forward path, which bypasses ParseBlock.
+        private static string StripGCodeComments(string s)
+        {
+            int sc = s.IndexOf(';');
+            if (sc >= 0)
+                s = s.Substring(0, sc);
+
+            int open;
+            while ((open = s.IndexOf('(')) >= 0)
+            {
+                int close = s.IndexOf(')', open + 1);
+                s = close >= 0 ? s.Remove(open, close - open + 1) : s.Substring(0, open);
+            }
+
+            return s;
         }
 
         private bool canExecuteStartFromBlock(int block)
