@@ -104,6 +104,49 @@ namespace CNC.Controls
                 (DataContext as GrblViewModel).Message = string.Empty;
         }
 
+        // "Install ATC" button: install or update the embedded tool-change macro set (cal/probe_tfl/tc) on the
+        // controller's LittleFS. Explicit and user-initiated - the only provisioning trigger (no auto-on-connect
+        // or auto-on-show, which proved fragile against controller-I/O timing). Always re-verifies the filesystem
+        // when clicked, so it reliably catches a macro that was deleted since.
+        private void InstallAtcMacros_Click(object sender, RoutedEventArgs e)
+        {
+            if (Comms.com == null || !Comms.com.IsOpen)
+            {
+                MessageBox.Show(Window.GetWindow(this), "Connect to a controller first.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
+            {
+                MessageBox.Show(Window.GetWindow(this), "This controller does not report an automatic tool changer, so the tool-change macros do not apply here.",
+                    "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            AtcMacros.ProvisionResult result = ProvisionAtcMacros(reason =>
+            {
+                string msg = reason == AtcMacros.UpdateReason.Outdated
+                    ? "The tool-change macros on the controller are out of date.\n\nUpdate them now?"
+                    : "Install the tool-change macros (cal, probe_tfl, tc) on the controller now?";
+                return MessageBox.Show(Window.GetWindow(this), msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+            });
+
+            if (result == AtcMacros.ProvisionResult.UpToDate)
+                MessageBox.Show(Window.GetWindow(this), "The tool-change macros are already installed and up to date.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+            else if (result == AtcMacros.ProvisionResult.Failed)
+                MessageBox.Show(Window.GetWindow(this), "The tool-change macros could not be installed. Check the connection and try again.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Warning);
+            else if (result == AtcMacros.ProvisionResult.Uploaded && GrblInfo.AtcMacrosRequired)
+            {
+                // A reboot is only needed when ATC was off (tc.macro absent): the firmware scans for it at
+                // mount/boot, so a fresh install must reboot to come online. An in-place content update with ATC
+                // already on is picked up on the next tool change - no reboot.
+                if (MessageBox.Show(Window.GetWindow(this),
+                        "Tool-change macros installed. The controller must reboot to enable the tool changer.\n\nReboot now?",
+                        "Tool change macros", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    Comms.com.WriteCommand("$REBOOT");
+            }
+        }
+
         public void CloseFile()
         {
         }
@@ -461,7 +504,14 @@ namespace CNC.Controls
 
             if (filename != string.Empty)
             {
-                UploadLocalFile(filename, currentFile != null ? currentFile["Path"] as string : null);
+                // Target the selected file's filesystem, or - if nothing is selected - the root volume: the SD
+                // card when present, else littlefs mounted at root. When nothing is mounted at "/" (SD enabled
+                // but no card, with littlefs at /littlefs), fall back to the first available mount so $CWD=/
+                // can't fail with error:63 - mirrors the root-restore logic in GrblSDCard.Load.
+                string dest = currentFile != null ? currentFile["Path"] as string
+                            : (GrblSDCard.Mounts.Exists(m => m.Path == "/") ? "/"
+                               : (GrblSDCard.Mounts.Count > 0 ? GrblSDCard.Mounts[0].Path : "/"));
+                UploadLocalFile(filename, dest);
                 ReloadFiles();
             }
         }
@@ -469,6 +519,33 @@ namespace CNC.Controls
         // Upload a local file to the controller, targeting destPath's filesystem (root if null/"/"); the
         // controller file name is the local base name. Sets status messages and returns success; the caller
         // reloads. Reused by Upload / Edit-save / Create / Copy / Move.
+        // Upload any missing ATC support macros to the controller filesystem, then refresh the listing so they
+        // show. Reuses this tab's UploadLocalFile so the transfer (target filesystem, FTP/YModem) is the proven
+        // path. Called by the SD Card tab's "Install ATC" button (InstallAtcMacros_Click) - the only provisioning
+        // trigger (explicit, user-initiated; no auto-on-connect or auto-on-show).
+        public AtcMacros.ProvisionResult ProvisionAtcMacros(System.Func<AtcMacros.UpdateReason, bool> confirmUpload)
+        {
+            // Use the authoritative shared view model, NOT this view's DataContext: when provisioning runs at
+            // connect the SD Card tab may not have been realized yet, so DataContext is still null and
+            // EnsureProvisioned(null, ...) returns Skipped - which is why the prompt only appeared after the tab
+            // was opened. Grbl.GrblViewModel is always set once connected.
+            GrblViewModel model = Grbl.GrblViewModel;
+            try
+            {
+                var result = AtcMacros.EnsureProvisioned(model, UploadLocalFile, confirmUpload);
+                ReloadFiles();
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                // Never let a provisioning hiccup reach the app's global handler (its modal error box pumps the
+                // dispatcher and can turn one fault into a cascade); surface it on the status bar instead.
+                if (model != null)
+                    model.Message = "ATC macro upload failed: " + ex.Message;
+                return AtcMacros.ProvisionResult.Failed;
+            }
+        }
+
         private bool UploadLocalFile(string localPath, string destPath)
         {
             GrblViewModel model = Grbl.GrblViewModel ?? DataContext as GrblViewModel;   // provisioning can run before this view is realized
@@ -478,8 +555,8 @@ namespace CNC.Controls
 
             // $CWD makes both the FTP path (re-queried via PWD below) and the YModem write land on the chosen
             // filesystem; the caller's ReloadFiles restores the root afterwards.
-            if (!string.IsNullOrEmpty(destPath) && destPath != "/")
-                Grbl.WaitForResponse("$CWD=" + destPath.TrimEnd('/'));
+            if (!string.IsNullOrEmpty(destPath))
+                Grbl.WaitForResponse("$CWD=" + (destPath.Length > 1 ? destPath.TrimEnd('/') : destPath));   // "/" -> $CWD=/ (root), so an unselected Upload lands on the root volume, not a stale $CWD
 
             if (GrblInfo.UploadProtocol == "FTP")
             {

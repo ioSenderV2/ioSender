@@ -1,0 +1,3 @@
+O<cal> SUB
+  #<_probe_radius> = 1.0
+O<cal> ENDSUB

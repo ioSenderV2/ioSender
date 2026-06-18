@@ -1,0 +1,105 @@
+; tc.macro - tool change handler for grblHAL.
+;
+; Replaces the firmware's built-in M6 flow. Triggered automatically when
+; /tc.macro is present at the SD card root and the SDcard plugin attaches
+; (boot or after $FM). With this in place, $341/$342/$343/$345/$346 are
+; ignored — all tool change behavior is defined here.
+;
+; Flow:
+;   - Spindle/coolant off, lift Z to safe (machine -5).
+;   - For real swaps (selected_tool != 8): rapid to G30 (foam bin),
+;     prompt operator, M0 hold for cycle start.
+;   - For T8 (sentinel = probe already in spindle): skip swap.
+;   - Rapid to G59.3 origin (over puck).
+;   - Probe puck: seek down at F500, pull off 2mm, slow re-touch at F25.
+;     G38.2 auto-routes to the toolsetter input because XY is at G59.3
+;     within TOOLSETTER_RADIUS (motion_control.c:1018-1019).
+;   - First call of session (#<_tlo_ref> == 0): store probe machine-Z as
+;     the reference; no G43.1 applied.
+;   - Subsequent calls: G43.1 Z[probe_z - tlo_ref] applies dynamic TLO.
+;   - Park at G30.
+;
+; Required state:
+;   - Machine is homed.
+;   - G30 is set to the tool-swap position (over foam bin, near max Z).
+;   - G59.3 is set to the toolsetter approach position (over puck,
+;     XY centered, Z high enough that the longest tool clears the puck
+;     during the XY rapid in).
+;   - #<_tlo_ref> is initialized to 0 at start of session (start_job.macro
+;     does this).
+;
+; Firmware-supplied NGC params:
+;   #<_current_tool>  - currently mounted tool ID
+;   #<_selected_tool> - T value from M6 T<n>
+
+(PRINT, TC01 ENTER cur=#<_current_tool> sel=#<_selected_tool>)
+
+M5
+M9
+G53 G0 Z-5
+
+o100 IF [#<_selected_tool> NE 8]
+  ; Safe-Z goto to G30 (Z already lifted to -5 above): traverse XY at the safe
+  ; height, then move Z. Decomposed by hand because grblHAL runs this macro
+  ; directly - ioSender's "safe Z on Go To" only rewrites gotos it sends itself.
+  ; #5181/#5182/#5183 = stored G30 machine position (ngc_params: g30_home).
+  G53 G0 X#5181 Y#5182
+  G53 G0 Z#5183
+  (MSG, Swap to T#<_selected_tool>, press cycle start)
+  M0
+  G49                ; cancel old tool's TLO before probing the new one
+o100 ENDIF
+
+; --- Rapid to G59.3 (over puck) ---
+; Safe-Z goto: lift (below), select G59.3, traverse XY at the safe Z, then
+; descend - rather than the coordinated "G0 X0 Y0 Z0", which would move Z while
+; traversing. Traversing at machine -5 (this macro's safe height) no longer
+; relies on G59.3's Z being set high enough to clear the puck during the rapid.
+G53 G0 Z-5
+G59.3
+G0 X0 Y0
+G0 Z0
+(PRINT, TC02 at G59.3)
+
+; --- Select probe input based on the tool in the spindle ---
+; T8 = 3D mechanical probe. Its stylus is sensitive (sub-mm deflection)
+; and is NOT designed to bear downward force on the puck. We probe via
+; the MAIN probe input (pin 15) — the stylus triggers it on first touch,
+; well before any meaningful pressure on the puck.
+; Any other tool = rigid cutting tool with no electrical sensing. The
+; puck's NC switch on the TOOLSETTER input fires when the tool pushes
+; down on it.
+; G65 P5 Q<id>: Q0 = Probe_Default (main), Q1 = Probe_Toolsetter (probe.h:40).
+o150 IF [#<_selected_tool> EQ 8]
+  G65 P5 Q0
+  (PRINT, TC02b main probe selected for T8)
+o150 ELSE
+  G65 P5 Q1
+  (PRINT, TC02b toolsetter selected for T#<_selected_tool>)
+o150 ENDIF
+
+G91
+G38.2 Z-80 F500
+G0 Z2
+G38.2 Z-5 F25
+#<_probe_z> = #5063
+G0 Z10
+G90
+G65 P5 Q0
+G54
+(PRINT, TC03 probe_z=#<_probe_z>)
+
+o200 IF [#<_tlo_ref> EQ 0]
+  #<_tlo_ref> = #<_probe_z>
+  (PRINT, TC04 TLO REF SET ref=#<_tlo_ref>)
+o200 ELSE
+  G43.1 Z[#<_probe_z> - #<_tlo_ref>]
+  (PRINT, TC05 TLO APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])
+o200 ENDIF
+
+; Safe-Z goto to G30 (Z lifted just above): traverse XY at the safe height, then
+; move Z. See the matching note on the G30 swap move earlier in this macro.
+G53 G0 Z-5
+G53 G0 X#5181 Y#5182
+G53 G0 Z#5183
+(PRINT, TC06 EXIT at G30)
