@@ -8,6 +8,48 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 ![Toggle DTR](Media/Sender8.png)
 
+---
+
+#### This fork — proposed enhancements
+
+This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a stack of proposed enhancements, each kept as a **clean, single-feature branch** (`pr/*`) that diffs against `master` so it can be reviewed — and picked up — independently.
+
+**See [`proposed-prs.html`](proposed-prs.html) for the full list** (open it in a browser): every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes.
+
+Branch model:
+- `master` = the upstream release plus PRs 1&ndash;8 already integrated.
+- Each remaining enhancement lives on its own `pr/<name>` branch off `master`. A few are **stacked** on another PR (e.g. the ATC macros branch builds on the SD-card filesystem branch) — `proposed-prs.html` lists each branch's *Depends on*.
+
+##### Apply one (or more) to your own fork
+
+Add this fork as a remote and fetch the branches:
+
+```bash
+git remote add srw https://github.com/stevenrwood/ioSender.git
+git fetch srw
+```
+
+Then pick up a single PR. Look up its branch name (and any parent it stacks on) in `proposed-prs.html`, then either **merge the branch** as-is:
+
+```bash
+git merge srw/pr/<branch>
+```
+
+or **cherry-pick just its commits** onto your current branch (handy when your base differs from this fork's `master`):
+
+```bash
+# the commits a pr/* branch adds on top of master
+git cherry-pick master..srw/pr/<branch>
+```
+
+For a **stacked** PR, apply its parent first (or cherry-pick from the parent instead of `master`):
+
+```bash
+git cherry-pick srw/pr/<parent-branch>..srw/pr/<branch>
+```
+
+Each branch touches a distinct, self-contained set of files, so independent PRs combine without conflicts; resolve any only where two PRs intentionally share a file (noted in the tracker).
+
 #### Edge pre-releases
 
 Edge pre-releases can be [downloaded from here](https://www.io-engineering.com/downloads), they contains changes yet to be incorporated in a main release and might be buggy and even break existing functionality.  
