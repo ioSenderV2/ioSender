@@ -757,33 +757,11 @@ namespace CNC.Controls
             model.ConnectionTarget = (Comms.com != null && Comms.com.IsOpen) ? Base.PortParams : null;
         }
 
-        // Auto-start the bundled simulator (silently - no dialog) when the saved target is it, so a
-        // startup auto-reconnect to a simulator target brings the simulator up first. No-op if it is
-        // already running or not flagged as a simulator connection.
+        // Launch is decoupled: the simulator is now run standalone by the user (it opens its own 3D view +
+        // config dialog and listens on its port), and ioSender simply connects to 127.0.0.1:<port> as a
+        // network target. ioSender no longer launches or manages the simulator process, so this is a no-op.
         private void EnsureSimulatorRunning()
         {
-            if (!Base.StartSimulator || SimulatorManager.IsSimulatorRunning)
-                return;
-
-            string exe = SimulatorManager.FindExecutable(string.IsNullOrWhiteSpace(Base.SimulatorExe) ? "grblHAL_sim.exe" : Base.SimulatorExe);
-            if (exe == null)
-                return;     // not bundled - fall through; the connect attempt simply fails as before
-
-            int netport = 23;
-            int sep = Base.PortParams.LastIndexOf(':');
-            if (sep >= 0)
-                int.TryParse(Base.PortParams.Substring(sep + 1), out netport);
-
-            string args = "-p " + netport +
-                          " -t " + Base.SimulatorSpeedup.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (!string.IsNullOrWhiteSpace(Base.SimulatorArgs))
-                args += " " + Base.SimulatorArgs;   // appended last, so a manual -t here overrides the config value
-
-            // StartSimulator returns once the process exists; the simulator binds its listening port
-            // right at startup, so a short settle delay is enough before the stream is opened. (A
-            // test-connect probe is avoided so it can't consume the simulator's single accept slot.)
-            if (SimulatorManager.StartSimulator(exe, args, true))
-                System.Threading.Thread.Sleep(1200);
         }
 
         // Persist whether the chosen connection is the bundled simulator (and how to launch it) so a
