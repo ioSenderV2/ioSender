@@ -112,6 +112,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
@@ -165,6 +166,12 @@
                               Content="Define spoilboard/stock/toolsetter from sim_setup.cfg"
                               Checked="chkUseSetup_Checked" Unchecked="chkUseSetup_Unchecked"
                               ToolTip="Launches the simulator with -setup sim_setup.cfg (kept next to grblHAL_sim.exe). Defines the simulated spoilboard, stock, toolsetter and tool-change positions and sets G28/G30/G59.3 from them, so probe macros find real surfaces."/>
+
+                    <Label Grid.Row="8" Grid.Column="0" Content="Show 3D:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <CheckBox x:Name="chkShow3D" Grid.Row="8" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
+                              Content="Open the simulator's 3D machine view window"
+                              Checked="chkShow3D_Checked" Unchecked="chkShow3D_Unchecked"
+                              ToolTip="Launches the simulator with -view: a 3D perspective window showing the machine envelope, spoilboard, stock, toolsetter and a cone for the live tool position (machine coordinates, mouse-orbit camera)."/>
                 </Grid>
             </TabItem>
         </TabControl>

@@ -115,6 +115,10 @@ namespace CNC.Controls
             chkUseSetup.IsChecked = setupInArgs
                 || (!string.IsNullOrEmpty(setupPath) && System.IO.File.Exists(setupPath));
 
+            // 3D view: reflect whether -view is already in the (persisted) launch args.
+            chkShow3D.IsChecked = !string.IsNullOrEmpty(prop.SimulatorArgs)
+                && prop.SimulatorArgs.IndexOf("-view", StringComparison.OrdinalIgnoreCase) >= 0;
+
             chkFormatFs.IsChecked = false;          // one-shot; never pre-armed when the dialog opens
             SimulatorManager.FormatNextStart = false;
             UpdateSimulatorButtons();   // re-evaluate now the saved exe name is applied (offers Download if absent)
@@ -235,6 +239,20 @@ namespace CNC.Controls
         {
             if (!string.IsNullOrEmpty(prop.SimulatorArgs))
                 prop.SimulatorArgs = prop.SimulatorArgs.Replace("-setup " + SimulatorManager.SimSetupName, string.Empty).Replace("  ", " ").Trim();
+        }
+
+        // "Show 3D": toggle -view into the (persisted) simulator launch args, opening the simulator's own
+        // 3D machine view window (machine envelope, fixtures and a live tool cone).
+        private void chkShow3D_Checked(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(prop.SimulatorArgs) || prop.SimulatorArgs.IndexOf("-view", StringComparison.OrdinalIgnoreCase) < 0)
+                prop.SimulatorArgs = (string.IsNullOrWhiteSpace(prop.SimulatorArgs) ? string.Empty : prop.SimulatorArgs.Trim() + " ") + "-view";
+        }
+
+        private void chkShow3D_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(prop.SimulatorArgs))
+                prop.SimulatorArgs = prop.SimulatorArgs.Replace("-view", string.Empty).Replace("  ", " ").Trim();
         }
 
         // "Format FS": arm a one-shot -format for the next simulator launch (wipes + reformats littlefs). Kept
