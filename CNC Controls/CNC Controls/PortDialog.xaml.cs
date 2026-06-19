@@ -106,6 +106,8 @@ namespace CNC.Controls
                 && prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) >= 0;
             chkUseMyMachine.IsChecked = myMachineInArgs
                 || (!string.IsNullOrEmpty(myMachinePath) && System.IO.File.Exists(myMachinePath));
+            chkFormatFs.IsChecked = false;          // one-shot; never pre-armed when the dialog opens
+            SimulatorManager.FormatNextStart = false;
             UpdateSimulatorButtons();   // re-evaluate now the saved exe name is applied (offers Download if absent)
 
             if (!string.IsNullOrEmpty(orgport)) {
@@ -212,11 +214,25 @@ namespace CNC.Controls
                 prop.SimulatorArgs = prop.SimulatorArgs.Replace("-e " + SimulatorManager.MyMachineEepromName, string.Empty).Replace("  ", " ").Trim();
         }
 
+        // "Format FS": arm a one-shot -format for the next simulator launch (wipes + reformats littlefs). Kept
+        // out of the persisted SimulatorArgs so it can't wipe the filesystem on every connect - it is consumed
+        // and cleared by the first StartSimulator that launches a process.
+        private void chkFormatFs_Checked(object sender, RoutedEventArgs e)
+        {
+            SimulatorManager.FormatNextStart = true;
+        }
+
+        private void chkFormatFs_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SimulatorManager.FormatNextStart = false;
+        }
+
         private void btnStartSimulator_Click(object sender, RoutedEventArgs e)
         {
             if (TryStartSimulator())
             {
                 prop.SimulatorStarted = true;
+                chkFormatFs.IsChecked = false;   // the one-shot -format was consumed by this launch
             }
             else
             {

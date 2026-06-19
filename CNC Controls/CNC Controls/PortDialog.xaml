@@ -110,6 +110,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
@@ -151,6 +152,12 @@
 
                     <Label x:Uid="lbl_simAuto" Grid.Row="5" Grid.Column="0" Content="Auto-kill:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
                     <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,4,0,0" IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
+
+                    <Label Grid.Row="6" Grid.Column="0" Content="Format FS:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <CheckBox x:Name="chkFormatFs" Grid.Row="6" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
+                              Content="Wipe the simulator filesystem on next start"
+                              Checked="chkFormatFs_Checked" Unchecked="chkFormatFs_Unchecked"
+                              ToolTip="One-shot: the next simulator start wipes and reformats its littlefs filesystem (-format), clearing uploaded macros and ATC state. Clears automatically after one start."/>
                 </Grid>
             </TabItem>
         </TabControl>

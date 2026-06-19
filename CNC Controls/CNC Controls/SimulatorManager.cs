@@ -243,6 +243,11 @@ namespace CNC.Controls
             catch (Exception ex) { error = ex.Message; return false; }
         }
 
+        // One-shot request to wipe + reformat the simulator's littlefs filesystem on the next launch (appends
+        // the -format option). Set from the connect dialog's "Format FS" checkbox; consumed and cleared by the
+        // next StartSimulator that actually launches a process, so it never persists across runs.
+        public static bool FormatNextStart { get; set; }
+
         public static bool StartSimulator(string path, string args, bool autoKill)
         {
             try
@@ -251,6 +256,13 @@ namespace CNC.Controls
                     return true;
 
                 string name = System.IO.Path.GetFileNameWithoutExtension(path);
+
+                // Honour a one-shot filesystem reset requested from the connect dialog, for this launch only.
+                if (FormatNextStart)
+                {
+                    args = string.IsNullOrWhiteSpace(args) ? "-format" : args.Trim() + " -format";
+                    FormatNextStart = false;
+                }
 
                 // Reap stale instances of the managed simulator before launching. Our normal cleanup
                 // (KillStarted via Application.Exit / ProcessExit) does NOT run when the VS debugger is
