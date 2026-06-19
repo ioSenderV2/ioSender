@@ -111,6 +111,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
@@ -158,6 +159,12 @@
                               Content="Wipe the simulator filesystem on next start"
                               Checked="chkFormatFs_Checked" Unchecked="chkFormatFs_Unchecked"
                               ToolTip="One-shot: the next simulator start wipes and reformats its littlefs filesystem (-format), clearing uploaded macros and ATC state. Clears automatically after one start."/>
+
+                    <Label Grid.Row="7" Grid.Column="0" Content="Fixture setup:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <CheckBox x:Name="chkUseSetup" Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
+                              Content="Define spoilboard/stock/toolsetter from sim_setup.cfg"
+                              Checked="chkUseSetup_Checked" Unchecked="chkUseSetup_Unchecked"
+                              ToolTip="Launches the simulator with -setup sim_setup.cfg (kept next to grblHAL_sim.exe). Defines the simulated spoilboard, stock, toolsetter and tool-change positions and sets G28/G30/G59.3 from them, so probe macros find real surfaces."/>
                 </Grid>
             </TabItem>
         </TabControl>

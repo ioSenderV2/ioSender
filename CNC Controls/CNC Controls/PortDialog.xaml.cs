@@ -106,6 +106,15 @@ namespace CNC.Controls
                 && prop.SimulatorArgs.IndexOf(SimulatorManager.MyMachineEepromName, StringComparison.OrdinalIgnoreCase) >= 0;
             chkUseMyMachine.IsChecked = myMachineInArgs
                 || (!string.IsNullOrEmpty(myMachinePath) && System.IO.File.Exists(myMachinePath));
+
+            // Default the fixture setup on when a sim_setup.cfg exists next to the simulator (a saved choice in
+            // the args still wins), the same way the My Machine profile defaults on when its EEPROM is present.
+            string setupPath = SimulatorManager.SimSetupPath();
+            bool setupInArgs = !string.IsNullOrEmpty(prop.SimulatorArgs)
+                && prop.SimulatorArgs.IndexOf(SimulatorManager.SimSetupName, StringComparison.OrdinalIgnoreCase) >= 0;
+            chkUseSetup.IsChecked = setupInArgs
+                || (!string.IsNullOrEmpty(setupPath) && System.IO.File.Exists(setupPath));
+
             chkFormatFs.IsChecked = false;          // one-shot; never pre-armed when the dialog opens
             SimulatorManager.FormatNextStart = false;
             UpdateSimulatorButtons();   // re-evaluate now the saved exe name is applied (offers Download if absent)
@@ -212,6 +221,20 @@ namespace CNC.Controls
         {
             if (!string.IsNullOrEmpty(prop.SimulatorArgs))
                 prop.SimulatorArgs = prop.SimulatorArgs.Replace("-e " + SimulatorManager.MyMachineEepromName, string.Empty).Replace("  ", " ").Trim();
+        }
+
+        // "Fixture setup": toggle -setup sim_setup.cfg into the (persisted) simulator launch args, so the sim
+        // builds the spoilboard/stock/toolsetter from the file and sets G28/G30/G59.3 from it at boot.
+        private void chkUseSetup_Checked(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(prop.SimulatorArgs) || prop.SimulatorArgs.IndexOf(SimulatorManager.SimSetupName, StringComparison.OrdinalIgnoreCase) < 0)
+                prop.SimulatorArgs = (string.IsNullOrWhiteSpace(prop.SimulatorArgs) ? string.Empty : prop.SimulatorArgs.Trim() + " ") + "-setup " + SimulatorManager.SimSetupName;
+        }
+
+        private void chkUseSetup_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(prop.SimulatorArgs))
+                prop.SimulatorArgs = prop.SimulatorArgs.Replace("-setup " + SimulatorManager.SimSetupName, string.Empty).Replace("  ", " ").Trim();
         }
 
         // "Format FS": arm a one-shot -format for the next simulator launch (wipes + reformats littlefs). Kept

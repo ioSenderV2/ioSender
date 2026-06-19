@@ -380,6 +380,16 @@ namespace CNC.Controls
             return exe == null ? null : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), MyMachineEepromName);
         }
 
+        // Fixture setup file (-setup): defines the simulated spoilboard/stock/toolsetter/tool-change geometry
+        // and drives the controller's G28/G30/G59.3 offsets. Kept next to the simulator exe, like MyMachine.DAT.
+        public const string SimSetupName = "sim_setup.cfg";
+
+        public static string SimSetupPath()
+        {
+            string exe = FindExecutable("grblHAL_sim.exe");
+            return exe == null ? null : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), SimSetupName);
+        }
+
         // Build MyMachine.DAT by replaying the given "$id=value" settings into a throwaway, headless instance of
         // the bundled simulator: it serializes them into its NVRAM file exactly as real grblHAL would, so the
         // simulator then boots with the same context as the real controller. Settings the sim doesn't support
