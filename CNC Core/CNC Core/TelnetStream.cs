@@ -350,7 +350,17 @@ namespace CNC.Core
                     }
                 }
                 else
-                    ByteReceived?.Invoke(ReadByte());
+                {
+                    // Hand over every buffered byte, not just one. During a YModem transfer EventMode is off
+                    // and the only consumer is a one-shot ByteReceived waiter (WaitFor) that takes the first
+                    // byte and ignores the rest. Draining a single byte per socket callback while appending
+                    // the whole burst let `input` grow without bound if the controller ever flooded bytes (a
+                    // stalled/!confused transfer) - eventually an OutOfMemoryException. Draining fully here
+                    // bounds memory and cannot starve the waiter.
+                    int b;
+                    while ((b = ReadByte()) != -1)
+                        ByteReceived?.Invoke(b);
+                }
             }
 
             if (replies != null) foreach (string reply in replies)
