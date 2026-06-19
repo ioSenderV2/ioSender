@@ -96,9 +96,10 @@
                 </StackPanel>
             </TabItem>
             <TabItem x:Uid="tab_simulator" x:Name="tabSimulator" Header="Simulator">
-                <!-- Shared-size label column so labels (incl. "My Machine:") size to content and align, and the
-                     window (SizeToContent) grows to fit the row contents - presentable at any DPI / font scale. -->
-                <Grid Margin="5,5,5,8" Grid.IsSharedSizeScope="True">
+                <!-- The simulator runs standalone now: the user launches grblHAL_sim.exe directly (it opens its
+                     own 3D view + config and listens on its port). ioSender just connects to 127.0.0.1 on that
+                     port, so this tab only needs the port. -->
+                <Grid Margin="5,8,5,8" Grid.IsSharedSizeScope="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" SharedSizeGroup="simlbl"/>
                         <ColumnDefinition Width="*"/>
@@ -106,33 +107,10 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
-                        <Button x:Name="btnStartSimulator" Content="Start" MinWidth="90" Padding="6,2"/>
-                        <Button x:Name="btnStopSimulator" Content="Stop" MinWidth="90" Padding="6,2" Margin="5,0,0,0" IsEnabled="False"/>
-                        <Button x:Name="btnDownloadSimulator" Content="Download" MinWidth="90" Padding="6,2" Margin="5,0,0,0" Visibility="Collapsed"
-                                ToolTip="Download the grblHAL simulator from the web builder and install it in the application's 'simulator' folder."/>
-                        <TextBlock x:Name="txtSimulatorStatus" Text="Not running" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    </StackPanel>
-
-                    <Label x:Uid="lbl_simExe" Grid.Row="1" Grid.Column="0" Content="Executable:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <ComboBox Grid.Row="1" Grid.Column="1" IsEditable="True" MinWidth="250" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalContentAlignment="Center"
-                              Text="{Binding Path=SimulatorExe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                        <ComboBox.Items>
-                            <sys:String>grblHAL_sim.exe</sys:String>
-                        </ComboBox.Items>
-                    </ComboBox>
-
-                    <Label x:Uid="lbl_simPort" Grid.Row="2" Grid.Column="0" Content="Port:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <local:NumericTextBox Grid.Row="2" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,4,0,0" Format="####0">
+                    <Label x:Uid="lbl_simPort" Grid.Row="0" Grid.Column="0" Content="Port:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
+                    <local:NumericTextBox Grid.Row="0" Grid.Column="1" Width="90" HorizontalAlignment="Left" Margin="0,4,0,0" Format="####0">
                         <local:NumericTextBox.Value>
                             <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                 <Binding.ValidationRules>
@@ -142,36 +120,8 @@
                         </local:NumericTextBox.Value>
                     </local:NumericTextBox>
 
-                    <Label x:Uid="lbl_simArgs" Grid.Row="3" Grid.Column="0" Content="Args:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <TextBox Grid.Row="3" Grid.Column="1" MinWidth="250" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalContentAlignment="Center"
-                             Text="{Binding Path=SimulatorArgs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <Label Grid.Row="4" Grid.Column="0" Content="My Machine:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <CheckBox x:Name="chkUseMyMachine" Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
-                              Content="Boot from my machine's mirrored settings"
-                              Checked="chkUseMyMachine_Checked" Unchecked="chkUseMyMachine_Unchecked"
-                              ToolTip="Starts the simulator from MyMachine.DAT. Create/refresh it with 'Copy to simulator' in the Machine Setup Wizard while connected to your real machine."/>
-
-                    <Label x:Uid="lbl_simAuto" Grid.Row="5" Grid.Column="0" Content="Auto-kill:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,4,0,0" IsChecked="{Binding Path=AutoKillSimulator, Mode=TwoWay}" VerticalAlignment="Center"/>
-
-                    <Label Grid.Row="6" Grid.Column="0" Content="Format FS:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <CheckBox x:Name="chkFormatFs" Grid.Row="6" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
-                              Content="Wipe the simulator filesystem on next start"
-                              Checked="chkFormatFs_Checked" Unchecked="chkFormatFs_Unchecked"
-                              ToolTip="One-shot: the next simulator start wipes and reformats its littlefs filesystem (-format), clearing uploaded macros and ATC state. Clears automatically after one start."/>
-
-                    <Label Grid.Row="7" Grid.Column="0" Content="Fixture setup:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <CheckBox x:Name="chkUseSetup" Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
-                              Content="Define spoilboard/stock/toolsetter from sim_setup.cfg"
-                              Checked="chkUseSetup_Checked" Unchecked="chkUseSetup_Unchecked"
-                              ToolTip="Launches the simulator with -setup sim_setup.cfg (kept next to grblHAL_sim.exe). Defines the simulated spoilboard, stock, toolsetter and tool-change positions and sets G28/G30/G59.3 from them, so probe macros find real surfaces."/>
-
-                    <Label Grid.Row="8" Grid.Column="0" Content="Show 3D:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,4,8,0"/>
-                    <CheckBox x:Name="chkShow3D" Grid.Row="8" Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0"
-                              Content="Open the simulator's 3D machine view window"
-                              Checked="chkShow3D_Checked" Unchecked="chkShow3D_Unchecked"
-                              ToolTip="Launches the simulator with -view: a 3D perspective window showing the machine envelope, spoilboard, stock, toolsetter and a cone for the live tool position (machine coordinates, mouse-orbit camera)."/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" TextWrapping="Wrap" MaxWidth="340" Opacity="0.75"
+                               Text="Launch grblHAL_sim.exe first, then connect. The simulator listens on 127.0.0.1 at this port (default 23) and is configured in its own window."/>
                 </Grid>
             </TabItem>
         </TabControl>
