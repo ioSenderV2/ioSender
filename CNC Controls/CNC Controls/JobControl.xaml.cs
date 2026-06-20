@@ -1251,8 +1251,10 @@ namespace CNC.Controls
 
                 string line = (string)job.NextRow.Data; //  GCodeUtils.StripSpaces((string)currentRow["Data"]);
 
-                // Send comment lines as empty comment
-                if ((bool)job.NextRow.IsComment && !AppConfig.Settings.Base.SendComments)
+                // Send comment lines as empty comment when "Send comments" is off - except to the simulator,
+                // which parses (TOOL T=n D=.. TYPE=..) comments for material removal, so it must always get
+                // the full comment regardless of the setting.
+                if ((bool)job.NextRow.IsComment && !AppConfig.Settings.Base.SendComments && !AppConfig.Settings.Base.StartSimulator)
                 {
                     line = "()";
                     job.NextRow.Length = line.Length + 1;
