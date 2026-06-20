@@ -80,6 +80,11 @@ namespace CNC.Controls
         // (they have no _T<n> suffix).
         private static readonly Regex FileName = new Regex(@"^(\d+)_(.+)_T(\d+)\.nc$", RegexOptions.IgnoreCase);
 
+        // The tool-table file the add-in emits (e.g. 0_tooltable.nc): carries the (TOOL T= D= TYPE=)
+        // comments the simulator reads for material removal. It has no _T<n> suffix so MatchFolder skips
+        // it; it is loaded verbatim (comments preserved) at the very top of the combined program instead.
+        private static readonly Regex ToolTableFile = new Regex(@"tool\s*table", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         // --- _restore_rapids regexes (compiled: run per-line over large files) ---
         private static readonly Regex GMode = new Regex(@"^\s*(G0?0|G0?1)\b", RegexOptions.Compiled);
         private static readonly Regex Coord = new Regex(@"\b([XYZIJKF])(-?\d+(?:\.\d+)?)", RegexOptions.Compiled);
@@ -134,6 +139,41 @@ namespace CNC.Controls
             ops.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
             return ops;
+        }
+
+        /// <summary>Find the tool-table file (e.g. 0_tooltable.nc) in the folder, or null if none.</summary>
+        public static string MatchToolTable(string folder)
+        {
+            if (!Directory.Exists(folder))
+                return null;
+
+            return Directory.GetFiles(folder, "*.nc")
+                            .Where(p => ToolTableFile.IsMatch(Path.GetFileNameWithoutExtension(p)))
+                            .OrderBy(p => Path.GetFileName(p))
+                            .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Read a file's lines preserving comments (unlike StripWrappers, which drops the header). Only the
+        /// % tape-start/end marks and trailing blank lines are removed. Used for the tool-table file so its
+        /// (TOOL ...) comments survive into the combined program.
+        /// </summary>
+        public static List<string> ReadPreservingComments(string content)
+        {
+            var lines = SplitLines(content);
+            var outLines = new List<string>(lines.Length);
+
+            foreach (var raw in lines)
+            {
+                if (raw.Trim() == "%")          // tape start/end marker - not a g-code line
+                    continue;
+                outLines.Add(raw);
+            }
+
+            while (outLines.Count > 0 && outLines[outLines.Count - 1].Trim().Length == 0)
+                outLines.RemoveAt(outLines.Count - 1);
+
+            return outLines;
         }
 
         private static string[] SplitLines(string content)

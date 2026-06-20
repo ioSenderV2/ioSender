@@ -305,6 +305,25 @@ namespace CNC.Controls
                 foreach (var line in FusionFolderLoader.Prolog)
                     Program.AddBlock(line);
 
+                // Tool table (e.g. 0_tooltable.nc): loaded first, verbatim, so its (TOOL ...) comments reach
+                // the controller / simulator before the first tool change. Comments are preserved here (the
+                // per-op files below still get their headers stripped).
+                var toolTablePath = FusionFolderLoader.MatchToolTable(folder);
+                if (toolTablePath != null)
+                {
+                    try
+                    {
+                        var ttLines = FusionFolderLoader.ReadPreservingComments(System.IO.File.ReadAllText(toolTablePath));
+                        if (ttLines.Count > 0)
+                        {
+                            Program.BeginSection("Tool table");
+                            foreach (var line in ttLines)
+                                Program.AddBlock(line);
+                        }
+                    }
+                    catch { }
+                }
+
                 int sincePump = 0;
                 foreach (var op in ops)
                 {
