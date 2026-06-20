@@ -100,6 +100,34 @@ namespace CNC.Controls
 
                 Model.FileName = filename;
             }
+
+            if (filename != "")
+                PushHeaderToSimulator();
+        }
+
+        // When connected to the simulator, send the program's leading comment lines (e.g. (STOCK X=..) and
+        // (TOOL T=1 D=.. TYPE=..)) to it as soon as the program is loaded - so a start_job macro run *before*
+        // the program already knows the stock size and tool table. Only the simulator consumes these comments;
+        // a real controller ignores them. Stops at the first tool change / motion (the end of the header).
+        private void PushHeaderToSimulator()
+        {
+            if (!AppConfig.Settings.Base.StartSimulator || Comms.com == null || !Comms.com.IsOpen)
+                return;
+
+            int scanned = 0;
+            foreach (var block in Program.Blocks)
+            {
+                if (++scanned > 1000)
+                    break;
+                if (block.IsComment)
+                {
+                    Comms.com.WriteCommand(block.Data);
+                    continue;
+                }
+                string u = block.Data.ToUpperInvariant();
+                if (u.Contains("M6") || u.IndexOfAny(new[] { 'X', 'Y', 'Z' }) >= 0)
+                    break;                                  // first tool change / axis move -> header done
+            }
         }
 
         public static GCode File { get { return file.Value; } }
