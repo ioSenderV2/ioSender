@@ -288,6 +288,16 @@ namespace CNC.Controls
                     GrblStateChanged((sender as GrblViewModel).GrblState);
                     break;
 
+                case nameof(GrblViewModel.IsConnectionLost):
+                    // A mid-job socket drop (controller/simulator going away) leaves the streaming state
+                    // machine waiting on 'ok' responses that will never arrive, so the job stays "running"
+                    // with no indication while the link is actually gone. Stop the job so the UI reflects the
+                    // lost connection (idle-time loss is already surfaced by the poller). Only fires while a
+                    // job is active, so it cannot affect normal streaming.
+                    if ((sender as GrblViewModel).IsConnectionLost && (model.IsJobRunning || JobTimer.IsRunning))
+                        streamingHandler.Call(StreamingState.Stop, true);
+                    break;
+
                 case nameof(GrblViewModel.MDI):
                     SendCommand((sender as GrblViewModel).MDI);
                     break;
