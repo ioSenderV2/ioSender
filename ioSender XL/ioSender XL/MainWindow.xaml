@@ -96,10 +96,13 @@
             </StatusBarItem>
             <Separator Grid.Column="3" />
             <StatusBarItem Grid.Column="4">
-                <TextBlock x:Uid="lbl_connectionTarget" Text="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
+                <TextBlock x:Uid="lbl_connectionTarget" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <!-- green when a target is connected, red when not -->
+                            <!-- green when a target is connected, red when not. Text is a Setter (not a local
+                                 value) so the IsConnectionLost trigger below can override it - a directly set
+                                 Text binding would win over a trigger and never show "Not connected". -->
+                            <Setter Property="Text" Value="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}"/>
                             <Setter Property="Foreground" Value="ForestGreen"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="{x:Null}">
@@ -107,6 +110,12 @@
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="">
                                     <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                                <!-- socket dropped (e.g. simulator closed): the reconnect loop keeps the
+                                     target name set, so reflect the lost state here instead -->
+                                <DataTrigger Binding="{Binding Path=IsConnectionLost}" Value="True">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                    <Setter Property="Text" Value="Not connected"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
