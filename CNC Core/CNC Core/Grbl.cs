@@ -2615,13 +2615,17 @@ namespace CNC.Core
             get { return GrblSettings.Settings.Where(x => x.GroupId == Id); }
         }
 
-        // True when any contained setting differs from its startup value; drives the
-        // group-level "modified" highlight. Re-raised via RaiseModifiedChanged() by the
-        // settings as they change.
+        // Group-level highlight states, mirroring the per-setting ones: IsEdited (any unsaved edit) takes
+        // precedence over IsSavedModified (any saved-but-changed-from-startup). Re-raised via
+        // RaiseModifiedChanged() by the settings as they change.
+        public bool IsEdited { get { return Settings.Any(x => x.IsEdited); } }
+        public bool IsSavedModified { get { return !IsEdited && Settings.Any(x => x.IsSavedModified); } }
         public bool IsModified { get { return Settings.Any(x => x.IsModified); } }
 
         internal void RaiseModifiedChanged()
         {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEdited)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSavedModified)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsModified)));
         }
 
@@ -2837,6 +2841,8 @@ namespace CNC.Core
             {
                 if (DataType == DataTypes.FLOAT)
                     value = GrblSettings.FormatFloat(value, Format);
+                else if (DataType == DataTypes.BOOL && !string.IsNullOrEmpty(value))
+                    value = value.Trim() != "0" ? "1" : "0";  // canonicalise so editor/compare/highlight agree
                 if (_value != value)
                 {
                     _value = value;
@@ -2848,36 +2854,62 @@ namespace CNC.Core
                         // trigger a spurious "settings changed, save now?" prompt.
                         IsDirty = _loaded == null || _value != _loaded;
                         OnPropertyChanged();
+                        OnPropertyChanged(nameof(EditValue));
                         OnPropertyChanged(nameof(FormattedValue));
                         OnPropertyChanged(nameof(BitfieldLabels));
+                        OnPropertyChanged(nameof(IsEdited));
+                        OnPropertyChanged(nameof(IsSavedModified));
                         OnPropertyChanged(nameof(IsModified));
                         NotifyGroup();
                     }
                 }
             }
         }
+
+        // The value to display/edit: the pending (unsaved) editor edit if one exists, otherwise the
+        // controller value. Edits are staged in GrblSettings.PendingEdits rather than mutating Value,
+        // so the rest of the app keeps seeing the controller value until Save. See NotifyEdited().
+        public string EditValue
+        {
+            get { return GrblSettings.PendingEdits.TryGetValue(Id, out string v) ? v : _value; }
+        }
+
+        // Re-raise the bindings that depend on EditValue when a pending edit is added/changed/cleared.
+        internal void NotifyEdited()
+        {
+            OnPropertyChanged(nameof(EditValue));
+            OnPropertyChanged(nameof(FormattedValue));
+            OnPropertyChanged(nameof(BitfieldLabels));
+            OnPropertyChanged(nameof(IsEdited));
+            OnPropertyChanged(nameof(IsSavedModified));
+            OnPropertyChanged(nameof(IsModified));
+            NotifyGroup();
+        }
+
         public string FormattedValue
         {
             get
             {
-                if (_value == null)
+                string val = EditValue;
+
+                if (val == null)
                     return "n/a";
 
                 switch(DataType)
                 {
                     case DataTypes.BOOL:
-                        return _value == "0" ? "false" : "true";
+                        return val == "0" ? "false" : "true";
 
                     case DataTypes.BITFIELD:
-                        return _value == "0" ? "no" : _value;
+                        return val == "0" ? "no" : val;
 
                     case DataTypes.XBITFIELD:
-                        return _value == "0" ? "disabled" : string.Format("enabled ({0})", _value);
+                        return val == "0" ? "disabled" : string.Format("enabled ({0})", val);
 
                     case DataTypes.AXISMASK:
-                        if(_value != "0")
+                        if(val != "0")
                         {
-                            int axes = int.Parse(_value), idx = 0;
+                            int axes = int.Parse(val), idx = 0;
                             string res = string.Empty;
                             while(axes != 0)
                             {
@@ -2890,10 +2922,10 @@ namespace CNC.Core
                         return "no";
 
                     case DataTypes.RADIOBUTTONS:
-                        return Format.Split(',')[int.Parse(_value)];
+                        return Format.Split(',')[int.Parse(val)];
                 }
 
-                return _value;
+                return val;
             }
         }
 
@@ -2905,10 +2937,12 @@ namespace CNC.Core
         {
             get
             {
-                if (_value == null || (DataType != DataTypes.BITFIELD && DataType != DataTypes.XBITFIELD))
+                string val = EditValue;
+
+                if (val == null || (DataType != DataTypes.BITFIELD && DataType != DataTypes.XBITFIELD))
                     return null;
 
-                if (!int.TryParse(_value, out int mask) || mask == 0)
+                if (!int.TryParse(val, out int mask) || mask == 0)
                     return null;
 
                 string[] labels = Format.Split(',');
@@ -2990,9 +3024,22 @@ namespace CNC.Core
         // Not updated by Save or Reload, so RevertToStartup() restores the session-start value.
         public string StartupValue { get { return _startup; } }
 
-        // True when the current value differs from the startup value. Independent of IsDirty
-        // (which tracks unsaved-since-last-write); drives the "modified" highlight in the UI.
-        public bool IsModified { get { return _startup != null && _value != _startup; } }
+        // Controller (loaded) baseline - the value last read from or written to the controller. Used to
+        // capture the old value when logging what a Save changed.
+        internal string LoadedValue { get { return _loaded; } }
+
+        // True when there is an unsaved editor edit staged for this setting (the edited value differs
+        // from the controller value). Drives the primary "unsaved edit" highlight.
+        public bool IsEdited { get { return GrblSettings.PendingEdits.ContainsKey(Id); } }
+
+        // True when the saved (controller) value differs from the session-startup value and there is no
+        // pending edit - i.e. a change already written to the controller this session. Drives the
+        // secondary "saved but changed from startup" highlight.
+        public bool IsSavedModified { get { return !IsEdited && _startup != null && _value != _startup; } }
+
+        // True when the effective value (including any pending edit) differs from the startup value.
+        // Independent of IsDirty (which tracks unsaved-since-last-write); drives "revert to startup".
+        public bool IsModified { get { return _startup != null && EditValue != _startup; } }
 
         // Captures the current value as the startup baseline. Called once on first load.
         internal void SetStartupBaseline()
@@ -3010,12 +3057,13 @@ namespace CNC.Core
             _loaded = _value;
         }
 
-        // Restores the value to the session-start value, staged as a normal (dirty) edit so
-        // it is written to the controller on the next Save - matching manual-edit behaviour.
+        // Restores the value to the session-start value, staged as a pending edit so it is written to
+        // the controller on the next Save - matching manual-edit behaviour. If startup equals the
+        // controller value the pending edit is dropped (SetPendingEdit handles the equality).
         public void RevertToStartup()
         {
             if (IsModified)
-                Value = _startup;
+                GrblSettings.SetPendingEdit(this, _startup);
         }
 
         private void NotifyGroup()
@@ -3024,11 +3072,99 @@ namespace CNC.Core
         }
     }
 
+    // One settings restore point (an auto-snapshot written on Save). See GrblSettings.GetSnapshots().
+    public class SettingsSnapshot
+    {
+        public string FilePath { get; set; }
+        public DateTime Saved { get; set; }
+        public int Changes { get; set; }
+        public string Machine { get; set; }
+
+        // Multi-line "$id name: old -> new" list parsed from the snapshot's comment header; null if absent.
+        public string ChangesDetail { get; set; }
+
+        public string SavedText { get { return Saved.ToString("yyyy-MM-dd HH:mm:ss"); } }
+        public string ChangesText { get { return Changes >= 0 ? Changes.ToString() : string.Empty; } }
+
+        // Tooltip text for the restore picker: the change list, or a fallback when none was recorded.
+        public string Tooltip { get { return string.IsNullOrEmpty(ChangesDetail) ? "No change details recorded." : ("Changed settings:\n" + ChangesDetail); } }
+    }
+
     public static class GrblSettings
     {
         private static List<string> responses = new List<string>();
 
         public static ObservableCollection<GrblSettingDetails> Settings { get; private set; } = new ObservableCollection<GrblSettingDetails>();
+
+        // Edits made in the settings editor but not yet written to the controller, keyed by setting Id.
+        // The left-hand list reads these (via GrblSettingDetails.EditValue) so changes show immediately
+        // without mutating Value. Applied to Value and cleared on Save (see ApplyPendingEdits/Save).
+        public static readonly Dictionary<int, string> PendingEdits = new Dictionary<int, string>();
+
+        public static bool HasPendingEdits { get { return PendingEdits.Count > 0; } }
+
+        // Stage (or, if the value matches the controller value, drop) a pending editor edit and refresh
+        // the affected setting's bindings. Float values are normalised to match the Value setter so a
+        // formatting-only difference is not treated as a change.
+        public static void SetPendingEdit(GrblSettingDetails setting, string value)
+        {
+            if (setting == null)
+                return;
+
+            if (setting.DataType == GrblSettingDetails.DataTypes.FLOAT)
+                value = FormatFloat(value, setting.Format);
+
+            bool had = PendingEdits.TryGetValue(setting.Id, out string current);
+
+            if (value == setting.Value)
+            {
+                if (!had)
+                    return;                 // already at controller value, nothing staged
+                PendingEdits.Remove(setting.Id);
+            }
+            else
+            {
+                if (had && current == value)
+                    return;                 // unchanged
+                PendingEdits[setting.Id] = value;
+            }
+
+            setting.NotifyEdited();
+        }
+
+        // Discard all pending editor edits (e.g. on Reload) and refresh the affected settings.
+        public static void ClearPendingEdits()
+        {
+            if (PendingEdits.Count == 0)
+                return;
+
+            var ids = PendingEdits.Keys.ToList();
+            PendingEdits.Clear();
+
+            foreach (var id in ids)
+                Settings.FirstOrDefault(x => x.Id == id)?.NotifyEdited();
+        }
+
+        // Flush pending editor edits into the settings' Value (marking them dirty for the write below)
+        // and clear the pending map. Called from Save.
+        private static void ApplyPendingEdits()
+        {
+            if (PendingEdits.Count == 0)
+                return;
+
+            var edits = PendingEdits.ToList();
+            PendingEdits.Clear();   // clear first so IsEdited reads false when the Value setter notifies
+
+            foreach (var edit in edits)
+            {
+                var setting = Settings.FirstOrDefault(x => x.Id == edit.Key);
+                if (setting != null)
+                {
+                    setting.Value = edit.Value;
+                    setting.NotifyEdited();     // refresh IsEdited/IsSavedModified even if Value was unchanged
+                }
+            }
+        }
 
         public static bool IsLoaded { get { return Settings.Count > 0; } }
         public static bool ReportProbeCoordinates { get; private set; }
@@ -3238,9 +3374,7 @@ namespace CNC.Core
 
         public static bool HasChanges()
         {
-            var changed = Settings.Where(x => x.IsDirty);
-
-            return changed != null && changed.Count() > 0;
+            return PendingEdits.Count > 0 || Settings.Any(x => x.IsDirty);
         }
 
 #if USE_ASYNC
@@ -3250,12 +3384,18 @@ namespace CNC.Core
 #endif
         {
             bool ok = true;
-            var changed = Settings.Where(x => x.IsDirty);
 
-            if (changed != null && changed.Count() > 0)
+            ApplyPendingEdits();    // flush editor edits into Value (marks dirty) and clear the pending map
+
+            var changed = Settings.Where(x => x.IsDirty).ToList();
+
+            if (changed.Count > 0)
             {
+                var changeLog = new List<string>();   // "$id name: old -> new" per successfully-written setting
+
                 foreach (var setting in changed)
                 {
+                    string oldValue = setting.LoadedValue;  // controller value before this write
 #if USE_ASYNC
                     var task = Task.Run(() => Comms.com.AwaitAck(string.Format("${0}={1}", Setting.Id, Setting.Value)));
                     await await Task.WhenAny(task, Task.Delay(2500));
@@ -3272,7 +3412,12 @@ namespace CNC.Core
 
                     setting.IsDirty = setting.HasErrors;
                     if (!setting.HasErrors)
+                    {
+                        changeLog.Add(string.Format("${0}{1}: {2} -> {3}", setting.Id,
+                            string.IsNullOrEmpty(setting.Name) ? string.Empty : " " + setting.Name,
+                            string.IsNullOrEmpty(oldValue) ? "(unset)" : oldValue, setting.Value));
                         setting.SetLoadedBaseline();    // controller now holds this value
+                    }
                 }
 
                 // Re-derive GrblInfo from the now-current settings (max travel, homing direction, step
@@ -3281,6 +3426,8 @@ namespace CNC.Core
                 // Wizard) instead of the values read at connect.
                 if (Grbl.GrblViewModel != null)
                     GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
+
+                WriteSnapshot(changeLog);       // timestamped restore point of the now-saved settings
             }
 
             return ok;
@@ -3367,6 +3514,111 @@ namespace CNC.Core
             }
 
             return ok;
+        }
+
+        // Rolling, timestamped restore points written on each Save. Per controller-identity so multiple
+        // machines do not intermix; full settings dumps in the Backup format so Restore reuses LoadFile().
+        private const int MaxSnapshots = 20;
+
+        public static string SnapshotFolder { get { return System.IO.Path.Combine(Resources.ConfigPath, "settings-backups"); } }
+
+        private static string SnapshotTag()
+        {
+            string tag = new string((GrblInfo.Identity ?? string.Empty).Trim().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+            return tag.Length == 0 ? "controller" : tag;
+        }
+
+        // Write a restore point of the current (saved) settings; best-effort, never blocks a Save.
+        // The file leads with a "; changes (N):" comment block listing what this save changed
+        // (old -> new), followed by a full settings dump in the Backup format.
+        public static void WriteSnapshot(IList<string> changes)
+        {
+            if (Settings.Count == 0)
+                return;
+
+            int n = changes == null ? 0 : changes.Count;
+
+            try
+            {
+                Directory.CreateDirectory(SnapshotFolder);
+                string tag = SnapshotTag();
+                string name = string.Format("snapshot_{0}_{1}_{2}.txt", DateTime.Now.ToString("yyyyMMddHHmmss"), n, tag);
+
+                using (var sw = new StreamWriter(System.IO.Path.Combine(SnapshotFolder, name)))
+                {
+                    sw.WriteLine(string.Format("; changes ({0}):", n));
+                    if (changes != null)
+                        foreach (var c in changes)
+                            sw.WriteLine(";   " + c);
+                    foreach (string s in Export())
+                        sw.WriteLine(s);
+                }
+
+                // Prune oldest beyond MaxSnapshots for this controller (lexicographic order == chronological).
+                var files = Directory.GetFiles(SnapshotFolder, "snapshot_*_" + tag + ".txt").OrderByDescending(f => f).ToList();
+                for (int i = MaxSnapshots; i < files.Count; i++)
+                    try { File.Delete(files[i]); } catch { }
+            }
+            catch { }   // snapshots are a convenience; failure must not affect the save
+        }
+
+        // Read back the "; changes (N):" comment block written by WriteSnapshot (the change lines only).
+        private static string ReadSnapshotChanges(string path)
+        {
+            try
+            {
+                using (var sr = new StreamReader(path))
+                {
+                    string first = sr.ReadLine();
+                    if (first == null || !first.StartsWith("; changes ("))
+                        return null;
+
+                    var lines = new List<string>();
+                    string ln;
+                    while ((ln = sr.ReadLine()) != null && ln.StartsWith(";   "))
+                        lines.Add(ln.Substring(4));
+
+                    return lines.Count > 0 ? string.Join("\n", lines) : null;
+                }
+            }
+            catch { return null; }
+        }
+
+        // Restore points (newest first) for the Restore picker.
+        public static List<SettingsSnapshot> GetSnapshots()
+        {
+            var list = new List<SettingsSnapshot>();
+
+            try
+            {
+                if (!Directory.Exists(SnapshotFolder))
+                    return list;
+
+                foreach (var path in Directory.GetFiles(SnapshotFolder, "snapshot_*.txt"))
+                {
+                    var parts = System.IO.Path.GetFileNameWithoutExtension(path).Split('_');
+                    if (parts.Length < 4)
+                        continue;
+
+                    if (!DateTime.TryParseExact(parts[1], "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
+                        saved = File.GetLastWriteTime(path);
+
+                    if (!int.TryParse(parts[2], out int changes))
+                        changes = -1;
+
+                    list.Add(new SettingsSnapshot
+                    {
+                        FilePath = path,
+                        Saved = saved,
+                        Changes = changes,
+                        Machine = string.Join("_", parts.Skip(3)),
+                        ChangesDetail = ReadSnapshotChanges(path)
+                    });
+                }
+            }
+            catch { }
+
+            return list.OrderByDescending(s => s.Saved).ToList();
         }
 
         public static string FormatFloat(string value, string format)

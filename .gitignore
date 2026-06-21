@@ -35,4 +35,6 @@ EEPROM.DAT
 MyMachine.DAT
 simulator/EEPROM.DAT
 simulator/MyMachine.DAT
+simulator/grblHAL_sim.exe
+simulator/grblHAL_validator.exe
 scene_debug.log

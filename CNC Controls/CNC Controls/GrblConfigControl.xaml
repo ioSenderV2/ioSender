@@ -60,10 +60,14 @@
             <Setter Property="Padding" Value="5,0" />
             <Setter Property="VerticalAlignment" Value="Top" />
         </Style>
-        <!-- Highlight for settings/groups whose value differs from the value at startup -->
+        <!-- Highlight for settings/groups. Blue = value saved to the controller this session but still
+             different from the value at startup. Orange/bold = unsaved edit (takes precedence). -->
         <Style x:Key="ModifiedTextStyle" TargetType="TextBlock">
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsModified}" Value="True">
+                <DataTrigger Binding="{Binding IsSavedModified}" Value="True">
+                    <Setter Property="Foreground" Value="#1565C0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEdited}" Value="True">
                     <Setter Property="FontWeight" Value="Bold" />
                     <Setter Property="Foreground" Value="#E07B00" />
                 </DataTrigger>
@@ -118,7 +122,10 @@
                 <Style TargetType="DataGridRow">
                     <Setter Property="ContextMenu" Value="{StaticResource SettingRowMenu}" />
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsModified}" Value="True">
+                        <DataTrigger Binding="{Binding IsSavedModified}" Value="True">
+                            <Setter Property="Foreground" Value="#1565C0" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsEdited}" Value="True">
                             <Setter Property="FontWeight" Value="Bold" />
                             <Setter Property="Foreground" Value="#E07B00" />
                         </DataTrigger>
@@ -127,7 +134,7 @@
             </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn x:Uid="hdr_settingId" Header="Id" Binding="{Binding Id}" Width="50"/>
-                <DataGridTextColumn x:Uid="hdr_settingValue" Header="Value" Binding="{Binding Value}" Width="70"/>
+                <DataGridTextColumn x:Uid="hdr_settingValue" Header="Value" Binding="{Binding EditValue}" Width="70"/>
                 <DataGridTextColumn x:Uid="hdr_settingUnit" Header="Unit" Binding="{Binding Unit}" Width="80"/>
                 <DataGridTextColumn x:Uid="hdr_settingName" Header="Name" Binding="{Binding Name}" Width="*"/>
             </DataGrid.Columns>
@@ -150,6 +157,7 @@
                             </Binding>
                         </Button.IsEnabled> -->
                     </Button>
+                    <Button x:Uid="btn_copyToSim" x:Name="btnCopyToSim" Content="Copy to simulator" ToolTip="Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile, so a later simulator connection matches this machine." HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Padding="8,0" MinWidth="120" Click="CopyToSim_Click"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Height="Auto" VerticalAlignment="Top" HorizontalAlignment="Right">
                     <Button x:Uid="btn_backup" x:Name="btnBackup" Content="Backup" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnBackup_Click"/>

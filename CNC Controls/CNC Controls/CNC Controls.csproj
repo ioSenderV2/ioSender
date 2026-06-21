@@ -99,6 +99,9 @@
     <Compile Include="GCodeRotateDialog.xaml.cs">
       <DependentUpon>GCodeRotateDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="RestorePointDialog.xaml.cs">
+      <DependentUpon>RestorePointDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GCodeWrap.cs" />
     <Compile Include="GotoBaseControl.xaml.cs">
       <DependentUpon>GotoBaseControl.xaml</DependentUpon>
@@ -358,6 +361,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="GCodeRotateDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="RestorePointDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

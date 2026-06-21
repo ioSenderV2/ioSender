@@ -43,7 +43,9 @@ using Microsoft.Win32;
 using System.Collections.Generic;
 using System.IO;
 using System;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -143,6 +145,7 @@ namespace CNC.Controls
         void btnReload_Click(object sender, RoutedEventArgs e)
         {
             using(new UIUtils.WaitCursor()) {
+                GrblSettings.ClearPendingEdits();    // Reload discards unsaved editor edits
                 GrblSettings.Load();
                 if (curSetting != null)
                     ShowSetting(curSetting.Setting, false);
@@ -154,6 +157,26 @@ namespace CNC.Controls
             if(GrblSettings.Backup(string.Format("{0}settings.txt", Core.Resources.ConfigPath)))
                 model.Message = string.Format((string)FindResource("SettingsWritten"), "settings.txt");
             GrblWorkParameters.Backup(string.Format("{0}offsets.nc", Core.Resources.ConfigPath));
+        }
+
+        // Mirror the current settings into the bundled simulator's "My Machine" EEPROM (same action as the
+        // Machine Setup Wizard), so a later simulator connection boots with this machine's configuration.
+        // Runs off the UI thread - it briefly drives a headless simulator instance.
+        private async void CopyToSim_Click(object sender, RoutedEventArgs e)
+        {
+            var cmds = GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
+            if (cmds.Count == 0)
+            {
+                model.Message = "No settings to copy - reload settings from the controller first.";
+                return;
+            }
+
+            btnCopyToSim.IsEnabled = false;
+            model.Message = "Copying settings to the simulator...";
+            string err = null;
+            bool ok = await Task.Run(() => SimulatorManager.BuildMyMachineEeprom(cmds, out err));
+            btnCopyToSim.IsEnabled = true;
+            model.Message = ok ? "Copied settings to the simulator (My Machine)." : ("Copy to simulator failed - " + err);
         }
 
         private void ShowSetting(GrblSettingDetails setting, bool assign)
@@ -335,6 +358,7 @@ namespace CNC.Controls
 
                 using (new UIUtils.WaitCursor())
                 {
+                    GrblSettings.ClearPendingEdits();    // restored-from-file values supersede unsaved edits
                     GrblSettings.Load();
                 }
             }
@@ -355,18 +379,15 @@ namespace CNC.Controls
 
         private void btnRestore_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog file = new OpenFileDialog();
+            // Pick a restore point (auto-snapshot written on each Save), newest first; the dialog's
+            // Browse... button falls back to choosing an arbitrary backup file.
+            RestorePointDialog dlg = new RestorePointDialog { Owner = Window.GetWindow(this) };
 
-            file.InitialDirectory = Core.Resources.ConfigPath;
-            file.Title = (string)FindResource("SettingsRestore");
-
-            file.Filter = string.Format("Text files (*.txt)|*.txt");
-
-            if (file.ShowDialog() == true)
+            if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.SelectedFile))
             {
                 using (new UIUtils.WaitCursor())
                 {
-                    LoadFile(file.FileName);
+                    LoadFile(dlg.SelectedFile);
                 }
             }
         }

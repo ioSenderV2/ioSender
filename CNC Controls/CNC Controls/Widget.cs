@@ -88,11 +88,6 @@ namespace CNC.Controls
 
         private GrblSettingDetails properties = null;
 
-        public void Assign (string value)
-        {
-            properties.Value = Value = value;
-        }
-
         public WidgetProperties(GrblSettingDetails Properties)
         {
             properties = Properties;
@@ -102,7 +97,8 @@ namespace CNC.Controls
             Format = Properties.Format;
             Unit = Properties.Unit;
             Label = Properties.Name;
-            Value = Properties.Value;
+            // Seed the editor from any pending (unsaved) edit so re-selecting a changed setting shows it.
+            Value = Properties.EditValue;
             Min = Properties.Min;
             Max = Properties.Max;
             AllowNull = Properties.AllowNull;
@@ -170,7 +166,9 @@ namespace CNC.Controls
                     grid = labelGrid = AddGrid(200);
                     grid.Children.Add(wCheckBox);
                     Grid.SetColumn(wCheckBox, 1);
-                    wCheckBox.Checked += wWidget_TextChanged;
+                    // Click (not Checked) so unchecking also fires, and so the programmatic
+                    // IsChecked set in the constructor does not trigger a spurious commit.
+                    wCheckBox.Click += wWidget_TextChanged;
                     components.Children.Add(grid);
                     break;
 
@@ -256,6 +254,7 @@ namespace CNC.Controls
                     components.Children.Add(grid);
                     wNumericTextBox.TextChanged += wWidget_TextChanged;
                     wNumericTextBox.KeyDown += wWidget_KeyDown;
+                    wNumericTextBox.LostFocus += wWidget_LostFocus;
                     Binding binding = new Binding("Text")
                     {
                         Source = Canvas.DataContext,
@@ -334,6 +333,7 @@ namespace CNC.Controls
                     components.Children.Add(grid);
                     wTextBox.TextChanged += wWidget_TextChanged;
                     wTextBox.KeyDown += wWidget_KeyDown;
+                    wTextBox.LostFocus += wWidget_LostFocus;
                     break;
             }
 
@@ -521,7 +521,9 @@ namespace CNC.Controls
                         break;
 
                     case GrblSettingDetails.DataTypes.BOOL:
-                        wCheckBox.IsChecked = value == "1";
+                        // Any non-"0" value is true (matches FormattedValue / the rest of the codebase);
+                        // a strict "== 1" left the box unchecked for booleans reported as other truthy values.
+                        wCheckBox.IsChecked = (value == null ? "0" : value.Trim()) != "0";
                         break;
 
                     case GrblSettingDetails.DataTypes.INTEGER:
@@ -573,10 +575,20 @@ namespace CNC.Controls
                     break;
             }
 
-            //changed = Modified ? widget.Value == Text : widget.Value != Text;
-            //if (changed)
-            //    Modified = !Modified;
-            //orgText = Text;
+            // Commit toggle-type edits (checkboxes/radio buttons) to the setting as soon as they
+            // change so the left-hand tree shows the new value and the modified-from-startup highlight
+            // immediately. Text and numeric editors commit on lost focus instead (wWidget_LostFocus)
+            // so the left side does not flicker through every partial value while typing.
+            // Gated on isEnabled so the initial value-set during construction does not commit.
+            if (isEnabled && wTextBox == null && wNumericTextBox == null)
+                Assign();
+        }
+
+        // Commit text/numeric edits when focus leaves the editor, if the value changed and is valid.
+        private void wWidget_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (isEnabled)
+                Assign();
         }
 
         #endregion
@@ -602,11 +614,12 @@ namespace CNC.Controls
 
         public void Assign()
         {
-            if (isValid() && Text != widget.Value)
+            // Stage the edit in the pending-changes map (cleared/flushed on Save) instead of mutating
+            // the setting's Value, which stays at the controller value until the user saves.
+            if (isValid())
             {
                 Modified = false;
-                widget.Assign(Text);
-                model.TextValue = Text;
+                GrblSettings.SetPendingEdit(widget.Setting, Text);
             }
         }
 
