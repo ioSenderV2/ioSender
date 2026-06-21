@@ -120,7 +120,7 @@
                 <GroupBox Header="3 · Axis information" Padding="8" Margin="0,8,0,0">
                     <StackPanel Orientation="Vertical">
                         <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,6"
-                                   Text="Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches. The Live dot lights when grbl sees that limit input."/>
+                                   Text="Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches, Home min ($23) to home an axis toward its minimum (negative) end - kept in sync with the home-corner picture above (Z is fixed to the top). The Live dot lights when grbl sees that limit input."/>
                         <!-- Plain row grid (not a DataGrid) so every numeric cell is a live, single-click textbox. -->
                         <StackPanel Orientation="Vertical">
                             <Grid Margin="0,0,0,2">
@@ -128,6 +128,7 @@
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="100"/>
@@ -139,7 +140,8 @@
                                 <TextBlock Grid.Column="3" Text="Steps/mm" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
                                 <TextBlock Grid.Column="4" Text="Invert dir ($3)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
                                 <TextBlock Grid.Column="5" Text="NC limit ($5)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
-                                <TextBlock Grid.Column="6" Text="Live" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="6" Text="Home min ($23)" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                <TextBlock Grid.Column="7" Text="Live" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
                             </Grid>
                             <Separator Margin="0,0,0,2"/>
                             <ItemsControl ItemsSource="{Binding Setup.Axes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
@@ -150,6 +152,7 @@
                                                 <ColumnDefinition Width="50"/>
                                                 <ColumnDefinition Width="120"/>
                                                 <ColumnDefinition Width="130"/>
+                                                <ColumnDefinition Width="100"/>
                                                 <ColumnDefinition Width="100"/>
                                                 <ColumnDefinition Width="100"/>
                                                 <ColumnDefinition Width="100"/>
@@ -164,7 +167,8 @@
                                                      Text="{Binding StepsPerMm, UpdateSourceTrigger=PropertyChanged}"/>
                                             <CheckBox Grid.Column="4" IsChecked="{Binding InvertDirection}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             <CheckBox Grid.Column="5" IsChecked="{Binding LimitNormallyClosed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            <Border Grid.Column="6" Style="{StaticResource LimitDot}"/>
+                                            <CheckBox Grid.Column="6" IsChecked="{Binding HomeAtMin}" IsEnabled="{Binding HomingDirEditable}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="7" Style="{StaticResource LimitDot}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
