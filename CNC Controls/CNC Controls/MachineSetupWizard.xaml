@@ -259,15 +259,14 @@
 
         <!-- Footer -->
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
-            <Button x:Name="btnForget" DockPanel.Dock="Left" Content="Forget machine" Width="110" Click="Forget_Click"
+            <Button x:Name="btnForget" DockPanel.Dock="Left" Content="Forget machine" Padding="14,0" Click="Forget_Click"
                     ToolTip="Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings)."/>
-            <Button x:Name="btnCopyToSim" DockPanel.Dock="Left" Content="Copy to simulator" Width="120" Margin="6,0,0,0" Click="CopyToSim_Click"
-                    ToolTip="Mirror this controller's current settings into the bundled simulator's 'My Machine' profile, so connecting to the simulator gives the same context as this machine."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnReload" Content="Reload" Width="90" Margin="0,0,6,0" Click="Reload_Click"
                         ToolTip="Discard edits and re-read the current settings from the controller."/>
-                <Button x:Name="btnApply" Content="Apply" Width="90" Click="Apply_Click"
+                <Button x:Name="btnApply" Content="Apply" Width="90" Click="Apply_Click" IsEnabled="False"
+                        ToolTipService.ShowDuration="60000" ToolTipOpening="btnApply_ToolTipOpening"
                         ToolTip="Write the changed settings to the controller."/>
             </StackPanel>
         </DockPanel>

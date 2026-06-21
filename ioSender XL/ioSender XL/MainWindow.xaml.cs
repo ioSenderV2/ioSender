@@ -313,7 +313,9 @@ namespace GCode_Sender
                 timer.Stop();
                 if (!ready)
                     return;
-                if (needWizard && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                // Skip the first-run wizard when connected to the simulator - it's not a real machine to set up.
+                bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
+                if (needWizard && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine) && !sim)
                     ShowMachineSetupWizard();
             };
             timer.Start();

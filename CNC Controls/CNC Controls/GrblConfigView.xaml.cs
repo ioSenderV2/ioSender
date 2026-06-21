@@ -85,6 +85,10 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(GrblInfo.Version))
                 return false;
 
+            // Don't push machine setup when connected to the simulator - there's no real machine to configure.
+            if (Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base != null && AppConfig.Settings.Base.StartSimulator)
+                return false;
+
             if (AppConfig.Settings.Base != null && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
                 return true;   // no machine picked/applied via the wizard yet
 
