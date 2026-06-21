@@ -143,6 +143,7 @@ namespace CNC.Controls
         void btnReload_Click(object sender, RoutedEventArgs e)
         {
             using(new UIUtils.WaitCursor()) {
+                GrblSettings.ClearPendingEdits();    // Reload discards unsaved editor edits
                 GrblSettings.Load();
                 if (curSetting != null)
                     ShowSetting(curSetting.Setting, false);
@@ -335,6 +336,7 @@ namespace CNC.Controls
 
                 using (new UIUtils.WaitCursor())
                 {
+                    GrblSettings.ClearPendingEdits();    // restored-from-file values supersede unsaved edits
                     GrblSettings.Load();
                 }
             }
@@ -355,18 +357,15 @@ namespace CNC.Controls
 
         private void btnRestore_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog file = new OpenFileDialog();
+            // Pick a restore point (auto-snapshot written on each Save), newest first; the dialog's
+            // Browse... button falls back to choosing an arbitrary backup file.
+            RestorePointDialog dlg = new RestorePointDialog { Owner = Window.GetWindow(this) };
 
-            file.InitialDirectory = Core.Resources.ConfigPath;
-            file.Title = (string)FindResource("SettingsRestore");
-
-            file.Filter = string.Format("Text files (*.txt)|*.txt");
-
-            if (file.ShowDialog() == true)
+            if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.SelectedFile))
             {
                 using (new UIUtils.WaitCursor())
                 {
-                    LoadFile(file.FileName);
+                    LoadFile(dlg.SelectedFile);
                 }
             }
         }
