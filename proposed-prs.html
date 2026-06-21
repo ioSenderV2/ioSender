@@ -62,7 +62,7 @@
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz">7 files · +582/−43</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
 <tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
-<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1247/−1</td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1304/−1</td></tr>
 <tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz">2 files · +23/−1</td></tr>
 <tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz">3 files · +40/−8</td></tr>
 <tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz">2 files · +29/−10</td></tr>
@@ -751,12 +751,12 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">735</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">273</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">790</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">274</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MachineCatalog.cs</td><td class="num add">194</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">30</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">8</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">4</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
 </table>
@@ -764,6 +764,8 @@
 <p>A guided, first-run <strong>Machine Setup Wizard</strong> tab in grbl:Settings that configures the machine-description settings a fresh controller needs &mdash; so a new machine can be described without hunting through the <code>$</code> list. Auto-selected when the machine looks unconfigured (no remembered machine, or <code>$130-$132</code> all zero).</p>
 <ul>
   <li><strong>Single page, nothing written until applied:</strong> the whole machine description is laid out on one page &mdash; machine selector, a clickable home-position picture, a per-axis table, and the remaining homing &amp; limits questions &mdash; so it reads at a glance instead of an eight-step click-through. <em>Apply</em> writes the changes via <code>GrblSettings.Save()</code>.</li>
+  <li><strong>Apply only when there's something to write:</strong> Apply is disabled while the wizard's values already match the controller; the pending-change set recomputes on every edit (machine pick, field, reload). Numeric settings are compared by value, so a formatting-only difference (<code>1</code> vs <code>1.000</code>) is not flagged as a change. Hovering Apply lists the exact pending writes (<code>$id name: old &rarr; new</code>).</li>
+  <li><strong>Out of the way:</strong> sits as the <em>last</em> grbl:Settings tab (rarely needed after initial commissioning), so Basic settings is the default tab.</li>
   <li><strong>Machine catalog:</strong> a built-in catalog (<code>MachineCatalog.cs</code>) of common hobby machines as manufacturer&nbsp;&rarr;&nbsp;product&nbsp;&rarr;&nbsp;model drop-downs (or a custom X&times;Y), each carrying a sensible home corner and force-set-origin default; the first entry is a generic XYZ machine with limit switches. Picking a model pre-fills the page, which the user then confirms or tweaks.</li>
   <li><strong>Axis table:</strong> an editable per-axis grid &mdash; travel limit (<code>$130-$132</code>), max rate (<code>$110-$112</code>), steps/mm (<code>$100-$102</code>), invert direction (<code>$3</code>) and normally-closed limit (<code>$5</code>) &mdash; edited in place.</li>
   <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>) and auto-enables force-set-origin (<code>$22</code> bit&nbsp;3) on grblHAL; Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">PR 20</a>).</li>
@@ -771,7 +773,7 @@
   <li><strong>Remembered &amp; forgettable:</strong> the chosen machine is saved (<code>AppConfig.LastMachine</code>) and restored next launch &mdash; keeping the live controller values over the catalog preset on restore &mdash; and a <em>Forget machine</em> button clears it so the wizard reappears next time.</li>
   <li><strong>Correct write order &amp; honest errors:</strong> grblHAL rejects soft limits (<code>$20=1</code>) unless homing is enabled (<code>error:10</code>). Apply now enables homing by the user's intent (writing <code>$22</code> even on a fresh controller where it is currently off, instead of gating on the live state) and writes soft limits in a second pass &mdash; after <code>$22</code> &mdash; since <code>GrblSettings.Save()</code> writes in ascending id order. Soft limits are only requested when homing will be on. On failure it lists the exact rejected <code>$</code> settings and the controller's reason rather than a generic &ldquo;failed to write settings&rdquo;.</li>
 </ul>
-<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller and the bundled simulator; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut. The first-run gate that forces the wizard to the foreground until a machine is applied, and the &ldquo;copy this machine into the simulator&rsquo;s My Machine profile&rdquo; action, depend on connection-side plumbing and ride along in the integration branch rather than this stand-alone PR.</p>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller and the bundled simulator; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut. The first-run gate that forces the wizard to the foreground until a machine is applied &mdash; and its skip-when-connected-to-the-simulator behaviour &mdash; depend on connection-side plumbing and ride along in the integration branch rather than this stand-alone PR. The &ldquo;copy this machine into the simulator&rsquo;s My Machine profile&rdquo; action now lives on the grbl:Settings tab (<a href="#pr15">PR 15</a>).</p>
 </div>
 </div>
 
