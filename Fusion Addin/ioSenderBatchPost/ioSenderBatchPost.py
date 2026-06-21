@@ -6,9 +6,16 @@ own .nc file in a chosen folder, named:
 
     <seq#>_<displayName>_T<tool#>.nc      e.g.  2_FinishBottom_T2.nc
 
-That is all it does - it does NOT combine the files, insert tool changes, or
-restore Fusion-Personal-Use rapids. Those steps are performed by ioSender's
-"File > Load Folder" command, which reads exactly this set of files.
+It also writes a "0_tooltable.nc" header file carrying (STOCK X=.. Y=.. Z=..) and
+(TOOL T=.. D=.. TYPE=..) comment lines - the stock size and each tool's diameter
+and shape - which the grblHAL simulator's 3D view reads for material-removal
+carving. ioSender's "File > Load Folder" loads that file first (comments
+preserved) and pushes those leading comments to the simulator; real controllers
+ignore them. See TOOL_TABLE_FORMAT.md in the simulator repo for the grammar.
+
+It does NOT combine the per-op files, insert tool changes, or restore
+Fusion-Personal-Use rapids. Those steps are performed by ioSender's Load Folder
+command, which reads exactly this set of files.
 
 This is a standalone extract of the post-processing half of the SRWCommands
 "Batch Post Process" command, with none of the SRWCommands framework.
@@ -19,6 +26,7 @@ import adsk.cam
 import adsk.fusion
 import os
 import re
+import math
 import traceback
 
 # Keep event handlers alive for the lifetime of the add-in.
@@ -91,6 +99,147 @@ def _get_tool_number(op):
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Tool-table / stock extraction for the simulator's 3D carve.
+#
+# This mirrors the SRWCommands PostProcess add-in so both produce an identical
+# 0_ToolTable.nc. CAM length parameters are in cm (Fusion internal units) -> mm;
+# angle parameters are in radians. The simulator's (STOCK)/(TOOL) comments are
+# always in mm / degrees regardless of document units. See TOOL_TABLE_FORMAT.md.
+# ---------------------------------------------------------------------------
+
+def _tool_geometry(op):
+    """{'number','diameter','type','angle'} for an op's tool, or None when the
+    cutter has no usable diameter (the simulator ignores a TOOL with no D=)."""
+    try:
+        tool = op.tool
+        if tool is None:
+            return None
+        params = tool.parameters
+
+        def _pval(name):
+            try:
+                return params.itemByName(name).value.value
+            except Exception:
+                return None
+
+        raw_dia = _pval('tool_diameter')
+        if raw_dia is None or float(raw_dia) <= 0.0:
+            return None
+        diameter_mm = float(raw_dia) * 10.0     # cm -> mm
+
+        raw_type = _pval('tool_type')
+        t = (raw_type if isinstance(raw_type, str) else '').lower()
+
+        raw_angle = _pval('tool_taperAngle')
+        if raw_angle is None:
+            raw_angle = _pval('tool_tipAngle')
+
+        if 'ball' in t:
+            ttype = 'BALL'
+        elif ('chamfer' in t or 'v-bit' in t or 'vbit' in t or 'v bit' in t
+              or 'engrave' in t or 'taper' in t):
+            ttype = 'VBIT'
+        elif ('flat' in t or 'bull' in t or 'end mill' in t or 'face' in t
+              or 'slot' in t):
+            ttype = 'FLAT'
+        elif t:
+            ttype = t.split()[0].upper()
+        else:
+            ttype = 'FLAT'
+
+        angle = None
+        if ttype == 'VBIT' and raw_angle is not None:
+            # CAM angle is radians; the chamfer/taper angle is the half-angle from
+            # the tool axis and v-bits are specified by their INCLUDED angle, so
+            # double it. (Matches SRWCommands; verify against a real v-bit.)
+            angle = int(round(math.degrees(float(raw_angle)) * 2.0))
+
+        return {'number': _get_tool_number(op), 'diameter': diameter_mm,
+                'type': ttype, 'angle': angle}
+    except Exception:
+        return None
+
+
+def _read_stock_dims(setup):
+    """Stock box size (x, y, z mm) from a setup's parameters, or None. Prefers the
+    computed box dims, then the box corners, then the fixed-box dims (all cm->mm)."""
+    try:
+        prm = setup.parameters
+    except Exception:
+        return None
+
+    def _p(name):
+        try:
+            return float(prm.itemByName(name).value.value)
+        except Exception:
+            return None
+
+    def _ok(v):
+        return v is not None and not math.isnan(v) and v > 1e-9
+
+    # 1) Computed box dimensions (fixed and relative box stock).
+    x, y, z = (_p('job_stockInfoDimensionX'),
+               _p('job_stockInfoDimensionY'),
+               _p('job_stockInfoDimensionZ'))
+    if _ok(x) and _ok(y) and _ok(z):
+        return (x * 10.0, y * 10.0, z * 10.0)
+
+    # 2) Stock box corners.
+    xl, xh = _p('stockXLow'), _p('stockXHigh')
+    yl, yh = _p('stockYLow'), _p('stockYHigh')
+    zl, zh = _p('stockZLow'), _p('stockZHigh')
+    if None not in (xl, xh, yl, yh, zl, zh):
+        cx, cy, cz = xh - xl, yh - yl, zh - zl
+        if _ok(cx) and _ok(cy) and _ok(cz):
+            return (cx * 10.0, cy * 10.0, cz * 10.0)
+
+    # 3) Fixed-box dimensions.
+    x, y, z = _p('job_stockFixedX'), _p('job_stockFixedY'), _p('job_stockFixedZ')
+    if _ok(x) and _ok(y) and _ok(z):
+        return (x * 10.0, y * 10.0, z * 10.0)
+
+    return None
+
+
+def _stock_dims_mm(cam):
+    """Stock (x, y, z) mm from the first setup with readable box stock, else None."""
+    for i in range(cam.setups.count):
+        dims = _read_stock_dims(cam.setups.item(i))
+        if dims:
+            return dims
+    return None
+
+
+def _format_tool_diameter(d_mm):
+    """Diameter as a compact decimal keeping >=1 decimal place (6.35, 12.7, 1.0)."""
+    s = ('%.3f' % d_mm).rstrip('0')
+    if s.endswith('.'):
+        s += '0'
+    return s
+
+
+def _fmt(v):
+    """Whole-number mm for the summary message."""
+    return str(int(round(v)))
+
+
+def _write_tool_table(folder, stock, tools):
+    """Write 0_ToolTable.nc with (STOCK ...) + (TOOL ...) lines. Returns the path.
+    Format matches the SRWCommands add-in so both produce identical files."""
+    lines = ['(Tool table - generated by ioSenderBatchPost)']
+    if stock:
+        lines.append('(STOCK X=%d Y=%d Z=%d)' % (round(stock[0]), round(stock[1]), round(stock[2])))
+    for t in sorted(tools.values(), key=lambda d: d['number']):
+        dstr = _format_tool_diameter(t['diameter'])
+        angle = (' A=%d' % t['angle']) if (t['type'] == 'VBIT' and t['angle'] is not None) else ''
+        lines.append('(TOOL T=%d D=%-6sTYPE=%s%s)' % (t['number'], dstr, t['type'], angle))
+    path = os.path.join(folder, '0_ToolTable.nc')
+    with open(path, 'w', newline='\n') as f:
+        f.write('\n'.join(lines) + '\n')
+    return path
+
+
 def _ensure_toolpath(cam, op):
     """Generate the toolpath for an operation if needed. True if valid after."""
     try:
@@ -123,8 +272,12 @@ def _default_output_folder(app):
         return os.path.expanduser('~/Downloads')
 
 
-def _post_all(folder, post_file):
-    """Post every operation to <folder> with <post_file>. Returns (posted, total, failures)."""
+def _post_all(folder, post_file, write_tool_table=True):
+    """Post every operation to <folder> with <post_file>.
+
+    Returns (posted, total, failures, table_info) where table_info is None or
+    {'path', 'tools', 'stock'} describing the 0_tooltable.nc that was written.
+    """
     app = adsk.core.Application.get()
 
     cam = adsk.cam.CAM.cast(app.activeProduct)
@@ -138,6 +291,7 @@ def _post_all(folder, post_file):
 
     total = 0
     failures = []
+    tools = {}      # tool number -> geometry dict (first occurrence wins)
     for s_idx in range(cam.setups.count):
         setup = cam.setups.item(s_idx)
         op_count = setup.operations.count
@@ -145,6 +299,11 @@ def _post_all(folder, post_file):
             op = setup.operations.item(o_idx)
             total += 1
             tool_number = _get_tool_number(op)
+
+            # Collect cutter geometry for the tool table (independent of posting).
+            geom = _tool_geometry(op)
+            if geom and geom['number'] not in tools:
+                tools[geom['number']] = geom
 
             # Setup name when a setup has one op (the common case where the
             # setup is named after the machining step); else Setup_Op.
@@ -171,7 +330,13 @@ def _post_all(folder, post_file):
             if not ok:
                 failures.append('%s: postProcess returned False' % display_name)
 
-    return total - len(failures), total, failures
+    table_info = None
+    if write_tool_table and tools:
+        stock = _stock_dims_mm(cam)
+        path = _write_tool_table(folder, stock, tools)
+        table_info = {'path': path, 'tools': len(tools), 'stock': stock}
+
+    return total - len(failures), total, failures, table_info
 
 
 # ---------------------------------------------------------------------------
@@ -196,9 +361,23 @@ class ExecuteHandler(adsk.core.CommandEventHandler):
                 ui.messageBox('No post processor selected, or the file was not found.', CMD_NAME)
                 return
 
-            posted, total, failures = _post_all(folder, post_file)
+            write_tt = True
+            tt = inputs.itemById('writeToolTable')
+            if tt is not None:
+                write_tt = bool(tt.value)
 
-            msg = 'Posted %d of %d operation(s) to:\n%s\n\nOpen this folder in ioSender with File > Load Folder.' % (posted, total, folder)
+            posted, total, failures, table_info = _post_all(folder, post_file, write_tt)
+
+            msg = 'Posted %d of %d operation(s) to:\n%s' % (posted, total, folder)
+            if table_info:
+                if table_info['stock']:
+                    sx, sy, sz = table_info['stock']
+                    msg += '\n\nWrote %s (%d tool(s), stock %s x %s x %s mm).' % (
+                        os.path.basename(table_info['path']), table_info['tools'], _fmt(sx), _fmt(sy), _fmt(sz))
+                else:
+                    msg += '\n\nWrote %s (%d tool(s); stock size unavailable - set it in the simulator).' % (
+                        os.path.basename(table_info['path']), table_info['tools'])
+            msg += '\n\nOpen this folder in ioSender with File > Load Folder.'
             if failures:
                 msg += '\n\nFailed:\n  ' + '\n  '.join(failures)
             ui.messageBox(msg, CMD_NAME)
@@ -230,12 +409,17 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             if not names:
                 dd.listItems.add('(no .cps posts found)', True, '')
 
+            inputs.addBoolValueInput('writeToolTable', 'Write tool table (0_tooltable.nc)', True, '', True)
+
             inputs.addTextBoxCommandInput(
                 'info', '',
                 'Each operation is posted to &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc in this folder. '
                 'Combining, tool-change insertion and rapid restoration are done by ioSender '
-                '(File &gt; Load Folder), which works with any post (M6 or not).',
-                3, True)
+                '(File &gt; Load Folder), which works with any post (M6 or not).<br/><br/>'
+                'The tool table writes a 0_tooltable.nc with (STOCK ...) and (TOOL ...) comments '
+                '(stock size + each tool\'s diameter/shape) for the grblHAL simulator\'s 3D carve. '
+                'Harmless on real machines.',
+                5, True)
 
             onExecute = ExecuteHandler()
             cmd.execute.add(onExecute)
