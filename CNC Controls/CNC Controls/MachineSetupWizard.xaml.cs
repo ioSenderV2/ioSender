@@ -50,6 +50,8 @@ namespace CNC.Controls
         public double DefaultMaxRate { get { return (Letter == "A" || Letter == "B" || Letter == "C") ? 3600d : ((Letter == "Z" || Letter == "W") ? 500d : 2000d); } }
         // Home switch at the minimum (negative) end of travel -> machine travels positive ($23 bit set).
         public bool HomeAtMin { get { return _homeAtMin; } set { _homeAtMin = value; OnPropertyChanged(); } }
+        // Z is fixed to home at the top of the gantry ($23 Z bit always clear), so its direction isn't user-editable.
+        public bool HomingDirEditable { get { return Letter != "Z"; } }
         // Reverse this axis' motor direction ($3 direction-invert mask).
         public bool InvertDirection { get { return _invertDirection; } set { _invertDirection = value; OnPropertyChanged(); } }
         public bool LimitNormallyClosed { get { return _limitNormallyClosed; } set { _limitNormallyClosed = value; OnPropertyChanged(); } }
@@ -556,6 +558,8 @@ namespace CNC.Controls
         // Apply only when there is something to write.
         private void OnSetupChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(AxisSetup.HomeAtMin))
+                UpdateHomeCornerText();   // keep the home-corner picture in sync when a checkbox is toggled
             UpdateApplyState();
         }
 
