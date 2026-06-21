@@ -47,7 +47,7 @@
 <tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
 <tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
 <tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
-<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">18 files · +1245/−6</td></tr>
+<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">19 files · +1593/−8</td></tr>
 <tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
 <tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1323/−26</td></tr>
 <tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1467/−52</td></tr>
@@ -222,20 +222,21 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">.gitattributes</td><td class="num add">3</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/FolderPicker.cs</td><td class="num add">159</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/FusionFolderLoader.cs</td><td class="num add">313</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">109</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">37</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">84</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FusionFolderLoader.cs</td><td class="num add">353</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">156</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">45</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">129</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">4</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">41</td><td class="num del">5</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
-<tr><td class="mono">Fusion Addin/README.md</td><td class="num add">95</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/README.md</td><td class="num add">116</td><td class="num">0</td></tr>
 <tr><td class="mono">Fusion Addin/install-macos.sh</td><td class="num add">39</td><td class="num">0</td></tr>
 <tr><td class="mono">Fusion Addin/install-windows.ps1</td><td class="num add">40</td><td class="num">0</td></tr>
 <tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.manifest</td><td class="num add">11</td><td class="num">0</td></tr>
-<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.py</td><td class="num add">292</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.py</td><td class="num add">476</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender/ioSender/MainWindow.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
@@ -252,6 +253,7 @@
 </ul>
 <p>The new <code>FusionFolderLoader</code> is a faithful C# port of the add-in's combine / strip / rapid-restore rules; <code>FolderPicker</code> uses the modern <code>IFileOpenDialog</code> (<code>FOS_PICKFOLDERS</code>) for folder selection. <code>GCodeBlock</code> gains a <code>Section</code> tag for outline grouping and an optional <code>AddLineNumbers</code> gate; <code>GrblViewModel</code> gains <code>IsFolderView</code> and a one-shot <code>RunToBlock</code> end-bound consumed by <code>CycleStart</code>.</p>
 <p><strong>Companion Fusion 360 add-in (<code>ioSenderBatchPost</code>):</strong> a standalone add-in (no external framework) that posts every operation in every setup to its own <code>&lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc</code> file in a chosen folder — the input for Load Folder. Combining, tool-change insertion and rapid restoration are intentionally left to ioSender, so the add-in only posts. A post-processor dropdown (default <code>grbl.cps</code>) selects which post Fusion runs per operation. Ships with <code>install-windows.ps1</code> / <code>install-macos.sh</code> and a README. Fusion auto-discovers it once copied, but it must be enabled once via <em>Scripts and Add-Ins</em>.</p>
+<p><strong>Tool table for the simulator:</strong> the add-in also writes a <code>0_ToolTable.nc</code> carrying <code>(STOCK X= Y= Z=)</code> and <code>(TOOL T= D= TYPE= [A=])</code> comment lines — the stock box size and each tool's diameter and shape (<code>FLAT</code>/<code>BALL</code>/<code>VBIT</code>, with the V-bit included angle) — read from the setup&rsquo;s stock parameters and tool definitions. Load Folder detects this file (name matches <code>tool table</code>), loads it first with comments preserved, and pushes the leading <code>(STOCK …)</code>/<code>(TOOL …)</code> lines to a connected grblHAL simulator, which uses them for its 3D material-removal carve (real controllers ignore the comments). A dialog checkbox toggles it; the output matches the SRWCommands PostProcess add-in byte-for-byte. See <code>TOOL_TABLE_FORMAT.md</code> in the simulator repo.</p>
 <p class="foot">Note: the <code>Fusion Addin/</code> folder is an optional companion tool; the maintainer may prefer to host it separately. It can be dropped from the PR if so.</p>
 </div>
 </div>
