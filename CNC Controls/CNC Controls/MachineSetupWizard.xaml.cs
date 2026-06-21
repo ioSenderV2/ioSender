@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -103,6 +104,9 @@ namespace CNC.Controls
 
             model = DataContext as GrblViewModel;
             DataContextChanged += (s, e) => { if (DataContext is GrblViewModel) model = (GrblViewModel)DataContext; };
+
+            // Recompute the pending-change set (and Apply's enabled state) whenever the model-level settings change.
+            Setup.PropertyChanged += OnSetupChanged;
         }
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.MachineSetup; } }
@@ -149,6 +153,7 @@ namespace CNC.Controls
                     _subscribed = true;
                 }
                 UpdateLimitState();
+                UpdateApplyState();
             }
             else
             {
@@ -173,7 +178,11 @@ namespace CNC.Controls
         {
             Setup.Axes.Clear();
             foreach (var axis in model.Axes)
-                Setup.Axes.Add(new AxisSetup(axis.Letter, axis.Index));
+            {
+                var a = new AxisSetup(axis.Letter, axis.Index);
+                a.PropertyChanged += OnSetupChanged;   // per-axis edits also refresh the change set / Apply state
+                Setup.Axes.Add(a);
+            }
         }
 
         // Restore the machine persisted from a previous run, else fall back to the generic default.
@@ -519,7 +528,7 @@ namespace CNC.Controls
                 if (detail == null)
                     continue;   // setting not present on this firmware - skip silently
 
-                if (detail.Value != kv.Value)
+                if (TargetDiffers(detail, kv.Value))
                     Changes.Add(new SettingChange
                     {
                         Setting = "$" + (int)kv.Key,
@@ -528,6 +537,37 @@ namespace CNC.Controls
                         NewValue = kv.Value
                     });
             }
+        }
+
+        // True when the target value would actually change the setting. INTEGER/FLOAT are compared numerically
+        // so formatting-only differences (e.g. "1" vs "1.000") are not reported as changes.
+        private static bool TargetDiffers(GrblSettingDetails detail, string target)
+        {
+            if (detail.DataType == GrblSettingDetails.DataTypes.FLOAT || detail.DataType == GrblSettingDetails.DataTypes.INTEGER)
+            {
+                if (double.TryParse(detail.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double cur) &&
+                    double.TryParse(target, NumberStyles.Any, CultureInfo.InvariantCulture, out double tgt))
+                    return cur != tgt;
+            }
+            return detail.Value != target;
+        }
+
+        // Any setting changed (machine pick, field edit, reload) - refresh the pending-change set and enable
+        // Apply only when there is something to write.
+        private void OnSetupChanged(object sender, PropertyChangedEventArgs e)
+        {
+            UpdateApplyState();
+        }
+
+        private void UpdateApplyState()
+        {
+            if (model == null || !GrblSettings.IsLoaded)
+            {
+                btnApply.IsEnabled = false;
+                return;
+            }
+            BuildReview();
+            btnApply.IsEnabled = Changes.Count > 0;
         }
 
         private void Review_Expanded(object sender, RoutedEventArgs e)
@@ -545,6 +585,7 @@ namespace CNC.Controls
             RestoreOrDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
+            UpdateApplyState();
         }
 
         // Forget the remembered machine so the first-run setup wizard reappears on the next launch. Does NOT
@@ -559,6 +600,18 @@ namespace CNC.Controls
             cbxManufacturer.SelectedIndex = -1;
             SelectDefaultMachine();
             txtStatus.Text = "Machine forgotten - the setup wizard will reappear next launch.";
+        }
+
+        // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
+        // against the current selection and the controller's current values.
+        private void btnApply_ToolTipOpening(object sender, ToolTipEventArgs e)
+        {
+            BuildReview();
+            btnApply.ToolTip = Changes.Count == 0
+                ? "No changes - the target settings already match the controller."
+                : string.Format("Writes {0} setting{1} to the controller:\n{2}",
+                    Changes.Count, Changes.Count == 1 ? "" : "s",
+                    string.Join("\n", Changes.Select(c => string.Format("  {0} {1}: {2} → {3}", c.Setting, c.Name, c.OldValue, c.NewValue))));
         }
 
         private void Apply_Click(object sender, RoutedEventArgs e)
@@ -649,6 +702,8 @@ namespace CNC.Controls
                     : "The controller rejected the settings write (no specific error was reported).";
                 MessageBox.Show(detail, "Machine setup - settings rejected", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+
+            UpdateApplyState();   // reflect the post-write state (cleared on success, still pending on failure)
         }
 
         #endregion
