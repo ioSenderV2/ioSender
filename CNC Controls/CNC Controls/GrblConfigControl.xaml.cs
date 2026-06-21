@@ -43,7 +43,9 @@ using Microsoft.Win32;
 using System.Collections.Generic;
 using System.IO;
 using System;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -154,6 +156,26 @@ namespace CNC.Controls
             if(GrblSettings.Backup(string.Format("{0}settings.txt", Core.Resources.ConfigPath)))
                 model.Message = string.Format((string)FindResource("SettingsWritten"), "settings.txt");
             GrblWorkParameters.Backup(string.Format("{0}offsets.nc", Core.Resources.ConfigPath));
+        }
+
+        // Mirror the current settings into the bundled simulator's "My Machine" EEPROM (same action as the
+        // Machine Setup Wizard), so a later simulator connection boots with this machine's configuration.
+        // Runs off the UI thread - it briefly drives a headless simulator instance.
+        private async void CopyToSim_Click(object sender, RoutedEventArgs e)
+        {
+            var cmds = GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
+            if (cmds.Count == 0)
+            {
+                model.Message = "No settings to copy - reload settings from the controller first.";
+                return;
+            }
+
+            btnCopyToSim.IsEnabled = false;
+            model.Message = "Copying settings to the simulator...";
+            string err = null;
+            bool ok = await Task.Run(() => SimulatorManager.BuildMyMachineEeprom(cmds, out err));
+            btnCopyToSim.IsEnabled = true;
+            model.Message = ok ? "Copied settings to the simulator (My Machine)." : ("Copy to simulator failed - " + err);
         }
 
         private void ShowSetting(GrblSettingDetails setting, bool assign)

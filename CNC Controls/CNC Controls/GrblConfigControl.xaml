@@ -114,6 +114,7 @@
                             </Binding>
                         </Button.IsEnabled> -->
                     </Button>
+                    <Button x:Uid="btn_copyToSim" x:Name="btnCopyToSim" Content="Copy to simulator" ToolTip="Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile, so a later simulator connection matches this machine." HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Padding="8,0" MinWidth="120" Click="CopyToSim_Click"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Height="Auto" VerticalAlignment="Top" HorizontalAlignment="Right">
                     <Button x:Uid="btn_backup" x:Name="btnBackup" Content="Backup" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnBackup_Click"/>

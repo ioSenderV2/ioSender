@@ -23,6 +23,10 @@ $RECYCLE.BIN/
 bin/
 obj/
 
+# Bundled grblHAL simulator binaries (placed in simulator/ at build/runtime)
+simulator/grblHAL_sim.exe
+simulator/grblHAL_validator.exe
+
 # =========================
 # Operating System Files
 # =========================
