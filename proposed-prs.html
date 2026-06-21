@@ -42,7 +42,7 @@
 
 <div class="toc">
 <table>
-<tr><td class="n">1</td><td><a href="#pr1">RP.Math build fix</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz">1 file · +6</td></tr>
+<tr><td class="n">1</td><td><a href="#pr1">Bug Fixes for released ioSender</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz">4 files · +21/−10</td></tr>
 <tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="mono">pr/motor-signals</td><td class="sz">1 file · +2/−30</td></tr>
 <tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
 <tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
@@ -56,10 +56,10 @@
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
 <tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
 <tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">8 files · +829/−134</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">18 files · +942/−66</td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">21 files · +969/−66</td></tr>
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
-<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; highlight changed settings + revert</a></td><td class="mono">pr/grbl-settings</td><td class="sz">3 files · +166/−7</td></tr>
+<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz">7 files · +582/−43</td></tr>
 <tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
 <tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
 <tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1247/−1</td></tr>
@@ -87,18 +87,26 @@
 
 <!-- ============ PR 1 ============ -->
 <div class="pr">
-<h2 id="pr1"><span class="badge">PR 1</span>Reference RP.Math in CNC Core to fix GCodeEmulator build</h2>
+<h2 id="pr1"><span class="badge">PR 1</span>Bug Fixes for released ioSender</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/fix-rp-math-build</code></div>
   <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build</a></div>
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">.gitattributes</td><td class="num add">3</td><td class="num">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">3</td><td class="num">1</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">9</td><td class="num">7</td></tr>
 </table>
 <div class="desc">
-<p>CNC Core compiles <code>GCodeEmulator.cs</code>, which uses the <code>RP.Math.Vector3</code> type, but the project file declared no reference to RP.Math. A clean build of CNC Core therefore fails to resolve the type.</p>
-<p>This adds the <code>RP.Math</code> and <code>RP.Math.Vector3</code> references using the <em>same</em> <code>HintPath</code> convention already used elsewhere in the solution — <code>CNC Controls.csproj</code> already references <code>RP.Math.Vector3</code> via <code>..\..\Vector-master\RP.Math.Vector3\bin\Release\</code>. The fix is six lines and purely additive; no code changes.</p>
+<p>A bucket of fixes for bugs that exist in released ioSender, independent of the feature PRs. Each is small and self-contained:</p>
+<ul>
+<li><strong>RP.Math build fix.</strong> CNC Core compiles <code>GCodeEmulator.cs</code>, which uses the <code>RP.Math.Vector3</code> type, but the project file declared no reference to RP.Math, so a clean build fails to resolve the type. Adds the <code>RP.Math</code> and <code>RP.Math.Vector3</code> references using the <em>same</em> <code>HintPath</code> convention already used by <code>CNC Controls.csproj</code> (<code>..\..\Vector-master\RP.Math.Vector3\bin\Release\</code>). Purely additive.</li>
+<li><strong>LF line-ending guard.</strong> Adds <code>.gitattributes</code> (<code>* text=auto eol=lf</code>) so line endings are normalized.</li>
+<li><strong>CSV null-reference fix.</strong> Avoids a <code>NullReferenceException</code> when an alarm/error/settings-group CSV resource is missing.</li>
+<li><strong>Boolean settings convention.</strong> The settings editor checkbox initialised with <code>value == "1"</code>, but a boolean is true when <code>value != "0"</code> everywhere else (the list, controller-value parsing). Booleans reported as a truthy value other than the literal <code>"1"</code> showed enabled in the list yet left the checkbox unchecked. Canonicalises boolean values to <code>"1"</code>/<code>"0"</code> in <code>GrblSettingDetails.Value</code> and reads the checkbox with the <code>!= "0"</code> convention.</li>
+</ul>
 </div>
 </div>
 
@@ -558,6 +566,7 @@
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">44</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">42</td><td class="num del">8</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">39</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">22</td><td class="num">0</td></tr>
 <tr><td class="mono">simulator/README.md</td><td class="num add">18</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">14</td><td class="num del">3</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">14</td><td class="num del">2</td></tr>
@@ -569,6 +578,8 @@
 <tr><td class="mono">readme.md</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">.gitignore</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
 <tr><td class="mono">simulator/sim-build.json</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
@@ -581,8 +592,9 @@
   <li><strong>Stop the job on disconnect:</strong> if the controller connection drops <em>during a running job</em>, streaming is now stopped (previously this was handled cleanly only while idle).</li>
   <li><strong>Always send comments to the simulator:</strong> g-code comments are forwarded to the simulator regardless of the app&rsquo;s <em>Send comments</em> setting &mdash; the simulator reads them for tool/stock metadata (<code>(TOOL &hellip;)</code>, <code>(STOCK &hellip;)</code>) that drives its 3D view and material-removal carve.</li>
   <li><strong>Startup ordering:</strong> <code>AppConfig.SetupAndOpen</code> is split into <code>LoadConfig</code> (run synchronously at construction, so config is available before any control&rsquo;s <code>Loaded</code> handler reads it) and <code>OpenConnection</code> (deferred to <code>ApplicationIdle</code> so the main window paints before the &mdash; possibly blocking &mdash; connection dialog). Transport is chosen by target string (<code>COMx</code> vs <code>host:port</code>) rather than a leading-digit IPv4 check.</li>
+  <li><strong>Copy current settings to the simulator:</strong> a <em>Copy to simulator</em> button on the grbl:Settings tab (next to Save) mirrors the live controller settings into the bundled simulator&rsquo;s &ldquo;My Machine&rdquo; EEPROM via <code>SimulatorManager.BuildMyMachineEeprom</code>, so a later simulator connection boots with this machine&rsquo;s configuration.</li>
 </ul>
-<p class="foot">Builds clean (CNC Controls and the full ioSender XL + classic solutions) off <code>master</code>. The <code>SimulatorManager</code> launch / web-builder-download / &ldquo;My Machine&rdquo; EEPROM machinery still lives in the branch but is no longer wired to the (now connect-only) dialog &mdash; a candidate for removal in a follow-up. No simulator binary is committed; see <code>simulator/README.md</code>.</p>
+<p class="foot">Builds clean (CNC Controls and the full ioSender XL + classic solutions) off <code>master</code>. The &ldquo;My Machine&rdquo; EEPROM builder is now wired to the <em>Copy to simulator</em> button (above); the <code>SimulatorManager</code> launch / web-builder-download machinery is no longer wired to the (now connect-only) dialog &mdash; a candidate for removal in a follow-up. No simulator binary is committed; see <code>simulator/README.md</code>.</p>
 </div>
 </div>
 
@@ -640,7 +652,7 @@
 
 <!-- ============ PR 18 ============ -->
 <div class="pr">
-<h2 id="pr18"><span class="badge">PR 18</span>grbl:Settings &mdash; highlight changed settings + revert</h2>
+<h2 id="pr18"><span class="badge">PR 18</span>grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</h2>
 <div class="meta">
   <div><span class="label">Branch</span><code>pr/grbl-settings</code></div>
   <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
@@ -648,17 +660,23 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">93</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">41</td><td class="num del">5</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">32</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">356</td><td class="num del">15</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml</td><td class="num add">49</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">39</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">25</td><td class="num del">14</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RestorePointDialog.xaml</td><td class="num add">41</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RestorePointDialog.xaml.cs</td><td class="num add">65</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
-<p>Orca/PrusaSlicer-style indication of which controller <code>$</code> settings you have changed, on the grbl:Settings <strong>Basic</strong> tab. Settings whose value differs from the value read at session start &mdash; and any setting group that contains one &mdash; are shown bold/orange, so changes are visible at a glance across the whole tree. Applies to both the grblHAL settings tree and the classic-grbl grid.</p>
+<p>Orca/PrusaSlicer-style indication of which controller <code>$</code> settings you have changed, on the grbl:Settings <strong>Basic</strong> tab, plus live editing feedback, granular revert and automatic per-Save restore points. Applies to both the grblHAL settings tree and the classic-grbl grid.</p>
 <ul>
-  <li><strong>Revert from a right-click menu:</strong> <em>Revert to value at startup</em> on a setting, and <em>Revert all in group to value at startup</em> on a group node.</li>
-  <li><strong>Three baselines, cleanly separated:</strong> <code>GrblSettingDetails</code> now tracks the current value, the frozen <em>startup</em> value (drives the <code>IsModified</code> highlight) and the <em>loaded</em> controller value (drives the <code>IsDirty</code> needs-write state). Making <code>IsDirty</code> mean "differs from the controller" rather than "changed" fixes a spurious "settings changed, save now?" prompt when reverting an edit back to the controller value.</li>
-  <li><strong>Live group highlight:</strong> <code>GrblSettingGroup</code> implements <code>INotifyPropertyChanged</code> so a group's marker updates as its settings change.</li>
-  <li><strong>Bitfield flag tooltip:</strong> <code>BITFIELD</code>/<code>XBITFIELD</code> settings still display numerically, but hovering the value now shows the set flags decoded to their labels (one per line, <code>N/A</code> entries skipped) via a new <code>GrblSettingDetails.BitfieldLabels</code> property &mdash; so you can see which options a bitfield enables without opening the editor.</li>
+  <li><strong>Live edits in the left-hand list:</strong> edits stage in a pending-changes map (<code>GrblSettings.PendingEdits</code>) that the list reads via a new <code>EditValue</code>, so the value and its highlight update <em>immediately</em> without mutating the controller value. Checkboxes/radios commit on change; text/numeric editors commit on lost focus. Pending edits are flushed to <code>Value</code> and cleared on Save; discarded on Reload/Restore.</li>
+  <li><strong>Two highlight states:</strong> <span style="color:#E07B00;font-weight:bold">orange/bold</span> = unsaved edit (<code>IsEdited</code>); <span style="color:#1565C0">blue</span> = saved to the controller this session but still different from the session-start value (<code>IsSavedModified</code>). Groups roll up the same way.</li>
+  <li><strong>Revert from a right-click menu:</strong> <em>Revert to value at startup</em> on a setting, and <em>Revert all in group to value at startup</em> on a group node (staged as a pending edit, written on next Save).</li>
+  <li><strong>Snapshot on Save + Restore picker:</strong> every Save writes a timestamped restore point (full settings dump in the Backup format, led by a <code>; changes (N):</code> old&rarr;new comment block), per controller identity, keeping the last 20. The <strong>Restore</strong> button opens a picker listing restore points newest-first with a changed-count column and a per-row tooltip showing exactly what each Save changed; <em>Browse&hellip;</em> falls back to any backup file.</li>
+  <li><strong>Baselines, cleanly separated:</strong> <code>GrblSettingDetails</code> tracks the current value, the frozen <em>startup</em> value (highlight) and the <em>loaded</em> controller value (drives <code>IsDirty</code>). Making <code>IsDirty</code> mean "differs from the controller" rather than "changed" fixes a spurious "settings changed, save now?" prompt when reverting an edit back to the controller value.</li>
+  <li><strong>Bitfield flag tooltip:</strong> <code>BITFIELD</code>/<code>XBITFIELD</code> settings still display numerically, but hovering the value shows the set flags decoded to their labels (one per line, <code>N/A</code> entries skipped) via <code>GrblSettingDetails.BitfieldLabels</code>.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator. Per-setting "revert to factory default" is intentionally deferred &mdash; grblHAL exposes no per-setting default (only the global <code>$RST=$</code> reset-all), so factory revert would need a future firmware-side snapshot of as-flashed values.</p>
 </div>
