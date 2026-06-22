@@ -282,7 +282,7 @@ namespace CNC.Controls
             foreach (var axis in Setup.Axes)
             {
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
-                axis.MaxTravel = stored > 0d ? stored + 2d * Setup.HomingPulloff : 0d;
+                axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
                 axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
                 double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
@@ -349,7 +349,7 @@ namespace CNC.Controls
                 int i = axis.Index;
                 if (p.StepsPerMm != null && i < p.StepsPerMm.Length && p.StepsPerMm[i] > 0d) axis.StepsPerMm = p.StepsPerMm[i];
                 if (p.MaxRate != null && i < p.MaxRate.Length) axis.MaxRate = p.MaxRate[i];
-                if (p.Travel != null && i < p.Travel.Length) axis.MaxTravel = p.Travel[i] + 2d * Setup.HomingPulloff;
+                if (p.Travel != null && i < p.Travel.Length) axis.MaxTravel = p.Travel[i];
             }
 
             if (p.Homing.HasValue)
@@ -467,10 +467,11 @@ namespace CNC.Controls
         {
             var targets = new Dictionary<GrblSetting, string>();
 
-            // Stored max travel is the physical travel less the pull-off clearance reserved at BOTH ends.
+            // Max travel ($13x) is written exactly as entered - no pull-off fudge. The old +/-2*pulloff
+            // round-trip compounded across re-applies and silently shrank $13x (e.g. 120 -> 110 -> 100).
             foreach (var axis in Setup.Axes)
             {
-                double stored = Math.Max(0d, axis.MaxTravel - 2d * Setup.HomingPulloff);
+                double stored = Math.Max(0d, axis.MaxTravel);
                 targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
                 targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
                 if (axis.StepsPerMm > 0d)   // only write steps/mm when known (current value or a preset) - never clobber with 0
