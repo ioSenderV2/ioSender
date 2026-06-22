@@ -124,8 +124,7 @@ namespace GCode_Sender
             }
             else if (ctl is LimitsControl lc)
             {
-                _limits = lc;
-                lc.Visibility = Visibility.Collapsed;   // revealed by showProgramLimits when a job is active
+                _limits = lc;   // stays visible; shows machine limits with no program, program limits when loaded
             }
         }
 
@@ -378,9 +377,9 @@ namespace GCode_Sender
         // https://stackoverflow.com/questions/5707143/how-to-get-the-width-height-of-a-collapsed-control-in-wpf
         private void showProgramLimits()
         {
-            // Reveal the Program-limits panel (if the user placed one) now that a job is active.
-            if (_limits != null)
-                _limits.Visibility = Visibility.Visible;
+            // The Limits panel stays visible; refresh it so it shows program limits when a job is loaded,
+            // or the machine soft-limit envelope when not.
+            _limits?.Refresh();
             // Bottom-row slots auto-hide on short windows (generalizes the old Coolant/Goto hiding).
             slot2.Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
             slot5.Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;

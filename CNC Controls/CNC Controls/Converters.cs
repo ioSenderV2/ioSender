@@ -479,6 +479,23 @@ namespace CNC.Controls
         }
     }
 
+    // machine position = work position (values[0]) + work-coordinate offset (values[1]).
+    // Rides the live Position notifications the DRO uses; a NaN/absent offset is treated as 0.
+    public class PositionSumConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            double work = values.Length > 0 && values[0] is double w ? w : double.NaN;
+            double offset = values.Length > 1 && values[1] is double o && !double.IsNaN(o) ? o : 0d;
+            return double.IsNaN(work) ? double.NaN : work + offset;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class LogicalOrConverter : IMultiValueConverter
     {
         public IValueConverter FinalConverter { get; set; }

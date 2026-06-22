@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System.Windows.Controls;
+using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -49,6 +50,45 @@ namespace CNC.Controls
         public LimitsControl()
         {
             InitializeComponent();
+            Loaded += (s, e) => Refresh();
+            DataContextChanged += (s, e) => Refresh();
+        }
+
+        // Shows the loaded program's bounding box ("Program limits"), or the machine soft-limit envelope
+        // from $13x/$23 ("Machine limits") when no program is loaded.
+        public void Refresh()
+        {
+            var model = DataContext as GrblViewModel;
+            if (model == null)
+                return;
+
+            var ctrls = new[] { axisX, axisY, axisZ, axisA, axisB, axisC };
+
+            if (GCode.File.IsLoaded)
+            {
+                grpLimits.Header = "Program limits";
+                var pl = model.ProgramLimits;
+                for (int i = 0; i < ctrls.Length && i < GrblInfo.NumAxes; i++)
+                {
+                    ctrls[i].MinValue = pl.MinValues[i];
+                    ctrls[i].MaxValue = pl.MaxValues[i];
+                }
+            }
+            else
+            {
+                // An axis that homes at max ($23 bit clear) runs 0..-travel; one that homes at min runs 0..+travel.
+                grpLimits.Header = "Machine limits";
+                int homeMask = GrblSettings.GetInteger(GrblSetting.HomingDirMask);
+                if (homeMask < 0) homeMask = 0;
+                for (int i = 0; i < ctrls.Length && i < GrblInfo.NumAxes; i++)
+                {
+                    double travel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + i);
+                    if (travel < 0d) travel = 0d;
+                    bool homeAtMin = (homeMask & (1 << i)) != 0;
+                    ctrls[i].MinValue = homeAtMin ? 0d : -travel;
+                    ctrls[i].MaxValue = homeAtMin ? travel : 0d;
+                }
+            }
         }
     }
 }
