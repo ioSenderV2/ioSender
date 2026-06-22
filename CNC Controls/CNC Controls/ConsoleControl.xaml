@@ -31,10 +31,20 @@
                      VerticalContentAlignment="Center"
                      ToolTip="Enter a command (MDI). Up/Down recalls history, Esc clears."/>
         </DockPanel>
-        <TextBox IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+        <TextBox x:Name="txtOutput" IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                  local:TextBoxUtilities.AlwaysScrollToEnd="True" FontSize="10" FontFamily="Verdana"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                 ScrollViewer.HorizontalScrollBarVisibility="Visible">
+                 ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                 ToolTip="Right-click for Clear all / Clear up to here / Save. The log keeps every line until cleared (in memory only - not written to disk)."
+                 PreviewMouseRightButtonDown="Output_RightDown">
+            <TextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Clear all" Click="OutClearAll_Click"/>
+                    <MenuItem Header="Clear up to here" Click="OutClearToHere_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Save..." Click="OutSave_Click"/>
+                </ContextMenu>
+            </TextBox.ContextMenu>
             <TextBox.Text>
                 <MultiBinding Converter="{StaticResource OcToString}">
                     <Binding Path="ResponseLog" Mode="OneWay"/>
