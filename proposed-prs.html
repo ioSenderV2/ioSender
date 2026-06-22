@@ -32,6 +32,9 @@
   .toc td { padding: 3px 6px; border-bottom: 1px solid #eaeef2; }
   .toc td.n { width: 22px; color:#57606a; }
   .toc td.sz { text-align:right; white-space:nowrap; color:#57606a; font-family: Consolas, monospace; }
+  .toc td.sz .chg { color:#d97706; }   /* orange - changed */
+  .toc td.sz .del { color:#cf222e; }   /* red - deleted */
+  .toc td.sz .add { color:#1a7f37; }   /* green - added */
   .foot { color:#57606a; font-size:9pt; margin-top:6px; }
 </style>
 </head>
@@ -42,31 +45,31 @@
 
 <div class="toc">
 <table>
-<tr><td class="n">1</td><td><a href="#pr1">Bug Fixes for released ioSender</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz">4 files · +21/−10</td></tr>
-<tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="mono">pr/motor-signals</td><td class="sz">1 file · +2/−30</td></tr>
-<tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz">14 files · +1209/−13</td></tr>
-<tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz">9 files · +519/−61</td></tr>
-<tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz">5 files · +589</td></tr>
-<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz">19 files · +1593/−8</td></tr>
-<tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz">26 files · +123/−107</td></tr>
-<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz">9 files · +1323/−26</td></tr>
-<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz">29 files · +1467/−52</td></tr>
-<tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz">11 files · +464/−26</td></tr>
-<tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz">9 files · +659/−18</td></tr>
-<tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz">6 files · +83/−24</td></tr>
-<tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz">4 files · +1259</td></tr>
-<tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz">8 files · +829/−134</td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz">21 files · +969/−66</td></tr>
-<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz">4 files · +1176/−37</td></tr>
-<tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz">2 files · +60/−7</td></tr>
-<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz">7 files · +582/−43</td></tr>
-<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz">6 files · +131/−19</td></tr>
-<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz">5 files · +206/−60</td></tr>
-<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz">8 files · +1312/−1</td></tr>
-<tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz">2 files · +23/−1</td></tr>
-<tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz">3 files · +40/−8</td></tr>
-<tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz">2 files · +29/−10</td></tr>
-<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz">12 files · +792/−10</td></tr>
+<tr><td class="n">1</td><td><a href="#pr1">Bug Fixes for released ioSender</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz"><span class="chg">5 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="mono">pr/motor-signals</td><td class="sz"><span class="chg">2 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz"><span class="chg">12 changed</span> · <span class="del">0 deleted</span> · <span class="add">3 added</span></td></tr>
+<tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz"><span class="chg">10 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz"><span class="chg">4 changed</span> · <span class="del">0 deleted</span> · <span class="add">2 added</span></td></tr>
+<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz"><span class="chg">12 changed</span> · <span class="del">0 deleted</span> · <span class="add">7 added</span></td></tr>
+<tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz"><span class="chg">27 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz"><span class="chg">7 changed</span> · <span class="del">0 deleted</span> · <span class="add">3 added</span></td></tr>
+<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz"><span class="chg">21 changed</span> · <span class="del">0 deleted</span> · <span class="add">20 added</span></td></tr>
+<tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz"><span class="chg">9 changed</span> · <span class="del">0 deleted</span> · <span class="add">2 added</span></td></tr>
+<tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz"><span class="chg">8 changed</span> · <span class="del">0 deleted</span> · <span class="add">1 added</span></td></tr>
+<tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz"><span class="chg">6 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz"><span class="chg">1 changed</span> · <span class="del">0 deleted</span> · <span class="add">8 added</span></td></tr>
+<tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz"><span class="chg">5 changed</span> · <span class="del">0 deleted</span> · <span class="add">3 added</span></td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz"><span class="chg">18 changed</span> · <span class="del">0 deleted</span> · <span class="add">3 added</span></td></tr>
+<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz"><span class="chg">3 changed</span> · <span class="del">0 deleted</span> · <span class="add">1 added</span></td></tr>
+<tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz"><span class="chg">2 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz"><span class="chg">5 changed</span> · <span class="del">0 deleted</span> · <span class="add">2 added</span></td></tr>
+<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz"><span class="chg">6 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz"><span class="chg">5 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz"><span class="chg">5 changed</span> · <span class="del">0 deleted</span> · <span class="add">3 added</span></td></tr>
+<tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz"><span class="chg">2 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz"><span class="chg">3 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz"><span class="chg">2 changed</span> · <span class="del">0 deleted</span> · <span class="add">0 added</span></td></tr>
+<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="chg">7 changed</span> · <span class="del">0 deleted</span> · <span class="add">5 added</span></td></tr>
 </table>
 </div>
 
@@ -95,6 +98,7 @@
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">.gitattributes</td><td class="num add">3</td><td class="num">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">7</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/Widget.cs</td><td class="num add">3</td><td class="num">1</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">6</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">9</td><td class="num">7</td></tr>
@@ -106,6 +110,7 @@
 <li><strong>LF line-ending guard.</strong> Adds <code>.gitattributes</code> (<code>* text=auto eol=lf</code>) so line endings are normalized.</li>
 <li><strong>CSV null-reference fix.</strong> Avoids a <code>NullReferenceException</code> when an alarm/error/settings-group CSV resource is missing.</li>
 <li><strong>Boolean settings convention.</strong> The settings editor checkbox initialised with <code>value == "1"</code>, but a boolean is true when <code>value != "0"</code> everywhere else (the list, controller-value parsing). Booleans reported as a truthy value other than the literal <code>"1"</code> showed enabled in the list yet left the checkbox unchecked. Canonicalises boolean values to <code>"1"</code>/<code>"0"</code> in <code>GrblSettingDetails.Value</code> and reads the checkbox with the <code>!= "0"</code> convention.</li>
+<li><strong>Null-comms streaming guard.</strong> <code>JobControl.ResponseReceived</code> is raised by a specific comms instance but writes to the static <code>Comms.com</code>; during a reconnect/teardown (startup handshake or relaunch) that static can be null while an in-flight response from the old link still arrives, NREing in the SendMDI/Reset cases. Bails out early when <code>Comms.com</code> is null.</li>
 </ul>
 </div>
 </div>
@@ -354,35 +359,47 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">119</td><td class="num del">20</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">2</td><td class="num del">1</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">152</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">141</td><td class="num del">20</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">168</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">2</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">43</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">65</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">90</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">157</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogConfigControl.xaml</td><td class="num add">7</td><td class="num del">7</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogSlider.xaml</td><td class="num add">66</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogSlider.xaml.cs</td><td class="num add">51</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogUiConfigControl.xaml</td><td class="num add">18</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KbdJogGridControl.xaml</td><td class="num add">46</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KbdJogGridControl.xaml.cs</td><td class="num add">64</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml</td><td class="num add">25</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml.cs</td><td class="num add">34</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">61</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">146</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MainPanelRegistry.cs</td><td class="num add">100</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachinePositionControl.xaml</td><td class="num add">26</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachinePositionControl.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">108</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">288</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPanelRegistry.cs</td><td class="num add">111</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml</td><td class="num add">11</td><td class="num del">1</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml.cs</td><td class="num add">38</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml</td><td class="num add">41</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">114</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">133</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PanelFlyout.xaml</td><td class="num add">43</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/PanelFlyout.xaml.cs</td><td class="num add">80</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Properties/Settings.Designer.cs</td><td class="num add">36</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Properties/Settings.settings</td><td class="num add">9</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SidebarItem.cs</td><td class="num add">23</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TabRegistry.cs</td><td class="num add">42</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ToggleControl.xaml</td><td class="num add">20</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIJogGridControl.xaml</td><td class="num add">65</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIJogGridControl.xaml.cs</td><td class="num add">77</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml</td><td class="num add">44</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml.cs</td><td class="num add">29</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">22</td><td class="num del">4</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">8</td><td class="num del">6</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">45</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">23</td><td class="num del">14</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">101</td><td class="num del">19</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">72</td><td class="num del">5</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">123</td><td class="num del">5</td></tr>
 </table>
 <div class="desc">
 <p><strong>ioSender XL only.</strong> Makes the crowded right-hand panel area configurable instead of fixed. A new <strong>Edit Main Page</strong> dialog (beside <em>Edit Key Bindings</em>) is a shuttle editor with three buckets — <em>Available</em>, <em>Main page</em> (up to six slots), and <em>Flyouts</em> — so each named panel can be placed on the main page or as a pinnable right-edge flyout, or left off entirely to reclaim space. Nothing is auto-assigned.</p>
@@ -393,6 +410,7 @@
   <li><strong>Settings:App</strong> gains opt-in autosave (with a discard prompt) and a <em>Reset to default</em> context-menu entry on numeric fields; the old <em>Edit Key Mappings</em> button is renamed <strong>Edit Key Bindings</strong>.</li>
 </ul>
 <p>Layout choices persist (panels / flyouts / pins serialized as CSV to sidestep the <code>XmlSerializer</code> list-append quirk). Also includes robustness fixes: a resilient <code>SerialStream.OutCount</code> that no longer throws on a dropped port, and a deferred main-panel build so startup can't race the config load.</p>
+<p><strong>Extended:</strong> a fourth bucket places panels <em>left</em> of the 3D view (DRO, Program limits, Machine Position now in the registry) in a scroll region that never overlaps the fixed Signals/Status block. Per-offset <em>Set</em> now also handles G54&ndash;G59.3 (captures the current machine position as that coordinate system's origin via <code>G10&nbsp;L2&nbsp;P&lt;n&gt;</code>). The UI jog panel renders as a 2&times;4 distance/speed grid with green-click selection, a <em>Continuous</em> toggle and a <em>Remember distance &amp; speed across restarts</em> option; <em>Link distance and speed to UI jogging</em> makes keyboard jogging follow the UI distance <em>and</em> speed (hiding the Keyboard Jogging panel). Coolant toggles render as a self-contained red/green pill (no theme dependency). A new <strong>Tabs</strong> tab in the editor reorders / hides the main TabControl tabs (Settings:App protected), applied on startup via <code>TabRegistry</code> / <code>Config.Tabs</code>. The <em>Restart</em> button moved to Settings:App (next to <em>Edit Main Page</em>), enabled only after a layout/tab change.</p>
 </div>
 </div>
 
