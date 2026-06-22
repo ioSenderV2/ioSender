@@ -43,7 +43,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 25 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 26 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PR 27 off master &mdash; PR 26 reserved for a planned firmware-watchdog controller reboot) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
 
 <div class="toc">
 <table>
@@ -55,7 +55,7 @@
 <tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1593</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz"><span class="k">Files:</span> <span class="chg">27</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+126</span> <span class="del">-109</span></td></tr>
 <tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1991</span> <span class="del">-684</span></td></tr>
-<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz"><span class="k">Files:</span> <span class="chg">21</span> <span class="del">0</span> <span class="add">+20</span><br><span class="k">Lines:</span> <span class="add">+2367</span> <span class="del">-94</span></td></tr>
+<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz"><span class="k">Files:</span> <span class="chg">24</span> <span class="del">0</span> <span class="add">+20</span><br><span class="k">Lines:</span> <span class="add">+2475</span> <span class="del">-118</span></td></tr>
 <tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+472</span> <span class="del">-26</span></td></tr>
 <tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+723</span> <span class="del">-21</span></td></tr>
 <tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+83</span> <span class="del">-24</span></td></tr>
@@ -65,14 +65,15 @@
 <tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+1176</span> <span class="del">-37</span></td></tr>
 <tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+60</span> <span class="del">-7</span></td></tr>
 <tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+582</span> <span class="del">-43</span></td></tr>
-<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+131</span> <span class="del">-19</span></td></tr>
+<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+178</span> <span class="del">-21</span></td></tr>
 <tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+206</span> <span class="del">-60</span></td></tr>
-<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1312</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1313</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+23</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+40</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-10</span></td></tr>
-<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+792</span> <span class="del">-10</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (25 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">187</span> <span class="del">0</span> <span class="add">+63</span><br><span class="k">Lines:</span> <span class="add">+18537</span> <span class="del">-1485</span></td></tr>
+<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+805</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">27</td><td><a href="#pr27">Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</a></td><td class="mono">pr/editable-predefined-offsets</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+21</span> <span class="del">-2</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (26 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">192</span> <span class="del">0</span> <span class="add">+63</span><br><span class="k">Lines:</span> <span class="add">+18727</span> <span class="del">-1524</span></td></tr>
 </table>
 </div>
 
@@ -367,6 +368,7 @@
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfigView.xaml.cs</td><td class="num add">168</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">2</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">65</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">17</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">157</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/JogConfigControl.xaml</td><td class="num add">7</td><td class="num del">7</td></tr>
@@ -377,7 +379,9 @@
 <tr><td class="mono">CNC Controls/CNC Controls/KbdJogGridControl.xaml.cs</td><td class="num add">64</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml</td><td class="num add">25</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/KeyboardJoggingControl.xaml.cs</td><td class="num add">34</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachinePositionControl.xaml</td><td class="num add">26</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LimitsControl.xaml</td><td class="num add">6</td><td class="num del">24</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LimitsControl.xaml.cs</td><td class="num add">40</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachinePositionControl.xaml</td><td class="num add">69</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MachinePositionControl.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">108</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">288</td><td class="num">0</td></tr>
@@ -394,13 +398,13 @@
 <tr><td class="mono">CNC Controls/CNC Controls/TabRegistry.cs</td><td class="num add">42</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/ToggleControl.xaml</td><td class="num add">20</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIJogGridControl.xaml</td><td class="num add">65</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/UIJogGridControl.xaml.cs</td><td class="num add">77</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIJogGridControl.xaml.cs</td><td class="num add">80</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml</td><td class="num add">44</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/UIJoggingControl.xaml.cs</td><td class="num add">29</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">22</td><td class="num del">4</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">23</td><td class="num del">14</td></tr>
-<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">101</td><td class="num del">19</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">100</td><td class="num del">19</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">123</td><td class="num del">5</td></tr>
 </table>
@@ -414,6 +418,7 @@
 </ul>
 <p>Layout choices persist (panels / flyouts / pins serialized as CSV to sidestep the <code>XmlSerializer</code> list-append quirk). Also includes robustness fixes: a resilient <code>SerialStream.OutCount</code> that no longer throws on a dropped port, and a deferred main-panel build so startup can't race the config load.</p>
 <p><strong>Extended:</strong> a fourth bucket places panels <em>left</em> of the 3D view (DRO, Program limits, Machine Position now in the registry) in a scroll region that never overlaps the fixed Signals/Status block. Per-offset <em>Set</em> now also handles G54&ndash;G59.3 (captures the current machine position as that coordinate system's origin via <code>G10&nbsp;L2&nbsp;P&lt;n&gt;</code>). The UI jog panel renders as a 2&times;4 distance/speed grid with green-click selection, a <em>Continuous</em> toggle and a <em>Remember distance &amp; speed across restarts</em> option; <em>Link distance and speed to UI jogging</em> makes keyboard jogging follow the UI distance <em>and</em> speed (hiding the Keyboard Jogging panel). Coolant toggles render as a self-contained red/green pill (no theme dependency). A new <strong>Tabs</strong> tab in the editor reorders / hides the main TabControl tabs (Settings:App protected), applied on startup via <code>TabRegistry</code> / <code>Config.Tabs</code>. The <em>Restart</em> button moved to Settings:App (next to <em>Edit Main Page</em>), enabled only after a layout/tab change.</p>
+<p><strong>Panel refinements:</strong> the Machine&nbsp;Position panel shows MPos as a live <code>work&nbsp;+&nbsp;WorkPositionOffset</code> sum (tracking the DRO notifications); the limits panel stays visible and shows the machine soft-limit envelope from <code>$13x</code>/<code>$23</code> when no program is loaded (program bounding box when one is), retitling itself <em>Machine limits</em> / <em>Program limits</em> accordingly; the 2&times;4 jog grid keeps its green selection highlight using the retained discrete index (survives keyboard/continuous-mode flips); and the <strong>Tabs</strong> editor now also lists tabs that host an <code>IGrblConfigTab</code> (no <code>ViewType</code>) by falling back to the <code>TabItem</code> name.</p>
 </div>
 </div>
 
@@ -713,9 +718,9 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">82</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">117</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">28</td><td class="num del">4</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">20</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">16</td><td class="num del">2</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">7</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MDIControl.xaml.cs</td><td class="num add">5</td><td class="num del">16</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MDIControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
@@ -727,6 +732,7 @@
   <li><strong>Shared command history:</strong> a single <code>GrblViewModel.MDIHistory</code> (newest first) is fed by both the MDI strip and the console prompt and surfaced in both &mdash; the strip's dropdown binds to it and the prompt recalls it with Up/Down (Esc clears). A command entered in either place is recallable in the other. (The view-model <code>CommandLog</code> is not populated for these entries, so it is not used.)</li>
   <li><strong>Same guards, auto-focus:</strong> the prompt is locked out while a job runs (same as the MDI strip) and grabs focus when the console becomes visible (tab switch or the pop-out console window) so it's ready to type into.</li>
   <li><strong>Pop-out for free:</strong> the prompt is self-contained in <code>ConsoleControl</code>, so the detachable console window (which hosts the same control) gets it too.</li>
+  <li><strong>Output context menu:</strong> right-click the response log for <em>Clear all</em>, <em>Clear up to here</em> (drops the clicked line and everything above it), and <em>Save&hellip;</em> (writes the in-memory log to a text file).</li>
   <li><strong>No jog conflict:</strong> the keyboard-jog handler jogs whenever a key is <em>mapped</em> to jog (Up/Down are by default) <em>before</em> its per-key text-box guard, so the prompt's arrows would otherwise move the machine. <code>ProcessKeypress</code> now forces no-jog when the focused element is a <code>TextBox</code> tagged <code>"MDI"</code>, and the prompt is tagged accordingly &mdash; uniformly exempting both the MDI strip's edit box and the console prompt.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution); verified against the bundled grblHAL simulator: commands echo + execute, auto-focus, history recall (Up/Down step through prior commands), and an A/B test confirming Up jogs the DRO when a non-input element is focused but does not when the console prompt is focused. Keys are handled in <code>PreviewKeyDown</code> so the arrows reach the prompt rather than being consumed by the TextBox.</p>
@@ -772,7 +778,7 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">794</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">795</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">278</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MachineCatalog.cs</td><td class="num add">194</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">30</td><td class="num">0</td></tr>
@@ -883,14 +889,14 @@
 <tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">369</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">80</td><td class="num del">3</td></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">4</td><td class="num del">1</td></tr>
-<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">11</td><td class="num">0</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">14</td><td class="num del">1</td></tr>
 <tr><td class="mono">CNC Core/CNC Core/YModem.cs</td><td class="num add">14</td><td class="num del">5</td></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
 <tr><td class="mono">ioSender/ioSender/JobView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
 <tr><td class="mono">macros/tc.macro</td><td class="num add">105</td><td class="num">0</td></tr>
 <tr><td class="mono">macros/probe_tfl.macro</td><td class="num add">140</td><td class="num">0</td></tr>
-<tr><td class="mono">macros/start_job.macro</td><td class="num add">45</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/start_job.macro</td><td class="num add">52</td><td class="num">0</td></tr>
 <tr><td class="mono">macros/cal.macro</td><td class="num add">3</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
@@ -899,9 +905,32 @@
   <li><strong>Embedded macros + provisioning:</strong> <code>AtcMacros.cs</code> carries <code>cal</code>/<code>probe_tfl</code>/<code>tc.macro</code> as embedded resources and uploads them to <code>/littlefs</code> over <strong>YModem</strong> (absolute <code>/littlefs/&lt;name&gt;</code> path so they land on the right filesystem even with an SD card mounted at root; a <code>atc.sum</code> SHA-256 sidecar detects drift / re-installs).</li>
   <li><strong>Explicit &ldquo;Install ATC macros&rdquo; button</strong> on the SD&nbsp;Card tab is the <em>only</em> provisioning trigger &mdash; user-initiated, re-verifying the filesystem each click. Auto-on-connect/auto-on-show were removed after proving fragile against controller-I/O timing (could wedge the link or hang on close).</li>
   <li><strong><code>$I</code> capability parsing</strong> (<code>Grbl.cs</code>): <code>ATC=1</code>&nbsp;&rarr;&nbsp;<code>HasATC</code>, <code>ATC=0</code>&nbsp;&rarr;&nbsp;<code>AtcMacrosRequired</code> (an ATC is configured but its <code>tc.macro</code> is missing &mdash; prompt to install + reboot), <code>YM</code>&nbsp;&rarr;&nbsp;<code>HasYModem</code>. A 2-arg <code>YModem.Upload(path, remoteName)</code> overload targets an absolute remote path.</li>
-  <li><strong>Start Job macro</strong> (both apps): seeded on connect to an ATC controller (<code>@start_job.macro</code>, run line-by-line through the macro pre-processor). The controller-side macros it <code>CALL</code>s stay on LittleFS, resolved by <code>O&lt;cal&gt; CALL</code> / <code>M6</code>.</li>
+  <li><strong>Start Job macro</strong> (both apps): seeded on connect to an ATC controller (<code>@start_job.macro</code>, run line-by-line through the macro pre-processor). The controller-side macros it <code>CALL</code>s stay on LittleFS, resolved by <code>O&lt;cal&gt; CALL</code> / <code>M6</code>. The Start&nbsp;Job go-to&nbsp;<code>G30</code>/<code>G28</code> moves are written as an explicit safe-Z sequence (lift to machine top, traverse X/Y, descend) rather than a bare diagonal rapid; the Z probes descend to <code>-140</code> (below the spoilboard, within <code>$132</code>).</li>
+  <li><strong>Embed-on-Build:</strong> <code>CNC Controls.csproj</code> disables VS&rsquo;s fast up-to-date check so edits to the external <code>..\..\macros\*.macro</code> embedded resources are actually re-embedded on a normal Build (the fast check ignores external files and would otherwise ship a stale copy).</li>
 </ul>
 <p class="foot">Builds clean in Release for both apps; the full Start Job sequence was verified end-to-end on hardware (2026-06-18). Kept self-contained on PR&nbsp;14 by seeding the Start Job macro without an auto function-key (that nicety needs PR&nbsp;10's <code>Macro.FKey</code>); assign one in the Macro manager if wanted. The <code>O&lt;cal&gt; CALL</code> error:81 fix lives in PR&nbsp;11 (label/keyword gap-close) plus a firmware-side macro-search-path fix.</p>
+</div>
+</div>
+
+<!-- ===== PR 27 ===== -->
+<div class="pr">
+<h2 id="pr27"><span class="badge">PR 27</span>Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/editable-predefined-offsets</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/editable-predefined-offsets">master&hellip;pr/editable-predefined-offsets</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml.cs</td><td class="num add">21</td><td class="num del">2</td></tr>
+</table>
+<div class="desc">
+<p>The predefined offsets <code>G28</code> and <code>G30</code> were read-only in the Offsets view &mdash; you could only store the <em>current</em> machine position. This makes them <strong>editable</strong>: type a target and <em>Set</em> now honours it.</p>
+<ul>
+  <li><strong>Set rapids, then stores:</strong> because <code>G28.1</code>/<code>G30.1</code> can only capture the live position, <em>Set</em> first rapids the machine to the edited target with <code>G53&nbsp;G0</code>, then stores it with <code>G28.1</code>/<code>G30.1</code>. A confirmation prompt spells out the move first (it physically moves the machine); a pending unit change is honoured around the move.</li>
+  <li><strong>Everything else unchanged:</strong> non-predefined work offsets keep their existing behaviour.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). One-file change to <code>OffsetView</code>.</p>
 </div>
 </div>
 
