@@ -165,9 +165,9 @@ namespace CNC.Controls
                 Offset.Code = selectedOffset.Code;
 
                 if (IsPredefined)
-                    btnCurrPos_Click(null, null);
+                    btnCurrPos_Click(null, null);   // seed the fields with the current machine position
 
-                CanEdit = !IsPredefined;
+                CanEdit = true;   // G28/G30 are now editable too - Set rapids to the edited target, then stores it
             }
             else
                 selectedOffset = null;
@@ -192,6 +192,25 @@ namespace CNC.Controls
                 cmd = (DataContext as GrblViewModel).IsMetric ? "G21" : "G20";
 
             (DataContext as GrblViewModel).Message = String.Empty;
+
+            // G28/G30 can only be stored from the CURRENT machine position (G28.1/G30.1). To honour an edited
+            // target value, rapid there first (G53 G0) then store. This MOVES the machine, so confirm first.
+            if (IsPredefined && axis != "ClearAll")
+            {
+                var flags = axis == "All" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis);
+                string axes = newpos.ToString(flags);
+                if (MessageBox.Show(
+                        string.Format("This will rapid the machine to {0} (G53 G0) and store that as {1}.\n\nProceed?", axes, selectedOffset.Code),
+                        "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+                if (mChanged)
+                    Comms.com.WriteCommand(cmd);
+                Comms.com.WriteCommand("G53G0" + axes);
+                Comms.com.WriteCommand(selectedOffset.Code + ".1");
+                if (mChanged)
+                    Comms.com.WriteCommand((DataContext as GrblViewModel).IsMetric ? "G20" : "G21");
+                return;
+            }
 
             if (selectedOffset.Id == 0)
             {

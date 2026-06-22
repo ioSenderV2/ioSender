@@ -140,6 +140,41 @@ namespace CNC.Controls
             (DataContext as GrblViewModel).ResponseLog.Clear();
         }
 
+        // Output-window right-click menu. Capture which line was clicked so "Clear up to here" knows where.
+        private int _rightClickLine = -1;
+
+        private void Output_RightDown(object sender, MouseButtonEventArgs e)
+        {
+            var tb = sender as TextBox;
+            int ci = tb.GetCharacterIndexFromPoint(e.GetPosition(tb), true);
+            _rightClickLine = ci >= 0 ? tb.GetLineIndexFromCharacterIndex(ci) : -1;
+        }
+
+        private void OutClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            (DataContext as GrblViewModel)?.ResponseLog.Clear();
+        }
+
+        private void OutClearToHere_Click(object sender, RoutedEventArgs e)
+        {
+            var log = (DataContext as GrblViewModel)?.ResponseLog;
+            if (log == null || _rightClickLine < 0)
+                return;
+            int n = Math.Min(_rightClickLine + 1, log.Count);   // remove the clicked line and everything above it
+            for (int i = 0; i < n; i++)
+                log.RemoveAt(0);
+        }
+
+        private void OutSave_Click(object sender, RoutedEventArgs e)
+        {
+            var log = (DataContext as GrblViewModel)?.ResponseLog;
+            if (log == null)
+                return;
+            var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*", FileName = "console.txt" };
+            if (dlg.ShowDialog() == true)
+                System.IO.File.WriteAllLines(dlg.FileName, log);
+        }
+
         private void consoleOption_Click(object sender, RoutedEventArgs e)
         {
             // Preserve all three console checkbox states for the next session

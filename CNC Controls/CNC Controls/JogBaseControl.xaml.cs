@@ -138,6 +138,15 @@ namespace CNC.Controls
                     arrowPanel.Margin = new Thickness(5, 10, 5, 0);
                 }
 
+                // Controller (Xbox) jogging mirrors the on-screen UI jog panel's selected distance/feed (the 2x4
+                // grid / sliders). Set unconditionally on every load so the live view-model always has these,
+                // regardless of which jog control happened to trip the one-shot keyboardMappingsOk guard first -
+                // otherwise ControllerMapper falls back to the keyboard step distance and slow feed.
+                var gvm = DataContext as GrblViewModel;
+                gvm.JogDistanceProvider = () => JogData.Distance;
+                gvm.JogFeedProvider = () => JogData.FeedRate;
+                gvm.CycleJogFeed = dir => JogData.FeedIndex = JogData.FeedIndex + dir;   // controller bumpers
+
                 if (!keyboardMappingsOk)
                 {
                     if (!GrblInfo.HasFirmwareJog || AppConfig.Settings.Jog.LinkStepJogToUI)
@@ -147,11 +156,6 @@ namespace CNC.Controls
                         (DataContext as GrblViewModel).PropertyChanged += Model_PropertyChanged;
 
                     keyboard = (DataContext as GrblViewModel).Keyboard;
-
-                    // Let controller jogging use the same step distance/feed as the on-screen jog panel.
-                    var gvm = DataContext as GrblViewModel;
-                    gvm.JogDistanceProvider = () => JogData.Distance;
-                    gvm.JogFeedProvider = () => JogData.FeedRate;
 
                     if (AppConfig.Settings.Jog.LinkStepJogToUI)
                         SyncKeyboardFeedToUI();   // initial sync; kept current by JogData_PropertyChanged

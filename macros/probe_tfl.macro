@@ -51,7 +51,7 @@ O<probe_tfl> SUB
   ; or XY offset move.
   (PRINT, M02 at G28, probing spoilboard)
   G90
-  G38.2 Z-109 F500                  ; probe to absolute Z=-109 (envelope.min + 1)
+  G38.2 Z-140 F500                  ; probe down to -140 (below the spoilboard, within $132)
   G91 G0 Z2                         ; pull off (relative)
   G38.2 Z-5 F25                     ; slow re-touch (relative)
   #<_z_spoil> = #5063
@@ -69,7 +69,7 @@ O<probe_tfl> SUB
 
   ; --- Probe Z down to find stock top ---
   G90
-  G38.2 Z-109 F500                  ; probe to absolute Z=-109
+  G38.2 Z-140 F500                  ; probe down to -140 (below the spoilboard, within $132)
   G91 G0 Z2                         ; pull off
   G38.2 Z-5 F25                     ; slow re-touch
   #<z_trig> = #5063

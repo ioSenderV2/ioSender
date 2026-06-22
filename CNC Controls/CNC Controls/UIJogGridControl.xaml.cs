@@ -44,8 +44,9 @@ namespace CNC.Controls
 
         private void Jog_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(JogViewModel.StepSize) || e.PropertyName == nameof(JogViewModel.Feed))
-                UpdateHighlight();
+            // Refresh on any selection-related change (keyboard jogging can flip StepSize to Continuous and back,
+            // which previously dropped the highlight even though the chosen distance was retained).
+            UpdateHighlight();
         }
 
         private void Distance_Click(object sender, RoutedEventArgs e)
@@ -65,8 +66,10 @@ namespace CNC.Controls
             if (jog == null || dist == null)
                 return;
 
-            int d = (int)jog.StepSize;   // Step0-3 = 0-3, Continuous = 4 (no distance cell highlighted)
-            int f = (int)jog.Feed;
+            // Use the retained discrete index (DistanceIndex stays valid even while in Continuous mode), so the
+            // chosen distance keeps its green highlight during keyboard/continuous jogging.
+            int d = jog.DistanceIndex;
+            int f = jog.FeedIndex;
             for (int i = 0; i < 4; i++)
             {
                 dist[i].Background = d == i ? Selected : Brushes.Transparent;

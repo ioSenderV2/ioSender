@@ -21,12 +21,19 @@
 (PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)
 
 G49                ; clear any residual TLO from a prior session
-G30                ; rapid to the probe-install (foam bin) position
-(WAITIDLE)         ; let the rapid finish so the machine is parked before the operator is prompted
+; Safe-Z go to G30 (probe-install): lift to machine top, traverse X/Y, then descend. Done by hand because
+; ioSender's "Safe Z on Go To" only wraps the Go To panel - a bare G30 here is a single diagonal rapid.
+G53 G0 Z0          ; lift to machine top
+G53 G0 X[#5181] Y[#5182]   ; traverse to G30 X/Y at safe height (#5181/#5182 = G30 stored X/Y)
+G53 G0 Z[#5183]    ; descend to G30 Z
+(WAITIDLE)         ; let the rapids finish so the machine is parked before the operator is prompted
 
 (MBOX, OKCANCEL, Install 3D probe and seat it fully, then click OK. Cancel aborts the job.)
 
-G28                ; rapid to the corner-probe approach position
+; Safe-Z go to G28 (corner approach): lift, traverse, descend (see the G30 note above).
+G53 G0 Z0          ; lift to machine top
+G53 G0 X[#5161] Y[#5162]   ; traverse to G28 X/Y at safe height (#5161/#5162 = G28 stored X/Y)
+G53 G0 Z[#5163]    ; descend to G28 Z
 (WAITIDLE)         ; at the approach position before the probe routine runs
 
 #<_tlo_ref> = 0    ; reset the TLO reference global (controller-side parameter)

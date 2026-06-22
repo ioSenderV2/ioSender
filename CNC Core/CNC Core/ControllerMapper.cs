@@ -263,8 +263,14 @@ namespace CNC.Core
                 case ControllerAction.JogYMinus: JogStep("Y", -1); break;
                 case ControllerAction.JogZPlus: JogStep("Z", 1); break;
                 case ControllerAction.JogZMinus: JogStep("Z", -1); break;
-                case ControllerAction.JogStepIncrease: AdjustStep(10d); break;
-                case ControllerAction.JogStepDecrease: AdjustStep(0.1d); break;
+                // Bumpers step the on-screen UI jog speed preset (2x4 grid); fall back to the old step-size
+                // multiplier only when no UI jog panel is loaded to provide the callback.
+                case ControllerAction.JogStepIncrease:
+                    if (grbl.CycleJogFeed != null) grbl.CycleJogFeed(1); else AdjustStep(10d);
+                    break;
+                case ControllerAction.JogStepDecrease:
+                    if (grbl.CycleJogFeed != null) grbl.CycleJogFeed(-1); else AdjustStep(0.1d);
+                    break;
             }
         }
 

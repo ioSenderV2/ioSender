@@ -722,11 +722,11 @@ namespace GCode_Sender
             var infos = new System.Collections.Generic.List<CNC.Controls.TabInfo>();
             foreach (var t in present)
             {
+                // Most tabs host an ICNCView (key = ViewType); some (e.g. Trinamic tuner) host an IGrblConfigTab
+                // with no ViewType, so fall back to the TabItem's x:Name so they still appear in the editor.
                 var v = getView(t);
-                if (v == null)
-                    continue;
-                string name = v.ViewType.ToString();
-                if (byName.ContainsKey(name))
+                string name = v != null ? v.ViewType.ToString() : t.Name;
+                if (string.IsNullOrEmpty(name) || byName.ContainsKey(name))
                     continue;
                 byName[name] = t;
                 infos.Add(new CNC.Controls.TabInfo(name, t.Header?.ToString() ?? name));

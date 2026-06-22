@@ -425,6 +425,8 @@ namespace CNC.Core
         // same distance/feed the on-screen jog uses. Null until the jog panel has loaded.
         public Func<double> JogDistanceProvider { get; set; }
         public Func<double> JogFeedProvider { get; set; }
+        // Steps the UI jog panel's speed preset selection by +1/-1 (controller bumpers). Null until loaded.
+        public Action<int> CycleJogFeed { get; set; }
 
         public bool ResponseLogVerbose { get { return _responseLogVerbose; } set { _responseLogVerbose = value; OnPropertyChanged(); } }
         public bool ResponseLogFilterRT { get; set; } = false;
