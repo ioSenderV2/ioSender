@@ -1154,6 +1154,13 @@ namespace CNC.Controls
 
         private void ResponseReceived(string response)
         {
+            // ResponseReceived is raised by a specific comms instance, but the streaming switch below writes to
+            // the static Comms.com. During a reconnect/teardown (startup simulator handshake, or the Restart
+            // relaunch) the static can be null/replaced while an in-flight response from the old link still
+            // arrives - writing then NREs (SendMDI/Reset cases). No link means nothing to send, so bail out.
+            if (Comms.com == null)
+                return;
+
             if (streamingHandler.Count)
             {
                 //if(response == "pending")
