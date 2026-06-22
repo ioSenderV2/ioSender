@@ -14,6 +14,11 @@
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <TargetFrameworkProfile />
+    <!-- The ATC .macro files are EmbeddedResources from ..\..\macros\ (outside this project). VS's fast
+         up-to-date check ignores external files, so a normal Build skips re-embedding edited macros (leaving
+         stale embedded/seeded/uploaded copies). Disabling it forces the real up-to-date check, which tracks
+         the EmbeddedResource inputs - so editing a macro + Build re-embeds it without needing a Clean. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
