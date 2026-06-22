@@ -53,7 +53,6 @@ namespace CNC.Controls
             Home,
             Unlock,
             Reset,
-            Reboot,
             Check
         }
 
@@ -65,7 +64,6 @@ namespace CNC.Controls
 
             btnHome.Tag = StatusButton.Home;
             btnReset.Tag = StatusButton.Reset;
-            btnReboot.Tag = StatusButton.Reboot;
             btnUnlock.Tag = StatusButton.Unlock;
             chkCheckMode.Tag = StatusButton.Check;
         }
@@ -84,17 +82,6 @@ namespace CNC.Controls
 
                 case StatusButton.Unlock:
                     (DataContext as GrblViewModel).ExecuteCommand(GrblConstants.CMD_UNLOCK);
-                    break;
-
-                case StatusButton.Reboot:
-                    // Full MCU reset via the $REBOOT grblHAL plugin - recovers a wedged controller that is still
-                    // reading serial. Confirm because it drops all state (position/homing).
-                    if (MessageBox.Show("Reboot the controller now?\n\nThis resets the MCU (clears position and homing). Use it to recover a stuck controller.",
-                            "Reboot controller", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
-                    {
-                        if (Comms.com != null)
-                            Comms.com.WriteCommand("$REBOOT");   // sent directly so it works even when the gcode stream is wedged
-                    }
                     break;
 
                 case StatusButton.Home:
