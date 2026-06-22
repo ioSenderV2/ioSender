@@ -1,0 +1,26 @@
+<UserControl x:Class="CNC.Controls.MachinePositionControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="210">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SharedStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <GroupBox Header="Machine Position" HorizontalAlignment="Left" VerticalAlignment="Top" Width="210">
+        <StackPanel Margin="3,2,0,2">
+            <local:NumericField Label="X:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.X, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+            <local:NumericField Label="Y:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.Y, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource YAxisVisibleStyle}"/>
+            <local:NumericField Label="Z:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.Z, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ZAxisVisibleStyle}"/>
+            <local:NumericField Label="A:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.A, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource AAxisVisibleStyle}"/>
+            <local:NumericField Label="B:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.B, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource BAxisVisibleStyle}"/>
+            <local:NumericField Label="C:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.C, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource CAxisVisibleStyle}"/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>

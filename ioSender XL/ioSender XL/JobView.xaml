@@ -35,14 +35,16 @@
             <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Height="23"/>
         </StackPanel>
         <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" Width="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-            <StackPanel x:Name="t1" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Top" DockPanel.Dock="Top">
-                <cnccontrols:DROControl x:Name="DRO" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                <cnccontrols:LimitsControl x:Name="limitsControl" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed"/>
-            </StackPanel>
+            <!-- Signals/Status are pinned at the bottom (declared first so the DockPanel reserves the bottom strip). -->
             <StackPanel x:Name="t2" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" DockPanel.Dock="Bottom">
                 <cnccontrols:SignalsControl x:Name="signalsControl" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 <cnccontrols:StatusControl x:Name="statusControl" Margin="0,5,0,0" VerticalAlignment="Bottom"/>
             </StackPanel>
+            <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels); scrolls if taller than the
+                 space above Signals/Status so it never overlays them. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="t1" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+            </ScrollViewer>
         </DockPanel>
         <Grid x:Name="rhGrid" DockPanel.Dock="Right" >
             <Grid.ColumnDefinitions>
@@ -54,18 +56,23 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"/>
-            <!-- Configurable main-page slots: left column (top/middle/bottom) populated from Config.MainPanels[0..2] -->
-            <StackPanel Grid.Row="1" Margin="5,0,0,0" MinWidth="250" VerticalAlignment="Stretch">
-                <ContentControl x:Name="slot0"/>
-                <ContentControl x:Name="slot1"/>
-                <ContentControl x:Name="slot2"/>
-            </StackPanel>
+            <!-- Configurable main-page slots: left column (top/middle/bottom) populated from Config.MainPanels[0..2].
+                 Wrapped in a ScrollViewer so a tall stack scrolls instead of clipping the bottom panel (worse at high DPI). -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="5,0,0,0" MinWidth="250">
+                    <ContentControl x:Name="slot0"/>
+                    <ContentControl x:Name="slot1"/>
+                    <ContentControl x:Name="slot2"/>
+                </StackPanel>
+            </ScrollViewer>
             <!-- right column from Config.MainPanels[3..5] -->
-            <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,5" MinWidth="250" VerticalAlignment="Stretch">
-                <ContentControl x:Name="slot3"/>
-                <ContentControl x:Name="slot4"/>
-                <ContentControl x:Name="slot5"/>
-            </StackPanel>
+            <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,0,5" MinWidth="250">
+                    <ContentControl x:Name="slot3"/>
+                    <ContentControl x:Name="slot4"/>
+                    <ContentControl x:Name="slot5"/>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
         <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,5,0,0">
             <cnccontrols:JobControl x:Name="GCodeSender" Margin="0,5,0,0" DockPanel.Dock="Bottom"/>

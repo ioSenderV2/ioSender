@@ -232,6 +232,7 @@
     <Compile Include="Settings.cs" />
     <Compile Include="SidebarItem.cs" />
     <Compile Include="MainPanelRegistry.cs" />
+    <Compile Include="TabRegistry.cs" />
     <Compile Include="PanelFlyout.xaml.cs">
       <DependentUpon>PanelFlyout.xaml</DependentUpon>
     </Compile>
@@ -246,6 +247,12 @@
     </Compile>
     <Compile Include="UIJoggingControl.xaml.cs">
       <DependentUpon>UIJoggingControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UIJogGridControl.xaml.cs">
+      <DependentUpon>UIJogGridControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="KbdJogGridControl.xaml.cs">
+      <DependentUpon>KbdJogGridControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="KeyboardJoggingControl.xaml.cs">
       <DependentUpon>KeyboardJoggingControl.xaml</DependentUpon>
@@ -292,6 +299,9 @@
     <Compile Include="Widget.cs" />
     <Compile Include="MachinePositionFlyout.xaml.cs">
       <DependentUpon>MachinePositionFlyout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MachinePositionControl.xaml.cs">
+      <DependentUpon>MachinePositionControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="WorkParametersControl.xaml.cs">
       <DependentUpon>WorkParametersControl.xaml</DependentUpon>
@@ -506,6 +516,14 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="UIJogGridControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="KbdJogGridControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="KeyboardJoggingControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -579,6 +597,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MachinePositionFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MachinePositionControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

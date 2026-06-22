@@ -34,5 +34,41 @@ namespace CNC.Controls.Properties {
                 this["ColorMode"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int UiJogStep {
+            get {
+                return ((int)(this["UiJogStep"]));
+            }
+            set {
+                this["UiJogStep"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int UiJogFeed {
+            get {
+                return ((int)(this["UiJogFeed"]));
+            }
+            set {
+                this["UiJogFeed"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool UiJogContinuous {
+            get {
+                return ((bool)(this["UiJogContinuous"]));
+            }
+            set {
+                this["UiJogContinuous"] = value;
+            }
+        }
     }
 }

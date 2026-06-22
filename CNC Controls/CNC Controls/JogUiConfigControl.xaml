@@ -17,6 +17,14 @@
             <local:NumericField x:Uid="lbl_feedrate2" Label="Feedrate 2:" ColonAt="160" Unit="mm/min" Format="####0" Value="{Binding Path=JogUiMetric.Feedrate2, Mode=TwoWay}" ToolTip="On-screen jog speed preset 2, selected independently of the distance."/>
             <local:NumericField x:Uid="lbl_feedrate1" Label="Feedrate 1:" ColonAt="160" Unit="mm/min" Format="####0" Value="{Binding Path=JogUiMetric.Feedrate1, Mode=TwoWay}" ToolTip="On-screen jog speed preset 1, selected independently of the distance."/>
             <local:NumericField x:Uid="lbl_feedrate0" Label="Feedrate 0:" ColonAt="160" Unit="mm/min" Format="####0" Value="{Binding Path=JogUiMetric.Feedrate0, Mode=TwoWay}" ToolTip="On-screen jog speed preset 0 (slowest), selected independently of the distance."/>
+            <CheckBox x:Uid="lbl_linkToUi" IsChecked="{Binding Path=Jog.LinkStepJogToUI, Mode=TwoWay}" Margin="5,10,0,3" VerticalContentAlignment="Top"
+                      ToolTip="When checked, keyboard jogging uses the distance and speed selected on the on-screen UI jog panel, and the separate Keyboard Jogging panel is unavailable. When unchecked, keyboard jogging uses its own Slow/Fast speed (set on the Jog page).">
+                <TextBlock Text="Link distance and speed to UI jogging" TextWrapping="Wrap"/>
+            </CheckBox>
+            <CheckBox x:Uid="lbl_keepUiJog" IsChecked="{Binding Path=Jog.KeepUiJogSelection, Mode=TwoWay}" Margin="5,0,0,3" VerticalContentAlignment="Top"
+                      ToolTip="Restore the on-screen jog distance and speed selection from the previous session when ioSender starts.">
+                <TextBlock Text="Remember distance and speed across restarts" TextWrapping="Wrap"/>
+            </CheckBox>
         </StackPanel>
     </GroupBox>
 </UserControl>

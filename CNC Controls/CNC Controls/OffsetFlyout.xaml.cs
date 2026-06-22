@@ -27,8 +27,8 @@ namespace CNC.Controls
             this.code = code;
             PanelName = code;
             btnGo.Content = code;
-            // "Get current position" applies to the predefined positions.
-            btnSet.Visibility = (code == "G28" || code == "G30") ? Visibility.Visible : Visibility.Collapsed;
+            // "Set" stores the current machine position: G28/G30 via their .1 form, G54-G59.3 via G10 L2.
+            btnSet.Visibility = (code == "G28" || code == "G30" || code.StartsWith("G5")) ? Visibility.Visible : Visibility.Collapsed;
             IsVisibleChanged += OffsetFlyout_IsVisibleChanged;
         }
 
@@ -97,8 +97,27 @@ namespace CNC.Controls
 
         private void btnSet_Click(object sender, RoutedEventArgs e)
         {
-            // G28.1 / G30.1 store the current machine position.
-            (DataContext as GrblViewModel)?.ExecuteCommand(code + ".1");
+            var grbl = DataContext as GrblViewModel;
+            if (grbl == null)
+                return;
+
+            if (code == "G28" || code == "G30")
+            {
+                grbl.ExecuteCommand(code + ".1");   // store the current machine position
+                return;
+            }
+
+            // G54-G59.3: set this coordinate system's origin to the current machine position, all axes
+            // (e.g. jog to the toolsetter and Set G59.3). G10 L2 P<n> takes machine coordinates.
+            var cs = Cs;
+            if (cs == null)
+                return;
+
+            var sb = new StringBuilder("G10L2P" + cs.Id);
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+                sb.Append(GrblInfo.AxisIndexToLetter(i) + grbl.MachinePosition.Values[i].ToInvariantString("F3"));
+
+            grbl.ExecuteCommand(sb.ToString());
         }
 
         private void btn_Close(object sender, RoutedEventArgs e)

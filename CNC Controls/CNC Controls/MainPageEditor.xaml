@@ -5,52 +5,99 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        Title="Edit Main Page" Height="430" Width="580" MinHeight="340" MinWidth="500"
+        Title="Edit Main Page" Height="560" Width="580" MinHeight="440" MinWidth="500"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
 
-            <TextBlock Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-            <ListBox x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="3" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+        <TabControl Grid.Row="0">
+            <TabItem Header="Panels">
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-            <TextBlock Grid.Column="2" Grid.Row="0" Text="Main page (top → bottom = slot order, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-            <ListBox x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-            <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                <Button x:Name="btnToMain" Content="&gt;" Width="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to main page"/>
-                <Button x:Name="btnFromMain" Content="&lt;" Width="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove from main page"/>
-            </StackPanel>
-            <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                <Button x:Name="btnMainUp" Content="▲" Width="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
-                <Button x:Name="btnMainDown" Content="▼" Width="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
-            </StackPanel>
+                    <TextBlock Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
 
-            <TextBlock Grid.Column="2" Grid.Row="2" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
-            <ListBox x:Name="lstFlyouts" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-            <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
-                <Button x:Name="btnToFlyout" Content="&gt;" Width="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
-                <Button x:Name="btnFromFlyout" Content="&lt;" Width="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
-            </StackPanel>
-            <StackPanel Grid.Column="3" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
-                <Button x:Name="btnFlyUp" Content="▲" Width="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
-                <Button x:Name="btnFlyDown" Content="▼" Width="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
-            </StackPanel>
-        </Grid>
+                    <TextBlock Grid.Column="2" Grid.Row="0" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnToMain" Content="&gt;" Width="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to right of 3D view"/>
+                        <Button x:Name="btnFromMain" Content="&lt;" Width="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnMainUp" Content="▲" Width="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnMainDown" Content="▼" Width="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Grid.Row="2" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <ListBox x:Name="lstLeft" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnToLeft" Content="&gt;" Width="30" Margin="0,2" Click="btnToLeft_Click" ToolTip="Add to left of 3D view"/>
+                        <Button x:Name="btnFromLeft" Content="&lt;" Width="30" Margin="0,2" Click="btnFromLeft_Click" ToolTip="Remove"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnLeftUp" Content="▲" Width="26" Margin="0,2" Click="btnLeftUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnLeftDown" Content="▼" Width="26" Margin="0,2" Click="btnLeftDown_Click" ToolTip="Move down"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Grid.Row="4" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <ListBox x:Name="lstFlyouts" Grid.Column="2" Grid.Row="5" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnToFlyout" Content="&gt;" Width="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
+                        <Button x:Name="btnFromFlyout" Content="&lt;" Width="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnFlyUp" Content="▲" Width="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnFlyDown" Content="▼" Width="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Tabs">
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+
+                    <TextBlock Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnTabShow" Content="&gt;" Width="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
+                        <Button x:Name="btnTabHide" Content="&lt;" Width="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                        <Button x:Name="btnTabUp" Content="▲" Width="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move left (earlier)"/>
+                        <Button x:Name="btnTabDown" Content="▼" Width="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move right (later)"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <TextBlock Text="Changes take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>

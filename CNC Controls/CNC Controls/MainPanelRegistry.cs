@@ -32,16 +32,21 @@ namespace CNC.Controls
         public string Label { get; }                 // shown in the editor and flyout tab
         public PanelKind Kind { get; }
         public Func<UserControl> CreateMainPanel { get; }   // main-page control factory (Panel kind only)
+        public Func<UserControl> CreateFlyoutPanel { get; } // optional alternate control when hosted in a flyout
 
-        public AssignableItem(string name, string label, PanelKind kind, Func<UserControl> createMainPanel = null)
+        public AssignableItem(string name, string label, PanelKind kind, Func<UserControl> createMainPanel = null, Func<UserControl> createFlyoutPanel = null)
         {
             Name = name;
             Label = label;
             Kind = kind;
             CreateMainPanel = createMainPanel;
+            CreateFlyoutPanel = createFlyoutPanel;
         }
 
         public bool CanBeMainPanel { get { return Kind == PanelKind.Panel; } }
+
+        // Control to host in a sidebar flyout - the flyout-specific variant if provided, else the main one.
+        public UserControl CreateFlyout() { return (CreateFlyoutPanel ?? CreateMainPanel)?.Invoke(); }
     }
 
     public static class MainPanelRegistry
@@ -62,15 +67,17 @@ namespace CNC.Controls
             }),
             new AssignableItem("Feed", "Feed rate", PanelKind.Panel, () => new FeedControl()),
             new AssignableItem("Goto", "Goto", PanelKind.Panel, () => new GotoControl()),
-            new AssignableItem("UIJogging", "UI Jogging", PanelKind.Panel, () => new UIJoggingControl()),
-            new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KeyboardJoggingControl())
+            new AssignableItem("UIJogging", "UI Jogging", PanelKind.Panel, () => new UIJogGridControl(), () => new UIJoggingControl()),
+            new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KbdJogGridControl(), () => new KeyboardJoggingControl()),
+            new AssignableItem("DRO", "DRO (work)", PanelKind.Panel, () => new DROControl()),
+            new AssignableItem("ProgramLimits", "Program limits", PanelKind.Panel, () => new LimitsControl()),
+            new AssignableItem("MachinePosition", "Machine Position", PanelKind.Panel, () => new MachinePositionControl())
         };
 
         // Special flyout-only items (flyout instances are supplied by the host window).
         public static readonly List<AssignableItem> Specials = new List<AssignableItem>
         {
-            new AssignableItem("Macros", "Macros", PanelKind.Special),
-            new AssignableItem("MachinePosition", "Machine Position", PanelKind.Special)
+            new AssignableItem("Macros", "Macros", PanelKind.Special)
         };
 
         // Coordinate-system offsets (flyout only); shown via OffsetFlyout(code).
@@ -89,6 +96,10 @@ namespace CNC.Controls
             list.AddRange(Panels);
             list.AddRange(Specials);
             list.AddRange(Offsets);
+            // Keyboard jogging is redundant when its distance/speed are linked to UI jogging - hide it so it
+            // can't be assigned, and so a previously-placed one is dropped on next layout build.
+            if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.LinkStepJogToUI)
+                list.RemoveAll(i => i.Name == "KeyboardJogging");
             return list;
         }
 

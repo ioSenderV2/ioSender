@@ -23,6 +23,7 @@
             <Button x:Uid="btn_editKeyMap" x:Name="btnEditKeyMap" Content="Edit Key Bindings" Width="130" Margin="5" Padding="5,0" Click="btnEditKeyMap_Click" Style="{StaticResource ConfigButtonStyle}"/>
             <Button x:Uid="btn_editMacros" x:Name="btnEditMacros" Content="Edit Macros" Width="110" Margin="5" Padding="5,0" Click="btnEditMacros_Click" Style="{StaticResource ConfigButtonStyle}"/>
             <Button x:Uid="btn_editMainPage" x:Name="btnEditMainPage" Content="Edit Main Page" Width="130" Margin="5" Padding="5,0" Click="btnEditMainPage_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed"/>
+            <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Width="90" Margin="5" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply the main-page / tab layout changes. Enabled once a change is made."/>
         </StackPanel>
         <ItemsControl x:Name="xx" DockPanel.Dock="Top">
             <ItemsControl.ItemsPanel>
