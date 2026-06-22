@@ -101,7 +101,7 @@ namespace CNC.Controls
                 DataContext = profile.Base;
                 xx.ItemsSource = model.ConfigControls;
                 model.ConfigControls.Add(new BasicConfigControl());
-                btnEditMainPage.Visibility = MainPanelRegistry.LayoutEnabled ? Visibility.Visible : Visibility.Collapsed;
+                btnEditMainPage.Visibility = btnRestart.Visibility = MainPanelRegistry.LayoutEnabled ? Visibility.Visible : Visibility.Collapsed;
                 if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.Keypad)
                     model.ConfigControls.Add(new JogUiConfigControl());
                 if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI)
@@ -155,8 +155,24 @@ namespace CNC.Controls
             if (dlg.ShowDialog() == true)
             {
                 AppConfig.Settings.Save();
-                Grbl.GrblViewModel.Message = "Main page layout saved - restart to apply.";
+                if (dlg.Changed)
+                {
+                    // A layout/tab change needs a restart - enable the Restart button and flag it in the status line.
+                    btnRestart.IsEnabled = true;
+                    Grbl.GrblViewModel.Message = "Restart required to apply main page / tab layout changes.";
+                }
             }
+        }
+
+        private void btnRestart_Click(object sender, RoutedEventArgs e)
+        {
+            AppConfig.Settings.Save();
+            try
+            {
+                System.Diagnostics.Process.Start(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                Application.Current.Shutdown();
+            }
+            catch { }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
         }
 
         #region Autosave on tab-leave / close (opt-in)

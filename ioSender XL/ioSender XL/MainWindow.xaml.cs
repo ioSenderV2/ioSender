@@ -158,6 +158,9 @@ namespace GCode_Sender
             if (!AppConfig.Settings.GCodeViewer.IsEnabled)
                 ShowView(false, ViewType.GCodeViewer);
 
+            // Publish the present tabs to the Edit Main Page > Tabs editor, then apply the saved order/visibility.
+            PublishAndApplyTabs();
+
             UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
 
             xx.ItemsSource = UIViewModel.SidebarItems;
@@ -179,7 +182,7 @@ namespace GCode_Sender
                 switch (item.Kind)
                 {
                     case PanelKind.Panel:
-                        flyout = new PanelFlyout(item.Name, item.Label, item.CreateMainPanel());
+                        flyout = new PanelFlyout(item.Name, item.Label, item.CreateFlyout());
                         break;
                     case PanelKind.Offset:
                         flyout = new OffsetFlyout(item.Name);
@@ -471,6 +474,54 @@ namespace GCode_Sender
             TabItem tab = getTab(view);
 
             return tab != null;
+        }
+
+        // Publish the tabs currently present (after capability filtering) so the "Edit Main Page" Tabs editor can
+        // list them, then reorder/hide them per Config.Tabs (ordered ViewType names). Settings:App is always kept
+        // visible (it hosts the editor), and an empty/invalid result falls back to the built-in order.
+        private void PublishAndApplyTabs()
+        {
+            var present = new System.Collections.Generic.List<TabItem>();
+            foreach (TabItem t in tabMode.Items)
+                present.Add(t);
+
+            var byName = new System.Collections.Generic.Dictionary<string, TabItem>();
+            var infos = new System.Collections.Generic.List<CNC.Controls.TabInfo>();
+            foreach (var t in present)
+            {
+                var v = getView(t);
+                if (v == null)
+                    continue;
+                string name = v.ViewType.ToString();
+                if (byName.ContainsKey(name))
+                    continue;
+                byName[name] = t;
+                infos.Add(new CNC.Controls.TabInfo(name, t.Header?.ToString() ?? name));
+            }
+            CNC.Controls.TabRegistry.Publish(infos);
+
+            var order = AppConfig.Settings.Base.Tabs;
+            if (order == null || order.Count == 0)
+                return;     // default: keep built-in order and visibility
+
+            var desired = new System.Collections.Generic.List<TabItem>();
+            foreach (var name in order)
+            {
+                TabItem t;
+                if (byName.TryGetValue(name, out t) && !desired.Contains(t))
+                    desired.Add(t);
+            }
+            TabItem prot;   // Settings:App must remain reachable
+            if (byName.TryGetValue(ViewType.AppConfig.ToString(), out prot) && !desired.Contains(prot))
+                desired.Add(prot);
+
+            if (desired.Count == 0)
+                return;     // safety: never hide everything
+
+            tabMode.Items.Clear();
+            foreach (var t in desired)
+                tabMode.Items.Add(t);
+            tabMode.SelectedIndex = 0;
         }
 
 #if ADD_CAMERA

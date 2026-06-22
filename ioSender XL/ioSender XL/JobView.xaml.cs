@@ -64,14 +64,16 @@ namespace GCode_Sender
         // References to dynamically-placed panels that code-behind needs for keyboard-jog focus gating.
         private SpindleControl spindleControl = null;
         private WorkParametersControl workParametersControl = null;
+        private DROControl _dro = null;            // captured when a DRO panel is placed (left or right); may be null
+        private LimitsControl _limits = null;      // captured when a Program-limits panel is placed; may be null
 
         public JobView()
         {
             InitializeComponent();
 
             BuildMainPanels();
+            BuildLeftPanels();
 
-            DRO.DROEnabledChanged += DRO_DROEnabledChanged;
             DataContextChanged += View_DataContextChanged;
         }
 
@@ -103,10 +105,58 @@ namespace GCode_Sender
                 slots[s++].Content = ctl;
                 placed.Add(name);
 
-                if (ctl is SpindleControl sc)
-                    spindleControl = sc;
-                else if (ctl is WorkParametersControl wp)
-                    workParametersControl = wp;
+                CaptureRefs(ctl);
+            }
+        }
+
+        // Capture references to panels that have host wiring (focus gating, program-limits reveal) so they
+        // work wherever the user places them (left, right, or not at all -> the reference stays null).
+        private void CaptureRefs(UserControl ctl)
+        {
+            if (ctl is SpindleControl sc)
+                spindleControl = sc;
+            else if (ctl is WorkParametersControl wp)
+                workParametersControl = wp;
+            else if (ctl is DROControl dro)
+            {
+                _dro = dro;
+                dro.DROEnabledChanged += DRO_DROEnabledChanged;
+            }
+            else if (ctl is LimitsControl lc)
+            {
+                _limits = lc;
+                lc.Visibility = Visibility.Collapsed;   // revealed by showProgramLimits when a job is active
+            }
+        }
+
+        // Populate the area left of the 3D view from Config.LeftPanels (default = DRO + Program limits).
+        // Signals/Status stay fixed below it (t2). Applied on restart.
+        private void BuildLeftPanels()
+        {
+            if (AppConfig.Settings.Base == null)   // config not loaded yet (ctor runs before SetupAndOpen) — defer
+            {
+                Dispatcher.BeginInvoke(new System.Action(BuildLeftPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+
+            t1.Children.Clear();
+            var placed = new System.Collections.Generic.HashSet<string>();
+
+            foreach (var name in AppConfig.Settings.Base.LeftPanels)
+            {
+                if (string.IsNullOrEmpty(name) || placed.Contains(name))
+                    continue;
+
+                var def = MainPanelRegistry.ByName(name);
+                if (def == null || !def.CanBeMainPanel || def.CreateMainPanel == null)
+                    continue;
+
+                var ctl = def.CreateMainPanel();
+                ctl.HorizontalAlignment = HorizontalAlignment.Left;
+                ctl.VerticalAlignment = VerticalAlignment.Top;
+                t1.Children.Add(ctl);
+                placed.Add(name);
+                CaptureRefs(ctl);
             }
         }
 
@@ -288,7 +338,7 @@ namespace GCode_Sender
             }
             else if(ViewType != ViewType.Shutdown)
             {
-                DRO.IsFocusable = false;
+                if (_dro != null) _dro.IsFocusable = false;
 #if ADD_CAMERA
                 if (MainWindow.UIViewModel.Camera != null)
                 {
@@ -306,7 +356,7 @@ namespace GCode_Sender
 
             if (GCodeSender.Activate(activate)) {
                 showProgramLimits();
-                Task.Delay(500).ContinueWith(t => DRO.EnableFocus());
+                Task.Delay(500).ContinueWith(t => _dro?.EnableFocus());
                 Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
                 {
                     focusedControl.Focus();
@@ -328,19 +378,9 @@ namespace GCode_Sender
         // https://stackoverflow.com/questions/5707143/how-to-get-the-width-height-of-a-collapsed-control-in-wpf
         private void showProgramLimits()
         {
-            double height;
-
-            if (limitsControl.Visibility == Visibility.Collapsed)
-            {
-                limitsControl.Visibility = Visibility.Hidden;
-                limitsControl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                height = limitsControl.DesiredSize.Height;
-                limitsControl.Visibility = Visibility.Collapsed;
-            }
-            else
-                height = limitsControl.ActualHeight;
-
-            limitsControl.Visibility = (dp.ActualHeight - t1.ActualHeight - t2.ActualHeight + limitsControl.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
+            // Reveal the Program-limits panel (if the user placed one) now that a job is active.
+            if (_limits != null)
+                _limits.Visibility = Visibility.Visible;
             // Bottom-row slots auto-hide on short windows (generalizes the old Coolant/Goto hiding).
             slot2.Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
             slot5.Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;
@@ -532,7 +572,7 @@ namespace GCode_Sender
 
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || DRO.IsFocused || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
+            return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
 
 #endregion

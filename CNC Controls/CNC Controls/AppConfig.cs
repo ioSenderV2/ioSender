@@ -214,7 +214,7 @@ namespace CNC.Controls
             KeypadAndUI
         }
 
-        private bool _kbEnable, _linkStepToUi = true, _defaultSpeedFast = false;
+        private bool _kbEnable, _linkStepToUi = true, _defaultSpeedFast = false, _keepUiJogSelection = false;
         private JogMode _jogMode = JogMode.UI;
 
         private double _fastFeedrate = 500d, _slowFeedrate = 200d, _stepFeedrate = 100d;
@@ -223,6 +223,8 @@ namespace CNC.Controls
         public JogMode Mode { get { return _jogMode; } set { _jogMode = value; OnPropertyChanged(); } }
         public bool KeyboardEnable { get { return _kbEnable; } set { _kbEnable = value; OnPropertyChanged(); } }
         public bool LinkStepJogToUI { get { return _linkStepToUi; } set { _linkStepToUi = value; OnPropertyChanged(); } }
+        // Restore the on-screen jog distance/speed selection from the previous session on startup.
+        public bool KeepUiJogSelection { get { return _keepUiJogSelection; } set { _keepUiJogSelection = value; OnPropertyChanged(); } }
         // Default keyboard continuous-jog speed: false = Slow (Shift -> Fast), true = Fast (Shift -> Slow).
         public bool DefaultSpeedFast { get { return _defaultSpeedFast; } set { _defaultSpeedFast = value; OnPropertyChanged(); } }
         public double FastFeedrate { get { return _fastFeedrate; } set { _fastFeedrate = value; OnPropertyChanged(); } }
@@ -307,11 +309,21 @@ namespace CNC.Controls
         // falls back to the initializer defaults for configs that predate the feature.
         private List<string> _mainPanels = new List<string> { "Outline", "Spindle", "Coolant", "WorkParameters", "Feed", "Goto" };
         private List<string> _flyoutItems = new List<string> { "Macros", "MachinePosition" };
+        // LeftPanels: ordered panel names filling the area left of the 3D view (default = the original DRO +
+        // program-limits stack). Signals/Status stay fixed below it.
+        private List<string> _leftPanels = new List<string> { "DRO", "ProgramLimits" };
+        // Tabs: ordered ViewType names of the main TabControl tabs that should be shown, in display order.
+        // Empty (the default) means "show all available tabs in their built-in order" - no reordering/hiding.
+        private List<string> _tabs = new List<string>();
 
         [XmlIgnore]
         public List<string> MainPanels { get { return _mainPanels; } set { _mainPanels = value ?? new List<string>(); } }
         [XmlIgnore]
+        public List<string> Tabs { get { return _tabs; } set { _tabs = value ?? new List<string>(); } }
+        [XmlIgnore]
         public List<string> FlyoutItems { get { return _flyoutItems; } set { _flyoutItems = value ?? new List<string>(); } }
+        [XmlIgnore]
+        public List<string> LeftPanels { get { return _leftPanels; } set { _leftPanels = value ?? new List<string>(); } }
 
         public string MainPanelsCsv
         {
@@ -322,6 +334,16 @@ namespace CNC.Controls
         {
             get { return string.Join(",", _flyoutItems); }
             set { _flyoutItems = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
+        public string LeftPanelsCsv
+        {
+            get { return string.Join(",", _leftPanels); }
+            set { _leftPanels = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
+        public string TabsCsv
+        {
+            get { return string.Join(",", _tabs); }
+            set { _tabs = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
 
         // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)

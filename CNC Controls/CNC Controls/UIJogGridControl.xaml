@@ -1,0 +1,65 @@
+<UserControl x:Class="CNC.Controls.UIJogGridControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             Loaded="UIJogGridControl_Loaded"
+             d:DesignHeight="180" d:DesignWidth="210">
+    <UserControl.Resources>
+        <!-- Flat clickable value cell; Background is driven from code-behind (green when selected). -->
+        <Style x:Key="JogCell" TargetType="Button">
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <GroupBox Header="UI Jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Width="210">
+        <Grid x:Name="content" Margin="3,2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Headers/values come straight from the (metric-only) UI jogging settings on Settings:App,
+                 so the panel always matches that page regardless of the machine's inch/mm mode. -->
+            <TextBlock Grid.Column="0" Grid.Row="0" Text="mm" Foreground="#FF57606A" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+            <TextBlock Grid.Column="1" Grid.Row="0" Text="mm/min" Foreground="#FF57606A" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+
+            <Button x:Name="d0" Grid.Column="0" Grid.Row="1" Tag="0" Content="{Binding JogUiMetric.Distance0, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Distance_Click"/>
+            <Button x:Name="d1" Grid.Column="0" Grid.Row="2" Tag="1" Content="{Binding JogUiMetric.Distance1, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Distance_Click"/>
+            <Button x:Name="d2" Grid.Column="0" Grid.Row="3" Tag="2" Content="{Binding JogUiMetric.Distance2, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Distance_Click"/>
+            <Button x:Name="d3" Grid.Column="0" Grid.Row="4" Tag="3" Content="{Binding JogUiMetric.Distance3, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Distance_Click"/>
+
+            <Button x:Name="f0" Grid.Column="1" Grid.Row="1" Tag="0" Content="{Binding JogUiMetric.Feedrate0, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
+            <Button x:Name="f1" Grid.Column="1" Grid.Row="2" Tag="1" Content="{Binding JogUiMetric.Feedrate1, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
+            <Button x:Name="f2" Grid.Column="1" Grid.Row="3" Tag="2" Content="{Binding JogUiMetric.Feedrate2, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
+            <Button x:Name="f3" Grid.Column="1" Grid.Row="4" Tag="3" Content="{Binding JogUiMetric.Feedrate3, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
+
+            <CheckBox Grid.Column="0" Grid.Row="5" Grid.ColumnSpan="2" Content="Continuous" Margin="2,4,0,0"
+                      IsChecked="{Binding Continuous, Mode=TwoWay}"/>
+        </Grid>
+    </GroupBox>
+</UserControl>

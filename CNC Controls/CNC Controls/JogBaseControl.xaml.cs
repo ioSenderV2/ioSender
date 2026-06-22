@@ -58,6 +58,7 @@ namespace CNC.Controls
         private KeypressHandler keyboard;
         private static bool keyboardMappingsOk = false;
         private static volatile int jogAxis = -1;
+        private static bool _uiSelectionRestored = false;   // restore the saved jog selection only once per run
 
         private const Key xplus = Key.J, xminus = Key.H, yplus = Key.K, yminus = Key.L, zplus = Key.I, zminus = Key.M, aplus = Key.U, aminus = Key.N;
 
@@ -81,7 +82,25 @@ namespace CNC.Controls
                     if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.UI || (AppConfig.Settings.Jog.LinkStepJogToUI && JogData.StepSize != JogViewModel.JogStep.Step3))
                         (DataContext as GrblViewModel).JogStep = JogData.Distance;
                     break;
+
+                case nameof(JogViewModel.FeedRate):
+                    if (AppConfig.Settings.Jog.LinkStepJogToUI)
+                        SyncKeyboardFeedToUI();
+                    break;
             }
+        }
+
+        // "Link distance and speed to UI jogging": keyboard held-arrow jog uses the UI-selected feed too,
+        // so all keyboard jog feedrates track the on-screen selection (step distance links via JogStep above).
+        private void SyncKeyboardFeedToUI()
+        {
+            var gvm = DataContext as GrblViewModel;
+            if (gvm == null || gvm.Keyboard == null || JogData == null)
+                return;
+
+            double fr = JogData.FeedRate;
+            for (int i = 0; i < gvm.Keyboard.JogFeedrates.Length; i++)
+                gvm.Keyboard.JogFeedrates[i] = fr;
         }
 
         private void Model_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -103,10 +122,17 @@ namespace CNC.Controls
 
                 JogData.SetMetric(mode == "G21");
 
+                // Restore last session's distance/speed selection (once per run), then start persisting changes.
+                if (!_uiSelectionRestored)
+                {
+                    JogData.RestoreUiSelection();
+                    _uiSelectionRestored = true;
+                }
+
                 // If the user placed the "UI Jogging" slider panel (main page or flyout), it now
                 // provides the distance/feed selection - hide the in-panel radio selectors.
                 if (MainPanelRegistry.LayoutEnabled &&
-                     (AppConfig.Settings.Base.MainPanels.Contains("UIJogging") || AppConfig.Settings.Base.FlyoutItems.Contains("UIJogging")))
+                     (AppConfig.Settings.Base.MainPanels.Contains("UIJogging") || AppConfig.Settings.Base.LeftPanels.Contains("UIJogging") || AppConfig.Settings.Base.FlyoutItems.Contains("UIJogging")))
                 {
                     selectorPanel.Visibility = Visibility.Collapsed;
                     arrowPanel.Margin = new Thickness(5, 10, 5, 0);
@@ -126,6 +152,9 @@ namespace CNC.Controls
                     var gvm = DataContext as GrblViewModel;
                     gvm.JogDistanceProvider = () => JogData.Distance;
                     gvm.JogFeedProvider = () => JogData.FeedRate;
+
+                    if (AppConfig.Settings.Jog.LinkStepJogToUI)
+                        SyncKeyboardFeedToUI();   // initial sync; kept current by JogData_PropertyChanged
 
                     keyboardMappingsOk = true;
 
@@ -645,6 +674,40 @@ namespace CNC.Controls
         private bool _metric = true;
         private double[] _distance = new double[5];
         private int[] _feedRate = new int[4];
+        private bool _persistSelection = false;   // set after the initial restore so we don't save defaults
+
+        // Restore the distance/speed selection saved at the end of the previous session (if the option is on),
+        // then start persisting subsequent changes. Called once from JogControl_Loaded after SetMetric.
+        public void RestoreUiSelection()
+        {
+            if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.KeepUiJogSelection)
+            {
+                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogStep));
+                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogFeed));
+                StepSize = Properties.Settings.Default.UiJogContinuous ? JogStep.Continuous : _lastStep;
+            }
+            _persistSelection = true;
+
+            // Enabling the option in Settings:App after a selection was already made should capture the current
+            // selection right away - otherwise nothing is saved until the next change (too late on restart).
+            if (AppConfig.Settings.Base != null)
+                AppConfig.Settings.Base.Jog.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(JogConfig.KeepUiJogSelection) && AppConfig.Settings.Base.Jog.KeepUiJogSelection)
+                        PersistSelection();
+                };
+        }
+
+        // Persist the current selection immediately (user settings store - isolated from the Base config file).
+        private void PersistSelection()
+        {
+            if (!_persistSelection || AppConfig.Settings.Base == null || !AppConfig.Settings.Base.Jog.KeepUiJogSelection)
+                return;
+            Properties.Settings.Default.UiJogStep = DistanceIndex;
+            Properties.Settings.Default.UiJogContinuous = Continuous;
+            Properties.Settings.Default.UiJogFeed = (int)_jogFeed;
+            Properties.Settings.Default.Save();
+        }
 
         public void SetMetric(bool on)
         {
@@ -665,9 +728,9 @@ namespace CNC.Controls
             OnPropertyChanged(nameof(SpeedHeader));
         }
 
-        public JogStep StepSize { get { return _jogStep; } set { _jogStep = value; OnPropertyChanged(); OnPropertyChanged(nameof(Distance)); OnPropertyChanged(nameof(DistanceIndex)); OnPropertyChanged(nameof(Continuous)); OnPropertyChanged(nameof(SelectedDistance)); OnPropertyChanged(nameof(SelectedDistanceText)); } }
+        public JogStep StepSize { get { return _jogStep; } set { _jogStep = value; OnPropertyChanged(); OnPropertyChanged(nameof(Distance)); OnPropertyChanged(nameof(DistanceIndex)); OnPropertyChanged(nameof(Continuous)); OnPropertyChanged(nameof(SelectedDistance)); OnPropertyChanged(nameof(SelectedDistanceText)); PersistSelection(); } }
         public double Distance { get { return _distance[(int)_jogStep]; } }
-        public JogFeed Feed { get { return _jogFeed; } set { _jogFeed = value; OnPropertyChanged(); OnPropertyChanged(nameof(FeedRate)); OnPropertyChanged(nameof(FeedIndex)); OnPropertyChanged(nameof(SelectedFeedrate)); OnPropertyChanged(nameof(SelectedFeedrateText)); } }
+        public JogFeed Feed { get { return _jogFeed; } set { _jogFeed = value; OnPropertyChanged(); OnPropertyChanged(nameof(FeedRate)); OnPropertyChanged(nameof(FeedIndex)); OnPropertyChanged(nameof(SelectedFeedrate)); OnPropertyChanged(nameof(SelectedFeedrateText)); PersistSelection(); } }
         public double FeedRate { get { return _feedRate[(int)_jogFeed]; } }
 
         public int Feedrate0 { get { return _feedRate[0]; } }
@@ -763,6 +826,10 @@ namespace CNC.Controls
         }
 
         public string SelectedFeedrateText { get { return SelectedFeedrate.ToString("0.###"); } }
+
+        // The two selectable speeds, for the side-panel grid (the flyout uses the slider + SelectedFeedrateText).
+        public string SlowText { get { return AppConfig.Settings.Jog.SlowFeedrate.ToString("0.###"); } }
+        public string FastText { get { return AppConfig.Settings.Jog.FastFeedrate.ToString("0.###"); } }
 
         public string SpeedHeader
         {

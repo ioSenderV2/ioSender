@@ -12,7 +12,25 @@
             <ColumnDefinition Width="40"/>
             <ColumnDefinition Width="7*"/>
         </Grid.ColumnDefinitions>
-        <ToggleSwitch:HorizontalToggleSwitch x:Name="tsw" IsChecked="{Binding Path=IsChecked, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,3,0,0" Height="20" ThumbSize="20" Width="40" Tag="Flood" CheckedContent="" UncheckedContent="" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        <Label x:Uid="lbl_ToggleSwitch" Grid.Column="1" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Height="26"/>
+        <!-- Self-contained red/green pill toggle (no third-party template dependency, renders in any theme). -->
+        <ToggleButton x:Name="tsw" Width="40" Height="20" Margin="0,2,0,2" Focusable="False"
+                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                      IsChecked="{Binding Path=IsChecked, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}">
+            <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="track" CornerRadius="10" BorderThickness="1" BorderBrush="#FF707070" Background="#FFC0392B">
+                        <Ellipse x:Name="thumb" Width="16" Height="16" Fill="White" Stroke="#FF707070" StrokeThickness="0.5" HorizontalAlignment="Left" Margin="2,0,0,0"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="track" Property="Background" Value="#FF27AE60"/>
+                            <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="thumb" Property="Margin" Value="0,0,2,0"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </ToggleButton.Template>
+        </ToggleButton>
+        <Label x:Uid="lbl_ToggleSwitch" Grid.Column="1" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" VerticalAlignment="Center" Padding="5,0,5,1"/>
     </Grid>
 </UserControl>
