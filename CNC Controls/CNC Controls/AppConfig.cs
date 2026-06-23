@@ -697,6 +697,13 @@ namespace CNC.Controls
 
                 CancellationToken cancellationToken = new CancellationToken();
 
+                // Start MPG detection from a clean slate: drop anything already buffered on the freshly-opened
+                // stream (a burst delivered on a telnet reconnect, or an auto-report backlog from the controller).
+                // ioSender never enables auto-reporting itself, so any such traffic would otherwise be misread as
+                // a pendant polling Grbl -> a false "MPG mode active" prompt on reconnect. Purging also lets the
+                // window-2 full-report request below be answered without the backlog racing ahead of it.
+                Comms.com.PurgeQueue();
+
                 // Wait 400ms to see if a MPG is polling Grbl...
 
                 new Thread(() =>
