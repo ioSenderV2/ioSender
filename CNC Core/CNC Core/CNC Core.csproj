@@ -39,6 +39,12 @@
   <ItemGroup>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="RP.Math">
+      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.dll</HintPath>
+    </Reference>
+    <Reference Include="RP.Math.Vector3">
+      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.Vector3.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
