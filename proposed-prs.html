@@ -43,7 +43,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 26 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PR 26 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 26 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
 
 <div class="toc">
 <table>
@@ -73,7 +73,8 @@
 <tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-10</span></td></tr>
 <tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+805</span> <span class="del">-21</span></td></tr>
 <tr><td class="n">26</td><td><a href="#pr26">Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</a></td><td class="mono">pr/editable-predefined-offsets</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+21</span> <span class="del">-2</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (26 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">193</span> <span class="del">0</span> <span class="add">+63</span><br><span class="k">Lines:</span> <span class="add">+18917</span> <span class="del">-1526</span></td></tr>
+<tr><td class="n">27</td><td><a href="#pr27">Dialogs &mdash; center owner-less modal dialogs</a></td><td class="mono">pr/dialog-centering</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-2</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (27 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">197</span> <span class="del">0</span> <span class="add">+63</span><br><span class="k">Lines:</span> <span class="add">+18921</span> <span class="del">-1528</span></td></tr>
 </table>
 </div>
 
@@ -934,6 +935,30 @@
   <li><strong>Everything else unchanged:</strong> non-predefined work offsets keep their existing behaviour.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). One-file change to <code>OffsetView</code>.</p>
+</div>
+</div>
+
+<!-- ===== PR 27 ===== -->
+<div class="pr">
+<h2 id="pr27"><span class="badge">PR 27</span>Dialogs &mdash; center owner-less modal dialogs</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/dialog-centering</code></div>
+  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/dialog-centering">master&hellip;pr/dialog-centering</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MPGPending.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ProbeVerify.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ProbingViewModel.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Two modal dialogs &mdash; <strong>MPGPending</strong> (the &ldquo;MPG mode active&rdquo; prompt shown during the connect handshake) and <strong>ProbeVerify</strong> (probe-connection check) &mdash; set neither <code>Owner</code> nor <code>WindowStartupLocation</code>, so they opened as independent OS-placed top-level windows with their own taskbar button instead of centering over ioSender.</p>
+<ul>
+  <li><strong>Owner + CenterOwner:</strong> each now sets <code>Owner</code> to the main window at the call site and <code>WindowStartupLocation=CenterOwner</code> + <code>ShowInTaskbar=False</code> in XAML, so they center over the client area and stay attached to the app &mdash; matching every other dialog in the sender.</li>
+</ul>
+<p class="foot">Builds clean off <code>master</code>. The other modal dialogs already set an owner; the owned-but-not-centered ones (g-code transform / importer dialogs) were left as-is for now.</p>
 </div>
 </div>
 
