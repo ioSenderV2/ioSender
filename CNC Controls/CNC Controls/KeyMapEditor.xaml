@@ -157,7 +157,7 @@
             <TabItem Header="Controller">
                 <Grid Margin="0,6,0,0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -166,7 +166,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="2,2,2,2">
@@ -178,9 +178,8 @@
 
                     <DataGrid Grid.Row="2" x:Name="gridController" AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                              SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
-                              RowHeight="26" ColumnHeaderHeight="26" Height="184"
-                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                              SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0" MinHeight="120"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" ScrollViewer.CanContentScroll="True">
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Setter Property="ToolTip" Value="{Binding Description}"/>
