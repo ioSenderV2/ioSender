@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System.ComponentModel;
 using System.Windows.Controls;
 using CNC.Core;
 
@@ -47,15 +48,51 @@ namespace CNC.Controls
     /// </summary>
     public partial class LimitsControl : UserControl
     {
+        private ProgramLimits _hooked;
+
         public LimitsControl()
         {
             InitializeComponent();
             Loaded += (s, e) => Refresh();
-            DataContextChanged += (s, e) => Refresh();
+            DataContextChanged += (s, e) => { HookLimits(); Refresh(); };
         }
 
-        // Shows the loaded program's bounding box ("Program limits"), or the machine soft-limit envelope
-        // from $13x/$23 ("Machine limits") when no program is loaded.
+        // Re-evaluate whenever the program bounding box changes, so the title flips to "Program limits"
+        // the moment the loaded program has motion - and back to "Machine limits" when it is cleared.
+        private void HookLimits()
+        {
+            var model = DataContext as GrblViewModel;
+            if (model == null || ReferenceEquals(model.ProgramLimits, _hooked))
+                return;
+            if (_hooked != null)
+                _hooked.PropertyChanged -= Limits_PropertyChanged;
+            _hooked = model.ProgramLimits;
+            _hooked.PropertyChanged += Limits_PropertyChanged;
+        }
+
+        private void Limits_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            Refresh();
+        }
+
+        // A loaded program "has moves" only when its bounding box has a real extent on some axis. A program
+        // with no motion finalizes to an all-zero box (every axis Min==Max==0) and an unloaded one is all-NaN.
+        private static bool ProgramHasMoves(GrblViewModel model)
+        {
+            if (!GCode.File.IsLoaded)
+                return false;
+            var pl = model.ProgramLimits;
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+            {
+                double min = pl.MinValues[i], max = pl.MaxValues[i];
+                if (!double.IsNaN(min) && !double.IsNaN(max) && max != min)
+                    return true;
+            }
+            return false;
+        }
+
+        // Shows the loaded program's bounding box ("Program limits") once it has moves; otherwise the machine
+        // soft-limit envelope from $13x/$23 ("Machine limits") - i.e. no program loaded, or one with no motion.
         public void Refresh()
         {
             var model = DataContext as GrblViewModel;
@@ -64,7 +101,7 @@ namespace CNC.Controls
 
             var ctrls = new[] { axisX, axisY, axisZ, axisA, axisB, axisC };
 
-            if (GCode.File.IsLoaded)
+            if (ProgramHasMoves(model))
             {
                 grpLimits.Header = "Program limits";
                 var pl = model.ProgramLimits;
