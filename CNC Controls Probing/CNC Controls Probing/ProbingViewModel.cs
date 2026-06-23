@@ -156,7 +156,7 @@ namespace CNC.Controls.Probing
 
             if (!probeOk)
             {
-                new ProbeVerify(this).ShowDialog();
+                new ProbeVerify(this) { Owner = System.Windows.Application.Current.MainWindow }.ShowDialog();
                 if (!ProbeVerified)
                     ProbeVerified = MessageBox.Show(LibStrings.FindResource("NoVerifyContinue"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 

@@ -632,7 +632,7 @@ namespace CNC.Controls
                 // ...if so show dialog for wait for it to stop polling and relinquish control.
                 if (MPGactive == true)
                 {
-                    MPGPending await = new MPGPending(model);
+                    MPGPending await = new MPGPending(model) { Owner = Application.Current.MainWindow };
                     await.ShowDialog();
                     if (await.Cancelled)
                     {
