@@ -143,8 +143,12 @@ namespace CNC.Controls
                 // regardless of which jog control happened to trip the one-shot keyboardMappingsOk guard first -
                 // otherwise ControllerMapper falls back to the keyboard step distance and slow feed.
                 var gvm = DataContext as GrblViewModel;
-                gvm.JogDistanceProvider = () => JogData.Distance;
-                gvm.JogFeedProvider = () => JogData.FeedRate;
+                // Use the retained discrete selection (SelectedDistance/SelectedFeedrate via DistanceIndex/FeedIndex)
+                // - the same value the 2x4 grid highlights - NOT Distance/FeedRate, whose Distance is -1 while
+                // StepSize is Continuous (keyboard jogging flips it there), which made the controller fall back to
+                // the keyboard step size instead of the chosen UI jog distance.
+                gvm.JogDistanceProvider = () => JogData.SelectedDistance;
+                gvm.JogFeedProvider = () => JogData.SelectedFeedrate;
                 gvm.CycleJogFeed = dir => JogData.FeedIndex = JogData.FeedIndex + dir;   // controller bumpers
 
                 if (!keyboardMappingsOk)
