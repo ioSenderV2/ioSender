@@ -353,6 +353,82 @@ namespace GCode_Sender
             UpdateSimulatorTint();
         }
 
+        // "Prefer network connection": after a serial/USB connection whose $I reported an IP, probe <ip>:23 and,
+        // if it answers, switch the live connection from serial to the network. Called from JobView once the
+        // controller info is loaded. No-op unless the option is set, the current link is serial, and an IP is
+        // known. The probe runs off the UI thread; the actual switch is marshalled back and deferred so it runs
+        // after the serial handshake has fully settled. Guarded against re-entry while a migration is in flight.
+        private bool migratingToNetwork = false;
+        public void TryMigrateToNetwork()
+        {
+            var cfg = AppConfig.Settings;
+            if (migratingToNetwork || cfg.Base == null || !cfg.Base.PreferNetwork)
+                return;
+            if (Comms.com == null || !Comms.com.IsOpen || !cfg.Base.PortParams.ToLower().StartsWith("com"))
+                return;   // only migrate away from a serial/USB link
+            string ip = GrblInfo.IpAddress;
+            if (string.IsNullOrWhiteSpace(ip))
+                return;
+
+            migratingToNetwork = true;
+            string serialTarget = cfg.Base.PortParams;
+            var model = (GrblViewModel)DataContext;
+
+            new Thread(() =>
+            {
+                bool reachable = ProbeTcp(ip, 23, 1500);
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    try
+                    {
+                        // The link may have dropped or already moved off serial while we were probing.
+                        if (reachable && Comms.com != null && Comms.com.IsOpen && cfg.Base.PortParams.ToLower().StartsWith("com"))
+                        {
+                            Disconnect();
+                            bool migrated = cfg.ConnectTo(Title, model, App.Current.Dispatcher, ip + ":23") == 0
+                                            && Comms.com != null && Comms.com.IsOpen;
+                            if (!migrated)   // network connect failed despite the probe - fall back to the serial port
+                                cfg.ConnectTo(Title, model, App.Current.Dispatcher, serialTarget);
+                            if (Comms.com != null && Comms.com.IsOpen)
+                            {
+                                Comms.com.PurgeQueue();
+                                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
+                                    grbl.Activate(true, ViewType.Startup);
+                            }
+                            model.Message = migrated
+                                ? "Connection migrated to network (" + ip + ":23)"
+                                : "Network migration failed; staying on " + serialTarget;
+                            UpdateSimulatorTint();
+                        }
+                    }
+                    finally
+                    {
+                        migratingToNetwork = false;
+                    }
+                }), DispatcherPriority.ApplicationIdle);
+            }) { IsBackground = true }.Start();
+        }
+
+        // Quick TCP reachability check: can we open a connection to host:port within timeoutMs?
+        private static bool ProbeTcp(string host, int port, int timeoutMs)
+        {
+            try
+            {
+                using (var client = new System.Net.Sockets.TcpClient())
+                {
+                    var ar = client.BeginConnect(host, port, null, null);
+                    if (!ar.AsyncWaitHandle.WaitOne(timeoutMs))
+                        return false;
+                    client.EndConnect(ar);
+                    return client.Connected;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // Tint the whole window pale yellow while connected to the simulator (Base.StartSimulator is set to
         // the chosen target's sim-ness on each connect) so a virtual machine is unmistakable at a glance -
         // the gray the app normally shows IS this window background, seen through the transparent content.

@@ -242,6 +242,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
+        private bool _preferNetwork = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -264,6 +265,9 @@ namespace CNC.Controls
         // Empty until first set - seeded from the controller's $I-reported IP on a serial connection, then
         // updated to the IP used on each successful network connection. Empty falls back to the mDNS name.
         public string NetworkHost { get; set; } = string.Empty;
+        // When set, after a serial/USB connection whose $I reports an IP, ioSender probes <ip>:23 and, if it
+        // answers, automatically switches the connection to the network (status line: "Connection migrated...").
+        public bool PreferNetwork { get { return _preferNetwork; } set { if (_preferNetwork != value) { _preferNetwork = value; OnPropertyChanged(); } } }
         public int ResetDelay { get; set; } = 2000;
         // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch
         // it first (a 127.0.0.1:port target is otherwise indistinguishable from a real network controller).
@@ -677,6 +681,18 @@ namespace CNC.Controls
 
             PersistSimulatorChoice(portsel);
             setPort(port, string.Empty);
+            OpenStreamFor(model, dispatcher);
+            Save(CNC.Core.Resources.IniFile);
+
+            return InitConnectedController(appname, model, 0);
+        }
+
+        // Connect to a specific target without showing the dialog. Used by the "prefer network" auto-migrate
+        // (serial -> network) flow; a migrated network target is always a real controller, never the simulator.
+        public int ConnectTo(string appname, GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher, string target)
+        {
+            Base.StartSimulator = false;
+            setPort(target, string.Empty);
             OpenStreamFor(model, dispatcher);
             Save(CNC.Core.Resources.IniFile);
 
