@@ -7,7 +7,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         x:Uid="dlg_connection"
-        Title="Sender connection" SizeToContent="WidthAndHeight" MinHeight="240" MinWidth="450" Icon="App.ico" ResizeMode="NoResize">
+        Title="Sender connection" SizeToContent="WidthAndHeight" MinHeight="240" MinWidth="450" Icon="App.ico" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <Style x:Key="PortErrorStyle" TargetType="local:NumericTextBox">
             <Style.Triggers>
