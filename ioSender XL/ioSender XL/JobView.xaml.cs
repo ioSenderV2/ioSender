@@ -500,8 +500,10 @@ namespace GCode_Sender
             }
 
             // GrblInfo (incl. the $I-reported IP) is loaded now - remember an IP to default the Connect
-            // dialog's network tab to next launch.
+            // dialog's network tab to next launch, and (if "Prefer network" is set) migrate a serial link
+            // to the network when the controller's telnet port answers.
             AppConfig.Settings.CaptureConnectedIp();
+            MainWindow.ui.TryMigrateToNetwork();
 
             GrblCommand.ToolChange = GrblInfo.ManualToolChange ? "M61Q{0}" : (GrblInfo.HasATC ? "T{0}M6" : "T{0}");
 
