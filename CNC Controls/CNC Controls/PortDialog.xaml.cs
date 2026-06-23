@@ -86,6 +86,12 @@ namespace CNC.Controls
 
         public string ShowDialog(string orgport)
         {
+            // Center the dialog over the main window (and keep it off the taskbar) instead of floating it as an
+            // independent top-level window. Owner must be set before ShowDialog for WindowStartupLocation=CenterOwner.
+            var owner = Application.Current?.MainWindow;
+            if (owner != null && owner != this && owner.IsLoaded)
+                Owner = owner;
+
             // Default the network tab's host to the last successfully-connected IP (falls back to the mDNS
             // name set in PortProperties). If the saved target itself is a network one, parsenet below
             // overrides this with that exact host.
