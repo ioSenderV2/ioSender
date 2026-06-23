@@ -271,6 +271,10 @@ namespace CNC.Controls
         // falls back to a single move otherwise.
         public bool SafeGotoZ { get { return _safeGotoZ; } set { _safeGotoZ = value; OnPropertyChanged(); } }
         public string PortParams { get; set; } = "COMn:115200,N,8,1";
+        // Default host for the Connect dialog's network tab: the most recent IP successfully connected to.
+        // Empty until first set - seeded from the controller's $I-reported IP on a serial connection, then
+        // updated to the IP used on each successful network connection. Empty falls back to the mDNS name.
+        public string NetworkHost { get; set; } = string.Empty;
         public int ResetDelay { get; set; } = 2000;
         // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch
         // it first (a 127.0.0.1:port target is otherwise indistinguishable from a real network controller).
@@ -784,6 +788,32 @@ namespace CNC.Controls
         // network target. ioSender no longer launches or manages the simulator process, so this is a no-op.
         private void EnsureSimulatorRunning()
         {
+        }
+
+        // Remember an IP address to default the Connect dialog's network tab to next time. Call once a
+        // connection is fully up (GrblInfo loaded, so $I/GrblInfo.IpAddress is available). On a network
+        // connection store the IP just used (most recent wins); on a serial connection seed it from the
+        // controller's reported IP only while still unset. The bundled simulator (127.0.0.1) is excluded.
+        public void CaptureConnectedIp()
+        {
+            string target = Base.PortParams ?? string.Empty, lower = target.ToLower();
+            bool isNetwork = !Base.StartSimulator && !lower.StartsWith("com") && target.Contains(":");
+
+            string ip = null;
+            if (isNetwork)
+            {
+                string host = lower.StartsWith("ws://") ? target.Substring(5) : target;   // [ws://]host:port
+                int c = host.IndexOf(':');
+                ip = c > 0 ? host.Substring(0, c) : host;
+            }
+            else if (string.IsNullOrEmpty(Base.NetworkHost) && !string.IsNullOrWhiteSpace(GrblInfo.IpAddress))
+                ip = GrblInfo.IpAddress;   // serial: seed from the controller's $I-reported IP
+
+            if (!string.IsNullOrWhiteSpace(ip) && ip != Base.NetworkHost)
+            {
+                Base.NetworkHost = ip;
+                Save(CNC.Core.Resources.IniFile);
+            }
         }
 
         // Persist whether the chosen connection is the bundled simulator (and how to launch it) so a

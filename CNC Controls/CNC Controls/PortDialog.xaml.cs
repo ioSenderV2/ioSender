@@ -86,6 +86,12 @@ namespace CNC.Controls
 
         public string ShowDialog(string orgport)
         {
+            // Default the network tab's host to the last successfully-connected IP (falls back to the mDNS
+            // name set in PortProperties). If the saved target itself is a network one, parsenet below
+            // overrides this with that exact host.
+            if (!string.IsNullOrWhiteSpace(AppConfig.Settings.Base?.NetworkHost))
+                prop.IpAddress = AppConfig.Settings.Base.NetworkHost;
+
             if (!string.IsNullOrEmpty(orgport)) {
 
                 if ((prop.IsWebSocket = orgport.ToLower().StartsWith("ws://")))
