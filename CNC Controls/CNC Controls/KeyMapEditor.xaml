@@ -224,21 +224,21 @@
                       </Grid>
                     </GroupBox>
 
-                    <GroupBox Grid.Row="1" Header="Analog stick jog (left stick X/Y, triggers Z)">
-                      <WrapPanel Margin="4,2,4,2">
-                        <CheckBox x:Name="chkAnalogEnabled" Content="Enable" VerticalAlignment="Center" Margin="0,0,14,4"
+                    <GroupBox Grid.Row="1" Header="Analog stick jog (left stick X/Y, triggers Z)" Margin="0,2,0,0">
+                      <WrapPanel Margin="6,6,6,6">
+                        <CheckBox x:Name="chkAnalogEnabled" Content="Enable" VerticalAlignment="Center" Margin="0,0,16,6"
                                   ToolTip="Enable jogging with the left stick (X/Y) and triggers (Z)."/>
-                        <TextBlock Text="Deadzone" VerticalAlignment="Center" Margin="0,0,3,4"/>
-                        <TextBox x:Name="txtDeadzone" Width="34" VerticalAlignment="Center" Margin="0,0,1,4"
+                        <TextBlock Text="Deadzone" VerticalAlignment="Center" Margin="0,0,4,6"/>
+                        <TextBox x:Name="txtDeadzone" MinWidth="42" VerticalAlignment="Center" VerticalContentAlignment="Center" Padding="2,1" Margin="0,0,2,6"
                                  ToolTip="Left-stick deadzone, percent of full deflection. Raise if the machine drifts at rest."/>
-                        <TextBlock Text="%" VerticalAlignment="Center" Margin="0,0,14,4"/>
-                        <TextBlock Text="Max feed ×" VerticalAlignment="Center" Margin="0,0,3,4"/>
-                        <TextBox x:Name="txtFeedScale" Width="40" VerticalAlignment="Center" Margin="0,0,14,4"
+                        <TextBlock Text="%" VerticalAlignment="Center" Margin="0,0,16,6"/>
+                        <TextBlock Text="Max feed ×" VerticalAlignment="Center" Margin="0,0,4,6"/>
+                        <TextBox x:Name="txtFeedScale" MinWidth="46" VerticalAlignment="Center" VerticalContentAlignment="Center" Padding="2,1" Margin="0,0,16,6"
                                  ToolTip="Full-stick feed as a multiple of the Jog panel feed (clamped to the machine's max rate)."/>
-                        <TextBlock Text="Invert:" VerticalAlignment="Center" Margin="0,0,4,4"/>
-                        <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,6,4"/>
-                        <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,6,4"/>
-                        <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,4"/>
+                        <TextBlock Text="Invert:" VerticalAlignment="Center" Margin="0,0,6,6"/>
+                        <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,6"/>
                       </WrapPanel>
                     </GroupBox>
                 </Grid>
