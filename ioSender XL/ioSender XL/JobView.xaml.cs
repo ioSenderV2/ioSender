@@ -125,9 +125,11 @@ namespace GCode_Sender
                 break;
 
                 case nameof(GrblViewModel.GrblReset):
+                    // Controller is null mid-reconnect (PrepareForReconnect cleared it, Activate not yet re-run);
+                    // a reset notification arriving in that window must be ignored - Activate re-runs the handshake.
                     if ((sender as GrblViewModel).IsReady)
                     {
-                        if (!Controller.ResetPending && (sender as GrblViewModel).GrblReset)
+                        if (Controller != null && !Controller.ResetPending && (sender as GrblViewModel).GrblReset)
                         {
                             initOK = null;
                             Dispatcher.BeginInvoke(new System.Action(() => Activate(true, ViewType.GRBL)), DispatcherPriority.ApplicationIdle);
@@ -136,7 +138,7 @@ namespace GCode_Sender
                     break;
 
                 case nameof(GrblViewModel.ParserState):
-                    if (!Controller.ResetPending && (sender as GrblViewModel).GrblReset)
+                    if (Controller != null && !Controller.ResetPending && (sender as GrblViewModel).GrblReset)
                     {
                         EnableUI(true);
                         (sender as GrblViewModel).GrblReset = false;
