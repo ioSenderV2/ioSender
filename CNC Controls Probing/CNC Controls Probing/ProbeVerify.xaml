@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:CNC.Controls.Probing"
         mc:Ignorable="d"
         Title="Sender" Height="100" Width="300" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Loaded="Window_Loaded" Closing="Window_Closing" Icon="Resources/App.ico">
     <Grid Background="Snow">
         <Label x:Uid="str_probeVerify" x:Name="label" Content="Assert probe to verify connection." HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" FontSize="16"/>
