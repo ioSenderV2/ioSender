@@ -401,6 +401,10 @@ namespace GCode_Sender
                 GCodeSender.EnablePolling(true);
             }
 
+            // GrblInfo (incl. the $I-reported IP) is loaded now - remember an IP to default the Connect
+            // dialog's network tab to next launch.
+            AppConfig.Settings.CaptureConnectedIp();
+
             GrblCommand.ToolChange = GrblInfo.ManualToolChange ? "M61Q{0}" : (GrblInfo.HasATC ? "T{0}M6" : "T{0}");
 
             if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.Keypad)
