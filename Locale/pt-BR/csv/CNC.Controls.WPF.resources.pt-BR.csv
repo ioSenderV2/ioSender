@@ -368,3 +368,5 @@ CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_close:System.Windows.Fr
 CNC.Controls.WPF.g.pt-BR.resources:panelflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
 CNC.Controls.WPF.g.pt-BR.resources:panelflyout.baml,btn_close:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close
 CNC.Controls.WPF.g.pt-BR.resources:numericfield.baml,mnu_reset:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset to default
+CNC.Controls.WPF.g.pt-BR.resources:joguiconfigcontrol.baml,txt_linkJog:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Link distance and speed to UI jogging
+CNC.Controls.WPF.g.pt-BR.resources:joguiconfigcontrol.baml,txt_rememberJog:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Remember distance and speed across restarts
