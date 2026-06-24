@@ -512,3 +512,17 @@ CNC.Controls.WPF.g.de-DE.resources:sdcardview.baml,mnu_loadRun:System.Windows.Co
 CNC.Controls.WPF.g.de-DE.resources:sdcardview.baml,mnu_loadRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender and start it.
 CNC.Controls.WPF.g.de-DE.resources:sdcardview.baml,mnu_copyTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Cop_y to
 CNC.Controls.WPF.g.de-DE.resources:sdcardview.baml,mnu_moveTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Move to
+CNC.Controls.WPF.g.de-DE.resources:fileactioncontrol.baml,btn_openFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open file
+CNC.Controls.WPF.g.de-DE.resources:fileactioncontrol.baml,btn_reloadFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reload file
+CNC.Controls.WPF.g.de-DE.resources:fileactioncontrol.baml,btn_editFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit file
+CNC.Controls.WPF.g.de-DE.resources:fileactioncontrol.baml,btn_closeFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close file
+CNC.Controls.WPF.g.de-DE.resources:mdicontrol.baml,cbo_mdi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enter a G-code command (MDI block) and press Enter or Send to run it on the controller. Use Up/Down to recall recent commands.
+CNC.Controls.WPF.g.de-DE.resources:keymapeditor.baml,chk_invertX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the X-axis jog direction for this analog stick.
+CNC.Controls.WPF.g.de-DE.resources:keymapeditor.baml,chk_invertY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the Y-axis jog direction for this analog stick.
+CNC.Controls.WPF.g.de-DE.resources:keymapeditor.baml,chk_invertZ:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the Z-axis jog direction for this analog stick.
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,txt_axTravel:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum travel for this axis in mm - sets the soft-limit extent (grbl $130-$132).
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,txt_axRate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum feed rate for this axis in mm/min (grbl $110-$112).
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,txt_axSteps:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Steps per millimetre for this axis (grbl $100-$102).
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,chk_axInvert:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick to reverse this axis&apos;s motion direction (grbl $3 direction-invert mask).
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,chk_axLimitNC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis&apos;s limit switches are wired normally-closed (grbl $5 invert mask).
+CNC.Controls.WPF.g.de-DE.resources:machinesetupwizard.baml,chk_axHomeMin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis homes toward its minimum end; untick to home toward the maximum end (grbl $23).
