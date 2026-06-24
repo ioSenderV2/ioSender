@@ -59,6 +59,14 @@
 <h3><span class="pill p-fw">FIRMWARE</span>stevenrwood/iMXRT1062</h3>
 <p>The Teensy&nbsp;4 (i.MXRT1062) controller driver (fork of <code>grblHAL/iMXRT1062</code>). Unlike the other two, the firmware changes live <strong>in submodule forks</strong>, not the driver repo &mdash; the driver carries the build config and the index. PRs: <code>core</code> #1&ndash;4 (combined littlefs+YModem, build-timestamp line, littlefs macro-search-path fix, ngc-flowctrl whitespace fix), <code>Plugin_SD_card</code> #1&ndash;2 (reset-during-SD-streaming, default-macro/ATC options), <code>Plugin_networking</code> #1 (hostname boot info). Build with PlatformIO (env <code>teensy41</code>). The <code>srw/local-build-config</code> branch pins all submodules to the fork branches for a turnkey build; <code>setup_forks.sh</code> wires the fork remotes.</p>
 
+<div class="note">
+  <strong>Requirements &amp; pairing.</strong> The forks are built to run together; two headline features need their counterpart present:
+  <ul>
+    <li><strong>The 3D carve view (Simulator)</strong> needs the bundled Fusion add-in <code>Fusion&nbsp;Addin/ioSenderBatchPost/</code> &mdash; it posts each CAM operation to a folder <em>and</em> writes a <code>0_ToolTable.nc</code> header carrying <code>(STOCK&nbsp;X=&hellip;)</code> + <code>(TOOL&nbsp;T=&hellip;&nbsp;D=&hellip;)</code> geometry. ioSender&rsquo;s <em>Load&nbsp;Folder</em> loads that first and forwards the comments to the simulator (the <em>send-comments</em> option forces them through), and the <code>sim-view</code> feature renders the carve from them. No add-in &rarr; no stock/tool geometry &rarr; the carve has nothing to draw. The add-in ships in the repo, so no external dependency.</li>
+    <li><strong>Running the stock upstream simulator instead of this fork?</strong> ioSender still connects and streams g-code &mdash; homing, jogging and plain programs work &mdash; but every fork-only sim feature is absent: <strong>no 3D carve view</strong> (it doesn&rsquo;t exist upstream), no modeled probe surfaces (so the ATC Start-Job probe cycle can&rsquo;t be validated), no littlefs (no file-manager / macro-upload testing), and no settings persistence or <code>$REBOOT</code>.</li>
+  </ul>
+</div>
+
 <h2>3 &middot; apply-prs &mdash; the composer</h2>
 <p><code>apply-prs</code> (in <code>ioSender/tools/</code>) builds a fresh branch from a chosen set of PRs across any fork. It resolves each PR&rsquo;s dependency closure, merges them in topological order off the fork&rsquo;s base, and builds to verify. Append-only files (e.g. the locale CSVs) merge with a union driver so they never conflict; genuine same-line overlaps are reported up front and the merge aborts cleanly for a manual resolve. Forks are declared in <code>tools/forks.json</code> (repo path, base, manifest, build command, union globs).</p>
 <pre><span class="c"># ioSender (the default fork)</span>
@@ -71,8 +79,11 @@ python tools/apply-prs.py sim-all  --fork sim 1 2 3 4 5
 python tools/apply-prs.py probe    --fork sim 2 --run   <span class="c"># compose, CMake build, launch grblHAL_sim.exe</span>
 python tools/apply-prs.py --check  --fork sim 3 5       <span class="c"># overlap report for littlefs + sim-view</span>
 
-<span class="c"># firmware fork: submodule-aware compose (planned) &mdash; today use</span>
-<span class="c">#   srw/local-build-config (turnkey) or setup_forks.sh + per-submodule branches</span></pre>
+<span class="c"># Simulator &amp; firmware interlock &mdash; for USING them, take the whole bundle:</span>
+<span class="c">#   sim:      use the integration branch  (apply-prs --fork sim is a dev/review aid)</span>
+<span class="c">#   firmware: use srw/local-build-config  (turnkey, all submodule branches pinned)</span>
+<span class="c">#   their per-PR branches exist for upstream submission, not subset builds</span></pre>
+<p>Subset composition is really an <strong>ioSender</strong> concern &mdash; its ~18 features are independent, so picking a few is meaningful. The <strong>Simulator</strong> and <strong>firmware</strong> forks interlock and are few, so for <em>using</em> them you take the whole bundle (Simulator <code>integration</code>; firmware <code>srw/local-build-config</code>). Their granular per-PR branches exist for <strong>upstream submission</strong> (a maintainer may adopt just one), and <code>apply-prs --fork sim</code> is a build/review convenience rather than a consumer menu.</p>
 <p class="foot">Each fork&rsquo;s <code>master</code> baseline differs: ioSender&rsquo;s already contains PRs&nbsp;1&ndash;8&nbsp;+&nbsp;24 (requesting one just skips it as &ldquo;already in master&rdquo;); the Simulator&rsquo;s is pristine, so all five compose. Because a composed branch starts at the base, old branches that don&rsquo;t build standalone still build here.</p>
 
 <h2>4 &middot; Effort &amp; scale</h2>
