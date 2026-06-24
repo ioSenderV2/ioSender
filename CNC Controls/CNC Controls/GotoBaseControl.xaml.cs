@@ -65,15 +65,24 @@ namespace CNC.Controls
                 return;
 
             string tag = (string)(sender as Button).Tag;
+            SafeGoto(model, tag == "G5x" ? CoordinateSystem : tag);
+        }
 
-            // Resolve the target machine position: the selected work-coordinate origin (G54-G59.3) for the
-            // "G5x" button, or the G28/G30 secondary home for those buttons.
-            CoordinateSystem cs = GrblWorkParameters.GetCoordinateSystem(tag == "G5x" ? CoordinateSystem : tag);
+        // THE single "Go To" routine - used by every go-to-offset button (this panel, the per-offset flyout)
+        // so Safe Z is applied uniformly. <code> is a work-coordinate origin (G54-G59.3, G92) or the G28/G30
+        // secondary home; its target machine position is read from the $#-populated coordinate table.
+        //
+        // Safe Z (when enabled): lift Z to machine top first, traverse X/Y (and any rotaries), then descend Z -
+        // so the move clears any fixtures or stock standing up in Z instead of cutting a diagonal through them.
+        // Requires homing (machine coordinates valid), soft limits ($20, so the moves are envelope-checked) and
+        // a known target; otherwise falls back to the original single (coordinated) move.
+        public static void SafeGoto(GrblViewModel model, string code)
+        {
+            if (model == null || string.IsNullOrEmpty(code))
+                return;
 
-            // Safe Z: lift Z to machine top first, traverse X/Y (and any rotaries), then descend Z - so the move
-            // clears any fixtures or stock standing up in Z instead of cutting a diagonal through them. Requires
-            // homing (machine coordinates valid) and soft limits ($20, so the moves are envelope-checked) and a
-            // known target; otherwise fall back to the single move.
+            CoordinateSystem cs = GrblWorkParameters.GetCoordinateSystem(code);
+
             if (AppConfig.Settings.Base.SafeGotoZ && cs != null && model.HomedState == HomedState.Homed
                  && GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1
                  && GrblInfo.AxisFlags.HasFlag(AxisFlags.Z))
@@ -89,13 +98,10 @@ namespace CNC.Controls
             }
 
             // Fallback: original single (coordinated) move.
-            if (tag == "G5x")
-            {
-                if (cs != null)
-                    model.ExecuteCommand("G53G0" + cs.ToString(GrblInfo.AxisFlags));
-            }
-            else
-                model.ExecuteCommand(tag);
+            if (code == "G28" || code == "G30")
+                model.ExecuteCommand(code);
+            else if (cs != null)
+                model.ExecuteCommand("G53G0" + cs.ToString(GrblInfo.AxisFlags));
         }
 
         private void CoordinateSystems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

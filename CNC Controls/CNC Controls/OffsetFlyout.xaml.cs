@@ -75,24 +75,8 @@ namespace CNC.Controls
         private void btnGo_Click(object sender, RoutedEventArgs e)
         {
             var grbl = DataContext as GrblViewModel;
-            if (grbl == null)
-                return;
-
-            if (code == "G28" || code == "G30")
-                grbl.ExecuteCommand(code);
-            else
-            {
-                var cs = Cs;
-                if (cs == null)
-                    return;
-
-                // Move to the stored work origin in machine coordinates - XY only, no auto-Z.
-                string axes = string.Empty;
-                if (!double.IsNaN(cs.X)) axes += "X" + cs.X.ToInvariantString("F3");
-                if (!double.IsNaN(cs.Y)) axes += "Y" + cs.Y.ToInvariantString("F3");
-                if (axes != string.Empty)
-                    grbl.ExecuteCommand("G53G0" + axes);
-            }
+            if (grbl != null)
+                GotoBaseControl.SafeGoto(grbl, code);   // the one shared Go-To routine - applies Safe Z uniformly
         }
 
         private void btnSet_Click(object sender, RoutedEventArgs e)
