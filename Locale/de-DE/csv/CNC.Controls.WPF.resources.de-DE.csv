@@ -331,4 +331,4 @@ CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:Syst
 CNC.Controls.WPF.g.de-DE.resources:portdialog.baml,tab_simulator:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Simulator
 CNC.Controls.WPF.g.de-DE.resources:portdialog.baml,lbl_simPort:System.Windows.Controls.ContentControl.Content,Label,True,True,,Port:
 CNC.Controls.WPF.g.de-DE.resources:basicconfigcontrol.baml,lbl_preferNetwork:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prefer network connection if available
-CNC.Controls.WPF.g.de-DE.resources:basicconfigcontrol.baml,lbl_preferNetwork:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,After connecting over USB/serial, if the controller reports an IP address (via $I) and its telnet port (23) responds, automatically switch the connection to the network.
+CNC.Controls.WPF.g.de-DE.resources:basicconfigcontrol.baml,lbl_preferNetwork:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After connecting over USB/serial, if the controller reports an IP address (via $I) and its telnet port (23) responds, automatically switch the connection to the network."
