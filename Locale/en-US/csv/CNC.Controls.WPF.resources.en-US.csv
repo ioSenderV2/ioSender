@@ -383,3 +383,9 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Win
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Discard edits and re-read the current settings from the controller.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the changed settings to the controller.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axTravel:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum travel for this axis in mm - sets the soft-limit extent (grbl $130-$132).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axRate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum feed rate for this axis in mm/min (grbl $110-$112).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axSteps:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Steps per millimetre for this axis (grbl $100-$102).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axInvert:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick to reverse this axis&apos;s motion direction (grbl $3 direction-invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axLimitNC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis&apos;s limit switches are wired normally-closed (grbl $5 invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axHomeMin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis homes toward its minimum end; untick to home toward the maximum end (grbl $23).
