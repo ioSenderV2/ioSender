@@ -11,17 +11,17 @@
              Loaded="UserControl_Loaded">
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="Auto" MinWidth="380"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <!-- Left: inputs -->
-        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="5,5,0,0" HorizontalAlignment="Left" Width="370">
+        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="5,5,0,0" HorizontalAlignment="Left" MinWidth="370">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120"/>
                 <ComboBox x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
                           ItemsSource="{Binding Path=CalAxes, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                           SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                          HorizontalAlignment="Left" VerticalAlignment="Center" Width="60" MinHeight="22" Margin="2"/>
+                          HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="2"/>
             </StackPanel>
             <local:NumericField x:Uid="fld_sccurrent" Label="Current steps/mm:" ColonAt="120" IsReadOnly="True" Format="###0.000###"
                 Value="{Binding CurrentResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="steps/mm"/>
@@ -50,13 +50,13 @@
             <local:NumericField x:Uid="fld_sctool" Label="Tool (0 = none):" ColonAt="120" Format="##0"
                 Value="{Binding ToolNumber, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
-                <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" Width="80" Height="24" Margin="3,0" Click="Button_Click"/>
-                <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" Width="100" Height="24" Margin="3,0"
+                <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
                         IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
             </StackPanel>
             <local:NumericField x:Uid="fld_scnewres" Label="New steps/mm:" ColonAt="120" Format="###0.000###"
                 Value="{Binding NewResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="steps/mm"/>
-            <TextBlock x:Name="txtWarnings" Foreground="Red" Margin="5,8" HorizontalAlignment="Left" Width="350" TextWrapping="Wrap"/>
+            <TextBlock x:Name="txtWarnings" Foreground="Red" Margin="5,8" HorizontalAlignment="Left" MinWidth="350" TextWrapping="Wrap"/>
         </StackPanel>
         <!-- Right: results + instructions -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
@@ -65,7 +65,7 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
+            <TextBlock x:Uid="txt_scresults" Grid.Row="0" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
             <DataGrid x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                       ItemsSource="{Binding Results, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
@@ -79,14 +79,14 @@
                     </Style>
                 </DataGrid.RowStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Pair" Binding="{Binding Label}" IsReadOnly="True" Width="70"/>
-                    <DataGridTextColumn Header="Candidate steps/mm" Binding="{Binding Steps, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
-                    <DataGridTextColumn Header="Commanded (mm)" Binding="{Binding Commanded, StringFormat=0.000}" IsReadOnly="True" Width="*"/>
-                    <DataGridTextColumn Header="Measured (mm)" Binding="{Binding Measured, StringFormat=0.000, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                    <DataGridTextColumn Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scPair" Header="Pair" Binding="{Binding Label}" IsReadOnly="True" MinWidth="70"/>
+                    <DataGridTextColumn x:Uid="col_scCandidate" Header="Candidate steps/mm" Binding="{Binding Steps, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scCommanded" Header="Commanded (mm)" Binding="{Binding Commanded, StringFormat=0.000}" IsReadOnly="True" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scMeasured" Header="Measured (mm)" Binding="{Binding Measured, StringFormat=0.000, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBox x:Name="txtInstructions" Grid.Row="2" Background="#FFF8F8F8" IsReadOnly="True" Margin="0,6,0,0" Height="150" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            <TextBox x:Name="txtInstructions" Grid.Row="2" Background="#FFF8F8F8" IsReadOnly="True" Margin="0,6,0,0" MinHeight="150" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
         </Grid>
     </Grid>
 </UserControl>

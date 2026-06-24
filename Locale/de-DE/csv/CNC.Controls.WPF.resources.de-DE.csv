@@ -328,3 +328,26 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,X und Y Programmgrenzen abfahren
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Sicherstellen, dass die Werkzeugspitze frei von Hindernissen ist!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,lbl_scaxis:System.Windows.Controls.ContentControl.Content,Label,True,True,,Axis:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_sccurrent:CNC.Controls.NumericField.Label,None,True,True,,Current steps/mm:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scspan:CNC.Controls.NumericField.Label,None,True,True,,Span:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scdelta:CNC.Controls.NumericField.Label,None,True,True,,Delta steps/mm:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scpoints:CNC.Controls.NumericField.Label,None,True,True,,Test points:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scdepth:CNC.Controls.NumericField.Label,None,True,True,,Scratch depth:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scplunge:CNC.Controls.NumericField.Label,None,True,True,,Plunge feed:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scfeed:CNC.Controls.NumericField.Label,None,True,True,,Scratch feed:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scsafez:CNC.Controls.NumericField.Label,None,True,True,,Safe Z:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_sclinelen:CNC.Controls.NumericField.Label,None,True,True,,Line length:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scrowspacing:CNC.Controls.NumericField.Label,None,True,True,,Row spacing:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scmargin:CNC.Controls.NumericField.Label,None,True,True,,Edge margin:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scrpm:CNC.Controls.NumericField.Label,None,True,True,,Spindle RPM:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_sctool:CNC.Controls.NumericField.Label,None,True,True,,Tool (0 = none):
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,btn_scgen:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,btn_scsave:System.Windows.Controls.ContentControl.Content,Button,True,True,,Save steps/mm
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,fld_scnewres:CNC.Controls.NumericField.Label,None,True,True,,New steps/mm:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,txt_scresults:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Measured results - enter the measured spacing for each pair after running:
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,col_scPair:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Pair
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,col_scCandidate:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Candidate steps/mm
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,col_scCommanded:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Commanded (mm)
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,col_scMeasured:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Measured (mm)
+CNC.Controls.WPF.g.de-DE.resources:steppercalibrationscratchwizard.baml,col_scImplied:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Implied steps/mm
