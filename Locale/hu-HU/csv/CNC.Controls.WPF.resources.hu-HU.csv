@@ -388,3 +388,31 @@ CNC.Controls.WPF.g.hu-HU.resources:machinesetupwizard.baml,btn_reload:System.Win
 CNC.Controls.WPF.g.hu-HU.resources:machinesetupwizard.baml,btn_reload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Discard edits and re-read the current settings from the controller.
 CNC.Controls.WPF.g.hu-HU.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
 CNC.Controls.WPF.g.hu-HU.resources:machinesetupwizard.baml,btn_apply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the changed settings to the controller.
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,dlg_editMainPage:System.Windows.Window.Title,Title,True,True,,Edit Main Page
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,tab_panels:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Panels
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_available:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Available (unassigned)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_rightOf3d:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Right of 3D View (top → bottom, max 6)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_toMain:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add to right of 3D view
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_fromMain:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Remove
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_mainUp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move up
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_mainDown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move down
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_leftOf3d:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Left of 3D View (top → bottom)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_toLeft:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add to left of 3D view
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_fromLeft:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Remove
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_leftUp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move up
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_leftDown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move down
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_flyouts:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Flyouts (sidebar)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_toFlyout:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add as flyout
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_fromFlyout:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Remove flyout
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_flyUp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move up
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_flyDown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move down
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,tab_tabs:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Tabs
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_hiddenTabs:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Hidden tabs
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_shownTabs:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Shown tabs (top → bottom = left → right)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_tabShow:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show this tab
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_tabHide:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Hide this tab
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_tabUp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move left (earlier)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_tabDown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move right (later)
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,txt_restartNote:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Changes take effect after restart.
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.hu-HU.resources:mainpageeditor.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel

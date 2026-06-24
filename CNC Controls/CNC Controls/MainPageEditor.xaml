@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        Title="Edit Main Page" Height="560" Width="580" MinHeight="440" MinWidth="500"
+        x:Uid="dlg_editMainPage" Title="Edit Main Page" Height="560" Width="580" MinHeight="440" MinWidth="500"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
 
         <TabControl Grid.Row="0">
-            <TabItem Header="Panels">
+            <TabItem x:Uid="tab_panels" Header="Panels">
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -31,45 +31,45 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Uid="txt_available" Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
                     <ListBox x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
 
-                    <TextBlock Grid.Column="2" Grid.Row="0" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Uid="txt_rightOf3d" Grid.Column="2" Grid.Row="0" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
                     <ListBox x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnToMain" Content="&gt;" Width="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to right of 3D view"/>
-                        <Button x:Name="btnFromMain" Content="&lt;" Width="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove"/>
+                        <Button x:Name="btnToMain" x:Uid="btn_toMain" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to right of 3D view"/>
+                        <Button x:Name="btnFromMain" x:Uid="btn_fromMain" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnMainUp" Content="▲" Width="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
-                        <Button x:Name="btnMainDown" Content="▼" Width="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
+                        <Button x:Name="btnMainUp" x:Uid="btn_mainUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnMainDown" x:Uid="btn_mainDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
                     </StackPanel>
 
-                    <TextBlock Grid.Column="2" Grid.Row="2" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <TextBlock x:Uid="txt_leftOf3d" Grid.Column="2" Grid.Row="2" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
                     <ListBox x:Name="lstLeft" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnToLeft" Content="&gt;" Width="30" Margin="0,2" Click="btnToLeft_Click" ToolTip="Add to left of 3D view"/>
-                        <Button x:Name="btnFromLeft" Content="&lt;" Width="30" Margin="0,2" Click="btnFromLeft_Click" ToolTip="Remove"/>
+                        <Button x:Name="btnToLeft" x:Uid="btn_toLeft" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToLeft_Click" ToolTip="Add to left of 3D view"/>
+                        <Button x:Name="btnFromLeft" x:Uid="btn_fromLeft" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromLeft_Click" ToolTip="Remove"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnLeftUp" Content="▲" Width="26" Margin="0,2" Click="btnLeftUp_Click" ToolTip="Move up"/>
-                        <Button x:Name="btnLeftDown" Content="▼" Width="26" Margin="0,2" Click="btnLeftDown_Click" ToolTip="Move down"/>
+                        <Button x:Name="btnLeftUp" x:Uid="btn_leftUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnLeftUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnLeftDown" x:Uid="btn_leftDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnLeftDown_Click" ToolTip="Move down"/>
                     </StackPanel>
 
-                    <TextBlock Grid.Column="2" Grid.Row="4" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <TextBlock x:Uid="txt_flyouts" Grid.Column="2" Grid.Row="4" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
                     <ListBox x:Name="lstFlyouts" Grid.Column="2" Grid.Row="5" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnToFlyout" Content="&gt;" Width="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
-                        <Button x:Name="btnFromFlyout" Content="&lt;" Width="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
+                        <Button x:Name="btnToFlyout" x:Uid="btn_toFlyout" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
+                        <Button x:Name="btnFromFlyout" x:Uid="btn_fromFlyout" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnFlyUp" Content="▲" Width="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
-                        <Button x:Name="btnFlyDown" Content="▼" Width="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
+                        <Button x:Name="btnFlyUp" x:Uid="btn_flyUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
+                        <Button x:Name="btnFlyDown" x:Uid="btn_flyDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Tabs">
+            <TabItem x:Uid="tab_tabs" Header="Tabs">
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -82,27 +82,27 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Uid="txt_hiddenTabs" Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
                     <ListBox x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
 
-                    <TextBlock Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBlock x:Uid="txt_shownTabs" Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
                     <ListBox x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabShow" Content="&gt;" Width="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
-                        <Button x:Name="btnTabHide" Content="&lt;" Width="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
+                        <Button x:Name="btnTabShow" x:Uid="btn_tabShow" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
+                        <Button x:Name="btnTabHide" x:Uid="btn_tabHide" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabUp" Content="▲" Width="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move left (earlier)"/>
-                        <Button x:Name="btnTabDown" Content="▼" Width="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move right (later)"/>
+                        <Button x:Name="btnTabUp" x:Uid="btn_tabUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move left (earlier)"/>
+                        <Button x:Name="btnTabDown" x:Uid="btn_tabDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move right (later)"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
         </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock Text="Changes take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
-            <Button Content="OK" Width="80" IsDefault="True" Click="btnOK_Click" Margin="0,0,6,0"/>
-            <Button Content="Cancel" Width="80" IsCancel="True"/>
+            <TextBlock x:Uid="txt_restartNote" Text="Changes take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
+            <Button x:Uid="btn_ok" Content="OK" MinWidth="80" IsDefault="True" Click="btnOK_Click" Margin="0,0,6,0"/>
+            <Button x:Uid="btn_cancel" Content="Cancel" MinWidth="80" IsCancel="True"/>
         </StackPanel>
     </Grid>
 </Window>
