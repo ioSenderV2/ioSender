@@ -50,3 +50,4 @@ ioSender.g.en-US.resources:mainwindow.baml,tab_sdCard:System.Windows.Controls.He
 ioSender.g.en-US.resources:mainwindow.baml,tab_threading:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Befűzés
 ioSender.g.en-US.resources:mainwindow.baml,tab_tools:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Eszközök
 ioSender.g.en-US.resources:mainwindow.baml,tab_turning:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Fordulás
+ioSender.g.hu-HU.resources:mainwindow.baml,mnu_loadFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load _Folder...

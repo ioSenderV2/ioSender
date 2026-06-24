@@ -328,3 +328,5 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,Виконати переміщення по границям обробки по X та Y.
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Упевніться, що путь інструмента вільний!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Коди аварій та помилок контролера
+CNC.Controls.WPF.g.uk-UA.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Start from this toolpath
+CNC.Controls.WPF.g.uk-UA.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Run just this toolpath
