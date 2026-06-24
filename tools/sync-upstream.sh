@@ -163,7 +163,7 @@ fi
 
 echo
 echo "Remember to rebuild-verify the rebased/affected branches, re-sync integration,"
-echo "and refresh the tracker (proposed-prs.html stats + Proposed-PRs.pdf)."
+echo "and refresh the tracker (ProposedPRs.html stats + ProposedPRs.pdf)."
 
 if [ "$PUSH" -eq 1 ]; then
   note "Pushing $MASTER + rebased branches (force-with-lease)"

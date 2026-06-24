@@ -31,7 +31,7 @@
 <body>
 
 <h1>grblHAL Fork Suite &mdash; Overview</h1>
-<div class="sub">Three coordinated forks by <code>stevenrwood</code> &mdash; the <strong>ioSender</strong> g-code sender, the <strong>grblHAL Simulator</strong>, and the <strong>iMXRT1062 (Teensy&nbsp;4)</strong> firmware &mdash; each a set of focused, individually-reviewable enhancements staged as pull requests on the fork.</div>
+<div class="sub">Three coordinated forks by <code>stevenrwood</code> and Claude Code &mdash; the <strong>ioSender</strong> g-code sender, the <strong>grblHAL Simulator</strong>, and the <strong>iMXRT1062 (Teensy&nbsp;4)</strong> firmware &mdash; each a set of focused, individually-reviewable enhancements staged as pull requests on the fork.</div>
 
 <div class="note">
   <strong>What this is.</strong> A single map across the three repos: the goals and how the work is organised, each fork&rsquo;s PRs, how to build any subset with the <code>apply-prs</code> composer, and links to the per-fork proposal trackers. The detailed file/line counts and prose for each change live in those trackers (linked at the end).
@@ -43,7 +43,7 @@
 <ul>
   <li><strong>One purpose per branch.</strong> Every change is a <code>pr/&lt;name&gt;</code> branch off the fork&rsquo;s base, scoped to a single feature or fix.</li>
   <li><strong>An <code>integration</code> branch</strong> merges them all &mdash; the everyday working build, where new work happens before being routed back to its owning <code>pr/*</code> branch so each stays a clean single-feature diff.</li>
-  <li><strong>A proposal tracker</strong> (<code>proposed-prs.html</code> + PDF) documents every PR: a features-at-a-glance index, per-PR file/line counts, dependency notes, and a &ldquo;how to consume&rdquo; guide. It is what gets shared with the upstream maintainers.</li>
+  <li><strong>A proposal tracker</strong> (<code>ProposedPRs.html</code> + PDF) documents every PR: a features-at-a-glance index, per-PR file/line counts, dependency notes, and a &ldquo;how to consume&rdquo; guide. It is what gets shared with the upstream maintainers.</li>
   <li><strong>An <code>apply-prs</code> composer</strong> (see &sect;3) builds any chosen subset on demand &mdash; resolving dependencies and reporting overlaps &mdash; so a consumer takes only the features they want.</li>
 </ul>
 <p><strong>Why forks rather than upstream PRs.</strong> The upstream maintainers are deliberately minimalist and selective, so the strategy is to <em>maintain the forks and stay submittable</em>: each branch remains a focused, ready-to-propose diff, surfaced in the tracker, without blocking on upstream acceptance.</p>
@@ -94,16 +94,22 @@ python tools/apply-prs.py --check  --fork sim 3 5       <span class="c"># overla
 <table>
 <tr><th>Fork</th><th>Tracker (HTML)</th><th>Rendered (PDF)</th></tr>
 <tr><td><span class="pill p-snd">SENDER</span>ioSender</td>
-    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/proposed-prs.html">proposed-prs.html</a></td>
-    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/Proposed-PRs.pdf">Proposed-PRs.pdf</a></td></tr>
+    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/ProposedPRs.html">ProposedPRs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/ProposedPRs.pdf">ProposedPRs.pdf</a></td></tr>
 <tr><td><span class="pill p-sim">SIM</span>Simulator</td>
-    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/proposed-prs.html">proposed-prs.html</a></td>
-    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/Proposed-PRs.pdf">Proposed-PRs.pdf</a></td></tr>
+    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/ProposedPRs.html">ProposedPRs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/ProposedPRs.pdf">ProposedPRs.pdf</a></td></tr>
 <tr><td><span class="pill p-fw">FIRMWARE</span>iMXRT1062</td>
-    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/proposedprs.html">srw/proposedprs.html</a></td>
-    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/proposedprs.pdf">srw/proposedprs.pdf</a></td></tr>
+    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/ProposedPRs.html">srw/ProposedPRs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/ProposedPRs.pdf">srw/ProposedPRs.pdf</a></td></tr>
 </table>
-<p class="foot">Tooling: <code>ioSender/tools/apply-prs.py</code> (composer) &middot; <code>tools/forks.json</code> (fork registry) &middot; <code>tools/prs.json</code> (ioSender manifest) &middot; <code>Simulator/tools/prs.json</code> (sim manifest) &middot; <code>iMXRT1062/srw/firmware-forks.json</code> + <code>setup_forks.sh</code> (firmware index).</p>
+<p class="foot">Tooling:
+<a href="https://github.com/stevenrwood/ioSender/blob/integration/tools/apply-prs.py"><code>apply-prs.py</code></a> (composer) &middot;
+<a href="https://github.com/stevenrwood/ioSender/blob/integration/tools/forks.json"><code>forks.json</code></a> (fork registry) &middot;
+<a href="https://github.com/stevenrwood/ioSender/blob/integration/tools/prs.json"><code>prs.json</code></a> (ioSender manifest) &middot;
+<a href="https://github.com/stevenrwood/Simulator/blob/integration/tools/prs.json"><code>Simulator/tools/prs.json</code></a> (sim manifest) &middot;
+<a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/firmware-forks.json"><code>firmware-forks.json</code></a> +
+<a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/setup_forks.sh"><code>setup_forks.sh</code></a> (firmware index).</p>
 
 </body>
 </html>

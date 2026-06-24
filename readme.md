@@ -14,13 +14,13 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a stack of proposed enhancements, each kept as a **clean, single-feature branch** (`pr/*`) that diffs against `master` so it can be reviewed — and picked up — independently.
 
-**New here? Start with [`Overview.pdf`](Overview.pdf)** ([`overview.html`](overview.html)) — the big picture across all three coordinated forks (this **sender**, the grblHAL **Simulator**, and the iMXRT1062 **firmware**): goals & process, each fork's PRs, the `apply-prs` composer with examples, and links to every tracker.
+**New here? Start with [`Overview.pdf`](Overview.pdf)** ([`Overview.html`](Overview.html)) — the big picture across all three coordinated forks (this **sender**, the grblHAL **Simulator**, and the iMXRT1062 **firmware**): goals & process, each fork's PRs, the `apply-prs` composer with examples, and links to every tracker.
 
-**See [`Proposed-PRs.pdf`](Proposed-PRs.pdf) for this repo's full PR list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`proposed-prs.html`](proposed-prs.html) if you'd rather open it in a browser.)
+**See [`ProposedPRs.pdf`](ProposedPRs.pdf) for this repo's full PR list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`ProposedPRs.html`](ProposedPRs.html) if you'd rather open it in a browser.)
 
 Branch model:
 - `master` = the upstream release plus PRs 1&ndash;8 already integrated.
-- Each remaining enhancement lives on its own `pr/<name>` branch off `master`. A few are **stacked** on another PR (e.g. the ATC macros branch builds on the SD-card filesystem branch) — `proposed-prs.html` lists each branch's *Depends on*.
+- Each remaining enhancement lives on its own `pr/<name>` branch off `master`. A few are **stacked** on another PR (e.g. the ATC macros branch builds on the SD-card filesystem branch) — `ProposedPRs.html` lists each branch's *Depends on*.
 
 ##### Apply one (or more) to your own fork
 
@@ -31,7 +31,7 @@ git remote add srw https://github.com/stevenrwood/ioSender.git
 git fetch srw
 ```
 
-Then pick up a single PR. Look up its branch name (and any parent it stacks on) in `proposed-prs.html`, then either **merge the branch** as-is:
+Then pick up a single PR. Look up its branch name (and any parent it stacks on) in `ProposedPRs.html`, then either **merge the branch** as-is:
 
 ```bash
 git merge srw/pr/<branch>
