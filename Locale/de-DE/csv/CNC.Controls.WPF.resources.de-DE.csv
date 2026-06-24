@@ -328,3 +328,14 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,X und Y Programmgrenzen abfahren
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Sicherstellen, dass die Werkzeugspitze frei von Hindernissen ist!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
+CNC.Controls.WPF.g.de-DE.resources:grblconfigcontrol.baml,mnu_revertStartup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert to value at startup
+CNC.Controls.WPF.g.de-DE.resources:grblconfigcontrol.baml,mnu_revertStartup2:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert to value at startup
+CNC.Controls.WPF.g.de-DE.resources:grblconfigcontrol.baml,mnu_revertGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert all in group to value at startup
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,wnd_restorePoint:System.Windows.Window.Title,Title,True,True,,Restore settings
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,txt_restoreIntro:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Select a restore point (most recent first), or browse for a backup file:
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,col_rpSaved:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Saved
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,col_rpChanges:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Changes
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,col_rpMachine:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Machine
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,btn_rpBrowse:System.Windows.Controls.ContentControl.Content,Button,True,True,,Browse...
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,btn_rpRestore:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore
+CNC.Controls.WPF.g.de-DE.resources:restorepointdialog.baml,btn_rpCancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
