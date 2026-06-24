@@ -104,7 +104,7 @@ namespace CNC.Controls
                     return false;
                 if (!HomeMachine(model))
                 {
-                    MessageBox.Show("Homing did not complete - validation cancelled.", "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(LibStrings.FindResource("ValHomingCancelled"), "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
             }
@@ -130,13 +130,13 @@ namespace CNC.Controls
             try
             {
                 if (!EnterCheckMode(model))
-                    MessageBox.Show("The controller did not enter check mode ($C) - validation aborted.",
+                    MessageBox.Show(LibStrings.FindResource("ValNoCheckMode"),
                         "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                 else
                 {
                     enteredCheck = true;
                     if (!ApplyPrefix(model))
-                        MessageBox.Show("The controller rejected a basic set-up command - validation aborted.",
+                        MessageBox.Show(LibStrings.FindResource("ValSetupRejected"),
                             "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                     else
                     {

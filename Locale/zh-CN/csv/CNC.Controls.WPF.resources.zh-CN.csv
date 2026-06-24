@@ -581,3 +581,8 @@ CNC.Controls.WPF.g.zh-CN.resources:restorepointdialog.baml,btn_rpRestore:System.
 CNC.Controls.WPF.g.zh-CN.resources:restorepointdialog.baml,btn_rpCancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
 CNC.Controls.WPF.g.zh-CN.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Start from this toolpath
 CNC.Controls.WPF.g.zh-CN.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Run just this toolpath
+CNC.Controls.WPF.g.zh-CN.resources:libstrings.baml,str_scNoAxisRes:System.String.$Content,None,True,True,,Current steps/mm is not available for the selected axis.
+CNC.Controls.WPF.g.zh-CN.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
+CNC.Controls.WPF.g.zh-CN.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
+CNC.Controls.WPF.g.zh-CN.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
+CNC.Controls.WPF.g.zh-CN.resources:libstrings.baml,str_lfNoToolpaths:System.String.$Content,None,True,True,,No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.
