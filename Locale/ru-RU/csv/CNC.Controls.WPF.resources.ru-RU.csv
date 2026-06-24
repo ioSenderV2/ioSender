@@ -335,12 +335,12 @@ CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,mnu_expandAll:System.Window
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,mnu_collapseAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Collapse all
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,mnu_resetGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset group to defaults
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,tab_keyboard:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Keyboard
-CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_kbdHelp:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast).
+CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_kbdHelp:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,"Click a binding to set it, then press the key combination. Use Clear to unbind. Jog keys are single keys (modifiers are applied live: Ctrl = step, Shift = fast)."
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_jogPresets:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Jog presets:
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,rb_numpad:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Numeric keypad
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,rb_numpad:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Use the numeric keypad for jog step/feed presets (Ctrl+NumPad0-7) and step/feed adjust (NumPad2/4/6/8).
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,rb_topRow:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Top-row numbers
-CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,rb_topRow:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed.
+CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,rb_topRow:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"For keyboards without a numeric keypad: Ctrl+1-8 for jog step/feed presets, [ ] for jog step, - = for jog feed."
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_groupedHelp:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Grouped by function. Right-click a group header for expand/collapse/reset; right-click a row to reset it. Changed bindings are highlighted.
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,col_action:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Action
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,col_shortcut:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Shortcut
@@ -348,14 +348,14 @@ CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,tab_controller:System.Windo
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,grp_buttons:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Buttons
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,btn_restoreDefaults:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore Defaults
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_controllerStatus:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Searching for controller…
-CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_controllerHelp:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. The left stick jogs X/Y and the triggers jog Z (analog) - see settings below.
+CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_controllerHelp:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,"Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. The left stick jogs X/Y and the triggers jog Z (analog) - see settings below."
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,col_buttonCtrl:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Button
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,col_actionCtrl:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Action
-CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,grp_analog:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Analog stick jog (left stick X/Y, triggers Z)
+CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,grp_analog:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,"Analog stick jog (left stick X/Y, triggers Z)"
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,chk_analogEnable:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Enable
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,chk_analogEnable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enable jogging with the left stick (X/Y) and triggers (Z).
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_deadzone:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Deadzone
-CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,fld_deadzone:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Left-stick deadzone, percent of full deflection. Raise if the machine drifts at rest.
+CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,fld_deadzone:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Left-stick deadzone, percent of full deflection. Raise if the machine drifts at rest."
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_maxFeed:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Max feed ×
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,fld_feedScale:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Full-stick feed as a multiple of the Jog panel feed (clamped to the machine&apos;s max rate).
 CNC.Controls.WPF.g.ru-RU.resources:keymapeditor.baml,txt_invert:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Invert:
