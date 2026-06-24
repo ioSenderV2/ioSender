@@ -19,7 +19,7 @@ This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fo
 **See [`ProposedPRs.pdf`](ProposedPRs.pdf) for this repo's full PR list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`ProposedPRs.html`](ProposedPRs.html) if you'd rather open it in a browser.)
 
 Branch model:
-- `master` = the upstream release plus PRs 1&ndash;8 already integrated.
+- `master` = the upstream release plus PRs 1&ndash;8 and 24 already integrated.
 - Each remaining enhancement lives on its own `pr/<name>` branch off `master`. A few are **stacked** on another PR (e.g. the ATC macros branch builds on the SD-card filesystem branch) — `ProposedPRs.html` lists each branch's *Depends on*.
 
 ##### Apply one (or more) to your own fork
