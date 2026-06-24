@@ -356,3 +356,15 @@ CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_tabDown:System.Window
 CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,txt_restartNote:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Changes take effect after restart.
 CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
 CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:uijoggridcontrol.baml,grp_uiJogging:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,UI Jogging
+CNC.Controls.WPF.g.en-US.resources:uijoggridcontrol.baml,chk_continuous:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Continuous
+CNC.Controls.WPF.g.en-US.resources:kbdjoggridcontrol.baml,grp_kbdJogging:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Keyboard jogging
+CNC.Controls.WPF.g.en-US.resources:machinepositioncontrol.baml,grp_machinePos:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Machine Position
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_go:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to offset
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_set:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_set:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store current machine position in this offset
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_close:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:panelflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
+CNC.Controls.WPF.g.en-US.resources:panelflyout.baml,btn_close:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:numericfield.baml,mnu_reset:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset to default

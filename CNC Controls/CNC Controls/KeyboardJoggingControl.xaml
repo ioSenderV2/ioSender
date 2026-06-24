@@ -18,7 +18,7 @@
             <TextBlock Text="{Binding SpeedHeader}" Foreground="#FF57606A"/>
         </Viewbox>
         <!-- Slider - centered vertically in the flyout -->
-        <local:JogSlider Grid.Row="1" Maximum="1" Width="150" HorizontalAlignment="Center"
+        <local:JogSlider Grid.Row="1" Maximum="1" MinWidth="150" HorizontalAlignment="Center"
                          SelectedIndex="{Binding SpeedIndex, Mode=TwoWay}" ValueText="{Binding SelectedFeedrateText}"
                          ToolTip="Default held-arrow jog speed. Hold Shift to jog at the other speed."/>
     </Grid>

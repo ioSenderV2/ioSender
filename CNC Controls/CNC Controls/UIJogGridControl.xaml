@@ -28,7 +28,7 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <GroupBox Header="UI Jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Width="210">
+    <GroupBox x:Uid="grp_uiJogging" Header="UI Jogging" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
         <Grid x:Name="content" Margin="3,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -58,7 +58,7 @@
             <Button x:Name="f2" Grid.Column="1" Grid.Row="3" Tag="2" Content="{Binding JogUiMetric.Feedrate2, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
             <Button x:Name="f3" Grid.Column="1" Grid.Row="4" Tag="3" Content="{Binding JogUiMetric.Feedrate3, Source={x:Static local:AppConfig.Settings}}" Style="{StaticResource JogCell}" Click="Feed_Click"/>
 
-            <CheckBox Grid.Column="0" Grid.Row="5" Grid.ColumnSpan="2" Content="Continuous" Margin="2,4,0,0"
+            <CheckBox Grid.Column="0" Grid.Row="5" Grid.ColumnSpan="2" x:Uid="chk_continuous" Content="Continuous" Margin="2,4,0,0"
                       IsChecked="{Binding Continuous, Mode=TwoWay}"/>
         </Grid>
     </GroupBox>
