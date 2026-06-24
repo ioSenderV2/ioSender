@@ -1,0 +1,23 @@
+{
+  "_note": "Fork registry for apply-prs --fork <name>. repo is relative to the ioSender repo root (siblings under the same parent). manifest is relative to that fork's repo. mode: 'merge' = single-repo branch merge; 'submodule' (firmware, not yet implemented) composes inside submodule forks.",
+  "iosender": {
+    "repo": ".",
+    "base": "master",
+    "mode": "merge",
+    "manifest": "tools/prs.json",
+    "union": ["Locale/**/*.csv"],
+    "submodules": false,
+    "build": { "type": "msbuild", "solution": "ioSender XL/ioSender XL.sln",
+               "exe": "ioSender XL/ioSender XL/bin/Release/ioSender.exe" }
+  },
+  "sim": {
+    "repo": "../Simulator",
+    "base": "master",
+    "mode": "merge",
+    "manifest": "tools/prs.json",
+    "union": [],
+    "submodules": true,
+    "build": { "type": "cmake", "dir": "build", "generator": "MinGW Makefiles",
+               "exe": "build/grblHAL_sim.exe" }
+  }
+}

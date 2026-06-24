@@ -1,52 +1,54 @@
 #!/usr/bin/env python3
 """
-apply-prs - compose a buildable branch from selected fork PRs.
+apply-prs - compose a buildable branch from selected fork PRs (multi-fork).
 
 Usage:
-    python tools/apply-prs.py <new-branch> <pr> [<pr> ...]   # compose those PRs (+ deps)
-    python tools/apply-prs.py my-build 15 16 21              # 16 auto-pulls 15
-    python tools/apply-prs.py my-build 25 --run              # compose, build, launch
-    python tools/apply-prs.py --check 9 10 12                # report same-line overlaps, no branch
-    python tools/apply-prs.py --list                         # list known PRs
+    python tools/apply-prs.py <new-branch> <pr> [<pr> ...]            # ioSender (default fork)
+    python tools/apply-prs.py my-build --fork sim 1 3 5              # the Simulator fork
+    python tools/apply-prs.py my-build --fork sim 2 --run           # compose, build, launch
+    python tools/apply-prs.py --check --fork sim 3 5                 # overlaps only, no branch
+    python tools/apply-prs.py --list [--fork sim]                    # list a fork's PRs
 
-Before composing it runs a pre-flight (git merge-tree, no checkout) that reports which of
-the selected PRs overlap on the same lines. The locale CSVs use a merge=union driver so
-their append-only rows never conflict; ~90% of PR pairs auto-merge. The genuine overlaps
-are almost all on AppConfig.cs / MainWindow (the central settings + menu registration
-files) - those few you resolve by hand; everything else composes clean.
+Forks are declared in tools/forks.json (repo path, base branch, manifest, build, union
+drivers). For each fork the named branch is created off its base and the selected PRs
+(+ their dependency closure, topologically ordered) are merged in. Append-only files
+named in the fork's "union" list merge with a union driver so they never conflict; other
+overlaps are reported and the merge aborted for a manual resolve. A pre-flight (git
+merge-tree, no checkout) reports same-line overlaps before composing.
 
-<new-branch> is created off master and must not already exist (use --force to replace).
-The dependency closure is resolved from tools/prs.json, topologically ordered, and each
-PR branch is merged in order. The locale CSVs use a `merge=union` driver so their
-append-only rows never conflict; any other conflict is reported and the merge aborted
-so you can resolve it by hand.
-
-master already integrates PRs 1-8 and 24 (the "in_master" baseline); requesting one of
-those just prints a note and skips it. Because the branch starts at master, the composed
-build inherits the RP.Math reference + App.config, so it builds even though some old PR
-branches don't build standalone.
+ioSender's master already integrates PRs 1-8 and 24 (in_master baseline); the Simulator's
+master is pristine, so all its PRs are composable. The branch starts at the fork's base,
+so old/standalone-unbuildable branches still compose and build here.
 """
-import argparse, json, os, subprocess, sys
+import argparse, json, os, subprocess, sys, fnmatch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MANIFEST = os.path.join(ROOT, "tools", "prs.json")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+IO_ROOT = os.path.dirname(SCRIPT_DIR)                 # the ioSender repo (where this tool lives)
+FORKS_JSON = os.path.join(SCRIPT_DIR, "forks.json")
 MSBUILD = r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
-SOLUTION = "ioSender XL/ioSender XL.sln"
-MASTER = "master"
-UNION_LINE = "Locale/**/*.csv merge=union"
+
+# active fork context (set in main)
+REPO = IO_ROOT
+BASE = "master"
+UNION = []
 
 
 def git(*args, check=True, capture=True):
-    r = subprocess.run(["git"] + list(args), cwd=ROOT, capture_output=capture, text=True)
+    r = subprocess.run(["git"] + list(args), cwd=REPO, capture_output=capture, text=True)
     if check and r.returncode != 0:
         sys.stderr.write((r.stderr or r.stdout or "") + "\n")
         raise SystemExit(f"git {' '.join(args)} failed ({r.returncode})")
     return r
 
 
-def load_manifest():
-    with open(MANIFEST, encoding="utf-8") as fh:
+def load_manifest(path):
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)["prs"]
+
+
+def is_union(path):
+    p = path.replace("\\", "/")
+    return any(fnmatch.fnmatch(p, g) for g in UNION)
 
 
 def closure(requested, prs):
@@ -62,7 +64,7 @@ def closure(requested, prs):
         for r in prs[str(n)]["requires"]:
             if not prs[str(r)]["in_master"]:
                 stack.append(r)
-    def cdeps(m):  # composable deps still in play
+    def cdeps(m):
         return [r for r in prs[str(m)]["requires"] if not prs[str(r)]["in_master"]]
     order, placed = [], set()
     while len(order) < len(need):
@@ -75,7 +77,6 @@ def closure(requested, prs):
 
 
 def _requires_rel(a, b, prs):
-    """True if a and b are in a (transitive) dependency relation (composer merges them ordered)."""
     def reqs(n, acc):
         for r in prs[str(n)]["requires"]:
             if r not in acc:
@@ -85,23 +86,23 @@ def _requires_rel(a, b, prs):
 
 
 def preflight(order, prs):
-    """Pairwise overlap check (git merge-tree, no checkout). Returns {(a,b): [non-csv files]}.
-    Skips dependency pairs (merged in order) and CSV-only overlaps (union driver handles them)."""
+    """Pairwise overlap check (git merge-tree, no checkout). Returns {(a,b): [non-union files]}.
+    Skips dependency pairs (merged in order) and union-handled overlaps."""
     import itertools, re
     fline = re.compile(r'^\s+(?:our|their|base)\s+\d+\s+[0-9a-f]+\s+(.+)$')
     hits = {}
     for a, b in itertools.combinations(order, 2):
         if _requires_rel(a, b, prs):
             continue
-        out = subprocess.run(["git", "merge-tree", MASTER,
+        out = subprocess.run(["git", "merge-tree", BASE,
                               prs[str(a)]["branch"], prs[str(b)]["branch"]],
-                             cwd=ROOT, capture_output=True).stdout.decode("utf-8", "replace")
+                             cwd=REPO, capture_output=True).stdout.decode("utf-8", "replace")
         cur, files = None, set()
         for ln in out.splitlines():
             m = fline.match(ln)
             if m:
                 cur = m.group(1).strip()
-            elif "<<<<<<<" in ln and cur and "/csv/" not in cur.replace("\\", "/"):
+            elif "<<<<<<<" in ln and cur and not is_union(cur):
                 files.add(cur)
         if files:
             hits[(a, b)] = sorted(files)
@@ -116,46 +117,83 @@ def ensure_clean_tree():
                          + "\n  ".join(dirty))
 
 
+def run_build(cfg):
+    """Returns (ok, [error lines])."""
+    b = cfg["build"]; t = b["type"]
+    if t == "msbuild":
+        if not os.path.exists(MSBUILD):
+            print(f"  (MSBuild not found at {MSBUILD}; skipping build)"); return None, []
+        r = subprocess.run([MSBUILD, b["solution"], "-t:Build", "-p:Configuration=Release",
+                            "-m", "-v:minimal", "-nologo"], cwd=REPO, capture_output=True, text=True)
+        errs = [l.strip() for l in r.stdout.splitlines() if ": error" in l.lower()]
+        return r.returncode == 0, errs[:8]
+    if t == "cmake":
+        bdir = os.path.join(REPO, b.get("dir", "build"))
+        cfgcmd = ["cmake", "-S", REPO, "-B", bdir]
+        if b.get("generator"):
+            cfgcmd += ["-G", b["generator"]]
+        c = subprocess.run(cfgcmd, cwd=REPO, capture_output=True, text=True)
+        if c.returncode != 0:
+            return False, [l.strip() for l in (c.stdout + c.stderr).splitlines() if "error" in l.lower()][:8]
+        r = subprocess.run(["cmake", "--build", bdir, "--clean-first", "--parallel"],
+                           cwd=REPO, capture_output=True, text=True)
+        errs = [l.strip() for l in (r.stdout + r.stderr).splitlines() if "error" in l.lower()]
+        return r.returncode == 0, errs[:8]
+    raise SystemExit(f"unknown build type {t!r}")
+
+
 def main():
+    global REPO, BASE, UNION
     ap = argparse.ArgumentParser(description="Compose a buildable branch from selected fork PRs.")
     ap.add_argument("target", nargs="?", help="name of the new branch to create (must not exist)")
     ap.add_argument("prs", nargs="*", type=int, help="PR numbers to include")
+    ap.add_argument("--fork", default="iosender", help="which fork (see tools/forks.json)")
     ap.add_argument("--no-build", action="store_true", help="skip the verification build")
-    ap.add_argument("--run", action="store_true", help="launch ioSender.exe after a successful build")
+    ap.add_argument("--run", action="store_true", help="launch the built exe after a successful build")
     ap.add_argument("--force", action="store_true", help="replace the target branch if it exists")
     ap.add_argument("--check", action="store_true", help="report overlaps for the set and exit (no branch)")
     ap.add_argument("--list", action="store_true", help="list known PRs and exit")
     args = ap.parse_args()
-    prs = load_manifest()
+
+    forks = json.load(open(FORKS_JSON, encoding="utf-8"))
+    if args.fork not in forks or args.fork.startswith("_"):
+        ap.error(f"unknown fork {args.fork!r}; known: " + ", ".join(k for k in forks if not k.startswith("_")))
+    cfg = forks[args.fork]
+    REPO = os.path.abspath(os.path.join(IO_ROOT, cfg["repo"]))
+    BASE = cfg["base"]
+    UNION = cfg.get("union", [])
+    prs = load_manifest(os.path.join(REPO, cfg["manifest"]))
 
     if args.list:
+        print(f"[{args.fork}]  {REPO}")
         for n in sorted(prs, key=int):
             d = prs[n]
             tag = "in master" if d["in_master"] else "composable"
             dep = f"  (requires {d['requires']})" if d["requires"] else ""
             print(f"  PR{int(n):>2}  [{tag:<10}] {d['branch']:<32} {d['title']}{dep}")
         return
+
     if args.check and args.target is not None:
-        # no branch name in --check mode: the first positional is actually a PR number
         try:
             args.prs = [int(args.target)] + args.prs
         except ValueError:
             ap.error("--check takes PR numbers only")
         args.target = None
     if not args.prs or (not args.check and not args.target):
-        ap.error("usage: apply-prs <new-branch> <pr> [<pr> ...]   (or --check <pr...>, --list)")
+        ap.error("usage: apply-prs <new-branch> [--fork F] <pr> [<pr> ...]   (or --check, --list)")
 
     name = args.target
     baseline = [n for n in args.prs if str(n) in prs and prs[str(n)]["in_master"]]
     for n in baseline:
-        print(f"  PR{n} ({prs[str(n)]['branch']}) is already in master - skipping (baseline).")
+        print(f"  PR{n} ({prs[str(n)]['branch']}) is already in {BASE} - skipping (baseline).")
     selectable = [n for n in args.prs if not (str(n) in prs and prs[str(n)]["in_master"])]
     if not selectable:
-        raise SystemExit("nothing to compose - all requested PRs are already in master.")
+        raise SystemExit(f"nothing to compose - all requested PRs are already in {BASE}.")
 
     order = closure(selectable, prs)
     added = [n for n in order if n not in args.prs]
-    print(f"\nRequested : {sorted(args.prs)}")
+    print(f"\nFork      : {args.fork}  ({REPO})")
+    print(f"Requested : {sorted(args.prs)}")
     if added:
         print(f"+ deps    : {added}")
     print("Merge order:")
@@ -171,7 +209,7 @@ def main():
         print("\nNo same-line overlaps in this set - composes cleanly.")
     if args.check:
         return
-    print(f"\nBranch    : {name}  (off {MASTER})\n")
+    print(f"\nBranch    : {name}  (off {BASE})\n")
 
     ensure_clean_tree()
     start = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
@@ -179,17 +217,19 @@ def main():
         if not args.force:
             raise SystemExit(f"branch '{name}' already exists (pick another name or use --force).")
         git("branch", "-D", name)
-    git("checkout", "-q", "-B", name, MASTER)
+    git("checkout", "-q", "-B", name, BASE)
 
-    ga = os.path.join(ROOT, ".gitattributes")
-    text = open(ga, encoding="utf-8").read() if os.path.exists(ga) else ""
-    if UNION_LINE not in text:
-        with open(ga, "a", encoding="utf-8", newline="\n") as fh:
-            if text and not text.endswith("\n"):
-                fh.write("\n")
-            fh.write(UNION_LINE + "\n")
-        git("add", ".gitattributes")
-        git("commit", "-q", "-m", "apply-prs: union-merge locale CSVs")
+    if UNION:
+        ga = os.path.join(REPO, ".gitattributes")
+        text = open(ga, encoding="utf-8").read() if os.path.exists(ga) else ""
+        addlines = [f"{g} merge=union" for g in UNION if f"{g} merge=union" not in text]
+        if addlines:
+            with open(ga, "a", encoding="utf-8", newline="\n") as fh:
+                if text and not text.endswith("\n"):
+                    fh.write("\n")
+                fh.write("\n".join(addlines) + "\n")
+            git("add", ".gitattributes")
+            git("commit", "-q", "-m", "apply-prs: union-merge append-only files")
     git("config", "rerere.enabled", "true")
 
     for n in order:
@@ -205,26 +245,27 @@ def main():
                              "These edit the same lines. Resolve manually, or compose a different set.")
         print(f"   merged PR{n:>2}  {br}")
 
-    print(f"\nComposed branch '{name}' is ready ({len(order)} PR(s) on top of master).")
+    if cfg.get("submodules"):
+        git("submodule", "update", "--init", "--recursive", check=False)
+
+    print(f"\nComposed branch '{name}' is ready ({len(order)} PR(s) on top of {BASE}).")
     if args.no_build:
-        print(f"  git checkout {name}   # build in VS / msbuild")
+        print(f"  git checkout {name}   # then build")
         return
-    if not os.path.exists(MSBUILD):
-        print(f"  (MSBuild not found at {MSBUILD}; skipping build)")
+    print("Building ...")
+    ok, errs = run_build(cfg)
+    if ok is None:
         return
-    print("Building Release ...")
-    b = subprocess.run([MSBUILD, SOLUTION, "-t:Build", "-p:Configuration=Release",
-                        "-m", "-v:minimal", "-nologo"], cwd=ROOT, capture_output=True, text=True)
-    if b.returncode != 0:
+    if not ok:
         print("BUILD FAILED:")
-        for e in [l for l in b.stdout.splitlines() if ": error" in l.lower()][:8]:
-            print("   " + e.strip())
+        for e in errs:
+            print("   " + e)
         print("\nA missing-symbol error usually means an undeclared dependency - add it to "
-              "the requires[] of the offending PR in tools/prs.json, then re-run.")
+              "the requires[] of the offending PR in this fork's prs.json, then re-run.")
         raise SystemExit(1)
-    exe = os.path.join(ROOT, "ioSender XL", "ioSender XL", "bin", "Release", "ioSender.exe")
+    exe = os.path.join(REPO, cfg["build"].get("exe", ""))
     print(f"BUILD OK -> {exe}")
-    if args.run and os.path.exists(exe):
+    if args.run and exe and os.path.exists(exe):
         print("Launching ...")
         subprocess.Popen([exe], cwd=os.path.dirname(exe))
 
