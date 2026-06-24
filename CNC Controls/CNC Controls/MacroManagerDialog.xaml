@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        Title="Edit Macros" Height="360" Width="520" MinHeight="240" MinWidth="420"
+        x:Uid="wnd_macroManager" Title="Edit Macros" Height="360" Width="520" MinHeight="240" MinWidth="420"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <local:MacroReferenceConverter x:Key="MacroRef"/>
@@ -31,8 +31,8 @@
                   RowHeaderWidth="0" BorderBrush="#FFD0D0D0" BorderThickness="1"
                   SelectionChanged="grdMacros_SelectionChanged" CellEditEnding="grdMacros_CellEditEnding">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="150"/>
-                <DataGridTemplateColumn Header="File" Width="110" CanUserSort="False">
+                <DataGridTextColumn x:Uid="col_macroName" Header="Name" Binding="{Binding Name}" Width="*" MinWidth="150"/>
+                <DataGridTemplateColumn x:Uid="col_macroFile" Header="File" Width="110" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Code, Converter={StaticResource MacroRef}}"
@@ -42,19 +42,19 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Prompt" Width="55" CanUserSort="False">
+                <DataGridTemplateColumn x:Uid="col_macroPrompt" Header="Prompt" Width="55" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding ConfirmOnExecute, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            <CheckBox x:Uid="chk_macroPrompt" IsChecked="{Binding ConfirmOnExecute, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                       ToolTip="Ask for confirmation before running this macro."/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Key" Width="64" CanUserSort="False">
+                <DataGridTemplateColumn x:Uid="col_macroKey" Header="Key" Width="64" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <ComboBox ItemsSource="{Binding FKeyOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                            <ComboBox x:Uid="cbo_macroKey" ItemsSource="{Binding FKeyOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                       SelectedValuePath="Value" DisplayMemberPath="Label"
                                       SelectedValue="{Binding FKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       SelectionChanged="FKey_SelectionChanged" Margin="1"
@@ -66,16 +66,16 @@
         </DataGrid>
 
         <StackPanel Grid.Row="0" Grid.Column="1" Width="92" Margin="8,0,0,0">
-            <Button x:Name="btnCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"/>
-            <Button x:Name="btnView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
+            <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"/>
+            <Button x:Name="btnView" x:Uid="btn_macroView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
                     ToolTip="Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."/>
-            <Button x:Name="btnEdit" Content="Edit" Click="btnEdit_Click" Style="{StaticResource SideButton}"
+            <Button x:Name="btnEdit" x:Uid="btn_macroEdit" Content="Edit" Click="btnEdit_Click" Style="{StaticResource SideButton}"
                     ToolTip="Edit the macro's definition - the inline G-code, or the @&lt;path&gt; reference line (to change or remove the path). Saved changes are read back."/>
-            <Button x:Name="btnDelete" Content="Delete" Click="btnDelete_Click" Style="{StaticResource SideButton}"/>
+            <Button x:Name="btnDelete" x:Uid="btn_macroDelete" Content="Delete" Click="btnDelete_Click" Style="{StaticResource SideButton}"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="btnClose" Content="Close" Width="80" Padding="5,2" IsDefault="True" IsCancel="True" Click="btnClose_Click"/>
+            <Button x:Name="btnClose" x:Uid="btn_macroClose" Content="Close" Width="80" Padding="5,2" IsDefault="True" IsCancel="True" Click="btnClose_Click"/>
         </StackPanel>
     </Grid>
 </Window>

@@ -27,7 +27,7 @@
     <Border BorderBrush="DarkGray" BorderThickness="1" CornerRadius="3" Background="#FFE5E5EA">
         <Grid Width="315" Height="90">
             <StackPanel Orientation="Horizontal" Margin="12,16,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <ComboBox x:Name="cbMacros" Width="190" Height="25" VerticalContentAlignment="Center"
+                <ComboBox x:Name="cbMacros" x:Uid="cbo_macroSelect" Width="190" Height="25" VerticalContentAlignment="Center"
                           ItemsSource="{Binding Path=Macros, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           DisplayMemberPath="Name" ToolTip="Select a macro to run."/>
                 <Button x:Uid="btn_runMacro" Content="Run" MinWidth="60" Height="25" Margin="10,0,0,0" Click="button_Click" ToolTip="Run the selected macro."/>
