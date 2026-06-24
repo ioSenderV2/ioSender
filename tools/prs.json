@@ -1,0 +1,173 @@
+{
+  "_note": "PR composer manifest. requires[] = hard deps (structural stacking + semantic/code). Branches compose onto a fresh branch off master.",
+  "prs": {
+    "1": {
+      "branch": "pr/fix-rp-math-build",
+      "title": "Bug Fixes for released ioSender",
+      "in_master": true,
+      "requires": []
+    },
+    "2": {
+      "branch": "pr/motor-signals",
+      "title": "Surface Motor Fault / Warning signals",
+      "in_master": true,
+      "requires": []
+    },
+    "3": {
+      "branch": "pr/keymapping_editor",
+      "title": "Console persistence + Key Mappings editor",
+      "in_master": true,
+      "requires": []
+    },
+    "4": {
+      "branch": "pr/connection-loss-reconnect",
+      "title": "Connection-loss handling + auto-reconnect",
+      "in_master": true,
+      "requires": []
+    },
+    "5": {
+      "branch": "pr/stepper-calibration-scratch",
+      "title": "Stepper calibration (scratch) tab",
+      "in_master": true,
+      "requires": []
+    },
+    "6": {
+      "branch": "pr/load-folder",
+      "title": "Load Folder + Fusion batch-post add-in",
+      "in_master": true,
+      "requires": []
+    },
+    "7": {
+      "branch": "pr/highdpi-layout",
+      "title": "High-DPI / large-text layout",
+      "in_master": true,
+      "requires": []
+    },
+    "8": {
+      "branch": "pr/xbox-mapping",
+      "title": "Xbox controller + Key Mappings editor polish",
+      "in_master": true,
+      "requires": []
+    },
+    "9": {
+      "branch": "pr/main-page-layout",
+      "title": "Configurable main page + flyouts + jog panels (XL)",
+      "in_master": false,
+      "requires": []
+    },
+    "10": {
+      "branch": "pr/macro-editor",
+      "title": "Macro manager + run-only flyout",
+      "in_master": false,
+      "requires": []
+    },
+    "11": {
+      "branch": "pr/macro-processor",
+      "title": "Macro Processor Enhancements",
+      "in_master": false,
+      "requires": []
+    },
+    "12": {
+      "branch": "pr/onboarding-tooltips",
+      "title": "Onboarding tooltips",
+      "in_master": false,
+      "requires": []
+    },
+    "13": {
+      "branch": "pr/build-docs",
+      "title": "Build documentation (Mega-XL notes + tool-change guide)",
+      "in_master": false,
+      "requires": []
+    },
+    "14": {
+      "branch": "pr/sdcard-filesystems",
+      "title": "SD + LittleFS file browser & file manager",
+      "in_master": false,
+      "requires": []
+    },
+    "15": {
+      "branch": "pr/connect-simulator",
+      "title": "USB / Ethernet / simulator connection support + Connect menu",
+      "in_master": false,
+      "requires": []
+    },
+    "16": {
+      "branch": "pr/validate",
+      "title": "Validate controller (check-mode g-code conformance test)",
+      "in_master": false,
+      "requires": [
+        15
+      ]
+    },
+    "17": {
+      "branch": "pr/window-restore",
+      "title": "Restore main window position across launches",
+      "in_master": false,
+      "requires": [
+        15
+      ]
+    },
+    "18": {
+      "branch": "pr/grbl-settings",
+      "title": "grbl:Settings - live edits, change highlight, revert & snapshots",
+      "in_master": false,
+      "requires": []
+    },
+    "19": {
+      "branch": "pr/mdi-console",
+      "title": "Console - inline terminal-style command prompt",
+      "in_master": false,
+      "requires": []
+    },
+    "20": {
+      "branch": "pr/click-to-jog",
+      "title": "3D view - Ctrl+click to jog + per-axis orientation",
+      "in_master": false,
+      "requires": []
+    },
+    "21": {
+      "branch": "pr/machine-setup-wizard",
+      "title": "grbl:Settings - Machine Setup Wizard",
+      "in_master": false,
+      "requires": []
+    },
+    "22": {
+      "branch": "pr/keyboard-jog-focus",
+      "title": "Keyboard jog - keep active when Job-view focus drifts",
+      "in_master": false,
+      "requires": []
+    },
+    "23": {
+      "branch": "pr/safe-z-goto",
+      "title": "Go To - optional safe-Z (lift, traverse, descend)",
+      "in_master": false,
+      "requires": []
+    },
+    "24": {
+      "branch": "pr/telnet-deadlock-fix",
+      "title": "comms - fix telnet/websocket UI deadlock",
+      "in_master": true,
+      "requires": []
+    },
+    "25": {
+      "branch": "pr/atc-macros",
+      "title": "ATC tool-change macro provisioning (Install ATC + Start Job)",
+      "in_master": false,
+      "requires": [
+        14
+      ]
+    },
+    "26": {
+      "branch": "pr/editable-predefined-offsets",
+      "title": "Offsets - editable G28/G30 (Set rapids & stores)",
+      "in_master": false,
+      "requires": []
+    },
+    "27": {
+      "branch": "pr/dialog-centering",
+      "title": "Dialogs - center owner-less modal dialogs",
+      "in_master": false,
+      "requires": []
+    }
+  }
+}
