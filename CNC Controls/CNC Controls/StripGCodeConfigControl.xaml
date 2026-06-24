@@ -20,16 +20,16 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Label Grid.Row="0" Grid.Column="0" Content="M6:" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,2"/>
-            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM6, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
+            <ComboBox Grid.Row="0" Grid.Column="1" x:Uid="cbo_stripM6" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM6, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
                       ToolTip="When to strip M6 (tool change). Strip it if your machine has no tool changer and you change tools by hand outside the program."/>
             <Label Grid.Row="1" Grid.Column="0" Content="M7:" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,2"/>
-            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM7, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
+            <ComboBox Grid.Row="1" Grid.Column="1" x:Uid="cbo_stripM7" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM7, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
                       ToolTip="When to strip M7 (mist coolant on). Strip it if your machine has no mist coolant."/>
             <Label Grid.Row="2" Grid.Column="0" Content="M8:" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,2"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM8, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
+            <ComboBox Grid.Row="2" Grid.Column="1" x:Uid="cbo_stripM8" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreM8, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
                       ToolTip="When to strip M8 (flood coolant on). Strip it if your machine has no flood coolant."/>
             <Label Grid.Row="3" Grid.Column="0" Content="G61/G64:" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,2"/>
-            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreG61G64, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
+            <ComboBox Grid.Row="3" Grid.Column="1" x:Uid="cbo_stripG6x" ItemsSource="{Binding Path=CommandIgnoreStates}" SelectedItem="{Binding Path=IgnoreG61G64, Mode=TwoWay}" HorizontalAlignment="Left" Margin="3,2" VerticalAlignment="Center" Width="70"
                       ToolTip="When to strip G61/G64 (exact-path vs continuous/path-blending mode). Strip if your controller doesn't support them or you prefer to keep its configured default."/>
         </Grid>
     </GroupBox>
