@@ -333,3 +333,4 @@ CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,txt_consoleOutput:System.
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear all
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearToHere:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear up to here
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_save:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save...
+CNC.Controls.WPF.g.en-US.resources:mdicontrol.baml,cbo_mdi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enter a G-code command (MDI block) and press Enter or Send to run it on the controller. Use Up/Down to recall recent commands.
