@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>grblHAL Fork Suite — Overview</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1b1f23; font-size: 11pt; line-height: 1.45; }
+  h1 { font-size: 22pt; margin: 0 0 2px; }
+  h1 + .sub { color: #57606a; font-size: 10.5pt; margin-bottom: 18px; }
+  h2 { font-size: 15pt; margin: 22px 0 6px; color: #0a3069; border-bottom: 2px solid #d0d7de; padding-bottom: 3px; }
+  h3 { font-size: 11.5pt; margin: 12px 0 4px; color: #0a3069; }
+  code, .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.7pt; }
+  a { color: #0969da; text-decoration: none; word-break: break-word; }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0; padding-left: 20px; } li { margin: 3px 0; }
+  .note { border:1px solid #d0d7de; border-left:4px solid #0969da; border-radius:6px; background:#f6f8fa; padding:8px 12px; margin:12px 0; font-size:10pt; }
+  table { width:100%; border-collapse:collapse; margin:8px 0; font-size:10pt; }
+  th { text-align:left; border-bottom:1.5px solid #d0d7de; padding:4px 6px; color:#57606a; }
+  td { padding:3px 6px; border-bottom:1px solid #eaeef2; vertical-align:top; }
+  td.num { text-align:right; font-family:Consolas,monospace; white-space:nowrap; }
+  tr.tot td { border-top:2px solid #d0d7de; font-weight:600; }
+  pre { background:#f6f8fa; border:1px solid #d0d7de; border-radius:6px; padding:10px 12px; font-family:"Cascadia Code",Consolas,monospace; font-size:9.2pt; overflow-x:auto; line-height:1.5; }
+  pre .c { color:#57606a; }
+  .pill { display:inline-block; border-radius:10px; padding:1px 9px; font-size:8.5pt; font-weight:700; color:#fff; margin-right:4px; }
+  .p-snd { background:#0a3069; } .p-sim { background:#3a5a40; } .p-fw { background:#6a4a00; }
+  .foot { color:#57606a; font-size:9pt; }
+</style>
+</head>
+<body>
+
+<h1>grblHAL Fork Suite &mdash; Overview</h1>
+<div class="sub">Three coordinated forks by <code>stevenrwood</code> &mdash; the <strong>ioSender</strong> g-code sender, the <strong>grblHAL Simulator</strong>, and the <strong>iMXRT1062 (Teensy&nbsp;4)</strong> firmware &mdash; each a set of focused, individually-reviewable enhancements staged as pull requests on the fork.</div>
+
+<div class="note">
+  <strong>What this is.</strong> A single map across the three repos: the goals and how the work is organised, each fork&rsquo;s PRs, how to build any subset with the <code>apply-prs</code> composer, and links to the per-fork proposal trackers. The detailed file/line counts and prose for each change live in those trackers (linked at the end).
+</div>
+
+<h2>1 &middot; Goals &amp; process</h2>
+<p><strong>Goal.</strong> Improve the open-source grblHAL CNC stack &mdash; the Windows sender, the PC simulator that drives it, and the controller firmware &mdash; with small, self-contained features and fixes, each kept as a clean diff so the upstream maintainers can adopt, cherry-pick, or decline them piece by piece.</p>
+<p><strong>How the work is organised</strong> (identical model in all three repos):</p>
+<ul>
+  <li><strong>One purpose per branch.</strong> Every change is a <code>pr/&lt;name&gt;</code> branch off the fork&rsquo;s base, scoped to a single feature or fix.</li>
+  <li><strong>An <code>integration</code> branch</strong> merges them all &mdash; the everyday working build, where new work happens before being routed back to its owning <code>pr/*</code> branch so each stays a clean single-feature diff.</li>
+  <li><strong>A proposal tracker</strong> (<code>proposed-prs.html</code> + PDF) documents every PR: a features-at-a-glance index, per-PR file/line counts, dependency notes, and a &ldquo;how to consume&rdquo; guide. It is what gets shared with the upstream maintainers.</li>
+  <li><strong>An <code>apply-prs</code> composer</strong> (see &sect;3) builds any chosen subset on demand &mdash; resolving dependencies and reporting overlaps &mdash; so a consumer takes only the features they want.</li>
+</ul>
+<p><strong>Why forks rather than upstream PRs.</strong> The upstream maintainers are deliberately minimalist and selective, so the strategy is to <em>maintain the forks and stay submittable</em>: each branch remains a focused, ready-to-propose diff, surfaced in the tracker, without blocking on upstream acceptance.</p>
+
+<h2>2 &middot; The three forks</h2>
+
+<h3><span class="pill p-snd">SENDER</span>stevenrwood/ioSender</h3>
+<p>The WPF g-code sender (fork of <code>terjeio/ioSender</code>). <strong>27 tracked PRs.</strong> PRs <strong>1&ndash;8 and 24</strong> are already integrated into the fork&rsquo;s <code>master</code> baseline; the selectable set is PRs <strong>9&ndash;23, 25&ndash;27</strong>. Headline features: configurable main page + flyouts, USB/Ethernet/simulator connection + Connect menu, Validate-controller conformance test, Machine Setup Wizard, grbl:Settings change-highlight/revert, SD+LittleFS file manager, macro manager + pre-processor, in-app Key&nbsp;Mappings editor, Xbox controller support, 3D-view click-to-jog, ATC tool-change provisioning, and a full 7-locale localization pass. Hard deps: 16&rarr;15, 17&rarr;15, 25&rarr;14.</p>
+
+<h3><span class="pill p-sim">SIMULATOR</span>stevenrwood/Simulator</h3>
+<p>The PC grblHAL simulator that ioSender&rsquo;s Connect dialog can launch (fork of <code>grblHAL/Simulator</code>). <strong>5 PRs</strong>, all off pristine <code>master</code>: <code>pr/ymodem-socket</code> (file upload over the socket), <code>pr/sim-probe</code> (modelled stock/toolsetter/spoilboard surfaces), <code>pr/littlefs</code> (on-board filesystem), <code>pr/persistence-reboot</code> (settings persistence + <code>$REBOOT</code>), and <code>pr/sim-view</code> (3D view + material-removal carve &mdash; the integration superset). Two companion fixes live in submodule forks (<code>core</code>, <code>Plugin_SD_card</code>). CMake/MinGW build &rarr; <code>grblHAL_sim.exe</code>.</p>
+
+<h3><span class="pill p-fw">FIRMWARE</span>stevenrwood/iMXRT1062</h3>
+<p>The Teensy&nbsp;4 (i.MXRT1062) controller driver (fork of <code>grblHAL/iMXRT1062</code>). Unlike the other two, the firmware changes live <strong>in submodule forks</strong>, not the driver repo &mdash; the driver carries the build config and the index. PRs: <code>core</code> #1&ndash;4 (combined littlefs+YModem, build-timestamp line, littlefs macro-search-path fix, ngc-flowctrl whitespace fix), <code>Plugin_SD_card</code> #1&ndash;2 (reset-during-SD-streaming, default-macro/ATC options), <code>Plugin_networking</code> #1 (hostname boot info). Build with PlatformIO (env <code>teensy41</code>). The <code>srw/local-build-config</code> branch pins all submodules to the fork branches for a turnkey build; <code>setup_forks.sh</code> wires the fork remotes.</p>
+
+<h2>3 &middot; apply-prs &mdash; the composer</h2>
+<p><code>apply-prs</code> (in <code>ioSender/tools/</code>) builds a fresh branch from a chosen set of PRs across any fork. It resolves each PR&rsquo;s dependency closure, merges them in topological order off the fork&rsquo;s base, and builds to verify. Append-only files (e.g. the locale CSVs) merge with a union driver so they never conflict; genuine same-line overlaps are reported up front and the merge aborts cleanly for a manual resolve. Forks are declared in <code>tools/forks.json</code> (repo path, base, manifest, build command, union globs).</p>
+<pre><span class="c"># ioSender (the default fork)</span>
+python tools/apply-prs.py my-build 15 16 21      <span class="c"># compose (16 auto-pulls 15), build Release, verify</span>
+python tools/apply-prs.py --check 9 10           <span class="c"># just report same-line overlaps (no branch)</span>
+python tools/apply-prs.py --list                 <span class="c"># list every PR + baseline/composable tag + deps</span>
+
+<span class="c"># Simulator fork</span>
+python tools/apply-prs.py sim-all  --fork sim 1 2 3 4 5
+python tools/apply-prs.py probe    --fork sim 2 --run   <span class="c"># compose, CMake build, launch grblHAL_sim.exe</span>
+python tools/apply-prs.py --check  --fork sim 3 5       <span class="c"># overlap report for littlefs + sim-view</span>
+
+<span class="c"># firmware fork: submodule-aware compose (planned) &mdash; today use</span>
+<span class="c">#   srw/local-build-config (turnkey) or setup_forks.sh + per-submodule branches</span></pre>
+<p class="foot">Each fork&rsquo;s <code>master</code> baseline differs: ioSender&rsquo;s already contains PRs&nbsp;1&ndash;8&nbsp;+&nbsp;24 (requesting one just skips it as &ldquo;already in master&rdquo;); the Simulator&rsquo;s is pristine, so all five compose. Because a composed branch starts at the base, old branches that don&rsquo;t build standalone still build here.</p>
+
+<h2>4 &middot; Effort</h2>
+<p>Estimated from the git history (commit timestamps clustered into work sessions). The journey began <strong>2026-05-30</strong> with the very commit that started it &mdash; <em>&ldquo;Fix build: add missing RP.Math references&rdquo;</em> &mdash; and ran through 2026-06-23: <strong>608 commits</strong> over <strong>25 active days</strong>, an estimated <strong>~110 hours</strong> of focused work.</p>
+<table>
+<tr><th>Week</th><th class="num">Commits</th><th class="num">~Hours</th><th>Focus</th></tr>
+<tr><td>May 30 &ndash; 31</td><td class="num">10</td><td class="num">1.5</td><td>build fix (RP.Math) + first features</td></tr>
+<tr><td>Jun 1 &ndash; 7</td><td class="num">150</td><td class="num">34</td><td>UI/jog, ATC, connect-simulator, first trackers</td></tr>
+<tr><td>Jun 8 &ndash; 14</td><td class="num">130</td><td class="num">29</td><td>grbl:Settings, machine-setup, validate</td></tr>
+<tr><td>Jun 15 &ndash; 21</td><td class="num">151</td><td class="num">38</td><td>ATC, localization, fork PRs, sim/firmware</td></tr>
+<tr><td>Jun 22 &ndash; 23</td><td class="num">167</td><td class="num">11</td><td>localization sweep, trackers, apply-prs tooling</td></tr>
+<tr class="tot"><td>Total</td><td class="num">608</td><td class="num">~113</td><td>~4.5 h/day on active days</td></tr>
+</table>
+<p>By area, the two largest buckets were <strong>documentation/trackers</strong> and <strong>localization</strong> &mdash; the polish weighed as much as any single feature. By repo: ioSender ~520 commits, Simulator ~58, firmware ~30.</p>
+<p class="foot">This is an approximation from commit timestamps, not tracked time: it misses un-committed thinking/testing (under-counts) and credits whole windows during fast bursts (over-counts) &mdash; treat ~100&ndash;115&nbsp;h as the honest band.</p>
+
+<h2>5 &middot; The proposal trackers</h2>
+<p>Each fork&rsquo;s full PR detail &mdash; features index, per-PR file/line counts, dependency matrix, and how-to-consume notes:</p>
+<table>
+<tr><th>Fork</th><th>Tracker (HTML)</th><th>Rendered (PDF)</th></tr>
+<tr><td><span class="pill p-snd">SENDER</span>ioSender</td>
+    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/proposed-prs.html">proposed-prs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/ioSender/blob/integration/Proposed-PRs.pdf">Proposed-PRs.pdf</a></td></tr>
+<tr><td><span class="pill p-sim">SIM</span>Simulator</td>
+    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/proposed-prs.html">proposed-prs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/Simulator/blob/integration/Proposed-PRs.pdf">Proposed-PRs.pdf</a></td></tr>
+<tr><td><span class="pill p-fw">FIRMWARE</span>iMXRT1062</td>
+    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/proposedprs.html">srw/proposedprs.html</a></td>
+    <td><a href="https://github.com/stevenrwood/iMXRT1062/blob/srw/local-build-config/srw/proposedprs.pdf">srw/proposedprs.pdf</a></td></tr>
+</table>
+<p class="foot">Tooling: <code>ioSender/tools/apply-prs.py</code> (composer) &middot; <code>tools/forks.json</code> (fork registry) &middot; <code>tools/prs.json</code> (ioSender manifest) &middot; <code>Simulator/tools/prs.json</code> (sim manifest) &middot; <code>iMXRT1062/srw/firmware-forks.json</code> + <code>setup_forks.sh</code> (firmware index).</p>
+
+</body>
+</html>
