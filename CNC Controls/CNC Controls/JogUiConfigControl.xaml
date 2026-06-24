@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="250" d:DesignWidth="310">
-    <GroupBox x:Uid="grp_uiJogging" x:Name="grp_uiJog" Header="UI jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310"
+    <GroupBox x:Uid="grp_uiJogging" x:Name="grp_uiJog" Header="UI jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" MinWidth="310"
               ToolTip="Four distance presets and four speed presets for the on-screen jog panel. Distance and speed are chosen with separate selectors, so any distance can be paired with any speed. 0 is the smallest/slowest, 3 the largest/fastest.">
         <StackPanel HorizontalAlignment="Left" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <local:NumericField x:Uid="lbl_distance3" Label="Distance 3:" ColonAt="160" Unit="mm" Format="###0.0##" Value="{Binding Path=JogUiMetric.Distance3, Mode=TwoWay}" ToolTip="On-screen jog distance preset 3 (largest step)."/>
@@ -19,11 +19,11 @@
             <local:NumericField x:Uid="lbl_feedrate0" Label="Feedrate 0:" ColonAt="160" Unit="mm/min" Format="####0" Value="{Binding Path=JogUiMetric.Feedrate0, Mode=TwoWay}" ToolTip="On-screen jog speed preset 0 (slowest), selected independently of the distance."/>
             <CheckBox x:Uid="lbl_linkToUi" IsChecked="{Binding Path=Jog.LinkStepJogToUI, Mode=TwoWay}" Margin="5,10,0,3" VerticalContentAlignment="Top"
                       ToolTip="When checked, keyboard jogging uses the distance and speed selected on the on-screen UI jog panel, and the separate Keyboard Jogging panel is unavailable. When unchecked, keyboard jogging uses its own Slow/Fast speed (set on the Jog page).">
-                <TextBlock Text="Link distance and speed to UI jogging" TextWrapping="Wrap"/>
+                <TextBlock x:Uid="txt_linkJog" Text="Link distance and speed to UI jogging" TextWrapping="Wrap"/>
             </CheckBox>
             <CheckBox x:Uid="lbl_keepUiJog" IsChecked="{Binding Path=Jog.KeepUiJogSelection, Mode=TwoWay}" Margin="5,0,0,3" VerticalContentAlignment="Top"
                       ToolTip="Restore the on-screen jog distance and speed selection from the previous session when ioSender starts.">
-                <TextBlock Text="Remember distance and speed across restarts" TextWrapping="Wrap"/>
+                <TextBlock x:Uid="txt_rememberJog" Text="Remember distance and speed across restarts" TextWrapping="Wrap"/>
             </CheckBox>
         </StackPanel>
     </GroupBox>
