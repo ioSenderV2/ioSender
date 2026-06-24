@@ -6,7 +6,14 @@ Usage:
     python tools/apply-prs.py <new-branch> <pr> [<pr> ...]   # compose those PRs (+ deps)
     python tools/apply-prs.py my-build 15 16 21              # 16 auto-pulls 15
     python tools/apply-prs.py my-build 25 --run              # compose, build, launch
+    python tools/apply-prs.py --check 9 10 12                # report same-line overlaps, no branch
     python tools/apply-prs.py --list                         # list known PRs
+
+Before composing it runs a pre-flight (git merge-tree, no checkout) that reports which of
+the selected PRs overlap on the same lines. The locale CSVs use a merge=union driver so
+their append-only rows never conflict; ~90% of PR pairs auto-merge. The genuine overlaps
+are almost all on AppConfig.cs / MainWindow (the central settings + menu registration
+files) - those few you resolve by hand; everything else composes clean.
 
 <new-branch> is created off master and must not already exist (use --force to replace).
 The dependency closure is resolved from tools/prs.json, topologically ordered, and each
@@ -67,6 +74,40 @@ def closure(requested, prs):
     return order
 
 
+def _requires_rel(a, b, prs):
+    """True if a and b are in a (transitive) dependency relation (composer merges them ordered)."""
+    def reqs(n, acc):
+        for r in prs[str(n)]["requires"]:
+            if r not in acc:
+                acc.add(r); reqs(r, acc)
+        return acc
+    return a in reqs(b, set()) or b in reqs(a, set())
+
+
+def preflight(order, prs):
+    """Pairwise overlap check (git merge-tree, no checkout). Returns {(a,b): [non-csv files]}.
+    Skips dependency pairs (merged in order) and CSV-only overlaps (union driver handles them)."""
+    import itertools, re
+    fline = re.compile(r'^\s+(?:our|their|base)\s+\d+\s+[0-9a-f]+\s+(.+)$')
+    hits = {}
+    for a, b in itertools.combinations(order, 2):
+        if _requires_rel(a, b, prs):
+            continue
+        out = subprocess.run(["git", "merge-tree", MASTER,
+                              prs[str(a)]["branch"], prs[str(b)]["branch"]],
+                             cwd=ROOT, capture_output=True).stdout.decode("utf-8", "replace")
+        cur, files = None, set()
+        for ln in out.splitlines():
+            m = fline.match(ln)
+            if m:
+                cur = m.group(1).strip()
+            elif "<<<<<<<" in ln and cur and "/csv/" not in cur.replace("\\", "/"):
+                files.add(cur)
+        if files:
+            hits[(a, b)] = sorted(files)
+    return hits
+
+
 def ensure_clean_tree():
     dirty = [l for l in git("status", "--porcelain").stdout.splitlines()
              if l and not l.startswith("??")]
@@ -82,6 +123,7 @@ def main():
     ap.add_argument("--no-build", action="store_true", help="skip the verification build")
     ap.add_argument("--run", action="store_true", help="launch ioSender.exe after a successful build")
     ap.add_argument("--force", action="store_true", help="replace the target branch if it exists")
+    ap.add_argument("--check", action="store_true", help="report overlaps for the set and exit (no branch)")
     ap.add_argument("--list", action="store_true", help="list known PRs and exit")
     args = ap.parse_args()
     prs = load_manifest()
@@ -93,8 +135,15 @@ def main():
             dep = f"  (requires {d['requires']})" if d["requires"] else ""
             print(f"  PR{int(n):>2}  [{tag:<10}] {d['branch']:<32} {d['title']}{dep}")
         return
-    if not args.target or not args.prs:
-        ap.error("usage: apply-prs <new-branch> <pr> [<pr> ...]   (or --list)")
+    if args.check and args.target is not None:
+        # no branch name in --check mode: the first positional is actually a PR number
+        try:
+            args.prs = [int(args.target)] + args.prs
+        except ValueError:
+            ap.error("--check takes PR numbers only")
+        args.target = None
+    if not args.prs or (not args.check and not args.target):
+        ap.error("usage: apply-prs <new-branch> <pr> [<pr> ...]   (or --check <pr...>, --list)")
 
     name = args.target
     baseline = [n for n in args.prs if str(n) in prs and prs[str(n)]["in_master"]]
@@ -112,7 +161,17 @@ def main():
     print("Merge order:")
     for n in order:
         print(f"   PR{n:>2}  {prs[str(n)]['branch']}")
-    print(f"Branch    : {name}  (off {MASTER})\n")
+
+    overlaps = preflight(order, prs)
+    if overlaps:
+        print("\n!! these selected PRs overlap on the same lines (you'll resolve a hunk per file):")
+        for (a, b), fs in sorted(overlaps.items()):
+            print(f"   PR{a} x PR{b}: " + ", ".join(f.split('/')[-1] for f in fs))
+    else:
+        print("\nNo same-line overlaps in this set - composes cleanly.")
+    if args.check:
+        return
+    print(f"\nBranch    : {name}  (off {MASTER})\n")
 
     ensure_clean_tree()
     start = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
