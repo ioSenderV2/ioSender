@@ -328,3 +328,21 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,X und Y Programmgrenzen abfahren
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Sicherstellen, dass die Werkzeugspitze frei von Hindernissen ist!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,wnd_macroManager:System.Windows.Window.Title,Title,True,True,,Edit Macros
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,col_macroName:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Name
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,col_macroFile:System.Windows.Controls.DataGridColumn.Header,None,True,True,,File
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,col_macroPrompt:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Prompt
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,col_macroKey:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Key
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,chk_macroPrompt:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask for confirmation before running this macro.
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,cbo_macroKey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Function key that runs this macro when no job is running. Each key can be assigned to only one macro.
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroCreate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Create
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroView:System.Windows.Controls.ContentControl.Content,Button,True,True,,View
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code.
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroEdit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroEdit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit the macro&apos;s definition - the inline G-code, or the @&lt;path&gt; reference line (to change or remove the path). Saved changes are read back.
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroDelete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.de-DE.resources:macromanagerdialog.baml,btn_macroClose:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.WPF.g.de-DE.resources:macroexecutecontrol.baml,cbo_macroSelect:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Select a macro to run.
+CNC.Controls.WPF.g.de-DE.resources:macroexecutecontrol.baml,btn_runMacro:System.Windows.Controls.ContentControl.Content,Button,True,True,,Run
+CNC.Controls.WPF.g.de-DE.resources:macroexecutecontrol.baml,btn_runMacro:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the selected macro.
+CNC.Controls.WPF.g.de-DE.resources:appconfigview.baml,btn_editMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit Macros
