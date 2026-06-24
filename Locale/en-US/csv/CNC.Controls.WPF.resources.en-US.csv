@@ -328,3 +328,18 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,Execute moves to outline X and Y program limits.
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,Ensure tool tip is clear of any obstructions!
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_create:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Create
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createNew:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_New content...
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createNew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create a new file: opens Notepad; the file is written to the controller when you close it.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createUpload:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,From _file...
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createUpload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create from an existing local file (upload).
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_view:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_View
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_view:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open a copy of the file in Notepad (changes are not saved back).
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_edit:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Edit
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_edit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit the file in Notepad; saved back to the controller when you close Notepad.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_load:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Load
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_load:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_loadRun:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load and _run
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_loadRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender and start it.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_copyTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Cop_y to
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_moveTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Move to
