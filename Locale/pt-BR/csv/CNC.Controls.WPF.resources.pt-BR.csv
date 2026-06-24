@@ -328,3 +328,6 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,Executar movimentos para determinar os limites de X e Y do programa.
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,Verifique que a ponta da sonda não ira encontrar obstruções!
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Erro de controlador e códigos de alarme
+CNC.Controls.WPF.g.pt-BR.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
+CNC.Controls.WPF.g.pt-BR.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
+CNC.Controls.WPF.g.pt-BR.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.

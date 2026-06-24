@@ -328,3 +328,6 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,Виконати переміщення по границям обробки по X та Y.
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Упевніться, що путь інструмента вільний!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Коди аварій та помилок контролера
+CNC.Controls.WPF.g.uk-UA.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
+CNC.Controls.WPF.g.uk-UA.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
+CNC.Controls.WPF.g.uk-UA.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
