@@ -50,3 +50,4 @@ ioSender.g.en-US.resources:mainwindow.baml,tab_sdCard:System.Windows.Controls.He
 ioSender.g.en-US.resources:mainwindow.baml,tab_threading:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,螺纹加工
 ioSender.g.en-US.resources:mainwindow.baml,tab_tools:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,刀具
 ioSender.g.en-US.resources:mainwindow.baml,tab_turning:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,车削
+ioSender.g.zh-CN.resources:mainwindow.baml,mnu_validate:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Validate controller...

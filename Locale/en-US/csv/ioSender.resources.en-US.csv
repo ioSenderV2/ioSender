@@ -50,3 +50,4 @@ ioSender.g.en-US.resources:mainwindow.baml,tab_sdCard:System.Windows.Controls.He
 ioSender.g.en-US.resources:mainwindow.baml,tab_threading:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Threading
 ioSender.g.en-US.resources:mainwindow.baml,tab_tools:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Tools
 ioSender.g.en-US.resources:mainwindow.baml,tab_turning:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Turning
+ioSender.g.en-US.resources:mainwindow.baml,mnu_validate:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Validate controller...

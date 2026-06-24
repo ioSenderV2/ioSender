@@ -113,7 +113,7 @@
                     </TextBlock.Style>
                     <TextBlock.ContextMenu>
                         <ContextMenu Opened="targetContextMenu_Opened">
-                            <MenuItem Header="_Validate controller..." Click="validateMenuItem_Click"/>
+                            <MenuItem x:Uid="mnu_validate" Header="_Validate controller..." Click="validateMenuItem_Click"/>
                         </ContextMenu>
                     </TextBlock.ContextMenu>
                 </TextBlock>
