@@ -304,7 +304,7 @@ namespace CNC.Controls
 
             if (ops.Count == 0)
             {
-                MessageBox.Show("No per-toolpath files matching <seq>_<name>_T<tool>.nc were found in the selected folder.",
+                MessageBox.Show(LibStrings.FindResource("LfNoToolpathFiles"),
                                 "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }

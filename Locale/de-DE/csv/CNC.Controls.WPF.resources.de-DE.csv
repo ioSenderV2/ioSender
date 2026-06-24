@@ -330,3 +330,4 @@ CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Wind
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
 CNC.Controls.WPF.g.de-DE.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Start from this toolpath
 CNC.Controls.WPF.g.de-DE.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Run just this toolpath
+CNC.Controls.WPF.g.de-DE.resources:libstrings.baml,str_lfNoToolpaths:System.String.$Content,None,True,True,,No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.
