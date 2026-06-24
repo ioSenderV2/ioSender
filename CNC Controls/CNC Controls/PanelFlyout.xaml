@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
-             d:DesignHeight="130" d:DesignWidth="200" Width="200">
+             d:DesignHeight="130" d:DesignWidth="200" MinWidth="200">
     <UserControl.Resources>
         <Style x:Key="FlyoutGlyphButton" TargetType="ButtonBase">
             <Setter Property="Background" Value="Transparent"/>
@@ -33,9 +33,9 @@
         <Grid>
             <ContentControl x:Name="host" Margin="4,10,4,10" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,4,0" Panel.ZIndex="10">
-                <ToggleButton x:Name="btnPin" Content="📌" FontSize="11" Width="17" Height="17" Style="{StaticResource FlyoutGlyphButton}"
+                <ToggleButton x:Name="btnPin" x:Uid="btn_pin" Content="📌" FontSize="11" Width="17" Height="17" Style="{StaticResource FlyoutGlyphButton}"
                               ToolTip="Pin (keep open when another flyout is opened)" Checked="btnPin_Changed" Unchecked="btnPin_Changed"/>
-                <Button x:Name="btnClose" Content="✕" FontSize="10" Width="15" Height="17" Style="{StaticResource FlyoutGlyphButton}"
+                <Button x:Name="btnClose" x:Uid="btn_close" Content="✕" FontSize="10" Width="15" Height="17" Style="{StaticResource FlyoutGlyphButton}"
                         ToolTip="Close" Click="btn_Close"/>
             </StackPanel>
         </Grid>

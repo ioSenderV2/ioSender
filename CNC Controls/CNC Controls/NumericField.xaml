@@ -17,7 +17,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Label x:Name="label" x:Uid="lbl_NumField" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-        <local:NumericTextBox x:Name="data" Grid.Column="1" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" Width="64"
+        <local:NumericTextBox x:Name="data" Grid.Column="1" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" MinWidth="64"
             IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
             Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
             Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
@@ -28,7 +28,7 @@
                     <MenuItem Command="Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                     <MenuItem Command="Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                     <Separator/>
-                    <MenuItem x:Name="miReset" Header="Reset to default" Click="ResetToDefault_Click"/>
+                    <MenuItem x:Name="miReset" x:Uid="mnu_reset" Header="Reset to default" Click="ResetToDefault_Click"/>
                 </ContextMenu>
             </local:NumericTextBox.ContextMenu>
         </local:NumericTextBox>

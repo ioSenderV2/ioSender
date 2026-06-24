@@ -14,7 +14,7 @@
             <local:PositionSumConverter x:Key="MachinePos"/>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox Header="Machine Position" HorizontalAlignment="Left" VerticalAlignment="Top" Width="210">
+    <GroupBox x:Uid="grp_machinePos" Header="Machine Position" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
         <StackPanel Margin="3,2,0,2">
             <local:NumericField Label="X:" Unit="" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <local:NumericField.Value>
