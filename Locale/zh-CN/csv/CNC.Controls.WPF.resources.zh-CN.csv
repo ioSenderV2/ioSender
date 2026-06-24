@@ -362,3 +362,6 @@ CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,txt_invert:System.Windows.C
 CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,btn_reset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset
 CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,btn_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
 CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,chk_invertX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the X-axis jog direction for this analog stick.
+CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,chk_invertY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the Y-axis jog direction for this analog stick.
+CNC.Controls.WPF.g.zh-CN.resources:keymapeditor.baml,chk_invertZ:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reverse the Z-axis jog direction for this analog stick.

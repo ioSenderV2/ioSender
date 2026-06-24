@@ -236,9 +236,9 @@
                         <TextBox x:Name="txtFeedScale" x:Uid="fld_feedScale" MinWidth="46" VerticalAlignment="Center" VerticalContentAlignment="Center" Padding="2,1" Margin="0,0,16,6"
                                  ToolTip="Full-stick feed as a multiple of the Jog panel feed (clamped to the machine's max rate)."/>
                         <TextBlock x:Uid="txt_invert" Text="Invert:" VerticalAlignment="Center" Margin="0,0,6,6"/>
-                        <CheckBox x:Name="chkInvertX" Content="X" VerticalAlignment="Center" Margin="0,0,8,6"/>
-                        <CheckBox x:Name="chkInvertY" Content="Y" VerticalAlignment="Center" Margin="0,0,8,6"/>
-                        <CheckBox x:Name="chkInvertZ" Content="Z" VerticalAlignment="Center" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="chkInvertX" x:Uid="chk_invertX" ToolTip="Reverse the X-axis jog direction for this analog stick." Content="X" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="chkInvertY" x:Uid="chk_invertY" ToolTip="Reverse the Y-axis jog direction for this analog stick." Content="Y" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="chkInvertZ" x:Uid="chk_invertZ" ToolTip="Reverse the Z-axis jog direction for this analog stick." Content="Z" VerticalAlignment="Center" Margin="0,0,0,6"/>
                       </WrapPanel>
                     </GroupBox>
                 </Grid>
