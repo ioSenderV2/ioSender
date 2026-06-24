@@ -38,12 +38,79 @@
   .toc td.sz .k { color:#8c959f; }     /* "Files:" / "Lines:" key */
   .toc tr.tot td { border-top:2px solid #d0d7de; border-bottom:none; font-weight:600; padding-top:6px; }
   .foot { color:#57606a; font-size:9pt; margin-top:6px; }
+  .feat { border:1px solid #d0d7de; border-radius:6px; padding:10px 14px; margin:14px 0 0; }
+  .feat h3 { font-size:10.5pt; color:#0a3069; margin:11px 0 3px; border-bottom:1px solid #eaeef2; padding-bottom:2px; }
+  .feat h3.first { margin-top:2px; }
+  .feat table { width:100%; border-collapse:collapse; font-size:10pt; }
+  .feat td { padding:2px 6px; border-bottom:1px solid #f0f2f4; vertical-align:top; }
+  .feat td.tag { width:34px; white-space:nowrap; }
+  .feat td.prs { width:120px; white-space:nowrap; text-align:right; font-family:Consolas,monospace; font-size:9pt; }
+  .t-new { color:#1a7f37; font-weight:700; font-size:8pt; }
+  .t-chg { color:#d97706; font-weight:700; font-size:8pt; }
+  .t-fix { color:#cf222e; font-weight:700; font-size:8pt; }
+  .star { color:#b08800; }
 </style>
 </head>
 <body>
 
 <h1>Proposed Pull Requests</h1>
 <div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 26 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
+
+<div class="feat">
+<div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
+
+<h3 class="first">Connectivity &amp; reliability</h3>
+<table>
+<tr><td>Connect to USB / Ethernet / simulator, with a Connect/Reconnect menu, remembered host and opt-in prefer-network</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr15">15</a></td></tr>
+<tr><td>Validate controller &mdash; streams a capability-tailored test in check mode (no motion), reports pass/fail + 3D preview</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr16">16</a> +<a href="#pr15">15</a></td></tr>
+<tr><td>Restore main-window <em>position</em> across launches (was size only)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr17">17</a> +<a href="#pr15">15</a></td></tr>
+<tr><td>Survive connection loss / SD-card swap &mdash; guarded writes + auto-reconnect instead of crashing</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr4">4</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Telnet / websocket modal-dialog UI deadlock</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr24">24</a><span class="star">&#9733;</span></td></tr>
+</table>
+
+<h3>Jogging &amp; main page</h3>
+<table>
+<tr><td>Configurable main page &mdash; Edit Main Page editor, pinnable flyouts, assignable jog panels, per-offset Go/Set buttons</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr9">9</a></td></tr>
+<tr><td>Native Xbox / game-controller support &mdash; analog-stick jog, remappable buttons, live Controller tab</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr8">8</a><span class="star">&#9733;</span></td></tr>
+<tr><td>3D view: Ctrl+click to jog (retracts Z first) + per-axis $23 orientation fix</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr20">20</a></td></tr>
+<tr><td>Keyboard jog keeps working when focus drifts off the Job view</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr22">22</a></td></tr>
+<tr><td>High-DPI / 125&ndash;150% text-scaling layout</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr7">7</a><span class="star">&#9733;</span></td></tr>
+</table>
+
+<h3>Machine setup &amp; settings</h3>
+<table>
+<tr><td>Machine Setup Wizard &mdash; guided first-run machine description (catalog, home-corner picker, per-axis table)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr21">21</a></td></tr>
+<tr><td>grbl:Settings &mdash; change-from-startup highlight, granular revert, per-Save restore points, bitfield tooltips</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr18">18</a></td></tr>
+<tr><td>Stepper calibration (scratch) tab &mdash; long-span V-bit steps/mm</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr5">5</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Safe-Z on Go To &mdash; lift / traverse / descend instead of a diagonal rapid</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr23">23</a></td></tr>
+<tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
+</table>
+
+<h3>Files, SD card &amp; ATC</h3>
+<table>
+<tr><td>Load Folder &mdash; assemble per-toolpath <code>.nc</code> files into one outlined program (+ Fusion add-in)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr6">6</a><span class="star">&#9733;</span></td></tr>
+<tr><td>SD + LittleFS browser &amp; file manager &mdash; multi-filesystem, View/Edit/Create/Upload via Notepad</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr14">14</a></td></tr>
+<tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a> +<a href="#pr14">14</a></td></tr>
+</table>
+
+<h3>Macros, console &amp; keys</h3>
+<table>
+<tr><td>Macro manager dialog (grid, F-key assign, confirm-on-run flag) + run-only macro flyout</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr10">10</a></td></tr>
+<tr><td>Macro pre-processor directives &mdash; PREREQ / MBOX / WAITIDLE / PROMPT / <code>@path</code></td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr11">11</a></td></tr>
+<tr><td>In-app Key Mappings editor + console state persistence</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr3">3</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Console: inline terminal command prompt + output right-click menu (Clear / Save)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr19">19</a></td></tr>
+</table>
+
+<h3>Polish, onboarding &amp; docs</h3>
+<table>
+<tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
+<tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
+<tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
+<tr><td>Show Motor Fault / Warning signals in the Signals display</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr2">2</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Build documentation &mdash; Mega-XL upgrade notes + repeatable tool-change guide</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr13">13</a></td></tr>
+<tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a><span class="star">&#9733;</span></td></tr>
+</table>
+</div>
 
 <div class="toc">
 <table>
