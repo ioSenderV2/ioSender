@@ -328,7 +328,7 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,X und Y Programmgrenzen abfahren
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Sicherstellen, dass die Werkzeugspitze frei von Hindernissen ist!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Controller error and alarm codes
-CNC.Controls.WPF.g.de-DE.resources:consolecontrol.baml,txt_mdiInput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enter a command (MDI). Up/Down recalls history, Esc clears.
+CNC.Controls.WPF.g.de-DE.resources:consolecontrol.baml,txt_mdiInput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Enter a command (MDI). Up/Down recalls history, Esc clears."
 CNC.Controls.WPF.g.de-DE.resources:consolecontrol.baml,txt_consoleOutput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Right-click for Clear all / Clear up to here / Save. The log keeps every line until cleared (in memory only - not written to disk).
 CNC.Controls.WPF.g.de-DE.resources:consolecontrol.baml,mnu_clearAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear all
 CNC.Controls.WPF.g.de-DE.resources:consolecontrol.baml,mnu_clearToHere:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear up to here

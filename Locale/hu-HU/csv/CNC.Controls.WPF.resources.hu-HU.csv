@@ -328,7 +328,7 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_trinamic:System.Windo
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line1:System.Windows.Documents.Run.Text,Text,True,True,,Hajtsa végre a mozgásokat az X és Y program határainak felvázolásához.
 CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,txt_line2:System.Windows.Documents.Run.Text,Text,True,True,,"Ügyeljen arra, hogy a szerszám hegye ne legyen akadályozva!"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:System.Windows.Window.Title,Title,True,True,,Vezérlő hiba és riasztási kódok
-CNC.Controls.WPF.g.hu-HU.resources:consolecontrol.baml,txt_mdiInput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enter a command (MDI). Up/Down recalls history, Esc clears.
+CNC.Controls.WPF.g.hu-HU.resources:consolecontrol.baml,txt_mdiInput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Enter a command (MDI). Up/Down recalls history, Esc clears."
 CNC.Controls.WPF.g.hu-HU.resources:consolecontrol.baml,txt_consoleOutput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Right-click for Clear all / Clear up to here / Save. The log keeps every line until cleared (in memory only - not written to disk).
 CNC.Controls.WPF.g.hu-HU.resources:consolecontrol.baml,mnu_clearAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear all
 CNC.Controls.WPF.g.hu-HU.resources:consolecontrol.baml,mnu_clearToHere:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear up to here
