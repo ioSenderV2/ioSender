@@ -1,6 +1,6 @@
 import re, io, json, subprocess
 REPO = r"c:\github\ioSender"
-h = io.open(r"c:\github\ioSender\proposed-prs.html", encoding="utf-8").read()
+h = io.open(r"c:\github\ioSender\ProposedPRs.html", encoding="utf-8").read()
 def sh(a): return subprocess.run(["git"]+a, cwd=REPO, capture_output=True, text=True).stdout
 
 toc = re.findall(r'<td class="n">(\d+)</td><td><a href="#pr\d+">([^<]+)</a></td><td class="mono">([^<]+)</td>', h)
