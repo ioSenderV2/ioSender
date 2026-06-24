@@ -331,7 +331,7 @@ CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,wnd_errorsAndAlarms:Syst
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,dlg_editMainPage:System.Windows.Window.Title,Title,True,True,,Edit Main Page
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,tab_panels:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Panels
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,txt_available:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Available (unassigned)
-CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,txt_rightOf3d:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Right of 3D View (top → bottom, max 6)
+CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,txt_rightOf3d:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,"Right of 3D View (top → bottom, max 6)"
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,btn_toMain:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add to right of 3D view
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,btn_fromMain:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Remove
 CNC.Controls.WPF.g.ru-RU.resources:mainpageeditor.baml,btn_mainUp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move up
@@ -371,6 +371,6 @@ CNC.Controls.WPF.g.ru-RU.resources:numericfield.baml,mnu_reset:System.Windows.Co
 CNC.Controls.WPF.g.ru-RU.resources:joguiconfigcontrol.baml,txt_linkJog:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Link distance and speed to UI jogging
 CNC.Controls.WPF.g.ru-RU.resources:joguiconfigcontrol.baml,txt_rememberJog:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Remember distance and speed across restarts
 CNC.Controls.WPF.g.ru-RU.resources:basicconfigcontrol.baml,lbl_autoSaveSettings:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save settings on exit
-CNC.Controls.WPF.g.ru-RU.resources:basicconfigcontrol.baml,lbl_autoSaveSettings:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Save App settings automatically when leaving this tab or closing, instead of using the Save settings button.
+CNC.Controls.WPF.g.ru-RU.resources:basicconfigcontrol.baml,lbl_autoSaveSettings:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save App settings automatically when leaving this tab or closing, instead of using the Save settings button."
 CNC.Controls.WPF.g.ru-RU.resources:basicconfigcontrol.baml,lbl_promptOnSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
 CNC.Controls.WPF.g.ru-RU.resources:basicconfigcontrol.baml,lbl_promptOnSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show a confirm/discard list of changed settings before auto-saving.
