@@ -362,7 +362,7 @@ namespace CNC.Controls
 
             if (CurrentResolution <= 0d)
             {
-                MessageBox.Show("Current steps/mm is not available for the selected axis.", "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(LibStrings.FindResource("ScNoAxisResolution"), "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
