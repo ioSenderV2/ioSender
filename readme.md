@@ -14,7 +14,9 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a stack of proposed enhancements, each kept as a **clean, single-feature branch** (`pr/*`) that diffs against `master` so it can be reviewed — and picked up — independently.
 
-**See [`Proposed-PRs.pdf`](Proposed-PRs.pdf) for the full list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`proposed-prs.html`](proposed-prs.html) if you'd rather open it in a browser.)
+**New here? Start with [`Overview.pdf`](Overview.pdf)** ([`overview.html`](overview.html)) — the big picture across all three coordinated forks (this **sender**, the grblHAL **Simulator**, and the iMXRT1062 **firmware**): goals & process, each fork's PRs, the `apply-prs` composer with examples, and links to every tracker.
+
+**See [`Proposed-PRs.pdf`](Proposed-PRs.pdf) for this repo's full PR list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`proposed-prs.html`](proposed-prs.html) if you'd rather open it in a browser.)
 
 Branch model:
 - `master` = the upstream release plus PRs 1&ndash;8 already integrated.
