@@ -636,6 +636,116 @@ namespace CNC.Controls
         {
             JogCommand((string)(sender as Button).Tag == "stop" ? "stop" : (string)(sender as Button).Content);
         }
+
+        // Centre button: while a jog is running it cancels the jog (the red stop sign shown then); when idle it
+        // rapids to a centre point at safe Z (bullseye). Target = the loaded program's XY-bounding-box centre
+        // ("stock") if it has moves, else the machine-envelope centre. The move always retracts Z to the top
+        // first and stays there (never plunges) - the same safe G53 jog pattern the 3D click-to-jog uses.
+        private void CenterButton_Click(object sender, RoutedEventArgs e)
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model != null && model.GrblState.State == GrblStates.Jog)
+                JogCommand("stop");
+            else
+                GoToCenter();
+        }
+
+        private void GoToCenter()
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model == null)
+                return;
+
+            if (model.HomedState != HomedState.Homed) {
+                model.Message = "Go to centre: home the machine first.";
+                return;
+            }
+
+            if (model.IsJobRunning ||
+                 !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
+                model.Message = "Go to centre: the machine must be idle.";
+                return;
+            }
+
+            if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
+                model.Message = "Go to centre: set max travel ($130-$132) first.";
+                return;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
+                model.Message = "Go to centre: enable soft limits ($20=1) first.";
+                return;
+            }
+
+            double mx, my;
+
+            if (ProgramHasMoves(model)) {
+                Position wco = new Position(model.WorkPositionOffset, model.UnitFactor);
+                ProgramLimits pl = model.ProgramLimits;
+                mx = ClampMachine(0, (pl.MinX + pl.MaxX) / 2d + wco.X);   // stock (work) centre -> machine
+                my = ClampMachine(1, (pl.MinY + pl.MaxY) / 2d + wco.Y);
+                model.Message = "Go to centre of stock at safe Z.";
+            } else {
+                mx = (ClampMachine(0, double.MaxValue) + ClampMachine(0, double.MinValue)) / 2d;   // envelope mid
+                my = (ClampMachine(1, double.MaxValue) + ClampMachine(1, double.MinValue)) / 2d;
+                model.Message = "Go to centre of machine at safe Z.";
+            }
+
+            double mtop = ClampMachine(2, double.MaxValue);   // fully retracted toward the home/top end (safe Z)
+            double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
+
+            // Retract Z to the top first, then rapid to the centre XY and stay there. grblHAL runs queued $J=
+            // jogs strictly FIFO, so the Z retract always completes before the XY traverse - never at depth.
+            model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+            model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
+        }
+
+        // Per-axis max feed ($110-$112), used so the jog moves at rapid speed; falls back to the fast-jog feed.
+        private double RapidFeed(int axis)
+        {
+            double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis);
+            return rate > 0d ? rate : AppConfig.Settings.Jog.FastFeedrate;
+        }
+
+        // Clamp an absolute machine-axis target to the safe travel range (mirrors the jog limiter above).
+        private double ClampMachine(int axis, double pos)
+        {
+            double maxTravel = GrblInfo.MaxTravel.Values[axis];
+            double clearance = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
+
+            if (GrblInfo.ForceSetOrigin) {
+                if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis))) {
+                    if (pos > 0d) pos = 0d;
+                    else if (pos < -maxTravel + clearance) pos = -maxTravel + clearance;
+                } else {
+                    if (pos < 0d) pos = 0d;
+                    else if (pos > maxTravel - clearance) pos = maxTravel - clearance;
+                }
+            } else {
+                if (pos > -clearance) pos = -clearance;
+                else if (pos < -(maxTravel - clearance)) pos = -(maxTravel - clearance);
+            }
+
+            return pos;
+        }
+
+        // A loaded program "has moves" only when its bounding box has a real extent on some axis (an unloaded
+        // program is all-NaN, a moveless one all-zero). Mirrors LimitsControl's "Program limits" test.
+        private static bool ProgramHasMoves(GrblViewModel model)
+        {
+            if (!GCode.File.IsLoaded)
+                return false;
+
+            ProgramLimits pl = model.ProgramLimits;
+            for (int i = 0; i < GrblInfo.NumAxes; i++) {
+                double min = pl.MinValues[i], max = pl.MaxValues[i];
+                if (!double.IsNaN(min) && !double.IsNaN(max) && max != min)
+                    return true;
+            }
+            return false;
+        }
     }
 
     internal class ArrayValues<T> : ViewModelBase

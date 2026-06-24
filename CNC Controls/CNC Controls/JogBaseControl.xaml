@@ -75,10 +75,50 @@
                 </StackPanel>
                 <StackPanel VerticalAlignment="Center" Margin="5,0">
                     <local:JogButton Content="Y+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                    <Button Tag="stop" Style="{StaticResource JogButtonStyle}" Margin="0,5" Click="Button_Click">
-                        <Button.Content>
-                            <Image Source="Resources/Symbols_Stop_32xLG.png"/>
-                        </Button.Content>
+                    <!-- Centre button: bullseye = "go to centre at safe Z" when idle; red stop sign = "stop jog" while
+                         jogging. Icon + tooltip swap off GrblState via IsJoggingConverter (no code-behind needed). -->
+                    <Button x:Uid="btn_jogCenter" Margin="0,5" Click="CenterButton_Click" ToolTip="Go to centre at safe Z">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource JogButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
+                                        <Setter Property="ToolTip" Value="Stop jog"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Grid>
+                            <Viewbox Width="34" Height="34" Visibility="Collapsed">
+                                <Viewbox.Style>
+                                    <Style TargetType="Viewbox">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Viewbox.Style>
+                                <Grid Width="100" Height="100">
+                                    <Polygon Points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" Fill="#FFD32F2F" Stroke="#FFB71C1C" StrokeThickness="4" StrokeLineJoin="Round"/>
+                                </Grid>
+                            </Viewbox>
+                            <Viewbox Width="34" Height="34">
+                                <Viewbox.Style>
+                                    <Style TargetType="Viewbox">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Viewbox.Style>
+                                <Grid Width="100" Height="100">
+                                    <Ellipse Width="98" Height="98" Fill="#FFD32F2F"/>
+                                    <Ellipse Width="64" Height="64" Fill="White"/>
+                                    <Ellipse Width="30" Height="30" Fill="#FFD32F2F"/>
+                                </Grid>
+                            </Viewbox>
+                        </Grid>
                     </Button>
                     <local:JogButton Content="Y-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
                 </StackPanel>
