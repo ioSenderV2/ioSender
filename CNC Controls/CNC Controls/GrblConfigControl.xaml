@@ -76,7 +76,7 @@
         <!-- Row context menu for the classic-grbl DataGrid (kept out of the row Style, which
              cannot host event handlers). DataContext resolves to the row's GrblSettingDetails. -->
         <ContextMenu x:Key="SettingRowMenu">
-            <MenuItem Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
+            <MenuItem x:Uid="mnu_revertStartup" Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
         </ContextMenu>
     </UserControl.Resources>
     <DockPanel>
@@ -92,7 +92,7 @@
                         <StackPanel Orientation="Horizontal">
                             <StackPanel.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="Revert all in group to value at startup" IsEnabled="{Binding IsModified}" Click="groupRevertStartup_Click" />
+                                    <MenuItem x:Uid="mnu_revertGroup" Header="Revert all in group to value at startup" IsEnabled="{Binding IsModified}" Click="groupRevertStartup_Click" />
                                 </ContextMenu>
                             </StackPanel.ContextMenu>
                             <TextBlock Text="{Binding Name}" Style="{StaticResource ModifiedTextStyle}" />
@@ -102,7 +102,7 @@
                         <StackPanel Orientation="Horizontal">
                             <StackPanel.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
+                                    <MenuItem x:Uid="mnu_revertStartup2" Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />
                                 </ContextMenu>
                             </StackPanel.ContextMenu>
                             <TextBlock Text="{Binding Id}" Margin="0,0,5,0" Style="{StaticResource ModifiedTextStyle}" />
