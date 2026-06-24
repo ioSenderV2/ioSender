@@ -14,7 +14,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Label x:Uid="lbl_theme" x:Name="lblTheme" Content="Theme:" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox Grid.Column="1" IsEnabled="False" ItemsSource="{Binding Path=Themes}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding Path=Theme, Mode=TwoWay}" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Center" Width="80" ToolTip="Application colour theme." ToolTipService.ShowOnDisabled="True"/>
+                <ComboBox Grid.Column="1" x:Uid="cbo_theme" IsEnabled="False" ItemsSource="{Binding Path=Themes}" DisplayMemberPath="Value" SelectedValuePath="Key" SelectedValue="{Binding Path=Theme, Mode=TwoWay}" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Center" Width="80" ToolTip="Application colour theme." ToolTipService.ShowOnDisabled="True"/>
             </Grid>
             <local:NumericField x:Uid="fld_resetDelay" Label="Reset delay:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=ResetDelay, Mode=TwoWay}" ToolTip="Delay to allow controller to finish booting before communication starts."/>
             <local:NumericField x:Uid="fld_pollInterval" Label="Poll interval:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=PollInterval, Mode=TwoWay}" ToolTip="Time between status request sent to controller."/>
