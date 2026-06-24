@@ -579,3 +579,5 @@ CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,col_rpMachine:System.
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,btn_rpBrowse:System.Windows.Controls.ContentControl.Content,Button,True,True,,Browse...
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,btn_rpRestore:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,btn_rpCancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.hu-HU.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Start from this toolpath
+CNC.Controls.WPF.g.hu-HU.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Run just this toolpath
