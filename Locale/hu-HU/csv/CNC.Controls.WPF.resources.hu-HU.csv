@@ -332,7 +332,7 @@ CNC.Controls.WPF.g.hu-HU.resources:grblconfigcontrol.baml,mnu_revertStartup:Syst
 CNC.Controls.WPF.g.hu-HU.resources:grblconfigcontrol.baml,mnu_revertStartup2:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert to value at startup
 CNC.Controls.WPF.g.hu-HU.resources:grblconfigcontrol.baml,mnu_revertGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert all in group to value at startup
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,wnd_restorePoint:System.Windows.Window.Title,Title,True,True,,Restore settings
-CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,txt_restoreIntro:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Select a restore point (most recent first), or browse for a backup file:
+CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,txt_restoreIntro:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,"Select a restore point (most recent first), or browse for a backup file:"
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,col_rpSaved:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Saved
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,col_rpChanges:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Changes
 CNC.Controls.WPF.g.hu-HU.resources:restorepointdialog.baml,col_rpMachine:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Machine
