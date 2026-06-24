@@ -75,7 +75,8 @@ python tools/apply-prs.py --check  --fork sim 3 5       <span class="c"># overla
 <span class="c">#   srw/local-build-config (turnkey) or setup_forks.sh + per-submodule branches</span></pre>
 <p class="foot">Each fork&rsquo;s <code>master</code> baseline differs: ioSender&rsquo;s already contains PRs&nbsp;1&ndash;8&nbsp;+&nbsp;24 (requesting one just skips it as &ldquo;already in master&rdquo;); the Simulator&rsquo;s is pristine, so all five compose. Because a composed branch starts at the base, old branches that don&rsquo;t build standalone still build here.</p>
 
-<h2>4 &middot; Effort</h2>
+<h2>4 &middot; Effort &amp; scale</h2>
+<h3>Hours</h3>
 <p>Estimated from the git history (commit timestamps clustered into work sessions). The journey began <strong>2026-05-30</strong> with the very commit that started it &mdash; <em>&ldquo;Fix build: add missing RP.Math references&rdquo;</em> &mdash; and ran through 2026-06-23: <strong>608 commits</strong> over <strong>25 active days</strong>, an estimated <strong>~110 hours</strong> of focused work.</p>
 <table>
 <tr><th>Week</th><th class="num">Commits</th><th class="num">~Hours</th><th>Focus</th></tr>
@@ -88,6 +89,28 @@ python tools/apply-prs.py --check  --fork sim 3 5       <span class="c"># overla
 </table>
 <p>By area, the two largest buckets were <strong>documentation/trackers</strong> and <strong>localization</strong> &mdash; the polish weighed as much as any single feature. By repo: ioSender ~520 commits, Simulator ~58, firmware ~30.</p>
 <p class="foot">This is an approximation from commit timestamps, not tracked time: it misses un-committed thinking/testing (under-counts) and credits whole windows during fast bursts (over-counts) &mdash; treat ~100&ndash;115&nbsp;h as the honest band.</p>
+
+<h3>Tokens</h3>
+<p>Totalled from the local Claude Code session logs across both forks &mdash; <strong>24,436</strong> assistant turns:</p>
+<table>
+<tr><th>Category</th><th class="num">Tokens</th><th>&nbsp;</th></tr>
+<tr><td>Fresh input</td><td class="num">3.7 M</td><td class="foot">new prompt text each turn</td></tr>
+<tr><td>Cache write</td><td class="num">218.7 M</td><td class="foot">context written to cache</td></tr>
+<tr><td>Cache read</td><td class="num">10,571.9 M</td><td class="foot">context re-read each turn (the giant one)</td></tr>
+<tr><td><strong>Output (generated)</strong></td><td class="num"><strong>48.5 M</strong></td><td class="foot">the code, docs &amp; analysis the assistant wrote</td></tr>
+<tr class="tot"><td>Total processed</td><td class="num">~10.84 B</td><td class="foot">~97% cached-context reads</td></tr>
+</table>
+<p>Two figures are worth quoting: <strong>~48 M output tokens</strong> generated across ~24 K turns (what the assistant actually wrote), and <strong>~10.8 B tokens processed</strong> including the re-read conversation context. At Opus list API rates the equivalent metered cost would be ~$24 K &mdash; but on a flat-rate subscription that is notional, not what was paid. <span class="foot">(Reproduce with <code>npx ccusage@latest daily</code>, which reads the same logs.)</span></p>
+
+<h3>Codebase size</h3>
+<p>Source lines in each fork vs its upstream baseline &mdash; the fork&rsquo;s own code only (excludes build output, vendored libraries and the shared grblHAL submodules):</p>
+<table>
+<tr><th>Project</th><th class="num">Upstream</th><th class="num">Fork</th><th class="num">Added</th><th>&nbsp;</th></tr>
+<tr><td>ioSender <span class="foot">(.cs + .xaml)</span></td><td class="num">54,738</td><td class="num">68,686</td><td class="num">+13,948</td><td class="foot">+25%</td></tr>
+<tr><td>Simulator <span class="foot">(.c / .h)</span></td><td class="num">3,199</td><td class="num">5,301</td><td class="num">+2,102</td><td class="foot">+66%</td></tr>
+<tr><td>Firmware driver <span class="foot">(.c / .h)</span></td><td class="num">16,302</td><td class="num">16,370</td><td class="num">+68</td><td class="foot">surgical submodule patches</td></tr>
+</table>
+<p class="foot">The firmware&rsquo;s substantive changes live in three submodule forks (<code>core</code>, <code>Plugin_SD_card</code>, <code>Plugin_networking</code>) as small focused PRs, so the driver itself barely moves &mdash; the firmware tracker carries the per-PR diffs.</p>
 
 <h2>5 &middot; The proposal trackers</h2>
 <p>Each fork&rsquo;s full PR detail &mdash; features index, per-PR file/line counts, dependency matrix, and how-to-consume notes:</p>
