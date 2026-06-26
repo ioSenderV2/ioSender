@@ -64,7 +64,22 @@ namespace CNC.Controls
             // The touch plate has no stylus - it uses the bit in the collet, so its diameter field is the bit's.
             bool hasDiameter = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
             Show(fldDiameter, hasDiameter);
-            fldDiameter.Label = type == ProbeType.TouchPlate ? "Bit diameter:" : "Tip diameter:";
+            switch (type)
+            {
+                case ProbeType.TouchPlate:
+                    fldDiameter.Label = "Bit diameter:";
+                    fldDiameter.ToolTip = "Diameter of the bit in the collet (used for edge radius compensation).";
+                    break;
+                case ProbeType.ThreeDProbe:
+                    fldDiameter.Label = "Ball diameter:";
+                    fldDiameter.ToolTip = "3D probe ball/body diameter. Its radius is the minimum standoff held " +
+                                          "clear of the work on G28 / rapid clearance moves.";
+                    break;
+                default:
+                    fldDiameter.Label = "Tip diameter:";
+                    fldDiameter.ToolTip = "Probe tip diameter (used for edge radius compensation).";
+                    break;
+            }
 
             Show(fldPlate, type == ProbeType.TouchPlate);
             Show(fldLip, type == ProbeType.TouchPlate);
@@ -91,7 +106,7 @@ namespace CNC.Controls
             switch (type)
             {
                 case ProbeType.ThreeDProbe:
-                    d.ProbeDiameter = 2d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 42d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d;
                     d.ProbeOffsetX = 0d; d.ProbeOffsetY = 0d;
                     break;

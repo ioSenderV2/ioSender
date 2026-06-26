@@ -33,7 +33,7 @@ namespace CNC.Controls
     {
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
-        private double _diameter = 2d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
+        private double _diameter = 42d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
                        _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d;
 
@@ -56,7 +56,13 @@ namespace CNC.Controls
                 }
             }
         }
-        public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); } }
+        // Probe contact diameter. For a 3D probe this is the ball/body Ø - its radius is the minimum
+        // standoff held during G28 / clearance moves so the probe body never strikes the stock.
+        public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }
+
+        // Minimum XY standoff (probe radius) to keep clear of the work on G28/rapid clearance moves.
+        [System.Xml.Serialization.XmlIgnore]
+        public double MinStandoff { get { return _diameter / 2d; } }
         public double ProbeFeedRate { get { return _searchFeed; } set { _searchFeed = value; OnChanged(); } }     // search (initial) feed
         public double LatchFeedRate { get { return _latchFeed; } set { _latchFeed = value; OnChanged(); } }       // second slow probe feed
         public double RapidsFeedRate { get { return _rapidsFeed; } set { _rapidsFeed = value; OnChanged(); } }    // 0 = use controller setting
