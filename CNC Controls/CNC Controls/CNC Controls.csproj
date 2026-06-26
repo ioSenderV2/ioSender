@@ -101,6 +101,9 @@
     <Compile Include="ProbeDefinitionEditDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionEditDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ProbeMotionParamsDialog.xaml.cs">
+      <DependentUpon>ProbeMotionParamsDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ProbeDefinitionsDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionsDialog.xaml</DependentUpon>
     </Compile>
@@ -337,6 +340,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ProbeDefinitionEditDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProbeMotionParamsDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

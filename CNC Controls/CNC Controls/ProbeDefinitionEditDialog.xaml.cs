@@ -58,23 +58,23 @@ namespace CNC.Controls
             UpdateFieldVisibility(type);
         }
 
-        // Show only the fields relevant to the selected type.
+        // Show only the essentials relevant to the selected type (speeds/distances live behind 'Edit motion params').
         private void UpdateFieldVisibility(ProbeType type)
         {
-            // A corner touch plate (lip) probes X/Y too, so it shows the XY fields - but uses the tool, not a tip.
-            bool probesXY = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
+            // The touch plate has no stylus - it uses the bit in the collet, so its diameter field is the bit's.
+            bool hasDiameter = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
+            Show(fldDiameter, hasDiameter);
+            fldDiameter.Label = type == ProbeType.TouchPlate ? "Bit diameter:" : "Tip diameter:";
 
-            Show(fldDiameter, type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder);
-            Show(fldXYClr, probesXY);
-            Show(fldZClr, type != ProbeType.ToolSetter);     // Z drop to the edge for 3D / edge / plate
-            Show(fldOffsetX, type == ProbeType.ThreeDProbe);
-            Show(fldOffsetY, type == ProbeType.ThreeDProbe);
-            Show(fldSpin, type == ProbeType.EdgeFinder);
             Show(fldPlate, type == ProbeType.TouchPlate);
             Show(fldLip, type == ProbeType.TouchPlate);
             Show(fldSetter, type == ProbeType.ToolSetter);
-            Show(fldRapids, true);                            // positioning rapids apply to every type
-            // Always shown: name, search feed, latch feed, probing distance, latch distance.
+            Show(fldSpin, type == ProbeType.EdgeFinder);
+        }
+
+        private void btnMotion_Click(object sender, RoutedEventArgs e)
+        {
+            new ProbeMotionParamsDialog(DataContext as ProbeDefinition) { Owner = this }.ShowDialog();
         }
 
         private static void Show(UIElement el, bool visible)
@@ -97,6 +97,7 @@ namespace CNC.Controls
                     break;
 
                 case ProbeType.TouchPlate:
+                    d.ProbeDiameter = 6d;   // bit in the collet
                     d.PlateThickness = 12d; d.LipWidth = 10d; d.XYClearance = 5d; d.Depth = 5d;
                     d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d;
