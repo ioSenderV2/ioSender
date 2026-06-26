@@ -24,11 +24,11 @@
             <DataGrid.Columns>
                 <DataGridTextColumn x:Uid="pdl_name" Header="Name" Binding="{Binding Name}" Width="*" MinWidth="110"/>
                 <DataGridTextColumn x:Uid="pdl_type" Header="Type" Binding="{Binding TypeName}" MinWidth="80"/>
-                <DataGridTextColumn x:Uid="pdl_dia" Header="Dia." Binding="{Binding ProbeDiameter, StringFormat=0.0##}" Width="55"/>
-                <DataGridTextColumn x:Uid="pdl_search" Header="Search" Binding="{Binding ProbeFeedRate, StringFormat=0}" Width="65"/>
-                <DataGridTextColumn x:Uid="pdl_latch" Header="Latch" Binding="{Binding LatchFeedRate, StringFormat=0}" Width="55"/>
-                <DataGridTextColumn x:Uid="pdl_dist" Header="Probe dist." Binding="{Binding ProbeDistance, StringFormat=0.0##}" Width="75"/>
-                <DataGridTextColumn x:Uid="pdl_clr" Header="XY clr" Binding="{Binding XYClearance, StringFormat=0.0##}" Width="55"/>
+                <DataGridTextColumn x:Uid="pdl_dia" Header="Tip" Binding="{Binding ProbeDiameter, StringFormat=0.0##}" Width="50"/>
+                <DataGridTextColumn x:Uid="pdl_search" Header="Approach" Binding="{Binding ProbeFeedRate, StringFormat=0}" Width="75"/>
+                <DataGridTextColumn x:Uid="pdl_latch" Header="Re-touch" Binding="{Binding LatchFeedRate, StringFormat=0}" Width="70"/>
+                <DataGridTextColumn x:Uid="pdl_dist" Header="Search dist." Binding="{Binding ProbeDistance, StringFormat=0.0##}" Width="80"/>
+                <DataGridTextColumn x:Uid="pdl_clr" Header="Standoff" Binding="{Binding XYClearance, StringFormat=0.0##}" Width="65"/>
             </DataGrid.Columns>
         </DataGrid>
         <StackPanel Grid.Row="0" Grid.Column="1" Width="90" Margin="8,0,0,0">
