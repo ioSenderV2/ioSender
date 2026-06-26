@@ -300,5 +300,12 @@ namespace CNC.Controls
         }
 
         #endregion
+
+        private void btnEditProbeDefs_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new ProbeDefinitionsDialog(ProbeDefinitions.Items) { Owner = Window.GetWindow(this) };
+            dlg.ShowDialog();
+            ProbeDefinitions.Save();
+        }
     }
 }

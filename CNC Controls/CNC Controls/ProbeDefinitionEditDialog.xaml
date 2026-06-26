@@ -1,0 +1,32 @@
+<Window x:Class="CNC.Controls.ProbeDefinitionEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        d:DesignHeight="360" d:DesignWidth="320"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="320"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Probe definition" Icon="App.ico">
+    <StackPanel Margin="12">
+        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <Label x:Uid="pd_name" Content="Name:" Width="140" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="txtName" Width="150" MinHeight="22" VerticalContentAlignment="Center"
+                     Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        </StackPanel>
+        <local:NumericField x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="140" Unit="mm" Format="##0.0##" Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_searchFeed" Label="Search feed:" ColonAt="140" Unit="mm/min" Format="#####0" Margin="0,2,0,0" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_latchFeed" Label="Latch feed:" ColonAt="140" Unit="mm/min" Format="#####0" Margin="0,2,0,0" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_rapidsFeed" Label="Rapids feed:" ColonAt="140" Unit="mm/min" Format="#####0" ToolTip="0 = use the controller setting" Margin="0,2,0,0" Value="{Binding Path=RapidsFeedRate, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_probeDist" Label="Probing distance:" ColonAt="140" Unit="mm" Format="#####0.0##" ToolTip="Maximum distance for a probing move" Margin="0,2,0,0" Value="{Binding Path=ProbeDistance, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_latchDist" Label="Latch distance:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="Retract before the slow latch probe; 0 to skip the latch" Margin="0,2,0,0" Value="{Binding Path=LatchDistance, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_xyClear" Label="XY clearance:" ColonAt="140" Unit="mm" Format="##0.0##" Margin="0,2,0,0" Value="{Binding Path=XYClearance, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_depth" Label="Z clearance:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="Z drop below the start point before an XY probe" Margin="0,2,0,0" Value="{Binding Path=Depth, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_offsetX" Label="Probe offset X:" ColonAt="140" Unit="mm" Format="-##0.0##" ToolTip="Probe tip to spindle-centre offset (0 for a concentric 3D probe)" Margin="0,2,0,0" Value="{Binding Path=ProbeOffsetX, Mode=TwoWay}"/>
+        <local:NumericField x:Uid="pd_offsetY" Label="Probe offset Y:" ColonAt="140" Unit="mm" Format="-##0.0##" Margin="0,2,0,0" Value="{Binding Path=ProbeOffsetY, Mode=TwoWay}"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Uid="pd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" Width="75" MinHeight="24" IsDefault="True"/>
+            <Button x:Uid="pd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" Width="75" MinHeight="24" Margin="6,0,0,0"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
