@@ -104,6 +104,13 @@ namespace CNC.Controls
         public static readonly DependencyProperty ToolNumberProperty = Reg(nameof(ToolNumber), 0d);
         public double ToolNumber { get { return (double)GetValue(ToolNumberProperty); } set { SetValue(ToolNumberProperty, value); } }
 
+        // Transient run modes (not persisted - default off each session so a real job is never accidentally dry/outline).
+        public static readonly DependencyProperty OutlineOnlyProperty = DependencyProperty.Register(nameof(OutlineOnly), typeof(bool), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(false, OnParam));
+        public bool OutlineOnly { get { return (bool)GetValue(OutlineOnlyProperty); } set { SetValue(OutlineOnlyProperty, value); } }
+
+        public static readonly DependencyProperty DryRunProperty = DependencyProperty.Register(nameof(DryRun), typeof(bool), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(false, OnParam));
+        public bool DryRun { get { return (bool)GetValue(DryRunProperty); } set { SetValue(DryRunProperty, value); } }
+
         public static readonly DependencyProperty StepoverProperty = DependencyProperty.Register(nameof(Stepover), typeof(double), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(0d));
         public double Stepover { get { return (double)GetValue(StepoverProperty); } set { SetValue(StepoverProperty, value); } }
 
@@ -133,7 +140,7 @@ namespace CNC.Controls
                 warn = "Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.";
             else if (WidthMM <= 0d || HeightMM <= 0d)
                 warn = "Set the area width and height (they default to the machine travel envelope).";
-            else if (SpindleRPM > BitMaxRPM && BitMaxRPM > 0d)
+            else if (!DryRun && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d)
                 warn = string.Format("Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}) - reduce RPM.", SpindleRPM, BitMaxRPM);
 
             if (txtWarnings != null)
@@ -143,13 +150,13 @@ namespace CNC.Controls
             {
                 if (stepover > 0d && WidthMM > 0d && HeightMM > 0d)
                 {
-                    double crossLen = Math.Min(WidthMM, HeightMM), longLen = Math.Max(WidthMM, HeightMM);
-                    int rows = Math.Max(2, (int)Math.Ceiling(crossLen / stepover) + 1);
-                    int passes = TotalDepth > 0d && DepthOfCut > 0d ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
-                    double metres = (double)rows * longLen * passes / 1000d;
-                    txtSummary.Text = string.Format(
-                        "Area {0:0} x {1:0} mm · stepover {2:0.0} mm · {3} rows · {4} depth pass{5} · ~{6:0.0} m of cutting",
-                        WidthMM, HeightMM, stepover, rows, passes, passes == 1 ? "" : "es", metres);
+                    int passes = (!DryRun && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+                    int rows = Math.Max(2, (int)Math.Ceiling(Math.Min(WidthMM, HeightMM) / stepover) + 1);
+                    string mode = OutlineOnly ? "outline only" : string.Format("{0} rows", rows);
+                    string depth = DryRun ? "DRY RUN (no plunge)" : string.Format("{0} depth pass{1}", passes, passes == 1 ? "" : "es");
+                    string rpm = DryRun ? "spindle off" : string.Format("{0:0} rpm", EffectiveRPM());
+                    txtSummary.Text = string.Format("Area {0:0} x {1:0} mm · stepover {2:0.0} mm · {3} · {4} · {5}",
+                        WidthMM, HeightMM, stepover, mode, depth, rpm);
                 }
                 else
                     txtSummary.Text = string.Empty;
@@ -165,52 +172,52 @@ namespace CNC.Controls
             double d = BitDiameter;
             double stepover = StepoverMM();
             double w = WidthMM, h = HeightMM;
-            bool longIsX = w >= h;
-            double longLen = longIsX ? w : h;
-            double crossLen = longIsX ? h : w;
-
-            int nRows = Math.Max(2, (int)Math.Ceiling(crossLen / stepover) + 1);
-            double step = crossLen / (nRows - 1);   // even spacing, <= requested stepover, last row exactly at the far edge
-            int nPasses = TotalDepth > 0d && DepthOfCut > 0d ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+            bool dry = DryRun;
+            double rpm = EffectiveRPM();
             int tool = (int)Math.Round(ToolNumber);
 
-            lines.Add(string.Format("(ioSender spoilboard surfacing - {0} x {1} mm area, {2} mm bit, {3:0}% overlap)", F(w), F(h), F(d), Overlap));
-            lines.Add(string.Format("(stepover {0} mm, {1} rows, {2} depth pass(es), DOC {3} mm to {4} mm total)", F(step), nRows, nPasses, F(DepthOfCut), F(TotalDepth)));
+            // The XY path to follow: the area perimeter (outline) or the serpentine raster.
+            var path = OutlineOnly ? OutlinePath(w, h) : RasterPath(w, h, stepover);
+            int nPasses = (!dry && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+
+            lines.Add(string.Format("(ioSender spoilboard surfacing - {0} x {1} mm area, {2} mm bit, {3:0}% overlap{4}{5})",
+                F(w), F(h), F(d), Overlap, OutlineOnly ? ", outline only" : "", dry ? ", DRY RUN" : ""));
+            lines.Add(string.Format("(stepover {0} mm, {1} depth pass(es), DOC {2} mm to {3} mm total, spindle {4})",
+                F(stepover), nPasses, F(DepthOfCut), F(TotalDepth), dry ? "off" : ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " rpm"));
             lines.Add("(Jog to the front-left corner, touch the bit to the surface and zero work XYZ there - Z0 = surface top.)");
             // Prolog - mirrors the other generated programs (units, plane, absolute, machine safe-Z).
             lines.Add("G90 G94");
             lines.Add("G17");
             lines.Add("G21");
             lines.Add("G53 G0 Z0");
-            if (tool > 0)
+            if (!dry && tool > 0)
                 lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
-            if (SpindleRPM > 0d)
-                lines.Add("S" + ((int)Math.Round(SpindleRPM)).ToString(CultureInfo.InvariantCulture) + " M3");
+            if (!dry && rpm > 0d)
+                lines.Add("S" + ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " M3");
             lines.Add("G17 G90 G94");
             lines.Add("G54");
             lines.Add("G0 Z" + F(SafeZ));
 
-            for (int p = 1; p <= nPasses; p++)
+            if (dry)
+            {
+                // Dry run: trace the path once at safe Z so the extents can be watched - no plunge, no spindle.
+                lines.Add("(dry run - tracing the path at safe Z, no plunge)");
+                lines.Add("G0 " + XY(path[0]));
+                for (int i = 1; i < path.Count; i++)
+                    lines.Add("G1 " + XY(path[i]) + " F" + F(Feed));
+            }
+            else for (int p = 1; p <= nPasses; p++)
             {
                 double z = -Math.Min(p * DepthOfCut, TotalDepth);
                 lines.Add(string.Format("(depth pass {0} of {1} at Z{2})", p, nPasses, F(z)));
-                lines.Add("G0 " + XY(longIsX, 0d, 0d));               // rapid to the start corner at safe Z
+                lines.Add("G0 " + XY(path[0]));                       // rapid to the start corner at safe Z
                 lines.Add(string.Format("G1 Z{0} F{1}", F(z), F(PlungeFeed)));
-
-                double curLong = 0d;
-                for (int i = 0; i < nRows; i++)
-                {
-                    double cross = Math.Min(i * step, crossLen);
-                    if (i > 0)                                       // step across to this row at cutting feed
-                        lines.Add("G1 " + XY(longIsX, curLong, cross) + " F" + F(Feed));
-                    double endLong = curLong == 0d ? longLen : 0d;   // cut along the long axis, alternating direction
-                    lines.Add("G1 " + XY(longIsX, endLong, cross) + " F" + F(Feed));
-                    curLong = endLong;
-                }
+                for (int i = 1; i < path.Count; i++)
+                    lines.Add("G1 " + XY(path[i]) + " F" + F(Feed));
                 lines.Add("G0 Z" + F(SafeZ));
             }
 
-            if (SpindleRPM > 0d)
+            if (!dry && rpm > 0d)
                 lines.Add("M5");
             lines.Add("G53 G0 Z0");
             lines.Add("M30");
@@ -218,12 +225,53 @@ namespace CNC.Controls
             return lines;
         }
 
-        // Map a (long-axis, cross-axis) position back to an "X.. Y.." word pair.
-        private static string XY(bool longIsX, double longVal, double crossVal)
+        // Spindle RPM to command: the entered value, or 70% of the bit's rated max when left at 0.
+        private double EffectiveRPM()
         {
-            double x = longIsX ? longVal : crossVal;
-            double y = longIsX ? crossVal : longVal;
-            return string.Format("X{0} Y{1}", F(x), F(y));
+            return SpindleRPM > 0d ? SpindleRPM : 0.70d * BitMaxRPM;
+        }
+
+        // Serpentine (boustrophedon) raster: step across the shorter axis by the stepover, cut along the
+        // longer one, alternating direction. Returns the XY polyline (first point is the plunge corner).
+        private static List<double[]> RasterPath(double w, double h, double stepover)
+        {
+            var pts = new List<double[]>();
+            bool longIsX = w >= h;
+            double longLen = longIsX ? w : h;
+            double crossLen = longIsX ? h : w;
+            int nRows = Math.Max(2, (int)Math.Ceiling(crossLen / stepover) + 1);
+            double step = crossLen / (nRows - 1);   // even spacing, <= requested stepover, last row exactly at the far edge
+
+            Add(pts, longIsX, 0d, 0d);
+            double curLong = 0d;
+            for (int i = 0; i < nRows; i++)
+            {
+                double cross = Math.Min(i * step, crossLen);
+                if (i > 0)
+                    Add(pts, longIsX, curLong, cross);          // step across to this row
+                double endLong = curLong == 0d ? longLen : 0d;  // cut along the long axis, alternating direction
+                Add(pts, longIsX, endLong, cross);
+                curLong = endLong;
+            }
+            return pts;
+        }
+
+        // Closed rectangle perimeter of the area, starting at the front-left corner.
+        private static List<double[]> OutlinePath(double w, double h)
+        {
+            return new List<double[]> {
+                new[] { 0d, 0d }, new[] { w, 0d }, new[] { w, h }, new[] { 0d, h }, new[] { 0d, 0d }
+            };
+        }
+
+        private static void Add(List<double[]> pts, bool longIsX, double longVal, double crossVal)
+        {
+            pts.Add(longIsX ? new[] { longVal, crossVal } : new[] { crossVal, longVal });
+        }
+
+        private static string XY(double[] p)
+        {
+            return string.Format("X{0} Y{1}", F(p[0]), F(p[1]));
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -249,7 +297,7 @@ namespace CNC.Controls
                                 "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
+            if (!DryRun && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
                 MessageBox.Show(string.Format("Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?", SpindleRPM, BitMaxRPM),
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
@@ -324,7 +372,8 @@ namespace CNC.Controls
                 "3. Press Generate to build the program and load it into the program view.\n" +
                 "4. Switch to the main view. Jog to the FRONT-LEFT corner of the area, lower Z until the bit just touches the surface (ideally the highest spot), and zero work XYZ there - work Z0 becomes the surface top.\n" +
                 "5. Run the program. It rasters from the corner across the area, cutting Z0 minus the depth of cut each pass down to the total depth.\n" +
-                "Notes: stepover = bit diameter x (1 - overlap). Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6. RPM 0 omits spindle commands. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.";
+                "Notes: stepover = bit diameter x (1 - overlap). Spindle RPM 0 = 70% of the bit's max RPM. Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6.\n" +
+                "Outline only cuts just the area perimeter (to check extents); Dry run traces the path at safe Z with no plunge or spindle. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.";
 
             UpdateSummary();
         }

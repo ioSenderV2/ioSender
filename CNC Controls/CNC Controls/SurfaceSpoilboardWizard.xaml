@@ -46,6 +46,14 @@
                     <ComboBoxItem x:Uid="cbi_sbtoolPrompt" Content="Prompt"/>
                 </ComboBox>
             </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="20,8,0,0">
+                <CheckBox x:Uid="chk_sboutline" Content="Outline only" VerticalAlignment="Center"
+                          ToolTip="Cut only the rectangular perimeter of the area - useful to check the extents before a full surfacing pass."
+                          IsChecked="{Binding OutlineOnly, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                <CheckBox x:Uid="chk_sbdryrun" Content="Dry run" Margin="24,0,0,0" VerticalAlignment="Center"
+                          ToolTip="Trace the path at safe Z with no plunge and the spindle off - to verify motion and extents without cutting."
+                          IsChecked="{Binding DryRun, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
                 <Button x:Uid="btn_sbgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
             </StackPanel>
