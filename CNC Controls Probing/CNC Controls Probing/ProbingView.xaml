@@ -116,6 +116,9 @@
                 <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
                     <local:EdgeFinderIntControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </TabItem>
+                <TabItem x:Uid="tab_loadStock" Header="Load stock">
+                    <local:LoadStockControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                </TabItem>
                 <TabItem x:Uid="tab_Rotation" Header="Rotation">
                     <local:RotationControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </TabItem>

@@ -47,7 +47,8 @@ namespace CNC.Controls.Probing
         EdgeFinderExternal,
         CenterFinder,
         Rotation,
-        HeightMap
+        HeightMap,
+        LoadStock
     }
 
     public interface IProbeTab
