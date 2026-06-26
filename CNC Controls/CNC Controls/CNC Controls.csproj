@@ -114,6 +114,9 @@
     <Compile Include="ProbeDefinitionsDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionsDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="PendingChangesDialog.xaml.cs">
+      <DependentUpon>PendingChangesDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GCodeWrap.cs" />
     <Compile Include="GotoBaseControl.xaml.cs">
       <DependentUpon>GotoBaseControl.xaml</DependentUpon>
@@ -398,6 +401,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ProbeDefinitionsDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="PendingChangesDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

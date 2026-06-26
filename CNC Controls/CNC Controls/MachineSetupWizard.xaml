@@ -246,31 +246,27 @@
                     </Grid>
                 </GroupBox>
 
-                <!-- Pending changes (preview) -->
-                <Expander x:Name="expReview" x:Uid="exp_review" Header="Preview pending changes" Margin="0,8,0,0" Expanded="Review_Expanded">
-                    <DataGrid AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MaxHeight="200" Margin="0,4,0,0"
-                              ItemsSource="{Binding Changes, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn x:Uid="col_setting" Header="Setting" Binding="{Binding Setting}" MinWidth="80"/>
-                            <DataGridTextColumn x:Uid="col_name" Header="Name" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn x:Uid="col_current" Header="Current" Binding="{Binding OldValue}" MinWidth="120"/>
-                            <DataGridTextColumn x:Uid="col_new" Header="New" Binding="{Binding NewValue}" MinWidth="120"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Expander>
+                <!-- 5. Probe definitions (probes are machine hardware) -->
+                <GroupBox x:Uid="grp_probes" Header="5 · Probe definitions" Padding="8" Margin="0,8,0,0">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                                   Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
+                        <Button x:Uid="btn_editProbes" x:Name="btnEditProbes" Content="Edit probes…" HorizontalAlignment="Left" Padding="14,2" MinHeight="24" Click="Probes_Click"/>
+                    </StackPanel>
+                </GroupBox>
             </StackPanel>
         </ScrollViewer>
 
         <!-- Footer -->
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
-            <Button x:Name="btnForget" x:Uid="btn_forget" DockPanel.Dock="Left" Content="Forget machine" Padding="14,0" Click="Forget_Click"
-                    ToolTip="Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings)."/>
-            <Button x:Name="btnProbes" x:Uid="btn_probes" DockPanel.Dock="Left" Content="Probe definitions…" Padding="14,0" Margin="6,0,0,0" Click="Probes_Click"
-                    ToolTip="Add or edit the probes fitted to this machine (used by Load Stock and probing)."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
+                <Button x:Name="btnForget" x:Uid="btn_forget" Content="Forget machine" Padding="14,0" Margin="0,0,6,0" Click="Forget_Click"
+                        ToolTip="Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings)."/>
                 <Button x:Name="btnReload" x:Uid="btn_reload" Content="Reload" MinWidth="90" Margin="0,0,6,0" Click="Reload_Click"
                         ToolTip="Discard edits and re-read the current settings from the controller."/>
+                <Button x:Name="btnPreview" x:Uid="btn_preview" Content="Preview" MinWidth="90" Margin="0,0,6,0" IsEnabled="False" Click="Preview_Click"
+                        ToolTip="Show the settings that will change when you Apply. Enabled once you make a change."/>
                 <Button x:Name="btnApply" x:Uid="btn_apply" Content="Apply" MinWidth="90" Click="Apply_Click" IsEnabled="False"
                         ToolTipService.ShowDuration="60000" ToolTipOpening="btnApply_ToolTipOpening"
                         ToolTip="Write the changed settings to the controller."/>

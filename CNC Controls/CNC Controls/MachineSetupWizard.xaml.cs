@@ -572,13 +572,20 @@ namespace CNC.Controls
                 return;
             }
             BuildReview();
-            btnApply.IsEnabled = Changes.Count > 0;
+            btnApply.IsEnabled = btnPreview.IsEnabled = Changes.Count > 0;
         }
 
-        private void Review_Expanded(object sender, RoutedEventArgs e)
+        // Preview the pending changes in a dialog (replaces the old inline expander).
+        private void Preview_Click(object sender, RoutedEventArgs e)
         {
             BuildReview();
+            if (Changes.Count == 0)
+            {
+                txtStatus.Text = "No pending changes.";
+                return;
+            }
             txtStatus.Text = string.Format("{0} pending change(s).", Changes.Count);
+            new PendingChangesDialog(Changes) { Owner = Window.GetWindow(this) }.ShowDialog();
         }
 
         // Reload: discard any edits, re-read the controller's settings and return to the generic default.
@@ -638,9 +645,6 @@ namespace CNC.Controls
                     model.Message = "Machine setup: nothing changed.";
                 return;
             }
-
-            // Keep the preview in sync so the user sees exactly what is being written.
-            expReview.IsExpanded = true;
 
             var targets = BuildTargets();
 
