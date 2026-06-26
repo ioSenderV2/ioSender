@@ -1,0 +1,53 @@
+<UserControl x:Class="CNC.Controls.Probing.LoadStockControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             xmlns:local="clr-namespace:CNC.Controls.Probing"
+             mc:Ignorable="d" Height="370"
+             d:DesignHeight="370" d:DesignWidth="500">
+    <UserControl.Resources>
+        <Controls:LogicalNotConverter x:Key="IsNotRunningConverter" />
+        <Controls:BoolToVisibleConverter x:Key="ToVisibleConverter" />
+    </UserControl.Resources>
+    <Grid>
+        <StackPanel Orientation="Vertical" Margin="5">
+            <StackPanel Orientation="Horizontal">
+                <local:CsSelectControl/>
+                <GroupBox x:Uid="grp_lsstock" Header="Stock (approximate)" Margin="5,0,0,0">
+                    <StackPanel Orientation="Vertical" Margin="0,5,0,5">
+                        <Controls:NumericField x:Uid="lbl_lswidth" Label="Width (X):" ColonAt="80" Unit="mm" Margin="0,2,0,0"
+                            Value="{Binding Path=ApproxWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        <Controls:NumericField x:Uid="lbl_lsheight" Label="Height (Y):" ColonAt="80" Unit="mm" Margin="0,2,0,0"
+                            Value="{Binding Path=ApproxHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        <Controls:NumericField x:Uid="lbl_lswpheight" Label="Stock height:" ColonAt="80" Unit="mm" Margin="0,2,0,0"
+                            IsEnabled="{Binding Path=ProbeZ}" Value="{Binding Path=WorkpieceHeight, Mode=TwoWay}"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                <CheckBox x:Uid="lbl_lsProbeZ" Content="Probe Z (top surface)" IsChecked="{Binding Path=ProbeZ}"/>
+                <CheckBox x:Uid="lbl_lsPreview" Content="Preview" Margin="15,0,0,0" IsChecked="{Binding Path=PreviewEnable}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <GroupBox x:Uid="grp_lsresult" Header="Result" Width="245" Height="180" VerticalAlignment="Top">
+                    <TextBlock TextWrapping="Wrap" Margin="5"
+                               Text="{Binding Path=Result, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}"/>
+                </GroupBox>
+                <GroupBox Header="Preview" Margin="30,0,0,0" VerticalAlignment="Top"
+                          Visibility="{Binding Path=PreviewEnable, Converter={StaticResource ToVisibleConverter}}">
+                    <TextBox IsReadOnly="True" Text="{Binding Path=PreviewText, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,5,0,0"
+                             Width="245" Height="180" FontSize="10" FontFamily="Verdana"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                </GroupBox>
+            </StackPanel>
+        </StackPanel>
+        <StackPanel Margin="5,0,0,5" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+            <Button x:Uid="btn_lsstart" Content="Start" Margin="2,0" Width="75" Click="start_Click"
+                    IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
+            <Button x:Uid="btn_lsstop" Content="Stop" Margin="2,0" Width="75" Click="stop_Click"
+                    IsEnabled="{Binding Path=Grbl.IsJobRunning}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
