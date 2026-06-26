@@ -61,17 +61,19 @@ namespace CNC.Controls
         // Show only the fields relevant to the selected type.
         private void UpdateFieldVisibility(ProbeType type)
         {
-            bool xy = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder;   // probes a side face
+            // A corner touch plate (lip) probes X/Y too, so it shows the XY fields - but uses the tool, not a tip.
+            bool probesXY = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
 
-            Show(fldDiameter, xy);
-            Show(fldXYClr, xy);
+            Show(fldDiameter, type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder);
+            Show(fldXYClr, probesXY);
+            Show(fldZClr, type != ProbeType.ToolSetter);     // Z drop to the edge for 3D / edge / plate
             Show(fldOffsetX, type == ProbeType.ThreeDProbe);
             Show(fldOffsetY, type == ProbeType.ThreeDProbe);
             Show(fldSpin, type == ProbeType.EdgeFinder);
             Show(fldPlate, type == ProbeType.TouchPlate);
+            Show(fldLip, type == ProbeType.TouchPlate);
             Show(fldSetter, type == ProbeType.ToolSetter);
-            Show(fldZClr, type != ProbeType.ToolSetter);     // Z drop matters for 3D / edge / plate
-            Show(fldRapids, type != ProbeType.TouchPlate);   // rapids for 3D / edge / setter
+            Show(fldRapids, true);                            // positioning rapids apply to every type
             // Always shown: name, search feed, latch feed, probing distance, latch distance.
         }
 
@@ -95,8 +97,9 @@ namespace CNC.Controls
                     break;
 
                 case ProbeType.TouchPlate:
-                    d.PlateThickness = 0.5d; d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d;
-                    d.ProbeDistance = 25d; d.LatchDistance = 1d; d.Depth = 5d;
+                    d.PlateThickness = 12d; d.LipWidth = 10d; d.XYClearance = 5d; d.Depth = 5d;
+                    d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d; d.RapidsFeedRate = 0d;
+                    d.ProbeDistance = 25d; d.LatchDistance = 1d;
                     break;
 
                 case ProbeType.ToolSetter:

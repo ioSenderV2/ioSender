@@ -35,7 +35,7 @@ namespace CNC.Controls
         private ProbeType _type = ProbeType.ThreeDProbe;
         private double _diameter = 2d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
-                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 0.5d, _setterHeight = 0d, _spinRPM = 0d;
+                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public ProbeType ProbeType { get { return _type; } set { _type = value; OnChanged(); OnChanged(nameof(TypeName)); } }
@@ -66,7 +66,8 @@ namespace CNC.Controls
         public double Depth { get { return _depth; } set { _depth = value; OnChanged(); } }                       // Z drop below start before an XY probe
         public double ProbeOffsetX { get { return _offsetX; } set { _offsetX = value; OnChanged(); } }            // probe tip -> spindle centre offset
         public double ProbeOffsetY { get { return _offsetY; } set { _offsetY = value; OnChanged(); } }
-        public double PlateThickness { get { return _plateThickness; } set { _plateThickness = value; OnChanged(); } } // touch plate Z offset
+        public double PlateThickness { get { return _plateThickness; } set { _plateThickness = value; OnChanged(); } } // touch plate Z offset (work Z0 = top - thickness)
+        public double LipWidth { get { return _lipWidth; } set { _lipWidth = value; OnChanged(); } }                  // touch plate lip XY offset from the stock edge
         public double SetterHeight { get { return _setterHeight; } set { _setterHeight = value; OnChanged(); } }      // tool setter trigger height
         public double SpinRPM { get { return _spinRPM; } set { _spinRPM = value; OnChanged(); } }                     // spinning edge finder RPM (0 = none)
 
@@ -83,7 +84,7 @@ namespace CNC.Controls
             LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
-            PlateThickness = o.PlateThickness; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
+            PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
