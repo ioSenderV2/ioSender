@@ -123,12 +123,5 @@ namespace CNC.Controls
                 Grbl.GrblViewModel.Message = string.Format(LibStrings.FindResource("KeymappingsSaved"), filename);
             }
         }
-
-        private void btnEditProbeDefs_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new ProbeDefinitionsDialog(ProbeDefinitions.Items) { Owner = Window.GetWindow(this) };
-            dlg.ShowDialog();
-            ProbeDefinitions.Save();
-        }
     }
 }
