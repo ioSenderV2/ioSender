@@ -97,6 +97,13 @@
     <Compile Include="GCodeRotateDialog.xaml.cs">
       <DependentUpon>GCodeRotateDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ProbeDefinition.cs" />
+    <Compile Include="ProbeDefinitionEditDialog.xaml.cs">
+      <DependentUpon>ProbeDefinitionEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ProbeDefinitionsDialog.xaml.cs">
+      <DependentUpon>ProbeDefinitionsDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GCodeWrap.cs" />
     <Compile Include="GotoBaseControl.xaml.cs">
       <DependentUpon>GotoBaseControl.xaml</DependentUpon>
@@ -326,6 +333,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="GCodeRotateDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProbeDefinitionEditDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProbeDefinitionsDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
