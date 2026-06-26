@@ -352,3 +352,6 @@ CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,col_scCo
 CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,col_scMeasured:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Measured (mm)
 CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,col_scImplied:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Implied steps/mm
 CNC.Controls.WPF.g.uk-UA.resources:libstrings.baml,str_scNoAxisRes:System.String.$Content,None,True,True,,Current steps/mm is not available for the selected axis.
+CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,lbl_sctool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,cbi_toolLoaded:System.Windows.Controls.ContentControl.Content,None,True,True,,Loaded
+CNC.Controls.WPF.g.uk-UA.resources:steppercalibrationscratchwizard.baml,cbi_toolPrompt:System.Windows.Controls.ContentControl.Content,None,True,True,,Prompt
