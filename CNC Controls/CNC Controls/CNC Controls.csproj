@@ -237,6 +237,9 @@
     <Compile Include="StepperCalibrationScratchWizard.xaml.cs">
       <DependentUpon>StepperCalibrationScratchWizard.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SurfaceSpoilboardWizard.xaml.cs">
+      <DependentUpon>SurfaceSpoilboardWizard.xaml</DependentUpon>
+    </Compile>
     <Compile Include="StripGCodeConfigControl.xaml.cs">
       <DependentUpon>StripGCodeConfigControl.xaml</DependentUpon>
     </Compile>
@@ -484,6 +487,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="StepperCalibrationScratchWizard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SurfaceSpoilboardWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
