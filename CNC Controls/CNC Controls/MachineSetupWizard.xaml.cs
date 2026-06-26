@@ -607,6 +607,14 @@ namespace CNC.Controls
             txtStatus.Text = "Machine forgotten - the setup wizard will reappear next launch.";
         }
 
+        // Probes are machine hardware, so the probe library is edited from here. Used by Load Stock and probing.
+        private void Probes_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new ProbeDefinitionsDialog(ProbeDefinitions.Items) { Owner = Window.GetWindow(this) };
+            dlg.ShowDialog();
+            ProbeDefinitions.Save();
+        }
+
         // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
         // against the current selection and the controller's current values.
         private void btnApply_ToolTipOpening(object sender, ToolTipEventArgs e)

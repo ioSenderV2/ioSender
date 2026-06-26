@@ -265,6 +265,8 @@
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
             <Button x:Name="btnForget" x:Uid="btn_forget" DockPanel.Dock="Left" Content="Forget machine" Padding="14,0" Click="Forget_Click"
                     ToolTip="Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings)."/>
+            <Button x:Name="btnProbes" x:Uid="btn_probes" DockPanel.Dock="Left" Content="Probe definitions…" Padding="14,0" Margin="6,0,0,0" Click="Probes_Click"
+                    ToolTip="Add or edit the probes fitted to this machine (used by Load Stock and probing)."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnReload" x:Uid="btn_reload" Content="Reload" MinWidth="90" Margin="0,0,6,0" Click="Reload_Click"
