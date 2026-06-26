@@ -55,9 +55,27 @@ namespace CNC.Controls.Probing
         public void Start(bool preview = false)
         {
             var probing = DataContext as ProbingViewModel;
+            if (probing == null)
+                return;
 
             if (!probing.ValidateInput(false))
                 return;
+
+            var XYClearance = probing.XYClearance + probing.ProbeDiameter / 2d;
+
+            if (preview)
+            {
+                // Preview only builds and shows the probe program - no machine/probe readiness needed,
+                // so it works before homing or with the probe disconnected (unlike Program.Init()).
+                probing.StartPosition.Zero();
+                probing.Program.Clear();
+                probing.Program.Add(string.Format("G91F{0}", probing.ProbeFeedRate.ToInvariantString()));
+                AddCorner(probing, false, false, XYClearance);
+                probing.PreviewText = probing.Program.ToString().Replace("G53", string.Empty);
+                PreviewOnCompleted();
+                probing.PreviewText += "\n; Post XY probe\n" + probing.Program.ToString().Replace("G53", string.Empty);
+                return;
+            }
 
             if (!probing.VerifyProbe())
                 return;
@@ -68,27 +86,13 @@ namespace CNC.Controls.Probing
             isCancelled = false;
             Result = string.Empty;
 
-            if (preview)
-                probing.StartPosition.Zero();
-
-            var XYClearance = probing.XYClearance + probing.ProbeDiameter / 2d;
-
             probing.Program.Add(string.Format("G91F{0}", probing.ProbeFeedRate.ToInvariantString()));
 
             // Front-left (A) corner: probe +X to the left face, +Y to the front face.
             AddCorner(probing, false, false, XYClearance);
 
-            if (preview)
-            {
-                probing.PreviewText = probing.Program.ToString().Replace("G53", string.Empty);
-                PreviewOnCompleted();
-                probing.PreviewText += "\n; Post XY probe\n" + probing.Program.ToString().Replace("G53", string.Empty);
-            }
-            else
-            {
-                probing.Program.Execute(true);
-                OnCompleted();
-            }
+            probing.Program.Execute(true);
+            OnCompleted();
         }
 
         // Probe the front-left corner: X toward the left face, retract, reposition, Y toward the front face.
