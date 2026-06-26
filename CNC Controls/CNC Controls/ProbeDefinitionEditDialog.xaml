@@ -5,18 +5,18 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        d:DesignHeight="420" d:DesignWidth="320"
-        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="320"
+        d:DesignHeight="260" d:DesignWidth="340"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="340"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Probe definition" Icon="App.ico">
     <StackPanel Margin="12">
         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-            <Label x:Uid="pd_name" Content="Name:" Width="140" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-            <TextBox x:Name="txtName" Width="150" MinHeight="22" VerticalContentAlignment="Center"
+            <Label x:Uid="pd_name" Content="Name:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="txtName" Width="170" MinHeight="22" VerticalContentAlignment="Center"
                      Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-            <Label x:Uid="pd_type" Content="Type:" Width="140" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cbxType" Width="150" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
+            <Label x:Uid="pd_type" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxType" Width="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
                 <ComboBoxItem x:Uid="pd_type3d" Content="3D touch probe" Tag="ThreeDProbe"/>
                 <ComboBoxItem x:Uid="pd_typePlate" Content="Touch plate" Tag="TouchPlate"/>
                 <ComboBoxItem x:Uid="pd_typeSetter" Content="Tool setter" Tag="ToolSetter"/>
@@ -24,25 +24,19 @@
             </ComboBox>
         </StackPanel>
         <Separator Margin="0,7"/>
-        <!-- Type-specific fields - visibility is set per type in code-behind -->
-        <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe's ball / tip." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="140" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldSpin" x:Uid="pd_spin" Label="Spin speed:" ColonAt="140" Unit="RPM" Format="#####0" ToolTip="Spinning edge-finder speed; 0 = does not spin." Margin="0,2,0,0" Value="{Binding Path=SpinRPM, Mode=TwoWay}"/>
-        <!-- Speeds and distances, in plain language -->
-        <local:NumericField x:Name="fldSearch" x:Uid="pd_searchFeed" Label="Approach speed:" ColonAt="140" Unit="mm/min" Format="#####0" ToolTip="How fast it moves to first touch the surface." Margin="0,2,0,0" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldLatch" x:Uid="pd_latchFeed" Label="Re-touch speed:" ColonAt="140" Unit="mm/min" Format="#####0" ToolTip="Slow speed for the accurate second touch." Margin="0,2,0,0" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldRapids" x:Uid="pd_rapidsFeed" Label="Travel speed:" ColonAt="140" Unit="mm/min" Format="#####0" ToolTip="Speed for positioning moves; 0 = use the controller default." Margin="0,2,0,0" Value="{Binding Path=RapidsFeedRate, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldProbeDist" x:Uid="pd_probeDist" Label="Max search distance:" ColonAt="140" Unit="mm" Format="#####0.0##" ToolTip="Furthest it will travel looking for the surface." Margin="0,2,0,0" Value="{Binding Path=ProbeDistance, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldLatchDist" x:Uid="pd_latchDist" Label="Back-off distance:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="How far it backs off before the slow second touch; 0 to skip it." Margin="0,2,0,0" Value="{Binding Path=LatchDistance, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldXYClr" x:Uid="pd_xyClear" Label="Edge standoff:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="How far out from the edge it starts before approaching." Margin="0,2,0,0" Value="{Binding Path=XYClearance, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldZClr" x:Uid="pd_depth" Label="Drop to side:" ColonAt="140" Unit="mm" Format="##0.0##" ToolTip="How far it lowers to get beside the edge before probing sideways." Margin="0,2,0,0" Value="{Binding Path=Depth, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldOffsetX" x:Uid="pd_offsetX" Label="Spindle offset X:" ColonAt="140" Unit="mm" Format="-##0.0##" ToolTip="Probe tip distance from the spindle centre (0 for a centred 3D probe)." Margin="0,2,0,0" Value="{Binding Path=ProbeOffsetX, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldOffsetY" x:Uid="pd_offsetY" Label="Spindle offset Y:" ColonAt="140" Unit="mm" Format="-##0.0##" ToolTip="Probe tip distance from the spindle centre (0 for a centred 3D probe)." Margin="0,2,0,0" Value="{Binding Path=ProbeOffsetY, Mode=TwoWay}"/>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Uid="pd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" Width="75" MinHeight="24" IsDefault="True"/>
-            <Button x:Uid="pd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" Width="75" MinHeight="24" Margin="6,0,0,0"/>
-        </StackPanel>
+        <!-- Essentials only - the speeds/distances live behind 'Edit motion params'. Visibility + the diameter
+             label are set per type in code-behind. -->
+        <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
+        <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
+        <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
+        <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
+        <local:NumericField x:Name="fldSpin" x:Uid="pd_spin" Label="Spin speed:" ColonAt="120" Unit="RPM" Format="#####0" ToolTip="Spinning edge-finder speed; 0 = does not spin." Margin="0,2,0,0" Value="{Binding Path=SpinRPM, Mode=TwoWay}"/>
+        <DockPanel Margin="0,14,0,0">
+            <Button x:Uid="pd_motion" x:Name="btnMotion" Content="Edit motion params…" DockPanel.Dock="Left" Padding="10,2" MinHeight="24" Click="btnMotion_Click"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Uid="pd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" Width="75" MinHeight="24" IsDefault="True"/>
+                <Button x:Uid="pd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" Width="75" MinHeight="24" Margin="6,0,0,0"/>
+            </StackPanel>
+        </DockPanel>
     </StackPanel>
 </Window>
