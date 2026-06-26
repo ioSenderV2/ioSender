@@ -562,10 +562,9 @@ namespace GCode_Sender
                 MainWindow.ShowView(false, ViewType.Tools);
 
             if(GrblInfo.HasProbe && GrblSettings.ReportProbeCoordinates)
-            {
                 MainWindow.EnableView(true, ViewType.Probing);
-                MainWindow.EnableView(true, ViewType.LoadStock);   // needs horizontal probing to find the corner + size
-            }
+
+            MainWindow.EnableView(true, ViewType.LoadStock);   // front-door tool - always available
 
             MainWindow.EnableView(true, ViewType.Offsets);
             MainWindow.EnableView(true, ViewType.GRBLConfig);

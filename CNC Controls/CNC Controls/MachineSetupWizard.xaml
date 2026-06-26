@@ -254,6 +254,15 @@
                         <Button x:Uid="btn_editProbes" x:Name="btnEditProbes" Content="Edit probes…" HorizontalAlignment="Left" Padding="14,2" MinHeight="24" Click="Probes_Click"/>
                     </StackPanel>
                 </GroupBox>
+
+                <!-- 6. Controller macros (ATC tool-change set + Load Stock corner probe) -->
+                <GroupBox x:Uid="grp_ctrlMacros" Header="6 · Controller macros" Padding="8" Margin="0,8,0,0">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                                   Text="Install or update the controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (probe_corner). Requires an ATC-capable grblHAL with a filesystem."/>
+                        <Button x:Uid="btn_installMacros" x:Name="btnInstallMacros" Content="Install ATC macros…" HorizontalAlignment="Left" Padding="14,2" MinHeight="24" Click="InstallMacros_Click"/>
+                    </StackPanel>
+                </GroupBox>
             </StackPanel>
         </ScrollViewer>
 

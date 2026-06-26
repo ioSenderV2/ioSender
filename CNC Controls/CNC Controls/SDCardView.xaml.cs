@@ -59,10 +59,15 @@ namespace CNC.Controls
 
         private DataRow currentFile = null;
 
+        // Shared so other views (e.g. the Machine Setup Wizard, Step 6) can trigger ATC-macro provisioning
+        // through this view's proven upload path; set when the tab is realized (at app startup).
+        public static SDCardView Instance { get; private set; }
+
         public SDCardView()
         {
             InitializeComponent();
             ctxMenu.DataContext = this;
+            Instance = this;
         }
 
         #region Methods and properties required by IRenderer interface
@@ -110,15 +115,22 @@ namespace CNC.Controls
         // when clicked, so it reliably catches a macro that was deleted since.
         private void InstallAtcMacros_Click(object sender, RoutedEventArgs e)
         {
+            InstallAtcMacros(Window.GetWindow(this));
+        }
+
+        // Install/update the embedded ATC macro set (cal/probe_tfl/tc/probe_corner) on the controller. Public +
+        // owner-parameterized so the Machine Setup Wizard (Step 6) drives the same proven path as this tab's button.
+        public void InstallAtcMacros(Window owner)
+        {
             if (Comms.com == null || !Comms.com.IsOpen)
             {
-                MessageBox.Show(Window.GetWindow(this), "Connect to a controller first.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(owner, "Connect to a controller first.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
             {
-                MessageBox.Show(Window.GetWindow(this), "This controller does not report an automatic tool changer, so the tool-change macros do not apply here.",
+                MessageBox.Show(owner, "This controller does not report an automatic tool changer, so the tool-change macros do not apply here.",
                     "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -127,20 +139,20 @@ namespace CNC.Controls
             {
                 string msg = reason == AtcMacros.UpdateReason.Outdated
                     ? "The tool-change macros on the controller are out of date.\n\nUpdate them now?"
-                    : "Install the tool-change macros (cal, probe_tfl, tc) on the controller now?";
-                return MessageBox.Show(Window.GetWindow(this), msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+                    : "Install the tool-change macros (cal, probe_tfl, tc, probe_corner) on the controller now?";
+                return MessageBox.Show(owner, msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
             });
 
             if (result == AtcMacros.ProvisionResult.UpToDate)
-                MessageBox.Show(Window.GetWindow(this), "The tool-change macros are already installed and up to date.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(owner, "The tool-change macros are already installed and up to date.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
             else if (result == AtcMacros.ProvisionResult.Failed)
-                MessageBox.Show(Window.GetWindow(this), "The tool-change macros could not be installed. Check the connection and try again.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(owner, "The tool-change macros could not be installed. Check the connection and try again.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Warning);
             else if (result == AtcMacros.ProvisionResult.Uploaded && GrblInfo.AtcMacrosRequired)
             {
                 // A reboot is only needed when ATC was off (tc.macro absent): the firmware scans for it at
                 // mount/boot, so a fresh install must reboot to come online. An in-place content update with ATC
                 // already on is picked up on the next tool change - no reboot.
-                if (MessageBox.Show(Window.GetWindow(this),
+                if (MessageBox.Show(owner,
                         "Tool-change macros installed. The controller must reboot to enable the tool changer.\n\nReboot now?",
                         "Tool change macros", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                     Comms.com.WriteCommand("$REBOOT");

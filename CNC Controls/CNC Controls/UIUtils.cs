@@ -345,6 +345,11 @@ namespace CNC.Controls
                                                                                                                   typeof(TextBoxUtilities),
                                                                                                                   new PropertyMetadata(false, AlwaysScrollToEndChanged));
 
+        // Per-textbox flag: are we parked at the bottom? Set on a manual scroll, gates auto-follow so new
+        // output appends without yanking the view back down while the user is reading scroll-back.
+        private static readonly DependencyProperty AtBottomProperty = DependencyProperty.RegisterAttached("AtBottom",
+            typeof(bool), typeof(TextBoxUtilities), new PropertyMetadata(true));
+
         private static void AlwaysScrollToEndChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             TextBox tb = sender as TextBox;
@@ -354,11 +359,11 @@ namespace CNC.Controls
                 if (alwaysScrollToEnd)
                 {
                     tb.ScrollToEnd();
-                    tb.TextChanged += TextChanged;
+                    tb.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(OnScrollChanged));
                 }
                 else
                 {
-                    tb.TextChanged -= TextChanged;
+                    tb.RemoveHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(OnScrollChanged));
                 }
             }
             else
@@ -387,9 +392,15 @@ namespace CNC.Controls
             textBox.SetValue(AlwaysScrollToEndProperty, alwaysScrollToEnd);
         }
 
-        private static void TextChanged(object sender, TextChangedEventArgs e)
+        // Auto-follow only when parked at the bottom: a manual scroll (no extent change) records whether we're
+        // at the bottom; when new content arrives (extent grew) we scroll to the end only if we were.
+        private static void OnScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            ((TextBox)sender).ScrollToEnd();
+            TextBox tb = (TextBox)sender;
+            if (e.ExtentHeightChange == 0.0)
+                tb.SetValue(AtBottomProperty, e.VerticalOffset >= e.ExtentHeight - e.ViewportHeight - 1.0);
+            else if ((bool)tb.GetValue(AtBottomProperty))
+                tb.ScrollToEnd();
         }
     }
 }

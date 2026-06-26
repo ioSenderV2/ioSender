@@ -24,7 +24,7 @@ namespace CNC.Controls
         // start_job.macro is intentionally NOT here: it runs ioSender-side through MacroProcessor
         // (seeded via SeedStartJobMacro), not on the controller. cal/probe_tfl/tc stay on littlefs
         // because grblHAL resolves their O<...> CALL / M6 references from its own filesystem.
-        static readonly string[] Required = { "cal.macro", "probe_tfl.macro", "tc.macro" };
+        static readonly string[] Required = { "cal.macro", "probe_tfl.macro", "tc.macro", "pcorner.macro" };
 
         // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
         // YModem upload), so a queued UI event can re-enter it before it returns - mutually recursing with the SD

@@ -223,9 +223,21 @@ namespace CNC.Controls
         // that can fall behind the main window. Returns null if the main window is not (yet) shown.
         private static Window OwnerWindow()
         {
-            return Application.Current != null && Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
+            if (Application.Current == null)
+                return null;
+
+            Window main = Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
                 ? Application.Current.MainWindow
                 : null;
+
+            // Prefer a visible Topmost auxiliary window (e.g. the floating run-control panel) as the dialog
+            // owner: an owned dialog is forced ABOVE its owner, so this keeps message boxes from being hidden
+            // behind a Topmost window - a hidden modal box blocks the app and looks exactly like a hang.
+            foreach (Window w in Application.Current.Windows)
+                if (w != main && w.IsVisible && w.Topmost)
+                    return w;
+
+            return main;
         }
 
         // MessageBox.Show with the main window as owner when available (the owner overload requires a

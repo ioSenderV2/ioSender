@@ -336,8 +336,22 @@ namespace CNC.Core
                         // The label case is left as-is (the controller upper-cases it) and any "[expr]" call
                         // arguments after the keyword are preserved (a space there is fine - the arg reader
                         // skips it).
+                        // An optional leading line number (N<digits>) is skipped when detecting the O<name>
+                        // label: grblHAL accepts "N## O<name> CALL" (gcode.c "Hack to allow line number with
+                        // O word"), so a numbered flow line must still be forwarded unparsed - otherwise
+                        // ParseBlock rewrites it and the call faults.
                         string trimmed = original.TrimStart();
-                        if (parser.ExpressionsSupported && trimmed.Length > 1 && (trimmed[0] == 'O' || trimmed[0] == 'o') && trimmed[1] == '<')
+                        int oPos = 0;
+                        if (trimmed.Length > 1 && (trimmed[0] == 'N' || trimmed[0] == 'n') && char.IsDigit(trimmed[1]))
+                        {
+                            int j = 2;
+                            while (j < trimmed.Length && char.IsDigit(trimmed[j]))
+                                j++;
+                            while (j < trimmed.Length && (trimmed[j] == ' ' || trimmed[j] == '\t'))
+                                j++;
+                            oPos = j;
+                        }
+                        if (parser.ExpressionsSupported && trimmed.Length > oPos + 1 && (trimmed[oPos] == 'O' || trimmed[oPos] == 'o') && trimmed[oPos + 1] == '<')
                         {
                             string line = StripGCodeComments(original).TrimEnd();
                             int gt = line.IndexOf('>');
@@ -1581,7 +1595,7 @@ namespace CNC.Core
                     else if (data == "ok" ? !ResponseLogFilterOk : stateChanged || ResponseLogShowRTAll)
                         ResponseLog.Add(data);
 
-                    if (ResponseLog.Count > 200)
+                    if (ResponseLog.Count > 2000)
                         ResponseLog.RemoveAt(0);
                 }
             }

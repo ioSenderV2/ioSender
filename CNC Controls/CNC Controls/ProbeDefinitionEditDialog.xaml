@@ -10,11 +10,6 @@
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Probe definition" Icon="App.ico">
     <StackPanel Margin="12">
         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-            <Label x:Uid="pd_name" Content="Name:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-            <TextBox x:Name="txtName" Width="170" MinHeight="22" VerticalContentAlignment="Center"
-                     Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
             <Label x:Uid="pd_type" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
             <ComboBox x:Name="cbxType" Width="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
                 <ComboBoxItem x:Uid="pd_type3d" Content="3D touch probe" Tag="ThreeDProbe"/>
@@ -27,6 +22,7 @@
         <!-- Essentials only - the speeds/distances live behind 'Edit motion params'. Visibility + the diameter
              label are set per type in code-behind. -->
         <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
+        <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Ball diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
         <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
         <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
         <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>

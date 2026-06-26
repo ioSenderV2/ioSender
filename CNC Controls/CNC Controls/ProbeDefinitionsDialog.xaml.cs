@@ -48,11 +48,12 @@ namespace CNC.Controls
 
         private void btnAdd_Click(object sender, RoutedEventArgs e)
         {
-            var def = new ProbeDefinition { Name = UniqueName("Probe") };
+            var def = new ProbeDefinition();
             var dlg = new ProbeDefinitionEditDialog(def) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
                 items.Add(def);
+                ProbeDefinitions.Renumber(items);   // names derive from type + count
                 grd.SelectedItem = def;
             }
         }
@@ -72,7 +73,10 @@ namespace CNC.Controls
             var edit = sel.Clone();
             var dlg = new ProbeDefinitionEditDialog(edit) { Owner = this };
             if (dlg.ShowDialog() == true)
+            {
                 sel.CopyFrom(edit);
+                ProbeDefinitions.Renumber(items);   // type may have changed
+            }
         }
 
         private void btnDelete_Click(object sender, RoutedEventArgs e)
@@ -80,7 +84,10 @@ namespace CNC.Controls
             var sel = Selected;
             if (sel != null && MessageBox.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
                                                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
                 items.Remove(sel);
+                ProbeDefinitions.Renumber(items);
+            }
         }
 
         private void btnClose_Click(object sender, RoutedEventArgs e)

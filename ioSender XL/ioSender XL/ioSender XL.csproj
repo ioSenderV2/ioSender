@@ -86,6 +86,14 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="MachineControlPanel.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MachineControlWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -99,6 +107,12 @@
     </Compile>
     <Compile Include="LoadStockView.xaml.cs">
       <DependentUpon>LoadStockView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MachineControlPanel.xaml.cs">
+      <DependentUpon>MachineControlPanel.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MachineControlWindow.xaml.cs">
+      <DependentUpon>MachineControlWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

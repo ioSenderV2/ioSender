@@ -1,0 +1,24 @@
+<UserControl x:Class="GCode_Sender.MachineControlPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             mc:Ignorable="d" d:DesignWidth="280">
+    <!-- The lower-left Grbl-tab machine controls, gathered as one reusable block: status + signals, the
+         realtime run controls, feed + rapids override, and MDI. Bound to the shared GrblViewModel (DataContext).
+         Hosted floating (on Run, via MachineControlWindow) and re-usable on the Grbl tab itself. -->
+    <StackPanel Margin="8">
+        <cnccontrols:SignalsControl HorizontalAlignment="Left"/>
+        <cnccontrols:StatusControl Margin="0,6,0,0" HorizontalAlignment="Left"/>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Left">
+            <Button x:Uid="mcp_start" x:Name="btnStart" Content="Cycle Start" ToolTip="Resume from feed hold (~)" Width="88" Height="32" Click="Start_Click"/>
+            <Button x:Uid="mcp_hold" x:Name="btnHold" Content="Feed Hold" ToolTip="Pause motion (!)" Width="88" Height="32" Margin="6,0,0,0" Click="Hold_Click"/>
+            <Button x:Uid="mcp_stop" x:Name="btnStop" Content="Stop" ToolTip="Soft reset / abort" Width="88" Height="32" Margin="6,0,0,0" Background="#FFE74C3C" Foreground="White" Click="Stop_Click"/>
+        </StackPanel>
+        <cnccontrols:FeedControl Margin="0,8,0,0" HorizontalAlignment="Left"/>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Left">
+            <cnccontrols:MDIControl x:Name="mdiControl" VerticalAlignment="Center"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

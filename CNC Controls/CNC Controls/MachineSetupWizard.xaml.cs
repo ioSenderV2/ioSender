@@ -622,6 +622,15 @@ namespace CNC.Controls
             ProbeDefinitions.Save();
         }
 
+        // Step 6: install/update the controller-side macros - delegates to the SD Card view's proven path.
+        private void InstallMacros_Click(object sender, RoutedEventArgs e)
+        {
+            if (SDCardView.Instance != null)
+                SDCardView.Instance.InstallAtcMacros(Window.GetWindow(this));
+            else
+                MessageBox.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
         // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
         // against the current selection and the controller's current values.
         private void btnApply_ToolTipOpening(object sender, ToolTipEventArgs e)

@@ -671,6 +671,7 @@
     <!-- ATC support macros, embedded for auto-provisioning (AtcMacros.cs). LogicalName = bare file name. -->
     <EmbeddedResource Include="..\..\macros\cal.macro"><LogicalName>cal.macro</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\macros\probe_tfl.macro"><LogicalName>probe_tfl.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\macros\start_job.macro"><LogicalName>start_job.macro</LogicalName></EmbeddedResource>
     <None Include="app.config" />

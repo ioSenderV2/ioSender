@@ -1,0 +1,141 @@
+; pcorner.macro - generalized corner XYZ probe for grblHAL (any of the 4 stock corners).
+;
+; Generalized from probe_tfl.macro: SAME safe philosophy - probe Z down to DISCOVER the
+; spoilboard and stock-top heights, never rapid to an assumed Z; decompose every reposition
+; into an explicit safe-Z lift -> traverse -> descend; route axis-at-a-time around the corner.
+;
+; Drop at the root of the SD card / littlefs. Args are passed via GLOBALS set before a NO-ARG call (grblHAL's
+; O-word CALL does not reliably accept multiple bracketed call args), then invoke:
+;   #<_ls_corner> = <1-4>     1=FL 2=FR 3=BL 4=BR. Sets the probe-direction signs:
+;                               sx = +1 for LEFT corners (1,3), -1 for RIGHT (2,4)   (probe toward the X face)
+;                               sy = +1 for FRONT corners (1,2), -1 for BACK (3,4)   (probe toward the Y face)
+;   #<_ls_refx>   = machine X of the reference, just OUTSIDE this corner's X face (clear air).
+;   #<_ls_refy>   = machine Y of the reference, just OUTSIDE this corner's Y face.
+;   #<_ls_rad>    = probe tip radius (mm).
+;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
+;                            (clear air below), publishing #<_start_z> as the DISCOVER/REUSE flag.
+;                            (Use for the FIRST corner only - its reference must clear the probe
+;                             body, i.e. G28 set 10-30 mm outside the corner.)
+;                 < 9000  -> REUSE: skip the spoilboard probe. EVERY corner (DISCOVER or REUSE)
+;                            still probes its OWN stock top, so each reports its own Z (flatness).
+;
+; Outputs (GLOBAL named params, survive the SUB):
+;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
+;   #<_corner_z>                THIS corner's stock-top Z (machine) - varies per corner = flatness
+;   #<_start_z>                 published by the DISCOVER call as the REUSE flag for later corners
+;
+; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 3 mm thick;
+;   Z probes seek to -140 (keep within $132). The DISCOVER reference must have clear air below it
+;   to the spoilboard (no fence/clamp) and be >= body-radius outside the faces.
+
+O<pcorner> SUB
+  #<rad>    = #1                 ; tip radius = the single CALL arg (matches probe_tfl); rest via globals
+  #<corner> = #<_ls_corner>
+  #<rx>     = #<_ls_refx>
+  #<ry>     = #<_ls_refy>
+  #<sz_in>  = #<_ls_startz>
+
+  ; Clear G54 so the absolute Z probes below run in machine coordinates - exactly as probe_tfl.macro
+  ; does. Without this a stale G54 Z offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
+  ; Load Stock sets the real origin from the probed machine coordinates after all corners are done.
+  G10 L2 P1 X0 Y0 Z0
+
+  ; --- direction signs from the corner id ---
+  o10 IF [[#<corner> EQ 1] OR [#<corner> EQ 3]]
+    #<sx> = 1
+  o10 ELSE
+    #<sx> = -1
+  o10 ENDIF
+  o11 IF [[#<corner> EQ 1] OR [#<corner> EQ 2]]
+    #<sy> = 1
+  o11 ELSE
+    #<sy> = -1
+  o11 ENDIF
+  (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad>)
+
+  ; ================= spoilboard reference Z (first corner / DISCOVER only) =================
+  ; Probed once at the origin reference (clear air below per preconditions) to anchor thickness;
+  ; later corners skip it. Only used to guard very thin stock when picking start_z.
+  o20 IF [#<sz_in> GE 9000]
+    G90
+    G53 G0 Z0
+    G53 G0 X[#<rx>] Y[#<ry>]
+    G53 G1 Z[#5163] F1000           ; controlled descent (~0.25 of rapids) to the stored G28 Z - safer to watch than a rapid plunge
+    G38.2 Z-140 F500                ; short slow probe to the spoilboard from there (not from machine top)
+    G91 G0 Z2
+    G38.2 Z-5 F25
+    #<_z_spoil> = #5063
+    G91 G0 Z10
+    G90
+    (PRINT, PC z_spoil=#<_z_spoil>)
+  o20 ENDIF
+
+  ; ================= stock-top Z at THIS corner (EVERY corner -> flatness) =================
+  ; Move 30 mm into the stock interior (sign per corner) and probe the top, so each corner reports
+  ; its own Z - the spread across the four corners is the stock/spoilboard flatness.
+  G90
+  o40 IF [#<sz_in> GE 9000]
+    G53 G0 Z0                       ; first corner: this corner's top not known yet, travel at machine top
+  o40 ELSE
+    G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
+  o40 ENDIF
+  G53 G0 X[#<rx> + [30 * #<sx>]] Y[#<ry> + [30 * #<sy>]]
+  G38.2 Z-140 F500
+  G91 G0 Z2
+  G38.2 Z-5 F25
+  #<_z_top> = #5063
+  #<_safe_z> = [#<_z_top> + 20]     ; safe travel height now known: 20 mm above this corner's top
+  G91 G0 Z10
+  G90
+  (PRINT, PC z_top=#<_z_top>)
+
+  ; ================= start_z for the face probes (centre tip 4 mm below THIS corner's top) =================
+  o30 IF [#<sz_in> GE 9000]
+    ; DISCOVER: spoilboard known, so guard very thin stock
+    o31 IF [[#<_z_top> - #<_z_spoil>] LT 5]
+      #<_start_z> = [#<_z_spoil> + 1]
+    o31 ELSE
+      #<_start_z> = [#<_z_top> - 4]
+    o31 ENDIF
+  o30 ELSE
+    #<_start_z> = [#<_z_top> - 4]
+  o30 ENDIF
+  (PRINT, PC start_z=#<_start_z>)
+
+  ; ================= X face probe =================
+  ; Beside the X face (at ref_x, clear air) but 30 mm into the stock's Y range, so probing
+  ; toward the face contacts stock. Descend to start_z, then seek toward the face.
+  G53 G0 Z[#<_safe_z>]              ; retract only to just above the stock top (top + 5), not machine top
+  G53 G0 X[#<rx>] Y[#<ry> + [30 * #<sy>]]
+  G53 G0 Z[#<_start_z>]
+  G91 G38.2 X[35 * #<sx>] F500
+  G0 X[-2 * #<sx>]
+  G38.2 X[5 * #<sx>] F25
+  #<x_trig> = #5061
+  G0 X[-10 * #<sx>]
+  G90
+  (PRINT, PC x_trig=#<x_trig>)
+
+  ; ================= Y face probe (route axis-at-a-time around the corner) =================
+  ; First move in Y to just outside the Y face (still beside the stock in X), then move in X
+  ; into the stock's X range, then seek toward the Y face. Never a diagonal at probing depth.
+  G53 G0 Y[#<ry>]
+  G53 G0 X[#<rx> + [30 * #<sx>]]
+  G91 G38.2 Y[35 * #<sy>] F500
+  G0 Y[-2 * #<sy>]
+  G38.2 Y[5 * #<sy>] F25
+  #<y_trig> = #5062
+  G0 Y[-10 * #<sy>]
+  G90
+  (PRINT, PC y_trig=#<y_trig>)
+
+  ; ================= outputs (radius compensated) =================
+  #<_corner_x> = [#<x_trig> + [#<rad> * #<sx>]]
+  #<_corner_y> = [#<y_trig> + [#<rad> * #<sy>]]
+  #<_corner_z> = #<_z_top>
+  (PRINT, PC OUT c=#<corner> x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
+
+  ; retract to just above the stock top - the next corner travels at this height
+  G53 G0 Z[#<_safe_z>]
+  (PRINT, PC EXIT)
+O<pcorner> ENDSUB

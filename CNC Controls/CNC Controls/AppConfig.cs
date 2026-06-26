@@ -1127,11 +1127,16 @@ namespace CNC.Controls
             }
             else
             {
-                MessageBox.Show(response == string.Empty
+                // No (or unparseable) response from the controller. Don't force-quit: offer a choice so the
+                // operator can keep ioSender open to inspect the console, save the -debugfile log, or retry a
+                // reconnect. Yes = exit (the old behaviour); No = stay open (RestartResult.NoResponse).
+                string detail = response == string.Empty
                                     ? LibStrings.FindResource("MsgNoResponseExit")
-                                    : string.Format(LibStrings.FindResource("MsgBadResponseExit"), response),
-                                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Stop);
-                return RestartResult.Exit;
+                                    : string.Format(LibStrings.FindResource("MsgBadResponseExit"), response);
+                return MessageBox.Show(detail + "\r\n\r\nExit ioSender now? Choose No to keep it open so you can inspect the console, save the log, or reconnect.",
+                                       "ioSender - no controller response", MessageBoxButton.YesNo, MessageBoxImage.Stop) == MessageBoxResult.Yes
+                    ? RestartResult.Exit
+                    : RestartResult.NoResponse;
             }
 
             return response == string.Empty ? RestartResult.NoResponse : RestartResult.Ok;

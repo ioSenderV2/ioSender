@@ -184,7 +184,7 @@ namespace GCode_Sender
                 if (view != null && view != appconf)
                 {
                     view.Setup(UIViewModel, AppConfig.Settings);
-                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.AppConfig;
+                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.AppConfig || view.ViewType == ViewType.LoadStock;
                 }
             }
 #if ADD_CAMERA
@@ -656,6 +656,13 @@ namespace GCode_Sender
         private void validateMenuItem_Click(object sender, RoutedEventArgs e)
         {
             ValidateProcessor.Run((GrblViewModel)DataContext);
+        }
+
+        // Copy the full status-bar message to the clipboard (the line itself is single-line / can be truncated).
+        private void CopyMessage_Click(object sender, RoutedEventArgs e)
+        {
+            try { System.Windows.Clipboard.SetText((DataContext as GrblViewModel)?.Message ?? string.Empty); }
+            catch { /* clipboard may be locked by another app - ignore */ }
         }
 
         private void AttachBasePropertyChangedHandler()

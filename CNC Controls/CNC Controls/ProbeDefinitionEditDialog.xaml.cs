@@ -64,22 +64,20 @@ namespace CNC.Controls
             // The touch plate has no stylus - it uses the bit in the collet, so its diameter field is the bit's.
             bool hasDiameter = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
             Show(fldDiameter, hasDiameter);
-            switch (type)
+            if (type == ProbeType.TouchPlate)
             {
-                case ProbeType.TouchPlate:
-                    fldDiameter.Label = "Bit diameter:";
-                    fldDiameter.ToolTip = "Diameter of the bit in the collet (used for edge radius compensation).";
-                    break;
-                case ProbeType.ThreeDProbe:
-                    fldDiameter.Label = "Ball diameter:";
-                    fldDiameter.ToolTip = "3D probe ball/body diameter. Its radius is the minimum standoff held " +
-                                          "clear of the work on G28 / rapid clearance moves.";
-                    break;
-                default:
-                    fldDiameter.Label = "Tip diameter:";
-                    fldDiameter.ToolTip = "Probe tip diameter (used for edge radius compensation).";
-                    break;
+                fldDiameter.Label = "Bit diameter:";
+                fldDiameter.ToolTip = "Diameter of the bit in the collet (used for edge radius compensation).";
             }
+            else
+            {
+                fldDiameter.Label = "Tip diameter:";
+                fldDiameter.ToolTip = "Stylus tip / bit diameter that contacts the work (used for edge radius compensation).";
+            }
+
+            // The 3D probe also has a large ball/body; its radius is the minimum standoff for rapid/G28 moves
+            // and drives the Load Stock approach clearance.
+            Show(fldBody, type == ProbeType.ThreeDProbe);
 
             Show(fldPlate, type == ProbeType.TouchPlate);
             Show(fldLip, type == ProbeType.TouchPlate);
@@ -106,7 +104,7 @@ namespace CNC.Controls
             switch (type)
             {
                 case ProbeType.ThreeDProbe:
-                    d.ProbeDiameter = 42d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d;
                     d.ProbeOffsetX = 0d; d.ProbeOffsetY = 0d;
                     break;
@@ -132,11 +130,7 @@ namespace CNC.Controls
 
         private void btnOk_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace((DataContext as ProbeDefinition)?.Name))
-            {
-                MessageBox.Show("Please enter a name for the probe.", "Probe definition", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
+            // Names are derived from type + count (ProbeDefinitions.Renumber), so no name entry is needed.
             DialogResult = true;
             Close();
         }

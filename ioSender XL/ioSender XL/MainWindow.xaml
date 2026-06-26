@@ -92,7 +92,19 @@
             </StatusBarItem>
             <Separator Grid.Column="1" />
             <StatusBarItem Grid.Column="2">
-                <TextBlock x:Uid="lbl_message" Text="{Binding Path=Message}" TextWrapping="NoWrap"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Uid="btn_copyMessage" x:Name="btnCopyMessage" Click="CopyMessage_Click" Cursor="Hand"
+                            ToolTip="Copy the full status message to the clipboard" Focusable="False"
+                            Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,5,0" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="#FF555555"/>
+                    </Button>
+                    <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
+                               VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
+                        <TextBlock.ToolTip>
+                            <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap" MaxWidth="540"/>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                </StackPanel>
             </StatusBarItem>
             <Separator Grid.Column="3" />
             <StatusBarItem Grid.Column="4">

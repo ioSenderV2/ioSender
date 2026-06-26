@@ -64,9 +64,9 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-#if RESPONSELOG
+        // Raw serial log, enabled at runtime by the -debugfile <path> launch arg (Resources.DebugFile).
+        // Written from the comms thread, so it survives a frozen UI - the only log available after a hang.
         StreamWriter log = null;
-#endif
         public SerialStream(string PortParams, int ResetDelay, Dispatcher dispatcher)
         {
             Comms.com = this;
@@ -191,7 +191,6 @@ namespace CNC.Core
                         break;
                 }
 
-#if RESPONSELOG
                 if (log == null && Resources.DebugFile != string.Empty) try
                 {
                     log = new StreamWriter(Resources.DebugFile);
@@ -200,7 +199,6 @@ namespace CNC.Core
                 {
                     MessageBox.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
-#endif
                 return true;
             }
 
@@ -214,14 +212,12 @@ namespace CNC.Core
 
         ~SerialStream()
         {
-#if RESPONSELOG
-    if(log != null) try
-    {
-        log.Close();
-        log = null;
-    }
-    catch { }
-#endif
+            if (log != null) try
+            {
+                log.Close();
+                log = null;
+            }
+            catch { }
             if (!IsClosing && IsOpen)
                 Close();
         }
@@ -378,13 +374,11 @@ namespace CNC.Core
         {
             byte[] bytes = Encoding.Default.GetBytes(data);
             WriteBytes(bytes, bytes.Length);
-#if RESPONSELOG
             if (log != null)
             {
                 log.WriteLine(data);
                 log.Flush();
             }
-#endif
         }
 
         public void WriteCommand(string command)
@@ -395,13 +389,11 @@ namespace CNC.Core
                 WriteByte((byte)command.ToCharArray()[0]);
             else
             {
-#if RESPONSELOG
                 if (log != null)
                 {
                     log.WriteLine(command);
                     log.Flush();
                 }
-#endif
                 command += "\r";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(command);
                 try
@@ -502,13 +494,11 @@ namespace CNC.Core
                     {
                         Reply = pos == 0 ? string.Empty : input.ToString(0, pos - 1);
                         input.Remove(0, pos + 1);
-#if RESPONSELOG
                         if (log != null)
                         {
                             log.WriteLine(Reply);
                             log.Flush();
                         }
-#endif
                         if (Reply.Length != 0 && DataReceived != null)
                             Dispatcher.BeginInvoke(DataReceived, Reply);
                         //                            Dispatcher.Invoke(addEdge, Reply);

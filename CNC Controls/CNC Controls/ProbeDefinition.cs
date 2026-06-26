@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Xml.Serialization;
 
@@ -33,7 +34,7 @@ namespace CNC.Controls
     {
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
-        private double _diameter = 42d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
+        private double _diameter = 2d, _bodyDiameter = 42d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
                        _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d;
 
@@ -56,13 +57,17 @@ namespace CNC.Controls
                 }
             }
         }
-        // Probe contact diameter. For a 3D probe this is the ball/body Ø - its radius is the minimum
-        // standoff held during G28 / clearance moves so the probe body never strikes the stock.
-        public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }
+        // Tip diameter - the stylus tip / bit that actually contacts the work; its radius is the edge
+        // radius compensation applied to face touches.
+        public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); } }
 
-        // Minimum XY standoff (probe radius) to keep clear of the work on G28/rapid clearance moves.
+        // 3D-probe ball/body diameter - the large part that must clear the work; its radius is the
+        // minimum standoff held during G28 / rapid clearance moves so the body never strikes the stock.
+        public double BodyDiameter { get { return _bodyDiameter; } set { _bodyDiameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }
+
+        // Minimum XY standoff (body radius) to keep clear of the work on G28/rapid clearance moves.
         [System.Xml.Serialization.XmlIgnore]
-        public double MinStandoff { get { return _diameter / 2d; } }
+        public double MinStandoff { get { return _bodyDiameter / 2d; } }
         public double ProbeFeedRate { get { return _searchFeed; } set { _searchFeed = value; OnChanged(); } }     // search (initial) feed
         public double LatchFeedRate { get { return _latchFeed; } set { _latchFeed = value; OnChanged(); } }       // second slow probe feed
         public double RapidsFeedRate { get { return _rapidsFeed; } set { _rapidsFeed = value; OnChanged(); } }    // 0 = use controller setting
@@ -86,7 +91,7 @@ namespace CNC.Controls
 
         public void CopyFrom(ProbeDefinition o)
         {
-            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; ProbeFeedRate = o.ProbeFeedRate;
+            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; ProbeFeedRate = o.ProbeFeedRate;
             LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
@@ -142,6 +147,8 @@ namespace CNC.Controls
                 }
             }
             catch { /* ignore - start with an empty library */ }
+
+            Renumber(_items);   // names are derived from type, not stored
         }
 
         public static void Save()
@@ -154,6 +161,22 @@ namespace CNC.Controls
                     xs.Serialize(fs, list);
             }
             catch { }
+        }
+
+        // Derive each probe's name from its type: "3D probe" when it's the only one of that type,
+        // "Tool setter (1)" / "(2)" ... when there are several. Call after add/delete/type-change.
+        public static void Renumber() { Renumber(Items); }
+
+        public static void Renumber(IList<ProbeDefinition> items)
+        {
+            if (items == null)
+                return;
+            foreach (var grp in items.GroupBy(d => d.ProbeType))
+            {
+                var list = grp.ToList();
+                for (int i = 0; i < list.Count; i++)
+                    list[i].Name = list.Count == 1 ? list[i].TypeName : string.Format("{0} ({1})", list[i].TypeName, i + 1);
+            }
         }
     }
 }
