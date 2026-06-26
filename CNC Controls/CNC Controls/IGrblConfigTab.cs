@@ -47,7 +47,8 @@ namespace CNC.Controls
         StepperCalibrationScratch,
         Trinamic,
         PidTuning,
-        MachineSetup
+        MachineSetup,
+        SurfaceSpoilboard
     }
     interface IGrblConfigTab
     {

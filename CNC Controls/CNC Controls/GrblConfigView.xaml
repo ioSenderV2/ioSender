@@ -27,5 +27,8 @@
         <TabItem x:Uid="tab_machineSetup" x:Name="tabMachineSetup" Header="Machine Setup Wizard">
             <local:MachineSetupWizard x:Name="machineSetupWizard"/>
         </TabItem>
+        <TabItem x:Uid="tab_surfaceSpoilboard" x:Name="tabSurfaceSpoilboard" Header="Surface spoilboard">
+            <local:SurfaceSpoilboardWizard x:Name="surfaceSpoilboardWizard"/>
+        </TabItem>
     </TabControl>
 </UserControl>
