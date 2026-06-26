@@ -55,7 +55,8 @@ namespace CNC.Controls
         GCodeViewer,
         SpindleLinearizer,
         Probing,
-        LatheWizards
+        LatheWizards,
+        LoadStock
     }
 
     public interface ICNCView

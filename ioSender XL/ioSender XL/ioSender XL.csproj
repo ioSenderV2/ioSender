@@ -82,6 +82,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="LoadStockView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -92,6 +96,9 @@
     </Compile>
     <Compile Include="JobView.xaml.cs">
       <DependentUpon>JobView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="LoadStockView.xaml.cs">
+      <DependentUpon>LoadStockView.xaml</DependentUpon>
     </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
