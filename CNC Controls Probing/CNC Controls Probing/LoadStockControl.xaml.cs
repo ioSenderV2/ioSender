@@ -47,8 +47,8 @@ namespace CNC.Controls.Probing
                 var probing = DataContext as ProbingViewModel;
                 probing.AllowMeasure = false;
                 probing.Instructions =
-                    "Push the stock against the corner fence. Jog the probe to just OUTSIDE the front-left corner, " +
-                    "a little below the top surface, then Start. The probe finds the left and front faces and sets the work origin there.";
+                    "Push the stock against the corner fence. Jog the probe OVER the front-left corner with the tip just above the top surface, then Start. " +
+                    "It steps off the corner, lowers by the probe depth and finds the left and front faces, then sets the work origin there. Use Preview first.";
             }
         }
 
