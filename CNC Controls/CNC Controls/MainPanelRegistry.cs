@@ -33,14 +33,16 @@ namespace CNC.Controls
         public PanelKind Kind { get; }
         public Func<UserControl> CreateMainPanel { get; }   // main-page control factory (Panel kind only)
         public Func<UserControl> CreateFlyoutPanel { get; } // optional alternate control when hosted in a flyout
+        public bool CanBeFlyout { get; }                    // false = main-page only (no flyout assignment)
 
-        public AssignableItem(string name, string label, PanelKind kind, Func<UserControl> createMainPanel = null, Func<UserControl> createFlyoutPanel = null)
+        public AssignableItem(string name, string label, PanelKind kind, Func<UserControl> createMainPanel = null, Func<UserControl> createFlyoutPanel = null, bool canBeFlyout = true)
         {
             Name = name;
             Label = label;
             Kind = kind;
             CreateMainPanel = createMainPanel;
             CreateFlyoutPanel = createFlyoutPanel;
+            CanBeFlyout = canBeFlyout;
         }
 
         public bool CanBeMainPanel { get { return Kind == PanelKind.Panel; } }
@@ -67,8 +69,8 @@ namespace CNC.Controls
             }),
             new AssignableItem("Feed", "Feed rate", PanelKind.Panel, () => new FeedControl()),
             new AssignableItem("Goto", "Goto", PanelKind.Panel, () => new GotoControl()),
-            new AssignableItem("UIJogging", "UI Jogging", PanelKind.Panel, () => new UIJogGridControl(), () => new UIJoggingControl()),
-            new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KbdJogGridControl(), () => new KeyboardJoggingControl()),
+            new AssignableItem("UIJogging", "UI Jogging", PanelKind.Panel, () => new UIJogGridControl(), canBeFlyout: false),
+            new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KbdJogGridControl(), canBeFlyout: false),
             new AssignableItem("DRO", "DRO (work)", PanelKind.Panel, () => new DROControl()),
             new AssignableItem("ProgramLimits", "Program limits", PanelKind.Panel, () => new LimitsControl()),
             new AssignableItem("MachinePosition", "Machine Position", PanelKind.Panel, () => new MachinePositionControl())
@@ -96,9 +98,9 @@ namespace CNC.Controls
             list.AddRange(Panels);
             list.AddRange(Specials);
             list.AddRange(Offsets);
-            // Keyboard jogging is redundant when its distance/speed are linked to UI jogging - hide it so it
-            // can't be assigned, and so a previously-placed one is dropped on next layout build.
-            if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.LinkStepJogToUI)
+            // The live Keyboard jogging panel only makes sense when keyboard jogging is enabled - hide it so it
+            // can't be assigned, and so a previously-placed one is dropped on next layout build, when it is off.
+            if (AppConfig.Settings.Base != null && !AppConfig.Settings.Base.Jog.KeyboardEnable)
                 list.RemoveAll(i => i.Name == "KeyboardJogging");
             return list;
         }

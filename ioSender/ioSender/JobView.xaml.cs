@@ -252,17 +252,14 @@ namespace GCode_Sender
                 if(GCode.File.IsLoaded)
                     MainWindow.ui.WindowTitle = ((GrblViewModel)DataContext).FileName;
 
-                model.Keyboard.JogStepDistance = AppConfig.Settings.Jog.LinkStepJogToUI ? AppConfig.Settings.JogUiMetric.Distance0 : AppConfig.Settings.Jog.StepDistance;
+                model.Keyboard.JogStepDistance = AppConfig.Settings.Jog.StepDistance;
                 model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowDistance;
                 model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastDistance;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = AppConfig.Settings.Jog.StepFeedrate;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowFeedrate;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastFeedrate;
 
-                model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI;
-
-                if (!GrblInfo.IsGrblHAL)
-                    model.Keyboard.IsContinuousJoggingEnabled = AppConfig.Settings.Jog.KeyboardEnable;
+                model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.KeyboardEnable;
 
                 model.IgnoreNextCycleStart = true;
             }
@@ -365,7 +362,7 @@ namespace GCode_Sender
         private void OnBooted()
         {
             isBooted = true;
-            string filename = CNC.Core.Resources.ConfigPath + string.Format("KeyMap{0}.xml", (int)AppConfig.Settings.Jog.Mode);
+            string filename = CNC.Core.Resources.ConfigPath + "KeyMap0.xml";
 
             if (System.IO.File.Exists(filename))
                 model.Keyboard.LoadMappings(filename);

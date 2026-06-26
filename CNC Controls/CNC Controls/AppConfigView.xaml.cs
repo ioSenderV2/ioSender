@@ -102,10 +102,9 @@ namespace CNC.Controls
                 xx.ItemsSource = model.ConfigControls;
                 model.ConfigControls.Add(new BasicConfigControl());
                 btnEditMainPage.Visibility = btnRestart.Visibility = MainPanelRegistry.LayoutEnabled ? Visibility.Visible : Visibility.Collapsed;
-                if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.Keypad)
-                    model.ConfigControls.Add(new JogUiConfigControl());
-                if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI)
-                    model.ConfigControls.Add(new JogConfigControl());
+                // UI jogging and keyboard jogging are both always available, so always offer both config panels.
+                model.ConfigControls.Add(new JogUiConfigControl());
+                model.ConfigControls.Add(new JogConfigControl());
                 model.ConfigControls.Add(new StripGCodeConfigControl());
 
                 UpdateSaveButtonVisibility();
@@ -151,7 +150,7 @@ namespace CNC.Controls
 
             if (dlg.ShowDialog() == true)
             {
-                string filename = CNC.Core.Resources.ConfigPath + string.Format("KeyMap{0}.xml", (int)AppConfig.Settings.Jog.Mode);
+                string filename = CNC.Core.Resources.ConfigPath + "KeyMap0.xml";
                 Grbl.GrblViewModel.Keyboard.SaveMappings(filename);
                 AppConfig.Settings.Save();
                 AppConfig.NotifyConsoleShortcutChanged();

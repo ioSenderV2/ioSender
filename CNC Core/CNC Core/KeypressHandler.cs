@@ -507,7 +507,10 @@ namespace CNC.Core
 
             this.allowJog = allowJog;
 
-            if(IsJoggingEnabled && e.IsDown && CanJog && !(Keyboard.Modifiers == ModifierKeys.Alt || Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) || Keyboard.Modifiers == ModifierKeys.Windows))
+            // Ctrl+Shift is allowed through here now (Ctrl+Shift+<jog key> = Slow tier below). It is no longer
+            // excluded: the Ctrl+Shift letter jogs (J/H/K/L...) are not jog keys, so they still fall through to
+            // the handler dispatch and are unaffected.
+            if(IsJoggingEnabled && e.IsDown && CanJog && !(Keyboard.Modifiers == ModifierKeys.Alt || Keyboard.Modifiers == ModifierKeys.Windows))
                 jogKey = jogKeys.Where(p => p.Key == e.Key && p.Command != string.Empty).FirstOrDefault();
 
             if (jogKey != null)
@@ -550,7 +553,8 @@ namespace CNC.Core
 
                 if (isJogging)
                 {
-                    if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                    ModifierKeys jogmods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
+                    if (jogmods == ModifierKeys.Control)   // Ctrl (alone) -> single step
                     {
                         for (int i = 0; i < N_AXIS; i++)
                             axisjog[i].Key = Key.None;
@@ -561,9 +565,14 @@ namespace CNC.Core
                     else if (IsContinuousJoggingEnabled)
                     {
                         preCancel = true;
-                        // No modifier = the configured default speed; Shift = the other speed.
-                        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift;
-                        jogMode = (shift ? !DefaultSpeedFast : DefaultSpeedFast) ? JogMode.Fast : JogMode.Slow;
+                        // Absolute tiers, consistent with the UI jog panel / buttons: Shift = Fast, Ctrl+Shift =
+                        // Slow, no modifier = the DefaultSpeedFast default speed.
+                        if (jogmods == (ModifierKeys.Control | ModifierKeys.Shift))
+                            jogMode = JogMode.Slow;
+                        else if (jogmods == ModifierKeys.Shift)
+                            jogMode = JogMode.Fast;
+                        else
+                            jogMode = DefaultSpeedFast ? JogMode.Fast : JogMode.Slow;
                     }
                     else
                     {
@@ -649,16 +658,30 @@ namespace CNC.Core
                         return handler.Call(e.SystemKey);
                 }
             }
-            else if (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control || Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            else
             {
-                var handler = handlers.Where(k => k.Modifiers == Keyboard.Modifiers && k.Key == e.Key && k.OnUp == e.IsUp && k.context == context).FirstOrDefault();
-                if (handler != null)
-                    return handler.Call(e.Key);
-                else
+                // Shift/Ctrl/Ctrl+Shift on a jog key are only speed/step modifiers (Shift=fast, Ctrl=step,
+                // Ctrl+Shift=slow - applied in JogCommand), never distinct key bindings. In UI jog mode the
+                // continuous-jog path above is disabled and the cursor keys dispatch here (registered with
+                // ModifierKeys.None), so without this a modified arrow matches nothing and is silently dropped
+                // (which is why Shift+arrow only jogged when the arrow was pressed first). Strip those modifiers
+                // for jog keys so every combo routes to the unmodified handler and JogCommand applies the tier.
+                // The Ctrl+Shift letter jogs (J/H/K/L etc.) are unaffected - those keys are not jog keys.
+                ModifierKeys mods = Keyboard.Modifiers;
+                if (jogKeys.Any(j => j.Key == e.Key))
+                    mods &= ~(ModifierKeys.Shift | ModifierKeys.Control);
+
+                if (mods == ModifierKeys.None || mods == ModifierKeys.Control || mods == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
-                    handler = handlers.Where(k => k.Modifiers == Keyboard.Modifiers && k.Key == e.Key && k.OnUp == e.IsUp && k.context == null).FirstOrDefault();
+                    var handler = handlers.Where(k => k.Modifiers == mods && k.Key == e.Key && k.OnUp == e.IsUp && k.context == context).FirstOrDefault();
                     if (handler != null)
                         return handler.Call(e.Key);
+                    else
+                    {
+                        handler = handlers.Where(k => k.Modifiers == mods && k.Key == e.Key && k.OnUp == e.IsUp && k.context == null).FirstOrDefault();
+                        if (handler != null)
+                            return handler.Call(e.Key);
+                    }
                 }
             }
 

@@ -33,10 +33,47 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Visible override slider: the default WPF slider's hairline track + tiny thumb are almost
+             invisible (worse at high DPI). This gives a clear groove and a chunky thumb that scale with DPI. -->
+        <Style x:Key="OverrideSliderStyle" TargetType="Slider">
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TickBar Grid.Row="0" Placement="Top" Height="4" Margin="0,0,0,1" Fill="#FF8A9099" Ticks="{TemplateBinding Ticks}"/>
+                            <Border Grid.Row="1" Height="6" CornerRadius="3" Background="#FFDADDE1" BorderBrush="#FF8A9099" BorderThickness="1" SnapsToDevicePixels="True"/>
+                            <Track x:Name="PART_Track" Grid.Row="1">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False" Opacity="0"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False" Opacity="0"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="13" Height="20" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border CornerRadius="2" Background="#FF5A6066" BorderBrush="#FF2E3236" BorderThickness="1" SnapsToDevicePixels="True"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
         <Label x:Uid="lbl_override" x:Name="lblOverride" HorizontalContentAlignment="Right" Content="Override" VerticalAlignment="Center" VerticalContentAlignment="Center" MinWidth="75"/>
-        <Slider x:Name="xxx" Width="100" TickPlacement="TopLeft" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10" LostMouseCapture="Slider_LostMouseCapture" GotMouseCapture="Slider_GotMouseCapture"
+        <Slider x:Name="xxx" Width="100" Style="{StaticResource OverrideSliderStyle}" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10" LostMouseCapture="Slider_LostMouseCapture" GotMouseCapture="Slider_GotMouseCapture"
                 Value="{Binding SliderValue, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 Ticks="{Binding Ticks, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 TickFrequency="{Binding TickFrequency, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"

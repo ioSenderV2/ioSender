@@ -422,6 +422,19 @@ namespace CNC.Controls
             if (model == null)
                 model = DataContext as GrblViewModel;
 
+            if (!_paramsLoaded)   // restore the saved parameters once, then persist on every change
+            {
+                _paramsLoaded = true;
+                LoadScratchParams();
+                cbxTool.SelectedIndex = ToolNumber > 0d ? 1 : 0;   // Loaded / Prompt
+                foreach (var dp in new[] {
+                    SpanProperty, DeltaProperty, PointsProperty, ScratchDepthProperty, PlungeFeedProperty,
+                    ScratchFeedProperty, SafeZProperty, LineLengthProperty, RowSpacingProperty,
+                    EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty })
+                    System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(StepperCalibrationScratchWizard))
+                        .AddValueChanged(this, (s, ev) => SaveScratchParams());
+            }
+
             if (model != null && (CalAxes == null || CalAxes.Count == 0))
             {
                 CalAxes = model.Axes.Where(a => a.Letter == "X" || a.Letter == "Y").ToList();
@@ -434,12 +447,69 @@ namespace CNC.Controls
             txtInstructions.Text =
                 "1. Fit the V-bit. Jog to a stock corner and set work zero (G54) there, with Z zero on the stock top.\n" +
                 "2. The first mark is made the Edge margin in from that corner on both axes; marks stay inside the stock.\n" +
-                "3. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM / tool, then press Generate.\n" +
+                "3. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM, choose Tool (Loaded or Prompt), then press Generate.\n" +
                 "4. Switch to the main view and run the loaded program. It starts the spindle, then scratches a pair of lines (perpendicular to the axis) for each candidate steps/mm.\n" +
                 "5. Measure the spacing between the two lines of each pair with calipers and enter it in the Measured column.\n" +
                 "6. The pair closest to the span is highlighted; New steps/mm is the average implied value. Press Save steps/mm to update the setting.\n" +
-                "Notes: Tool 0 omits the M6 tool change; RPM 0 omits spindle commands. Z cannot be calibrated this way - use the jog-based Stepper calibration tab for Z.";
+                "Notes: Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6 to load the bit. RPM 0 omits spindle commands. Z cannot be calibrated this way - use the jog-based Stepper calibration tab for Z.";
         }
+
+        private bool _paramsLoaded = false;
+
+        private void cbxTool_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            // Loaded (index 0) = no tool change; Prompt (index 1) = issue M6 to load the bit (ToolNumber > 0).
+            ToolNumber = cbxTool.SelectedIndex == 1 ? 1d : 0d;
+        }
+
+        private static string ScratchParamsFile {
+            get { return System.IO.Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, "StepperCalScratch.xml"); }
+        }
+
+        // Restore the parameters saved by SaveScratchParams (best effort - falls back to the property defaults).
+        private void LoadScratchParams()
+        {
+            try
+            {
+                if (!System.IO.File.Exists(ScratchParamsFile))
+                    return;
+                var xs = new System.Xml.Serialization.XmlSerializer(typeof(ScratchParams));
+                using (var fs = System.IO.File.OpenRead(ScratchParamsFile))
+                {
+                    var p = (ScratchParams)xs.Deserialize(fs);
+                    Span = p.Span; Delta = p.Delta; Points = p.Points; ScratchDepth = p.ScratchDepth;
+                    PlungeFeed = p.PlungeFeed; ScratchFeed = p.ScratchFeed; SafeZ = p.SafeZ;
+                    LineLength = p.LineLength; RowSpacing = p.RowSpacing; EdgeMargin = p.EdgeMargin;
+                    SpindleRPM = p.SpindleRPM; ToolNumber = p.ToolNumber;
+                }
+            }
+            catch { /* ignore - use the defaults */ }
+        }
+
+        // Persist the current parameters (called on every parameter change).
+        private void SaveScratchParams()
+        {
+            try
+            {
+                var p = new ScratchParams {
+                    Span = Span, Delta = Delta, Points = Points, ScratchDepth = ScratchDepth,
+                    PlungeFeed = PlungeFeed, ScratchFeed = ScratchFeed, SafeZ = SafeZ, LineLength = LineLength,
+                    RowSpacing = RowSpacing, EdgeMargin = EdgeMargin, SpindleRPM = SpindleRPM, ToolNumber = ToolNumber
+                };
+                var xs = new System.Xml.Serialization.XmlSerializer(typeof(ScratchParams));
+                using (var fs = System.IO.File.Create(ScratchParamsFile))
+                    xs.Serialize(fs, p);
+            }
+            catch { }
+        }
+    }
+
+    // Persisted stepper-calibration (scratch) parameters. Public for XmlSerializer.
+    public class ScratchParams
+    {
+        public double Span = 400d, Delta = 0.010d, Points = 3d, ScratchDepth = 0.3d, PlungeFeed = 100d,
+                      ScratchFeed = 500d, SafeZ = 5d, LineLength = 5d, RowSpacing = 15d, EdgeMargin = 10d,
+                      SpindleRPM = 18000d, ToolNumber = 1d;
     }
 
     public class CalibrationResult : ViewModelBase

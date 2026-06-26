@@ -53,7 +53,7 @@ namespace CNC.Controls
 
         public NumericTextBox()
         {
-            Height = 24;
+            MinHeight = 24;   // MinHeight, not Height, so the box grows with the font at high text scaling instead of clipping
             HorizontalContentAlignment = HorizontalAlignment.Right;
             VerticalContentAlignment = VerticalAlignment.Bottom;
             TextWrapping = TextWrapping.NoWrap;

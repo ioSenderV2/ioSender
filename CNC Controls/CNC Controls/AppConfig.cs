@@ -209,22 +209,15 @@ namespace CNC.Controls
     [Serializable]
     public class JogConfig : ViewModelBase
     {
-        public enum JogMode : int
-        {
-            UI = 0,
-            Keypad,
-            KeypadAndUI
-        }
-
-        private bool _kbEnable, _linkStepToUi = true, _defaultSpeedFast = false, _keepUiJogSelection = false;
-        private JogMode _jogMode = JogMode.UI;
+        private bool _kbEnable = true, _defaultSpeedFast = false, _keepUiJogSelection = false;
 
         private double _fastFeedrate = 500d, _slowFeedrate = 200d, _stepFeedrate = 100d;
         private double _fastDistance = 500d, _slowDistance = 500d, _stepDistance = 0.05d;
 
-        public JogMode Mode { get { return _jogMode; } set { _jogMode = value; OnPropertyChanged(); } }
+        // Master switch for keyboard jogging (default on; users who dislike it can turn it off). Keyboard,
+        // on-screen UI, and controller jogging are all independent input methods that are always live - there
+        // is no "jog mode" to select; the input you use is the mode.
         public bool KeyboardEnable { get { return _kbEnable; } set { _kbEnable = value; OnPropertyChanged(); } }
-        public bool LinkStepJogToUI { get { return _linkStepToUi; } set { _linkStepToUi = value; OnPropertyChanged(); } }
         // Restore the on-screen jog distance/speed selection from the previous session on startup.
         public bool KeepUiJogSelection { get { return _keepUiJogSelection; } set { _keepUiJogSelection = value; OnPropertyChanged(); } }
         // Default keyboard continuous-jog speed: false = Slow (Shift -> Fast), true = Fast (Shift -> Slow).
@@ -623,7 +616,6 @@ namespace CNC.Controls
         {
             int status = 0;
             _selectPort = false;
-            int jogMode = -1;
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
 
@@ -671,11 +663,6 @@ namespace CNC.Controls
                         CNC.Core.Resources.IsLegacyController = true;
                         break;
 
-                    case "-jogmode":
-                        if (int.TryParse(GetArg(args, p++), out jogMode))
-                            jogMode = Math.Min(Math.Max(jogMode, 0), (int)JogConfig.JogMode.KeypadAndUI);
-                        break;
-
                     default:
                         if (!args[p - 1].EndsWith(".exe") && File.Exists(args[p - 1]))
                             FileName = args[p - 1];
@@ -715,9 +702,6 @@ namespace CNC.Controls
             Base.Themes.Add("Dark", LibStrings.FindResource("ThemeDark"));
             Base.Themes.Add("Light", LibStrings.FindResource("ThemeLight"));
             Base.Themes.Add("White", LibStrings.FindResource("ThemeWhite"));
-
-            if (jogMode != -1)
-                Base.Jog.Mode = (JogConfig.JogMode)jogMode;
 
             _startupPort = port;
             _startupBaud = baud;

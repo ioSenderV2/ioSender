@@ -115,6 +115,7 @@ namespace CNC.Controls
         private double labelWidth = 180d;
         private StackPanel components;
         private WidgetViewModel model;
+        private readonly GrblConfigControl view;   // owning view, notified when an edit commits (live validation)
 
         public Label wLabel = null, wUnit = null;
         public TextBox wTextBox = null;
@@ -145,6 +146,7 @@ namespace CNC.Controls
         public Widget(GrblConfigControl View, WidgetProperties widget, StackPanel Canvas)
         {
             this.Canvas = components = Canvas;
+            this.view = View;
             this.widget = widget;
             model = ((WidgetViewModel)Canvas.DataContext);
 
@@ -200,7 +202,7 @@ namespace CNC.Controls
                             wCheckBox.Margin = new Thickness(0, 6, 0, 0);
                         }
                         else
-                            grid.Height = 20;
+                            grid.MinHeight = 20;
                         grid.Children.Add(wCheckBox);
                         Grid.SetColumn(wCheckBox, 1);
                         wCheckBox.Click += wWidget_TextChanged;
@@ -230,7 +232,7 @@ namespace CNC.Controls
                                 wRadiobutton.Margin = new Thickness(0, 6, 0, 0);
                             }
                             else
-                                grid.Height = 20;
+                                grid.MinHeight = 20;
                             grid.Children.Add(wRadiobutton);
                             Grid.SetColumn(wRadiobutton, 1);
                             wRadiobutton.Checked += wWidget_TextChanged;
@@ -245,7 +247,7 @@ namespace CNC.Controls
                     wNumericTextBox = new NumericTextBox
                     {
                         Format = widget.Format,
-                        Height = 22
+                        MinHeight = 22
                     };
                     labelWidth = 210;
                     grid = labelGrid = AddGrid(wNumericTextBox.Width + 4);
@@ -281,7 +283,7 @@ namespace CNC.Controls
                         Name = "tb_name_xxx",
                         MaxLength = widget.Format.Length,
                         VerticalContentAlignment = VerticalAlignment.Bottom,
-                        Height = 24
+                        MinHeight = 24
                         //TabIndex = Canvas.Row
                     };
                     if (widget.DataType == GrblSettingDetails.DataTypes.TEXT && widget.Format.StartsWith("x("))
@@ -344,7 +346,7 @@ namespace CNC.Controls
                     wLabel = new Label
                     {
                         Width = labelWidth,
-                        Height = 26,
+                        MinHeight = 26,
                         HorizontalContentAlignment = HorizontalAlignment.Right,
                         VerticalContentAlignment = VerticalAlignment.Center,
                         Name = "label_xx",
@@ -358,7 +360,7 @@ namespace CNC.Controls
                 {
                     wUnit = new Label
                     {
-                        Height = 26,
+                        MinHeight = 26,
                         HorizontalContentAlignment = HorizontalAlignment.Left,
                         Name = "unit_xxx",
                         Content = widget.Unit
@@ -382,7 +384,7 @@ namespace CNC.Controls
             Grid grid = new Grid
             {
                 Width = Canvas.Width,
-                Height = 26,
+                MinHeight = 26,
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -620,6 +622,7 @@ namespace CNC.Controls
             {
                 Modified = false;
                 GrblSettings.SetPendingEdit(widget.Setting, Text);
+                view?.OnSettingEdited(widget.Setting.Id);   // refresh live validation if this is one of its inputs
             }
         }
 

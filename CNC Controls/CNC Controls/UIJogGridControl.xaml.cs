@@ -52,7 +52,9 @@ namespace CNC.Controls
         private void Distance_Click(object sender, RoutedEventArgs e)
         {
             if (jog != null)
-                jog.StepSize = (JogViewModel.JogStep)int.Parse((string)((Button)sender).Tag);
+                // Go through DistanceIndex (not StepSize) so picking a distance updates the finite preset
+                // without dropping out of Continuous - distance and Continuous are independent controls here.
+                jog.DistanceIndex = int.Parse((string)((Button)sender).Tag);
         }
 
         private void Feed_Click(object sender, RoutedEventArgs e)

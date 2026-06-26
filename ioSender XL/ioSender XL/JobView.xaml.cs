@@ -79,19 +79,26 @@ namespace GCode_Sender
 
         // Populate the six configurable main-page slots from Config.MainPanels (ioSender XL).
         // Panels not placed here are shown as flyouts (see MainWindow). Applied on restart.
+        private const int MaxMainPanels = 8;   // keep in sync with MainPageEditor
+
         private void BuildMainPanels()
         {
-            if (AppConfig.Settings.Base == null)   // config not loaded yet (ctor runs before SetupAndOpen) — defer
+            if (AppConfig.Settings.Base == null)   // config not loaded yet (JobView ctor runs before LoadConfig)
             {
-                Dispatcher.BeginInvoke(new System.Action(BuildMainPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+                // Re-run before the first paint (priority above Render) so the configured layout is already in
+                // place when the window first renders - avoids the empty/default-then-populated flash on launch.
+                Dispatcher.BeginInvoke(new System.Action(BuildMainPanels), System.Windows.Threading.DispatcherPriority.DataBind);
                 return;
             }
 
-            var slots = new ContentControl[] { slot0, slot1, slot2, slot3, slot4, slot5 };
+            mainSlotsLeft.Children.Clear();
+            mainSlotsRight.Children.Clear();
+
             var names = AppConfig.Settings.Base.MainPanels;
             var placed = new System.Collections.Generic.HashSet<string>();
+            var panels = new System.Collections.Generic.List<UserControl>();
 
-            for (int s = 0, i = 0; s < slots.Length && names != null && i < names.Count; i++)
+            for (int i = 0; names != null && i < names.Count && panels.Count < MaxMainPanels; i++)
             {
                 string name = names[i];
                 if (string.IsNullOrEmpty(name) || placed.Contains(name))
@@ -102,11 +109,30 @@ namespace GCode_Sender
                     continue;
 
                 var ctl = def.CreateMainPanel();
-                slots[s++].Content = ctl;
+                panels.Add(ctl);
                 placed.Add(name);
-
                 CaptureRefs(ctl);
             }
+
+            // Flow across the two columns by measured height, in order: fill the left column to ~half the total
+            // height, then the rest go right - so the columns stay about even. Done inline (before first paint)
+            // using DesiredSize so the layout is final when the window renders, with no post-paint reshuffle.
+            double total = 0d;
+            var h = new double[panels.Count];
+            for (int i = 0; i < panels.Count; i++)
+            {
+                panels[i].Measure(new System.Windows.Size(250d, double.PositiveInfinity));
+                total += (h[i] = panels[i].DesiredSize.Height);
+            }
+            double half = total / 2d, leftH = 0d;
+            int split = panels.Count;
+            for (int i = 0; i < panels.Count; i++)
+            {
+                if (i > 0 && leftH + h[i] / 2d > half) { split = i; break; }
+                leftH += h[i];
+            }
+            for (int i = 0; i < panels.Count; i++)
+                (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(panels[i]);
         }
 
         // Capture references to panels that have host wiring (focus gating, program-limits reveal) so they
@@ -132,9 +158,10 @@ namespace GCode_Sender
         // Signals/Status stay fixed below it (t2). Applied on restart.
         private void BuildLeftPanels()
         {
-            if (AppConfig.Settings.Base == null)   // config not loaded yet (ctor runs before SetupAndOpen) — defer
+            if (AppConfig.Settings.Base == null)   // config not loaded yet (JobView ctor runs before LoadConfig)
             {
-                Dispatcher.BeginInvoke(new System.Action(BuildLeftPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+                // Build before first paint (above Render) so the configured left column is in place on launch.
+                Dispatcher.BeginInvoke(new System.Action(BuildLeftPanels), System.Windows.Threading.DispatcherPriority.DataBind);
                 return;
             }
 
@@ -345,7 +372,7 @@ namespace GCode_Sender
                 if (GCode.File.IsLoaded)
                     MainWindow.ui.WindowTitle = ((GrblViewModel)DataContext).FileName;
 
-                model.Keyboard.JogStepDistance = AppConfig.Settings.Jog.LinkStepJogToUI ? AppConfig.Settings.JogUiMetric.Distance0 : AppConfig.Settings.Jog.StepDistance;
+                model.Keyboard.JogStepDistance = AppConfig.Settings.Jog.StepDistance;
                 model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowDistance;
                 model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastDistance;
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = AppConfig.Settings.Jog.StepFeedrate;
@@ -353,10 +380,9 @@ namespace GCode_Sender
                 model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastFeedrate;
                 model.Keyboard.DefaultSpeedFast = AppConfig.Settings.Jog.DefaultSpeedFast;
 
-                model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.Mode != JogConfig.JogMode.UI;
-
-                if (!GrblInfo.IsGrblHAL)
-                    model.Keyboard.IsContinuousJoggingEnabled = AppConfig.Settings.Jog.KeyboardEnable;
+                // Keyboard jogging is its own always-available input; KeyboardEnable (default on) is the master
+                // switch. IsContinuousJoggingEnabled stays driven by controller capability (set in Grbl.cs).
+                model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.KeyboardEnable;
 
                 model.IgnoreNextCycleStart = true;
             }
@@ -405,9 +431,11 @@ namespace GCode_Sender
             // The Limits panel stays visible; refresh it so it shows program limits when a job is loaded,
             // or the machine soft-limit envelope when not.
             _limits?.Refresh();
-            // Bottom-row slots auto-hide on short windows (generalizes the old Coolant/Goto hiding).
-            slot2.Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
-            slot5.Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;
+            // The bottom panel of each column auto-hides on short windows (generalizes the old Coolant/Goto hiding).
+            if (mainSlotsLeft.Children.Count > 0)
+                mainSlotsLeft.Children[mainSlotsLeft.Children.Count - 1].Visibility = rhGrid.ActualHeight > 600 ? Visibility.Visible : Visibility.Collapsed;
+            if (mainSlotsRight.Children.Count > 0)
+                mainSlotsRight.Children[mainSlotsRight.Children.Count - 1].Visibility = rhGrid.ActualHeight > 575 ? Visibility.Visible : Visibility.Collapsed;
         }
 
 #if ADD_CAMERA
@@ -453,7 +481,7 @@ namespace GCode_Sender
         private void OnBooted()
         {
             isBooted = true;
-            string filename = CNC.Core.Resources.Path + string.Format("KeyMap{0}.xml", (int)AppConfig.Settings.Jog.Mode);
+            string filename = CNC.Core.Resources.Path + "KeyMap0.xml";
 
             if (System.IO.File.Exists(filename))
                 model.Keyboard.LoadMappings(filename);
@@ -506,12 +534,6 @@ namespace GCode_Sender
             MainWindow.ui.TryMigrateToNetwork();
 
             GrblCommand.ToolChange = GrblInfo.ManualToolChange ? "M61Q{0}" : (GrblInfo.HasATC ? "T{0}M6" : "T{0}");
-
-            if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.Keypad)
-            {
-                jogControl.Visibility = Visibility.Hidden;
-                joggerRow.MaxHeight = 0;
-            }
 
             showProgramLimits();
 

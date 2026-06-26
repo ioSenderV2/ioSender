@@ -7,9 +7,9 @@
              mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
-    <TabControl x:Name="tabConfig" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+    <TabControl x:Name="tabConfig" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
         <TabItem x:Uid="tab_basicConfig" x:Name="tabBasicConfig" Header="Basic settings">
-            <local:GrblConfigControl x:Name="basicConfig"/>
+            <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
         </TabItem>
         <TabItem x:Uid="tab_trinamic" x:Name="tabTrinamic" Header="Trinamic tuner">
             <local:TrinamicView x:Name="toolTrinamic"/>

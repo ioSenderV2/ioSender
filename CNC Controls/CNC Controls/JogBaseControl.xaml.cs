@@ -55,6 +55,7 @@ namespace CNC.Controls
         private bool softLimits = false;
         private int distance = 2, feedrate = 2;
         private double limitSwitchesClearance = .5d, position = 0d;
+        private bool jogIsContinuous = false;   // last jog was continuous (selected Continuous, or a Shift/Ctrl+Shift speed tier) - so cancel on release
         private KeypressHandler keyboard;
         private static bool keyboardMappingsOk = false;
         private static volatile int jogAxis = -1;
@@ -66,42 +67,18 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
-            JogData = new JogViewModel();
+            // JogData is a shared singleton: keep the existing instance so the distance/speed/Continuous
+            // selection survives a second jog panel being built (flyout, view switch, reconnect). Recreating
+            // it here reset the selection to defaults, and the once-per-run RestoreUiSelection guard meant it
+            // was never restored - so Continuous (and the chosen step/feed) silently reverted.
+            if (JogData == null)
+                JogData = new JogViewModel();
 
             Focusable = true;
         }
 
         public static JogViewModel JogData { get; private set; }
         public string MenuLabel { get { return (string)FindResource("MenuLabel"); } }
-
-        private void JogData_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            switch (e.PropertyName)
-            {
-                case nameof(JogViewModel.Distance):
-                    if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.UI || (AppConfig.Settings.Jog.LinkStepJogToUI && JogData.StepSize != JogViewModel.JogStep.Step3))
-                        (DataContext as GrblViewModel).JogStep = JogData.Distance;
-                    break;
-
-                case nameof(JogViewModel.FeedRate):
-                    if (AppConfig.Settings.Jog.LinkStepJogToUI)
-                        SyncKeyboardFeedToUI();
-                    break;
-            }
-        }
-
-        // "Link distance and speed to UI jogging": keyboard held-arrow jog uses the UI-selected feed too,
-        // so all keyboard jog feedrates track the on-screen selection (step distance links via JogStep above).
-        private void SyncKeyboardFeedToUI()
-        {
-            var gvm = DataContext as GrblViewModel;
-            if (gvm == null || gvm.Keyboard == null || JogData == null)
-                return;
-
-            double fr = JogData.FeedRate;
-            for (int i = 0; i < gvm.Keyboard.JogFeedrates.Length; i++)
-                gvm.Keyboard.JogFeedrates[i] = fr;
-        }
 
         private void Model_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -153,34 +130,15 @@ namespace CNC.Controls
 
                 if (!keyboardMappingsOk)
                 {
-                    if (!GrblInfo.HasFirmwareJog || AppConfig.Settings.Jog.LinkStepJogToUI)
-                        JogData.PropertyChanged += JogData_PropertyChanged;
-
                     if (softLimits)
                         (DataContext as GrblViewModel).PropertyChanged += Model_PropertyChanged;
 
                     keyboard = (DataContext as GrblViewModel).Keyboard;
 
-                    if (AppConfig.Settings.Jog.LinkStepJogToUI)
-                        SyncKeyboardFeedToUI();   // initial sync; kept current by JogData_PropertyChanged
-
                     keyboardMappingsOk = true;
 
-                    if (AppConfig.Settings.Jog.Mode == JogConfig.JogMode.UI)
-                    {
-                        keyboard.AddHandler(Key.PageUp, ModifierKeys.None, CursorJogZplus, false);
-                        keyboard.AddHandler(Key.PageUp, ModifierKeys.None, KeyJogCancel, true);
-                        keyboard.AddHandler(Key.PageDown, ModifierKeys.None, CursorJogZminus, false);
-                        keyboard.AddHandler(Key.PageDown, ModifierKeys.None, KeyJogCancel, true);
-                        keyboard.AddHandler(Key.Left, ModifierKeys.None, CursorJogXminus, false);
-                        keyboard.AddHandler(Key.Left, ModifierKeys.None, KeyJogCancel, true);
-                        keyboard.AddHandler(Key.Up, ModifierKeys.None, CursorJogYplus, false);
-                        keyboard.AddHandler(Key.Up, ModifierKeys.None, KeyJogCancel, true);
-                        keyboard.AddHandler(Key.Right, ModifierKeys.None, CursorJogXplus, false);
-                        keyboard.AddHandler(Key.Right, ModifierKeys.None, KeyJogCancel, true);
-                        keyboard.AddHandler(Key.Down, ModifierKeys.None, CursorJogYminus, false);
-                        keyboard.AddHandler(Key.Down, ModifierKeys.None, KeyJogCancel, true);
-                    }
+                    // Keyboard arrows jog through the keyboard's own continuous path (its Slow/Fast/Step config),
+                    // independent of the on-screen UI selection - so no cursor-key handlers are registered here.
 
                     keyboard.AddHandler(xplus, ModifierKeys.Control | ModifierKeys.Shift, KeyJogXplus, false);
                     keyboard.AddHandler(xplus, ModifierKeys.Control | ModifierKeys.Shift, KeyJogCancel, true);
@@ -228,31 +186,30 @@ namespace CNC.Controls
                         keyboard.AddFunction(KeyJogWminus, null);
                     }
                     
-                    if (AppConfig.Settings.Jog.Mode != JogConfig.JogMode.Keypad)
-                    {
-                        keyboard.AddHandler(Key.End, ModifierKeys.None, EndJog, false);
+                    // UI-jog selection shortcuts (NumPad picks the on-screen distance/feed preset; End cancels) -
+                    // always registered: UI jogging is always available.
+                    keyboard.AddHandler(Key.End, ModifierKeys.None, EndJog, false);
 
-                        keyboard.AddHandler(Key.NumPad0, ModifierKeys.Control, JogStep0);
-                        keyboard.AddHandler(Key.NumPad1, ModifierKeys.Control, JogStep1);
-                        keyboard.AddHandler(Key.NumPad2, ModifierKeys.Control, JogStep2);
-                        keyboard.AddHandler(Key.NumPad3, ModifierKeys.Control, JogStep3);
-                        keyboard.AddHandler(Key.NumPad4, ModifierKeys.Control, JogFeed0);
-                        keyboard.AddHandler(Key.NumPad5, ModifierKeys.Control, JogFeed1);
-                        keyboard.AddHandler(Key.NumPad6, ModifierKeys.Control, JogFeed2);
-                        keyboard.AddHandler(Key.NumPad7, ModifierKeys.Control, JogFeed3);
+                    keyboard.AddHandler(Key.NumPad0, ModifierKeys.Control, JogStep0);
+                    keyboard.AddHandler(Key.NumPad1, ModifierKeys.Control, JogStep1);
+                    keyboard.AddHandler(Key.NumPad2, ModifierKeys.Control, JogStep2);
+                    keyboard.AddHandler(Key.NumPad3, ModifierKeys.Control, JogStep3);
+                    keyboard.AddHandler(Key.NumPad4, ModifierKeys.Control, JogFeed0);
+                    keyboard.AddHandler(Key.NumPad5, ModifierKeys.Control, JogFeed1);
+                    keyboard.AddHandler(Key.NumPad6, ModifierKeys.Control, JogFeed2);
+                    keyboard.AddHandler(Key.NumPad7, ModifierKeys.Control, JogFeed3);
 
-                        keyboard.AddHandler(Key.NumPad2, ModifierKeys.None, FeedDec);
-                        keyboard.AddHandler(Key.NumPad4, ModifierKeys.None, StepDec);
-                        keyboard.AddHandler(Key.NumPad6, ModifierKeys.None, StepInc);
-                        keyboard.AddHandler(Key.NumPad8, ModifierKeys.None, FeedInc);
-                    }
+                    keyboard.AddHandler(Key.NumPad2, ModifierKeys.None, FeedDec);
+                    keyboard.AddHandler(Key.NumPad4, ModifierKeys.None, StepDec);
+                    keyboard.AddHandler(Key.NumPad6, ModifierKeys.None, StepInc);
+                    keyboard.AddHandler(Key.NumPad8, ModifierKeys.None, FeedInc);
                 }
             }
         }
 
         private bool KeyJogCancel(Key key)
         {
-            if (JogData.StepSize == JogViewModel.JogStep.Continuous)
+            if (JogData.StepSize == JogViewModel.JogStep.Continuous || jogIsContinuous)
             {
                 while (Comms.com.OutCount != 0) ;
                 Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL);
@@ -404,54 +361,6 @@ namespace CNC.Controls
             return true;
         }
 
-        private bool CursorJogXplus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating)
-                JogCommand(GrblInfo.LatheModeEnabled ? "Z+" : "X+");
-
-            return true;
-        }
-
-        private bool CursorJogXminus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating)
-                JogCommand(GrblInfo.LatheModeEnabled ? "Z-" : "X-");
-
-            return true;
-        }
-
-        private bool CursorJogYplus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating)
-                JogCommand(GrblInfo.LatheModeEnabled ? "X-" : "Y+");
-
-            return true;
-        }
-
-        private bool CursorJogYminus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating)
-                JogCommand(GrblInfo.LatheModeEnabled ? "X+" : "Y-");
-
-            return true;
-        }
-
-        private bool CursorJogZplus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating && !GrblInfo.LatheModeEnabled)
-                JogCommand("Z+");
-
-            return true;
-        }
-
-        private bool CursorJogZminus(Key key)
-        {
-            if (keyboard.CanJog && !keyboard.IsRepeating && !GrblInfo.LatheModeEnabled)
-                JogCommand("Z-");
-
-            return true;
-        }
-
         private void distance_Click(object sender, RoutedEventArgs e)
         {
             distance = int.Parse((string)(sender as RadioButton).Tag);
@@ -570,7 +479,24 @@ namespace CNC.Controls
             {
                 int axis = GrblInfo.AxisLetterToIndex(cmd[0]);
 
-                var distance = (JogData.Distance == -1 ? GrblInfo.MaxTravel.Values[axis] : JogData.Distance) * (cmd[1] == '-' ? -1d : 1d);
+                // Unified modifier tiers (panel buttons + keyboard arrows, sharing the keyboard's own Slow/Fast/Step
+                // config): Shift = Fast, Ctrl = a single Step increment, Ctrl+Shift = Slow, no modifier = the
+                // on-screen selected distance/feed. Fast/Slow are continuous (jog while held); Step is one finite
+                // increment. A -1 distance means continuous.
+                JogConfig jogcfg = AppConfig.Settings.Jog;
+                ModifierKeys mods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
+                double jogDistance, jogFeed;
+                if (mods == ModifierKeys.Control)                               // Ctrl -> single step
+                { jogDistance = jogcfg.StepDistance; jogFeed = jogcfg.StepFeedrate; }
+                else if (mods == ModifierKeys.Shift)                            // Shift -> fast continuous
+                { jogDistance = -1d; jogFeed = jogcfg.FastFeedrate; }
+                else if (mods == (ModifierKeys.Control | ModifierKeys.Shift))   // Ctrl+Shift -> slow continuous
+                { jogDistance = -1d; jogFeed = jogcfg.SlowFeedrate; }
+                else                                                            // no modifier -> selected preset
+                { jogDistance = JogData.Distance; jogFeed = JogData.FeedRate; }
+                jogIsContinuous = jogDistance == -1d;
+
+                var distance = (jogDistance == -1 ? GrblInfo.MaxTravel.Values[axis] : jogDistance) * (cmd[1] == '-' ? -1d : 1d);
 
                 if (softLimits)
                 {
@@ -612,10 +538,10 @@ namespace CNC.Controls
 
                     jogAxis = axis;
 
-                    cmd = string.Format("$J=G53{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), position.ToInvariantString(), Math.Ceiling(JogData.FeedRate).ToInvariantString());
+                    cmd = string.Format("$J=G53{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), position.ToInvariantString(), Math.Ceiling(jogFeed).ToInvariantString());
                 }
                 else
-                    cmd = string.Format("$J=G91{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), distance.ToInvariantString(), Math.Ceiling(JogData.FeedRate).ToInvariantString());
+                    cmd = string.Format("$J=G91{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), distance.ToInvariantString(), Math.Ceiling(jogFeed).ToInvariantString());
             }
 
             model.ExecuteCommand(cmd);
@@ -628,7 +554,7 @@ namespace CNC.Controls
 
         private void JogButton_JogEnd(object sender, EventArgs e)
         {
-            if(JogData.Distance == -1)
+            if (jogIsContinuous)   // continuous (selected Continuous, or a Shift/Ctrl+Shift speed tier) - stop on release
                 JogCommand("stop");
         }
 
@@ -866,7 +792,23 @@ namespace CNC.Controls
         public int DistanceIndex
         {
             get { return _jogStep == JogStep.Continuous ? (int)_lastStep : (int)_jogStep; }
-            set { _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, value)); StepSize = _lastStep; }
+            set
+            {
+                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, value));
+                // The UI jog panel presents distance and Continuous as separate controls, so changing the
+                // distance must not silently turn Continuous off. While Continuous is on, just update the
+                // stored finite preset (the distance used once Continuous is unchecked) and refresh the
+                // readouts; only leave Continuous when the user explicitly unchecks it.
+                if (_jogStep == JogStep.Continuous)
+                {
+                    OnPropertyChanged(nameof(DistanceIndex));
+                    OnPropertyChanged(nameof(SelectedDistance));
+                    OnPropertyChanged(nameof(SelectedDistanceText));
+                    PersistSelection();
+                }
+                else
+                    StepSize = _lastStep;
+            }
         }
         public bool Continuous
         {

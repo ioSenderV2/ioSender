@@ -190,8 +190,7 @@ namespace GCode_Sender
             UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
 
             xx.ItemsSource = UIViewModel.SidebarItems;
-            if(AppConfig.Settings.Jog.Mode != JogConfig.JogMode.Keypad)
-                UIViewModel.SidebarItems.Add(new SidebarItem(jogControl));
+            UIViewModel.SidebarItems.Add(new SidebarItem(jogControl));   // UI jogging is always available
             UIViewModel.SidebarItems.Add(new SidebarItem(macroControl));
             UIViewModel.SidebarItems.Add(new SidebarItem(gotoControl));
             UIViewModel.SidebarItems.Add(new SidebarItem(outlineFlyout));

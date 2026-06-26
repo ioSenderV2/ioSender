@@ -12,17 +12,17 @@
     </UserControl.Resources>
     <GroupBox x:Uid="grp_kbdJogging" x:Name="grpJog" Header="Keyboard jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310">
         <StackPanel HorizontalAlignment="Left" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
-            <StackPanel x:Uid="pnl_kbdJogging" Orientation="Horizontal" Visibility="{Binding Path=IsGrbl, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsVisibleConverter}}" ToolTip="Warning! - Grbl has outstanding bug(s) in jog cancel (on key up).">
-                <CheckBox x:Uid="lbl_enable" Content="Enable" IsChecked="{Binding Path=Jog.KeyboardEnable, Mode=TwoWay}" Margin="160,3,0,3"/>
-                <Image HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0" Source="Resources/StatusAnnotations_Warning_16xLG_color.png"/>
+            <StackPanel x:Uid="pnl_kbdJogging" Orientation="Horizontal">
+                <CheckBox x:Uid="lbl_enable" Content="Enable" IsChecked="{Binding Path=Jog.KeyboardEnable, Mode=TwoWay}" Margin="160,3,0,3" ToolTip="Turn keyboard jogging on or off. On by default."/>
+                <!-- Jog-cancel-on-key-up warning applies to legacy Grbl only. -->
+                <Image HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0" Source="Resources/StatusAnnotations_Warning_16xLG_color.png" Visibility="{Binding Path=IsGrbl, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsVisibleConverter}}" ToolTip="Warning! - Grbl has outstanding bug(s) in jog cancel (on key up)."/>
             </StackPanel>
             <local:NumericField x:Uid="fld_fastFeedrate" Label="Fast feedrate:" Localization.Attributes = "$Content (Inherit)" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.FastFeedrate, Mode=TwoWay}" ToolTip="Feed rate for fast keyboard jogging (e.g. while holding the fast-jog modifier key) - for quickly crossing the table."/>
             <local:NumericField x:Uid="fld_fastDistance" Label="Fast distance:" ColonAt="160" Value="{Binding Path=Jog.FastDistance, Mode=TwoWay}" ToolTip="How far each fast keyboard jog moves."/>
             <local:NumericField x:Uid="fld_slowFeedrate" Label="Slow feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.SlowFeedrate, Mode=TwoWay}" ToolTip="Feed rate for normal/slow keyboard jogging - for careful positioning near the work."/>
             <local:NumericField x:Uid="fld_slowDistance" Label="Slow distance:" ColonAt="160" Value="{Binding Path=Jog.SlowDistance, Mode=TwoWay}" ToolTip="How far each slow keyboard jog moves."/>
             <local:NumericField x:Uid="fld_stepFeedrate" Label="Step feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.StepFeedrate, Mode=TwoWay}" ToolTip="Feed rate for single-step jogs - each keypress moves exactly one step distance."/>
-            <CheckBox x:Uid="lbl_linkStepToUi" Content="Link distance and speed to UI jogging" IsChecked="{Binding Path=Jog.LinkStepJogToUI, Mode=TwoWay}" Margin="50,3,0,3" ToolTip="Use the distance and speed selected on the on-screen UI jog panel for keyboard jogging too, instead of the fixed step distance below and the Slow/Fast speeds."/>
-            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay}" IsEnabled="{Binding Path=Jog.LinkStepJogToUI, Converter={StaticResource BooleanNotConverter}}" ToolTip="Fixed distance moved per step jog (used when 'Link distance and speed to UI jogging' is off)."/>
+            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay}" ToolTip="Fixed distance moved per single-step (Ctrl) keyboard jog."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

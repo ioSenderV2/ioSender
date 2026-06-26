@@ -84,6 +84,36 @@ namespace GCode_Sender
                 return;
             }
 
+            // Restore the saved window size/position now (before the window is shown) so it opens at the
+            // right size instead of painting at the default size and being resized later in CompleteStartup -
+            // that post-paint resize was the visible "default layout then redraw" on launch.
+            if (AppConfig.Settings.Base.KeepWindowSize)
+            {
+                if (AppConfig.Settings.Base.WindowWidth == -1)
+                    WindowState = WindowState.Maximized;
+                else
+                {
+                    Width = Math.Max(Math.Min(AppConfig.Settings.Base.WindowWidth, SystemParameters.PrimaryScreenWidth), MinWidth);
+                    Height = Math.Max(Math.Min(AppConfig.Settings.Base.WindowHeight, SystemParameters.PrimaryScreenHeight), MinHeight);
+
+                    double savedLeft = AppConfig.Settings.Base.WindowLeft, savedTop = AppConfig.Settings.Base.WindowTop;
+                    if (!double.IsNaN(savedLeft) && !double.IsNaN(savedTop) && IsOnScreen(savedLeft, savedTop, Width, Height))
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual;
+                        Left = savedLeft;
+                        Top = savedTop;
+                    }
+                    else
+                    {
+                        if (Left + Width > SystemParameters.PrimaryScreenWidth)
+                            Left = 0d;
+                        if (Top + Height > SystemParameters.PrimaryScreenHeight)
+                            Top = 0d;
+                    }
+                }
+            }
+            saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
+
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
@@ -144,34 +174,6 @@ namespace GCode_Sender
 
             GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
 
-            if (AppConfig.Settings.Base.KeepWindowSize)
-            {
-                if (AppConfig.Settings.Base.WindowWidth == -1)
-                    WindowState = WindowState.Maximized;
-                else
-                {
-                    Width = Math.Max(Math.Min(AppConfig.Settings.Base.WindowWidth, SystemParameters.PrimaryScreenWidth), MinWidth);
-                    Height = Math.Max(Math.Min(AppConfig.Settings.Base.WindowHeight, SystemParameters.PrimaryScreenHeight), MinHeight);
-
-                    // Restore the saved position when it lands on a connected monitor; otherwise fall back to
-                    // the old clamp so a window saved on a now-disconnected screen can't open off-screen.
-                    double savedLeft = AppConfig.Settings.Base.WindowLeft, savedTop = AppConfig.Settings.Base.WindowTop;
-                    if (!double.IsNaN(savedLeft) && !double.IsNaN(savedTop) && IsOnScreen(savedLeft, savedTop, Width, Height))
-                    {
-                        WindowStartupLocation = WindowStartupLocation.Manual;
-                        Left = savedLeft;
-                        Top = savedTop;
-                    }
-                    else
-                    {
-                        if (Left + Width > SystemParameters.PrimaryScreenWidth)
-                            Left = 0d;
-                        if (Top + Height > SystemParameters.PrimaryScreenHeight)
-                            Top = 0d;
-                    }
-                }
-            }
-            saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
             var appconf = getView(getTab(ViewType.AppConfig));
 
             appconf.Setup(UIViewModel, AppConfig.Settings);
@@ -202,13 +204,14 @@ namespace GCode_Sender
 
             // Build sidebar flyouts from the user's FlyoutItems list (Edit Main Page dialog).
             var seenFlyouts = new System.Collections.Generic.HashSet<string>();
+            var pinnedFlyouts = new System.Collections.Generic.List<UserControl>();
             foreach (var name in AppConfig.Settings.Base.FlyoutItems)
             {
                 if (!seenFlyouts.Add(name))     // guard against duplicate entries
                     continue;
 
                 var item = MainPanelRegistry.ByName(name);
-                if (item == null)
+                if (item == null || !item.CanBeFlyout)   // skip leftover main-page-only panels (e.g. jog panels)
                     continue;
 
                 UserControl flyout;
@@ -251,9 +254,17 @@ namespace GCode_Sender
 
                 UIViewModel.SidebarItems.Add(new SidebarItem((ISidebarControl)flyout));
 
-                if (flyout is IPinnableFlyout pinned && pinned.Pinned)   // reopen pinned flyouts on launch
-                    flyout.Visibility = Visibility.Visible;
+                if (flyout is IPinnableFlyout pinned && pinned.Pinned)   // reopen pinned flyouts on launch (deferred below)
+                    pinnedFlyouts.Add(flyout);
             }
+
+            // Show pinned flyouts only after the window/sidebar canvas has laid out - setting Visibility inline
+            // during setup did not stick (they stayed closed on launch).
+            if (pinnedFlyouts.Count > 0)
+                Dispatcher.BeginInvoke(new System.Action(() => {
+                    foreach (var f in pinnedFlyouts)
+                        f.Visibility = Visibility.Visible;
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
 
             UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
             if (connected)

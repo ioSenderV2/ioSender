@@ -512,7 +512,7 @@ CNC.Controls.WPF.g.uk-UA.resources:sdcardview.baml,mnu_loadRun:System.Windows.Co
 CNC.Controls.WPF.g.uk-UA.resources:sdcardview.baml,mnu_loadRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender and start it.
 CNC.Controls.WPF.g.uk-UA.resources:sdcardview.baml,mnu_copyTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Cop_y to
 CNC.Controls.WPF.g.uk-UA.resources:sdcardview.baml,mnu_moveTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Move to
-CNC.Controls.WPF.g.uk-UA.resources:fileactioncontrol.baml,btn_openFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open file
+CNC.Controls.WPF.g.uk-UA.resources:fileactioncontrol.baml,btn_openFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load file
 CNC.Controls.WPF.g.uk-UA.resources:fileactioncontrol.baml,btn_reloadFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reload file
 CNC.Controls.WPF.g.uk-UA.resources:fileactioncontrol.baml,btn_editFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit file
 CNC.Controls.WPF.g.uk-UA.resources:fileactioncontrol.baml,btn_closeFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close file

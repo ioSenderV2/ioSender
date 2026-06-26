@@ -84,6 +84,8 @@ namespace CNC.Controls
                 dgrSettings.DataContext = GrblSettings.Settings;
                 dgrSettings.SelectedIndex = 0;
             }
+
+            UpdateValidation();
         }
 
         #region Methods required by GrblConfigTab interface
@@ -194,10 +196,7 @@ namespace CNC.Controls
             txtDescription.Text = setting.Description;
             curSetting = new Widget(this, new WidgetProperties(setting), canvas);
             curSetting.IsEnabled = true;
-
-            canvas.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-
-            txtDescription.Height = Math.Max(ActualHeight - 40d - canvas.DesiredSize.Height, 0d);
+            UpdateValidation();
         }
 
         private bool SetSetting (KeyValuePair<int, string> setting)
@@ -476,7 +475,69 @@ namespace CNC.Controls
 
         private void ConfigView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            txtDescription.Height = e.NewSize.Height - 40d - canvas.ActualHeight;
+            // Description box now fills via the details Grid (* row) - no manual height sizing needed.
+        }
+
+        // Live sanity check on the Basic settings tab: the step pulse time ($0) must fit inside one step
+        // period at the worst-case step rate (highest steps/mm x max feed rate across axes). grblHAL needs
+        // a minimum low time between pulses, so we warn before the driver actually starts missing steps.
+        private void UpdateValidation()
+        {
+            string warning = ValidateStepPulse();
+            if (string.IsNullOrEmpty(warning))
+                txtValidation.Visibility = Visibility.Collapsed;
+            else
+            {
+                txtValidation.Text = warning;
+                txtValidation.Visibility = Visibility.Visible;
+            }
+        }
+
+        // Called by Widget when a setting edit commits. Re-run the live check only if the edited setting is
+        // one of its inputs ($0 step pulse, $10x steps/mm, $11x max feed rate) so unrelated edits are cheap.
+        public void OnSettingEdited(int id)
+        {
+            int axes = GrblInfo.NumAxes;
+            if (id == (int)GrblSetting.PulseMicroseconds ||
+                (id >= (int)GrblSetting.TravelResolutionBase && id < (int)GrblSetting.TravelResolutionBase + axes) ||
+                (id >= (int)GrblSetting.MaxFeedRateBase && id < (int)GrblSetting.MaxFeedRateBase + axes))
+                UpdateValidation();
+        }
+
+        private string ValidateStepPulse()
+        {
+            double pulse = GrblSettings.GetDouble(GrblSetting.PulseMicroseconds);
+            if (double.IsNaN(pulse) || pulse <= 0d)
+                return null;
+
+            double worstHz = 0d;
+            int worstAxis = -1;
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+            {
+                double stepsmm = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + i);
+                double maxrate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + i);   // mm/min
+                if (double.IsNaN(stepsmm) || double.IsNaN(maxrate))
+                    continue;
+                double hz = stepsmm * maxrate / 60d;     // steps per second
+                if (hz > worstHz) { worstHz = hz; worstAxis = i; }
+            }
+            if (worstAxis < 0 || worstHz <= 0d)
+                return null;
+
+            const double minLowUs = 2d;                  // conservative minimum low time between pulses
+            double periodUs = 1e6 / worstHz;
+            if (pulse + minLowUs <= periodUs)
+                return null;                             // fits - OK
+
+            double safePulse = Math.Floor((periodUs - minLowUs) * 10d) / 10d;
+            return string.Format(
+                "⚠ Step rate reaches ~{0:0} kHz on {1} ({2:0} steps/mm × {3:0} mm/min → {4:0.0} µs period). " +
+                "At $0 = {5:0.#} µs the pulse is too long - reduce $0 to ≤ {6:0.#} µs.",
+                worstHz / 1000d,
+                GrblInfo.AxisIndexToLetter(worstAxis),
+                GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + worstAxis),
+                GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + worstAxis),
+                periodUs, pulse, Math.Max(0.1d, safePulse));
         }
     }
 }

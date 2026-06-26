@@ -120,7 +120,7 @@ namespace CNC.Controls
             }
             if (unmet.Count > 0)
             {
-                MessageBox.Show(string.Format("Cannot run macro \"{0}\":\r\n\r\n• {1}", name, string.Join("\r\n• ", unmet)),
+                ShowMessage(string.Format("Cannot run macro \"{0}\":\r\n\r\n• {1}", name, string.Join("\r\n• ", unmet)),
                     "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
@@ -167,7 +167,7 @@ namespace CNC.Controls
                     if (Body(raw, "PROMPT").Trim().Length == 0)
                     {
                         Flush(model, buffer);
-                        if (MessageBox.Show(string.Format("Run macro \"{0}\"?", name), "ioSender",
+                        if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
                                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                             return false;
                     }
@@ -187,7 +187,7 @@ namespace CNC.Controls
                     Flush(model, buffer);
                     if (!WaitForIdle(model))
                     {
-                        MessageBox.Show(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
+                        ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
                             "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return false;
                     }
@@ -214,8 +214,27 @@ namespace CNC.Controls
         // so it can be skipped when an input (PROMPT) dialog already gates the run.
         private static bool ConfirmRun(string name)
         {
-            return MessageBox.Show(string.Format("Run {0} macro?", name), "ioSender",
+            return ShowMessage(string.Format("Run {0} macro?", name), "ioSender",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        }
+
+        // The window macro dialogs (MBOX, prompts, error/abort notices) should be owned by, so they
+        // center on and stay above ioSender instead of popping up as an independent top-level window
+        // that can fall behind the main window. Returns null if the main window is not (yet) shown.
+        private static Window OwnerWindow()
+        {
+            return Application.Current != null && Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
+                ? Application.Current.MainWindow
+                : null;
+        }
+
+        // MessageBox.Show with the main window as owner when available (the owner overload requires a
+        // non-null window, so fall back to the ownerless overload before the main window exists).
+        private static MessageBoxResult ShowMessage(string text, string caption, MessageBoxButton buttons, MessageBoxImage icon)
+        {
+            var owner = OwnerWindow();
+            return owner != null ? MessageBox.Show(owner, text, caption, buttons, icon)
+                                 : MessageBox.Show(text, caption, buttons, icon);
         }
 
         // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
@@ -241,7 +260,7 @@ namespace CNC.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format("Macro \"{0}\" references a file that could not be read:\r\n\r\n{1}\r\n\r\n{2}", name, path, ex.Message),
+                ShowMessage(string.Format("Macro \"{0}\" references a file that could not be read:\r\n\r\n{1}\r\n\r\n{2}", name, path, ex.Message),
                     "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
@@ -319,13 +338,8 @@ namespace CNC.Controls
                 MinWidth = 300
             };
 
-            if (Application.Current != null && Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible)
-            {
-                win.Owner = Application.Current.MainWindow;
-                win.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            }
-            else
-                win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            win.Owner = OwnerWindow();
+            win.WindowStartupLocation = win.Owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
 
             var root = new StackPanel { Margin = new Thickness(12) };
 
@@ -379,7 +393,7 @@ namespace CNC.Controls
                     double v;
                     if (!double.TryParse(boxes[i].Text.Trim(), NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out v))
                     {
-                        MessageBox.Show(string.Format("\"{0}\" is not a valid number.", fields[i].Label), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(win, string.Format("\"{0}\" is not a valid number.", fields[i].Label), title, MessageBoxButton.OK, MessageBoxImage.Warning);
                         boxes[i].Focus();
                         boxes[i].SelectAll();
                         return;
@@ -566,7 +580,7 @@ namespace CNC.Controls
             if (body == string.Empty)
                 body = "(no message)";
 
-            var result = MessageBox.Show(body, name, buttons, MessageBoxImage.Information);
+            var result = ShowMessage(body, name, buttons, MessageBoxImage.Information);
             return !(result == MessageBoxResult.Cancel || result == MessageBoxResult.No);
         }
 

@@ -18,7 +18,7 @@ namespace CNC.Controls
 {
     public partial class MainPageEditor : Window
     {
-        private const int MaxMainPanels = 6;
+        private const int MaxMainPanels = 8;
         private const int MaxLeftPanels = 6;
         private const string ProtectedTab = "AppConfig";   // Settings:App must always stay reachable
 
@@ -56,7 +56,7 @@ namespace CNC.Controls
             foreach (var name in cfg.FlyoutItems)
             {
                 AssignableItem it;
-                if (byName.TryGetValue(name, out it) && !Main.Contains(it) && !Left.Contains(it) && !Flyouts.Contains(it))
+                if (byName.TryGetValue(name, out it) && it.CanBeFlyout && !Main.Contains(it) && !Left.Contains(it) && !Flyouts.Contains(it))
                     Flyouts.Add(it);
             }
             foreach (var it in all)
@@ -92,7 +92,7 @@ namespace CNC.Controls
             var avail = lstAvailable.SelectedItem as AssignableItem;
             btnToMain.IsEnabled = avail != null && avail.CanBeMainPanel && Main.Count < MaxMainPanels;
             btnToLeft.IsEnabled = avail != null && avail.CanBeMainPanel && Left.Count < MaxLeftPanels;
-            btnToFlyout.IsEnabled = avail != null;
+            btnToFlyout.IsEnabled = avail != null && avail.CanBeFlyout;
             btnFromMain.IsEnabled = lstMain.SelectedItem != null;
             btnFromLeft.IsEnabled = lstLeft.SelectedItem != null;
             btnFromFlyout.IsEnabled = lstFlyouts.SelectedItem != null;
@@ -157,7 +157,7 @@ namespace CNC.Controls
         private void btnToFlyout_Click(object sender, RoutedEventArgs e)
         {
             var it = lstAvailable.SelectedItem as AssignableItem;
-            if (it != null)
+            if (it != null && it.CanBeFlyout)
             {
                 Available.Remove(it);
                 Flyouts.Add(it);

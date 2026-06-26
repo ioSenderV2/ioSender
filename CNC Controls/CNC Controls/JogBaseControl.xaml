@@ -88,16 +88,11 @@
                             </Style>
                         </Button.Style>
                         <Grid>
+                            <!-- Stop sign kept in the tree but intentionally hidden: panel/keyboard jogs are
+                                 momentary (they stop the instant the button/key is released), so flashing a stop
+                                 affordance here would be misleading. The button still cancels an in-progress move
+                                 when clicked; the blank face during a jog is the honest state. -->
                             <Viewbox Width="34" Height="34" Visibility="Collapsed">
-                                <Viewbox.Style>
-                                    <Style TargetType="Viewbox">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Viewbox.Style>
                                 <Grid Width="100" Height="100">
                                     <Polygon Points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" Fill="#FFD32F2F" Stroke="#FFB71C1C" StrokeThickness="4" StrokeLineJoin="Round"/>
                                 </Grid>

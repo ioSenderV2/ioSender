@@ -164,10 +164,20 @@
                     <Button x:Uid="btn_restore" x:Name="btnRestore" Content="Restore" HorizontalAlignment="Right" Margin="5,0,0,0" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnRestore_Click"/>
                 </StackPanel>
             </DockPanel>
-            <StackPanel x:Name="details" DockPanel.Dock="Top" HorizontalAlignment="Left" Height="Auto" Margin="5,5,0,0" VerticalAlignment="Top">
-                <StackPanel x:Name="canvas" HorizontalAlignment="Left" Height="Auto" VerticalAlignment="Center" Width="455"/>
-                <TextBox x:Name="txtDescription" Background="#FFF8F8F8" IsReadOnly="True" Margin="5,0,0,0" HorizontalAlignment="Left" Height="180" TextWrapping="Wrap" VerticalAlignment="Top" Width="550"/>
-            </StackPanel>
+            <!-- Auto row: the selected setting's edit field(s); * row: the description box fills the rest.
+                 This lets the field always take its full height (it is no longer clipped by the box below)
+                 and the box fill the remaining area via layout - no code-computed height needed. -->
+            <Grid x:Name="details" DockPanel.Dock="Top" HorizontalAlignment="Left" VerticalAlignment="Stretch" Margin="5,16,0,5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel x:Name="canvas" Grid.Row="0" HorizontalAlignment="Left" MinHeight="30" Width="455" VerticalAlignment="Top"/>
+                <TextBox x:Name="txtDescription" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" Margin="5,10,0,0" HorizontalAlignment="Left" MinHeight="120" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Width="550"/>
+                <!-- Live config check: step pulse ($0) vs worst-case step rate (steps/mm x max feed rate). -->
+                <TextBlock x:Name="txtValidation" Grid.Row="2" Foreground="#C62828" TextWrapping="Wrap" Margin="5,6,0,0" MaxWidth="550" HorizontalAlignment="Left" Visibility="Collapsed"/>
+            </Grid>
         </DockPanel>
     </DockPanel>
 </UserControl>
