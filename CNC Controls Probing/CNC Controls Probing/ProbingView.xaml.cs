@@ -56,7 +56,7 @@ namespace CNC.Controls.Probing
     {
         private static bool keyboardMappingsOk = false;
 
-        private bool jogEnabled = false, probeTriggered = false, probeDisconnected = false, cycleStartSignal = false, wasMetric = true;
+        private bool probeTriggered = false, probeDisconnected = false, cycleStartSignal = false, wasMetric = true;
         private ProbingViewModel model = null;
         private ProbingProfiles profiles = new ProbingProfiles();
         private GrblViewModel grbl = null;
@@ -106,8 +106,6 @@ namespace CNC.Controls.Probing
 
                 if(positions == model.CameraPositions) // model.CameraPositions may have been changed elsewhere!
                     model.PreviewText += (model.PreviewText == string.Empty ? string.Empty : "\n") + string.Format((string)FindResource("CameraPosition"), model.CameraPositions, position.X.ToInvariantString(), position.Y.ToInvariantString());
-
-                Jog.Focus();
             }
         }
 
@@ -244,9 +242,6 @@ namespace CNC.Controls.Probing
                 if (GrblInfo.IsGrblHAL)
                     Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL);
 
-                if (!model.Grbl.IsGrblHAL && !AppConfig.Settings.Jog.KeyboardEnable)
-                    Jog.Visibility = Visibility.Collapsed;
-
                 if (GrblInfo.IsGrblHAL)
                 {
                     GrblParserState.Get();
@@ -366,11 +361,7 @@ namespace CNC.Controls.Probing
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
             if (!(e.Handled = ProcessKeyPreview(e)))
-            {
-                if (Keyboard.Modifiers == (ModifierKeys.Control|ModifierKeys.Shift))
-                    Jog.Focus();
                 base.OnPreviewKeyDown(e);
-            }
         }
         protected override void OnPreviewKeyUp(KeyEventArgs e)
         {
@@ -382,16 +373,9 @@ namespace CNC.Controls.Probing
             if (grbl.Keyboard == null)
                 return false;
 
-            return grbl.Keyboard.ProcessKeypress(e, Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) || jogEnabled, this);
-        }
-
-        private void Jog_FocusedChanged(object sender, RoutedEventArgs e)
-        {
-            var btn = sender as Button;
-            if (grbl.Keyboard.IsJogging)
-                grbl.Keyboard.JogCancel();
-            jogEnabled = btn.IsFocused && grbl.Keyboard.CanJog2;
-            btn.Content = (string)FindResource(jogEnabled ? "JogActive" : "JogDisabled");
+            // Keyboard jogging is always available here; ProcessKeypress only jogs when focus is not in a
+            // text box (so typing a value never jogs) - so no "activate jogging" gate/button is needed.
+            return grbl.Keyboard.ProcessKeypress(e, true, this);
         }
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -443,7 +427,7 @@ namespace CNC.Controls.Probing
             else
                 height = probeProperties.ActualHeight;
 
-            probeProperties.Visibility = (t1.ActualHeight - (Clearances.TranslatePoint(new Point(0, Clearances.ActualHeight), dp).Y + Jog.ActualHeight + Position.ActualHeight) + probeProperties.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
+            probeProperties.Visibility = (t1.ActualHeight - (Clearances.TranslatePoint(new Point(0, Clearances.ActualHeight), dp).Y + Position.ActualHeight) + probeProperties.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void showDRO()

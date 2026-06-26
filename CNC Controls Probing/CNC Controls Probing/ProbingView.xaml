@@ -101,7 +101,6 @@
                         <CheckBox x:Uid="lbl_touchPlateXY" Content="Is touch plate" ToolTip="Offsets are horizontal thickness of touchplate" Margin="19,0,0,0" IsChecked="{Binding Path=TouchPlateIsXY}" IsEnabled="{Binding Path=TouchPlateXYEnabled}" />
                     </StackPanel>
                 </GroupBox>
-                <Button x:Uid="btn_jog" x:Name="Jog" Content="Click to activate keyboard jogging" ToolTip="Ctrl+Shift to activate" Margin="0,5,0,6" Focusable="True" FocusVisualStyle="{x:Null}" GotFocus="Jog_FocusedChanged" LostFocus="Jog_FocusedChanged"/>
                 <TextBlock x:Name="Position" Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Height="25" Width="235" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
             </StackPanel>
         </DockPanel>
