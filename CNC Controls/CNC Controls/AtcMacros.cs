@@ -50,6 +50,67 @@ namespace CNC.Controls
             Outdated     // macros are present but their checksum no longer matches the embedded set
         }
 
+        public enum MacroState { Installed, Outdated, Missing }
+
+        public class MacroStatusRow
+        {
+            public string Name { get; set; }
+            public string Size { get; set; }
+            public string FS { get; set; }
+            public MacroState State { get; set; }
+        }
+
+        // Per-macro status for the Machine Setup "Controller macros" step. Lists the controller filesystem and
+        // marks each required macro Installed (present + the set checksum matches the embedded copies), Outdated
+        // (present but the set checksum differs) or Missing (absent). Size/FS come from the filesystem listing.
+        public static List<MacroStatusRow> GetStatus(GrblViewModel model)
+        {
+            var rows = new List<MacroStatusRow>();
+
+            if (model == null || !GrblInfo.HasFS || Comms.com == null || !Comms.com.IsOpen)
+            {
+                foreach (string name in Required)
+                    rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
+                return rows;
+            }
+
+            GrblSDCard.Load(model, false);
+
+            var present = new Dictionary<string, DataRow>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataRowView rv in GrblSDCard.Files)
+            {
+                if ((string)rv.Row["Dir"] == GrblSDCard.EmptyMountMarker)
+                    continue;
+                present[Path.GetFileName((string)rv.Row["Name"])] = rv.Row;
+            }
+
+            FsMount target = GrblSDCard.Mounts.FirstOrDefault(m =>
+                                 m.Name.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 m.Path.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0)
+                             ?? GrblSDCard.Mounts.FirstOrDefault(m => m.Path == "/")
+                             ?? GrblSDCard.Mounts.FirstOrDefault();
+            string destPath = target != null ? target.Path : "/littlefs";
+
+            bool stale = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != EmbeddedChecksum();
+
+            foreach (string name in Required)
+            {
+                DataRow row;
+                if (present.TryGetValue(name, out row))
+                    rows.Add(new MacroStatusRow
+                    {
+                        Name = name,
+                        Size = row.Table.Columns.Contains("Size") ? row["Size"]?.ToString() : string.Empty,
+                        FS = row.Table.Columns.Contains("Location") ? row["Location"]?.ToString() : string.Empty,
+                        State = stale ? MacroState.Outdated : MacroState.Installed
+                    });
+                else
+                    rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
+            }
+
+            return rows;
+        }
+
         // Reconcile the controller's ATC macros with this install's embedded copies. Lists the filesystem and
         // compares an embedded checksum against the sidecar written on the previous upload; if a macro is
         // missing or the checksum differs, confirmUpload(reason) is asked and - if approved - all macros plus a

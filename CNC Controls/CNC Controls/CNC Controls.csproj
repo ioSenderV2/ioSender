@@ -84,6 +84,12 @@
     <Compile Include="GrblConfigView.xaml.cs">
       <DependentUpon>GrblConfigView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MachineSetupView.xaml.cs">
+      <DependentUpon>MachineSetupView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ToolsView.xaml.cs">
+      <DependentUpon>ToolsView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ConsoleWindow.xaml.cs">
       <DependentUpon>ConsoleWindow.xaml</DependentUpon>
     </Compile>
@@ -336,6 +342,14 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="GrblConfigView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MachineSetupView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ToolsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

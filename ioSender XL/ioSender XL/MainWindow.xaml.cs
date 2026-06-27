@@ -174,17 +174,22 @@ namespace GCode_Sender
 
             GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
 
-            var appconf = getView(getTab(ViewType.AppConfig));
+            // App settings now live inside the Settings tab (GrblConfigView forwards Setup to AppConfigView);
+            // set the Settings view up first so the app-config controls are populated before the other views.
+            var settingsView = getView(getTab(ViewType.GRBLConfig));
 
-            appconf.Setup(UIViewModel, AppConfig.Settings);
+            settingsView?.Setup(UIViewModel, AppConfig.Settings);
 
-            foreach (TabItem tab in UIUtils.FindLogicalChildren<TabItem>(ui.tabMode))
+            // Top-level tabs only - do NOT recurse into nested TabControls, or sub-tabs that host an
+            // ICNCView (App Settings = AppConfigView) get wrongly disabled by the enable check below.
+            foreach (TabItem tab in ui.tabMode.Items)
             {
                 ICNCView view = getView(tab);
-                if (view != null && view != appconf)
+                if (view != null && view != settingsView)
                 {
                     view.Setup(UIViewModel, AppConfig.Settings);
-                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.AppConfig || view.ViewType == ViewType.LoadStock;
+                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.GRBLConfig
+                                 || view.ViewType == ViewType.LoadStock || view.ViewType == ViewType.MachineSetup;
                 }
             }
 #if ADD_CAMERA
@@ -315,48 +320,60 @@ namespace GCode_Sender
         // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
         private void ForceMachineSetupIfNeeded()
         {
-            bool needWizard = !_machineSetupForced && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine);
+            if (_machineSetupForced)
+                return;
 
             int tries = 0;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             timer.Tick += (s, e) =>
             {
                 bool ready = !string.IsNullOrEmpty(GrblInfo.Version) && GrblSettings.IsLoaded;
-                if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report
+                if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report version + settings
                     return;
                 timer.Stop();
                 if (!ready)
                     return;
-                // Skip the first-run wizard when connected to the simulator - it's not a real machine to set up.
+                // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
-                if (needWizard && string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine) && !sim)
-                    ShowMachineSetupWizard();
+                int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                if (step != 0 && !sim)
+                    ShowMachineSetup(step);
             };
             timer.Start();
         }
 
-        private void ShowMachineSetupWizard()
+        private void ShowMachineSetup(int step)
         {
             _machineSetupForced = true;
 
             CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
             CNC.Controls.MachineSetupWizard.SetupApplied += OnMachineSetupApplied;
 
-            TabItem tab = getTab(ViewType.GRBLConfig);
+            TabItem tab = getTab(ViewType.MachineSetup);
             if (tab != null)
             {
                 tab.IsEnabled = true;
-                tabMode.SelectedItem = tab;   // GrblConfigView.Activate auto-selects the Machine Setup Wizard sub-tab
+                tabMode.SelectedItem = tab;
+                (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
             }
 
             MessageBox.Show(this,
-                "Welcome! No machine is configured yet.\n\nPick your machine (or choose Custom and enter it by hand) and press Apply to finish setup. The normal screen opens once you do.",
-                "Set up your machine", MessageBoxButton.OK, MessageBoxImage.Information);
+                "Let's finish setting up your machine.\n\nWork through the steps - the normal screen opens once all are complete.",
+                "Machine setup", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // The wizard's Apply fired - machine is specified, return to the normal (Grbl) view.
+        // Apply fired: re-check the setup steps. Still gaps -> lead to the next one and stay; all complete
+        // -> return to the normal (Grbl) view.
         private void OnMachineSetupApplied()
         {
+            int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+            if (step != 0)
+            {
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                    (getView(getTab(ViewType.MachineSetup)) as CNC.Controls.MachineSetupView)?.GoToStep(step)));
+                return;
+            }
+
             CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
@@ -838,8 +855,11 @@ namespace GCode_Sender
                 if (byName.TryGetValue(name, out t) && !desired.Contains(t))
                     desired.Add(t);
             }
-            TabItem prot;   // Settings:App must remain reachable
-            if (byName.TryGetValue(ViewType.AppConfig.ToString(), out prot) && !desired.Contains(prot))
+            TabItem prot;   // Settings (hosts App settings + the Edit Main Page editor) must remain reachable
+            if (byName.TryGetValue(ViewType.GRBLConfig.ToString(), out prot) && !desired.Contains(prot))
+                desired.Add(prot);
+            // Machine Setup is the setup gate - always keep it visible even if a saved layout predates it.
+            if (byName.TryGetValue(ViewType.MachineSetup.ToString(), out prot) && !desired.Contains(prot))
                 desired.Add(prot);
 
             if (desired.Count == 0)

@@ -172,6 +172,15 @@
             <TabItem x:Uid="tab_grbl" x:Name="tabGrbl" Header="Grbl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <local:JobView x:Name="Grbl"/>
             </TabItem>
+            <TabItem x:Uid="tab_loadStock" x:Name="tabLoadStock" Header="Load stock">
+                <local:LoadStockView x:Name="loadStockView"/>
+            </TabItem>
+            <TabItem x:Uid="tab_offsets" x:Name="tabOffsets" Header="Offsets">
+                <cnccontrols:OffsetView x:Name="offsetControl"/>
+            </TabItem>
+            <TabItem x:Uid="tab_grblConfig" x:Name="tabConfig" Header="Settings" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <cnccontrols:GrblConfigView x:Name="configControl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </TabItem>
             <!---
             <TabItem x:Uid="tab_3DView" x:Name="tabViewer" Header="3D View">
                 <cncviewer:Viewer x:Name="viewer"/>
@@ -180,32 +189,17 @@
             <TabItem x:Uid="tab_probing" x:Name="tabProbing" Header="Probing">
                 <cncprobingcontrols:ProbingView x:Name="probingView"/>
             </TabItem>
-            <TabItem x:Uid="tab_loadStock" x:Name="tabLoadStock" Header="Load stock">
-                <local:LoadStockView x:Name="loadStockView"/>
-            </TabItem>
             <TabItem x:Uid="tab_sdCard" x:Name="tabSDCard" Header="SD Card">
                 <cnccontrols:SDCardView x:Name="SDCardView" FileSelected="SDCardView_FileSelected"/>
             </TabItem>
             <TabItem x:Uid="tab_latheWizards" x:Name="tabLatheWizards" Header="Lathe Wizards">
                 <cnclathecontrols:LatheWizardsView x:Name="latheWizards"/>
             </TabItem>
-            <TabItem x:Uid="tab_offsets" x:Name="tabOffsets" Header="Offsets">
-                <cnccontrols:OffsetView x:Name="offsetControl"/>
-            </TabItem>
             <TabItem x:Uid="tab_tools" x:Name="tabTools" Header="Tools">
-                <cnccontrols:ToolView x:Name="toolControl"/>
+                <cnccontrols:ToolsView x:Name="toolsView"/>
             </TabItem>
-            <TabItem x:Uid="tab_trinamic" x:Name="tabTrinamic" Header="Trinamic tuner">
-                <cnccontrols:TrinamicView x:Name="toolTrinamic"/>
-            </TabItem>
-            <TabItem x:Uid="tab_grblConfig" x:Name="tabConfig" Header="Settings: Grbl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <cnccontrols:GrblConfigView x:Name="configControl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-            </TabItem>
-            <TabItem x:Uid="tab_appConfig" x:Name="tabAppConfig" Header="Settings: App">
-                <cnccontrols:AppConfigView x:Name="appConfigControl"/>
-            </TabItem>
-            <TabItem x:Uid="tab_pidTuner" x:Name="tabPIDTuner" Header="PID Tuner">
-                <cnccontrols:PIDLogView x:Name="toolPIDTuner"/>
+            <TabItem x:Uid="tab_machineSetup" x:Name="tabMachineSetup" Header="Machine Setup">
+                <cnccontrols:MachineSetupView x:Name="machineSetupView"/>
             </TabItem>
             <!--
                 <TabItem x:Name="tabTurning" Header="Turning">

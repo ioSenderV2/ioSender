@@ -1,0 +1,30 @@
+<UserControl x:Class="CNC.Controls.ToolsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="515" d:DesignWidth="900"
+             Loaded="UserControl_Loaded">
+    <TabControl x:Name="tabTools" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+        <TabItem x:Uid="tab_toolTable" x:Name="tabToolTable" Header="Tool table">
+            <local:ToolView x:Name="toolControl"/>
+        </TabItem>
+        <TabItem x:Uid="tab_stepperCalibration" x:Name="tabStepperCalibration" Header="Stepper calibration">
+            <local:StepperCalibrationWizard x:Name="calibWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tab_stepperCalibrationScratch" x:Name="tabStepperCalibrationScratch" Header="Stepper calibration (scratch)">
+            <local:StepperCalibrationScratchWizard x:Name="calibScratchWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tab_surfaceSpoilboard" x:Name="tabSurfaceSpoilboard" Header="Surface spoilboard">
+            <local:SurfaceSpoilboardWizard x:Name="surfaceSpoilboardWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tab_trinamic" x:Name="tabTrinamic" Header="Trinamic tuner">
+            <local:TrinamicView x:Name="toolTrinamic"/>
+        </TabItem>
+        <TabItem x:Uid="tab_pidTuner" x:Name="tabPIDTuner" Header="PID Tuner">
+            <local:PIDLogView x:Name="toolPIDTuner"/>
+        </TabItem>
+    </TabControl>
+</UserControl>

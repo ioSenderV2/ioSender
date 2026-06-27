@@ -51,74 +51,91 @@
         <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,8">
             <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
             <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray"
-                       Text="Describe your machine on one page. Nothing is sent to the controller until you press Apply."/>
+                       Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
             <Separator Margin="0,4"/>
         </StackPanel>
 
-        <!-- Scrollable body -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Orientation="Vertical">
+        <!-- Body: one tab per setup step -->
+        <TabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
 
-                <!-- Top row: Machine (left) | Home position (right) -->
-                <Grid>
-                    <!-- Machine capped at 3/5 of the row, Home position gets the remaining 2/5. -->
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="3*"/>
-                        <ColumnDefinition Width="2*"/>
-                    </Grid.ColumnDefinitions>
+            <!-- Overview -->
+            <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
+                        <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
+                        <TextBlock x:Uid="ov_body" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:"/>
+                        <TextBlock x:Uid="ov_s1" TextWrapping="Wrap" Margin="0,6,0,0" Text="1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values."/>
+                        <TextBlock x:Uid="ov_s2" TextWrapping="Wrap" Margin="0,2,0,0" Text="2 · Home position - the corner your machine homes to."/>
+                        <TextBlock x:Uid="ov_s3" TextWrapping="Wrap" Margin="0,2,0,0" Text="3 · Axis information - travel, max rate and steps/mm for each axis."/>
+                        <TextBlock x:Uid="ov_s4" TextWrapping="Wrap" Margin="0,2,0,0" Text="4 · Homing &amp; limits - limit switches, homing and soft limits."/>
+                        <TextBlock x:Uid="ov_s5" TextWrapping="Wrap" Margin="0,2,0,0" Text="5 · Probe definitions - the probes fitted to this machine."/>
+                        <TextBlock x:Uid="ov_s6" TextWrapping="Wrap" Margin="0,2,0,0" Text="6 · Controller macros - install the controller-side macro set."/>
+                        <TextBlock x:Uid="ov_foot" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="Gray"
+                                   Text="Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <!-- 1. Machine -->
-                    <GroupBox x:Uid="grp_machine" Grid.Column="0" Header="1 · Machine" Padding="8" Margin="0,0,8,0" VerticalAlignment="Top">
-                        <StackPanel Orientation="Vertical">
-                            <DockPanel LastChildFill="False">
-                                <TextBlock x:Uid="txt_startFrom" DockPanel.Dock="Left" Text="Start from your machine" Style="{StaticResource SectionHeader}" VerticalAlignment="Center"/>
-                                <Button DockPanel.Dock="Right" x:Name="btnFirmwareInfo" x:Uid="btn_firmwareInfo" Content="Firmware info…" MinWidth="100" MinHeight="22"
-                                        VerticalAlignment="Center" Click="FirmwareInfo_Click"
-                                        ToolTip="Show the controller's $I build/version information."/>
-                            </DockPanel>
-                            <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                <ComboBox x:Name="cbxManufacturer" MinWidth="170" Margin="0,0,6,4" MinHeight="22"
-                                          ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                          SelectionChanged="Manufacturer_Changed"/>
-                                <ComboBox x:Name="cbxProduct" MinWidth="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
-                                <ComboBox x:Name="cbxModel" MinWidth="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
-                            </WrapPanel>
-                            <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
-                                       TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>
-                            <TextBlock x:Uid="txt_pickHint" Foreground="Gray" TextWrapping="Wrap" Margin="0,4,0,0"
-                                       Text="Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."/>
-                        </StackPanel>
-                    </GroupBox>
+            <!-- 1. Machine -->
+            <TabItem x:Name="tabStepMachine">
+                <TabItem.Header><TextBlock x:Uid="step_machine" x:Name="hdrMachine" Text="1 · Machine"/></TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Vertical" Margin="10">
+                        <DockPanel LastChildFill="False">
+                            <TextBlock x:Uid="txt_startFrom" DockPanel.Dock="Left" Text="Start from your machine" Style="{StaticResource SectionHeader}" VerticalAlignment="Center"/>
+                            <Button DockPanel.Dock="Right" x:Name="btnFirmwareInfo" x:Uid="btn_firmwareInfo" Content="Firmware info…" MinWidth="100" MinHeight="22"
+                                    VerticalAlignment="Center" Click="FirmwareInfo_Click"
+                                    ToolTip="Show the controller's $I build/version information."/>
+                        </DockPanel>
+                        <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <ComboBox x:Name="cbxManufacturer" MinWidth="170" Margin="0,0,6,4" MinHeight="22"
+                                      ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                      SelectionChanged="Manufacturer_Changed"/>
+                            <ComboBox x:Name="cbxProduct" MinWidth="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
+                            <ComboBox x:Name="cbxModel" MinWidth="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
+                                   TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>
+                        <TextBlock x:Uid="txt_pickHint" Foreground="Gray" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <!-- 2. Home position -->
-                    <GroupBox x:Uid="grp_homePos" Grid.Column="1" Header="2 · Home position" Padding="8" VerticalAlignment="Top">
-                        <StackPanel Orientation="Vertical">
-                            <Canvas x:Uid="cnv_homeBox" Width="330" Height="150" HorizontalAlignment="Left" Background="Transparent"
-                                    ToolTip="Click the top corner where your machine homes (looking down from above the front; Z homes at the top).">
-                                <!-- box: front face -->
-                                <Polygon Points="70,70 230,70 230,120 70,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
-                                <!-- box: right face -->
-                                <Polygon Points="230,70 270,20 270,70 230,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
-                                <!-- box: top face -->
-                                <Polygon Points="70,70 230,70 270,20 110,20" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
-                                <!-- axis hints -->
-                                <Line X1="70" Y1="135" X2="120" Y2="135" Stroke="#FF3060C0" StrokeThickness="2"/>
-                                <TextBlock Canvas.Left="124" Canvas.Top="127" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
-                                <Line X1="55" Y1="80" X2="80" Y2="45" Stroke="#FF2E8B57" StrokeThickness="2"/>
-                                <TextBlock Canvas.Left="40" Canvas.Top="28" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
-                                <!-- corner markers (top face) -->
-                                <Ellipse x:Name="cornerFL" x:Uid="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="61" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
-                                <Ellipse x:Name="cornerFR" x:Uid="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="61" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
-                                <Ellipse x:Name="cornerBL" x:Uid="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="11" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
-                                <Ellipse x:Name="cornerBR" x:Uid="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="11" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
-                            </Canvas>
-                        </StackPanel>
-                    </GroupBox>
-                </Grid>
+            <!-- 2. Home position -->
+            <TabItem x:Name="tabStepHome">
+                <TabItem.Header><TextBlock x:Uid="step_homePos" x:Name="hdrHome" Text="2 · Home position"/></TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Vertical" Margin="10">
+                        <Canvas x:Uid="cnv_homeBox" Width="330" Height="150" HorizontalAlignment="Left" Background="Transparent"
+                                ToolTip="Click the top corner where your machine homes (looking down from above the front; Z homes at the top).">
+                            <!-- box: front face -->
+                            <Polygon Points="70,70 230,70 230,120 70,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFF3F3F3"/>
+                            <!-- box: right face -->
+                            <Polygon Points="230,70 270,20 270,70 230,120" Stroke="#FF888888" StrokeThickness="1" Fill="#FFE8E8E8"/>
+                            <!-- box: top face -->
+                            <Polygon Points="70,70 230,70 270,20 110,20" Stroke="#FF666666" StrokeThickness="1" Fill="#FFFAFAFA"/>
+                            <!-- axis hints -->
+                            <Line X1="70" Y1="135" X2="120" Y2="135" Stroke="#FF3060C0" StrokeThickness="2"/>
+                            <TextBlock Canvas.Left="124" Canvas.Top="127" Text="+X" Foreground="#FF3060C0" FontWeight="Bold"/>
+                            <Line X1="55" Y1="80" X2="80" Y2="45" Stroke="#FF2E8B57" StrokeThickness="2"/>
+                            <TextBlock Canvas.Left="40" Canvas.Top="28" Text="+Y" Foreground="#FF2E8B57" FontWeight="Bold"/>
+                            <!-- corner markers (top face) -->
+                            <Ellipse x:Name="cornerFL" x:Uid="cornerFL" Style="{StaticResource CornerDot}" Canvas.Left="61" Canvas.Top="61" Tag="FL" MouseLeftButtonDown="Corner_Click" ToolTip="Front-left (X min, Y min)"/>
+                            <Ellipse x:Name="cornerFR" x:Uid="cornerFR" Style="{StaticResource CornerDot}" Canvas.Left="221" Canvas.Top="61" Tag="FR" MouseLeftButtonDown="Corner_Click" ToolTip="Front-right (X max, Y min)"/>
+                            <Ellipse x:Name="cornerBL" x:Uid="cornerBL" Style="{StaticResource CornerDot}" Canvas.Left="101" Canvas.Top="11" Tag="BL" MouseLeftButtonDown="Corner_Click" ToolTip="Back-left (X min, Y max)"/>
+                            <Ellipse x:Name="cornerBR" x:Uid="cornerBR" Style="{StaticResource CornerDot}" Canvas.Left="261" Canvas.Top="11" Tag="BR" MouseLeftButtonDown="Corner_Click" ToolTip="Back-right (X max, Y max)"/>
+                        </Canvas>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                <!-- 3. Axis information -->
-                <GroupBox x:Uid="grp_axis" Header="3 · Axis information" Padding="8" Margin="0,8,0,0">
-                    <StackPanel Orientation="Vertical">
+            <!-- 3. Axis information -->
+            <TabItem x:Name="tabStepAxis">
+                <TabItem.Header><TextBlock x:Uid="step_axis" x:Name="hdrAxis" Text="3 · Axis information"/></TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Vertical" Margin="10">
                         <TextBlock x:Uid="txt_axisHelp" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,6"
                                    Text="Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches, Home min ($23) to home an axis toward its minimum (negative) end - kept in sync with the home-corner picture above (Z is fixed to the top). The Live dot lights when grbl sees that limit input."/>
                         <!-- Plain row grid (not a DataGrid) so every numeric cell is a live, single-click textbox. -->
@@ -175,11 +192,14 @@
                             </ItemsControl>
                         </StackPanel>
                     </StackPanel>
-                </GroupBox>
+                </ScrollViewer>
+            </TabItem>
 
-                <!-- 4. Homing & limits -->
-                <GroupBox x:Uid="grp_homing" Header="4 · Homing &amp; limits" Padding="8" Margin="0,8,0,0">
-                    <Grid>
+            <!-- 4. Homing & limits -->
+            <TabItem x:Name="tabStepHoming">
+                <TabItem.Header><TextBlock x:Uid="step_homing" x:Name="hdrHoming" Text="4 · Homing &amp; limits"/></TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto" MinWidth="220"/>
@@ -244,34 +264,98 @@
                                       Text="{Binding Setup.HomingDebounce, UpdateSourceTrigger=PropertyChanged, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"/>
                         </Grid>
                     </Grid>
-                </GroupBox>
+                </ScrollViewer>
+            </TabItem>
 
-                <!-- 5. Probe definitions (probes are machine hardware) -->
-                <GroupBox x:Uid="grp_probes" Header="5 · Probe definitions" Padding="8" Margin="0,8,0,0">
-                    <StackPanel Orientation="Vertical">
-                        <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
-                        <Button x:Uid="btn_editProbes" x:Name="btnEditProbes" Content="Edit probes…" HorizontalAlignment="Left" Padding="14,2" MinHeight="24" Click="Probes_Click"/>
+            <!-- 5. Probe definitions (probes are machine hardware) -->
+            <TabItem x:Name="tabStepProbes">
+                <TabItem.Header><TextBlock x:Uid="step_probes" x:Name="hdrProbes" Text="5 · Probe definitions"/></TabItem.Header>
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
+                    <DataGrid x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
+                              HeadersVisibility="Column" GridLinesVisibility="All"
+                              SelectionChanged="Probes_SelectionChanged" MouseDoubleClick="Probes_DoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn x:Uid="pdl_name" Header="Name" Binding="{Binding Name}" Width="*" MinWidth="110"/>
+                            <DataGridTextColumn x:Uid="pdl_type" Header="Type" Binding="{Binding TypeName}" MinWidth="80"/>
+                            <DataGridTextColumn x:Uid="pdl_dia" Header="Tip" Binding="{Binding ProbeDiameter, StringFormat=0.0##}" Width="50"/>
+                            <DataGridTextColumn x:Uid="pdl_search" Header="Approach" Binding="{Binding ProbeFeedRate, StringFormat=0}" Width="75"/>
+                            <DataGridTextColumn x:Uid="pdl_latch" Header="Re-touch" Binding="{Binding LatchFeedRate, StringFormat=0}" Width="70"/>
+                            <DataGridTextColumn x:Uid="pdl_dist" Header="Search dist." Binding="{Binding ProbeDistance, StringFormat=0.0##}" Width="80"/>
+                            <DataGridTextColumn x:Uid="pdl_clr" Header="Standoff" Binding="{Binding XYClearance, StringFormat=0.0##}" Width="65"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Width="90" Margin="8,0,0,0">
+                        <Button x:Uid="pdl_add" x:Name="btnProbeAdd" Content="Add" Click="ProbeAdd_Click" Margin="0,0,0,4" MinHeight="26"/>
+                        <Button x:Uid="pdl_edit" x:Name="btnProbeEdit" Content="Edit" Click="ProbeEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
+                        <Button x:Uid="pdl_delete" x:Name="btnProbeDelete" Content="Delete" Click="ProbeDelete_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                     </StackPanel>
-                </GroupBox>
+                </Grid>
+            </TabItem>
 
-                <!-- 6. Controller macros (ATC tool-change set + Load Stock corner probe) -->
-                <GroupBox x:Uid="grp_ctrlMacros" Header="6 · Controller macros" Padding="8" Margin="0,8,0,0">
-                    <StackPanel Orientation="Vertical">
-                        <TextBlock x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="Install or update the controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (probe_corner). Requires an ATC-capable grblHAL with a filesystem."/>
-                        <Button x:Uid="btn_installMacros" x:Name="btnInstallMacros" Content="Install ATC macros…" HorizontalAlignment="Left" Padding="14,2" MinHeight="24" Click="InstallMacros_Click"/>
+            <!-- 6. Controller macros (ATC tool-change set + Load Stock corner probe) -->
+            <TabItem x:Name="tabStepMacros">
+                <TabItem.Header><TextBlock x:Uid="step_ctrlMacros" x:Name="hdrMacros" Text="6 · Controller macros"/></TabItem.Header>
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Text="Controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
+                    <DataGrid x:Name="grdMacros" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="All">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn x:Uid="msc_name" Header="Name" Width="*" MinWidth="150">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="2,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#FFC62828"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding State}" Value="Installed">
+                                                            <Setter Property="Foreground" Value="ForestGreen"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding State}" Value="Outdated">
+                                                            <Setter Property="Foreground" Value="DarkOrange"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn x:Uid="msc_size" Header="Size" Binding="{Binding Size}" Width="80"/>
+                            <DataGridTextColumn x:Uid="msc_fs" Header="FS" Binding="{Binding FS}" Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button x:Uid="btn_installMacros" x:Name="btnInstallMacros" Content="Install ATC macros…" Padding="14,2" MinHeight="26" Click="InstallMacros_Click" Visibility="Collapsed"/>
+                        <Button x:Uid="btn_refreshMacros" x:Name="btnRefreshMacros" Content="Refresh" Padding="14,2" MinHeight="26" Margin="8,0,0,0" Click="RefreshMacros_Click"/>
                     </StackPanel>
-                </GroupBox>
-            </StackPanel>
-        </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
         <!-- Footer -->
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnForget" x:Uid="btn_forget" Content="Forget machine" Padding="14,0" Margin="0,0,6,0" Click="Forget_Click"
-                        ToolTip="Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings)."/>
+                        ToolTip="Clear the remembered machine. The Machine Setup tab will reappear on the next launch (does not change controller settings)."/>
                 <Button x:Name="btnReload" x:Uid="btn_reload" Content="Reload" MinWidth="90" Margin="0,0,6,0" Click="Reload_Click"
                         ToolTip="Discard edits and re-read the current settings from the controller."/>
                 <Button x:Name="btnPreview" x:Uid="btn_preview" Content="Preview" MinWidth="90" Margin="0,0,6,0" IsEnabled="False" Click="Preview_Click"

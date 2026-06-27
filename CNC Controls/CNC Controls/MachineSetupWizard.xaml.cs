@@ -18,6 +18,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using CNC.Core;
 
@@ -109,6 +110,12 @@ namespace CNC.Controls
 
             // Recompute the pending-change set (and Apply's enabled state) whenever the model-level settings change.
             Setup.PropertyChanged += OnSetupChanged;
+
+            // Step 5 hosts the probe library inline (live ObservableCollection - add/edit/delete in place).
+            grdProbes.ItemsSource = ProbeDefinitions.Items;
+
+            // Colour the step tabs from the start - incomplete steps show red immediately, before any load.
+            RefreshStepColors();
         }
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.MachineSetup; } }
@@ -129,6 +136,160 @@ namespace CNC.Controls
         public string HomeCornerText { get { return (string)GetValue(HomeCornerTextProperty); } set { SetValue(HomeCornerTextProperty, value); } }
 
         public ObservableCollection<SettingChange> Changes { get; } = new ObservableCollection<SettingChange>();
+
+        #endregion
+
+        #region Startup setup gate
+
+        // Per-step completeness for the startup setup gate. Returns the first step (1-6) not yet satisfied,
+        // or 0 when fully set up. All checks read live controller/app state populated on connect ($$, $I).
+        public static int FirstIncompleteStep()
+        {
+            // 1 - Machine: a machine identity has been picked (or Custom applied).
+            if (string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
+                return 1;
+
+            // 2 - Home position: homing must be configured so a home corner is defined ($22/$23).
+            if (!GrblInfo.HomingEnabled)
+                return 2;
+
+            // 3 - Axis: every axis needs steps/mm ($100-$102) and max travel ($130-$132).
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+                if (GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + i) <= 0d ||
+                    GrblSettings.GetDouble(GrblSetting.MaxTravelBase + i) <= 0d)
+                    return 3;
+
+            // 4 - Homing & limits: at least one of soft ($20) / hard ($21) limit protection enabled.
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1 &&
+                GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) != 1)
+                return 4;
+
+            // 5 - Probe definitions: at least one defined (Load Stock / probing need it).
+            if (ProbeDefinitions.Items.Count == 0)
+                return 5;
+
+            // 6 - Controller macros: on an ATC-capable controller every required macro must be present and
+            // current. Query the filesystem (GetStatus) rather than trusting the ATC flag - the flag won't
+            // notice a macro the user deleted or edited by hand.
+            if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
+            {
+                var macros = AtcMacros.GetStatus(Grbl.GrblViewModel);
+                if (macros.Any(r => r.State != AtcMacros.MacroState.Installed))
+                    return 6;
+            }
+
+            return 0;
+        }
+
+        public static bool IsSetupComplete { get { return FirstIncompleteStep() == 0; } }
+
+        private static string StepName(int step)
+        {
+            switch (step)
+            {
+                case 1: return "Machine - pick your machine";
+                case 2: return "Home position - set up homing";
+                case 3: return "Axis information - steps/mm and travel";
+                case 4: return "Homing & limits - enable limit protection";
+                case 5: return "Probe definitions - define a probe";
+                case 6: return "Controller macros - install ATC macros";
+                default: return string.Empty;
+            }
+        }
+
+        // Select the given step's tab (1-6) and note it in the status line. Used by the startup gate.
+        // Tab order is Overview(0), Machine(1), Home(2), Axis(3), Homing(4), Probes(5), Macros(6).
+        public void GoToStep(int step)
+        {
+            if (tabSteps != null && step >= 1 && step <= 6)
+                tabSteps.SelectedIndex = step;
+
+            if (txtStatus != null)
+                txtStatus.Text = step <= 0 ? "Machine setup complete." : ("Next: step " + step + " - " + StepName(step));
+        }
+
+        // Per-step status for tab colouring: green = complete, orange = needs attention, red = not started.
+        private enum StepState { Complete, NeedsAttention, NotStarted }
+
+        private static readonly Brush StepGreen = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+        private static readonly Brush StepOrange = new SolidColorBrush(Color.FromRgb(0xE6, 0x5A, 0x00));
+        private static readonly Brush StepRed = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+
+        // Last macro-status query (cached so tab colouring doesn't re-hit the controller filesystem).
+        private System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
+
+        // Colour the six step tabs from their current state. Cheap (no filesystem query) - step 6 uses the
+        // cached macro status, so it can be called freely (e.g. on every Setup edit).
+        private void RefreshStepColors()
+        {
+            SetStepColor(hdrMachine, StepStatusOf(1));
+            SetStepColor(hdrHome, StepStatusOf(2));
+            SetStepColor(hdrAxis, StepStatusOf(3));
+            SetStepColor(hdrHoming, StepStatusOf(4));
+            SetStepColor(hdrProbes, StepStatusOf(5));
+            SetStepColor(hdrMacros, StepStatusOf(6));
+        }
+
+        // Colour only the tab's header text (not the tab body, which would make the descriptive text
+        // unreadable - and would break dark mode).
+        private static void SetStepColor(TextBlock hdr, StepState st)
+        {
+            if (hdr != null)
+                hdr.Foreground = st == StepState.Complete ? StepGreen : (st == StepState.NeedsAttention ? StepOrange : StepRed);
+        }
+
+        private StepState StepStatusOf(int step)
+        {
+            // Runs at init too (before settings/AppConfig are loaded), so anything not ready yet falls through
+            // to NotStarted (red) rather than throwing.
+            try
+            {
+                switch (step)
+                {
+                    case 1: // Machine: a machine has been applied (LastMachine recorded)
+                        return string.IsNullOrEmpty(AppConfig.Settings?.Base?.LastMachine) ? StepState.NotStarted : StepState.Complete;
+
+                    case 2: // Home position: homing configured (the pending Setup model)
+                        return Setup.HomingEnable ? StepState.Complete : StepState.NotStarted;
+
+                    case 3: // Axis: steps/mm + travel on every axis (some-but-not-all = needs attention)
+                    {
+                        int set = 0, total = 0;
+                        foreach (var a in Setup.Axes)
+                        {
+                            total++;
+                            if (a.StepsPerMm > 0d && a.MaxTravel > 0d)
+                                set++;
+                        }
+                        return set == 0 ? StepState.NotStarted : (set < total ? StepState.NeedsAttention : StepState.Complete);
+                    }
+
+                    case 4: // Homing & limits: some protection configured
+                        return (Setup.SoftLimitsEnable || Setup.HasLimitSwitches || Setup.HomingEnable) ? StepState.Complete : StepState.NotStarted;
+
+                    case 5: // Probes: at least one defined
+                        return (ProbeDefinitions.Items?.Count ?? 0) > 0 ? StepState.Complete : StepState.NotStarted;
+
+                    case 6: // Controller macros: all installed = green, some outdated = orange, any missing = red
+                        if (_macroStatus != null && _macroStatus.Count > 0)
+                        {
+                            if (_macroStatus.All(r => r.State == AtcMacros.MacroState.Installed))
+                                return StepState.Complete;
+                            if (_macroStatus.Any(r => r.State == AtcMacros.MacroState.Missing))
+                                return StepState.NotStarted;
+                            return StepState.NeedsAttention;
+                        }
+                        return GrblInfo.AtcMacrosRequired ? StepState.NotStarted : StepState.Complete;
+
+                    default:
+                        return StepState.NotStarted;
+                }
+            }
+            catch
+            {
+                return StepState.NotStarted;
+            }
+        }
 
         #endregion
 
@@ -156,6 +317,7 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
                 UpdateApplyState();
+                RefreshMacroStatus();   // queries the filesystem once so step 6's colour is right on open
             }
             else
             {
@@ -562,6 +724,7 @@ namespace CNC.Controls
             if (e.PropertyName == nameof(AxisSetup.HomeAtMin))
                 UpdateHomeCornerText();   // keep the home-corner picture in sync when a checkbox is toggled
             UpdateApplyState();
+            RefreshStepColors();
         }
 
         private void UpdateApplyState()
@@ -615,18 +778,105 @@ namespace CNC.Controls
         }
 
         // Probes are machine hardware, so the probe library is edited from here. Used by Load Stock and probing.
-        private void Probes_Click(object sender, RoutedEventArgs e)
+        // ---- Step 5: probe definitions (hosted inline) ----
+
+        private void Probes_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var dlg = new ProbeDefinitionsDialog(ProbeDefinitions.Items) { Owner = Window.GetWindow(this) };
-            dlg.ShowDialog();
-            ProbeDefinitions.Save();
+            bool sel = grdProbes.SelectedItem is ProbeDefinition;
+            btnProbeEdit.IsEnabled = btnProbeDelete.IsEnabled = sel;
         }
 
-        // Step 6: install/update the controller-side macros - delegates to the SD Card view's proven path.
+        private void Probes_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (grdProbes.SelectedItem is ProbeDefinition)
+                EditSelectedProbe();
+        }
+
+        private void ProbeAdd_Click(object sender, RoutedEventArgs e)
+        {
+            var def = new ProbeDefinition();
+            var dlg = new ProbeDefinitionEditDialog(def) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                ProbeDefinitions.Items.Add(def);
+                ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // names derive from type + count
+                ProbeDefinitions.Save();
+                grdProbes.SelectedItem = def;
+                RefreshStepColors();
+            }
+        }
+
+        private void ProbeEdit_Click(object sender, RoutedEventArgs e)
+        {
+            EditSelectedProbe();
+        }
+
+        // Edit a clone and copy back on OK so Cancel reverts.
+        private void EditSelectedProbe()
+        {
+            var sel = grdProbes.SelectedItem as ProbeDefinition;
+            if (sel == null)
+                return;
+
+            var edit = sel.Clone();
+            var dlg = new ProbeDefinitionEditDialog(edit) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                sel.CopyFrom(edit);
+                ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // type may have changed
+                ProbeDefinitions.Save();
+                grdProbes.Items.Refresh();
+            }
+        }
+
+        private void ProbeDelete_Click(object sender, RoutedEventArgs e)
+        {
+            var sel = grdProbes.SelectedItem as ProbeDefinition;
+            if (sel != null && MessageBox.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
+                                               MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                ProbeDefinitions.Items.Remove(sel);
+                ProbeDefinitions.Renumber(ProbeDefinitions.Items);
+                ProbeDefinitions.Save();
+                RefreshStepColors();
+            }
+        }
+
+        // ---- Step 6: controller macros status ----
+
+        private void Steps_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Refresh macro status when the macros step is shown (it queries the controller filesystem).
+            if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepMacros)
+                RefreshMacroStatus();
+        }
+
+        private void RefreshMacroStatus()
+        {
+            if (grdMacros == null)
+                return;
+
+            var rows = AtcMacros.GetStatus(model);
+            _macroStatus = rows;
+            grdMacros.ItemsSource = rows;
+            btnInstallMacros.Visibility = rows.Any(r => r.State != AtcMacros.MacroState.Installed)
+                ? Visibility.Visible : Visibility.Collapsed;
+            RefreshStepColors();
+        }
+
+        private void RefreshMacros_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshMacroStatus();
+        }
+
+        // Install/update the controller-side macros - delegates to the SD Card view's proven path, then refresh.
         private void InstallMacros_Click(object sender, RoutedEventArgs e)
         {
             if (SDCardView.Instance != null)
+            {
                 SDCardView.Instance.InstallAtcMacros(Window.GetWindow(this));
+                RefreshMacroStatus();
+            }
             else
                 MessageBox.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
         }

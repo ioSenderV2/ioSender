@@ -58,24 +58,9 @@ namespace CNC.Controls
         public ViewType ViewType { get { return ViewType.GRBLConfig; } }
         public bool CanEnable { get { return DataContext is GrblViewModel ? (DataContext as GrblViewModel).SystemCommandsAllowed : true; } }
 
-        private bool wizardAutoShown = false;
-
         public void Activate(bool activate, ViewType chgMode)
         {
-            // First time the settings view is opened on an unconfigured machine, jump straight to the
-            // Machine Setup Wizard. Selecting the tab raises tab_SelectionChanged, which activates it.
-            if (activate && !wizardAutoShown && MachineIsUnconfigured())
-            {
-                wizardAutoShown = true;
-                var wizard = getTab(GrblConfigType.MachineSetup);
-                if (wizard != null && tabConfig.SelectedItem != wizard)
-                {
-                    tabConfig.SelectedItem = wizard;
-                    return;
-                }
-            }
-
-            getView(tabConfig.SelectedItem == null ? tabConfig.Items[0] as TabItem : tabConfig.SelectedItem as TabItem)?.Activate(activate);
+            ActivateTab(tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem, activate);
         }
 
         // We've talked to a controller (version known) and the machine has not been set up via the wizard yet -
@@ -115,6 +100,14 @@ namespace CNC.Controls
 
         public void Setup(UIViewModel model, AppConfig profile)
         {
+            // The App Settings sub-tab (AppConfigView, an ICNCView) owns the app-config controls; forward
+            // Setup to it so they are initialised even though it is no longer a top-level tab.
+            foreach (UserControl uc in UIUtils.FindLogicalChildren<UserControl>(this))
+                if (uc is AppConfigView app)
+                {
+                    ((ICNCView)app).Setup(model, profile);
+                    break;
+                }
         }
 
         #endregion
@@ -159,28 +152,39 @@ namespace CNC.Controls
                 if (e.AddedItems.Count == 1)
                 {
                     if (e.RemovedItems.Count == 1)
-                        getView(e.RemovedItems[0] as TabItem).Activate(false);
+                        ActivateTab(e.RemovedItems[0] as TabItem, false);
 
-                    getView(e.AddedItems[0] as TabItem).Activate(true);
+                    ActivateTab(e.AddedItems[0] as TabItem, true);
                 }
                 e.Handled = true;
             }
         }
 
-        private void RemoveTab (GrblConfigType type)
+        // Activate/deactivate a sub-tab's content. Most are IGrblConfigTab (Activate(bool)); the App Settings
+        // tab hosts AppConfigView (ICNCView) - it MUST get Activate(false) on leave so its auto-save-on-leave
+        // runs, otherwise edited app settings are silently lost.
+        private void ActivateTab(TabItem tab, bool activate)
         {
-            var ptab = getTab(type);
-            if (ptab != null)
-                tabConfig.Items.Remove(ptab);
+            if (tab == null)
+                return;
+
+            var cfg = getView(tab);
+            if (cfg != null)
+            {
+                cfg.Activate(activate);
+                return;
+            }
+
+            foreach (UserControl uc in UIUtils.FindLogicalChildren<UserControl>(tab))
+                if (uc is ICNCView view)
+                {
+                    view.Activate(activate, ViewType.AppConfig);
+                    return;
+                }
         }
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
-                RemoveTab(GrblConfigType.Trinamic);
-
-            if (!GrblInfo.HasPIDLog)
-                RemoveTab(GrblConfigType.PidTuning);
         }
     }
 }
