@@ -20,6 +20,9 @@
         <TabItem x:Uid="tab_surfaceSpoilboard" x:Name="tabSurfaceSpoilboard" Header="Surface spoilboard">
             <local:SurfaceSpoilboardWizard x:Name="surfaceSpoilboardWizard"/>
         </TabItem>
+        <TabItem x:Uid="tab_autoSquare" x:Name="tabAutoSquare" Header="Auto square">
+            <local:AutoSquareWizard x:Name="autoSquareWizard"/>
+        </TabItem>
         <TabItem x:Uid="tab_trinamic" x:Name="tabTrinamic" Header="Trinamic tuner">
             <local:TrinamicView x:Name="toolTrinamic"/>
         </TabItem>

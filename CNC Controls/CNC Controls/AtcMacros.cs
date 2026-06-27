@@ -63,6 +63,10 @@ namespace CNC.Controls
         // Per-macro status for the Machine Setup "Controller macros" step. Lists the controller filesystem and
         // marks each required macro Installed (present + the set checksum matches the embedded copies), Outdated
         // (present but the set checksum differs) or Missing (absent). Size/FS come from the filesystem listing.
+        // Serialises GetStatus: two overlapping callers (the setup gate + the tab refresh) otherwise reload
+        // GrblSDCard's table under each other, detaching cached rows mid-read (RowNotInTableException).
+        private static readonly object _statusLock = new object();
+
         public static List<MacroStatusRow> GetStatus(GrblViewModel model)
         {
             var rows = new List<MacroStatusRow>();
@@ -74,38 +78,59 @@ namespace CNC.Controls
                 return rows;
             }
 
-            GrblSDCard.Load(model, false);
-
-            var present = new Dictionary<string, DataRow>(StringComparer.OrdinalIgnoreCase);
-            foreach (DataRowView rv in GrblSDCard.Files)
+            lock (_statusLock)
             {
-                if ((string)rv.Row["Dir"] == GrblSDCard.EmptyMountMarker)
-                    continue;
-                present[Path.GetFileName((string)rv.Row["Name"])] = rv.Row;
-            }
+                try
+                {
+                    GrblSDCard.Load(model, false);
 
-            FsMount target = GrblSDCard.Mounts.FirstOrDefault(m =>
-                                 m.Name.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                 m.Path.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0)
-                             ?? GrblSDCard.Mounts.FirstOrDefault(m => m.Path == "/")
-                             ?? GrblSDCard.Mounts.FirstOrDefault();
-            string destPath = target != null ? target.Path : "/littlefs";
-
-            bool stale = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != EmbeddedChecksum();
-
-            foreach (string name in Required)
-            {
-                DataRow row;
-                if (present.TryGetValue(name, out row))
-                    rows.Add(new MacroStatusRow
+                    // Snapshot the values NOW into plain rows - never hold DataRow references past here. The
+                    // table can be rebuilt by a poll / another load, which detaches cached rows and throws on
+                    // access. ToList() materialises a snapshot so iteration can't fault on a live edit either.
+                    var present = new Dictionary<string, MacroStatusRow>(StringComparer.OrdinalIgnoreCase);
+                    foreach (DataRowView rv in GrblSDCard.Files.Cast<DataRowView>().ToList())
                     {
-                        Name = name,
-                        Size = row.Table.Columns.Contains("Size") ? row["Size"]?.ToString() : string.Empty,
-                        FS = row.Table.Columns.Contains("Location") ? row["Location"]?.ToString() : string.Empty,
-                        State = stale ? MacroState.Outdated : MacroState.Installed
-                    });
-                else
-                    rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
+                        var r = rv.Row;
+                        if (r.RowState == DataRowState.Detached || r.RowState == DataRowState.Deleted)
+                            continue;
+                        if ((string)r["Dir"] == GrblSDCard.EmptyMountMarker)
+                            continue;
+                        string nm = Path.GetFileName((string)r["Name"]);
+                        present[nm] = new MacroStatusRow
+                        {
+                            Name = nm,
+                            Size = r.Table.Columns.Contains("Size") ? r["Size"]?.ToString() : string.Empty,
+                            FS = r.Table.Columns.Contains("Location") ? r["Location"]?.ToString() : string.Empty
+                        };
+                    }
+
+                    FsMount target = GrblSDCard.Mounts.FirstOrDefault(m =>
+                                         m.Name.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         m.Path.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0)
+                                     ?? GrblSDCard.Mounts.FirstOrDefault(m => m.Path == "/")
+                                     ?? GrblSDCard.Mounts.FirstOrDefault();
+                    string destPath = target != null ? target.Path : "/littlefs";
+
+                    // Only flag Outdated when we actually read a DIFFERENT checksum. An empty/failed read (a
+                    // raced FS query right after connect) must NOT flip every present macro to Outdated.
+                    string onFs = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim();
+                    bool stale = onFs.Length > 0 && onFs != EmbeddedChecksum();
+
+                    foreach (string name in Required)
+                    {
+                        MacroStatusRow found;
+                        if (present.TryGetValue(name, out found))
+                            rows.Add(new MacroStatusRow { Name = name, Size = found.Size, FS = found.FS, State = stale ? MacroState.Outdated : MacroState.Installed });
+                        else
+                            rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
+                    }
+                }
+                catch
+                {
+                    // Couldn't read the filesystem reliably (transient during connect/activate). Report nothing
+                    // rather than crash or guess - callers treat an empty list as "unknown" (no gate, no false status).
+                    rows.Clear();
+                }
             }
 
             return rows;

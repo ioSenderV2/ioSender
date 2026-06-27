@@ -34,6 +34,9 @@
                 Value="{Binding TotalDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbsafez" Label="Safe Z:" ColonAt="140" Format="###0.0##"
                 Value="{Binding SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_sbmargin" Label="Edge margin:" ColonAt="140" Format="###0.0##"
+                ToolTip="Clearance kept between the raster and each machine travel limit (on top of the homing pull-off). The surfaced area = travel less twice this on each axis."
+                Value="{Binding Margin, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbwidth" Label="Area width:" ColonAt="140" Format="#####0.0"
                 Value="{Binding WidthMM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbheight" Label="Area height:" ColonAt="140" Format="#####0.0"
@@ -48,7 +51,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="20,8,0,0">
                 <CheckBox x:Uid="chk_sboutline" Content="Outline only" VerticalAlignment="Center"
-                          ToolTip="Cut only the rectangular perimeter of the area - useful to check the extents before a full surfacing pass."
+                          ToolTip="Trace the rectangular perimeter of the area at safe Z - no plunge, spindle off - to check the extents before a full surfacing pass."
                           IsChecked="{Binding OutlineOnly, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                 <CheckBox x:Uid="chk_sbdryrun" Content="Dry run" Margin="24,0,0,0" VerticalAlignment="Center"
                           ToolTip="Trace the path at safe Z with no plunge and the spindle off - to verify motion and extents without cutting."
@@ -56,6 +59,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
                 <Button x:Uid="btn_sbgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_sbrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
             </StackPanel>
             <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="5,8" HorizontalAlignment="Left" MinWidth="350" MaxWidth="430" TextWrapping="Wrap"/>
         </StackPanel>
@@ -66,7 +70,9 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock x:Name="txtSummary" Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-            <TextBox x:Name="txtInstructions" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" Margin="0,0,0,0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            <!-- Before Generate: shows the instructions. After Generate: the generated program (the run buffer). -->
+            <TextBox x:Name="txtProgram" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,0"
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
         </Grid>
     </Grid>
 </UserControl>

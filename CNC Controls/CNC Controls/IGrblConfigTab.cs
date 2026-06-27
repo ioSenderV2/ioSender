@@ -48,7 +48,8 @@ namespace CNC.Controls
         Trinamic,
         PidTuning,
         MachineSetup,
-        SurfaceSpoilboard
+        SurfaceSpoilboard,
+        AutoSquare
     }
     interface IGrblConfigTab
     {

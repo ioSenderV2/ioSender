@@ -147,17 +147,24 @@ namespace CNC.Controls
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (Equals(e.OriginalSource, sender))
-            {
-                if (e.AddedItems.Count == 1)
-                {
-                    if (e.RemovedItems.Count == 1)
-                        ActivateTab(e.RemovedItems[0] as TabItem, false);
+            if (!Equals(e.OriginalSource, sender))
+                return;
 
-                    ActivateTab(e.AddedItems[0] as TabItem, true);
-                }
-                e.Handled = true;
-            }
+            e.Handled = true;
+            if (e.AddedItems.Count != 1)
+                return;
+
+            var removed = e.RemovedItems.Count == 1 ? e.RemovedItems[0] as TabItem : null;
+            var added = e.AddedItems[0] as TabItem;
+
+            // Defer: a child's Activate may pump the dispatcher (DoEvents while waiting on the controller),
+            // which throws if it runs during the layout pass that generated this nested TabControl's items.
+            Dispatcher.BeginInvoke((System.Action)(() =>
+            {
+                if (removed != null)
+                    ActivateTab(removed, false);
+                ActivateTab(added, true);
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         // Activate/deactivate a sub-tab's content. Most are IGrblConfigTab (Activate(bool)); the App Settings

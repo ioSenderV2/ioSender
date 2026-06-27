@@ -37,11 +37,7 @@ namespace CNC.Controls
         {
             if (activate)
             {
-                // Default the area to the machine's travel envelope the first time the tab is shown.
-                if (WidthMM <= 0d)
-                    WidthMM = AxisTravel(0);
-                if (HeightMM <= 0d)
-                    HeightMM = AxisTravel(1);
+                DefaultArea();   // size the area to the in-bounds travel envelope (less margins)
                 UpdateSummary();
             }
 
@@ -56,6 +52,49 @@ namespace CNC.Controls
         {
             double t = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axisIndex);
             return double.IsNaN(t) ? 0d : Math.Abs(t);
+        }
+
+        // +1 if the axis travels in the +machine direction away from home, else -1. Mirrors the
+        // click-to-jog limiter (Renderer.AxisDir): with force-set-origin ($22 bit3) grbl puts the
+        // home corner at machine 0 and the working area on the side given by the $23 homing-dir mask;
+        // without it grbl keeps all travel negative (MPos <= 0).
+        private static double AxisDir(int axis)
+        {
+            if (GrblInfo.ForceSetOrigin)
+                return GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis)) ? 1d : -1d;
+            return -1d;
+        }
+
+        // Machine-coordinate minimum (lower) corner of the travel envelope on one axis.
+        private static double EnvMin(int axis)
+        {
+            return AxisDir(axis) > 0d ? 0d : -AxisTravel(axis);
+        }
+
+        // Safe inset from each machine limit: the larger of the user edge margin and the homing
+        // pull-off (+1 mm) so the raster never grazes a limit switch at the home end.
+        private double Inset()
+        {
+            double pulloff = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
+            if (double.IsNaN(pulloff)) pulloff = 0d;
+            return Math.Max(Margin, pulloff + 1d);
+        }
+
+        // Largest in-bounds area on one axis: full travel less the inset at both ends.
+        private double MaxArea(int axis)
+        {
+            return Math.Max(0d, AxisTravel(axis) - 2d * Inset());
+        }
+
+        // Size the area to the in-bounds envelope: fill it when unset, and clamp a stale/oversized
+        // value (e.g. an old full-travel default) back down so the raster always fits the machine.
+        private void DefaultArea()
+        {
+            double maxW = MaxArea(0), maxH = MaxArea(1);
+            if (maxW > 0d && (WidthMM <= 0d || WidthMM > maxW))
+                WidthMM = maxW;
+            if (maxH > 0d && (HeightMM <= 0d || HeightMM > maxH))
+                HeightMM = maxH;
         }
 
         #region Dependency properties
@@ -91,8 +130,12 @@ namespace CNC.Controls
         public static readonly DependencyProperty TotalDepthProperty = Reg(nameof(TotalDepth), 0.3d);
         public double TotalDepth { get { return (double)GetValue(TotalDepthProperty); } set { SetValue(TotalDepthProperty, value); } }
 
-        public static readonly DependencyProperty SafeZProperty = Reg(nameof(SafeZ), 5d);
+        public static readonly DependencyProperty SafeZProperty = Reg(nameof(SafeZ), 20d);
         public double SafeZ { get { return (double)GetValue(SafeZProperty); } set { SetValue(SafeZProperty, value); } }
+
+        // Edge clearance kept between the raster and each machine travel limit (in addition to the homing pull-off).
+        public static readonly DependencyProperty MarginProperty = Reg(nameof(Margin), 5d);
+        public double Margin { get { return (double)GetValue(MarginProperty); } set { SetValue(MarginProperty, value); } }
 
         // Area is WidthMM/HeightMM (FrameworkElement already owns Width/Height); the program math uses these directly.
         public static readonly DependencyProperty WidthMMProperty = Reg(nameof(WidthMM), 0d);
@@ -132,15 +175,22 @@ namespace CNC.Controls
             double stepover = StepoverMM();
             Stepover = stepover;
 
+            bool preview = DryRun || OutlineOnly;   // both are spindle-off, no-plunge safe-Z traces
             string warn = string.Empty;
+
+            double maxW = MaxArea(0), maxH = MaxArea(1);
 
             if (BitDiameter <= 0d)
                 warn = "Bit diameter must be greater than 0.";
             else if (stepover <= 0d)
                 warn = "Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.";
+            else if (maxW <= 0d || maxH <= 0d)
+                warn = "Set max travel ($130-$132) first - the raster is referenced to the homed machine envelope.";
             else if (WidthMM <= 0d || HeightMM <= 0d)
                 warn = "Set the area width and height (they default to the machine travel envelope).";
-            else if (!DryRun && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d)
+            else if (WidthMM > maxW || HeightMM > maxH)
+                warn = string.Format("Area exceeds the in-bounds envelope ({0:0} x {1:0} mm = travel less {2:0.0} mm margins) - it will be clamped.", maxW, maxH, Inset());
+            else if (!preview && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d)
                 warn = string.Format("Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}) - reduce RPM.", SpindleRPM, BitMaxRPM);
 
             if (txtWarnings != null)
@@ -150,11 +200,11 @@ namespace CNC.Controls
             {
                 if (stepover > 0d && WidthMM > 0d && HeightMM > 0d)
                 {
-                    int passes = (!DryRun && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+                    int passes = (!preview && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
                     int rows = Math.Max(2, (int)Math.Ceiling(Math.Min(WidthMM, HeightMM) / stepover) + 1);
-                    string mode = OutlineOnly ? "outline only" : string.Format("{0} rows", rows);
-                    string depth = DryRun ? "DRY RUN (no plunge)" : string.Format("{0} depth pass{1}", passes, passes == 1 ? "" : "es");
-                    string rpm = DryRun ? "spindle off" : string.Format("{0:0} rpm", EffectiveRPM());
+                    string mode = OutlineOnly ? "outline (leveling check, pauses at corners)" : string.Format("{0} rows", rows);
+                    string depth = preview ? "no plunge" : string.Format("{0} depth pass{1}", passes, passes == 1 ? "" : "es");
+                    string rpm = preview ? "spindle off" : string.Format("{0:0} rpm", EffectiveRPM());
                     txtSummary.Text = string.Format("Area {0:0} x {1:0} mm · stepover {2:0.0} mm · {3} · {4} · {5}",
                         WidthMM, HeightMM, stepover, mode, depth, rpm);
                 }
@@ -171,37 +221,80 @@ namespace CNC.Controls
 
             double d = BitDiameter;
             double stepover = StepoverMM();
-            double w = WidthMM, h = HeightMM;
-            bool dry = DryRun;
+            double w = Math.Min(WidthMM, MaxArea(0)), h = Math.Min(HeightMM, MaxArea(1));   // clamped in-bounds
+            bool preview = DryRun || OutlineOnly;   // no plunge, spindle off - trace at safe Z to verify extents
             double rpm = EffectiveRPM();
             int tool = (int)Math.Round(ToolNumber);
 
+            // Machine-coordinate origin of the raster: the min-world corner of the travel envelope,
+            // inset by the safe margin. The operator touches off Z only (the surface top); ioSender
+            // references XY to the homed envelope, so the raster can never overrun a soft limit no
+            // matter where the bit was when Z was zeroed.
+            double inset = Inset();
+            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+
             // The XY path to follow: the area perimeter (outline) or the serpentine raster.
             var path = OutlineOnly ? OutlinePath(w, h) : RasterPath(w, h, stepover);
-            int nPasses = (!dry && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+            int nPasses = (!preview && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
 
             lines.Add(string.Format("(ioSender spoilboard surfacing - {0} x {1} mm area, {2} mm bit, {3:0}% overlap{4}{5})",
-                F(w), F(h), F(d), Overlap, OutlineOnly ? ", outline only" : "", dry ? ", DRY RUN" : ""));
-            lines.Add(string.Format("(stepover {0} mm, {1} depth pass(es), DOC {2} mm to {3} mm total, spindle {4})",
-                F(stepover), nPasses, F(DepthOfCut), F(TotalDepth), dry ? "off" : ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " rpm"));
-            lines.Add("(Jog to the front-left corner, touch the bit to the surface and zero work XYZ there - Z0 = surface top.)");
-            // Prolog - mirrors the other generated programs (units, plane, absolute, machine safe-Z).
-            lines.Add("G90 G94");
-            lines.Add("G17");
-            lines.Add("G21");
-            lines.Add("G53 G0 Z0");
-            if (!dry && tool > 0)
-                lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
-            if (!dry && rpm > 0d)
-                lines.Add("S" + ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " M3");
-            lines.Add("G17 G90 G94");
-            lines.Add("G54");
-            lines.Add("G0 Z" + F(SafeZ));
+                F(w), F(h), F(d), Overlap, OutlineOnly ? ", OUTLINE" : "", DryRun ? ", DRY RUN" : ""));
+            lines.Add(string.Format("(stepover {0} mm, {1} depth passes, DOC {2} mm to {3} mm total, spindle {4})",
+                F(stepover), nPasses, F(DepthOfCut), F(TotalDepth), preview ? "off" : ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " rpm"));
 
-            if (dry)
+            // Prerequisites: the machine must be homed (XY is referenced to the homed envelope).
+            lines.Add("(PREREQ, connected, homed, noalarm)");
+
+            // Park at the front-left corner (machine coords) before the touch-off so Z can be zeroed
+            // somewhere reachable - the back-left home corner is awkward to reach precisely. Z is parked
+            // near the top (max clearance) first, then we move XY over the corner.
+            double zTop = EnvMin(2) + AxisTravel(2) - inset;             // just below the upper Z limit
+            lines.Add("G90 G94 G17 G21");
+            lines.Add("G53 G0 Z" + F(zTop));                             // lift to a safe machine height
+            lines.Add(string.Format("G53 G0 X{0} Y{1}", F(ox), F(oy)));  // move to the front-left corner
+            lines.Add("(WAITIDLE)");                                      // arrive before prompting
+
+            // 1) Capture Z0 at the surface. Hold (nothing moves) while the operator lowers the bit onto the
+            // surface; on OK, zero work Z there. WAITIDLE after OK so the jog has finished before we set Z0.
+            lines.Add("(MBOX, OKCANCEL, At the FRONT-LEFT corner. Jog Z down until the bit just touches the surface, then click OK to set work Z0 here. Click Cancel to abort.)");
+            lines.Add("(WAITIDLE)");
+            lines.Add("G10 L20 P1 Z0");                                   // work Z0 = surface top (locked here)
+            lines.Add(string.Format("G10 L2 P1 X{0} Y{1}", F(ox), F(oy))); // work XY origin = inset machine corner
+
+            // 2) Auto-raise Z to the top so the dust boot can be fitted hands-free, then prompt. Z0 is already
+            // locked, so on OK we just drop back to safe Z above it and start. WAITIDLE so the raise finishes
+            // before the prompt, and again so any jog finishes before cutting.
+            lines.Add("G53 G0 Z" + F(zTop));                              // raise to the top for boot fitting
+            lines.Add("(WAITIDLE)");
+            lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Z0 is locked. Click Cancel to abort.)");
+            lines.Add("(WAITIDLE)");
+            lines.Add("G54");
+            lines.Add("G0 Z" + F(SafeZ));                                 // drop back to safe Z above the locked Z0
+            if (!preview && tool > 0)
+                lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
+            if (!preview && rpm > 0d)
+                lines.Add("S" + ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " M3");
+
+            if (OutlineOnly)
             {
-                // Dry run: trace the path once at safe Z so the extents can be watched - no plunge, no spindle.
-                lines.Add("(dry run - tracing the path at safe Z, no plunge)");
+                // Leveling check: visit each corner, drop to the Z0 reference plane and hold for a dial-gauge
+                // reading, then lift. Spindle off - fit a dial indicator in place of the cutter, zero it at
+                // the front-left (reference) corner, then read how far each other corner sits above/below.
+                lines.Add("(outline - leveling check: pausing at each corner at the Z0 plane, spindle off)");
+                string[] corner = { "front-left (reference)", "front-right", "back-right", "back-left" };
+                for (int i = 0; i < 4; i++)
+                {
+                    lines.Add("G0 " + XY(path[i]));                         // rapid to the corner at safe Z
+                    lines.Add(string.Format("G1 Z0 F{0}", F(PlungeFeed)));  // down to the Z0 reference plane
+                    lines.Add(string.Format("(MBOX, OKCANCEL, Corner {0} of 4 - {1}. Read the gauge to see how far this corner sits above/below the front-left reference, then click OK to continue. Cancel to stop.)", i + 1, corner[i]));
+                    lines.Add("G0 Z" + F(SafeZ));                           // lift before moving on
+                }
+                lines.Add("G0 " + XY(path[0]));                             // park back at the start corner
+            }
+            else if (DryRun)
+            {
+                // Trace the full raster once at safe Z so the extents can be watched - no plunge, spindle off.
+                lines.Add("(dry run - tracing the raster at safe Z, no plunge, spindle off)");
                 lines.Add("G0 " + XY(path[0]));
                 for (int i = 1; i < path.Count; i++)
                     lines.Add("G1 " + XY(path[i]) + " F" + F(Feed));
@@ -217,9 +310,9 @@ namespace CNC.Controls
                 lines.Add("G0 Z" + F(SafeZ));
             }
 
-            if (!dry && rpm > 0d)
+            if (!preview && rpm > 0d)
                 lines.Add("M5");
-            lines.Add("G53 G0 Z0");
+            lines.Add("G0 Z" + F(SafeZ));
             lines.Add("M30");
 
             return lines;
@@ -276,8 +369,26 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            if ((string)((Button)sender).Tag == "generate")
+            switch ((string)((Button)sender).Tag)
+            {
+                case "generate": Generate(); break;
+                case "run": Run(); break;
+            }
+        }
+
+        // Run the buffered program via the macro path (like Load Stock): the run-control panel floats, then the
+        // program streams - its (PREREQ)/(MBOX)/(WAITIDLE) directives confirm state and prompt to set work zero.
+        private void Run()
+        {
+            if (model == null)
+                return;
+            if (string.IsNullOrWhiteSpace(txtProgram.Text))
                 Generate();
+            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+                return;
+
+            MacroProcessor.RunControlPanel?.Invoke(model);
+            MacroProcessor.Run(model, "Surface spoilboard", txtProgram.Text, true);
         }
 
         private void Generate()
@@ -291,47 +402,27 @@ namespace CNC.Controls
                                 "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
+            if (MaxArea(0) <= 0d || MaxArea(1) <= 0d)
+            {
+                MessageBox.Show("Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first.",
+                                "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+            DefaultArea();   // fill / clamp the area to the in-bounds envelope
             if (WidthMM <= 0d || HeightMM <= 0d)
             {
                 MessageBox.Show("Set the area width and height first (they default to the machine travel envelope).",
                                 "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (!DryRun && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
+            if (!(DryRun || OutlineOnly) && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
                 MessageBox.Show(string.Format("Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?", SpindleRPM, BitMaxRPM),
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 
-            var lines = BuildProgram();
-
-            // Optionally save the program to disk (Cancel just loads it into the program view).
-            var save = new Microsoft.Win32.SaveFileDialog
-            {
-                Title = "Save surfacing program (optional - Cancel just loads it)",
-                Filter = "GCode files (*.nc)|*.nc|All files (*.*)|*.*",
-                FileName = "spoilboard_surface.nc"
-            };
-            if (save.ShowDialog() == true)
-            {
-                try
-                {
-                    System.IO.File.WriteAllLines(save.FileName, lines);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Could not save the program:\n" + ex.Message, "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-
-            // Load the program into the job view (in memory), like the stepper-calibration generator.
-            GCode.File.AddBlock("spoilboard_surface", Core.Action.New);
-            GCode.File.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
-            foreach (var line in lines)
-                GCode.File.AddBlock(line);
-            GCode.File.AddBlock("", Core.Action.End);
-
-            MessageBox.Show("Surfacing program loaded into the program view.\n\nSwitch to the main view, jog to the front-left corner, zero work XYZ with the bit touching the surface, then run it.",
-                            "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Show the generated program in the preview buffer; Run streams it via the macro path (like Load Stock).
+            txtProgram.Text = string.Join("\r\n", BuildProgram());
+            btnRun.IsEnabled = true;
         }
 
         private void cbxTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -352,28 +443,25 @@ namespace CNC.Controls
                 cbxTool.SelectedIndex = ToolNumber > 0d ? 1 : 0;   // Loaded / Prompt
                 foreach (var dp in new[] {
                     BitDiameterProperty, BitMaxRPMProperty, SpindleRPMProperty, OverlapProperty, FeedProperty,
-                    PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, SafeZProperty, WidthMMProperty,
-                    HeightMMProperty, ToolNumberProperty })
+                    PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, SafeZProperty, MarginProperty,
+                    WidthMMProperty, HeightMMProperty, ToolNumberProperty })
                     System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(SurfaceSpoilboardWizard))
                         .AddValueChanged(this, (s, ev) => SaveParams());
             }
 
-            // Default the area to the machine travel envelope if still unset.
-            if (WidthMM <= 0d)
-                WidthMM = AxisTravel(0);
-            if (HeightMM <= 0d)
-                HeightMM = AxisTravel(1);
+            // Default / clamp the area to the in-bounds travel envelope.
+            DefaultArea();
 
             txtWarnings.Text = string.Empty;
-            txtInstructions.Text =
-                "Surfaces (flattens) the spoilboard with a raster of overlapping passes.\n\n" +
+            txtProgram.Text =
+                "Surfaces (flattens) the spoilboard with a raster of overlapping passes, referenced to the homed machine envelope.\n\n" +
                 "1. Fit the surfacing bit. Enter its diameter and rated max RPM.\n" +
-                "2. Set the spindle RPM, overlap %, feed/plunge, depth of cut and total skim depth. The area defaults to the machine travel envelope - edit Width/Height to surface a smaller region.\n" +
-                "3. Press Generate to build the program and load it into the program view.\n" +
-                "4. Switch to the main view. Jog to the FRONT-LEFT corner of the area, lower Z until the bit just touches the surface (ideally the highest spot), and zero work XYZ there - work Z0 becomes the surface top.\n" +
-                "5. Run the program. It rasters from the corner across the area, cutting Z0 minus the depth of cut each pass down to the total depth.\n" +
-                "Notes: stepover = bit diameter x (1 - overlap). Spindle RPM 0 = 70% of the bit's max RPM. Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6.\n" +
-                "Outline only cuts just the area perimeter (to check extents); Dry run traces the path at safe Z with no plunge or spindle. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.";
+                "2. Set spindle RPM, overlap %, feed/plunge, depth of cut and total skim depth. The area defaults to the full travel envelope less the Edge margin - reduce Width/Height to surface a smaller region (anchored at the home-side corner).\n" +
+                "3. Press Generate to build the program (it appears here). Press Run to start - a confirmation and the floating run-control panel appear.\n" +
+                "4. The machine must be homed. It first moves to the FRONT-LEFT corner (easier to reach than the home corner). Prompt 1: jog Z down until the bit just touches the surface, click OK - work Z0 is locked there (XY is set automatically). Z then raises to the top automatically. Prompt 2: fit the dust boot / do any final prep, then click OK - it drops back to safe Z above the locked Z0 and starts.\n" +
+                "5. It rasters across the envelope, cutting Z0 minus the depth of cut each pass down to the total depth. Because XY is machine-referenced, it cannot overrun a soft limit.\n\n" +
+                "Notes: stepover = bit diameter x (1 - overlap). Spindle RPM 0 = 70% of the bit's max RPM. Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6. Edge margin keeps the raster clear of the travel limits (on top of the homing pull-off). Clear any clamps/screws from the raster area first.\n" +
+                "Outline only = a LEVELING CHECK: it moves to each corner, lowers to the Z0 plane and pauses for a dial-gauge reading (spindle off) so you can see how far out of level the board is - fit a dial indicator in place of the cutter and zero it at the front-left reference corner. Dry run traces the full raster at safe Z (no plunge, spindle off) to verify extents. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.";
 
             UpdateSummary();
         }
@@ -395,7 +483,7 @@ namespace CNC.Controls
                     var p = (SurfaceParams)xs.Deserialize(fs);
                     BitDiameter = p.BitDiameter; BitMaxRPM = p.BitMaxRPM; SpindleRPM = p.SpindleRPM;
                     Overlap = p.Overlap; Feed = p.Feed; PlungeFeed = p.PlungeFeed; DepthOfCut = p.DepthOfCut;
-                    TotalDepth = p.TotalDepth; SafeZ = p.SafeZ; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
+                    TotalDepth = p.TotalDepth; SafeZ = p.SafeZ; Margin = p.Margin; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
                     ToolNumber = p.ToolNumber;
                 }
             }
@@ -410,7 +498,7 @@ namespace CNC.Controls
                 {
                     BitDiameter = BitDiameter, BitMaxRPM = BitMaxRPM, SpindleRPM = SpindleRPM, Overlap = Overlap,
                     Feed = Feed, PlungeFeed = PlungeFeed, DepthOfCut = DepthOfCut, TotalDepth = TotalDepth,
-                    SafeZ = SafeZ, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
+                    SafeZ = SafeZ, Margin = Margin, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
                 };
                 var xs = new System.Xml.Serialization.XmlSerializer(typeof(SurfaceParams));
                 using (var fs = System.IO.File.Create(ParamsFile))
@@ -424,7 +512,7 @@ namespace CNC.Controls
     public class SurfaceParams
     {
         public double BitDiameter = 25.0d, BitMaxRPM = 18000d, SpindleRPM = 15000d, Overlap = 40d, Feed = 2000d,
-                      PlungeFeed = 500d, DepthOfCut = 0.3d, TotalDepth = 0.3d, SafeZ = 5d, WidthMM = 0d,
-                      HeightMM = 0d, ToolNumber = 0d;
+                      PlungeFeed = 500d, DepthOfCut = 0.3d, TotalDepth = 0.3d, SafeZ = 20d, Margin = 5d,
+                      WidthMM = 0d, HeightMM = 0d, ToolNumber = 0d;
     }
 }

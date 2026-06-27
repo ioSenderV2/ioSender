@@ -117,6 +117,27 @@ namespace GCode_Sender
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
+            // Let library-side generated-program runners (e.g. Surface Spoilboard) raise the floating run-control
+            // panel, which lives in this assembly.
+            CNC.Controls.MacroProcessor.RunControlPanel = m => MachineControlWindow.ShowFor(m, this);
+
+            // When a generated program is large enough to stream through the real job streamer, bring the Grbl
+            // (Job) tab forward (so the operator can watch progress / 3D and has the full run controls) and
+            // start it via the public CycleStart path. When the job ends, return to the tab it was launched
+            // from (e.g. Tools > Auto square) so iterative tools don't strand the operator on the Grbl tab.
+            CNC.Controls.MacroProcessor.RunStreamedJob = m =>
+            {
+                TabItem origin = tabMode.SelectedItem as TabItem;
+                TabItem tab = getTab(ViewType.GRBL);
+                if (tab != null)
+                    tabMode.SelectedItem = tab;
+                var jv = getView(tab) as JobView;
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                    new System.Action(() => jv?.StartLoadedJob()));
+                if (origin != null && origin != tab)
+                    RestoreTabOnJobEnd(m, origin);
+            };
+
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
             AttachBasePropertyChangedHandler();
@@ -336,10 +357,51 @@ namespace GCode_Sender
                 // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
                 int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
-                if (step != 0 && !sim)
-                    ShowMachineSetup(step);
+                if (step == 0 || sim)
+                    return;
+
+                // Confirm after a short settle: a connect/reset can momentarily yield a stale read - in
+                // particular the macro check (step 6) does a synchronous filesystem listing that comes back
+                // empty right after a reset, falsely flagging a step. Re-check once things have settled and
+                // only gate if still incomplete (avoids the "prompt appears but every tab is green" race).
+                var confirm = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+                confirm.Tick += (s2, e2) =>
+                {
+                    confirm.Stop();
+                    if (!GrblSettings.IsLoaded)
+                        return;
+                    int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                    if (step2 != 0)
+                        ShowMachineSetup(step2);
+                };
+                confirm.Start();
             };
             timer.Start();
+        }
+
+        // After a tool-launched streamed job (which jumps to the Grbl tab) finishes, hop back to the tab it was
+        // started from so iterative tools (e.g. Auto square: drill -> measure -> apply -> repeat) don't strand
+        // the operator on the Grbl tab. Watches StreamingState: arm on the first running state, restore on the
+        // next terminal one, then unsubscribe.
+        private void RestoreTabOnJobEnd(GrblViewModel m, TabItem origin)
+        {
+            bool started = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = m.StreamingState;
+                if (st == StreamingState.Send || st == StreamingState.SendMDI)
+                    started = true;
+                else if (started && (st == StreamingState.Idle || st == StreamingState.JobFinished ||
+                                     st == StreamingState.Stop || st == StreamingState.NoFile))
+                {
+                    m.PropertyChanged -= handler;
+                    Dispatcher.BeginInvoke(new System.Action(() => { if (origin != null) tabMode.SelectedItem = origin; }));
+                }
+            };
+            m.PropertyChanged += handler;
         }
 
         private void ShowMachineSetup(int step)
@@ -860,6 +922,9 @@ namespace GCode_Sender
                 desired.Add(prot);
             // Machine Setup is the setup gate - always keep it visible even if a saved layout predates it.
             if (byName.TryGetValue(ViewType.MachineSetup.ToString(), out prot) && !desired.Contains(prot))
+                desired.Add(prot);
+            // Tools is now a hub (tool table + calibration / spoilboard / tuning) - keep it visible too.
+            if (byName.TryGetValue(ViewType.Tools.ToString(), out prot) && !desired.Contains(prot))
                 desired.Add(prot);
 
             if (desired.Count == 0)

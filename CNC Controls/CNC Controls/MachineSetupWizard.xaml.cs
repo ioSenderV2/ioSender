@@ -145,6 +145,11 @@ namespace CNC.Controls
         // or 0 when fully set up. All checks read live controller/app state populated on connect ($$, $I).
         public static int FirstIncompleteStep()
         {
+            // Can't judge the machine until the controller has reported version + settings ($I/$$). Returning
+            // 0 (complete) here means a not-yet-ready / transient state never fires the setup gate.
+            if (string.IsNullOrEmpty(GrblInfo.Version) || !GrblSettings.IsLoaded)
+                return 0;
+
             // 1 - Machine: a machine identity has been picked (or Custom applied).
             if (string.IsNullOrEmpty(AppConfig.Settings.Base.LastMachine))
                 return 1;
@@ -847,8 +852,10 @@ namespace CNC.Controls
         private void Steps_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // Refresh macro status when the macros step is shown (it queries the controller filesystem).
+            // Deferred: GetStatus pumps the dispatcher, which throws if run during the layout pass that
+            // generated this nested TabControl's items.
             if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepMacros)
-                RefreshMacroStatus();
+                Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void RefreshMacroStatus()

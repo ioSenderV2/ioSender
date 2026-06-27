@@ -556,10 +556,10 @@ namespace GCode_Sender
             if (GrblInfo.HasFS && (GrblInfo.HasATC || GrblInfo.AtcMacrosRequired))
                 CNC.Controls.AtcMacros.SeedStartJobMacro();
 
-            if (GrblInfo.NumTools > 0)
-                MainWindow.EnableView(true, ViewType.Tools);
-            else
-                MainWindow.ShowView(false, ViewType.Tools);
+            // Tools is now a hub (tool table + stepper calibration / surface spoilboard / Trinamic / PID), so
+            // keep it available even when the controller has no tool table (NumTools == 0) - only the tool-table
+            // sub-tab is empty in that case. (Previously this hid the whole tab when NumTools == 0.)
+            MainWindow.EnableView(true, ViewType.Tools);
 
             if(GrblInfo.HasProbe && GrblSettings.ReportProbeCoordinates)
                 MainWindow.EnableView(true, ViewType.Probing);
@@ -584,6 +584,14 @@ namespace GCode_Sender
             }
             // disable ui components when in sleep mode
         }
+        // Start the currently-loaded in-memory program through the real (flow-controlled) job streamer.
+        // Used by generated-program runners (e.g. Surface Spoilboard) once their cut is loaded into GCode.File.
+        public void StartLoadedJob()
+        {
+            if (GCode.File.IsLoaded)
+                GCodeSender.CycleStart(0);
+        }
+
 #region UIevents
 
         void JobView_Load(object sender, EventArgs e)

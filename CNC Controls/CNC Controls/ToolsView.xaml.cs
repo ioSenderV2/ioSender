@@ -76,17 +76,24 @@ namespace CNC.Controls
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (Equals(e.OriginalSource, sender))
-            {
-                if (e.AddedItems.Count == 1)
-                {
-                    if (e.RemovedItems.Count == 1)
-                        ActivateTab(e.RemovedItems[0] as TabItem, false);
+            if (!Equals(e.OriginalSource, sender))
+                return;
 
-                    ActivateTab(e.AddedItems[0] as TabItem, true);
-                }
-                e.Handled = true;
-            }
+            e.Handled = true;
+            if (e.AddedItems.Count != 1)
+                return;
+
+            var removed = e.RemovedItems.Count == 1 ? e.RemovedItems[0] as TabItem : null;
+            var added = e.AddedItems[0] as TabItem;
+
+            // Defer: a child's Activate may pump the dispatcher (ToolView -> GrblWorkParameters.Get -> DoEvents),
+            // which throws if it runs during the layout pass that generated this nested TabControl's items.
+            Dispatcher.BeginInvoke((System.Action)(() =>
+            {
+                if (removed != null)
+                    ActivateTab(removed, false);
+                ActivateTab(added, true);
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private TabItem getTab(GrblConfigType tabtype)
@@ -109,11 +116,21 @@ namespace CNC.Controls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
+            // No controller tool table -> drop the (empty) Tool table sub-tab; the rest of the hub still applies.
+            if (GrblInfo.NumTools == 0 && tabToolTable != null)
+                tabTools.Items.Remove(tabToolTable);
+
             if (string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
                 RemoveTab(GrblConfigType.Trinamic);
 
             if (!GrblInfo.HasPIDLog)
                 RemoveTab(GrblConfigType.PidTuning);
+
+            // Auto square only applies to a ganged, auto-squared build (the squaring-offset setting is present).
+            // Only hide it once settings are actually loaded and the setting is definitively absent - otherwise
+            // a check that runs before $$ has been read would wrongly drop the tab and never restore it.
+            if (GrblSettings.IsLoaded && !AutoSquareWizard.SquaringSettingExists())
+                RemoveTab(GrblConfigType.AutoSquare);
         }
     }
 }

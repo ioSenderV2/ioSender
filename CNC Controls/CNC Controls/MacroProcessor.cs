@@ -62,6 +62,26 @@ namespace CNC.Controls
 {
     public static class MacroProcessor
     {
+        // Optional hook to surface the floating run-control panel (status / feed hold / override / MDI) while a
+        // generated program runs. Set by the shell (ioSender XL) since the panel lives in that assembly; callers
+        // in this library (e.g. the Surface Spoilboard generator) invoke it before Run so they don't need a
+        // direct reference to it.
+        public static System.Action<GrblViewModel> RunControlPanel;
+
+        // Hook to run the just-loaded in-memory program through the real job streamer: the host (ioSender XL)
+        // brings the Grbl (Job) tab forward and calls JobControl.CycleStart(0). Set by the shell because the
+        // streamer/job control live there. Called after a large flush has been loaded into GCode.File.
+        public static System.Action<GrblViewModel> RunStreamedJob;
+
+        // Above this many g-code lines a single flush is streamed through the flow-controlled job streamer
+        // (GCode.File + Cycle Start) instead of the MDI path. The MDI path has no character-counting flow
+        // control, so a large program overruns the controller's serial buffer (hanging it) and blocks the
+        // UI thread. Kept high enough that the small interactive macros (Load Stock etc.) stay on MDI.
+        private const int StreamLineThreshold = 40;
+
+        // Name given to the in-memory program when a flush is streamed (set per run).
+        private static string _streamName = "Macro";
+
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
         public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
         {
@@ -70,6 +90,8 @@ namespace CNC.Controls
 
             if (string.IsNullOrEmpty(name))
                 name = "Macro";
+
+            _streamName = name;
 
             // A macro whose body is a single "@<path>" line is a reference to an external file;
             // load and run that file's current contents (re-read every run, so the macro can be
@@ -194,20 +216,88 @@ namespace CNC.Controls
                     continue;
                 }
 
-                buffer.Append(ApplySubstitutions(raw, fields)).Append('\n');
+                buffer.Append(SanitizeComment(ApplySubstitutions(raw, fields))).Append('\n');
             }
             Flush(model, buffer);
 
             return true;
         }
 
+        // grblHAL ends a g-code comment at the FIRST ')', so any '(' or ')' INSIDE a (comment) corrupts the
+        // block - the text after the inner ')' is parsed as g-code (e.g. "1 depth pass(es)" -> stray ", DOC...").
+        // Replace parens between the outer '(' .. ')' with '[' .. ']' so generated comments are always well-formed.
+        // Applied to every streamed line (directives are consumed earlier, so only comments / g-code reach here).
+        private static string SanitizeComment(string s)
+        {
+            int open = s.IndexOf('(');
+            int close = s.LastIndexOf(')');
+            if (open < 0 || close <= open + 1)
+                return s;
+
+            var sb = new StringBuilder(s.Length);
+            sb.Append(s, 0, open + 1);
+            for (int i = open + 1; i < close; i++)
+                sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
+            sb.Append(s, close, s.Length - close);
+            return sb.ToString();
+        }
+
+        // Send the accumulated g-code. A SMALL burst goes via the MDI path (as before) - fine between
+        // directives and required for O-word/parameter macros the streamer's block parser can't handle.
+        // A LARGE burst (a real cutting program) is run through the normal job streamer instead: it has
+        // character-counting flow control and runs on a background thread, so it can't overrun the
+        // controller's serial buffer or freeze the UI - and feed-hold/stop/overrides/progress all work.
         private static void Flush(GrblViewModel model, StringBuilder buffer)
         {
-            if (buffer.Length > 0)
+            if (buffer.Length == 0)
+                return;
+
+            string code = buffer.ToString();
+            buffer.Clear();
+
+            var lines = code.Replace("\r", string.Empty).Split('\n');
+            int n = 0;
+            bool mdiOnly = false;
+            foreach (var l in lines)
             {
-                model.ExecuteMacro(buffer.ToString());
-                buffer.Clear();
+                string t = l.Trim();
+                if (t.Length == 0)
+                    continue;
+                n++;
+                // O-word flow calls and NGC parameters/expressions rely on the MDI forwarding path (the
+                // streamer's block parser would reject or drop them) - never stream those, any size.
+                if (t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || t.IndexOf('#') >= 0)
+                    mdiOnly = true;
             }
+
+            // A large plain-g-code body is ALWAYS streamed (never the MDI path, which would overrun the
+            // controller and freeze the UI). O-word/parameter bodies and small bursts stay on MDI.
+            if (!mdiOnly && n > StreamLineThreshold && RunStreamedJob != null)
+                StreamProgram(model, lines);
+            else
+                model.ExecuteMacro(code);
+        }
+
+        // Load the accumulated g-code into the in-memory program and start it on the normal job streamer.
+        private static void StreamProgram(GrblViewModel model, string[] lines)
+        {
+            var code = new List<string>();
+            foreach (var l in lines)
+            {
+                string t = l.Trim();
+                if (t.Length > 0)
+                    code.Add(t);
+            }
+            if (code.Count == 0)
+                return;
+
+            GCode.File.AddBlock(_streamName, CNC.Core.Action.New);            // names + clears the program
+            for (int i = 0; i < code.Count - 1; i++)
+                GCode.File.AddBlock(code[i], CNC.Core.Action.Add);
+            GCode.File.AddBlock(code[code.Count - 1], CNC.Core.Action.End);   // finalize (sets Model.Blocks)
+
+            // Host brings the Job tab forward and starts the flow-controlled stream (JobControl.CycleStart(0)).
+            RunStreamedJob.Invoke(model);
         }
 
         // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -
@@ -577,23 +667,90 @@ namespace CNC.Controls
         private static bool ShowMBox(string name, string line)
         {
             string body = Body(line, "MBOX").Trim();   // "OKCANCEL, message" or "message"
-            var buttons = MessageBoxButton.OK;
+            bool cancellable = false, yesNo = false;
 
             int comma = body.IndexOf(',');
             string head = (comma >= 0 ? body.Substring(0, comma) : body).Trim().ToUpperInvariant();
             if (head == "OK" || head == "OKCANCEL" || head == "YESNO")
             {
-                buttons = head == "OKCANCEL" ? MessageBoxButton.OKCancel
-                        : head == "YESNO" ? MessageBoxButton.YesNo
-                        : MessageBoxButton.OK;
+                cancellable = head == "OKCANCEL" || head == "YESNO";
+                yesNo = head == "YESNO";
                 body = comma >= 0 ? body.Substring(comma + 1).Trim() : string.Empty;
             }
 
             if (body == string.Empty)
                 body = "(no message)";
 
-            var result = ShowMessage(body, name, buttons, MessageBoxImage.Information);
-            return !(result == MessageBoxResult.Cancel || result == MessageBoxResult.No);
+            return ShowHoldPrompt(name, body, cancellable, yesNo);
+        }
+
+        // A modeless "hold" prompt: pauses the macro until the operator clicks, but - unlike a modal MessageBox -
+        // leaves the MAIN window fully usable and does NOT steal keyboard focus, so the operator can jog (incl.
+        // keyboard jog), change the jog step and zero the DRO while it is up (needed for "jog to the corner and
+        // set work zero" style prompts). PushFrame keeps the UI pumping while the macro waits here.
+        private static bool ShowHoldPrompt(string title, string message, bool cancellable, bool yesNo)
+        {
+            bool result = !cancellable;   // closing the window [X] = OK when there is no Cancel
+            var frame = new System.Windows.Threading.DispatcherFrame();
+
+            var win = new Window
+            {
+                Title = string.IsNullOrEmpty(title) ? "ioSender" : title,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow,
+                ShowInTaskbar = false,
+                ShowActivated = false,   // don't steal focus -> keyboard jogging stays live on the main window
+                Topmost = true,
+                Owner = OwnerWindow(),
+                WindowStartupLocation = OwnerWindow() != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
+            };
+
+            var root = new StackPanel { Margin = new Thickness(16), MaxWidth = 480 };
+            root.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            var okBtn = new Button { Content = yesNo ? "Yes" : "OK", MinWidth = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+            okBtn.Click += (s, e) => { result = true; frame.Continue = false; };
+            bar.Children.Add(okBtn);
+            if (cancellable)
+            {
+                var cancelBtn = new Button { Content = yesNo ? "No" : "Cancel", MinWidth = 80, IsCancel = true };
+                cancelBtn.Click += (s, e) => { result = false; frame.Continue = false; };
+                bar.Children.Add(cancelBtn);
+            }
+            root.Children.Add(bar);
+            win.Content = root;
+            win.Closed += (s, e) => frame.Continue = false;
+
+            // Keep keyboard jogging live while the prompt is up. The prompt is a separate top-level window, so
+            // it owns keyboard focus and the main window's jog forwarding never sees these keys (and the macro
+            // may have been launched from a non-Job tab anyway, where that forwarding is disabled). Forward
+            // jog-relevant keys straight to the keypress handler; leave Enter/Esc/Tab/Space for the buttons.
+            var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard;
+            if (kbd != null)
+            {
+                System.Windows.Input.KeyEventHandler forwardJog = (s, e) =>
+                {
+                    switch (e.Key)
+                    {
+                        case System.Windows.Input.Key.Enter:
+                        case System.Windows.Input.Key.Escape:
+                        case System.Windows.Input.Key.Tab:
+                        case System.Windows.Input.Key.Space:
+                            return;   // reserved for the OK / Cancel buttons
+                    }
+                    e.Handled = kbd.ProcessKeypress(e, true);
+                };
+                win.PreviewKeyDown += forwardJog;
+                win.PreviewKeyUp += forwardJog;
+            }
+
+            win.Show();
+            System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+            try { win.Close(); } catch { }
+
+            return result;
         }
 
         // True if the trimmed line is the named directive, e.g. "(MBOX ...)" / "(PREREQ ...)".

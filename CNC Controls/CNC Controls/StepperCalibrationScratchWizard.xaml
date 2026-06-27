@@ -57,6 +57,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
                 <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_scrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
                 <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
                         IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
             </StackPanel>
@@ -92,7 +93,9 @@
                     <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBox x:Name="txtInstructions" Grid.Row="2" Background="#FFF8F8F8" IsReadOnly="True" Margin="0,6,0,0" MinHeight="150" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            <!-- Before Generate: shows the instructions. After Generate: the generated program (the run buffer). -->
+            <TextBox x:Name="txtProgram" Grid.Row="2" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,6,0,0" MinHeight="150"
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
         </Grid>
     </Grid>
 </UserControl>

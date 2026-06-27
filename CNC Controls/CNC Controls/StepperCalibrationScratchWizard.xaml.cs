@@ -259,20 +259,22 @@ namespace CNC.Controls
 
             lines.Add(string.Format("(ioSender stepper calibration - {0} axis - V-bit scratch lines)", axis));
             lines.Add(string.Format("(span {0} mm, current steps/mm {1}, measure spacing between the two lines of each pair)", F(span), FR(s0)));
-            lines.Add("(Home the machine first. Zero work coords G54 at a stock corner, Z on top.)");
-            // File prolog - mirrors the Load Folder prolog (FusionFolderLoader.Prolog).
-            lines.Add("G90 G94");
-            lines.Add("G17");
-            lines.Add("G21");
-            // Machine-coord safe-Z retract, tool change with the spindle stopped, then spin up.
-            lines.Add("G53 G0 Z0");
+
+            // Prereq + fit/position prompt (mirrors the other generated programs): confirm the link, then hold while
+            // the operator fits the V-bit, jogs to a stock corner and sets work zero. Nothing moves until OK.
+            lines.Add("(PREREQ, connected, noalarm)");
+            lines.Add("(MBOX, OKCANCEL, Fit the V-bit, jog to a stock corner, then set work zero here - on the DRO click Zero All [Z0 = stock top]. Click OK to start, Cancel to abort.)");
+            lines.Add("(WAITIDLE)");
+
+            // Work-coordinate prolog (the operator zeroed at the corner) - no machine-coord G53 moves, so homing is
+            // not required. Lift to safe Z first (off the stock top), then change tool / start the spindle.
+            lines.Add("G90 G94 G17 G21");
+            lines.Add("G54");
+            lines.Add("G0 Z" + F(SafeZ));
             if (tool > 0)
                 lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
             if (SpindleRPM > 0d)
                 lines.Add("S" + ((int)Math.Round(SpindleRPM)).ToString(CultureInfo.InvariantCulture) + " M3");
-            lines.Add("G17 G90 G94");
-            lines.Add("G54");
-            lines.Add("G0 Z" + F(SafeZ));   // rapid to work safe height above the stock top
 
             for (int i = 0; i < n; i++)
             {
@@ -304,7 +306,7 @@ namespace CNC.Controls
 
             if (SpindleRPM > 0d)
                 lines.Add("M5");
-            lines.Add("G53 G0 Z0");
+            lines.Add("G0 Z" + F(SafeZ));
             lines.Add("M30");
 
             return lines;
@@ -349,10 +351,30 @@ namespace CNC.Controls
                     Generate();
                     break;
 
+                case "run":
+                    Run();
+                    break;
+
                 case "save":
                     Save();
                     break;
             }
+        }
+
+        // Run the buffered program via the macro path (like Load Stock / Surface spoilboard): the run-control
+        // panel floats, then the program streams - its (PREREQ)/(MBOX)/(WAITIDLE) confirm state and prompt the
+        // operator to fit the bit and set work zero before any motion.
+        private void Run()
+        {
+            if (model == null)
+                return;
+            if (string.IsNullOrWhiteSpace(txtProgram.Text) || Results.Count == 0)
+                Generate();
+            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+                return;
+
+            MacroProcessor.RunControlPanel?.Invoke(model);
+            MacroProcessor.Run(model, "Stepper calibration", txtProgram.Text, true);
         }
 
         private void Generate()
@@ -368,39 +390,9 @@ namespace CNC.Controls
 
             NewResolution = 0d;
 
-            var lines = BuildProgram();
-
-            // Optionally save the program to disk.
-            var save = new Microsoft.Win32.SaveFileDialog
-            {
-                Title = "Save calibration program (optional - Cancel just loads it)",
-                Filter = "GCode files (*.nc)|*.nc|All files (*.*)|*.*",
-                FileName = string.Format("stepper_cal_{0}.nc", GrblInfo.AxisIndexToLetter(Axis))
-            };
-            if (save.ShowDialog() == true)
-            {
-                try
-                {
-                    System.IO.File.WriteAllLines(save.FileName, lines);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Could not save the program:\n" + ex.Message, "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-
-            // Load the program into the job view (in memory), like the Load Folder feature.
-            GCode.File.AddBlock(string.Format("stepper_cal_{0}", GrblInfo.AxisIndexToLetter(Axis)), Core.Action.New);
-            // Match a normal file load: only prepend N<line> numbers when the user has enabled both
-            // controller line numbers and the "add line numbers" option - otherwise the gcode column
-            // would duplicate the row's sequence number.
-            GCode.File.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
-            foreach (var line in lines)
-                GCode.File.AddBlock(line);
-            GCode.File.AddBlock("", Core.Action.End);
-
-            MessageBox.Show("Calibration program loaded into the program view.\n\nSwitch to the main view, set work zero at the start corner, then run it. Measure each pair and enter the values here.",
-                            "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Show the generated program in the preview buffer; Run streams it via the macro path (like Load Stock).
+            txtProgram.Text = string.Join("\r\n", BuildProgram());
+            btnRun.IsEnabled = true;
         }
 
         private void Save()
@@ -444,13 +436,13 @@ namespace CNC.Controls
             }
 
             txtWarnings.Text = "Stock must fit the full span + margin along the axis and (margin + (points-1) x row spacing + line length) across it. A V-bit gives sharp, easy-to-measure scratch lines.";
-            txtInstructions.Text =
-                "1. Fit the V-bit. Jog to a stock corner and set work zero (G54) there, with Z zero on the stock top.\n" +
-                "2. The first mark is made the Edge margin in from that corner on both axes; marks stay inside the stock.\n" +
-                "3. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM, choose Tool (Loaded or Prompt), then press Generate.\n" +
-                "4. Switch to the main view and run the loaded program. It starts the spindle, then scratches a pair of lines (perpendicular to the axis) for each candidate steps/mm.\n" +
+            txtProgram.Text =
+                "1. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM, choose Tool (Loaded or Prompt), then press Generate (the program appears here).\n" +
+                "2. Press Run - a confirmation and the floating run-control panel appear.\n" +
+                "3. When prompted, fit the V-bit, jog to a stock corner and set work zero here (DRO > Zero All; Z0 = stock top), then click OK. The first mark is made the Edge margin in from that corner on both axes; marks stay inside the stock.\n" +
+                "4. It scratches a pair of lines (perpendicular to the axis) for each candidate steps/mm.\n" +
                 "5. Measure the spacing between the two lines of each pair with calipers and enter it in the Measured column.\n" +
-                "6. The pair closest to the span is highlighted; New steps/mm is the average implied value. Press Save steps/mm to update the setting.\n" +
+                "6. The pair closest to the span is highlighted; New steps/mm is the average implied value. Press Save steps/mm to update the setting.\n\n" +
                 "Notes: Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6 to load the bit. RPM 0 omits spindle commands. Z cannot be calibrated this way - use the jog-based Stepper calibration tab for Z.";
         }
 

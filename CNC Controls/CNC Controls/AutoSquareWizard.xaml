@@ -1,0 +1,97 @@
+<UserControl x:Class="CNC.Controls.AutoSquareWizard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="520" d:DesignWidth="980"
+             Loaded="UserControl_Loaded">
+    <Grid VerticalAlignment="Stretch">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="450"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <!-- Left: inputs (scrolls if the window is short). Definite width so the wrapping headers wrap and the
+             right-aligned buttons stay inside the column instead of being clipped off the right edge. -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Vertical" Margin="5,5,0,0">
+            <TextBlock x:Name="txtAxisInfo" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,6"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                <TextBlock x:Uid="txt_asgangedaxis" Text="Ganged axis:" VerticalAlignment="Center" MinWidth="160"/>
+                <ComboBox x:Name="cbxGangedAxis" Width="60" SelectedIndex="1" SelectionChanged="cbxGangedAxis_SelectionChanged"
+                          ToolTip="The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write.">
+                    <ComboBoxItem x:Uid="cbi_asaxisx" Content="X"/>
+                    <ComboBoxItem x:Uid="cbi_asaxisy" Content="Y"/>
+                    <ComboBoxItem x:Uid="cbi_asaxisz" Content="Z"/>
+                </ComboBox>
+            </StackPanel>
+            <local:NumericField x:Uid="fld_asoffset" Label="Current offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
+                Value="{Binding CurrentOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+
+            <Separator Margin="5,8"/>
+            <TextBlock x:Uid="txt_asholehdr" Text="Reference holes (drill an L: corner + one along each axis at the framing-square arm lengths):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <local:NumericField x:Uid="fld_asblade" Label="Square blade:" ColonAt="160" Format="#####0.0"
+                ToolTip="Your framing square's ACTUAL blade (long-arm) length, e.g. 609.6 mm for 24in. The tool insets the holes from this so the square's edge overhangs the far hole."
+                Value="{Binding BladeLength, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_astongue" Label="Square tongue:" ColonAt="160" Format="#####0.0"
+                ToolTip="Your framing square's ACTUAL tongue (short-arm) length, e.g. 406.4 mm for 16in. The tool insets the holes from this so the square's edge overhangs the far hole."
+                Value="{Binding TongueLength, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_ascorner" Label="Corner offset:" ColonAt="160" Format="###0.0##"
+                ToolTip="Drill the corner reference as two holes this far out along each leg (clears a framing square's inside-corner stress-relief radius). 0 = a single corner hole for a sharp square."
+                Value="{Binding CornerOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asbit" Label="Drill bit dia:" ColonAt="160" Format="###0.0##"
+                Value="{Binding BitDiameter, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asdepth" Label="Hole depth:" ColonAt="160" Format="###0.0##"
+                Value="{Binding DrillDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_aspeck" Label="Peck depth:" ColonAt="160" Format="###0.0##"
+                Value="{Binding PeckDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asplunge" Label="Plunge feed:" ColonAt="160" Format="#####0"
+                Value="{Binding PlungeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"/>
+            <local:NumericField x:Uid="fld_asrpm" Label="Spindle RPM:" ColonAt="160" Format="######0"
+                Value="{Binding SpindleRPM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
+            <local:NumericField x:Uid="fld_assafez" Label="Safe Z:" ColonAt="160" Format="###0.0##"
+                Value="{Binding SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asxoff" Label="X offset:" ColonAt="160" Format="-####0.0"
+                ToolTip="Nudge the whole hole pattern in X (from the bed centre) to dodge existing dog/insert holes."
+                Value="{Binding XOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asyoff" Label="Y offset:" ColonAt="160" Format="-####0.0"
+                ToolTip="Nudge the whole hole pattern in Y (from the bed centre) to dodge existing dog/insert holes."
+                Value="{Binding YOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <CheckBox x:Uid="chk_asdry" Content="Dry run (visit each hole at safe Z, no plunge - check clearance)" Margin="20,6,0,0" VerticalAlignment="Center"
+                      ToolTip="Move to each hole position with the spindle off and no plunge, pausing at each so you can confirm it clears your dog/insert holes before drilling."
+                      IsChecked="{Binding DryRun, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <CheckBox x:Uid="chk_asreuse" x:Name="chkReuseZ0" Content="Reuse Z0 (skip touch-off - same bit/setup)" Margin="20,6,0,0" VerticalAlignment="Center"
+                      ToolTip="Skip the park + Z touch-off and reuse the work Z0 from the last run. Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
+                      IsChecked="{Binding ReuseZ0, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
+                <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_asrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
+            </StackPanel>
+
+            <Separator Margin="5,8"/>
+            <TextBlock x:Uid="txt_asmeashdr" Text="Measure &amp; apply: pin the holes, register the square on the Y-leg pins, measure the gap at the X-leg pin (+ if it sits toward +Y of the blade):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <local:NumericField x:Uid="fld_asgap" Label="Measured gap:" ColonAt="160" Format="-###0.0##"
+                Value="{Binding MeasuredGap, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asnewoffset" Label="New offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
+                Value="{Binding NewOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
+                <Button x:Uid="btn_asapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
+                <Button x:Uid="btn_ashome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+            </StackPanel>
+            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="5,8" HorizontalAlignment="Left" MinWidth="380" MaxWidth="460" TextWrapping="Wrap"/>
+        </StackPanel>
+        </ScrollViewer>
+        <!-- Right: summary + program / instructions -->
+        <Grid Grid.Column="1" Margin="8,5,5,5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="txtSummary" Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
+            <!-- Before Generate: instructions. After Generate: the generated drilling program (the run buffer). -->
+            <TextBox x:Name="txtProgram" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,0"
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+        </Grid>
+    </Grid>
+</UserControl>
