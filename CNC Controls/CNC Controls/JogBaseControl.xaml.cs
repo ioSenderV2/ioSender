@@ -93,7 +93,11 @@ namespace CNC.Controls
         {
             if (DataContext is GrblViewModel)
             {
-                mode = GrblSettings.GetInteger(GrblSetting.ReportInches) == 0 ? "G21" : "G20";
+                // Mirror the DRO/model rule (Grbl.cs: IsMetric = $13 != 1): only an explicit $13=1 means
+                // inches. GetInteger returns -1 when $13 is absent (or not yet loaded) - default that to
+                // metric, otherwise the jog panel silently falls back to G20 + imperial step presets while
+                // the DRO stays in mm.
+                mode = GrblSettings.GetInteger(GrblSetting.ReportInches) == 1 ? "G20" : "G21";
                 softLimits = !(GrblInfo.IsGrblHAL && GrblSettings.GetInteger(grblHALSetting.SoftLimitJogging) == 1) && GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1;
                 limitSwitchesClearance = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
 

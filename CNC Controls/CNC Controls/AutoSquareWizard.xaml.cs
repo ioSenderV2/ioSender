@@ -80,7 +80,7 @@ namespace CNC.Controls
 
             if (!SquaringSettingExists())
             {
-                txtAxisInfo.Text = "No auto-square offset setting found. This firmware is not built with a ganged, auto-squared axis - nothing to tune here.";
+                txtAxisInfo.Text = "Measure-only: this firmware has no auto-square offset setting (not built with an auto-squared axis), so there's nothing to write. You can still drill the L and measure the gap to gauge how far out of square the gantry is - then correct it mechanically.";
                 CurrentOffset = 0d;
                 _offset = null;
             }
@@ -270,29 +270,39 @@ namespace CNC.Controls
 
         private void UpdateComputed()
         {
-            double raw = CurrentOffset + OffsetDelta();
+            bool measureOnly = _offset == null;
+            double delta = OffsetDelta();
+            double raw = CurrentOffset + delta;
             NewOffset = HasRange ? Math.Max(_offset.Min, Math.Min(_offset.Max, raw)) : raw;
 
+            bool travelSet = XLeg() > 0d && YLeg() > 0d;
+
             string warn = string.Empty;
-            if (_offset == null)
-                warn = "No auto-square offset setting on this controller.";
-            else if (XLeg() <= 0d || YLeg() <= 0d)
+            if (!travelSet)
                 warn = "Set max travel ($130-$132) first - the hole positions are referenced to the homed envelope.";
-            else if (HasRange && raw != NewOffset)
+            else if (!measureOnly && HasRange && raw != NewOffset)
                 warn = string.Format("New offset would exceed the setting range {0}..{1} mm and was clamped - check the measurement.", F(_offset.Min), F(_offset.Max));
-            else if (Math.Abs(NewOffset) > LargeOffsetWarn)
+            else if (!measureOnly && Math.Abs(NewOffset) > LargeOffsetWarn)
                 warn = string.Format("Offset {0:0.0} mm is large - that much racking can bind a rigid gantry. If it binds, the gantry is mechanically out of square (Y rails out of phase) - fix that first; the squaring offset is fine-trim only.", NewOffset);
 
             if (txtWarnings != null)
                 txtWarnings.Text = warn;
 
             if (btnApply != null)
-                btnApply.IsEnabled = _offset != null && Math.Abs(MeasuredGap) > 0d && XLeg() > 0d;
+                btnApply.IsEnabled = !measureOnly && Math.Abs(MeasuredGap) > 0d && travelSet;
 
             if (txtSummary != null)
-                txtSummary.Text = _offset == null ? string.Empty
-                    : string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → offset Δ {4:0.000} mm (rail span {5:0})  ·  new offset {6:0.000} mm",
-                        XLeg(), YLeg(), MeasuredGap, Lever(), OffsetDelta(), RailSpan(), NewOffset);
+            {
+                if (!travelSet)
+                    txtSummary.Text = string.Empty;
+                else if (measureOnly)
+                    // No offset to write - report the squareness error itself (mm out of square across the rail span).
+                    txtSummary.Text = string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → gantry ~{4:0.000} mm out of square across the {5:0} mm rail span. Measure-only (no offset setting) - correct mechanically.",
+                        XLeg(), YLeg(), MeasuredGap, Lever(), delta, RailSpan());
+                else
+                    txtSummary.Text = string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → offset Δ {4:0.000} mm (rail span {5:0})  ·  new offset {6:0.000} mm",
+                        XLeg(), YLeg(), MeasuredGap, Lever(), delta, RailSpan(), NewOffset);
+            }
         }
 
         // Peck-drill one hole at work (x,y): plunge in PeckDepth steps to -DrillDepth, retracting above the

@@ -126,11 +126,10 @@ namespace CNC.Controls
             if (!GrblInfo.HasPIDLog)
                 RemoveTab(GrblConfigType.PidTuning);
 
-            // Auto square only applies to a ganged, auto-squared build (the squaring-offset setting is present).
-            // Only hide it once settings are actually loaded and the setting is definitively absent - otherwise
-            // a check that runs before $$ has been read would wrongly drop the tab and never restore it.
-            if (GrblSettings.IsLoaded && !AutoSquareWizard.SquaringSettingExists())
-                RemoveTab(GrblConfigType.AutoSquare);
+            // Auto square is kept on every build: when the squaring-offset setting is present it tunes that
+            // offset; when it isn't (e.g. ganged but not auto-squared, or not ganged at all) it still serves as
+            // a squareness GAUGE - drill the L, measure the gap with a framing square to see how far out of
+            // square the X/Y axes are - just with the Apply-offset step disabled (correct mechanically instead).
         }
     }
 }
