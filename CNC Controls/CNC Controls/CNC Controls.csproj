@@ -74,6 +74,7 @@
     </Compile>
     <Compile Include="AppConfig.cs" />
     <Compile Include="ConfigStore.cs" />
+    <Compile Include="LayoutModel.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="AtcMacros.cs" />
     <Compile Include="ArcsToLines.cs" />
