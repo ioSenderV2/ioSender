@@ -55,6 +55,7 @@ namespace CNC.Controls
     {
         private GrblViewModel model = null;
         private GrblSettingDetails setting = null;
+        private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
 
         public StepperCalibrationScratchWizard()
         {
@@ -76,7 +77,10 @@ namespace CNC.Controls
                 if (CalAxes.Count > 0 && CalAxes.FirstOrDefault(a => a.Index == Axis) == null)
                     Axis = CalAxes[0].Index;
                 getAxisDetails(Axis);
+                MacroProcessor.SetActiveProgram?.Invoke("Stepper calibration", program);   // Program View shows our program
             }
+            else
+                MacroProcessor.ClearActiveProgram?.Invoke();   // leaving: revert to the loaded-job view
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -418,13 +422,12 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
-            if (string.IsNullOrWhiteSpace(txtProgram.Text) || Results.Count == 0)
+            if (string.IsNullOrWhiteSpace(program) || Results.Count == 0)
                 Generate();
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.RunControlPanel?.Invoke(model);
-            MacroProcessor.Run(model, "Stepper calibration", txtProgram.Text, true);
+            MacroProcessor.Run(model, "Stepper calibration", program, true);
         }
 
         private void Generate()
@@ -440,9 +443,10 @@ namespace CNC.Controls
 
             NewResolution = 0d;
 
-            // Show the generated program in the preview buffer; Run streams it via the macro path (like Load Stock).
-            txtProgram.Text = string.Join("\r\n", BuildProgram());
+            // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
+            program = string.Join("\r\n", BuildProgram());
             btnRun.IsEnabled = true;
+            MacroProcessor.ProgramPreview?.Invoke("Stepper calibration", program);
         }
 
         private void Save()
@@ -484,15 +488,6 @@ namespace CNC.Controls
                     Axis = CalAxes[0].Index;
                 getAxisDetails(Axis);
             }
-
-            txtProgram.Text =
-                "1. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM, choose Tool (Loaded or Prompt), then press Generate (the program appears here).\n" +
-                "2. Press Run - a confirmation and the floating run-control panel appear.\n" +
-                "3. When prompted, fit the V-bit, jog to a stock corner and set work zero here (DRO > Zero All; Z0 = stock top), then click OK. The first mark is made the Edge margin in from that corner on both axes; marks stay inside the stock.\n" +
-                "4. It scratches a pair of lines (perpendicular to the axis) for each candidate steps/mm.\n" +
-                "5. Measure the spacing between the two lines of each pair with calipers and enter it in the Measured column.\n" +
-                "6. The pair closest to the span is highlighted; New steps/mm is the average implied value. Press Save steps/mm to update the setting.\n\n" +
-                "Notes: Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6 to load the bit. RPM 0 omits spindle commands. Z cannot be calibrated this way - use the jog-based Stepper calibration tab for Z.";
         }
 
         private bool _paramsLoaded = false;

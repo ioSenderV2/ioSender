@@ -139,8 +139,12 @@ namespace GCode_Sender
                     RestoreTabOnJobEnd(m, origin);
             };
 
-            // Tools preview their generated program in the program-view overlay (raw text) via this hook.
+            // Tools preview their generated program in the program-view overlay (raw text) via these hooks:
+            // ProgramPreview pops it open (Generate feedback); SetActiveProgram/ClearActiveProgram set what the
+            // Program View button shows as the tool's tab is entered/left (empty before Generate).
             CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
+            CNC.Controls.MacroProcessor.SetActiveProgram = (name, text) => SetActiveProgram(name, text);
+            CNC.Controls.MacroProcessor.ClearActiveProgram = () => ClearActiveProgram();
 
             // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
             // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
@@ -246,12 +250,12 @@ namespace GCode_Sender
             overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // A tool (e.g. Load Stock) shows its freshly generated program in the program-view overlay as raw text
-        // and pops the overlay open - so Generate gives immediate, visible feedback. The next real file load
-        // returns the overlay to the live job view (see the FileName handler in WireBarOverlays).
-        public void ShowProgramPreview(string toolName, string program)
+        // Set what the program-view overlay shows WITHOUT opening it: a tool's program (raw text) as the
+        // "active program". Tools call this when their tab is shown (program is "" before Generate) so the
+        // Program View button reveals the tool's program - empty or generated. Refreshes if already open.
+        public void SetActiveProgram(string name, string program)
         {
-            overlayPreviewTitle.Text = string.IsNullOrEmpty(toolName) ? "Generated program" : toolName;
+            overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
             overlayProgramText.Text = program ?? string.Empty;
 
             overlayJobTitle.Visibility = Visibility.Collapsed;
@@ -259,6 +263,14 @@ namespace GCode_Sender
             overlayProgramView.Visibility = Visibility.Collapsed;
             overlayProgramText.Visibility = Visibility.Visible;
 
+            if (_programOverlay)
+                UpdateOverlay();
+        }
+
+        // Set the active program AND pop the overlay open - Generate's immediate feedback.
+        public void ShowProgramPreview(string name, string program)
+        {
+            SetActiveProgram(name, program);
             _programOverlay = true;
             btnProgramView.IsChecked = true;   // raises ProgramView_Toggled
             UpdateOverlay();
@@ -274,7 +286,13 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
-        // Return the overlay to the live job view (parsed g-code of the loaded file).
+        // Return the overlay to the live job view (parsed g-code of the loaded file). Public alias for tools
+        // that leave their tab (the active program reverts to the loaded job); visibility is left unchanged.
+        public void ClearActiveProgram()
+        {
+            ClearProgramPreview();
+        }
+
         private void ClearProgramPreview()
         {
             overlayProgramText.Text = string.Empty;

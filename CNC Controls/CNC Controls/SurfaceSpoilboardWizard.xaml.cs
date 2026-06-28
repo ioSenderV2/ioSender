@@ -21,6 +21,7 @@ namespace CNC.Controls
     public partial class SurfaceSpoilboardWizard : UserControl, IGrblConfigTab
     {
         private GrblViewModel model = null;
+        private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
         private bool _paramsLoaded = false;
 
         public SurfaceSpoilboardWizard()
@@ -39,7 +40,10 @@ namespace CNC.Controls
             {
                 DefaultArea();   // size the area to the in-bounds travel envelope (less margins)
                 UpdateSummary();
+                MacroProcessor.SetActiveProgram?.Invoke("Surface spoilboard", program);   // Program View shows our program
             }
+            else
+                MacroProcessor.ClearActiveProgram?.Invoke();   // leaving: revert to the loaded-job view
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -447,13 +451,12 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 Generate();
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.RunControlPanel?.Invoke(model);
-            bool ok = MacroProcessor.Run(model, "Surface spoilboard", txtProgram.Text, true);
+            bool ok = MacroProcessor.Run(model, "Surface spoilboard", program, true);
 
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry run
             // or outline check you can untick Dry run / Outline only and Run again to cut at the same Z0.
@@ -490,9 +493,10 @@ namespace CNC.Controls
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 
-            // Show the generated program in the preview buffer; Run streams it via the macro path (like Load Stock).
-            txtProgram.Text = string.Join("\r\n", BuildProgram());
+            // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
+            program = string.Join("\r\n", BuildProgram());
             btnRun.IsEnabled = true;
+            MacroProcessor.ProgramPreview?.Invoke("Surface spoilboard", program);
         }
 
         private void cbxTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -523,16 +527,6 @@ namespace CNC.Controls
             DefaultArea();
 
             txtWarnings.Text = string.Empty;
-            txtProgram.Text =
-                "Surfaces (flattens) the spoilboard with a raster of overlapping passes, referenced to the homed machine envelope.\n\n" +
-                "1. Fit the surfacing bit. Enter its diameter and rated max RPM.\n" +
-                "2. Set spindle RPM, overlap %, feed/plunge, depth of cut and total skim depth. The area defaults to the full travel envelope less the Edge margin - reduce Width/Height to surface a smaller region (anchored at the home-side corner).\n" +
-                "3. Press Generate to build the program (it appears here). Press Run to start - a confirmation and the floating run-control panel appear.\n" +
-                "4. The machine must be homed. It first moves to the FRONT-LEFT corner (a reachable starting point). Prompt 1: jog to the board's HIGHEST point (keyboard/jog moves X, Y and Z) and lower the bit until it just touches, then click OK - work Z0 is locked to that height. Where you touch off does NOT matter: the cut's XY is referenced to the machine corner automatically, so it returns to front-left and cuts relative to that Z0. Z then raises to the top automatically. Prompt 2: fit the dust boot / do any final prep, then click OK - it drops back to safe Z above the locked Z0 and starts.\n" +
-                "5. It rasters across the envelope, cutting Z0 minus the depth of cut each pass down to the total depth. Because XY is machine-referenced, it cannot overrun a soft limit.\n\n" +
-                "Notes: stepover = bit diameter x (1 - overlap). Spindle RPM 0 = 70% of the bit's max RPM. Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6. Edge margin keeps the raster clear of the travel limits (on top of the homing pull-off). Clear any clamps/screws from the raster area first.\n" +
-                "Outline only = a LEVELING CHECK: it moves to each corner, lowers to the Z0 plane and pauses for a dial-gauge reading (spindle off) so you can see how far out of level the board is - fit a dial indicator in place of the cutter and zero it at the front-left reference corner. Dry run traces just the area perimeter at safe Z (no plunge, spindle off) - a quick extents/clearance check; let it finish (home + Z0 are preserved), then untick Dry run and Run to cut at the same Z0. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.\n" +
-                "Reuse Z0 = skip the park + touch-off + dust-boot prompts and cut at the work Z0 from the last run (same bit, boot already fitted). It is auto-ticked after any run, so you can Dry run / Outline first, then untick that and Run again to surface at the same Z0. Untick Reuse Z0 to touch off afresh (e.g. after a bit change).";
 
             UpdateSummary();
         }

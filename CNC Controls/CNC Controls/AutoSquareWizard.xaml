@@ -87,16 +87,9 @@
             </StackPanel>
         </StackPanel>
         </Grid>
-        <!-- Right: summary + program / instructions -->
+        <!-- Right: summary (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="txtSummary" Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-            <!-- Before Generate: instructions. After Generate: the generated drilling program (the run buffer). -->
-            <TextBox x:Name="txtProgram" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,0"
-                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+            <TextBlock x:Name="txtSummary" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
     </Grid>
 </UserControl>

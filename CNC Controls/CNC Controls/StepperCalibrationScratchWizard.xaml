@@ -78,16 +78,14 @@
                     IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
         </StackPanel>
         </Grid>
-        <!-- Right: results + instructions -->
+        <!-- Right: measurements grid (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <!-- Text on top, measurements grid below (per the wizard layout). -->
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock x:Uid="txt_scresults" Grid.Row="1" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,6,0,4" TextWrapping="Wrap"/>
-            <DataGrid x:Name="dgResults" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+            <TextBlock x:Uid="txt_scresults" Grid.Row="0" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
+            <DataGrid x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                       ItemsSource="{Binding Results, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
                 <DataGrid.RowStyle>
@@ -107,9 +105,6 @@
                     <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
-            <!-- Before Generate: shows the instructions. After Generate: the generated program (the run buffer). -->
-            <TextBox x:Name="txtProgram" Grid.Row="0" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,6" MinHeight="150"
-                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
         </Grid>
     </Grid>
 </UserControl>

@@ -109,10 +109,12 @@ namespace GCode_Sender
                 Subscribe(true);
                 UpdateExpressionWarning();
                 UpdateDrawing();
+                MacroProcessor.SetActiveProgram?.Invoke("Load stock", program);   // Program View shows our program
             }
             else
             {
                 SaveInputs();
+                MacroProcessor.ClearActiveProgram?.Invoke();   // leaving: revert to the loaded-job view
                 // Stay subscribed when deactivated: a streamed Load Stock run switches to the Grbl tab while
                 // probing, so we must keep parsing the (PRINT PC OUT / LS_X/Y) result messages to populate the
                 // corners and raise the results popup. The handler only reacts to our own messages, so it's a

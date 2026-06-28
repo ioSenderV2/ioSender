@@ -78,6 +78,13 @@ namespace CNC.Controls
         // Generate so the program is shown - and the overlay popped open - without a direct shell reference.
         public static System.Action<string, string> ProgramPreview;
 
+        // Hooks for the "active program" the program-view button shows: a tool sets itself as the active program
+        // (name, current program text - empty before Generate) when its tab is shown, and clears it when its tab
+        // is left (the overlay reverts to the loaded-job view). Unlike ProgramPreview these do NOT pop the overlay
+        // open - they just set what it WOULD show. Set by ioSender XL.
+        public static System.Action<string, string> SetActiveProgram;
+        public static System.Action ClearActiveProgram;
+
         // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
         // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the
         // shell. Used when Run is called with stayPut:true (Load Stock) so a tool's program runs with full flow
