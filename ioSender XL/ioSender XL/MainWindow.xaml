@@ -13,6 +13,7 @@
         mc:Ignorable="d"
         Background="#FFE5E5E5"
         Title="Sender ({0})" Height="640" Width="925" MinHeight="700" MinWidth="1250"
+        Opacity="0" ShowInTaskbar="False"
         Loaded="Window_Load"
         SizeChanged="Window_SizeChanged"
         Closing="Window_Closing"
@@ -233,12 +234,21 @@
         <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="560" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
             <DockPanel>
-                <!-- Title = program source (file path / folder name / tool name). -->
+                <!-- Title = program source (loaded file/folder) or, in preview mode, the generating tool's name. -->
                 <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
-                    <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                    <Grid>
+                        <TextBlock x:Name="overlayJobTitle" Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                        <TextBlock x:Name="overlayPreviewTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
+                    </Grid>
                 </Border>
-                <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
+                <!-- Job view (parsed g-code) for loaded files; raw-text view for tool-generated program previews. -->
+                <Grid>
+                    <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
+                    <TextBox x:Name="overlayProgramText" Visibility="Collapsed" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                             Background="#FFF8F8F8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             TextWrapping="NoWrap" VerticalContentAlignment="Top"/>
+                </Grid>
             </DockPanel>
         </Border>
         <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->

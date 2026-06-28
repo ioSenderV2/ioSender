@@ -58,6 +58,7 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         private const string version = "2.0.47";
+        public static string Version { get { return version; } }
         public static MainWindow ui = null;
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
@@ -138,10 +139,50 @@ namespace GCode_Sender
                     RestoreTabOnJobEnd(m, origin);
             };
 
+            // Tools preview their generated program in the program-view overlay (raw text) via this hook.
+            CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
+
+            // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
+            // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
+
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
             AttachBasePropertyChangedHandler();
             WireBarOverlays();
+        }
+
+        // ---- startup splash: the window is created invisible and revealed once startup has settled ----
+        private SplashWindow _splash = null;
+        private bool _revealed = false;
+
+        public void AttachSplash(SplashWindow splash)
+        {
+            _splash = splash;
+        }
+
+        private void SetSplashStatus(string status)
+        {
+            _splash?.SetStatus(status);
+        }
+
+        // Reveal the (until-now invisible) main window and dismiss the splash. Idempotent: wired to every
+        // startup exit (connected+ready, incomplete-setup, disconnected, timeout) so it fires exactly once.
+        private void RevealMainWindow()
+        {
+            if (_revealed)
+                return;
+            _revealed = true;
+
+            Opacity = 1d;
+            ShowInTaskbar = true;
+            Activate();
+
+            if (_splash != null)
+            {
+                _splash.Close();
+                _splash = null;
+            }
         }
 
         // ---- bottom-bar overlays: program view (toggle) and/or console log (on command-box focus) ----
@@ -156,6 +197,16 @@ namespace GCode_Sender
             overlayConsole.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
             mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
+
+            // A real file load (FileName set) returns the program overlay from a tool's raw-text preview to
+            // the live job view. Tools that run via the macro path (Load Stock) never set FileName, so their
+            // preview persists until the next genuine load.
+            if (DataContext is GrblViewModel gvm)
+                gvm.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(GrblViewModel.FileName) && !string.IsNullOrEmpty((DataContext as GrblViewModel)?.FileName))
+                        ClearProgramPreview();
+                };
         }
 
         private void ConsoleOverlay_Key(object sender, System.Windows.Input.KeyEventArgs e)
@@ -193,6 +244,44 @@ namespace GCode_Sender
             // Program view (right) and console log (above the command box) are independent overlays.
             overlayProgram.Visibility = _programOverlay ? Visibility.Visible : Visibility.Collapsed;
             overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // A tool (e.g. Load Stock) shows its freshly generated program in the program-view overlay as raw text
+        // and pops the overlay open - so Generate gives immediate, visible feedback. The next real file load
+        // returns the overlay to the live job view (see the FileName handler in WireBarOverlays).
+        public void ShowProgramPreview(string toolName, string program)
+        {
+            overlayPreviewTitle.Text = string.IsNullOrEmpty(toolName) ? "Generated program" : toolName;
+            overlayProgramText.Text = program ?? string.Empty;
+
+            overlayJobTitle.Visibility = Visibility.Collapsed;
+            overlayPreviewTitle.Visibility = Visibility.Visible;
+            overlayProgramView.Visibility = Visibility.Collapsed;
+            overlayProgramText.Visibility = Visibility.Visible;
+
+            _programOverlay = true;
+            btnProgramView.IsChecked = true;   // raises ProgramView_Toggled
+            UpdateOverlay();
+        }
+
+        // Hide the program-view overlay entirely (e.g. when the buffer is empty after a stay-put run).
+        private void CloseProgramOverlay()
+        {
+            _programOverlay = false;
+            if (btnProgramView.IsChecked == true)
+                btnProgramView.IsChecked = false;   // raises ProgramView_Toggled -> UpdateOverlay
+            ClearProgramPreview();
+            UpdateOverlay();
+        }
+
+        // Return the overlay to the live job view (parsed g-code of the loaded file).
+        private void ClearProgramPreview()
+        {
+            overlayProgramText.Text = string.Empty;
+            overlayPreviewTitle.Visibility = Visibility.Collapsed;
+            overlayJobTitle.Visibility = Visibility.Visible;
+            overlayProgramText.Visibility = Visibility.Collapsed;
+            overlayProgramView.Visibility = Visibility.Visible;
         }
 
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
@@ -250,6 +339,7 @@ namespace GCode_Sender
             // Config already loaded in the constructor; here we only open the connection (deferred so
             // the main window paints first). res == 2: user cancelled / no connection - stay open
             // (disconnected) so the user can connect later via the Connect menu item.
+            SetSplashStatus("Connecting...");
             int res = AppConfig.Settings.OpenConnection(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
             bool connected = res == 0;
 
@@ -404,8 +494,20 @@ namespace GCode_Sender
 
             // First-run gate: with no machine saved yet, jump to the Machine Setup Wizard once the controller is
             // ready, then return to the normal UI when the user presses Apply (see ForceMachineSetupIfNeeded).
+            // The window is still invisible here - ForceMachineSetupIfNeeded reveals it (selecting the Machine
+            // Setup tab first if any step is incomplete) once the controller has reported in.
             if (connected)
+            {
+                SetSplashStatus("Validating machine...");
                 ForceMachineSetupIfNeeded();
+            }
+            else
+                RevealMainWindow();   // no controller / cancelled: show the normal UI disconnected
+
+            // Safety net: never leave the user staring at the splash if the controller never reports in.
+            var revealSafety = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+            revealSafety.Tick += (s, e) => { revealSafety.Stop(); RevealMainWindow(); };
+            revealSafety.Start();
         }
 
         private bool _machineSetupForced = false;
@@ -423,29 +525,41 @@ namespace GCode_Sender
             {
                 bool ready = !string.IsNullOrEmpty(GrblInfo.Version) && GrblSettings.IsLoaded;
                 if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report version + settings
+                {
+                    SetSplashStatus(string.IsNullOrEmpty(GrblInfo.Version) ? "Reading controller..." : "Reading settings...");
                     return;
+                }
                 timer.Stop();
                 if (!ready)
+                {
+                    RevealMainWindow();   // controller never reported in: reveal the normal UI anyway
                     return;
+                }
                 // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
                 int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
                 if (step == 0 || sim)
+                {
+                    RevealMainWindow();   // setup complete (or simulator): straight to the normal UI
                     return;
+                }
 
                 // Confirm after a short settle: a connect/reset can momentarily yield a stale read - in
                 // particular the macro check (step 6) does a synchronous filesystem listing that comes back
                 // empty right after a reset, falsely flagging a step. Re-check once things have settled and
                 // only gate if still incomplete (avoids the "prompt appears but every tab is green" race).
+                SetSplashStatus("Validating setup...");
                 var confirm = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
                 confirm.Tick += (s2, e2) =>
                 {
                     confirm.Stop();
-                    if (!GrblSettings.IsLoaded)
-                        return;
-                    int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
-                    if (step2 != 0)
-                        ShowMachineSetup(step2);
+                    if (GrblSettings.IsLoaded)
+                    {
+                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                        if (step2 != 0)
+                            ShowMachineSetup(step2);   // select the Machine Setup tab before revealing
+                    }
+                    RevealMainWindow();
                 };
                 confirm.Start();
             };
@@ -472,6 +586,60 @@ namespace GCode_Sender
                 {
                     m.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(() => { if (origin != null) tabMode.SelectedItem = origin; }));
+                }
+            };
+            m.PropertyChanged += handler;
+        }
+
+        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current
+        // tab (the bottom run bar drives Feed Hold/Stop on any tab), then restore the user's loaded job when it
+        // finishes - so e.g. Load Stock's probe program never takes over the job view. Interim until the streamer
+        // can take a program source as input (the IProgramSource refactor); for now it borrows the one buffer.
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code)
+        {
+            if (code == null || code.Length == 0)
+                return;
+
+            // capture the user's current job so it can be put back (only a file-backed program can be reloaded;
+            // folder/SD/transformed programs are cleared afterwards instead).
+            string restorePath = !string.IsNullOrEmpty(m.FileName) && System.IO.File.Exists(m.FileName) ? m.FileName : null;
+
+            GCode.File.AddBlock(name, CNC.Core.Action.New);              // names + clears the program buffer
+            for (int i = 0; i < code.Length - 1; i++)
+                GCode.File.AddBlock(code[i], CNC.Core.Action.Add);
+            GCode.File.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
+
+            RestoreJobOnEnd(m, restorePath);   // arm the restore before the run starts
+            RunControl.CycleStart(0);          // start streaming from the bottom run bar - no tab change
+        }
+
+        // When the current streamed run finishes, reload the captured job (or clear if there was none / it was
+        // not file-backed). Mirrors RestoreTabOnJobEnd: arm on the first running state, fire on the next terminal.
+        private void RestoreJobOnEnd(GrblViewModel m, string restorePath)
+        {
+            bool started = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = m.StreamingState;
+                if (st == StreamingState.Send || st == StreamingState.SendMDI)
+                    started = true;
+                else if (started && (st == StreamingState.Idle || st == StreamingState.JobFinished ||
+                                     st == StreamingState.Stop || st == StreamingState.NoFile))
+                {
+                    m.PropertyChanged -= handler;
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        if (!string.IsNullOrEmpty(restorePath))
+                            GCode.File.Load(restorePath);
+                        else
+                        {
+                            GCode.File.Close();
+                            CloseProgramOverlay();   // nothing left to show - dismiss the (now empty) program view
+                        }
+                    }));
                 }
             };
             m.PropertyChanged += handler;

@@ -1,0 +1,15 @@
+<Window x:Class="GCode_Sender.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" WindowStartupLocation="CenterScreen" SizeToContent="WidthAndHeight"
+        Topmost="False" Icon="App.ico">
+    <Border Background="#FF2D2D30" CornerRadius="6" BorderBrush="#FF3F3F46" BorderThickness="1" Padding="34,26">
+        <StackPanel Width="320">
+            <TextBlock Text="ioSender XL" FontSize="22" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="txtVersion" FontSize="12" Foreground="#FFB0B0B0" HorizontalAlignment="Center" Margin="0,2,0,18"/>
+            <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,14" Background="Transparent" BorderThickness="0" Foreground="#FF007ACC"/>
+            <TextBlock x:Name="txtStatus" Text="Starting..." FontSize="13" Foreground="#FFDDDDDD" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+    </Border>
+</Window>

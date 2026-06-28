@@ -208,6 +208,15 @@ namespace CNC.Controls
             set { SetValue(CanUpdateProperty, value); }
         }
 
+        // Minimum stock the pattern needs: span + 2 x margin along the axis, and
+        // (points-1) x row spacing + line length + 2 x margin across it.
+        public static readonly DependencyProperty MinStockTextProperty = DependencyProperty.Register(nameof(MinStockText), typeof(string), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(""));
+        public string MinStockText
+        {
+            get { return (string)GetValue(MinStockTextProperty); }
+            set { SetValue(MinStockTextProperty, value); }
+        }
+
         // X/Y axes only - hole/line spacing can only measure travel in the work plane.
         public static readonly DependencyProperty CalAxesProperty = DependencyProperty.Register(nameof(CalAxes), typeof(List<Axis>), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(null));
         public List<Axis> CalAxes
@@ -228,6 +237,9 @@ namespace CNC.Controls
             setting = GrblSettings.Get(GrblSetting.TravelResolutionBase + axisIndex);
             if (setting != null)
                 CurrentResolution = dbl.Parse(setting.Value);
+
+            RebuildResults();   // new axis -> new current steps/mm -> refresh prefilled candidates
+            UpdateMinStock();
         }
 
         private static string F(double value)
@@ -251,11 +263,10 @@ namespace CNC.Controls
             string axis = GrblInfo.AxisIndexToLetter(axisIndex);
             string perp = axis == "X" ? "Y" : "X";
             double s0 = CurrentResolution;
-            double span = Span, delta = Delta, l = LineLength, rs = RowSpacing, m = EdgeMargin;
-            int n = Math.Max(1, (int)Math.Round(Points));
+            double span = Span, l = LineLength, rs = RowSpacing, m = EdgeMargin;
             int tool = (int)Math.Round(ToolNumber);
 
-            Results.Clear();
+            RebuildResults();   // (re)populate the candidate rows the g-code below mirrors
 
             lines.Add(string.Format("(ioSender stepper calibration - {0} axis - V-bit scratch lines)", axis));
             lines.Add(string.Format("(span {0} mm, current steps/mm {1}, measure spacing between the two lines of each pair)", F(span), FR(s0)));
@@ -276,18 +287,16 @@ namespace CNC.Controls
             if (SpindleRPM > 0d)
                 lines.Add("S" + ((int)Math.Round(SpindleRPM)).ToString(CultureInfo.InvariantCulture) + " M3");
 
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < Results.Count; i++)
             {
-                double k = i - (n - 1) / 2.0;          // symmetric offset around the nominal value
-                double candidate = s0 + k * delta;
-                double commanded = s0 == 0d ? span : span * candidate / s0;
+                var r = Results[i];
+                double commanded = r.Commanded;
                 double a0 = m;                          // first mark, edge margin in from the corner
                 double a1 = m + commanded;              // second mark, one commanded span further
                 double rowStart = m + i * rs;           // each pair offset along the perpendicular axis
                 double rowEnd = rowStart + l;
-                string label = k == 0d ? "nominal" : (k > 0d ? "+" : "") + FR(k * delta);
 
-                lines.Add(string.Format("(P{0} {1}  steps/mm {2}  commanded {3})", i + 1, label, FR(candidate), F(commanded)));
+                lines.Add(string.Format("(P{0} {1}  steps/mm {2}  commanded {3})", i + 1, r.Label, FR(r.Steps), F(commanded)));
                 // mark 1 - at the edge margin
                 lines.Add(string.Format("G0 {0}{1} {2}{3}", axis, F(a0), perp, F(rowStart)));
                 lines.Add(string.Format("G1 Z-{0} F{1}", F(ScratchDepth), F(PlungeFeed)));
@@ -298,10 +307,6 @@ namespace CNC.Controls
                 lines.Add(string.Format("G1 Z-{0} F{1}", F(ScratchDepth), F(PlungeFeed)));
                 lines.Add(string.Format("G1 {0}{1} F{2}", perp, F(rowEnd), F(ScratchFeed)));
                 lines.Add("G0 Z" + F(SafeZ));
-
-                var result = new CalibrationResult(i + 1, label, candidate, commanded, s0);
-                result.PropertyChanged += Result_PropertyChanged;
-                Results.Add(result);
             }
 
             if (SpindleRPM > 0d)
@@ -341,6 +346,51 @@ namespace CNC.Controls
 
             if (measured.Count > 0)
                 NewResolution = Math.Round(measured.Average(r => r.Estimate), GrblInfo.IsGrblHAL ? 6 : 3);
+        }
+
+        // Prefill the results grid from the current parameters so the candidate steps/mm + commanded
+        // distances are visible before running; only the Measured column is left for the operator to fill in.
+        private void RebuildResults()
+        {
+            foreach (var r in Results)
+                r.PropertyChanged -= Result_PropertyChanged;
+            Results.Clear();
+
+            double s0 = CurrentResolution;
+            if (s0 <= 0d)
+                return;
+
+            double span = Span, delta = Delta;
+            int n = Math.Max(1, (int)Math.Round(Points));
+            for (int i = 0; i < n; i++)
+            {
+                double k = i - (n - 1) / 2.0;           // symmetric offset around the nominal value
+                double candidate = s0 + k * delta;
+                double commanded = span * candidate / s0;
+                string label = k == 0d ? "nominal" : (k > 0d ? "+" : "") + FR(k * delta);
+
+                var result = new CalibrationResult(i + 1, label, candidate, commanded, s0);
+                result.PropertyChanged += Result_PropertyChanged;
+                Results.Add(result);
+            }
+        }
+
+        // Minimum stock the pattern needs: span + 2 x margin along the axis; (points-1) x row spacing +
+        // line length + 2 x margin across it.
+        private void UpdateMinStock()
+        {
+            int n = Math.Max(1, (int)Math.Round(Points));
+            double along = Span + 2d * EdgeMargin;
+            double across = (n - 1) * RowSpacing + LineLength + 2d * EdgeMargin;
+            MinStockText = string.Format(CultureInfo.InvariantCulture, "{0:0} x {1:0} mm", along, across);
+        }
+
+        // A parameter changed: persist it, refresh the prefilled results grid and the minimum-stock figure.
+        private void OnParamsChanged()
+        {
+            SaveScratchParams();
+            RebuildResults();
+            UpdateMinStock();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -424,7 +474,7 @@ namespace CNC.Controls
                     ScratchFeedProperty, SafeZProperty, LineLengthProperty, RowSpacingProperty,
                     EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty })
                     System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(StepperCalibrationScratchWizard))
-                        .AddValueChanged(this, (s, ev) => SaveScratchParams());
+                        .AddValueChanged(this, (s, ev) => OnParamsChanged());
             }
 
             if (model != null && (CalAxes == null || CalAxes.Count == 0))
@@ -435,7 +485,6 @@ namespace CNC.Controls
                 getAxisDetails(Axis);
             }
 
-            txtWarnings.Text = "Stock must fit the full span + margin along the axis and (margin + (points-1) x row spacing + line length) across it. A V-bit gives sharp, easy-to-measure scratch lines.";
             txtProgram.Text =
                 "1. Select the axis, confirm the current steps/mm, set span / delta / test points / margin / RPM, choose Tool (Loaded or Prompt), then press Generate (the program appears here).\n" +
                 "2. Press Run - a confirmation and the floating run-control panel appear.\n" +

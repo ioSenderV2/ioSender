@@ -6,97 +6,81 @@
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              mc:Ignorable="d" d:DesignHeight="560" d:DesignWidth="720">
     <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="360"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Inputs -->
-        <GroupBox x:Uid="ls_grpSetup" Header="Probe and stock" Grid.Row="0">
-            <Grid Margin="6">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="40"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+        <!-- Left: scrolling inputs on top, warnings/result + Generate/Run pinned at the bottom-left -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-                <!-- left column: probe + corner -->
-                <StackPanel Grid.Column="0" Grid.Row="0" Grid.RowSpan="4">
-                    <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <Label x:Uid="ls_lblProbe" Content="Probe:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name"/>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <GroupBox x:Uid="ls_grpSetup" Header="Probe and stock" Margin="0,0,8,0">
+                    <StackPanel Margin="6">
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <Label x:Uid="ls_lblProbe" Content="Probe:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
+                            <Label x:Uid="ls_lblCorner" Content="Stock corner:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <!-- laid out like the bed: back row on top, front row below -->
+                                <RadioButton x:Uid="ls_rbBL" x:Name="rbBL" Grid.Column="0" Grid.Row="0" Content="Back-left"   GroupName="corner" Margin="4,2"/>
+                                <RadioButton x:Uid="ls_rbBR" x:Name="rbBR" Grid.Column="1" Grid.Row="0" Content="Back-right"  GroupName="corner" Margin="4,2"/>
+                                <RadioButton x:Uid="ls_rbFL" x:Name="rbFL" Grid.Column="0" Grid.Row="1" Content="Front-left"  GroupName="corner" Margin="4,2" IsChecked="True"/>
+                                <RadioButton x:Uid="ls_rbFR" x:Name="rbFR" Grid.Column="1" Grid.Row="1" Content="Front-right" GroupName="corner" Margin="4,2"/>
+                            </Grid>
+                        </StackPanel>
+                        <cnccontrols:NumericField x:Name="fldWidth"  x:Uid="ls_width"  Label="Approx. width (X):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,6,0,2"/>
+                        <cnccontrols:NumericField x:Name="fldHeight" x:Uid="ls_height" Label="Approx. height (Y):" ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxWcs" Width="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
+                                <ComboBoxItem Content="G54"/>
+                                <ComboBoxItem Content="G55"/>
+                                <ComboBoxItem Content="G56"/>
+                                <ComboBoxItem Content="G57"/>
+                                <ComboBoxItem Content="G58"/>
+                                <ComboBoxItem Content="G59"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe far faces)" IsChecked="True" Margin="0,6,0,2" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
-                        <Label x:Uid="ls_lblCorner" Content="Stock corner:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <!-- laid out like the bed: back row on top, front row below -->
-                            <RadioButton x:Uid="ls_rbBL" x:Name="rbBL" Grid.Column="0" Grid.Row="0" Content="Back-left"   GroupName="corner" Margin="4,2"/>
-                            <RadioButton x:Uid="ls_rbBR" x:Name="rbBR" Grid.Column="1" Grid.Row="0" Content="Back-right"  GroupName="corner" Margin="4,2"/>
-                            <RadioButton x:Uid="ls_rbFL" x:Name="rbFL" Grid.Column="0" Grid.Row="1" Content="Front-left"  GroupName="corner" Margin="4,2" IsChecked="True"/>
-                            <RadioButton x:Uid="ls_rbFR" x:Name="rbFR" Grid.Column="1" Grid.Row="1" Content="Front-right" GroupName="corner" Margin="4,2"/>
-                        </Grid>
-                    </StackPanel>
-                </StackPanel>
+                </GroupBox>
+            </ScrollViewer>
 
-                <!-- right column: size + options -->
-                <StackPanel Grid.Column="2" Grid.Row="0" Grid.RowSpan="4">
-                    <cnccontrols:NumericField x:Name="fldWidth"  x:Uid="ls_width"  Label="Approx. width (X):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                    <cnccontrols:NumericField x:Name="fldHeight" x:Uid="ls_height" Label="Approx. height (Y):" ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="cbxWcs" Width="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
-                            <ComboBoxItem Content="G54"/>
-                            <ComboBoxItem Content="G55"/>
-                            <ComboBoxItem Content="G56"/>
-                            <ComboBoxItem Content="G57"/>
-                            <ComboBoxItem Content="G58"/>
-                            <ComboBoxItem Content="G59"/>
-                        </ComboBox>
-                    </StackPanel>
-                    <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe far faces)" IsChecked="True" Margin="124,4,0,2" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-
-        <!-- Generated program (local; editable before Run) -->
-        <GroupBox x:Uid="ls_grpProgram" Header="Probe program (generated locally - edit before running if needed)" Grid.Row="1" Margin="0,8,0,0">
-            <TextBox x:Name="txtProgram" FontFamily="Consolas" FontSize="12" AcceptsReturn="True" AcceptsTab="True"
-                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" IsReadOnly="False"
-                     VerticalContentAlignment="Top"/>
-        </GroupBox>
-
-        <!-- Footer: warning, result, actions -->
-        <Grid Grid.Row="2" Margin="0,8,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <!-- Warning + result + Generate/Run pinned at the bottom-left of the input column -->
+            <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="No 3D probe or edge finder defined. Add one in Machine Setup Wizard &gt; Probe definitions - Load stock needs horizontal probing."/>
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
-                <TextBlock x:Name="txtResult" FontWeight="SemiBold" Text="Measured stock:  X = -   Y = -"/>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" Width="90" MinHeight="26" Click="Generate_Click"/>
-                <Button x:Uid="ls_run" x:Name="btnRun" Content="Run" Width="90" MinHeight="26" Margin="8,0,0,0" Click="Run_Click"/>
+                <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+                    <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" Width="90" MinHeight="26" Click="Generate_Click"/>
+                    <Button x:Uid="ls_run" x:Name="btnRun" Content="Run" Width="90" MinHeight="26" Margin="8,0,0,0" Click="Run_Click"/>
+                    <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" Width="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
+                            ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
+                </StackPanel>
             </StackPanel>
         </Grid>
+
+        <!-- Right: stock drawing - a rectangle from the approximate size before measuring; the true probed
+             quad with the measured X/Y spans and each corner's interior angle once a measuring run completes. -->
+        <GroupBox x:Uid="ls_grpDrawing" Header="Stock" Grid.Column="1" Margin="8,0,0,0">
+            <Border x:Name="drawingHost" Background="White" SnapsToDevicePixels="True" SizeChanged="DrawingHost_SizeChanged"/>
+        </GroupBox>
     </Grid>
 </UserControl>
