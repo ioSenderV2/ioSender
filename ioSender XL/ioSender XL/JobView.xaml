@@ -68,17 +68,8 @@
         </Grid>
         <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,5,0,0">
             <cnccontrols:JobControl x:Name="GCodeSender" Margin="0,5,0,0" DockPanel.Dock="Bottom"/>
-            <TabControl x:Name="tabGCode" TabStripPlacement="Bottom" DockPanel.Dock="Top" >
-                <TabItem x:Uid="tab_program" Header="Program">
-                    <cnccontrols:GCodeListControl/>
-                </TabItem>
-                <TabItem x:Uid="tab_3DView" x:Name="tab3D" Header="3D View">
-                    <cncviewer:RenderControl x:Name="gcodeRenderer"/>
-                </TabItem>
-                <TabItem x:Uid="tab_console" x:Name="tabConsole" Header="Console">
-                    <cnccontrols:ConsoleControl/>
-                </TabItem>
-            </TabControl>
+            <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a). -->
+            <local:JobWorkspace x:Name="workspace" DockPanel.Dock="Top"/>
         </DockPanel>
     </DockPanel>
 </UserControl>

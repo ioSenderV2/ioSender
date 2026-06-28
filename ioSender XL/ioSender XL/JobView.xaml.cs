@@ -277,14 +277,14 @@ namespace GCode_Sender
                         if (filename.StartsWith("Wizard:"))
                         {
                             //MainWindow.EnableView(true, ViewType.GCodeViewer);
-                            gcodeRenderer.Open(GCode.File.Tokens);
+                            workspace.ShowToolpath();
                         }
                         else if (!string.IsNullOrEmpty(filename))
                         {
                             //MainWindow.GCodeViewer.Open(GCode.File.Tokens);
                             //MainWindow.EnableView(true, ViewType.GCodeViewer);
                             GCodeSender.EnablePolling(false);
-                            gcodeRenderer.Open(GCode.File.Tokens);
+                            workspace.ShowToolpath();
                             GCodeSender.EnablePolling(true);
                         }
                     }
@@ -416,7 +416,7 @@ namespace GCode_Sender
 
         public void CloseFile()
         {
-            gcodeRenderer.Close();
+            workspace.ClearToolpath();
         }
 
         public void Setup(UIViewModel model, AppConfig profile)
@@ -537,8 +537,7 @@ namespace GCode_Sender
 
             showProgramLimits();
 
-            if (!AppConfig.Settings.GCodeViewer.IsEnabled)
-                tabGCode.Items.Remove(tab3D);
+            workspace.Set3DViewEnabled(AppConfig.Settings.GCodeViewer.IsEnabled);
 
             if (GrblInfo.LatheModeEnabled)
                 MainWindow.EnableView(true, ViewType.LatheWizards);
