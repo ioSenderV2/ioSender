@@ -73,6 +73,7 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="AppConfig.cs" />
+    <Compile Include="ConfigStore.cs" />
     <Compile Include="AtcMacros.cs" />
     <Compile Include="ArcsToLines.cs" />
     <Compile Include="BasicConfigControl.xaml.cs">

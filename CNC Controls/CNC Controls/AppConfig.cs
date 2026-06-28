@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.IO;
+using System.Xml.Linq;
 using System.Xml.Serialization;
 using System.Windows;
 using System.Collections.ObjectModel;
@@ -395,8 +396,51 @@ namespace CNC.Controls
 
         private static readonly Lazy<AppConfig> settings = new Lazy<AppConfig>(() => new AppConfig());
 
+        // Set when a load migrated the on-disk format (legacy <Config> v1 -> sectioned <AppConfig> v2)
+        // or imported a legacy standalone file, so LoadConfig persists the converted form immediately.
+        private bool _migratedFormat = false;
+
+        // Full Config serializer for reading the legacy v1 (<Config>) file - nested objects included.
+        private static readonly XmlSerializer legacySerializer = new XmlSerializer(typeof(Config));
+
+        // Core-section serializer: the same Config type but with the carved-out nested objects omitted
+        // (they are written/read as their own <section>s). Built once - constructing an XmlSerializer with
+        // overrides generates a dynamic assembly each time, so it must be cached.
+        private static readonly XmlSerializer coreSerializer = BuildCoreSerializer();
+
+        private static XmlSerializer BuildCoreSerializer()
+        {
+            var ov = new XmlAttributeOverrides();
+            var ignore = new XmlAttributes { XmlIgnore = true };
+            foreach (var member in new[] { "Jog", "JogUiMetric", "JogUiImperial", "Lathe", "Camera", "GCodeViewer", "Probing" })
+                ov.Add(typeof(Config), member, ignore);
+            return new XmlSerializer(typeof(Config), ov);
+        }
+
+        private bool _sectionsRegistered = false;
+
+        // Register the built-in config sections (Core first, so it rebuilds Base before the nested
+        // sections assign into it). The nested sections delegate to Base.<X> so the AppConfig.Base.<X>
+        // facade keeps returning the same instances after the carve-out.
+        private void RegisterSections()
+        {
+            if (_sectionsRegistered)
+                return;
+            _sectionsRegistered = true;
+
+            ConfigStore.Register(new XmlObjectSection<Config>("Core", () => Base, v => Base = v, coreSerializer));
+            ConfigStore.Register(new XmlObjectSection<JogConfig>("Jog", () => Base.Jog, v => Base.Jog = v));
+            ConfigStore.Register(new XmlObjectSection<JogUIConfig>("JogUiMetric", () => Base.JogUiMetric, v => Base.JogUiMetric = v));
+            ConfigStore.Register(new XmlObjectSection<JogUIConfig>("JogUiImperial", () => Base.JogUiImperial, v => Base.JogUiImperial = v));
+            ConfigStore.Register(new XmlObjectSection<LatheConfig>("Lathe", () => Base.Lathe, v => Base.Lathe = v));
+            ConfigStore.Register(new XmlObjectSection<CameraConfig>("Camera", () => Base.Camera, v => Base.Camera = v));
+            ConfigStore.Register(new XmlObjectSection<GCodeViewerConfig>("GCodeViewer", () => Base.GCodeViewer, v => Base.GCodeViewer = v));
+            ConfigStore.Register(new XmlObjectSection<ProbeConfig>("Probing", () => Base.Probing, v => Base.Probing = v));
+        }
+
         private AppConfig()
         {
+            RegisterSections();
             Properties.Settings.Default.PropertyChanged += Default_PropertyChanged;
         }
 
@@ -441,7 +485,9 @@ namespace CNC.Controls
             if (Base == null)
                 Base = new Config();
 
-            XmlSerializer xs = new XmlSerializer(typeof(Config));
+            // Compose Core + the carved-out sections (plus any sections from features not in this
+            // build, preserved verbatim) into the single sectioned App.config document.
+            XDocument doc = ConfigStore.WriteDocument();
             string tmp = filename + ".tmp";
 
             try
@@ -452,7 +498,7 @@ namespace CNC.Controls
                 // leaves a 0-byte config - which is exactly how the real config got destroyed. With this,
                 // the live file is only ever replaced by a fully-written one.
                 using (FileStream fsout = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
-                    xs.Serialize(fsout, Base);   // any failure throws here, before the swap - live file untouched
+                    doc.Save(fsout);   // any failure throws here, before the swap - live file untouched
 
                 if (File.Exists(filename))
                 {
@@ -507,6 +553,8 @@ namespace CNC.Controls
             // interrupted save or a sync truncation can leave it empty - fall back to the rolling backup
             // Save() keeps. Recovering the last good copy avoids losing the user's settings AND the
             // destructive "create new?" prompt that a false "invalid" used to trigger.
+            _migratedFormat = false;
+
             if (TryLoad(filename))
                 return true;
 
@@ -529,7 +577,6 @@ namespace CNC.Controls
                 return false;
 
             bool ok = false;
-            XmlSerializer xs = new XmlSerializer(typeof(Config));
 
             // The file can be momentarily unreadable at startup - build output still flushing, sync/AV
             // holding it open, a previous instance closing, or a save still in flight - so retry a few
@@ -544,8 +591,28 @@ namespace CNC.Controls
                     if (new FileInfo(filename).Length == 0L)
                         throw new IOException("config file is empty");
 
+                    XDocument doc;
                     using (StreamReader reader = new StreamReader(filename))
-                        Base = (Config)xs.Deserialize(reader);
+                        doc = XDocument.Load(reader);
+
+                    if (ConfigStore.IsLegacy(doc))
+                    {
+                        // Legacy v1 (<Config>): deserialize the whole graph (nested objects included)
+                        // into Base, then flag a migrate-save so it is rewritten as sectioned v2.
+                        using (var r = doc.Root.CreateReader())
+                            Base = (Config)legacySerializer.Deserialize(r);
+                        _migratedFormat = true;
+                    }
+                    else
+                    {
+                        // v2 (<AppConfig>): the Core section rebuilds Base, the nested sections fill it
+                        // in, unowned sections are preserved, and absent sections may import a legacy file.
+                        ConfigStore.ReadDocument(doc);
+                        if (Base == null)
+                            Base = new Config();
+                        if (ConfigStore.MigratedOnLoad)
+                            _migratedFormat = true;
+                    }
                     configfile = filename;
 
                     // Drop any session-only macros that leaked into the saved file. Iterate a COPY:
@@ -702,6 +769,15 @@ namespace CNC.Controls
             Base.Themes.Add("Dark", LibStrings.FindResource("ThemeDark"));
             Base.Themes.Add("Light", LibStrings.FindResource("ThemeLight"));
             Base.Themes.Add("White", LibStrings.FindResource("ThemeWhite"));
+
+            // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
+            // standalone file: persist the converted form now so the stored config is canonical. The
+            // previous file is preserved as .bak by the atomic Save (recoverable on a downgrade).
+            if (_migratedFormat)
+            {
+                Save(CNC.Core.Resources.IniFile);
+                _migratedFormat = false;
+            }
 
             _startupPort = port;
             _startupBaud = baud;
