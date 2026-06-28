@@ -54,7 +54,7 @@
 <body>
 
 <h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &rarr; upstream <code>terjeio/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; 26 branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master) &nbsp;·&nbsp; all branches LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>none submitted upstream yet</strong> (staging document)</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>31 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;31 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is consumed wholesale or cherry-picked.</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
@@ -84,6 +84,14 @@
 <tr><td>Stepper calibration (scratch) tab &mdash; long-span V-bit steps/mm</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr5">5</a><span class="star">&#9733;</span></td></tr>
 <tr><td>Safe-Z on Go To &mdash; lift / traverse / descend instead of a diagonal rapid</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr23">23</a></td></tr>
 <tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
+<tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
+</table>
+
+<h3>Commissioning &amp; workflow tools</h3>
+<table>
+<tr><td>Surface Spoilboard &mdash; machine-referenced facing (Z-only touch-off, Reuse Z0, finish pass, leveling check)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr29">29</a></td></tr>
+<tr><td>Load Stock &mdash; corner-probe stock size/flatness/skew/thickness, results popup, Copy size &rarr; Fusion add-in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr30">30</a></td></tr>
+<tr><td>Squareness (Auto Square) &mdash; drill an L, measure, write the ganged-axis squaring offset + re-home</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr31">31</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -141,7 +149,11 @@
 <tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+804</span> <span class="del">-10</span></td></tr>
 <tr><td class="n">26</td><td><a href="#pr26">Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</a></td><td class="mono">pr/editable-predefined-offsets</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+21</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">27</td><td><a href="#pr27">Dialogs &mdash; center owner-less modal dialogs</a></td><td class="mono">pr/dialog-centering</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-2</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (27 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">196</span> <span class="del">0</span> <span class="add">+64</span><br><span class="k">Lines:</span> <span class="add">+18929</span> <span class="del">-1526</span></td></tr>
+<tr><td class="n">28</td><td><a href="#pr28">Machine Setup restructure + Tools tab + setup gate</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+237</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">29</td><td><a href="#pr29">Surface Spoilboard &mdash; machine-referenced facing tool</a></td><td class="mono">pr/surface-spoilboard</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+673</span> <span class="del">0</span></td></tr>
+<tr><td class="n">30</td><td><a href="#pr30">Load Stock &mdash; corner-probe stock measurement</a></td><td class="mono">pr/load-stock</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1125</span> <span class="del">0</span></td></tr>
+<tr><td class="n">31</td><td><a href="#pr31">Squareness (Auto Square) &mdash; ganged-gantry offset tool</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+686</span> <span class="del">0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (31 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">211</span> <span class="del">0</span> <span class="add">+77</span><br><span class="k">Lines:</span> <span class="add">+21650</span> <span class="del">-1547</span></td></tr>
 </table>
 </div>
 
@@ -1054,6 +1066,112 @@
   <li><strong>Owner + CenterOwner:</strong> each now sets <code>Owner</code> to the main window at the call site and <code>WindowStartupLocation=CenterOwner</code> + <code>ShowInTaskbar=False</code> in XAML, so they center over the client area and stay attached to the app &mdash; matching every other dialog in the sender.</li>
 </ul>
 <p class="foot">Builds clean off <code>master</code>. The other modal dialogs already set an owner; the owned-but-not-centered ones (g-code transform / importer dialogs) were left as-is for now.</p>
+</div>
+</div>
+
+<!-- ===== PR 28 ===== -->
+<div class="pr">
+<h2 id="pr28"><span class="badge">PR 28</span>Machine Setup restructure + Tools tab + guided setup gate</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (reworks shared tab hosting; not a standalone composable branch).</div>
+  <div><span class="label">Depends on</span>Builds on <a href="#pr21">PR 21</a> (Machine Setup Wizard) and <a href="#pr18">PR 18</a> (grbl:Settings).</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build (the tab hosting is shared across features, so it is not carved into its own branch).</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/ToolsView.xaml</td><td class="num add">33</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/ToolsView.xaml.cs</td><td class="num add">135</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">65</td><td class="num del">20</td></tr>
+<tr><td class="mono">CNC Controls/IGrblConfigTab.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Reorganises the top-level UI into a clearer commissioning flow.</p>
+<ul>
+  <li><strong>Settings &rarr; Grbl + App sub-tabs:</strong> the controller (<code>$</code>) settings and the sender&rsquo;s own preferences are split into two sub-tabs instead of one long page.</li>
+  <li><strong>New Machine Setup top-level tab:</strong> an overview plus six colour-coded step-tabs, with a startup <em>gate</em> that leads a new user to the first incomplete step (step 6 queries the controller filesystem via <code>AtcMacros.GetStatus</code> for macro status). Reworks the Machine Setup Wizard (<a href="#pr21">PR 21</a>) into the step-tab form.</li>
+  <li><strong>New Tools container:</strong> a single home (<code>ToolsView</code>) for the commissioning/tuning tools &mdash; Stepper calibration &amp; scratch, Surface Spoilboard (<a href="#pr29">PR 29</a>), Squareness (<a href="#pr31">PR 31</a>), Trinamic and PID &mdash; via the <code>IGrblConfigTab</code> contract; top-level Trinamic/PID dropped.</li>
+  <li><strong>Inline grids:</strong> a probe-definition grid (step 5) and a macro-status grid (step 6) surface state without leaving the wizard.</li>
+</ul>
+<p class="foot">In the integration build. The bulk of the wizard body lives in <a href="#pr21">PR 21</a>; this entry covers the hosting/restructure (Tools container + sub-tabs + gate). Localization CSVs for the new/renamed tabs are still pending.</p>
+</div>
+</div>
+
+<!-- ===== PR 29 ===== -->
+<div class="pr">
+<h2 id="pr29"><span class="badge">PR 29</span>Surface Spoilboard &mdash; machine-referenced facing tool</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/surface-spoilboard</code> (off <code>master</code>); the in-integration version uses the macro&rarr;job streamer + Tools tab.</div>
+  <div><span class="label">Depends on</span>Tools container (<a href="#pr28">PR 28</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>, integration).</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...stevenrwood:ioSender:pr/surface-spoilboard">https://github.com/stevenrwood/ioSender/compare/master...pr/surface-spoilboard</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/SurfaceSpoilboardWizard.xaml</td><td class="num add">84</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SurfaceSpoilboardWizard.xaml.cs</td><td class="num add">589</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Flattens the spoilboard with a boustrophedon raster, generated to the homed machine envelope.</p>
+<ul>
+  <li><strong>Machine-referenced:</strong> the operator touches off <em>Z only</em>; XY is referenced to the homed envelope (less an edge margin), so the raster can never overrun a soft limit no matter where Z was zeroed.</li>
+  <li><strong>High-point touch-off:</strong> jog anywhere to the board&rsquo;s highest point and set Z0 there; the cut still references XY to the machine corner automatically.</li>
+  <li><strong>Reuse Z0 + Finish pass + abbreviated perimeter Dry run:</strong> re-cut at the same Z0 (with a cutter/dust-boot prompt), reserve a light final pass, or trace just the perimeter to check extents.</li>
+  <li><strong>Outline = leveling check:</strong> pauses at each corner on the Z0 plane for a dial-gauge reading.</li>
+  <li>Runs through the flow-controlled job streamer (Feed Hold / Stop stay live).</li>
+</ul>
+<p class="foot">In the integration build; hardware-tested.</p>
+</div>
+</div>
+
+<!-- ===== PR 30 ===== -->
+<div class="pr">
+<h2 id="pr30"><span class="badge">PR 30</span>Load Stock &mdash; corner-probe stock measurement</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>pr/load-stock</code> (off <code>master</code>); the in-integration version uses the macro&rarr;job streamer.</div>
+  <div><span class="label">Depends on</span>ATC macros / <code>pcorner.macro</code> on LittleFS (<a href="#pr25">PR 25</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>) + probe definitions.</div>
+  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...stevenrwood:ioSender:pr/load-stock">https://github.com/stevenrwood/ioSender/compare/master...pr/load-stock</a></div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml</td><td class="num add">102</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml.cs</td><td class="num add">721</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MachineControlPanel.xaml(.cs)</td><td class="num add">63</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MachineControlWindow.xaml(.cs)</td><td class="num add">96</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">143</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Measures real stock by probing its corners, then sets the work origin and reports geometry.</p>
+<ul>
+  <li><strong>Corner probe via <code>pcorner.macro</code>:</strong> an inline grblHAL NGC program calls the controller-side corner-probe macro per corner; probe feeds come from the selected 3D probe definition (no hardcoded feeds).</li>
+  <li><strong>Outputs:</strong> XY footprint, per-corner Z (flatness), squareness (skew + diagonal &Delta;), and stock thickness (top &minus; spoilboard reference). A results popup draws the probed quad with corner angles.</li>
+  <li><strong>Copy size:</strong> one click puts <code>X Y Z</code> on the clipboard to paste into the Fusion <code>ioSenderBatchPost</code> add-in (<a href="#pr6">PR 6</a>) &mdash; round-trips the measured stock into the simulator <code>(STOCK)</code> line.</li>
+  <li><strong>Floating run-control panel</strong> (<code>MachineControlWindow</code>) so the probe run can be driven without leaving the tab.</li>
+</ul>
+<p class="foot">In the integration build; hardware-tested (427&times;427 mm stock).</p>
+</div>
+</div>
+
+<!-- ===== PR 31 ===== -->
+<div class="pr">
+<h2 id="pr31"><span class="badge">PR 31</span>Squareness (Auto Square) &mdash; ganged-gantry offset tool</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (hosted in the Tools container).</div>
+  <div><span class="label">Depends on</span>Tools container (<a href="#pr28">PR 28</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>).</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/AutoSquareWizard.xaml</td><td class="num add">97</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AutoSquareWizard.xaml.cs</td><td class="num add">589</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Facilitates Phil Barrett&rsquo;s auto-square <em>offset</em> method for a ganged, auto-squared gantry.</p>
+<ul>
+  <li><strong>Drill an L:</strong> peck-drills a reference L (corner + far-X + far-Y holes, at the framing-square arm lengths, centred on the bed with X/Y nudge to dodge dog/insert holes).</li>
+  <li><strong>Measure &amp; apply:</strong> register a framing square on the pins, enter the gap; the tool converts it (gap &divide; lever &times; rail span) to a squaring-offset change, writes <code>$170&ndash;$172</code> and re-homes.</li>
+  <li><strong>Ganged-axis selector:</strong> grblHAL reports the offset for all of <code>$170&ndash;$172</code> but only the ganged axis accepts a write &mdash; the selector targets the right one.</li>
+  <li><strong>Measure-only gauge:</strong> on a build without the offset setting it still drills + measures to show how far out of square the gantry is (correct mechanically). Dry run + Reuse Z0.</li>
+</ul>
+<p class="foot">In the integration build. Note: the squaring offset is fine-trim only &mdash; a grossly racked gantry must be corrected mechanically first.</p>
 </div>
 </div>
 
