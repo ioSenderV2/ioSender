@@ -10,9 +10,9 @@
         <local:LogicalNotConverter x:Key="BooleanConverter" />
     </UserControl.Resources>
     <GroupBox x:Uid="grp_mdi" x:Name="grpMDI" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Header="MDI" Margin="0,0" HorizontalAlignment="Center" VerticalAlignment="Top">
-        <StackPanel Orientation="Horizontal">
+        <DockPanel>
+            <Button x:Uid="btn_send" x:Name="btnSend" DockPanel.Dock="Right" Command="{Binding MDICommand}" CommandParameter="{Binding Path=Command, RelativeSource={RelativeSource AncestorType=UserControl}}" Content="Send" Focusable="False" HorizontalAlignment="Right" Margin="3,0" VerticalAlignment="Center" Width="50" Height="22" Click="Send_Click"/>
             <ComboBox x:Name="txtMDI" x:Uid="cbo_mdi" ToolTip="Enter a G-code command (MDI block) and press Enter or Send to run it on the controller. Use Up/Down to recall recent commands." IsEditable="True" ItemsSource="{Binding MDIHistory}" SelectedItem="{Binding Path=Command, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Text="{Binding Path=Command, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" IsTextSearchEnabled="False" HorizontalAlignment="Left" Height="22" Margin="3,0" VerticalAlignment="Center" Width="375" SelectionChanged="txtMDI_SelectionChanged" KeyDown="txtMDI_KeyDown" Loaded="MDIControl_Loaded"/>
-            <Button x:Uid="btn_send" Command="{Binding MDICommand}" CommandParameter="{Binding Path=Command, RelativeSource={RelativeSource AncestorType=UserControl}}" Content="Send" Focusable="False" Grid.Column="1" HorizontalAlignment="Right" Margin="3,0" VerticalAlignment="Center" Width="50" Height="22" Click="Send_Click"/>
-        </StackPanel>
+        </DockPanel>
     </GroupBox>
 </UserControl>
