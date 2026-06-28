@@ -6,6 +6,7 @@
  * IGrblConfigTab. The selected child is activated either way (mirrors GrblConfigView).
  */
 
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
@@ -17,6 +18,39 @@ namespace CNC.Controls
         public ToolsView()
         {
             InitializeComponent();
+            RegisterTools();
+            BuildTools();
+        }
+
+        // Register the built-in tools as placeable components. Adding a new tool is a Register call from
+        // its own code + a node in the default layout's Tools slot - no edit to this view's markup.
+        private static void RegisterTools()
+        {
+            ComponentRegistry.Register(LayoutKeys.ToolTable, "Tool table", () => new ToolView());
+            ComponentRegistry.Register(LayoutKeys.StepperCal, "Stepper calibration", () => new StepperCalibrationWizard());
+            ComponentRegistry.Register(LayoutKeys.StepperScratch, "Stepper calibration (scratch)", () => new StepperCalibrationScratchWizard());
+            ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, "Surface spoilboard", () => new SurfaceSpoilboardWizard());
+            ComponentRegistry.Register(LayoutKeys.Squareness, "Squareness", () => new AutoSquareWizard());
+            ComponentRegistry.Register(LayoutKeys.Trinamic, "Trinamic tuner", () => new TrinamicView());
+            ComponentRegistry.Register(LayoutKeys.PID, "PID Tuner", () => new PIDLogView());
+        }
+
+        // Build the sub-tabs from the layout tree's Tools/"tools" slot (order = tree order).
+        private void BuildTools()
+        {
+            var toolsNode = LayoutTree.Flatten(AppConfig.Settings.Layout).FirstOrDefault(n => n.Component == LayoutKeys.Tools);
+            var slot = toolsNode?.Slot(LayoutKeys.SlotTools);
+            if (slot == null)
+                return;
+
+            tabTools.Items.Clear();
+            foreach (var node in slot.Items)
+            {
+                var d = ComponentRegistry.Get(node.Component);
+                var ctl = d?.Create?.Invoke();
+                if (ctl != null)
+                    tabTools.Items.Add(new TabItem { Header = d.Label, Content = ctl });
+            }
         }
 
         #region ICNCView
@@ -117,8 +151,9 @@ namespace CNC.Controls
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             // No controller tool table -> drop the (empty) Tool table sub-tab; the rest of the hub still applies.
-            if (GrblInfo.NumTools == 0 && tabToolTable != null)
-                tabTools.Items.Remove(tabToolTable);
+            if (GrblInfo.NumTools == 0)
+                foreach (TabItem t in UIUtils.FindLogicalChildren<TabItem>(tabTools))
+                    if (t.Content is ToolView) { tabTools.Items.Remove(t); break; }
 
             if (string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
                 RemoveTab(GrblConfigType.Trinamic);
