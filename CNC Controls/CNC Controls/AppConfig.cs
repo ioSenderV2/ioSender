@@ -907,10 +907,16 @@ namespace CNC.Controls
 
                     if (MPGactive == true)
                     {
-                        if (model.IsMPGActive != true && model.AutoReportingEnabled)
+                        // Window 1 only saw *some* unsolicited traffic; window 2 just pulled a fresh full status
+                        // report, so model.IsMPGActive now reflects the controller's authoritative MPG state. If no
+                        // pendant actually has control, this was a reconnect / auto-report / burst false positive -
+                        // proceed and do NOT raise the dialog (which would otherwise wait forever for a "pendant
+                        // released" event that can never come, since there is no pendant). Turn off auto-reporting
+                        // if that was the source so it stops tripping detection.
+                        if (model.IsMPGActive != true)
                         {
                             MPGactive = false;
-                            if (model.AutoReportInterval > 0)
+                            if (model.AutoReportingEnabled && model.AutoReportInterval > 0)
                             {
                                 model.AutoReportingEnabled = false;
                                 Comms.com.WriteByte(GrblConstants.CMD_AUTO_REPORTING_TOGGLE);

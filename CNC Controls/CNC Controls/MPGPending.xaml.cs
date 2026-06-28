@@ -57,6 +57,22 @@ namespace CNC.Controls
 
         public bool Cancelled { get; private set; } = true;
 
+        // Take control / ignore the detection and proceed without disconnecting. The escape for a false
+        // positive (no real pendant): the dialog would otherwise wait forever for a "pendant released"
+        // report that can never come. Does NOT close comms, so it can never block the UI.
+        private void btnContinue_Click(object sender, RoutedEventArgs e)
+        {
+            Cancelled = false;
+            Close();
+        }
+
+        // Explicit disconnect (also the Esc / window-close behaviour) - Window_Closing tears down comms.
+        private void btnDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            Cancelled = true;
+            Close();
+        }
+
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (Cancelled)
