@@ -272,6 +272,41 @@ riskiest and benefits from 0–2 being done first.
 
 ---
 
+## 7a. Phase 2 — detailed plan (from the JobView/JobControl map, 2026-06-28)
+
+**Current center composition** (`ioSender XL/JobView.xaml`): a `DockPanel` with `JobControl`
+(`x:Name=GCodeSender`) docked bottom and `tabGCode` (TabControl) filling the rest, holding three
+TabItems — Program (`GCodeListControl`), 3D View (`RenderControl gcodeRenderer`, `tab3D`),
+Console (`ConsoleControl`). The three center controls are already independent UserControls; only
+JobView's code-behind reaches into them.
+
+**JobControl reality:** ~1330 lines — the streaming state machine (flow control, block tracking,
+tool-change/probe handling, keyboard shortcuts, job timer) + a 4-button bar. "JobControl as
+container" = compose around it, not rewrite it. Public surface JobView/MainWindow call:
+`Activate(bool)`, `EnablePolling(bool)`, `CallHandler(StreamingState,bool)`, `RewindFile()`,
+`CycleStart(int)`, `SendRTCommand(string)`, `StreamingStateChanged` event, the four `Is*Enabled` DPs.
+
+**The 6 coupling points to untangle** (JobView.xaml.cs → center):
+1. `gcodeRenderer.Open(GCode.File.Tokens)` on FileName change (L280/287) — JobView pushes tokens.
+2. `GCodeSender.EnablePolling(false/true)` around the render (L286/288).
+3. `gcodeRenderer.Close()` in CloseFile (L419).
+4. `tabGCode.Items.Remove(tab3D)` when GCodeViewer disabled (L541).
+5. `GCodeSender.Activate()` then `showProgramLimits()` ordering (L407-408).
+6. `GCodeSender.Focus()` on visible (L605).
+
+**Increment plan (each independently buildable; UI is invasive, so go one at a time + verify):**
+- **2a. Extract `JobWorkspace` UserControl** = the `tabGCode` (Program/3D/Console) tree, owning
+  coupling points 1,3,4 internally (it observes the model's FileName / `GCode.File` itself and
+  manages its own 3D-tab visibility). Exposes a small surface for 2,5,6. JobView hosts
+  `<local:JobWorkspace/>` + `JobControl` below; JobView code-behind shrinks to coordination.
+- **2b. Configurable placement** — hierarchical `LayoutNode` slot tree replacing the four flat CSV
+  lists; migrate CSVs → default tree once. (Editor UI deferred per §8a.)
+- **2c. JobControl-as-container option** — JobControl optionally hosts the program view directly
+  (the user's "run controls + optional program view"), 3D/Console as peers.
+
+Hard part remains the `GCode.File` static (program data); fully decoupling it is **Phase 3**
+(`IProgramSource`). Phase 2 keeps reading the static — it only moves *who hosts* the controls.
+
 ## 8a. Decisions (2026-06-28)
 - **Streaming invariant:** exactly one *streaming* program at a time (one machine); many
   *viewable* programs allowed. Adopted as a hard invariant — simplifies JobControl ownership.
