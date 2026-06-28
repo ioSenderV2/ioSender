@@ -211,64 +211,6 @@ def _stock_dims_mm(cam):
     return None
 
 
-def _set_choice(param, candidates):
-    """Best-effort set of a CAM choice parameter to the first candidate id that takes.
-    Choice params don't use numeric expressions; try .value.value first, then an expression."""
-    if param is None:
-        return False
-    for c in candidates:
-        try:
-            param.value.value = c
-            return True
-        except Exception:
-            pass
-    for c in candidates:
-        try:
-            param.expression = "'%s'" % c
-            return True
-        except Exception:
-            pass
-    return False
-
-
-def _apply_measured_stock(cam, x_mm, y_mm, z_mm):
-    """Set EVERY setup's stock to a fixed-size box of the given mm dimensions (z_mm may be
-    None to leave Z alone). Returns (count_set, errors). Best-effort: the stock-mode choice id
-    has varied across Fusion versions, so if the mode can't be switched we still write the X/Y/Z
-    (which takes effect when the setup is already 'Fixed size box')."""
-    count = 0
-    errors = []
-    for i in range(cam.setups.count):
-        setup = cam.setups.item(i)
-        try:
-            prm = setup.parameters
-
-            def _set(name, expr):
-                p = prm.itemByName(name)
-                if p is None:
-                    return False
-                p.expression = expr
-                return True
-
-            # Switch to fixed-size box stock so the dimensions below are honoured.
-            _set_choice(prm.itemByName('job_stockMode'),
-                        ['fixedbox', 'fixed size box', 'fixedsizebox', 'fixed'])
-
-            okx = _set('job_stockFixedX', '%g mm' % x_mm)
-            oky = _set('job_stockFixedY', '%g mm' % y_mm)
-            if z_mm is not None:
-                _set('job_stockFixedZ', '%g mm' % z_mm)
-
-            if okx and oky:
-                count += 1
-            else:
-                errors.append("%s: couldn't find job_stockFixedX/Y - set the setup's Stock mode to "
-                              "'Fixed size box' once, then re-run" % setup.name)
-        except Exception as ex:
-            errors.append('%s: %s' % (setup.name, ex))
-    return count, errors
-
-
 def _format_tool_diameter(d_mm):
     """Diameter as a compact decimal keeping >=1 decimal place (6.35, 12.7, 1.0)."""
     s = ('%.3f' % d_mm).rstrip('0')
@@ -332,8 +274,10 @@ def _default_output_folder(app):
         return os.path.expanduser('~/Downloads')
 
 
-def _post_all(folder, post_file, write_tool_table=True):
+def _post_all(folder, post_file, write_tool_table=True, stock_override=None):
     """Post every operation to <folder> with <post_file>.
+
+    stock_override (x, y, z mm; z may be None) replaces the setup stock for the (STOCK) line only.
 
     Returns (posted, total, failures, table_info) where table_info is None or
     {'path', 'tools', 'stock'} describing the 0_tooltable.nc that was written.
@@ -348,6 +292,12 @@ def _post_all(folder, post_file, write_tool_table=True):
         raise RuntimeError('This Manufacture document has no setups.')
 
     os.makedirs(folder, exist_ok=True)
+
+    log = ['ioSenderBatchPost',
+           'post: %s' % post_file,
+           'post exists: %s' % os.path.isfile(post_file),
+           'folder: %s' % folder,
+           'setups: %d' % cam.setups.count]
 
     total = 0
     failures = []
@@ -371,6 +321,7 @@ def _post_all(folder, post_file, write_tool_table=True):
 
             if not _ensure_toolpath(cam, op):
                 failures.append('%s: toolpath generation failed' % display_name)
+                log.append('SKIP %s: no valid toolpath' % display_name)
                 continue
 
             program = _safe_filename('%d_%s_T%d' % (total, display_name, tool_number))
@@ -386,15 +337,36 @@ def _post_all(folder, post_file, write_tool_table=True):
                 ok = cam.postProcess(op, post_input)
             except Exception as ex:
                 failures.append('%s: postProcess raised: %s' % (display_name, ex))
+                log.append('FAIL %s: postProcess raised: %s' % (display_name, ex))
                 continue
             if not ok:
                 failures.append('%s: postProcess returned False' % display_name)
+                log.append('FAIL %s: postProcess returned False' % display_name)
+            else:
+                outnc = os.path.join(folder, program + '.nc')
+                nbytes = os.path.getsize(outnc) if os.path.exists(outnc) else -1
+                log.append('OK   %s -> %s.nc (%d bytes)' % (display_name, program, nbytes))
 
     table_info = None
     if write_tool_table and tools:
+        # Measured-stock override (pasted from ioSender Load Stock) wins for the (STOCK) line; else read the
+        # setup's stock box. We DO NOT change Fusion's CAM stock - resizing it forces a toolpath regenerate
+        # against the new box and can post operations with no motion (tool changes only).
         stock = _stock_dims_mm(cam)
+        if stock_override:
+            ox, oy, oz = stock_override
+            if oz is None:
+                oz = stock[2] if stock else 0
+            stock = (ox, oy, oz)
         path = _write_tool_table(folder, stock, tools)
         table_info = {'path': path, 'tools': len(tools), 'stock': stock}
+
+    log.append('posted %d of %d, failures %d' % (total - len(failures), total, len(failures)))
+    try:
+        with open(os.path.join(folder, '_batchpost.log'), 'w', newline='\n') as f:
+            f.write('\n'.join(log) + '\n')
+    except Exception:
+        pass
 
     return total - len(failures), total, failures, table_info
 
@@ -426,31 +398,23 @@ class ExecuteHandler(adsk.core.CommandEventHandler):
             if tt is not None:
                 write_tt = bool(tt.value)
 
-            # Optional: apply pasted measured stock (from ioSender Load Stock) to every setup before posting.
-            stock_applied = None
+            # Optional measured stock (pasted from ioSender Load Stock, "X Y [Z]") - used ONLY for the (STOCK)
+            # line in the tool table (the simulator block). We do NOT alter Fusion's CAM stock: resizing it
+            # forces a toolpath regenerate against the new box and can post operations with no motion.
+            stock_override = None
             stock_field = (inputs.itemById('measuredStock').value or '').strip()
             if stock_field:
                 nums = re.findall(r'[-+]?\d+(?:\.\d+)?', stock_field)
                 if len(nums) < 2:
                     ui.messageBox('Measured stock needs at least X and Y (e.g. "428 428 19").\n'
-                                  'Leave it blank to keep the current stock.', CMD_NAME)
+                                  'Leave it blank to use the setup stock.', CMD_NAME)
                     return
-                x_mm, y_mm = float(nums[0]), float(nums[1])
-                z_mm = float(nums[2]) if len(nums) >= 3 else None
-                cam0 = adsk.cam.CAM.cast(app.activeProduct)
-                if cam0:
-                    n_set, stock_errs = _apply_measured_stock(cam0, x_mm, y_mm, z_mm)
-                    stock_applied = (n_set, (x_mm, y_mm, z_mm), stock_errs)
+                stock_override = (float(nums[0]), float(nums[1]),
+                                  float(nums[2]) if len(nums) >= 3 else None)
 
-            posted, total, failures, table_info = _post_all(folder, post_file, write_tt)
+            posted, total, failures, table_info = _post_all(folder, post_file, write_tt, stock_override)
 
             msg = 'Posted %d of %d operation(s) to:\n%s' % (posted, total, folder)
-            if stock_applied:
-                n_set, (sx, sy, sz), stock_errs = stock_applied
-                zpart = (' x %s' % _fmt(sz)) if sz is not None else ''
-                msg += '\n\nSet stock on %d setup(s) to %s x %s%s mm.' % (n_set, _fmt(sx), _fmt(sy), zpart)
-                if stock_errs:
-                    msg += '\n  ' + '\n  '.join(stock_errs)
             if table_info:
                 if table_info['stock']:
                     sx, sy, sz = table_info['stock']
@@ -477,11 +441,11 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
 
             inputs.addStringValueInput('outputFolder', 'Output folder', _default_output_folder(app))
 
-            # Paste ioSender Load Stock's measured size here ("X Y" or "X Y Z" mm - use its Copy size
-            # button). When set, every setup's stock is changed to a fixed-size box of these dimensions
-            # before posting, so the toolpaths are regenerated against the real measured stock. Blank =
-            # leave the current stock untouched.
-            inputs.addStringValueInput('measuredStock', 'Measured stock X Y [Z] (mm)', '')
+            # Paste ioSender Load Stock's measured size here ("X Y" or "X Y Z" mm - use its Copy size button).
+            # When set, it is written to the (STOCK ...) line in 0_ToolTable.nc (the grblHAL simulator's block)
+            # in place of the setup stock. It does NOT change Fusion's CAM stock (that would force a toolpath
+            # regenerate and can post empty operations). Blank = use the setup's stock for (STOCK).
+            inputs.addStringValueInput('measuredStock', 'Measured stock X Y [Z] (mm) -> sim (STOCK)', '')
 
             # Post-processor dropdown, defaulting to grbl.cps. The choice doesn't affect
             # behaviour (ioSender handles files with or without M6) - it's just which post
@@ -507,10 +471,9 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
                 'The tool table writes a 0_tooltable.nc with (STOCK ...) and (TOOL ...) comments '
                 '(stock size + each tool\'s diameter/shape) for the grblHAL simulator\'s 3D carve. '
                 'Harmless on real machines.<br/><br/>'
-                'Measured stock: paste the size from ioSender Load Stock (its Copy size button) to set every '
-                'setup to a fixed-size box of those dimensions before posting - so toolpaths regenerate '
-                'against the real stock. Leave blank to keep the current stock. The setup\'s Stock mode must '
-                'be \'Fixed size box\' for the dimensions to take.',
+                'Measured stock: paste the size from ioSender Load Stock (its Copy size button) - it replaces the '
+                '(STOCK ...) line written for the grblHAL simulator with the real measured size. It does NOT '
+                'change Fusion\'s CAM stock or your toolpaths. Leave blank to use the setup\'s stock.',
                 5, True)
 
             onExecute = ExecuteHandler()

@@ -284,13 +284,24 @@ namespace GCode_Sender
                     pinnedFlyouts.Add(flyout);
             }
 
-            // Show pinned flyouts only after the window/sidebar canvas has laid out - setting Visibility inline
-            // during setup did not stick (they stayed closed on launch).
+            // Reopen pinned flyouts on launch. Setting Visibility inline (or even at Loaded priority) did not
+            // stick - the rest of CompleteStartup (tab select, connect, view Activate) runs right after and the
+            // flyouts stayed closed. A one-shot timer asserts it once startup has settled, so it survives any
+            // post-layout reset.
             if (pinnedFlyouts.Count > 0)
-                Dispatcher.BeginInvoke(new System.Action(() => {
+            {
+                var showPinned = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = System.TimeSpan.FromMilliseconds(400)
+                };
+                showPinned.Tick += (s, e) =>
+                {
+                    showPinned.Stop();
                     foreach (var f in pinnedFlyouts)
                         f.Visibility = Visibility.Visible;
-                }), System.Windows.Threading.DispatcherPriority.Loaded);
+                };
+                showPinned.Start();
+            }
 
             UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
             if (connected)
