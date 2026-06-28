@@ -149,8 +149,8 @@
                 <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
             </StatusBarItem>
         </StatusBar>
-        <!-- Single, always-visible machine-control cluster (Phase 2c) - replaces the floating
-             MachineControlWindow and the Grbl-tab's lower-left controls. Signals + Status (state/check +
+        <!-- Single, always-visible machine-control cluster (Phase 2c) - replaced the former floating
+             run-control window and the Grbl-tab's lower-left controls. Signals + Status (state/check +
              Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop / Rewind) +
              Feed/rapid override + MDI. Docked just above the status bar, full width, present on every tab so
              Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
