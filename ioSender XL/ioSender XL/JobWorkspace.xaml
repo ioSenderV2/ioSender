@@ -13,7 +13,14 @@
          ConsoleControl uses the inherited GrblViewModel DataContext. -->
     <TabControl x:Name="tabGCode" TabStripPlacement="Bottom">
         <TabItem x:Uid="tab_program" Header="Program">
-            <cnccontrols:GCodeListControl/>
+            <DockPanel>
+                <!-- Title = program source (file path / folder name / tool name). -->
+                <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
+                    <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                </Border>
+                <cnccontrols:GCodeListControl/>
+            </DockPanel>
         </TabItem>
         <TabItem x:Uid="tab_3DView" x:Name="tab3D" Header="3D View">
             <cncviewer:RenderControl x:Name="gcodeRenderer"/>

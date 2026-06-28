@@ -141,6 +141,58 @@ namespace GCode_Sender
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
             AttachBasePropertyChangedHandler();
+            WireBarOverlays();
+        }
+
+        // ---- bottom-bar overlays: program view (toggle) and/or console log (on command-box focus) ----
+        private bool _programOverlay = false, _consoleOverlay = false;
+
+        private void WireBarOverlays()
+        {
+            // Console log overlay follows the command box: appears when it gets focus, dismisses once focus
+            // leaves BOTH the box and the log (so you can scroll/select/copy from the log), or on Esc.
+            mdiControl.GotKeyboardFocus += (s, e) => { _consoleOverlay = true; UpdateOverlay(); };
+            mdiControl.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            overlayConsole.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
+            overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
+        }
+
+        private void ConsoleOverlay_Key(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape && _consoleOverlay)
+            {
+                _consoleOverlay = false;
+                UpdateOverlay();
+                e.Handled = true;
+            }
+        }
+
+        private void ScheduleConsoleOverlayCheck()
+        {
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                if (!mdiControl.IsKeyboardFocusWithin && !overlayConsole.IsKeyboardFocusWithin)
+                {
+                    _consoleOverlay = false;
+                    UpdateOverlay();
+                }
+            }), DispatcherPriority.Input);
+        }
+
+        private void ProgramView_Toggled(object sender, RoutedEventArgs e)
+        {
+            _programOverlay = btnProgramView.IsChecked == true;
+            UpdateOverlay();
+        }
+
+        // Program view and console log share one overlay over the work area, side by side. Each column is
+        // shown (and given equal width) only when its trigger is active; the host collapses when neither is.
+        private void UpdateOverlay()
+        {
+            // Program view (right) and console log (above the command box) are independent overlays.
+            overlayProgram.Visibility = _programOverlay ? Visibility.Visible : Visibility.Collapsed;
+            overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
@@ -824,18 +876,26 @@ namespace GCode_Sender
 
         private void TabMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // SelectionChanged bubbles - ignore it unless it's the TabControl's OWN tab change (a child
+            // combobox, e.g. the 3D viewer's render-mode dropdown, raises it too with non-TabItem items).
+            if (!Equals(e.OriginalSource, sender) || e.AddedItems.Count != 1)
+                return;
+
+            ICNCView nextView = getView((TabItem)e.AddedItems[0]);
+
+            // The sidebar flyouts only act on the Job tab, so only show them when it's selected (done
+            // regardless of IsReady so it tracks tab changes before a controller is connected too).
+            sidebarCanvas.Visibility = nextView != null && nextView.ViewType == ViewType.GRBL ? Visibility.Visible : Visibility.Collapsed;
+
             if (!(DataContext as GrblViewModel).IsReady)
                 return;
 
-            if (Equals(e.OriginalSource, sender) && UIViewModel.CurrentView != null && e.AddedItems.Count == 1)
+            if (UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
             {
-                ICNCView prevView = UIViewModel.CurrentView, nextView = getView((TabItem)e.AddedItems[0]);
-                if (nextView != null && nextView != UIViewModel.CurrentView)
-                {
-                    UIViewModel.CurrentView = nextView;
-                    prevView.Activate(false, nextView.ViewType);
-                    nextView.Activate(true, prevView.ViewType);
-                }
+                ICNCView prevView = UIViewModel.CurrentView;
+                UIViewModel.CurrentView = nextView;
+                prevView.Activate(false, nextView.ViewType);
+                nextView.Activate(true, prevView.ViewType);
             }
         }
 
@@ -910,7 +970,7 @@ namespace GCode_Sender
         // registered-tab localization is designed).
         private void RegisterBuiltinTabs()
         {
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Grbl", () => new JobView(), 10, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Job", () => new JobView(), 10, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, "Load stock", () => new LoadStockView(), 20, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));

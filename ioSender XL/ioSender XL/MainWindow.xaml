@@ -178,6 +178,7 @@
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
                         <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Center"/>
                         <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Center" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                     </StackPanel>
                 </Grid>
                 <!-- Middle: signal indicators (flush to top, enlarged to use the spare width) + current feed
@@ -216,7 +217,8 @@
             <cnccontrols:MachinePositionFlyout x:Name="mposFlyout" Visibility="Hidden" Canvas.Right="22"/>
             <cnccontrols:THCMonitorControl x:Name="thcControl" Visibility="Hidden" Canvas.Right="22"/>
         </Canvas>
-        <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" DockPanel.Dock="Left" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
+        <Grid DockPanel.Dock="Left">
+        <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
             <TabControl.Resources>
                 <Style TargetType="{x:Type TabItem}">
                     <Setter Property="Height" Value="32" />
@@ -226,5 +228,25 @@
             <!-- Tabs are built in code from TabRegistry (Phase 1: MainWindow is a container).
                  See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
         </TabControl>
+        <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
+        <!-- Program view always pops on the RIGHT. -->
+        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="560" Margin="0,60,0,0"
+                Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
+            <DockPanel>
+                <!-- Title = program source (file path / folder name / tool name). -->
+                <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
+                    <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                </Border>
+                <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
+            </DockPanel>
+        </Border>
+        <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->
+        <Border x:Name="overlayConsole" HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="300" Margin="6,0,0,0"
+                Width="{Binding ElementName=mdiControl, Path=ActualWidth}"
+                Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
+            <cnccontrols:ConsoleControl x:Name="overlayConsoleView" LogOnly="True"/>
+        </Border>
+        </Grid>
     </DockPanel>
 </Window>

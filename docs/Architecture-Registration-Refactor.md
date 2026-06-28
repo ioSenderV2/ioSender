@@ -204,6 +204,16 @@ Controls bind to `ctx.Program` / `ctx.Machine` instead of reaching for `GCode.Fi
 `AppConfig.Settings.*` statics. Default wiring passes the **active job program**, so existing
 behavior is preserved; passing a *different* `IProgramSource` is what unlocks multi-instance.
 
+### 4b-bis. Program-view title + active-for-streaming selection (user direction 2026-06-28)
+Every program view shows a **title = its source**: a file path, a folder name, or a tool name
+(`model.FileName`, set via `GCodeJob.AddBlock(name, New)` -> `FileChanged` — file path on load, folder
+name on Load Folder, `"Wizard: …"` for lathe wizards, the `MacroProcessor` `_streamName` e.g. "Surface
+Spoilboard"/"Load stock"/"Auto square" for generated cuts). Pre-Phase-3 all views share the single
+`GCode.File`, so the title is the same everywhere and there is exactly one streamable program. In Phase 3
+(`IProgramSource`, multiple programs), each view shows ITS program's source title **plus an
+active/streaming badge**, and non-active views get a **"Make active"** action; the title bar is where that
+lives. Invariant: exactly one active program (the one the bottom JobControl streams).
+
 ### 4c. "Active program" vs "a program"
 Multi-instance forces an explicit concept that's implicit today:
 - The **active job program** is the one a primary `JobControl` streams.
@@ -301,8 +311,14 @@ container" = compose around it, not rewrite it. Public surface JobView/MainWindo
   `<local:JobWorkspace/>` + `JobControl` below; JobView code-behind shrinks to coordination.
 - **2b. Configurable placement** — hierarchical `LayoutNode` slot tree replacing the four flat CSV
   lists; migrate CSVs → default tree once. (Editor UI deferred per §8a.)
-- **2c. JobControl-as-container option** — JobControl optionally hosts the program view directly
-  (the user's "run controls + optional program view"), 3D/Console as peers.
+- **2c. Single fixed Run Control + relocatable program view** (user direction 2026-06-28):
+  - **One** JobControl, **fixed across the main-window bottom** (always visible on every tab) -
+    move it out of JobView; JobView and other tabs reach it via a shared accessor
+    (e.g. `MainWindow.ui.RunControl`). **Retire the floating `MachineControlWindow`** (RunControlPanel/
+    RunStreamedJob target the fixed bar). Closes the earlier safety hole: Feed Hold/Stop always reachable
+    regardless of tab. Honors the one-streaming-program invariant (one control streams the active program).
+  - **Program view** (`GCodeListControl`) becomes a freely-placeable component (`Key="Program"`): its own
+    top-level tab OR a panel inside a tab - the layout tree + slot kind decide, no special-casing.
 
 Hard part remains the `GCode.File` static (program data); fully decoupling it is **Phase 3**
 (`IProgramSource`). Phase 2 keeps reading the static — it only moves *who hosts* the controls.

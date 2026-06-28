@@ -50,7 +50,7 @@ namespace CNC.Core
     public class GrblViewModel : MeasureViewModel
     {
         private string _tool, _probe, _message, _WPos, _MPos, _wco, _wcs, _a, _fs, _ov, _pn, _sc, _sd, _fans, _d, _gc, _h, _thcv, _thcs, _spindle;
-        private string _mdiCommand, _mdiText, _fileName, _fsCwd;
+        private string _mdiCommand, _mdiText, _fileName, _fsCwd, _programPath;
         private string[] _rtState = new string[3];
         private bool has_wco = false, _hasFans = false, _multiProbe = false;
         private SDState _sdMounted = SDState.Unmounted;
@@ -203,7 +203,7 @@ namespace CNC.Core
 
         public void Clear()
         {
-            _fileName = _mdiCommand = _mdiText = string.Empty;
+            _fileName = _mdiCommand = _mdiText = _programPath = string.Empty;
             _streamingState = StreamingState.NoFile;
             _isMPos = _reset = _isJobRunning = _isProbeSuccess = _pgmEnd = _isTloRefSet = false;
             _feedOverrideDisabled = _rpmOverrideDisabled = _feedHoldDisabled = false;
@@ -626,6 +626,9 @@ namespace CNC.Core
         public EnumFlags<Signals> OptionalSignals { get; set; } = new EnumFlags<Signals>(Core.Signals.Off);
         public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
         public string FileName { get { return _fileName; } set { _fileName = value; SDRewind = false; OnPropertyChanged(); OnPropertyChanged(nameof(IsFileLoaded)); OnPropertyChanged(nameof(IsPhysicalFileLoaded)); } }
+        // Full source path for display tooltips: the file path for a single file, the full folder path for a
+        // Load-Folder program, or the tool/wizard name for a generated program (no on-disk path). Set in GCode.
+        public string ProgramPath { get { return _programPath; } set { _programPath = value; OnPropertyChanged(); } }
         public bool IsSDCardJob { get { return FileName.StartsWith("SDCard:"); } }
         public bool SDRewind { get; set; }
         public bool IsFileLoaded { get { return _fileName != string.Empty; } }

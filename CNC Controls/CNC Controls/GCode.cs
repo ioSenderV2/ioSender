@@ -99,6 +99,9 @@ namespace CNC.Controls
                 }
 
                 Model.FileName = filename;
+                // Default the source path to the name; LoadFolder overrides it with the full folder path,
+                // and a single file's FileName already IS its full path. Generated programs have no path.
+                Model.ProgramPath = filename;
             }
 
             if (filename != "")
@@ -402,6 +405,7 @@ namespace CNC.Controls
             {
                 Model.IsFolderView = true;
                 Model.Blocks = Blocks;
+                Model.ProgramPath = folder;   // full folder path for the tooltip (FileName stays the leaf name)
             }
         }
 

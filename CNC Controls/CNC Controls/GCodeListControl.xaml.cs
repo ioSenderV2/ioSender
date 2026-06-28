@@ -103,6 +103,12 @@ namespace CNC.Controls
             if (sender is GrblViewModel) switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.ScrollPosition):
+                    // An instance created collapsed (e.g. the program overlay) has no realized ScrollViewer
+                    // yet - try to acquire it lazily, and skip until it exists rather than NRE.
+                    if (scroll == null)
+                        scroll = UIUtils.GetScrollViewer(grdGCode);
+                    if (scroll == null)
+                        break;
                     int sp = ((GrblViewModel)sender).ScrollPosition;
                     if (sp == 0)
                         scroll.ScrollToTop();
