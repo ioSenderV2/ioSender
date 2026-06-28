@@ -523,9 +523,8 @@ namespace GCode_Sender
             measureRun = chkMeasure.IsChecked == true;
             ResetResults();
 
-            // Float the machine-control panel (status, feed hold, override, MDI) so the run can be driven
-            // without leaving this tab.
-            MachineControlWindow.ShowFor(model, Window.GetWindow(this));
+            // Run control (status, feed hold, override, MDI) is fixed at the main-window bottom and always
+            // visible (Phase 2c), so the run can be driven without leaving this tab - no floating panel needed.
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
             // confirmation. confirm:true gives the operator a final "run?" before any motion.

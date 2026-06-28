@@ -117,9 +117,9 @@ namespace GCode_Sender
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
-            // Let library-side generated-program runners (e.g. Surface Spoilboard) raise the floating run-control
-            // panel, which lives in this assembly.
-            CNC.Controls.MacroProcessor.RunControlPanel = m => MachineControlWindow.ShowFor(m, this);
+            // The run control is now fixed at the main-window bottom (always visible on every tab), so the
+            // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
+            // use ?.Invoke, so they no-op). Feed Hold / Stop are always reachable from the fixed bar.
 
             // When a generated program is large enough to stream through the real job streamer, bring the Grbl
             // (Job) tab forward (so the operator can watch progress / 3D and has the full run controls) and
@@ -142,6 +142,11 @@ namespace GCode_Sender
             PipeServer.FileTransfer += Pipe_FileTransfer;
             AttachBasePropertyChangedHandler();
         }
+
+        // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
+        // reach them here instead of hosting their own.
+        public CNC.Controls.JobControl RunControl { get { return runControl; } }
+        public CNC.Controls.MDIControl MdiControl { get { return mdiControl; } }
 
         public string BaseWindowTitle { get; set; }
 

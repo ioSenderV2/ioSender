@@ -148,6 +148,20 @@
                 <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
             </StatusBarItem>
         </StatusBar>
+        <!-- Single, always-visible machine-control cluster (Phase 2c) - replaces the floating
+             MachineControlWindow and the Grbl-tab's lower-left controls. Signals + Status (state/check +
+             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop / Rewind) +
+             Feed/rapid override + MDI. Docked just above the status bar, full width, present on every tab so
+             Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">
+            <DockPanel Margin="6,3" LastChildFill="True">
+                <cnccontrols:SignalsControl DockPanel.Dock="Left" VerticalAlignment="Center"/>
+                <cnccontrols:StatusControl DockPanel.Dock="Left" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                <cnccontrols:JobControl x:Name="runControl" DockPanel.Dock="Left" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                <cnccontrols:FeedControl DockPanel.Dock="Left" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                <cnccontrols:MDIControl x:Name="mdiControl" Margin="14,0,0,0" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
         <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,34,0,0">
             <ItemsControl x:Name="xx" Width="22" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
