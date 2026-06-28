@@ -8,25 +8,9 @@
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="800">
     <!-- The center "workspace": the loaded program (list), the 3D toolpath view, and the console.
-         Extracted from JobView (Phase 2a) so the center is a self-contained, relocatable control.
-         The three controls are independent: GCodeListControl/RenderControl read the static GCode.File,
-         ConsoleControl uses the inherited GrblViewModel DataContext. -->
-    <TabControl x:Name="tabGCode" TabStripPlacement="Bottom">
-        <TabItem x:Uid="tab_program" Header="Program">
-            <DockPanel>
-                <!-- Title = program source (file path / folder name / tool name). -->
-                <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
-                    <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
-                </Border>
-                <cnccontrols:GCodeListControl/>
-            </DockPanel>
-        </TabItem>
-        <TabItem x:Uid="tab_3DView" x:Name="tab3D" Header="3D View">
-            <cncviewer:RenderControl x:Name="gcodeRenderer"/>
-        </TabItem>
-        <TabItem x:Uid="tab_console" x:Name="tabConsole" Header="Console">
-            <cnccontrols:ConsoleControl/>
-        </TabItem>
-    </TabControl>
+         Extracted from JobView (Phase 2a). The tabs are built in code from the layout tree's Grbl/"center"
+         slot (Phase 2b step 4) - see RegisterCenter()/BuildCenter() in the code-behind. The three controls
+         are independent: GCodeListControl/RenderControl read the static GCode.File, ConsoleControl uses the
+         inherited GrblViewModel DataContext. -->
+    <TabControl x:Name="tabGCode" TabStripPlacement="Bottom"/>
 </UserControl>
