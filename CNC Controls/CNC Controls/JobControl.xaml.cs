@@ -82,6 +82,11 @@ namespace CNC.Controls
 
         private int serialSize = 128;
         private bool initOK = false, isActive = false, useBuffering = false, feedHoldEnable = false;
+        // Probe-streaming throttle: once a probe (G38) has been streamed, cap look-ahead (ProbeLookahead lines)
+        // and never send past an in-flight probe until it completes - so a streamed probe macro can't race lines
+        // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
+        private bool jobHasProbe = false, probePending = false;
+        private const int ProbeLookahead = 10;
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
@@ -548,6 +553,7 @@ namespace CNC.Controls
                     job.PgmEndLine = model.RunToBlock >= 0 ? model.RunToBlock : GCode.File.Blocks - 1;
                     model.RunToBlock = -1;
                     job.serialUsed = missed = 0;
+                    probePending = jobHasProbe = false;
                     job.Started = job.Transferred = job.HasError = job.ToolChanged = false;
                     job.NextRow = GCode.File.Data[job.CurrBlock];
                     Comms.com.PurgeQueue();
@@ -1173,6 +1179,11 @@ namespace CNC.Controls
                 if (job.ACKPending > 0)
                     job.ACKPending--;
 
+                // Probe barrier released once everything outstanding (including the G38, whose 'ok' arrives only
+                // after the probe finishes) has been acked - then SendNextLine below resumes the stream.
+                if (probePending && job.ACKPending == 0)
+                    probePending = false;
+
                 if (!job.IsSDFile && (job.IsChecking || (string)GCode.File.Data[job.PendingLine].Sent == "*"))
                     job.serialUsed = Math.Max(0, job.serialUsed - (int)GCode.File.Data[job.PendingLine].Length);
 
@@ -1256,6 +1267,12 @@ namespace CNC.Controls
         {
             while (job.NextRow != null) {
 
+                // Probe barrier: hold all lines while a streamed probe (G38) is in flight, until it completes
+                // (every outstanding line acked). Stops post-probe lines piling into the controller's RX during
+                // the probe - the fault that broke streamed Load Stock.
+                if (probePending)
+                    break;
+
                 string line = (string)job.NextRow.Data; //  GCodeUtils.StripSpaces((string)currentRow["Data"]);
 
                 // Send comment lines as empty comment when "Send comments" is off - except to the simulator,
@@ -1267,7 +1284,8 @@ namespace CNC.Controls
                     job.NextRow.Length = line.Length + 1;
                 }
 
-                if (job.serialUsed < (serialSize - (int)job.NextRow.Length))
+                if (job.serialUsed < (serialSize - (int)job.NextRow.Length)
+                     && (!jobHasProbe || job.ACKPending < ProbeLookahead))   // cap look-ahead once probing
                 {
 
                     if (GCode.File.Commands.Count > 0)
@@ -1292,10 +1310,15 @@ namespace CNC.Controls
                         Comms.com.WriteString(line + '\r');
                         if (job.CurrentRow.BreakAt)
                             Comms.com.WriteString("M0" + '\r');
+
+                        // A probe move just went out: throttle this job from here on, and hold further lines
+                        // until this probe completes (cleared when all outstanding lines are acked - see below).
+                        if (line.IndexOf("G38", StringComparison.OrdinalIgnoreCase) >= 0)
+                            probePending = jobHasProbe = true;
                     }
                     job.ACKPending++;
 
-                    if (!useBuffering)
+                    if (!useBuffering || probePending)
                         break;
                 }
                 else

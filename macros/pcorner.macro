@@ -12,6 +12,8 @@
 ;   #<_ls_refx>   = machine X of the reference, just OUTSIDE this corner's X face (clear air).
 ;   #<_ls_refy>   = machine Y of the reference, just OUTSIDE this corner's Y face.
 ;   #<_ls_rad>    = probe tip radius (mm).
+;   #<_ls_searchf>= fast search feed (mm/min), from the 3D probe definition (Probe/Search feed).
+;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the 3D probe definition (Latch feed).
 ;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
 ;                            (clear air below), publishing #<_start_z> as the DISCOVER/REUSE flag.
 ;                            (Use for the FIRST corner only - its reference must clear the probe
@@ -61,9 +63,9 @@ O<pcorner> SUB
     G53 G0 Z0
     G53 G0 X[#<rx>] Y[#<ry>]
     G53 G1 Z[#5163] F1000           ; controlled descent (~0.25 of rapids) to the stored G28 Z - safer to watch than a rapid plunge
-    G38.2 Z-140 F500                ; short slow probe to the spoilboard from there (not from machine top)
+    G38.2 Z-140 F[#<_ls_searchf>]                ; short slow probe to the spoilboard from there (not from machine top)
     G91 G0 Z2
-    G38.2 Z-5 F25
+    G38.2 Z-5 F[#<_ls_latchf>]
     #<_z_spoil> = #5063
     G91 G0 Z10
     G90
@@ -80,9 +82,9 @@ O<pcorner> SUB
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
   G53 G0 X[#<rx> + [30 * #<sx>]] Y[#<ry> + [30 * #<sy>]]
-  G38.2 Z-140 F500
+  G38.2 Z-140 F[#<_ls_searchf>]
   G91 G0 Z2
-  G38.2 Z-5 F25
+  G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
   #<_safe_z> = [#<_z_top> + 20]     ; safe travel height now known: 20 mm above this corner's top
   G91 G0 Z10
@@ -108,9 +110,9 @@ O<pcorner> SUB
   G53 G0 Z[#<_safe_z>]              ; retract only to just above the stock top (top + 5), not machine top
   G53 G0 X[#<rx>] Y[#<ry> + [30 * #<sy>]]
   G53 G0 Z[#<_start_z>]
-  G91 G38.2 X[35 * #<sx>] F500
+  G91 G38.2 X[35 * #<sx>] F[#<_ls_searchf>]
   G0 X[-4 * #<sx>]                  ; back off enough for the deflecting ball to RELEASE before the slow re-probe
-  G38.2 X[6 * #<sx>] F25            ; (2 mm left it stuck triggered -> Alarm:4 "not in initial state"; 4 mm clears it)
+  G38.2 X[6 * #<sx>] F[#<_ls_latchf>]            ; (2 mm left it stuck triggered -> Alarm:4 "not in initial state"; 4 mm clears it)
   #<x_trig> = #5061
   G0 X[-10 * #<sx>]
   G90
@@ -121,9 +123,9 @@ O<pcorner> SUB
   ; into the stock's X range, then seek toward the Y face. Never a diagonal at probing depth.
   G53 G0 Y[#<ry>]
   G53 G0 X[#<rx> + [30 * #<sx>]]
-  G91 G38.2 Y[35 * #<sy>] F500      ; bigger back-off + longer slow re-probe (see X face above)
+  G91 G38.2 Y[35 * #<sy>] F[#<_ls_searchf>]      ; bigger back-off + longer slow re-probe (see X face above)
   G0 Y[-4 * #<sy>]
-  G38.2 Y[6 * #<sy>] F25
+  G38.2 Y[6 * #<sy>] F[#<_ls_latchf>]
   #<y_trig> = #5062
   G0 Y[-10 * #<sy>]
   G90

@@ -43,7 +43,9 @@ namespace GCode_Sender
         private static readonly Regex rxCorner = new Regex(
             @"PC\s+OUT\s+c=(\d+)(?:\.\d+)?\s+x=(-?\d+(?:\.\d+)?)\s+y=(-?\d+(?:\.\d+)?)\s+z=(-?\d+(?:\.\d+)?)",
             RegexOptions.IgnoreCase);
-        private double? measuredX = null, measuredY = null;
+        // corner-1 DISCOVER pass prints the spoilboard reference Z: "PC z_spoil=..". Thickness = top - spoilboard.
+        private static readonly Regex rxSpoil = new Regex(@"PC\s+z_spoil\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        private double? measuredX = null, measuredY = null, spoilZ = null;
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false, resultShown = false;
@@ -73,7 +75,10 @@ namespace GCode_Sender
             else
             {
                 SaveInputs();
-                Subscribe(false);
+                // Stay subscribed when deactivated: a streamed Load Stock run switches to the Grbl tab while
+                // probing, so we must keep parsing the (PRINT PC OUT / LS_X/Y) result messages to populate the
+                // corners and raise the results popup. The handler only reacts to our own messages, so it's a
+                // no-op otherwise. (Previously unsubscribing here lost every result message on the streamed path.)
             }
         }
 
@@ -131,6 +136,13 @@ namespace GCode_Sender
                 }
             }
 
+            var ms = rxSpoil.Match(msg);
+            if (ms.Success && double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double zs))
+            {
+                spoilZ = zs;
+                hit = true;
+            }
+
             if (hit)
                 Dispatcher.BeginInvoke(new System.Action(ShowResult));
         }
@@ -138,7 +150,7 @@ namespace GCode_Sender
         // Clear measured size + per-corner data for a fresh run, then refresh the readout.
         private void ResetResults()
         {
-            measuredX = measuredY = null;
+            measuredX = measuredY = spoilZ = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
             resultShown = false;
@@ -330,19 +342,22 @@ namespace GCode_Sender
             return sb.ToString();
         }
 
-        // Representative stock height (Z, mm) for the Fusion stock box: the mean of the probed corner heights
-        // (absolute, so it works whether Z0 is the stock top or the bed). Null if no corner Z was probed.
+        // Stock THICKNESS (Z, mm) for the Fusion stock box = mean probed stock-top Z minus the spoilboard Z
+        // (both machine coords; corner-1 DISCOVER probes the spoilboard -> "PC z_spoil="). Null if the
+        // spoilboard wasn't probed - then Copy size emits X Y only and you enter thickness in Fusion.
         private double? StockZ()
         {
+            if (!spoilZ.HasValue)
+                return null;
             double sum = 0d;
             int n = 0;
             for (int i = 1; i <= 4; i++)
                 if (cornerZ[i].HasValue)
                 {
-                    sum += Math.Abs(cornerZ[i].Value);
+                    sum += cornerZ[i].Value;
                     n++;
                 }
-            return n > 0 ? (double?)(sum / n) : null;
+            return n > 0 ? (double?)(sum / n - spoilZ.Value) : null;
         }
 
         // Flatness = spread of the per-corner stock-top Z values (needs at least two corners).
@@ -576,6 +591,8 @@ namespace GCode_Sender
             L("G21 G90 G94 G17");
             L("G49");
             L(string.Format("#<_ls_rad> = {0}", N(r)));   // probe tip radius (global, read by pcorner)
+            L(string.Format("#<_ls_searchf> = {0}", N(p.ProbeFeedRate)));   // fast search feed (from the 3D probe definition)
+            L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
 
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
