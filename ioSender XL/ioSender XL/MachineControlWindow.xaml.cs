@@ -30,7 +30,9 @@ namespace GCode_Sender
             if (_instance == null)
             {
                 _instance = new MachineControlWindow { Owner = owner };
-                _instance.Closed += (s, e) => { _instance.Detach(); _instance = null; };
+                // Return activation to the main window when the panel closes - otherwise Windows hands focus to
+                // whatever happens to be behind it (another app / a stray child) instead of ioSender.
+                _instance.Closed += (s, e) => { _instance.Detach(); _instance = null; owner?.Activate(); };
                 if (owner != null && !double.IsNaN(owner.Left))
                 {
                     _instance.Left = owner.Left + 60d;
@@ -65,7 +67,20 @@ namespace GCode_Sender
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(GrblViewModel.GrblError) && (_model?.GrblError ?? 0) != 0)
+            {
+                // Diagnostic: record the controller error that triggers this teardown to disk, so a failure
+                // that also wedges the UI still leaves evidence (config-folder \ macro-error.log).
+                try
+                {
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, "macro-error.log"),
+                        string.Format("{0:yyyy-MM-dd HH:mm:ss}  error={1}  state={2}  msg={3}\r\n",
+                            DateTime.Now, _model.GrblError, _model.GrblState.State, _model.Message));
+                }
+                catch { }
+
                 Dispatcher.BeginInvoke(new System.Action(Close));
+            }
         }
     }
 }

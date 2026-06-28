@@ -130,6 +130,11 @@ namespace CNC.Controls
         public static readonly DependencyProperty TotalDepthProperty = Reg(nameof(TotalDepth), 0.3d);
         public double TotalDepth { get { return (double)GetValue(TotalDepthProperty); } set { SetValue(TotalDepthProperty, value); } }
 
+        // Optional light final pass: roughing steps by DepthOfCut down to (TotalDepth - FinishDepth), then one
+        // pass removes the last FinishDepth for a clean finish. 0 = no separate finish pass (old behaviour).
+        public static readonly DependencyProperty FinishDepthProperty = Reg(nameof(FinishDepth), 0d);
+        public double FinishDepth { get { return (double)GetValue(FinishDepthProperty); } set { SetValue(FinishDepthProperty, value); } }
+
         public static readonly DependencyProperty SafeZProperty = Reg(nameof(SafeZ), 20d);
         public double SafeZ { get { return (double)GetValue(SafeZProperty); } set { SetValue(SafeZProperty, value); } }
 
@@ -154,6 +159,12 @@ namespace CNC.Controls
         public static readonly DependencyProperty DryRunProperty = DependencyProperty.Register(nameof(DryRun), typeof(bool), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(false, OnParam));
         public bool DryRun { get { return (bool)GetValue(DryRunProperty); } set { SetValue(DryRunProperty, value); } }
 
+        // Skip the park + Z touch-off + dust-boot prompts and reuse the existing work Z0 (same bit / setup).
+        // Auto-ticked after a run so a dry run can be followed by the real cut at the same Z0; the XY origin is
+        // machine-referenced and always re-set, so only the Z touch-off is reused.
+        public static readonly DependencyProperty ReuseZ0Property = DependencyProperty.Register(nameof(ReuseZ0), typeof(bool), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(false, OnParam));
+        public bool ReuseZ0 { get { return (bool)GetValue(ReuseZ0Property); } set { SetValue(ReuseZ0Property, value); } }
+
         public static readonly DependencyProperty StepoverProperty = DependencyProperty.Register(nameof(Stepover), typeof(double), typeof(SurfaceSpoilboardWizard), new PropertyMetadata(0d));
         public double Stepover { get { return (double)GetValue(StepoverProperty); } set { SetValue(StepoverProperty, value); } }
 
@@ -167,6 +178,34 @@ namespace CNC.Controls
         private double StepoverMM()
         {
             return BitDiameter * (1d - Overlap / 100d);
+        }
+
+        // The Z depth (negative) of each cutting pass: rough by DepthOfCut down to (TotalDepth - FinishDepth),
+        // then a final light pass at TotalDepth when a Finish pass is set. Returns at least one pass.
+        private List<double> PassDepths()
+        {
+            var depths = new List<double>();
+            double total = TotalDepth;
+            if (total <= 0d)                       // no depth set -> a single skim at the Z0 plane
+            {
+                depths.Add(0d);
+                return depths;
+            }
+            double doc = DepthOfCut > 0d ? DepthOfCut : total;
+            bool hasFinish = FinishDepth > 0d && FinishDepth < total;
+            double rough = hasFinish ? total - FinishDepth : total;
+
+            double z = 0d;
+            while (z < rough - 1e-6)
+            {
+                z = Math.Min(z + doc, rough);
+                depths.Add(-z);
+            }
+            if (hasFinish)
+                depths.Add(-total);                // light final pass removes the last FinishDepth
+            else if (depths.Count == 0)
+                depths.Add(-total);                // rough == 0 edge case: a single pass to total
+            return depths;
         }
 
         // Refresh the computed stepover, the run summary and any warning. Called on every parameter change.
@@ -200,9 +239,11 @@ namespace CNC.Controls
             {
                 if (stepover > 0d && WidthMM > 0d && HeightMM > 0d)
                 {
-                    int passes = (!preview && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+                    int passes = preview ? 1 : PassDepths().Count;
                     int rows = Math.Max(2, (int)Math.Ceiling(Math.Min(WidthMM, HeightMM) / stepover) + 1);
-                    string mode = OutlineOnly ? "outline (leveling check, pauses at corners)" : string.Format("{0} rows", rows);
+                    string mode = OutlineOnly ? "outline (leveling check, pauses at corners)"
+                                : DryRun ? "perimeter (dry run)"
+                                : string.Format("{0} rows", rows);
                     string depth = preview ? "no plunge" : string.Format("{0} depth pass{1}", passes, passes == 1 ? "" : "es");
                     string rpm = preview ? "spindle off" : string.Format("{0:0} rpm", EffectiveRPM());
                     txtSummary.Text = string.Format("Area {0:0} x {1:0} mm · stepover {2:0.0} mm · {3} · {4} · {5}",
@@ -235,39 +276,58 @@ namespace CNC.Controls
 
             // The XY path to follow: the area perimeter (outline) or the serpentine raster.
             var path = OutlineOnly ? OutlinePath(w, h) : RasterPath(w, h, stepover);
-            int nPasses = (!preview && TotalDepth > 0d && DepthOfCut > 0d) ? (int)Math.Ceiling(TotalDepth / DepthOfCut) : 1;
+            var depths = PassDepths();
+            int nPasses = depths.Count;
 
             lines.Add(string.Format("(ioSender spoilboard surfacing - {0} x {1} mm area, {2} mm bit, {3:0}% overlap{4}{5})",
                 F(w), F(h), F(d), Overlap, OutlineOnly ? ", OUTLINE" : "", DryRun ? ", DRY RUN" : ""));
-            lines.Add(string.Format("(stepover {0} mm, {1} depth passes, DOC {2} mm to {3} mm total, spindle {4})",
-                F(stepover), nPasses, F(DepthOfCut), F(TotalDepth), preview ? "off" : ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " rpm"));
+            lines.Add(string.Format("(stepover {0} mm, {1} depth passes, DOC {2} mm to {3} mm total{4}, spindle {5})",
+                F(stepover), nPasses, F(DepthOfCut), F(TotalDepth), FinishDepth > 0d && FinishDepth < TotalDepth ? ", finish " + F(FinishDepth) + " mm" : "",
+                preview ? "off" : ((int)Math.Round(rpm)).ToString(CultureInfo.InvariantCulture) + " rpm"));
 
             // Prerequisites: the machine must be homed (XY is referenced to the homed envelope).
             lines.Add("(PREREQ, connected, homed, noalarm)");
 
-            // Park at the front-left corner (machine coords) before the touch-off so Z can be zeroed
-            // somewhere reachable - the back-left home corner is awkward to reach precisely. Z is parked
-            // near the top (max clearance) first, then we move XY over the corner.
             double zTop = EnvMin(2) + AxisTravel(2) - inset;             // just below the upper Z limit
             lines.Add("G90 G94 G17 G21");
-            lines.Add("G53 G0 Z" + F(zTop));                             // lift to a safe machine height
-            lines.Add(string.Format("G53 G0 X{0} Y{1}", F(ox), F(oy)));  // move to the front-left corner
-            lines.Add("(WAITIDLE)");                                      // arrive before prompting
 
-            // 1) Capture Z0 at the surface. Hold (nothing moves) while the operator lowers the bit onto the
-            // surface; on OK, zero work Z there. WAITIDLE after OK so the jog has finished before we set Z0.
-            lines.Add("(MBOX, OKCANCEL, At the FRONT-LEFT corner. Jog Z down until the bit just touches the surface, then click OK to set work Z0 here. Click Cancel to abort.)");
-            lines.Add("(WAITIDLE)");
-            lines.Add("G10 L20 P1 Z0");                                   // work Z0 = surface top (locked here)
+            if (!ReuseZ0)
+            {
+                // Park at the front-left corner (machine coords) before the touch-off so Z can be zeroed
+                // somewhere reachable - the back-left home corner is awkward to reach precisely. Z is parked
+                // near the top (max clearance) first, then we move XY over the corner.
+                lines.Add("G53 G0 Z" + F(zTop));                             // lift to a safe machine height
+                lines.Add(string.Format("G53 G0 X{0} Y{1}", F(ox), F(oy)));  // move to the front-left corner
+                lines.Add("(WAITIDLE)");                                      // arrive before prompting
+
+                // 1) Capture Z0 at the surface. Hold (nothing moves) while the operator lowers the bit onto the
+                // surface; on OK, zero work Z there. WAITIDLE after OK so the jog has finished before we set Z0.
+                lines.Add("(MBOX, OKCANCEL, Jog to the HIGHEST point of the board [keyboard/jog moves X, Y and Z] and lower the bit until it just touches, then click OK to set work Z0 to that height. Where you touch off does not matter - XY is referenced to the machine corner automatically. Click Cancel to abort.)");
+                lines.Add("(WAITIDLE)");
+                lines.Add("G10 L20 P1 Z0");                                   // work Z0 = surface top (locked here)
+
+                // 2) Auto-raise Z to the top so the dust boot can be fitted hands-free, then prompt. Z0 is already
+                // locked, so on OK we just drop back to safe Z above it and start. WAITIDLE so the raise finishes
+                // before the prompt, and again so any jog finishes before cutting.
+                lines.Add("G53 G0 Z" + F(zTop));                              // raise to the top for boot fitting
+                lines.Add("(WAITIDLE)");
+                lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Z0 is locked. Click Cancel to abort.)");
+                lines.Add("(WAITIDLE)");
+            }
+            else
+            {
+                // Reuse the work Z0 from the last run: skip the park + Z touch-off, but STILL raise Z to the
+                // top and gate on a readiness prompt - the previous run may have been an Outline/Dry run with a
+                // dial indicator (not the cutter) fitted and no dust boot, so never start cutting unprompted.
+                lines.Add("G53 G0 Z" + F(zTop));
+                lines.Add("(WAITIDLE)");
+                lines.Add("(MBOX, OKCANCEL, Reusing the existing work Z0. Z is raised to the top - fit the CUTTER and the dust boot, clear the area, then click OK to start. Click Cancel to abort.)");
+                lines.Add("(WAITIDLE)");
+            }
+
+            // XY origin is machine-referenced and computed (no touch-off needed), so always (re)set it - this
+            // picks up any area / margin change and lets Reuse Z0 reuse just the Z touch-off.
             lines.Add(string.Format("G10 L2 P1 X{0} Y{1}", F(ox), F(oy))); // work XY origin = inset machine corner
-
-            // 2) Auto-raise Z to the top so the dust boot can be fitted hands-free, then prompt. Z0 is already
-            // locked, so on OK we just drop back to safe Z above it and start. WAITIDLE so the raise finishes
-            // before the prompt, and again so any jog finishes before cutting.
-            lines.Add("G53 G0 Z" + F(zTop));                              // raise to the top for boot fitting
-            lines.Add("(WAITIDLE)");
-            lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Z0 is locked. Click Cancel to abort.)");
-            lines.Add("(WAITIDLE)");
             lines.Add("G54");
             lines.Add("G0 Z" + F(SafeZ));                                 // drop back to safe Z above the locked Z0
             if (!preview && tool > 0)
@@ -293,16 +353,21 @@ namespace CNC.Controls
             }
             else if (DryRun)
             {
-                // Trace the full raster once at safe Z so the extents can be watched - no plunge, spindle off.
-                lines.Add("(dry run - tracing the raster at safe Z, no plunge, spindle off)");
-                lines.Add("G0 " + XY(path[0]));
-                for (int i = 1; i < path.Count; i++)
-                    lines.Add("G1 " + XY(path[i]) + " F" + F(Feed));
+                // Abbreviated dry run: trace just the area PERIMETER at safe Z (spindle off, no plunge). It
+                // streams (G1 moves, so Feed Hold / Stop work) and finishes in a few moves, so you can let it
+                // COMPLETE - which preserves home and Z0 - then untick Dry run and Run for real reusing Z0,
+                // with no need to abort mid-run. The raster always fits inside this perimeter.
+                var rect = OutlinePath(w, h);
+                lines.Add("(dry run - tracing the area perimeter at safe Z, no plunge, spindle off)");
+                lines.Add("G0 " + XY(rect[0]));
+                for (int i = 1; i < rect.Count; i++)
+                    lines.Add("G1 " + XY(rect[i]) + " F" + F(Feed));
             }
-            else for (int p = 1; p <= nPasses; p++)
+            else for (int p = 0; p < nPasses; p++)
             {
-                double z = -Math.Min(p * DepthOfCut, TotalDepth);
-                lines.Add(string.Format("(depth pass {0} of {1} at Z{2})", p, nPasses, F(z)));
+                double z = depths[p];
+                bool isFinish = FinishDepth > 0d && FinishDepth < TotalDepth && p == nPasses - 1;
+                lines.Add(string.Format("(depth pass {0} of {1} at Z{2}{3})", p + 1, nPasses, F(z), isFinish ? " - finish" : ""));
                 lines.Add("G0 " + XY(path[0]));                       // rapid to the start corner at safe Z
                 lines.Add(string.Format("G1 Z{0} F{1}", F(z), F(PlungeFeed)));
                 for (int i = 1; i < path.Count; i++)
@@ -388,7 +453,12 @@ namespace CNC.Controls
                 return;
 
             MacroProcessor.RunControlPanel?.Invoke(model);
-            MacroProcessor.Run(model, "Surface spoilboard", txtProgram.Text, true);
+            bool ok = MacroProcessor.Run(model, "Surface spoilboard", txtProgram.Text, true);
+
+            // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry run
+            // or outline check you can untick Dry run / Outline only and Run again to cut at the same Z0.
+            if (ok)
+                ReuseZ0 = true;
         }
 
         private void Generate()
@@ -443,7 +513,7 @@ namespace CNC.Controls
                 cbxTool.SelectedIndex = ToolNumber > 0d ? 1 : 0;   // Loaded / Prompt
                 foreach (var dp in new[] {
                     BitDiameterProperty, BitMaxRPMProperty, SpindleRPMProperty, OverlapProperty, FeedProperty,
-                    PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, SafeZProperty, MarginProperty,
+                    PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, FinishDepthProperty, SafeZProperty, MarginProperty,
                     WidthMMProperty, HeightMMProperty, ToolNumberProperty })
                     System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(SurfaceSpoilboardWizard))
                         .AddValueChanged(this, (s, ev) => SaveParams());
@@ -458,10 +528,11 @@ namespace CNC.Controls
                 "1. Fit the surfacing bit. Enter its diameter and rated max RPM.\n" +
                 "2. Set spindle RPM, overlap %, feed/plunge, depth of cut and total skim depth. The area defaults to the full travel envelope less the Edge margin - reduce Width/Height to surface a smaller region (anchored at the home-side corner).\n" +
                 "3. Press Generate to build the program (it appears here). Press Run to start - a confirmation and the floating run-control panel appear.\n" +
-                "4. The machine must be homed. It first moves to the FRONT-LEFT corner (easier to reach than the home corner). Prompt 1: jog Z down until the bit just touches the surface, click OK - work Z0 is locked there (XY is set automatically). Z then raises to the top automatically. Prompt 2: fit the dust boot / do any final prep, then click OK - it drops back to safe Z above the locked Z0 and starts.\n" +
+                "4. The machine must be homed. It first moves to the FRONT-LEFT corner (a reachable starting point). Prompt 1: jog to the board's HIGHEST point (keyboard/jog moves X, Y and Z) and lower the bit until it just touches, then click OK - work Z0 is locked to that height. Where you touch off does NOT matter: the cut's XY is referenced to the machine corner automatically, so it returns to front-left and cuts relative to that Z0. Z then raises to the top automatically. Prompt 2: fit the dust boot / do any final prep, then click OK - it drops back to safe Z above the locked Z0 and starts.\n" +
                 "5. It rasters across the envelope, cutting Z0 minus the depth of cut each pass down to the total depth. Because XY is machine-referenced, it cannot overrun a soft limit.\n\n" +
                 "Notes: stepover = bit diameter x (1 - overlap). Spindle RPM 0 = 70% of the bit's max RPM. Tool \"Loaded\" skips the tool change; \"Prompt\" issues M6. Edge margin keeps the raster clear of the travel limits (on top of the homing pull-off). Clear any clamps/screws from the raster area first.\n" +
-                "Outline only = a LEVELING CHECK: it moves to each corner, lowers to the Z0 plane and pauses for a dial-gauge reading (spindle off) so you can see how far out of level the board is - fit a dial indicator in place of the cutter and zero it at the front-left reference corner. Dry run traces the full raster at safe Z (no plunge, spindle off) to verify extents. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.";
+                "Outline only = a LEVELING CHECK: it moves to each corner, lowers to the Z0 plane and pauses for a dial-gauge reading (spindle off) so you can see how far out of level the board is - fit a dial indicator in place of the cutter and zero it at the front-left reference corner. Dry run traces just the area perimeter at safe Z (no plunge, spindle off) - a quick extents/clearance check; let it finish (home + Z0 are preserved), then untick Dry run and Run to cut at the same Z0. An uneven board only cleans fully if you zero Z on its highest point or set the total depth deep enough.\n" +
+                "Reuse Z0 = skip the park + touch-off + dust-boot prompts and cut at the work Z0 from the last run (same bit, boot already fitted). It is auto-ticked after any run, so you can Dry run / Outline first, then untick that and Run again to surface at the same Z0. Untick Reuse Z0 to touch off afresh (e.g. after a bit change).";
 
             UpdateSummary();
         }
@@ -483,7 +554,7 @@ namespace CNC.Controls
                     var p = (SurfaceParams)xs.Deserialize(fs);
                     BitDiameter = p.BitDiameter; BitMaxRPM = p.BitMaxRPM; SpindleRPM = p.SpindleRPM;
                     Overlap = p.Overlap; Feed = p.Feed; PlungeFeed = p.PlungeFeed; DepthOfCut = p.DepthOfCut;
-                    TotalDepth = p.TotalDepth; SafeZ = p.SafeZ; Margin = p.Margin; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
+                    TotalDepth = p.TotalDepth; FinishDepth = p.FinishDepth; SafeZ = p.SafeZ; Margin = p.Margin; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
                     ToolNumber = p.ToolNumber;
                 }
             }
@@ -498,7 +569,7 @@ namespace CNC.Controls
                 {
                     BitDiameter = BitDiameter, BitMaxRPM = BitMaxRPM, SpindleRPM = SpindleRPM, Overlap = Overlap,
                     Feed = Feed, PlungeFeed = PlungeFeed, DepthOfCut = DepthOfCut, TotalDepth = TotalDepth,
-                    SafeZ = SafeZ, Margin = Margin, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
+                    FinishDepth = FinishDepth, SafeZ = SafeZ, Margin = Margin, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
                 };
                 var xs = new System.Xml.Serialization.XmlSerializer(typeof(SurfaceParams));
                 using (var fs = System.IO.File.Create(ParamsFile))
@@ -512,7 +583,7 @@ namespace CNC.Controls
     public class SurfaceParams
     {
         public double BitDiameter = 25.0d, BitMaxRPM = 18000d, SpindleRPM = 15000d, Overlap = 40d, Feed = 2000d,
-                      PlungeFeed = 500d, DepthOfCut = 0.3d, TotalDepth = 0.3d, SafeZ = 20d, Margin = 5d,
+                      PlungeFeed = 500d, DepthOfCut = 0.3d, TotalDepth = 0.3d, FinishDepth = 0d, SafeZ = 20d, Margin = 5d,
                       WidthMM = 0d, HeightMM = 0d, ToolNumber = 0d;
     }
 }

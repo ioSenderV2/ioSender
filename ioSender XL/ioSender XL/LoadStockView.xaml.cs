@@ -186,9 +186,35 @@ namespace GCode_Sender
             root.Children.Add(BuildOutlineDrawing());
             root.Children.Add(new TextBlock { Margin = new Thickness(0, 12, 0, 0), Text = summary });
 
-            var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+
+            // Copy the measured stock size to the clipboard as "X Y Z" (mm) for pasting into the Fusion
+            // ioSenderBatchPost add-in's "measured stock" field (which sets the setup's stock box). X/Y are the
+            // footprint; Z is the mean of the probed corner heights. Z is dropped if no corner Z is available.
+            var copy = new Button { Content = "Copy size", MinWidth = 90, Margin = new Thickness(0, 0, 8, 0) };
+            copy.IsEnabled = measuredX.HasValue && measuredY.HasValue;
+            copy.Click += (s, e) =>
+            {
+                if (measuredX.HasValue && measuredY.HasValue)
+                {
+                    try
+                    {
+                        double? z = StockZ();
+                        string text = z.HasValue
+                            ? string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###} {2:0.###}", measuredX.Value, measuredY.Value, z.Value)
+                            : string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###}", measuredX.Value, measuredY.Value);
+                        Clipboard.SetText(text);
+                        copy.Content = "Copied";
+                    }
+                    catch { /* clipboard busy - ignore */ }
+                }
+            };
+            bar.Children.Add(copy);
+
+            var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80 };
             ok.Click += (s, e) => win.Close();
-            root.Children.Add(ok);
+            bar.Children.Add(ok);
+            root.Children.Add(bar);
 
             win.Content = root;
             win.Show();
@@ -302,6 +328,21 @@ namespace GCode_Sender
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);
 
             return sb.ToString();
+        }
+
+        // Representative stock height (Z, mm) for the Fusion stock box: the mean of the probed corner heights
+        // (absolute, so it works whether Z0 is the stock top or the bed). Null if no corner Z was probed.
+        private double? StockZ()
+        {
+            double sum = 0d;
+            int n = 0;
+            for (int i = 1; i <= 4; i++)
+                if (cornerZ[i].HasValue)
+                {
+                    sum += Math.Abs(cornerZ[i].Value);
+                    n++;
+                }
+            return n > 0 ? (double?)(sum / n) : null;
         }
 
         // Flatness = spread of the per-corner stock-top Z values (needs at least two corners).
@@ -512,9 +553,11 @@ namespace GCode_Sender
 
             // Pass args to pcorner via GLOBALS set before a NO-ARG call: grblHAL's O-word CALL does not take
             // multiple bracketed args reliably (it parses the extra brackets as G-code -> error:1/2), so we avoid
-            // call args entirely. Then (WAITIDLE) so the subroutine finishes before the next line is sent.
-            // Bracket only multi-term expressions; a bare param/number is assigned as-is (matches the proven
-            // "#<rad>=1" form). grblHAL needs brackets around an expression but not a single value.
+            // call args entirely. No (WAITIDLE) between corners: the whole program is streamed as one job, so the
+            // controller runs the four CALLs back-to-back under flow control (each publishes its globals before
+            // the next reads them) - which keeps Feed Hold/Stop live and the UI responsive. Results still stream
+            // back as (PRINT ...) messages. Bracket only multi-term expressions; a bare param/number is assigned
+            // as-is (matches the proven "#<rad>=1" form). grblHAL needs brackets around an expression but not one value.
             string Br(string v) { return v.IndexOf(' ') >= 0 ? "[" + v + "]" : v; }
             void EmitCall(int cornerId, string refx, string refy, string startz)
             {
@@ -523,7 +566,6 @@ namespace GCode_Sender
                 L(string.Format("#<_ls_refy> = {0}", Br(refy)));
                 L(string.Format("#<_ls_startz> = {0}", Br(startz)));
                 L("O<pcorner> CALL [#<_ls_rad>]");   // single arg (tip radius) - grblHAL's CALL resolves with one arg
-                L("(WAITIDLE)");
             }
 
             L(string.Format("(Load stock - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));

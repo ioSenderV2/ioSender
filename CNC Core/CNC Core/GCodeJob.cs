@@ -224,25 +224,49 @@ namespace CNC.Core
                 Reset();
                 commands.Clear();
 
+                // Let the loader keep #-expression / O-word lines verbatim (instead of dropping them) when the
+                // controller evaluates expressions, so a generated O-word program can be streamed (flow control)
+                // rather than MDI'd.
+                Parser.ExpressionsSupported = GrblInfo.ExpressionsSupported;
+
                 filename = block;
 
             }
             else if (block != null && block.Trim().Length > 0) try
             {
-                bool isComment;
+                bool isComment = false;
                 uint ln;
 
                 block = block.Trim();
-                if (Parser.ParseBlock(ref block, false, out ln, out isComment))
+
+                // O-word flow (O<name> CALL/IF/WHILE/...) and #-expression lines are evaluated by the CONTROLLER,
+                // not by this block parser. When the controller supports expressions keep them VERBATIM rather
+                // than dropping them - and NEVER prefix an O-word line with a line number (a leading N breaks the
+                // controller's O-word routing) - so generated O-word programs (e.g. Load Stock's corner probe)
+                // can be streamed with flow control instead of being forced onto the MDI path.
+                string ts = block.TrimStart();
+                bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
+                bool passThrough = GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0);
+
+                bool parsed;
+                try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
+                catch { if (!passThrough) throw; parsed = false; }
+
+                if (parsed || passThrough)
                 {
-                    if(GrblInfo.UseLinenumbers && AddLineNumbers)
+                    // Don't add a line number to a block that already carries one (e.g. a generated program that
+                    // numbered its own lines) - two N-words make a malformed block (the controller rejects it
+                    // with error:25). Also never number an O-word line (a leading N breaks O-word routing).
+                    string nt = block.TrimStart();
+                    bool alreadyNumbered = nt.Length > 1 && (nt[0] == 'N' || nt[0] == 'n') && char.IsDigit(nt[1]);
+                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !alreadyNumbered)
                     {
                         LineNumber += 10;
                         block = "N" + LineNumber.ToString() + block;
                     } else
                         LineNumber++;
 
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd));
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();

@@ -257,23 +257,49 @@ namespace CNC.Controls
 
             var lines = code.Replace("\r", string.Empty).Split('\n');
             int n = 0;
-            bool mdiOnly = false;
+            bool hasOwordOrExpr = false, hasCall = false, hasFeed = false;
             foreach (var l in lines)
             {
                 string t = l.Trim();
                 if (t.Length == 0)
                     continue;
                 n++;
-                // O-word flow calls and NGC parameters/expressions rely on the MDI forwarding path (the
-                // streamer's block parser would reject or drop them) - never stream those, any size.
-                if (t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || t.IndexOf('#') >= 0)
-                    mdiOnly = true;
+                bool oword = t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (oword)
+                    hasCall = true;                       // an O-word CALL moves the machine via the called macro
+                if (oword || t.IndexOf('#') >= 0)
+                    hasOwordOrExpr = true;
+                // A feed/cut move (G1/G2/G3, incl. G01..). Its presence - not line count - is what makes a
+                // burst dangerous to flood: see below.
+                if (!hasFeed && Regex.IsMatch(t, @"(?<![0-9])[Gg]0*[123](?![0-9])"))
+                    hasFeed = true;
             }
 
-            // A large plain-g-code body is ALWAYS streamed (never the MDI path, which would overrun the
-            // controller and freeze the UI). O-word/parameter bodies and small bursts stay on MDI.
-            if (!mdiOnly && n > StreamLineThreshold && RunStreamedJob != null)
+            // O-word/#-expression lines can only go through the streamer when the controller evaluates
+            // expressions (the job loader now passes them verbatim in that case, unnumbered); otherwise they
+            // must stay on the MDI path, which forwards them line-by-line for the controller to interpret.
+            bool canStream = !hasOwordOrExpr || GrblInfo.ExpressionsSupported;
+
+            // CRITICAL (safety): anything that actually MOVES the machine - a feed/cut move, or an O-word CALL
+            // (which moves via the called macro) - or a large burst MUST go through the flow-controlled job
+            // streamer, never the MDI path. The MDI path has no character-counting flow control, so a realtime
+            // Feed Hold / Stop queues BEHIND the whole burst and Hold/Stop appear DEAD until it drains, and the
+            // long synchronous send blocks the UI thread (the hourglass). The streamer keeps only ~one planner
+            // buffer outstanding, so realtime commands take effect at once and the UI stays live. No-motion
+            // setup bursts (a few G10/G54/#-set lines between prompts) stay on the quick MDI path.
+            bool mustStream = canStream && (hasFeed || hasCall || n > StreamLineThreshold);
+
+            if (mustStream)
+            {
+                if (RunStreamedJob == null)
+                {
+                    // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
+                    ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
+                        "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
                 StreamProgram(model, lines);
+            }
             else
                 model.ExecuteMacro(code);
         }
@@ -520,6 +546,12 @@ namespace CNC.Controls
         // while EventUtils.DoEvents keeps status reports (and the UI) flowing.
         private static bool WaitForIdle(GrblViewModel model)
         {
+            // A (WAITIDLE) reached while a flow-controlled job is streaming is a program/structure error: the
+            // stream sequences itself, and pumping the UI here waiting on a job that drives its own completion
+            // can wedge the UI. Fail loudly (abort the macro) instead of hanging.
+            if (model.StreamingState == StreamingState.Send)
+                return false;
+
             var token = new CancellationToken();
 
             // A $F= job acks immediately and only then starts running, so first wait briefly for
@@ -728,10 +760,14 @@ namespace CNC.Controls
             // may have been launched from a non-Job tab anyway, where that forwarding is disabled). Forward
             // jog-relevant keys straight to the keypress handler; leave Enter/Esc/Tab/Space for the buttons.
             var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard;
+            Window mainForJog = Application.Current?.MainWindow;
+            System.Windows.Input.KeyEventHandler forwardJog = null;
             if (kbd != null)
             {
-                System.Windows.Input.KeyEventHandler forwardJog = (s, e) =>
+                forwardJog = (s, e) =>
                 {
+                    if (e.Handled)
+                        return;   // already handled (e.g. the Job view's own jog handler when it is the current view)
                     switch (e.Key)
                     {
                         case System.Windows.Input.Key.Enter:
@@ -740,14 +776,30 @@ namespace CNC.Controls
                         case System.Windows.Input.Key.Space:
                             return;   // reserved for the OK / Cancel buttons
                     }
+                    if (System.Windows.Input.Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                        return;   // focus is in a text box (typing) - don't jog
                     e.Handled = kbd.ProcessKeypress(e, true);
                 };
+                // Forward jog keys from the prompt window (when it has focus) AND the main window. The prompt is
+                // shown ShowActivated=false so it never steals focus, and these tools run from a non-Job tab where
+                // the main window's own jog forwarding (CurrentView is JobView) is inactive - so without the
+                // main-window hook, no window would jog while the prompt is up. Unsubscribed when the frame ends.
                 win.PreviewKeyDown += forwardJog;
                 win.PreviewKeyUp += forwardJog;
+                if (mainForJog != null && mainForJog != win)
+                {
+                    mainForJog.PreviewKeyDown += forwardJog;
+                    mainForJog.PreviewKeyUp += forwardJog;
+                }
             }
 
             win.Show();
             System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+            if (forwardJog != null && mainForJog != null)
+            {
+                mainForJog.PreviewKeyDown -= forwardJog;
+                mainForJog.PreviewKeyUp -= forwardJog;
+            }
             try { win.Close(); } catch { }
 
             return result;

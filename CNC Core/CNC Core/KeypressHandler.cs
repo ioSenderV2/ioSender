@@ -519,7 +519,7 @@ namespace CNC.Core
                 if (e.IsRepeat)
                     return true;
 
-                if ((context.DataContext is GrblViewModel && (context.DataContext as GrblViewModel).GrblState.State == GrblStates.Alarm))
+                if (grbl.GrblState.State == GrblStates.Alarm)   // 'grbl' is this handler's model (== context.DataContext when a context is supplied); using it directly keeps a null-context caller (e.g. a modeless hold prompt forwarding jog keys) from NRE'ing here
                     return true;
 
                 N_AXIS = GrblInfo.AxisFlags.HasFlag(AxisFlags.A) ? 4 : 3;
@@ -535,7 +535,7 @@ namespace CNC.Core
             {
                 string command = string.Empty;
 
-                if ((context.DataContext is GrblViewModel && (context.DataContext as GrblViewModel).GrblState.State == GrblStates.Alarm))
+                if (grbl.GrblState.State == GrblStates.Alarm)   // 'grbl' is this handler's model (== context.DataContext when a context is supplied); using it directly keeps a null-context caller (e.g. a modeless hold prompt forwarding jog keys) from NRE'ing here
                     return true;
 
                 isJogging = false;

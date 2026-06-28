@@ -211,6 +211,64 @@ def _stock_dims_mm(cam):
     return None
 
 
+def _set_choice(param, candidates):
+    """Best-effort set of a CAM choice parameter to the first candidate id that takes.
+    Choice params don't use numeric expressions; try .value.value first, then an expression."""
+    if param is None:
+        return False
+    for c in candidates:
+        try:
+            param.value.value = c
+            return True
+        except Exception:
+            pass
+    for c in candidates:
+        try:
+            param.expression = "'%s'" % c
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def _apply_measured_stock(cam, x_mm, y_mm, z_mm):
+    """Set EVERY setup's stock to a fixed-size box of the given mm dimensions (z_mm may be
+    None to leave Z alone). Returns (count_set, errors). Best-effort: the stock-mode choice id
+    has varied across Fusion versions, so if the mode can't be switched we still write the X/Y/Z
+    (which takes effect when the setup is already 'Fixed size box')."""
+    count = 0
+    errors = []
+    for i in range(cam.setups.count):
+        setup = cam.setups.item(i)
+        try:
+            prm = setup.parameters
+
+            def _set(name, expr):
+                p = prm.itemByName(name)
+                if p is None:
+                    return False
+                p.expression = expr
+                return True
+
+            # Switch to fixed-size box stock so the dimensions below are honoured.
+            _set_choice(prm.itemByName('job_stockMode'),
+                        ['fixedbox', 'fixed size box', 'fixedsizebox', 'fixed'])
+
+            okx = _set('job_stockFixedX', '%g mm' % x_mm)
+            oky = _set('job_stockFixedY', '%g mm' % y_mm)
+            if z_mm is not None:
+                _set('job_stockFixedZ', '%g mm' % z_mm)
+
+            if okx and oky:
+                count += 1
+            else:
+                errors.append("%s: couldn't find job_stockFixedX/Y - set the setup's Stock mode to "
+                              "'Fixed size box' once, then re-run" % setup.name)
+        except Exception as ex:
+            errors.append('%s: %s' % (setup.name, ex))
+    return count, errors
+
+
 def _format_tool_diameter(d_mm):
     """Diameter as a compact decimal keeping >=1 decimal place (6.35, 12.7, 1.0)."""
     s = ('%.3f' % d_mm).rstrip('0')
@@ -366,9 +424,31 @@ class ExecuteHandler(adsk.core.CommandEventHandler):
             if tt is not None:
                 write_tt = bool(tt.value)
 
+            # Optional: apply pasted measured stock (from ioSender Load Stock) to every setup before posting.
+            stock_applied = None
+            stock_field = (inputs.itemById('measuredStock').value or '').strip()
+            if stock_field:
+                nums = re.findall(r'[-+]?\d+(?:\.\d+)?', stock_field)
+                if len(nums) < 2:
+                    ui.messageBox('Measured stock needs at least X and Y (e.g. "428 428 19").\n'
+                                  'Leave it blank to keep the current stock.', CMD_NAME)
+                    return
+                x_mm, y_mm = float(nums[0]), float(nums[1])
+                z_mm = float(nums[2]) if len(nums) >= 3 else None
+                cam0 = adsk.cam.CAM.cast(app.activeProduct)
+                if cam0:
+                    n_set, stock_errs = _apply_measured_stock(cam0, x_mm, y_mm, z_mm)
+                    stock_applied = (n_set, (x_mm, y_mm, z_mm), stock_errs)
+
             posted, total, failures, table_info = _post_all(folder, post_file, write_tt)
 
             msg = 'Posted %d of %d operation(s) to:\n%s' % (posted, total, folder)
+            if stock_applied:
+                n_set, (sx, sy, sz), stock_errs = stock_applied
+                zpart = (' x %s' % _fmt(sz)) if sz is not None else ''
+                msg += '\n\nSet stock on %d setup(s) to %s x %s%s mm.' % (n_set, _fmt(sx), _fmt(sy), zpart)
+                if stock_errs:
+                    msg += '\n  ' + '\n  '.join(stock_errs)
             if table_info:
                 if table_info['stock']:
                     sx, sy, sz = table_info['stock']
@@ -395,6 +475,12 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
 
             inputs.addStringValueInput('outputFolder', 'Output folder', _default_output_folder(app))
 
+            # Paste ioSender Load Stock's measured size here ("X Y" or "X Y Z" mm - use its Copy size
+            # button). When set, every setup's stock is changed to a fixed-size box of these dimensions
+            # before posting, so the toolpaths are regenerated against the real measured stock. Blank =
+            # leave the current stock untouched.
+            inputs.addStringValueInput('measuredStock', 'Measured stock X Y [Z] (mm)', '')
+
             # Post-processor dropdown, defaulting to grbl.cps. The choice doesn't affect
             # behaviour (ioSender handles files with or without M6) - it's just which post
             # Fusion runs per operation. Explicit so we never silently pick the wrong one.
@@ -418,7 +504,11 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
                 '(File &gt; Load Folder), which works with any post (M6 or not).<br/><br/>'
                 'The tool table writes a 0_tooltable.nc with (STOCK ...) and (TOOL ...) comments '
                 '(stock size + each tool\'s diameter/shape) for the grblHAL simulator\'s 3D carve. '
-                'Harmless on real machines.',
+                'Harmless on real machines.<br/><br/>'
+                'Measured stock: paste the size from ioSender Load Stock (its Copy size button) to set every '
+                'setup to a fixed-size box of those dimensions before posting - so toolpaths regenerate '
+                'against the real stock. Leave blank to keep the current stock. The setup\'s Stock mode must '
+                'be \'Fixed size box\' for the dimensions to take.',
                 5, True)
 
             onExecute = ExecuteHandler()

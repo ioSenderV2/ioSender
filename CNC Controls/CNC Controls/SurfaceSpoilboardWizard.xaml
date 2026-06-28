@@ -32,6 +32,9 @@
                 Value="{Binding DepthOfCut, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbtotal" Label="Total depth:" ColonAt="140" Format="###0.0##"
                 Value="{Binding TotalDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_sbfinish" Label="Finish pass:" ColonAt="140" Format="###0.0##"
+                ToolTip="A light final pass at this depth (0 = none). Roughing steps by Depth of cut down to Total depth minus this, then one pass removes the last Finish-pass amount for a clean surface."
+                Value="{Binding FinishDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbsafez" Label="Safe Z:" ColonAt="140" Format="###0.0##"
                 Value="{Binding SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbmargin" Label="Edge margin:" ColonAt="140" Format="###0.0##"
@@ -56,6 +59,9 @@
                 <CheckBox x:Uid="chk_sbdryrun" Content="Dry run" Margin="24,0,0,0" VerticalAlignment="Center"
                           ToolTip="Trace the path at safe Z with no plunge and the spindle off - to verify motion and extents without cutting."
                           IsChecked="{Binding DryRun, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                <CheckBox x:Uid="chk_sbreuse" x:Name="chkReuseZ0" Content="Reuse Z0" Margin="24,0,0,0" VerticalAlignment="Center"
+                          ToolTip="Skip the park + Z touch-off + dust-boot prompts and reuse the work Z0 from the last run (same bit / setup, boot already fitted). Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
+                          IsChecked="{Binding ReuseZ0, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
                 <Button x:Uid="btn_sbgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
