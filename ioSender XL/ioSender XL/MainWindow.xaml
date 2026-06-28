@@ -169,52 +169,8 @@
                     <Setter Property="MinWidth" Value="40" />
                 </Style>
             </TabControl.Resources>
-            <TabItem x:Uid="tab_grbl" x:Name="tabGrbl" Header="Grbl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <local:JobView x:Name="Grbl"/>
-            </TabItem>
-            <TabItem x:Uid="tab_loadStock" x:Name="tabLoadStock" Header="Load stock">
-                <local:LoadStockView x:Name="loadStockView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_offsets" x:Name="tabOffsets" Header="Offsets">
-                <cnccontrols:OffsetView x:Name="offsetControl"/>
-            </TabItem>
-            <TabItem x:Uid="tab_grblConfig" x:Name="tabConfig" Header="Settings" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <cnccontrols:GrblConfigView x:Name="configControl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-            </TabItem>
-            <!---
-            <TabItem x:Uid="tab_3DView" x:Name="tabViewer" Header="3D View">
-                <cncviewer:Viewer x:Name="viewer"/>
-            </TabItem>
-            -->
-            <TabItem x:Uid="tab_probing" x:Name="tabProbing" Header="Probing">
-                <cncprobingcontrols:ProbingView x:Name="probingView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_sdCard" x:Name="tabSDCard" Header="SD Card">
-                <cnccontrols:SDCardView x:Name="SDCardView" FileSelected="SDCardView_FileSelected"/>
-            </TabItem>
-            <TabItem x:Uid="tab_latheWizards" x:Name="tabLatheWizards" Header="Lathe Wizards">
-                <cnclathecontrols:LatheWizardsView x:Name="latheWizards"/>
-            </TabItem>
-            <TabItem x:Uid="tab_tools" x:Name="tabTools" Header="Tools">
-                <cnccontrols:ToolsView x:Name="toolsView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_machineSetup" x:Name="tabMachineSetup" Header="Machine Setup">
-                <cnccontrols:MachineSetupView x:Name="machineSetupView"/>
-            </TabItem>
-            <!--
-                <TabItem x:Name="tabTurning" Header="Turning">
-                    <Grid Background="#FFE5E5E5">
-                        <cnc:TurningWizard x:Name="toolTurning" HorizontalAlignment="Left" Height="515" VerticalAlignment="Top" Width="875"/>
-                    </Grid>
-                </TabItem>
-                <TabItem x:Name="tabFacing" Header="Facing">
-                    <Grid Background="#FFE5E5E5">
-                        <WindowsFormsHost HorizontalAlignment="Left" Height="515" VerticalAlignment="Top" Width="875">
-                            <cnc:FacingWizard x:Name="toolFacing" AutoScaleMode="Inherit"/>
-                        </WindowsFormsHost>
-                    </Grid>
-                </TabItem>
--->
+            <!-- Tabs are built in code from TabRegistry (Phase 1: MainWindow is a container).
+                 See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
         </TabControl>
     </DockPanel>
 </Window>

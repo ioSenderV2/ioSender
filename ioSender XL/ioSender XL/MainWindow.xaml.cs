@@ -185,6 +185,11 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
+            // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
+            // before anything that resolves a tab via getTab()/getView() below.
+            RegisterBuiltinTabs();
+            BuildTabs();
+
             // Config already loaded in the constructor; here we only open the connection (deferred so
             // the main window paints first). res == 2: user cancelled / no connection - stay open
             // (disconnected) so the user can connect later via the Connect menu item.
@@ -209,8 +214,8 @@ namespace GCode_Sender
                 if (view != null && view != settingsView)
                 {
                     view.Setup(UIViewModel, AppConfig.Settings);
-                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.GRBLConfig
-                                 || view.ViewType == ViewType.LoadStock || view.ViewType == ViewType.MachineSetup;
+                    // Initial pre-connection enable state comes from each tab's descriptor (set in
+                    // BuildTabs); the connection/JobRunning state drives enable from there on.
                 }
             }
 #if ADD_CAMERA
@@ -893,6 +898,44 @@ namespace GCode_Sender
             return tab != null;
         }
 
+        // Register the built-in tabs (ioSender XL) as descriptors. This is the one place that knows the
+        // concrete tab views; new tabs (incl. from plugins) register their own descriptor instead of
+        // editing MainWindow.xaml + the scattered enable/visibility lists. Labels are not yet localized
+        // (built-in tabs lost their LocBaml x:Uid headers in the container conversion - revisited when
+        // registered-tab localization is designed).
+        private void RegisterBuiltinTabs()
+        {
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Grbl", () => new JobView(), 10, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, "Load stock", () => new LoadStockView(), 20, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50));
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60,
+                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70));
+            TabRegistry.Register(new TabDescriptor(ViewType.Tools, "Tools", () => new ToolsView(), 80, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, "Machine Setup", () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
+        }
+
+        // Instantiate the registered tabs into the (XAML-empty) TabControl, in descriptor order.
+        private void BuildTabs()
+        {
+            tabMode.Items.Clear();
+            foreach (var d in TabRegistry.Descriptors)
+            {
+                var ctl = d.Create?.Invoke();
+                if (ctl == null)
+                    continue;
+                d.Configure?.Invoke(ctl);
+                tabMode.Items.Add(new TabItem
+                {
+                    Header = d.Label,
+                    Content = ctl,
+                    IsEnabled = d.EnabledWhenDisconnected
+                });
+            }
+        }
+
         // Publish the tabs currently present (after capability filtering) so the "Edit Main Page" Tabs editor can
         // list them, then reorder/hide them per Config.Tabs (ordered ViewType names). Settings:App is always kept
         // visible (it hosts the editor), and an empty/invalid result falls back to the built-in order.
@@ -928,15 +971,15 @@ namespace GCode_Sender
                 if (byName.TryGetValue(name, out t) && !desired.Contains(t))
                     desired.Add(t);
             }
-            TabItem prot;   // Settings (hosts App settings + the Edit Main Page editor) must remain reachable
-            if (byName.TryGetValue(ViewType.GRBLConfig.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
-            // Machine Setup is the setup gate - always keep it visible even if a saved layout predates it.
-            if (byName.TryGetValue(ViewType.MachineSetup.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
-            // Tools is now a hub (tool table + calibration / spoilboard / tuning) - keep it visible too.
-            if (byName.TryGetValue(ViewType.Tools.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
+            // Tabs flagged AlwaysVisible in the registry (Settings hosts App settings + the Edit Main
+            // Page editor; Machine Setup is the setup gate; Tools is the hub) must remain reachable even
+            // if a saved layout predates them or would hide them.
+            TabItem prot;
+            foreach (var d in CNC.Controls.TabRegistry.Descriptors)
+            {
+                if (d.AlwaysVisible && byName.TryGetValue(d.Name, out prot) && !desired.Contains(prot))
+                    desired.Add(prot);
+            }
 
             if (desired.Count == 0)
                 return;     // safety: never hide everything
