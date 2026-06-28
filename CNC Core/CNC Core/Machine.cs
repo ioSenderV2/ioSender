@@ -64,14 +64,20 @@ namespace CNC.Core
 
         public void Reset()
         {
-            // Sync with controller
-            if (GrblInfo.IsGrblHAL)
+            // Sync with controller - only when one is actually connected. The G-code model (GCode.File)
+            // can be constructed before any connection (e.g. a panel touching GCode.File while the UI
+            // builds), and querying a non-existent controller here NRE'd in PollGrbl.Suspend (Comms.com
+            // == null). When disconnected, just reset local modal/coordinate state.
+            if (Comms.com != null && Comms.com.IsOpen)
             {
-                GrblParserState.Get();
-                GrblWorkParameters.Get();
+                if (GrblInfo.IsGrblHAL)
+                {
+                    GrblParserState.Get();
+                    GrblWorkParameters.Get();
+                }
+                else
+                    GrblParserState.Get(true);
             }
-            else
-                GrblParserState.Get(true);
 
             coordinateSystems.Clear();
             foreach (CoordinateSystem c in GrblWorkParameters.CoordinateSystems)
