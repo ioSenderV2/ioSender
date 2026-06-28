@@ -136,6 +136,34 @@ namespace CNC.Controls
         }
     }
 
+    public static class TabOrder
+    {
+        // Reorder/filter the top-level tabs slot to match a saved flat tab order (legacy Config.Tabs):
+        // empty = keep the tree's current order; non-empty = exactly those, in order. Existing nodes are
+        // reused (their nested slots are preserved) and essentials are re-added. Transitional - keeps the
+        // old Edit-Main-Page editor (which writes Config.Tabs) working until the editor edits the tree.
+        public static void Apply(LayoutNode root, IEnumerable<string> savedTabs)
+        {
+            var tabs = root?.Slot(LayoutKeys.SlotTabs);
+            if (tabs == null)
+                return;
+
+            var list = savedTabs?.Where(s => !string.IsNullOrEmpty(s)).ToList();
+            if (list != null && list.Count > 0)
+            {
+                var byKey = tabs.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
+                var ordered = new List<LayoutNode>();
+                foreach (var key in list)
+                    if (byKey.TryGetValue(key, out var node) && !ordered.Contains(node))
+                        ordered.Add(node);
+                if (ordered.Count > 0)
+                    tabs.Items = ordered;
+            }
+
+            LayoutTree.EnsureEssentials(root);
+        }
+    }
+
     public static class LayoutMigration
     {
         // Build the initial tree from defaults, applying a saved top-level tab order/visibility - the old

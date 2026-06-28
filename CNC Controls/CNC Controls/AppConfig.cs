@@ -782,6 +782,11 @@ namespace CNC.Controls
             Base.Themes.Add("Light", LibStrings.FindResource("ThemeLight"));
             Base.Themes.Add("White", LibStrings.FindResource("ThemeWhite"));
 
+            // Keep the layout tree's top-level tab order in sync with the legacy Config.Tabs (still the
+            // editor's source until the layout editor edits the tree). Transitional - tree drives the build.
+            if (layoutSection != null)
+                TabOrder.Apply(layoutSection.Root, Base.Tabs);
+
             // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
             // standalone file: persist the converted form now so the stored config is canonical. The
             // previous file is preserved as .bak by the atomic Save (recoverable on a downgrade).

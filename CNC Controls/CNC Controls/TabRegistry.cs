@@ -90,6 +90,12 @@ namespace CNC.Controls
             return _descriptors.FirstOrDefault(d => d.ViewType == viewType);
         }
 
+        // Look up by stable Name (== layout-tree component key). Used when building tabs from the layout tree.
+        public static TabDescriptor DescriptorByName(string name)
+        {
+            return _descriptors.FirstOrDefault(d => d.Name == name);
+        }
+
         // ---- publish layer: the lighter list the editor reads (unchanged behaviour) ----
 
         // All tabs present in the host window (in their built-in order), published by the host at startup.

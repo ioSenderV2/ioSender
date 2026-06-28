@@ -917,12 +917,23 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, "Machine Setup", () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
         }
 
-        // Instantiate the registered tabs into the (XAML-empty) TabControl, in descriptor order.
+        // Instantiate the tabs into the (XAML-empty) TabControl in the order given by the layout tree
+        // (AppConfig.Layout's "tabs" slot). Each node's component key maps to a registered TabDescriptor
+        // that supplies the factory/label/enable/configure. The tree is the placement authority; the
+        // descriptor is the build recipe. EnsureEssentials guarantees Settings stays reachable.
         private void BuildTabs()
         {
             tabMode.Items.Clear();
-            foreach (var d in TabRegistry.Descriptors)
+
+            var tabsSlot = AppConfig.Settings.Layout?.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot == null)
+                return;
+
+            foreach (var node in tabsSlot.Items)
             {
+                var d = TabRegistry.DescriptorByName(node.Component);
+                if (d == null)
+                    continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
                 var ctl = d.Create?.Invoke();
                 if (ctl == null)
                     continue;
@@ -936,58 +947,24 @@ namespace GCode_Sender
             }
         }
 
-        // Publish the tabs currently present (after capability filtering) so the "Edit Main Page" Tabs editor can
-        // list them, then reorder/hide them per Config.Tabs (ordered ViewType names). Settings:App is always kept
-        // visible (it hosts the editor), and an empty/invalid result falls back to the built-in order.
+        // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main
+        // Page" Tabs editor can list them. Ordering/visibility is now driven by the layout tree (BuildTabs),
+        // which is kept in sync with the legacy Config.Tabs at load (TabOrder.Apply) - so no reorder here.
         private void PublishAndApplyTabs()
         {
-            var present = new System.Collections.Generic.List<TabItem>();
-            foreach (TabItem t in tabMode.Items)
-                present.Add(t);
-
-            var byName = new System.Collections.Generic.Dictionary<string, TabItem>();
             var infos = new System.Collections.Generic.List<CNC.Controls.TabInfo>();
-            foreach (var t in present)
+            var seen = new System.Collections.Generic.HashSet<string>();
+            foreach (TabItem t in tabMode.Items)
             {
                 // Most tabs host an ICNCView (key = ViewType); some (e.g. Trinamic tuner) host an IGrblConfigTab
                 // with no ViewType, so fall back to the TabItem's x:Name so they still appear in the editor.
                 var v = getView(t);
                 string name = v != null ? v.ViewType.ToString() : t.Name;
-                if (string.IsNullOrEmpty(name) || byName.ContainsKey(name))
+                if (string.IsNullOrEmpty(name) || !seen.Add(name))
                     continue;
-                byName[name] = t;
                 infos.Add(new CNC.Controls.TabInfo(name, t.Header?.ToString() ?? name));
             }
             CNC.Controls.TabRegistry.Publish(infos);
-
-            var order = AppConfig.Settings.Base.Tabs;
-            if (order == null || order.Count == 0)
-                return;     // default: keep built-in order and visibility
-
-            var desired = new System.Collections.Generic.List<TabItem>();
-            foreach (var name in order)
-            {
-                TabItem t;
-                if (byName.TryGetValue(name, out t) && !desired.Contains(t))
-                    desired.Add(t);
-            }
-            // Tabs flagged AlwaysVisible in the registry (Settings hosts App settings + the Edit Main
-            // Page editor; Machine Setup is the setup gate; Tools is the hub) must remain reachable even
-            // if a saved layout predates them or would hide them.
-            TabItem prot;
-            foreach (var d in CNC.Controls.TabRegistry.Descriptors)
-            {
-                if (d.AlwaysVisible && byName.TryGetValue(d.Name, out prot) && !desired.Contains(prot))
-                    desired.Add(prot);
-            }
-
-            if (desired.Count == 0)
-                return;     // safety: never hide everything
-
-            tabMode.Items.Clear();
-            foreach (var t in desired)
-                tabMode.Items.Add(t);
-            tabMode.SelectedIndex = 0;
         }
 
 #if ADD_CAMERA
