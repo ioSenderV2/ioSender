@@ -234,6 +234,16 @@ namespace CNC.Controls
             }
         }
 
+        // Run one-time legacy importers for every registered section. Used on the v1 (<Config>) -> v2
+        // load path, where the sectioned ReadDocument is bypassed: sections whose values came from the
+        // legacy blob have no importer (no-op), while new-concept sections (e.g. Layout) import.
+        public static void ImportLegacyForAbsentSections()
+        {
+            foreach (var s in _sections)
+                if (s.ImportLegacy())
+                    MigratedOnLoad = true;
+        }
+
         // Clear registrations + preserved unknowns. For test isolation only.
         public static void Reset()
         {

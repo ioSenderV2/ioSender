@@ -135,4 +135,35 @@ namespace CNC.Controls
             return root;
         }
     }
+
+    public static class LayoutMigration
+    {
+        // Build the initial tree from defaults, applying a saved top-level tab order/visibility - the old
+        // flat Config.Tabs (Phase 1 semantics: empty = default order/all shown; non-empty = exactly these,
+        // in order). The nested slots (Tools sub-tabs, Grbl center) take their defaults - they were not
+        // configurable before. EnsureEssentials guarantees the result is safe.
+        public static LayoutNode FromFlat(IEnumerable<string> savedTabs)
+        {
+            var tree = DefaultLayout.Build();
+            var list = savedTabs?.Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+            if (list != null && list.Count > 0)
+            {
+                var tabsSlot = tree.Slot(LayoutKeys.SlotTabs);
+                var byKey = tabsSlot.Items
+                    .GroupBy(n => n.Component)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                var ordered = new List<LayoutNode>();
+                foreach (var key in list)
+                    if (byKey.TryGetValue(key, out var node) && !ordered.Contains(node))
+                        ordered.Add(node);
+
+                if (ordered.Count > 0)
+                    tabsSlot.Items = ordered;
+            }
+
+            return LayoutTree.EnsureEssentials(tree);
+        }
+    }
 }

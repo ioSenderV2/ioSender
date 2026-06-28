@@ -436,7 +436,16 @@ namespace CNC.Controls
             ConfigStore.Register(new XmlObjectSection<CameraConfig>("Camera", () => Base.Camera, v => Base.Camera = v));
             ConfigStore.Register(new XmlObjectSection<GCodeViewerConfig>("GCodeViewer", () => Base.GCodeViewer, v => Base.GCodeViewer = v));
             ConfigStore.Register(new XmlObjectSection<ProbeConfig>("Probing", () => Base.Probing, v => Base.Probing = v));
+
+            // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
+            // read Base.Tabs when the section is absent (first run on a build that has it).
+            layoutSection = new LayoutSection(() => LayoutMigration.FromFlat(Base?.Tabs));
+            ConfigStore.Register(layoutSection);
         }
+
+        // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).
+        private LayoutSection layoutSection;
+        public LayoutNode Layout { get { return layoutSection?.Root; } }
 
         private AppConfig()
         {
@@ -601,6 +610,9 @@ namespace CNC.Controls
                         // into Base, then flag a migrate-save so it is rewritten as sectioned v2.
                         using (var r = doc.Root.CreateReader())
                             Base = (Config)legacySerializer.Deserialize(r);
+                        // ReadDocument is bypassed on this path, so run section legacy-importers
+                        // explicitly (e.g. build the Layout tree from the flat Config.Tabs).
+                        ConfigStore.ImportLegacyForAbsentSections();
                         _migratedFormat = true;
                     }
                     else
