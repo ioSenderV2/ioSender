@@ -214,7 +214,7 @@ namespace CNC.Controls.Viewer
                 Length = Math.Max(sx, 1d),
                 Width = Math.Max(sy, 1d),
                 Height = h,
-                Fill = new SolidColorBrush(Color.FromArgb(96, 205, 175, 125))
+                Fill = new SolidColorBrush(Color.FromArgb(80, 150, 100, 55))   // translucent brown stock
             });
         }
 
@@ -267,10 +267,11 @@ namespace CNC.Controls.Viewer
                     }
                 }
 
-                cutLines = new LinesVisual3D { Color = Color.FromRgb(80, 150, 235), Thickness = 1.4d, Points = cut };
-                rapidLines = new LinesVisual3D { Color = Color.FromRgb(120, 120, 120), Thickness = 0.6d, Points = rapid };
+                cutLines = new LinesVisual3D { Color = Color.FromRgb(20, 90, 210), Thickness = 1.4d, Points = cut };    // blue carve trails
+                rapidLines = new LinesVisual3D { Color = Color.FromRgb(160, 160, 160), Thickness = 0.6d, Points = rapid };
 
                 InitHeightmap();   // fresh stock surface sized to the new program
+                framed = false;    // re-frame the camera to the new program/stock on the next build
             }
 
             if (rapidLines != null)
@@ -351,8 +352,8 @@ namespace CNC.Controls.Viewer
             var model = new GeometryModel3D
             {
                 Geometry = carveMesh,
-                Material = MaterialHelper.CreateMaterial(Color.FromRgb(208, 178, 132)),
-                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(170, 145, 108))
+                Material = MaterialHelper.CreateMaterial(Color.FromRgb(155, 105, 60)),       // brown stock surface
+                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(120, 80, 45))
             };
             carveVisual = new ModelVisual3D { Content = model };
             RebuildMesh();

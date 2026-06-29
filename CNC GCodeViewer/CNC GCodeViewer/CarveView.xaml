@@ -12,7 +12,7 @@
          Material removal comes later. -->
     <Grid>
         <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="False"
-                               ShowViewCube="True" ShowCoordinateSystem="True" Background="#FF2D2D30"
+                               ShowViewCube="True" ShowCoordinateSystem="True" Background="#FFFBF4CF"
                                RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
             <helix:HelixViewport3D.Camera>
                 <PerspectiveCamera LookDirection="-1,1,-1" UpDirection="0,0,1" FieldOfView="45"/>
