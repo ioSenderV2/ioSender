@@ -24,7 +24,7 @@
                     <GroupBox x:Uid="hm_grpProbe" Header="Probe">
                         <StackPanel Orientation="Horizontal" Margin="6,4">
                             <Label x:Uid="hm_lblProbe" Content="Probe:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name"/>
+                            <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="cbxProbe_SelectionChanged"/>
                         </StackPanel>
                     </GroupBox>
 
@@ -76,6 +76,9 @@
                             <cnccontrols:NumericField x:Uid="hm_depth" Label="Probe depth:" ColonAt="90" Unit="mm" Format="###0.0##" Margin="0,4,0,0"
                                 ToolTip="How far below the start plane each probe may travel before it faults (surface should be within this)."
                                 Value="{Binding HeightMap.ProbeDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <cnccontrols:NumericField x:Uid="hm_feed" Label="Probe feed:" ColonAt="90" Unit="mm/min" Format="#####0" Margin="0,4,0,0"
+                                ToolTip="Feed for every probe. The surface is already roughly known, so all points probe gently at this single approach feed - no fast search pass - which avoids overshoot/false triggers on a fragile probe. Defaults to the probe's latch (slow) feed."
+                                Value="{Binding HeightMap.ProbeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                         </StackPanel>
                     </GroupBox>
                 </StackPanel>
@@ -96,8 +99,36 @@
             </StackPanel>
         </Grid>
 
-        <!-- Right: 3D view of the planned grid / probed surface (blue low -> red high) -->
-        <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Column="1" Margin="8,0,0,0">
+        <!-- Right: steps/help on top, 3D view of the planned grid / probed surface (blue low -> red high) below -->
+        <Grid Grid.Column="1" Margin="8,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
+                <TextBlock x:Uid="hm_steps" Margin="8" TextWrapping="Wrap" LineHeight="18">
+                    <Run FontWeight="Bold" Text="1. Tell it where the stock is."/>
+                    <Run Text=" Height mapping probes in the current work coordinates, so set the work origin on the stock first: jog to the stock corner and zero X/Y, and set Z0 at the surface (the Load stock tab does this for you). 'Full table' instead references the homed machine corner and prompts you to touch off Z0."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="2. Choose the area."/>
+                    <Run Text=" 'From program' covers the loaded job's footprint (load it, then 'Set from program limits'); 'Full table' covers the whole machine bed. Edit X/Y/W/H to fine-tune."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="3. Set the grid + probe."/>
+                    <Run Text=" Smaller grid = denser and slower. Pick the probe to use; set Safe Z (clearance) and Probe depth (how far below Z0 to search)."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="4. Generate."/>
+                    <Run Text=" Builds the probe program - review it in the program view at the bottom."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="5. Cycle Start."/>
+                    <Run Text=" Probes the grid; the surface draws here as each point is measured."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="6. Apply / Save."/>
+                    <Run Text=" Apply rewrites the loaded program to follow the surface. Save stores the map (.map) to reuse later (Load)."/>
+                </TextBlock>
+            </GroupBox>
+
+            <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Row="1">
             <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
                                    RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
                 <helix:HelixViewport3D.Camera>
@@ -127,6 +158,7 @@
                 <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
                 <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
             </helix:HelixViewport3D>
-        </GroupBox>
+            </GroupBox>
+        </Grid>
     </Grid>
 </UserControl>

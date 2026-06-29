@@ -46,7 +46,7 @@ namespace CNC.Controls.Probing
     {
         private bool _hasHeightMap = false, _canApply = false, _setToolOffset = false, _addPause = false, _lockGridSizeXY = true;
         private double _minX = 0d, _minY = 0d, _maxX = 50, _maxY = 50d, _gridSizeX = 5d, _gridSizeY = 5d;
-        private double _safeZ = 5d, _probeDepth = 5d;
+        private double _safeZ = 5d, _probeDepth = 5d, _probeFeed = 0d;
         private HeightMap _heightMap = null;
         private Point3DCollection _mapPoints;
         private Point3DCollection _bp;
@@ -69,6 +69,10 @@ namespace CNC.Controls.Probing
         public double SafeZ { get { return _safeZ; } set { if (value != _safeZ) { _safeZ = value; OnPropertyChanged(); } } }
         // How far below the start plane each probe may travel before faulting (mm).
         public double ProbeDepth { get { return _probeDepth; } set { if (value != _probeDepth) { _probeDepth = value; OnPropertyChanged(); } } }
+        // Feed used for every height-map probe (mm/min). The surface is already roughly known (Z0 is set), so all
+        // points probe at this slow approach feed - no fast search pass - which avoids overshoot/false triggers on
+        // a fragile probe. 0 = default to the probe definition's latch (slow) feed.
+        public double ProbeFeed { get { return _probeFeed; } set { if (value != _probeFeed) { _probeFeed = value; OnPropertyChanged(); } } }
 
         public bool GridSizeLockXY
         {

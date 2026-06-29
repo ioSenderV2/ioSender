@@ -282,7 +282,12 @@ namespace GCode_Sender
         {
             double safeZ = HeightMap.SafeZ;
             double depth = HeightMap.ProbeDepth;          // how far below the start plane the probe may travel
-            double searchF = p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 200d;
+            // Every point probes at this slow approach feed (no fast search pass): the surface is roughly known,
+            // so a single gentle probe avoids overshoot/false triggers on a fragile probe. Defaults to the probe's
+            // latch (slow) feed; the user can override in the Probe feed field.
+            double probeF = HeightMap.ProbeFeed > 0d ? HeightMap.ProbeFeed
+                          : p.LatchFeedRate > 0d ? p.LatchFeedRate
+                          : p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 100d;
 
             var b = new StringBuilder();
             void L(string s) { b.Append(s).Append('\n'); }
@@ -326,7 +331,7 @@ namespace GCode_Sender
                     int i = fwd ? k : map.SizeX - 1 - k;
                     var c = map.GetCoordinates(i, j);
                     L(string.Format("G0 X{0} Y{1}", N(c.X), N(c.Y)));
-                    L(string.Format("G38.3 Z{0} F{1}", N(-depth), N(searchF)));   // probe down to the surface
+                    L(string.Format("G38.3 Z{0} F{1}", N(-depth), N(probeF)));   // gentle probe down to the surface
                     L(string.Format("(PRINT, HM={0},{1} Z=#5063)", i, j));        // report the probe Z result
                     L("G0 Z" + N(safeZ));                                          // retract before the next point
                 }
@@ -465,5 +470,14 @@ namespace GCode_Sender
 
         private void AreaProgram_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.Program; }
         private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTable; }
+
+        private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Default the probe feed to the chosen probe's latch (slow) feed, but never clobber a value the user
+            // has set - so a fragile probe maps at the gentle approach feed out of the box, overridable per tab.
+            if (HeightMap.ProbeFeed <= 0d && cbxProbe.SelectedItem is ProbeDefinition p)
+                HeightMap.ProbeFeed = p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate;
+            InvalidateProgram();
+        }
     }
 }
