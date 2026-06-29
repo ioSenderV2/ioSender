@@ -15,6 +15,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -28,7 +30,15 @@ namespace CNC.Controls.Viewer
 {
     public partial class CarveView : UserControl
     {
-        private struct Seg { public Point3D A, B; public bool Rapid; public double Len; }
+        private struct Seg { public Point3D A, B; public bool Rapid; public double Len; public double Radius; }
+
+        // Tool info parsed from the program's (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) comments (the Fusion
+        // ioSenderBatchPost emits these). Maps tool number -> cutter geometry; drives the carve radius + cone.
+        private struct ToolInfo { public double Dia; public string Shape; public double Angle; }
+        private readonly Dictionary<int, ToolInfo> tools = new Dictionary<int, ToolInfo>();
+        private double defaultToolRadius = 3d;
+        private static readonly Regex rxTool =
+            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?", RegexOptions.IgnoreCase);
 
         private GrblViewModel model;
         private Position wpos;           // live WORK position (drives the cone when not playing)
@@ -75,6 +85,7 @@ namespace CNC.Controls.Viewer
                 if (wpos != null)
                     wpos.PropertyChanged += Wpos_PropertyChanged;
             }
+            viewport.SizeChanged += (s, ev) => FrameIfNeeded();   // frame once the viewport has a render size
             BuildScene();
         }
 
@@ -174,18 +185,24 @@ namespace CNC.Controls.Viewer
                 Normal = new Vector3D(0, 0, 1),
                 Height = Math.Max(zs * 0.2d, 15d),
                 BaseRadius = 0d,
-                TopRadius = 3d,
+                TopRadius = Math.Max(defaultToolRadius, 0.5d),   // real cutter radius from the program's (TOOL ...)
                 Fill = Brushes.OrangeRed
             };
             viewport.Children.Add(toolCone);
 
             UpdateTool();
+            FrameIfNeeded();
+        }
 
-            if (!framed && (xs > 1d || segs.Count > 0))   // frame once, when there is something to see
-            {
-                framed = true;
-                viewport.ZoomExtents(0);
-            }
+        // Frame the scene once - but only after the viewport has a render size. ZoomExtents before layout frames a
+        // degenerate box (it ends up zoomed onto the tool tip). Re-armed (framed=false) when a program loads, and
+        // also driven from the viewport's SizeChanged so the first real layout triggers it.
+        private void FrameIfNeeded()
+        {
+            if (framed || viewport == null || viewport.ActualWidth < 1d || viewport.ActualHeight < 1d)
+                return;
+            framed = true;
+            viewport.ZoomExtents(0);
         }
 
         // The stock block: the program's XY bounding box plus a margin, from the deepest cut up to work Z0.
@@ -234,6 +251,9 @@ namespace CNC.Controls.Viewer
                 var cut = new Point3DCollection();
                 var rapid = new Point3DCollection();
 
+                ParseTools();
+                double curRad = defaultToolRadius;
+
                 if (tokens != null)
                 {
                     var emu = new GCodeEmulator(true);   // translate canned cycles / G28 / G30 into moves
@@ -243,11 +263,16 @@ namespace CNC.Controls.Viewer
                     {
                         switch (a.Token.Command)
                         {
+                            case Commands.ToolSelect:
+                            case Commands.M61:
+                                if (a.Token is GCToolSelect ts && tools.TryGetValue(ts.Tool, out var ti))
+                                    curRad = Math.Max(ti.Dia / 2d, 0.1d);
+                                break;
                             case Commands.G0:
-                                AddSeg(a.Start, a.End, true, cut, rapid);
+                                AddSeg(a.Start, a.End, true, curRad, cut, rapid);
                                 break;
                             case Commands.G1:
-                                AddSeg(a.Start, a.End, false, cut, rapid);
+                                AddSeg(a.Start, a.End, false, curRad, cut, rapid);
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -255,13 +280,13 @@ namespace CNC.Controls.Viewer
                                 var p = a.Start;
                                 foreach (var q in pts)
                                 {
-                                    AddSeg(p, q, false, cut, rapid);
+                                    AddSeg(p, q, false, curRad, cut, rapid);
                                     p = q;
                                 }
                                 break;
                             default:
                                 if (!a.End.Equals(a.Start))
-                                    AddSeg(a.Start, a.End, a.IsRetract, cut, rapid);
+                                    AddSeg(a.Start, a.End, a.IsRetract, curRad, cut, rapid);
                                 break;
                         }
                     }
@@ -280,10 +305,10 @@ namespace CNC.Controls.Viewer
                 viewport.Children.Add(cutLines);
         }
 
-        private void AddSeg(Point3D a, Point3D b, bool rapid, Point3DCollection cut, Point3DCollection rapidColl)
+        private void AddSeg(Point3D a, Point3D b, bool rapid, double radius, Point3DCollection cut, Point3DCollection rapidColl)
         {
             double len = (b - a).Length;
-            segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len });
+            segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len, Radius = radius });
 
             var coll = rapid ? rapidColl : cut;
             coll.Add(a);
@@ -291,6 +316,41 @@ namespace CNC.Controls.Viewer
 
             Grow(a);
             Grow(b);
+        }
+
+        // Parse the program's (TOOL T=n D=d TYPE=t [A=a]) comment lines into the tool table; defaultToolRadius is
+        // the lowest-numbered tool's radius (used before the first tool change and for the live cone).
+        private void ParseTools()
+        {
+            tools.Clear();
+            defaultToolRadius = 3d;
+
+            var data = GCode.File.Data;
+            if (data == null)
+                return;
+
+            foreach (var b in data)
+            {
+                var m = rxTool.Match(b.Data ?? string.Empty);
+                if (!m.Success)
+                    continue;
+                if (int.TryParse(m.Groups[1].Value, out int t) &&
+                    double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
+                {
+                    double ang = 0d;
+                    if (m.Groups[4].Success)
+                        double.TryParse(m.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out ang);
+                    tools[t] = new ToolInfo { Dia = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang };
+                }
+            }
+
+            int lowest = int.MaxValue;
+            foreach (var kv in tools)
+                if (kv.Key < lowest)
+                {
+                    lowest = kv.Key;
+                    defaultToolRadius = Math.Max(kv.Value.Dia / 2d, 0.1d);
+                }
         }
 
         // Cut moves define the part footprint; rapids (often above the stock at safe Z) don't grow the stock.
@@ -539,7 +599,11 @@ namespace CNC.Controls.Viewer
                                   cs.A.Y + (cs.B.Y - cs.A.Y) * t,
                                   cs.A.Z + (cs.B.Z - cs.A.Z) * t);
             if (toolCone != null)
+            {
                 toolCone.Origin = pos;
+                if (cs.Radius > 0d)
+                    toolCone.TopRadius = cs.Radius;   // match the active tool; CarveTo carves with this radius
+            }
 
             CarveTo(pos);
             if (carveDirty && ++rebuildSkip >= 3)   // refresh the carved surface a few times/sec
