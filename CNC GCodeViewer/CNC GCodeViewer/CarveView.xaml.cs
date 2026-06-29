@@ -47,7 +47,9 @@ namespace CNC.Controls.Viewer
 
         // ---- program / stock ----
         private readonly List<Seg> segs = new List<Seg>();
-        private List<GCodeToken> builtTokens;
+        private int builtCount = -1;          // token count of the program the toolpath was last built from
+        private string builtName;             // FileName likewise (Parser.Tokens is a reused list, so we can't
+                                              // compare by reference - detect a new program by name + count)
         private LinesVisual3D cutLines, rapidLines;
         private Point3D bMin, bMax;     // program bounding box (work coords)
         private bool haveBox;
@@ -84,6 +86,7 @@ namespace CNC.Controls.Viewer
                 wpos = model.WorkPosition;
                 if (wpos != null)
                     wpos.PropertyChanged += Wpos_PropertyChanged;
+                model.PropertyChanged += Model_PropertyChanged;
             }
             viewport.SizeChanged += (s, ev) => FrameIfNeeded();   // frame once the viewport has a render size
             BuildScene();
@@ -93,7 +96,16 @@ namespace CNC.Controls.Viewer
         {
             if (wpos != null)
                 wpos.PropertyChanged -= Wpos_PropertyChanged;
+            if (model != null)
+                model.PropertyChanged -= Model_PropertyChanged;
             timer?.Stop();
+        }
+
+        // A program load (FileName change) while the view is open: rebuild the toolpath/stock.
+        private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(GrblViewModel.FileName) && IsVisible)
+                BuildScene();
         }
 
         // The controller settings/offsets that size + place the envelope and the loaded program may arrive after
@@ -240,10 +252,13 @@ namespace CNC.Controls.Viewer
         private void BuildToolpath()
         {
             var tokens = GCode.File.Tokens;
+            int cnt = tokens?.Count ?? 0;
+            string name = model?.FileName ?? string.Empty;
 
-            if (tokens != builtTokens)
+            if (cnt != builtCount || name != builtName)
             {
-                builtTokens = tokens;
+                builtCount = cnt;
+                builtName = name;
                 segs.Clear();
                 haveBox = false;
                 StopPlayback();
