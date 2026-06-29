@@ -81,10 +81,12 @@ namespace CNC.Controls.Viewer
         private int hnx, hny;
         private double hx0, hy0, hcell, htop, hbot;
         private MeshGeometry3D carveMesh;
+        private Point3DCollection meshPos;               // the mesh's live Positions (mutated in place as we carve)
+        private readonly List<int> dirtyCells = new List<int>();   // top-vert indices carved since the last push
+        private int rebuildSkip;
         private ModelVisual3D carveVisual;
         private Point3D lastPos;                         // previous cutter position (swept-path carve)
-        private bool haveLast, carveDirty;
-        private int rebuildSkip;
+        private bool haveLast;
 
         public CarveView()
         {
@@ -449,9 +451,10 @@ namespace CNC.Controls.Viewer
         {
             carveVisual = null;
             carveMesh = null;
+            meshPos = null;
             hmap = null;
             haveLast = false;
-            carveDirty = false;
+            dirtyCells.Clear();
             if (!haveBox)
                 return;
 
@@ -502,7 +505,19 @@ namespace CNC.Controls.Viewer
             AddQuad(tris, TR, BR, B3, B1);   // right side (x1)
             AddQuad(tris, B0, B1, B3, B2);   // bottom
 
-            carveMesh = new MeshGeometry3D { TriangleIndices = tris };
+            // Live positions: the deforming top grid + 4 bottom corners. Mutated in place as cells are carved
+            // (no per-frame reallocation), so the grid can stay fine without GC churn during playback.
+            meshPos = new Point3DCollection(topN + 4);
+            for (int j = 0; j <= hny; j++)
+                for (int i = 0; i <= hnx; i++)
+                    meshPos.Add(new Point3D(hx0 + i * hcell, hy0 + j * hcell, hmap[i, j]));   // hmap == htop here
+            double mx1 = hx0 + hnx * hcell, my1 = hy0 + hny * hcell;
+            meshPos.Add(new Point3D(hx0, hy0, hbot));   // B0
+            meshPos.Add(new Point3D(mx1, hy0, hbot));   // B1
+            meshPos.Add(new Point3D(hx0, my1, hbot));   // B2
+            meshPos.Add(new Point3D(mx1, my1, hbot));   // B3
+
+            carveMesh = new MeshGeometry3D { TriangleIndices = tris, Positions = meshPos };
             var model = new GeometryModel3D
             {
                 Geometry = carveMesh,
@@ -510,7 +525,6 @@ namespace CNC.Controls.Viewer
                 BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(178, 150, 110))
             };
             carveVisual = new ModelVisual3D { Content = model };
-            RebuildMesh();
         }
 
         private static void AddQuad(Int32Collection t, int a, int b, int c, int d)
@@ -519,38 +533,35 @@ namespace CNC.Controls.Viewer
             t.Add(a); t.Add(c); t.Add(d);
         }
 
-        // Rebuild the solid stock positions from the heightmap: the deforming top grid + 4 bottom corners
-        // (indices fixed, normals auto by WPF).
-        private void RebuildMesh()
+        // Push carved cells into the mesh positions in place (no reallocation); only the cells changed since the
+        // last push are written, so it stays cheap. WPF recomputes normals on the change, hence the throttle.
+        private void PushMesh()
         {
-            if (carveMesh == null || hmap == null)
+            if (meshPos == null || dirtyCells.Count == 0)
                 return;
-
-            var pos = new Point3DCollection((hnx + 1) * (hny + 1) + 4);
-            for (int j = 0; j <= hny; j++)
-                for (int i = 0; i <= hnx; i++)
-                    pos.Add(new Point3D(hx0 + i * hcell, hy0 + j * hcell, hmap[i, j]));
-
-            double x1 = hx0 + hnx * hcell, y1 = hy0 + hny * hcell;
-            pos.Add(new Point3D(hx0, hy0, hbot));   // B0
-            pos.Add(new Point3D(x1, hy0, hbot));    // B1
-            pos.Add(new Point3D(hx0, y1, hbot));    // B2
-            pos.Add(new Point3D(x1, y1, hbot));     // B3
-
-            carveMesh.Positions = pos;
+            int stride = hnx + 1;
+            foreach (int idx in dirtyCells)
+            {
+                int i = idx % stride, j = idx / stride;
+                meshPos[idx] = new Point3D(hx0 + i * hcell, hy0 + j * hcell, hmap[i, j]);
+            }
+            dirtyCells.Clear();
         }
 
-        // Reset the stock to an uncut block (e.g. on Stop, before a replay).
+        // Reset the stock to an uncut block (e.g. on Stop, before a replay) - in place.
         private void ResetStock()
         {
-            if (hmap == null)
+            if (hmap == null || meshPos == null)
                 return;
-            for (int i = 0; i <= hnx; i++)
-                for (int j = 0; j <= hny; j++)
+            int stride = hnx + 1;
+            for (int j = 0; j <= hny; j++)
+                for (int i = 0; i <= hnx; i++)
+                {
                     hmap[i, j] = htop;
+                    meshPos[j * stride + i] = new Point3D(hx0 + i * hcell, hy0 + j * hcell, htop);
+                }
+            dirtyCells.Clear();
             haveLast = false;
-            carveDirty = false;
-            RebuildMesh();
         }
 
         // Carve the swept path from the previous cutter position to p, using the current cutter geometry
@@ -614,7 +625,7 @@ namespace CNC.Controls.Viewer
                     if (hmap[i, j] > zc)
                     {
                         hmap[i, j] = zc;
-                        carveDirty = true;
+                        dirtyCells.Add(j * (hnx + 1) + i);   // pushed to the mesh (in place) on the next throttle
                     }
                 }
         }
@@ -637,11 +648,7 @@ namespace CNC.Controls.Viewer
             var p = new Point3D(x, y, z);
             toolCone.Origin = p;
             CarveTo(p);                  // live machine motion carves the stock too
-            if (carveDirty)              // poll rate is low, so refresh the surface each update
-            {
-                RebuildMesh();
-                carveDirty = false;
-            }
+            PushMesh();                  // status-poll rate is low, so push each update
         }
 
         // ---- playback control ----
@@ -739,8 +746,7 @@ namespace CNC.Controls.Viewer
                 if (toolCone != null)
                     toolCone.Origin = end;
                 CarveTo(end);
-                RebuildMesh();           // final refresh so the last cut shows
-                carveDirty = false;
+                PushMesh();              // final refresh so the last cut shows
                 playing = false;
                 timer?.Stop();
                 return;
@@ -761,11 +767,10 @@ namespace CNC.Controls.Viewer
             }
 
             CarveTo(pos);
-            if (carveDirty && ++rebuildSkip >= 4)   // refresh the carved surface a few times/sec (finer grid)
+            if (++rebuildSkip >= 3)   // push carved cells to the mesh a few times/sec
             {
                 rebuildSkip = 0;
-                RebuildMesh();
-                carveDirty = false;
+                PushMesh();
             }
         }
 
