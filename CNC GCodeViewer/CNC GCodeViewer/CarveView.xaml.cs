@@ -30,14 +30,24 @@ namespace CNC.Controls.Viewer
 {
     public partial class CarveView : UserControl
     {
-        private struct Seg { public Point3D A, B; public bool Rapid; public double Len; public double Radius; }
+        private struct Seg { public Point3D A, B; public bool Rapid; public double Len; public double Radius; public int Shape; public double Angle; }
+
+        // cutter shapes (from the program's TOOL TYPE=): flat end-mill, ball-nose, V-bit (Angle = included deg)
+        private const int ShapeFlat = 0, ShapeBall = 1, ShapeVbit = 2;
 
         // Tool info parsed from the program's (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) comments (the Fusion
         // ioSenderBatchPost emits these). Maps tool number -> cutter geometry; drives the carve radius + cone.
         private struct ToolInfo { public double Dia; public string Shape; public double Angle; }
         private readonly Dictionary<int, ToolInfo> tools = new Dictionary<int, ToolInfo>();
         private double defaultToolRadius = 3d;
+        private int defaultToolShape = ShapeFlat;
+        private double defaultToolAngle;
         private double stockZ;            // stock thickness from the program's (STOCK ... Z=..) comment; 0 = unknown
+
+        // current cutter geometry the carve uses (set per segment in playback, or the default for live motion)
+        private double curR = 3d;
+        private int curShape = ShapeFlat;
+        private double curAngle;
         private static readonly Regex rxTool =
             new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?", RegexOptions.IgnoreCase);
         private static readonly Regex rxStock =
@@ -291,6 +301,8 @@ namespace CNC.Controls.Viewer
 
                 ParseTools();
                 double curRad = defaultToolRadius;
+                int curShp = defaultToolShape;
+                double curAng = defaultToolAngle;
 
                 if (tokens != null)
                 {
@@ -304,13 +316,17 @@ namespace CNC.Controls.Viewer
                             case Commands.ToolSelect:
                             case Commands.M61:
                                 if (a.Token is GCToolSelect ts && tools.TryGetValue(ts.Tool, out var ti))
+                                {
                                     curRad = Math.Max(ti.Dia / 2d, 0.1d);
+                                    curShp = ShapeId(ti.Shape);
+                                    curAng = ti.Angle;
+                                }
                                 break;
                             case Commands.G0:
-                                AddSeg(a.Start, a.End, true, curRad, cut, rapid);
+                                AddSeg(a.Start, a.End, true, curRad, curShp, curAng, cut, rapid);
                                 break;
                             case Commands.G1:
-                                AddSeg(a.Start, a.End, false, curRad, cut, rapid);
+                                AddSeg(a.Start, a.End, false, curRad, curShp, curAng, cut, rapid);
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -318,13 +334,13 @@ namespace CNC.Controls.Viewer
                                 var p = a.Start;
                                 foreach (var q in pts)
                                 {
-                                    AddSeg(p, q, false, curRad, cut, rapid);
+                                    AddSeg(p, q, false, curRad, curShp, curAng, cut, rapid);
                                     p = q;
                                 }
                                 break;
                             default:
                                 if (!a.End.Equals(a.Start))
-                                    AddSeg(a.Start, a.End, a.IsRetract, curRad, cut, rapid);
+                                    AddSeg(a.Start, a.End, a.IsRetract, curRad, curShp, curAng, cut, rapid);
                                 break;
                         }
                     }
@@ -343,10 +359,17 @@ namespace CNC.Controls.Viewer
                 viewport.Children.Add(cutLines);
         }
 
-        private void AddSeg(Point3D a, Point3D b, bool rapid, double radius, Point3DCollection cut, Point3DCollection rapidColl)
+        private static int ShapeId(string shape)
+        {
+            if (shape == "BALL") return ShapeBall;
+            if (shape == "VBIT") return ShapeVbit;
+            return ShapeFlat;
+        }
+
+        private void AddSeg(Point3D a, Point3D b, bool rapid, double radius, int shape, double angle, Point3DCollection cut, Point3DCollection rapidColl)
         {
             double len = (b - a).Length;
-            segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len, Radius = radius });
+            segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len, Radius = radius, Shape = shape, Angle = angle });
 
             var coll = rapid ? rapidColl : cut;
             coll.Add(a);
@@ -362,6 +385,8 @@ namespace CNC.Controls.Viewer
         {
             tools.Clear();
             defaultToolRadius = 3d;
+            defaultToolShape = ShapeFlat;
+            defaultToolAngle = 0d;
             stockZ = 0d;
 
             var data = GCode.File.Data;
@@ -395,6 +420,8 @@ namespace CNC.Controls.Viewer
                 {
                     lowest = kv.Key;
                     defaultToolRadius = Math.Max(kv.Value.Dia / 2d, 0.1d);
+                    defaultToolShape = ShapeId(kv.Value.Shape);
+                    defaultToolAngle = kv.Value.Angle;
                 }
         }
 
@@ -516,16 +543,17 @@ namespace CNC.Controls.Viewer
             RebuildMesh();
         }
 
-        // Carve the swept path from the previous cutter position to p (flat tool of the cone's radius).
+        // Carve the swept path from the previous cutter position to p, using the current cutter geometry
+        // (curR / curShape / curAngle, set by the caller per segment or to the default for live motion).
         private void CarveTo(Point3D p)
         {
             if (hmap != null && haveLast)
-                CarveSegment(lastPos, p, toolCone != null ? toolCone.TopRadius : 3d);
+                CarveSegment(lastPos, p);
             lastPos = p;
             haveLast = true;
         }
 
-        private void CarveSegment(Point3D a, Point3D b, double r)
+        private void CarveSegment(Point3D a, Point3D b)
         {
             double dist = (b - a).Length;
             int steps = Math.Max(1, (int)(dist / (hcell * 0.5d)));
@@ -535,12 +563,17 @@ namespace CNC.Controls.Viewer
                 double pz = a.Z + (b.Z - a.Z) * t;
                 if (pz >= htop)
                     continue;   // above the stock - no cut
-                CarveDisc(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, Math.Max(pz, hbot), r);
+                CarveDisc(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, Math.Max(pz, hbot));
             }
         }
 
-        private void CarveDisc(double px, double py, double pz, double r)
+        // Lower stock cells under the cutter to its bottom profile at the tip depth pz:
+        //   flat  -> pz across the whole radius
+        //   ball  -> pz + (r - sqrt(r^2 - d^2))   (rounded bottom)
+        //   v-bit -> pz + d / tan(included/2)     (cone)
+        private void CarveDisc(double px, double py, double pz)
         {
+            double r = curR;
             int i0 = (int)Math.Floor((px - r - hx0) / hcell), i1 = (int)Math.Ceiling((px + r - hx0) / hcell);
             int j0 = (int)Math.Floor((py - r - hy0) / hcell), j1 = (int)Math.Ceiling((py + r - hy0) / hcell);
             if (i0 < 0) i0 = 0;
@@ -549,13 +582,28 @@ namespace CNC.Controls.Viewer
             if (j1 > hny) j1 = hny;
 
             double r2 = r * r;
+            double vk = (curShape == ShapeVbit && curAngle > 0d) ? 1d / Math.Tan(curAngle * 0.5d * Math.PI / 180d) : 0d;
+
             for (int i = i0; i <= i1; i++)
                 for (int j = j0; j <= j1; j++)
                 {
                     double dx = (hx0 + i * hcell) - px, dy = (hy0 + j * hcell) - py;
-                    if (dx * dx + dy * dy <= r2 && hmap[i, j] > pz)
+                    double d2 = dx * dx + dy * dy;
+                    if (d2 > r2)
+                        continue;
+
+                    double zc;
+                    if (curShape == ShapeBall)
+                        zc = pz + (r - Math.Sqrt(Math.Max(0d, r2 - d2)));
+                    else if (curShape == ShapeVbit)
+                        zc = pz + Math.Sqrt(d2) * vk;
+                    else
+                        zc = pz;
+                    if (zc < hbot) zc = hbot;
+
+                    if (hmap[i, j] > zc)
                     {
-                        hmap[i, j] = pz;
+                        hmap[i, j] = zc;
                         carveDirty = true;
                     }
                 }
@@ -571,6 +619,10 @@ namespace CNC.Controls.Viewer
             if (double.IsNaN(x)) x = 0d;
             if (double.IsNaN(y)) y = 0d;
             if (double.IsNaN(z)) z = 0d;
+
+            curR = defaultToolRadius;    // live motion uses the default (lowest) tool geometry
+            curShape = defaultToolShape;
+            curAngle = defaultToolAngle;
 
             var p = new Point3D(x, y, z);
             toolCone.Origin = p;
@@ -689,11 +741,13 @@ namespace CNC.Controls.Viewer
             var pos = new Point3D(cs.A.X + (cs.B.X - cs.A.X) * t,
                                   cs.A.Y + (cs.B.Y - cs.A.Y) * t,
                                   cs.A.Z + (cs.B.Z - cs.A.Z) * t);
+            curR = cs.Radius > 0d ? cs.Radius : defaultToolRadius;   // active tool's geometry for the carve
+            curShape = cs.Shape;
+            curAngle = cs.Angle;
             if (toolCone != null)
             {
                 toolCone.Origin = pos;
-                if (cs.Radius > 0d)
-                    toolCone.TopRadius = cs.Radius;   // match the active tool; CarveTo carves with this radius
+                toolCone.TopRadius = Math.Max(curR, 0.1d);
             }
 
             CarveTo(pos);
