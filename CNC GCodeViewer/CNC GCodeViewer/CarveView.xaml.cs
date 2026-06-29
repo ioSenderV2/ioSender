@@ -589,6 +589,7 @@ namespace CNC.Controls.Viewer
             if (segs.Count == 0)
                 return;
             playing = true;
+            SetToolpathVisible(false);   // hide the blue toolpath while simulating - just show the cut
             if (timer == null)
             {
                 timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(TickSeconds * 1000d) };
@@ -607,8 +608,27 @@ namespace CNC.Controls.Viewer
         {
             StopPlayback();
             ResetStock();                       // uncut block again, ready for a fresh replay
+            SetToolpathVisible(true);           // show the toolpath again
             if (segs.Count > 0 && toolCone != null)
                 toolCone.Origin = segs[0].A;    // back to the program start
+        }
+
+        // Show/hide the cut + rapid toolpath lines (hidden during playback so the carve is unobstructed).
+        private void SetToolpathVisible(bool show)
+        {
+            SetChild(cutLines, show);
+            SetChild(rapidLines, show);
+        }
+
+        private void SetChild(System.Windows.Media.Media3D.Visual3D v, bool show)
+        {
+            if (v == null || viewport == null)
+                return;
+            bool present = viewport.Children.Contains(v);
+            if (show && !present)
+                viewport.Children.Add(v);
+            else if (!show && present)
+                viewport.Children.Remove(v);
         }
 
         private void StopPlayback()
