@@ -254,14 +254,16 @@ namespace GCode_Sender
             pr.ProbeFeedRate = HeightMap.ProbeFeed > 0d ? HeightMap.ProbeFeed : (p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate);
             pr.ProbeDistance = HeightMap.ProbeDepth;
             pr.LatchDistance = 0d;
-            pr.ProbeOffsetX = p.ProbeOffsetX;
-            pr.ProbeOffsetY = p.ProbeOffsetY;
+            // Height mapping probes straight down with a spindle-centred Z-probe, so do NOT apply the probe's XY
+            // (edge-finder) offset - it would shift the grid off the corner. Probe the grid at the work coords.
+            pr.ProbeOffsetX = 0d;
+            pr.ProbeOffsetY = 0d;
             pr.HeightMap.MinX = HeightMap.MinX; pr.HeightMap.MaxX = HeightMap.MaxX;
             pr.HeightMap.MinY = HeightMap.MinY; pr.HeightMap.MaxY = HeightMap.MaxY;
             pr.HeightMap.GridSizeX = HeightMap.GridSizeX; pr.HeightMap.GridSizeY = HeightMap.GridSizeY;
 
-            // Map origin (work coords), backed off by the probe XY offset so the tip lands on the corner.
-            var startpos = new Position(pr.HeightMap.MinX - pr.ProbeOffsetX, pr.HeightMap.MinY - pr.ProbeOffsetY, 0d);
+            // Map origin = the area's min corner in the current work coordinates (e.g. G54 X0Y0).
+            var startpos = new Position(pr.HeightMap.MinX, pr.HeightMap.MinY, 0d);
 
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
             {
