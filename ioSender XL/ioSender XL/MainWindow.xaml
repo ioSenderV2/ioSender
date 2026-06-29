@@ -246,7 +246,7 @@
                 <Grid>
                     <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
                     <TextBox x:Name="overlayProgramText" Visibility="Collapsed" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
-                             Background="#FFF8F8F8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             Background="#FFE4F6E6" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                              TextWrapping="NoWrap" VerticalContentAlignment="Top"/>
                 </Grid>
             </DockPanel>
