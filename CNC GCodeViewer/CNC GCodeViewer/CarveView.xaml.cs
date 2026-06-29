@@ -51,6 +51,16 @@ namespace CNC.Controls.Viewer
         private const double TickSeconds = 0.033d;       // ~30 fps
         private DispatcherTimer timer;
 
+        // ---- material removal (dexel heightmap) ----
+        private double[,] hmap;                          // per-cell top-Z height of the stock
+        private int hnx, hny;
+        private double hx0, hy0, hcell, htop, hbot;
+        private MeshGeometry3D carveMesh;
+        private ModelVisual3D carveVisual;
+        private Point3D lastPos;                         // previous cutter position (swept-path carve)
+        private bool haveLast, carveDirty;
+        private int rebuildSkip;
+
         public CarveView()
         {
             InitializeComponent();
@@ -154,6 +164,8 @@ namespace CNC.Controls.Viewer
             // stock - sized to the loaded program (so it contains the cut), top at work Z0; default block if no program
             BuildToolpath();
             AddStock();
+            if (carveVisual != null)
+                viewport.Children.Add(carveVisual);   // carved top surface (deforms as the cutter passes)
 
             // tool cone - tip at the cutter, widening upward
             toolCone = new TruncatedConeVisual3D
@@ -257,6 +269,8 @@ namespace CNC.Controls.Viewer
 
                 cutLines = new LinesVisual3D { Color = Color.FromRgb(80, 150, 235), Thickness = 1.4d, Points = cut };
                 rapidLines = new LinesVisual3D { Color = Color.FromRgb(120, 120, 120), Thickness = 0.6d, Points = rapid };
+
+                InitHeightmap();   // fresh stock surface sized to the new program
             }
 
             if (rapidLines != null)
@@ -291,6 +305,130 @@ namespace CNC.Controls.Viewer
             bMax = new Point3D(Math.Max(bMax.X, p.X), Math.Max(bMax.Y, p.Y), Math.Max(bMax.Z, p.Z));
         }
 
+        // ---- dexel material removal ----
+
+        // Allocate the stock heightmap (cells start at the stock top) + the surface mesh, sized to the program.
+        private void InitHeightmap()
+        {
+            carveVisual = null;
+            carveMesh = null;
+            hmap = null;
+            haveLast = false;
+            carveDirty = false;
+            if (!haveBox)
+                return;
+
+            const double margin = 6d;
+            double x0 = bMin.X - margin, y0 = bMin.Y - margin, x1 = bMax.X + margin, y1 = bMax.Y + margin;
+            htop = Math.Max(bMax.Z, 0d);
+            hbot = Math.Min(bMin.Z, htop - 1d);
+
+            double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
+            const int maxCells = 150;
+            hcell = Math.Max(Math.Max(w, h) / maxCells, 0.5d);
+            hnx = Math.Max(1, (int)Math.Ceiling(w / hcell));
+            hny = Math.Max(1, (int)Math.Ceiling(h / hcell));
+            hx0 = x0;
+            hy0 = y0;
+
+            hmap = new double[hnx + 1, hny + 1];
+            for (int i = 0; i <= hnx; i++)
+                for (int j = 0; j <= hny; j++)
+                    hmap[i, j] = htop;
+
+            // triangle indices are fixed for the grid; built once, only Positions change as we carve
+            var tris = new Int32Collection(hnx * hny * 6);
+            int stride = hnx + 1;
+            for (int j = 0; j < hny; j++)
+                for (int i = 0; i < hnx; i++)
+                {
+                    int a = j * stride + i, b = a + 1, c = a + stride, d = c + 1;
+                    tris.Add(a); tris.Add(c); tris.Add(b);
+                    tris.Add(b); tris.Add(c); tris.Add(d);
+                }
+
+            carveMesh = new MeshGeometry3D { TriangleIndices = tris };
+            var model = new GeometryModel3D
+            {
+                Geometry = carveMesh,
+                Material = MaterialHelper.CreateMaterial(Color.FromRgb(208, 178, 132)),
+                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(170, 145, 108))
+            };
+            carveVisual = new ModelVisual3D { Content = model };
+            RebuildMesh();
+        }
+
+        // Rebuild the surface positions from the heightmap (indices/normals: indices fixed, normals auto by WPF).
+        private void RebuildMesh()
+        {
+            if (carveMesh == null || hmap == null)
+                return;
+
+            var pos = new Point3DCollection((hnx + 1) * (hny + 1));
+            for (int j = 0; j <= hny; j++)
+                for (int i = 0; i <= hnx; i++)
+                    pos.Add(new Point3D(hx0 + i * hcell, hy0 + j * hcell, hmap[i, j]));
+            carveMesh.Positions = pos;
+        }
+
+        // Reset the stock to an uncut block (e.g. on Stop, before a replay).
+        private void ResetStock()
+        {
+            if (hmap == null)
+                return;
+            for (int i = 0; i <= hnx; i++)
+                for (int j = 0; j <= hny; j++)
+                    hmap[i, j] = htop;
+            haveLast = false;
+            carveDirty = false;
+            RebuildMesh();
+        }
+
+        // Carve the swept path from the previous cutter position to p (flat tool of the cone's radius).
+        private void CarveTo(Point3D p)
+        {
+            if (hmap != null && haveLast)
+                CarveSegment(lastPos, p, toolCone != null ? toolCone.TopRadius : 3d);
+            lastPos = p;
+            haveLast = true;
+        }
+
+        private void CarveSegment(Point3D a, Point3D b, double r)
+        {
+            double dist = (b - a).Length;
+            int steps = Math.Max(1, (int)(dist / (hcell * 0.5d)));
+            for (int s = 0; s <= steps; s++)
+            {
+                double t = (double)s / steps;
+                double pz = a.Z + (b.Z - a.Z) * t;
+                if (pz >= htop)
+                    continue;   // above the stock - no cut
+                CarveDisc(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, Math.Max(pz, hbot), r);
+            }
+        }
+
+        private void CarveDisc(double px, double py, double pz, double r)
+        {
+            int i0 = (int)Math.Floor((px - r - hx0) / hcell), i1 = (int)Math.Ceiling((px + r - hx0) / hcell);
+            int j0 = (int)Math.Floor((py - r - hy0) / hcell), j1 = (int)Math.Ceiling((py + r - hy0) / hcell);
+            if (i0 < 0) i0 = 0;
+            if (j0 < 0) j0 = 0;
+            if (i1 > hnx) i1 = hnx;
+            if (j1 > hny) j1 = hny;
+
+            double r2 = r * r;
+            for (int i = i0; i <= i1; i++)
+                for (int j = j0; j <= j1; j++)
+                {
+                    double dx = (hx0 + i * hcell) - px, dy = (hy0 + j * hcell) - py;
+                    if (dx * dx + dy * dy <= r2 && hmap[i, j] > pz)
+                    {
+                        hmap[i, j] = pz;
+                        carveDirty = true;
+                    }
+                }
+        }
+
         // The cone follows the live work position when not simulating; playback owns it while playing.
         private void UpdateTool()
         {
@@ -302,7 +440,14 @@ namespace CNC.Controls.Viewer
             if (double.IsNaN(y)) y = 0d;
             if (double.IsNaN(z)) z = 0d;
 
-            toolCone.Origin = new Point3D(x, y, z);
+            var p = new Point3D(x, y, z);
+            toolCone.Origin = p;
+            CarveTo(p);                  // live machine motion carves the stock too
+            if (carveDirty)              // poll rate is low, so refresh the surface each update
+            {
+                RebuildMesh();
+                carveDirty = false;
+            }
         }
 
         // ---- playback control ----
@@ -329,8 +474,9 @@ namespace CNC.Controls.Viewer
         private void Stop_Click(object sender, RoutedEventArgs e)
         {
             StopPlayback();
+            ResetStock();                       // uncut block again, ready for a fresh replay
             if (segs.Count > 0 && toolCone != null)
-                toolCone.Origin = segs[0].A;   // back to the program start
+                toolCone.Origin = segs[0].A;    // back to the program start
         }
 
         private void StopPlayback()
@@ -375,8 +521,12 @@ namespace CNC.Controls.Viewer
 
             if (segIdx >= segs.Count)
             {
+                var end = segs[segs.Count - 1].B;
                 if (toolCone != null)
-                    toolCone.Origin = segs[segs.Count - 1].B;
+                    toolCone.Origin = end;
+                CarveTo(end);
+                RebuildMesh();           // final refresh so the last cut shows
+                carveDirty = false;
                 playing = false;
                 timer?.Stop();
                 return;
@@ -384,10 +534,19 @@ namespace CNC.Controls.Viewer
 
             var cs = segs[segIdx];
             double t = cs.Len > 0d ? segPos / cs.Len : 0d;
+            var pos = new Point3D(cs.A.X + (cs.B.X - cs.A.X) * t,
+                                  cs.A.Y + (cs.B.Y - cs.A.Y) * t,
+                                  cs.A.Z + (cs.B.Z - cs.A.Z) * t);
             if (toolCone != null)
-                toolCone.Origin = new Point3D(cs.A.X + (cs.B.X - cs.A.X) * t,
-                                              cs.A.Y + (cs.B.Y - cs.A.Y) * t,
-                                              cs.A.Z + (cs.B.Z - cs.A.Z) * t);
+                toolCone.Origin = pos;
+
+            CarveTo(pos);
+            if (carveDirty && ++rebuildSkip >= 3)   // refresh the carved surface a few times/sec
+            {
+                rebuildSkip = 0;
+                RebuildMesh();
+                carveDirty = false;
+            }
         }
 
         private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e)
