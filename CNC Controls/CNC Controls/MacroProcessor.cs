@@ -91,7 +91,17 @@ namespace CNC.Controls
         // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
         // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)
         // and tools no longer need their own Run button. Null = no tool active: Cycle Start streams the job.
-        public static System.Action ActiveRun;
+        // Setting it raises ActiveProgramChanged so program views can re-mark which one is the configured source.
+        private static System.Action _activeRun;
+        public static System.Action ActiveRun
+        {
+            get { return _activeRun; }
+            set { _activeRun = value; ActiveProgramChanged?.Invoke(); }
+        }
+
+        // Raised when the active program changes (a wizard tab set/cleared, or a job loaded). Program views
+        // subscribe to re-evaluate the "configured input source" highlight (the mint background).
+        public static event System.Action ActiveProgramChanged;
 
         // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
         // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the

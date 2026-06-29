@@ -41,6 +41,7 @@ using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CNC.Core;
@@ -55,11 +56,19 @@ namespace CNC.Controls
         public ScrollViewer scroll = null;
         private ObservableCollection<GCodeBlock> _program;   // null = show the loaded job (GCode.File)
 
+        // Mint marks the view that is the streamer's configured input source (what Cycle Start will run).
+        private static readonly Brush MintBrush = MakeFrozen(Color.FromRgb(0xE4, 0xF6, 0xE6));
+        private static Brush MakeFrozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+
         public GCodeListControl()
         {
             InitializeComponent();
 
             ctxMenu.DataContext = this;
+            // Re-mark the source highlight whenever the active program changes (a wizard tab set/cleared, a job
+            // loaded), even on views whose own program didn't change (e.g. the loaded-job view).
+            MacroProcessor.ActiveProgramChanged += RefreshSourceHighlight;
+            Unloaded += (s, e) => MacroProcessor.ActiveProgramChanged -= RefreshSourceHighlight;
         }
 
         // The program this view renders. A program is just a list of G-code blocks - file, folder or wizard,
@@ -69,6 +78,20 @@ namespace CNC.Controls
             _program = blocks;
             grdGCode.DataContext = (object)_program ?? GCode.File.Data;
             ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.IsFolderView ?? false));
+            RefreshSourceHighlight();
+        }
+
+        // Mint the background only when this view shows the streamer's configured input source: the active
+        // wizard program when one is set, otherwise the loaded job. So exactly the program Cycle Start will run
+        // is highlighted - a wizard's program view goes mint and the loaded-job view does not, and vice versa.
+        private void RefreshSourceHighlight()
+        {
+            bool isSource = MacroProcessor.ActiveRun != null
+                ? _program != null                                // the active wizard program's view
+                : _program == null && GCode.File.IsLoaded;        // the loaded-job view
+
+            grdGCode.Background = isSource ? MintBrush : Brushes.Transparent;
+            grdGCode.RowBackground = isSource ? MintBrush : Brushes.White;
         }
 
         #region Dependency properties
@@ -107,6 +130,7 @@ namespace CNC.Controls
                 (DataContext as GrblViewModel).PropertyChanged += GCodeListControl_PropertyChanged;
                 ApplyGrouping(_program == null && (DataContext as GrblViewModel).IsFolderView);
             }
+            RefreshSourceHighlight();
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
