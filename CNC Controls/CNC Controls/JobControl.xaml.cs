@@ -145,6 +145,28 @@ namespace CNC.Controls
 //            Thread.Sleep(100);
 
             Loaded += JobControl_Loaded;
+
+            // The run bar is fixed at the main-window bottom and visible on every tab, but its state machine is
+            // only "active" on the Grbl tab. A wizard tab registers its program as a runnable source while the
+            // Grbl tab is not active, so refresh the Cycle Start enable directly when the active program changes -
+            // otherwise the bar's enables stay frozen and Cycle Start looks dead on the wizard tab.
+            MacroProcessor.ActiveProgramChanged += OnActiveProgramChanged;
+        }
+
+        private void OnActiveProgramChanged()
+        {
+            if (model == null)
+                return;
+
+            // A wizard program is a runnable source even though the Grbl tab isn't active. Keep status reports
+            // flowing so the bar's state machine (GrblStateChanged, relaxed below) stays live - otherwise its
+            // enables freeze and Cycle Start re-disables after the first run.
+            if (MacroProcessor.ActiveRun != null)
+                EnablePolling(true);
+
+            // Refresh Cycle Start now (only meaningful when idle; a running/held job manages its own enables).
+            if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
+                IsCycleStartEnabled = Source.IsLoaded || MacroProcessor.ActiveRun != null || (model.IsSDCardJob && model.SDRewind);
         }
 
         public static readonly DependencyProperty IsCycleStartEnabledProperty = DependencyProperty.Register(nameof(IsCycleStartEnabled), typeof(bool), typeof(JobControl));
@@ -1090,7 +1112,10 @@ namespace CNC.Controls
             if (grblState.State == GrblStates.Jog)
                 model.IsJobRunning = false;
 
-            if (isActive) switch(newstate.State)
+            // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
+            // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
+            // there too (Idle re-enables Cycle Start after a run, Hold/Tool/Alarm behave as on the Grbl tab).
+            if (isActive || MacroProcessor.ActiveRun != null) switch(newstate.State)
             {
                 case GrblStates.Idle:
                     streamingHandler.Call(StreamingState.Idle, true);
