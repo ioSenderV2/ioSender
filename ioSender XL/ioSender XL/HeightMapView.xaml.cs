@@ -211,8 +211,25 @@ namespace GCode_Sender
 
         private void Start_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                StartProbing();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Height map could not start:\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void StartProbing()
+        {
             if (model == null)
+                model = DataContext as GrblViewModel ?? CNC.Core.Grbl.GrblViewModel;
+            if (model == null)
+            {
+                MessageBox.Show("No controller is connected.", "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
+            }
 
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
@@ -241,14 +258,22 @@ namespace GCode_Sender
             var startpos = new Position(pr.HeightMap.MinX - pr.ProbeOffsetX, pr.HeightMap.MinY - pr.ProbeOffsetY, 0d);
 
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
+            {
+                MessageBox.Show(string.Format("Could not move to the map origin / reach Idle. Controller state: {0}.\r\n\r\nConnect, home and clear any alarm, then try again.", model.GrblState.State),
+                    "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
+            }
             if (!pr.VerifyProbe())
             {
                 MessageBox.Show("The probe is not ready (not connected, or already triggered).", "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!pr.Program.Init())
+            {
+                MessageBox.Show(string.IsNullOrEmpty(pr.Message) ? "Probing could not be started (machine not idle, not homed, or position unknown)." : pr.Message,
+                    "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
+            }
 
             CNC.Controls.Probing.HeightMap map;
             try
