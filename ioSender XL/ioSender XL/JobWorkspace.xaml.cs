@@ -32,7 +32,7 @@ namespace GCode_Sender
         private static void RegisterCenter()
         {
             ComponentRegistry.Register(LayoutKeys.Program, "Program", () => new ProgramPanel());
-            ComponentRegistry.Register(LayoutKeys.Toolpath3D, "3D View", () => new RenderControl());
+            ComponentRegistry.Register(LayoutKeys.Toolpath3D, "3D View", () => new CarveView());   // live machine/carve view (replaces RenderControl)
             ComponentRegistry.Register(LayoutKeys.Console, "Console", () => new ConsoleControl());
         }
 

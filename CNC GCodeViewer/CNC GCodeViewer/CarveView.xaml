@@ -1,0 +1,22 @@
+<UserControl x:Class="CNC.Controls.Viewer.CarveView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:helix="clr-namespace:HelixToolkit.Wpf;assembly=HelixToolkit.Wpf"
+             mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="520"
+             Loaded="CarveView_Loaded" Unloaded="CarveView_Unloaded" IsVisibleChanged="CarveView_IsVisibleChanged">
+    <!-- Live 3D machine view (Phase 1 of the carve view, see docs/3D-Carve-View-Design.md): the work
+         envelope, a stock block and a cone at the live tool position. Material removal comes later. -->
+    <Grid>
+        <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="False"
+                               ShowViewCube="True" ShowCoordinateSystem="True" Background="#FF2D2D30"
+                               RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
+            <helix:HelixViewport3D.Camera>
+                <PerspectiveCamera LookDirection="-1,1,-1" UpDirection="0,0,1" FieldOfView="45"/>
+            </helix:HelixViewport3D.Camera>
+        </helix:HelixViewport3D>
+        <Button x:Uid="btn_carveReset" Content="Reset view" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                Margin="6" Padding="6,2" Focusable="False" Click="Reset_Click"/>
+    </Grid>
+</UserControl>
