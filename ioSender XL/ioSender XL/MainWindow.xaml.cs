@@ -276,16 +276,6 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
-        // Hide the program-view overlay entirely (e.g. when the buffer is empty after a stay-put run).
-        private void CloseProgramOverlay()
-        {
-            _programOverlay = false;
-            if (btnProgramView.IsChecked == true)
-                btnProgramView.IsChecked = false;   // raises ProgramView_Toggled -> UpdateOverlay
-            ClearProgramPreview();
-            UpdateOverlay();
-        }
-
         // Return the overlay to the live job view (parsed g-code of the loaded file). Public alias for tools
         // that leave their tab (the active program reverts to the loaded job); visibility is left unchanged.
         public void ClearActiveProgram()
@@ -609,31 +599,29 @@ namespace GCode_Sender
             m.PropertyChanged += handler;
         }
 
-        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current
-        // tab (the bottom run bar drives Feed Hold/Stop on any tab), then restore the user's loaded job when it
-        // finishes - so e.g. Load Stock's probe program never takes over the job view. Interim until the streamer
-        // can take a program source as input (the IProgramSource refactor); for now it borrows the one buffer.
+        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current tab
+        // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
+        // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
+        // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
         private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code)
         {
             if (code == null || code.Length == 0)
                 return;
 
-            // capture the user's current job so it can be put back (only a file-backed program can be reloaded;
-            // folder/SD/transformed programs are cleared afterwards instead).
-            string restorePath = !string.IsNullOrEmpty(m.FileName) && System.IO.File.Exists(m.FileName) ? m.FileName : null;
-
-            GCode.File.AddBlock(name, CNC.Core.Action.New);              // names + clears the program buffer
+            var prog = new CNC.Controls.GCode(m);                        // transient - does not mutate the job/Model
+            prog.AddBlock(name, CNC.Core.Action.New);
             for (int i = 0; i < code.Length - 1; i++)
-                GCode.File.AddBlock(code[i], CNC.Core.Action.Add);
-            GCode.File.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
+                prog.AddBlock(code[i], CNC.Core.Action.Add);
+            prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
 
-            RestoreJobOnEnd(m, restorePath);   // arm the restore before the run starts
+            RunControl.Source = prog;          // stream this program instead of the loaded job
+            RestoreSourceOnEnd(m);             // revert to the job source when the run ends
             RunControl.CycleStart(0);          // start streaming from the bottom run bar - no tab change
         }
 
-        // When the current streamed run finishes, reload the captured job (or clear if there was none / it was
-        // not file-backed). Mirrors RestoreTabOnJobEnd: arm on the first running state, fire on the next terminal.
-        private void RestoreJobOnEnd(GrblViewModel m, string restorePath)
+        // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
+        // arm on the first running state, fire on the next terminal one, then unsubscribe.
+        private void RestoreSourceOnEnd(GrblViewModel m)
         {
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
@@ -648,16 +636,7 @@ namespace GCode_Sender
                                      st == StreamingState.Stop || st == StreamingState.NoFile))
                 {
                     m.PropertyChanged -= handler;
-                    Dispatcher.BeginInvoke(new System.Action(() =>
-                    {
-                        if (!string.IsNullOrEmpty(restorePath))
-                            GCode.File.Load(restorePath);
-                        else
-                        {
-                            GCode.File.Close();
-                            CloseProgramOverlay();   // nothing left to show - dismiss the (now empty) program view
-                        }
-                    }));
+                    Dispatcher.BeginInvoke(new System.Action(() => RunControl.Source = null));   // back to the job
                 }
             };
             m.PropertyChanged += handler;
