@@ -6,6 +6,9 @@
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              xmlns:helix="clr-namespace:HelixToolkit.Wpf;assembly=HelixToolkit.Wpf"
              mc:Ignorable="d" d:DesignHeight="560" d:DesignWidth="820">
+    <UserControl.Resources>
+        <cnccontrols:LogicalNotConverter x:Key="IsNotRunning"/>
+    </UserControl.Resources>
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="340"/>
@@ -70,11 +73,8 @@
 
                     <GroupBox x:Uid="hm_grpProbing" Header="Probing" Margin="0,6,0,0">
                         <StackPanel Margin="6">
-                            <cnccontrols:NumericField x:Uid="hm_safez" Label="Safe Z:" ColonAt="90" Unit="mm" Format="###0.0##"
-                                ToolTip="Clearance above work Z0 the probe rapids to between points."
-                                Value="{Binding HeightMap.SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                            <cnccontrols:NumericField x:Uid="hm_depth" Label="Probe depth:" ColonAt="90" Unit="mm" Format="###0.0##" Margin="0,4,0,0"
-                                ToolTip="How far below the start plane each probe may travel before it faults (surface should be within this)."
+                            <cnccontrols:NumericField x:Uid="hm_depth" Label="Probe depth:" ColonAt="90" Unit="mm" Format="###0.0##"
+                                ToolTip="How far DOWN from the parked (start) Z each probe searches before it faults. Park Z at a small safe clearance above the surface, then this must be at least that clearance plus the surface variation."
                                 Value="{Binding HeightMap.ProbeDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             <cnccontrols:NumericField x:Uid="hm_feed" Label="Probe feed:" ColonAt="90" Unit="mm/min" Format="#####0" Margin="0,4,0,0"
                                 ToolTip="Feed for every probe. The surface is already roughly known, so all points probe gently at this single approach feed - no fast search pass - which avoids overshoot/false triggers on a fragile probe. Defaults to the probe's latch (slow) feed."
@@ -90,10 +90,11 @@
             <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
-                <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
-                           Text="This controller does not report NGC expression support ($I). The probe program needs grblHAL with expressions enabled."/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button x:Uid="hm_generate" Content="Generate" Width="80" MinHeight="26" Click="Generate_Click"/>
+                    <Button x:Uid="hm_start" Content="Start" Width="70" MinHeight="26" Click="Start_Click"
+                            IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"/>
+                    <Button x:Uid="hm_stop" Content="Stop" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
+                            IsEnabled="{Binding IsJobRunning}"/>
                     <Button x:Uid="hm_apply" Content="Apply" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
                             IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
                     <Button x:Uid="hm_save" Content="Save" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Save_Click"/>
@@ -111,22 +112,19 @@
 
             <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
                 <TextBlock x:Uid="hm_steps" Margin="8" TextWrapping="Wrap" LineHeight="18">
-                    <Run FontWeight="Bold" Text="1. Tell it where the stock is."/>
-                    <Run Text=" Height mapping probes in the current work coordinates, so set the work origin on the stock first: jog to the stock corner and zero X/Y, and set Z0 at the surface (the Load stock tab does this for you). 'Full table' instead references the homed machine corner and prompts you to touch off Z0."/>
+                    <Run FontWeight="Bold" Text="1. Set the work origin on the stock."/>
+                    <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Load stock tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
                     <LineBreak/>
-                    <Run FontWeight="Bold" Text="2. Choose the area."/>
-                    <Run Text=" 'From program' covers the loaded job's footprint (load it, then 'Set from program limits'); 'Full table' covers the whole machine bed. Edit X/Y/W/H to fine-tune."/>
+                    <Run FontWeight="Bold" Text="2. Choose the area + grid."/>
+                    <Run Text=" 'From program' covers the loaded job's footprint (load it, then 'Set from program limits'); 'Full travel' covers the machine bed. Edit X/Y/W/H to fine-tune. Smaller grid = denser and slower (a gently-curved spoilboard often needs only 3x3 or 4x4)."/>
                     <LineBreak/>
-                    <Run FontWeight="Bold" Text="3. Set the grid + probe."/>
-                    <Run Text=" Smaller grid = denser and slower. Pick the probe to use; set Safe Z (clearance) and Probe depth (how far below Z0 to search)."/>
+                    <Run FontWeight="Bold" Text="3. Pick the probe + jog Z to a safe clearance."/>
+                    <Run Text=" Park Z a few mm above the surface - the probe descends from there and retracts back to it between points. Probe depth is how far DOWN to search (at least the clearance plus the surface variation). Probe feed is the gentle approach speed; Settle dwell pauses before each probe for a fragile probe to release."/>
                     <LineBreak/>
-                    <Run FontWeight="Bold" Text="4. Generate."/>
-                    <Run Text=" Builds the probe program - review it in the program view at the bottom."/>
+                    <Run FontWeight="Bold" Text="4. Start."/>
+                    <Run Text=" Probes the grid one point at a time (Stop cancels); the surface draws here when it finishes."/>
                     <LineBreak/>
-                    <Run FontWeight="Bold" Text="5. Cycle Start."/>
-                    <Run Text=" Probes the grid; the surface draws here as each point is measured."/>
-                    <LineBreak/>
-                    <Run FontWeight="Bold" Text="6. Apply / Save."/>
+                    <Run FontWeight="Bold" Text="5. Apply / Save."/>
                     <Run Text=" Apply rewrites the loaded program to follow the surface. Save stores the map (.map) to reuse later (Load)."/>
                 </TextBlock>
             </GroupBox>

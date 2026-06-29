@@ -1,26 +1,23 @@
 /*
  * HeightMapView.xaml.cs - part of ioSender XL
  *
- * "Height Map" top-level tab, built on the generate-and-run model (like Load stock / Surface spoilboard):
- * pick a probe + grid + area, Generate a serpentine probe-grid NGC program (shown in the program view),
- * then Cycle Start streams it stay-put through the job streamer. Each point reports its probed Z back via a
- * controller-side (PRINT, HM=i,j Z=..) line; this tab parses those into a HeightMap and draws the surface
- * live. Apply then rewrites the loaded job to follow the surface (CNC.Controls.Probing.GCodeTransform).
+ * "Height Map" top-level tab. Probe a grid over the work surface and apply the resulting map to the loaded
+ * job so every move follows the surface. The probing is driven by ioSender's dedicated Probing engine
+ * (CNC.Controls.Probing.Program) - one synchronised probe at a time, capturing each result - exactly as the
+ * original Probing > Height map tab did, which is robust for a whole grid of probes (the job streamer is not).
  *
- * NOTE: the generated NGC is firmware-dependent (grblHAL NGC expressions + a probe, and #5063 as the probe
- *       Z result) and MUST be validated on the machine before it is trusted - same caveat as Load stock.
+ * The map is relative: heights are stored as the delta from the first probed point, so set the work origin on
+ * the stock and park Z at a safe clearance first - the engine probes down from there and retracts back to it.
  */
 
 using System;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using CNC.Core;
+using CNC.GCode;
 using CNC.Controls;
 using CNC.Controls.Probing;
 using HelixToolkit.Wpf;
@@ -29,21 +26,15 @@ namespace GCode_Sender
 {
     public partial class HeightMapView : UserControl, ICNCView
     {
-        // Where the probe grid is referenced. Program = the loaded job's XY extent in the active WCS; FullTable =
-        // the homed machine envelope (machine-referenced origin, like Surface spoilboard).
-        public enum AreaSource { Program, FullTable }
+        // Where the probe grid is referenced (work-coordinate area). Program = the loaded job's XY extent;
+        // FullTravel = the in-bounds machine envelope expressed in the current work frame.
+        public enum AreaSource { Program, FullTravel }
 
         private GrblViewModel model = null;
-        private bool subscribed = false;
-        private string program = string.Empty;     // last generated probe program (streamed via the macro path)
-        private double? z0 = null;                  // first probed Z (reference); stored heights are Zi - Z0
-        private int received = 0;                   // probed points captured this run
+        private ProbingViewModel probing = null;     // the Probing engine + its view model (created lazily)
+        private ProbingProfiles profiles = null;
 
-        // One (PRINT, HM=i,j Z=z) per probed point - i = X index, j = Y index (so order doesn't matter).
-        private static readonly Regex rxPoint = new Regex(
-            @"HM\s*=\s*(\d+)\s*[, ]\s*(\d+)\s+Z\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-
-        // The map/area/grid/viewport bindings (reused from the Probing library's sub-VM).
+        // The map/area/grid/viewport bindings (the Probing library's sub-VM, reused).
         public HeightMapViewModel HeightMap { get; } = new HeightMapViewModel();
 
         private AreaSource _area = AreaSource.Program;
@@ -59,14 +50,10 @@ namespace GCode_Sender
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             HeightMap.PropertyChanged += (s, e) =>
             {
-                // Re-frame the planned grid when the area / grid size changes (but not on our own map updates).
                 if (e.PropertyName == nameof(HeightMapViewModel.MinX) || e.PropertyName == nameof(HeightMapViewModel.MaxX) ||
                     e.PropertyName == nameof(HeightMapViewModel.MinY) || e.PropertyName == nameof(HeightMapViewModel.MaxY) ||
                     e.PropertyName == nameof(HeightMapViewModel.GridSizeX) || e.PropertyName == nameof(HeightMapViewModel.GridSizeY))
-                {
-                    InvalidateProgram();
                     RefreshPreview();
-                }
             };
         }
 
@@ -81,41 +68,35 @@ namespace GCode_Sender
             {
                 if (model == null)
                     model = DataContext as GrblViewModel;
-                Subscribe(true);
                 RefreshProbes();
                 DefaultArea();
                 RefreshPreview();
                 UpdateWarnings();
-                MacroProcessor.SetActiveProgram?.Invoke("Height map", program);   // Program View shows our program
-                MacroProcessor.ActiveRun = Run;                                    // Cycle Start runs it
-            }
-            else
-            {
-                MacroProcessor.ActiveRun = null;
-                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
-                // Stay subscribed: a stay-put run keeps this tab, but keeping the handler is harmless either way.
             }
         }
 
         public void CloseFile() { }
-        public void Setup(UIViewModel model, AppConfig profile) { }
+        public void Setup(UIViewModel m, AppConfig profile) { }
 
         #endregion
 
-        private void Subscribe(bool on)
+        // Create (once) the Probing engine view model bound to the live controller model.
+        private ProbingViewModel EnsureProbing()
         {
-            if (model == null || on == subscribed)
-                return;
-            if (on)
-                model.PropertyChanged += Model_PropertyChanged;
-            else
-                model.PropertyChanged -= Model_PropertyChanged;
-            subscribed = on;
+            if (model == null)
+                return null;
+            if (probing == null)
+            {
+                profiles = new ProbingProfiles();
+                profiles.Load();
+                probing = new ProbingViewModel(model, profiles);
+            }
+            return probing;
         }
 
-        // ---- machine travel envelope (mirrors Surface spoilboard's machine-referenced origin) ----
+        // ---- machine travel envelope (for the "Full travel" area, expressed in the current work frame) ----
 
-        private const double Margin = 5d;   // edge clearance kept from each travel limit (plus the homing pull-off)
+        private const double Margin = 5d;
 
         private static double AxisTravel(int axis)
         {
@@ -147,18 +128,18 @@ namespace GCode_Sender
             return Math.Max(0d, AxisTravel(axis) - 2d * Inset());
         }
 
-        // Size/position the probe area for the current source: the loaded job's XY extent, or the in-bounds
-        // machine envelope. Leaves a sane default if neither is known.
+        // Size/position the probe area for the current source. Both are work-coordinate regions (the engine
+        // probes in work coordinates); Full travel converts the machine envelope via the current work offset.
         private void DefaultArea()
         {
-            if (Area == AreaSource.FullTable)
+            if (Area == AreaSource.FullTravel)
             {
                 double inset = Inset(), w = MaxArea(0), h = MaxArea(1);
-                if (w > 0d && h > 0d)
+                if (w > 0d && h > 0d && model != null)
                 {
-                    HeightMap.MinX = EnvMin(0) + inset;
+                    HeightMap.MinX = EnvMin(0) + inset - model.WorkPositionOffset.X;
                     HeightMap.MaxX = HeightMap.MinX + w;
-                    HeightMap.MinY = EnvMin(1) + inset;
+                    HeightMap.MinY = EnvMin(1) + inset - model.WorkPositionOffset.Y;
                     HeightMap.MaxY = HeightMap.MinY + h;
                 }
             }
@@ -190,20 +171,14 @@ namespace GCode_Sender
         private void UpdateWarnings()
         {
             txtNoProbe.Visibility = cbxProbe.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            txtExprWarn.Visibility = (model != null && !GrblInfo.ExpressionsSupported) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        // Drop the generated program (Cycle Start re-generates via Run); clear the captured map's "applied" state.
-        private void InvalidateProgram()
-        {
-            program = string.Empty;
-            HeightMap.CanApply = false;
         }
 
         // ---- preview: show the planned grid (points + boundary) before probing ----
 
         private void RefreshPreview()
         {
+            if (HeightMap.HasHeightMap)   // a probed surface is showing - don't overwrite it with the bare grid
+                return;
             try
             {
                 var border = new LinesVisual3D();
@@ -218,7 +193,6 @@ namespace GCode_Sender
             catch { /* degenerate area - leave the previous preview */ }
         }
 
-        // Rebuild the 3D surface from the (partially) probed map - called live as points arrive.
         private void RefreshSurface()
         {
             if (HeightMap.Map == null)
@@ -233,176 +207,121 @@ namespace GCode_Sender
             HeightMap.MapPoints = points.Points;
         }
 
-        // ---- generate the serpentine probe-grid program ----
+        // ---- run: probe the grid through the Probing engine (mirrors the original Height map tab) ----
 
-        private void Generate_Click(object sender, RoutedEventArgs e)
-        {
-            Generate();
-            if (!string.IsNullOrEmpty(program))
-                MacroProcessor.ProgramPreview?.Invoke("Height map", program);   // refresh + pop the program view
-        }
-
-        private bool Generate()
+        private void Start_Click(object sender, RoutedEventArgs e)
         {
             if (model == null)
-                return false;
+                return;
 
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
             {
                 MessageBox.Show("Select a probe definition first (Machine Setup Wizard > Probe definitions).",
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return false;
+                return;
             }
 
-            HeightMap map;
+            var pr = EnsureProbing();
+            if (pr == null)
+                return;
+
+            // Single gentle probe at one approach feed (LatchDistance = 0 -> no fast/slow two-stage), from the
+            // parked Z down by Probe depth, then retract to the parked Z. Keeps a fragile probe happy.
+            pr.ProbeFeedRate = HeightMap.ProbeFeed > 0d ? HeightMap.ProbeFeed : (p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate);
+            pr.ProbeDistance = HeightMap.ProbeDepth;
+            pr.LatchDistance = 0d;
+            pr.ProbeOffsetX = p.ProbeOffsetX;
+            pr.ProbeOffsetY = p.ProbeOffsetY;
+            pr.HeightMap.MinX = HeightMap.MinX; pr.HeightMap.MaxX = HeightMap.MaxX;
+            pr.HeightMap.MinY = HeightMap.MinY; pr.HeightMap.MaxY = HeightMap.MaxY;
+            pr.HeightMap.GridSizeX = HeightMap.GridSizeX; pr.HeightMap.GridSizeY = HeightMap.GridSizeY;
+
+            // Map origin (work coords), backed off by the probe XY offset so the tip lands on the corner.
+            var startpos = new Position(pr.HeightMap.MinX - pr.ProbeOffsetX, pr.HeightMap.MinY - pr.ProbeOffsetY, 0d);
+
+            if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
+                return;
+            if (!pr.VerifyProbe())
+            {
+                MessageBox.Show("The probe is not ready (not connected, or already triggered).", "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+            if (!pr.Program.Init())
+                return;
+
+            CNC.Controls.Probing.HeightMap map;
             try
             {
-                map = new CNC.Controls.Probing.HeightMap(HeightMap.GridSizeX, HeightMap.GridSizeY,
-                    new Vector2(HeightMap.MinX, HeightMap.MinY), new Vector2(HeightMap.MaxX, HeightMap.MaxY));
+                map = new CNC.Controls.Probing.HeightMap(pr.HeightMap.GridSizeX, pr.HeightMap.GridSizeY,
+                    new Vector2(pr.HeightMap.MinX, pr.HeightMap.MinY), new Vector2(pr.HeightMap.MaxX, pr.HeightMap.MaxY));
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return false;
+                return;
             }
-
-            // Fresh empty map (cleared of any previous probe data) bound to the viewport for the live run.
-            HeightMap.Map = map;
-            HeightMap.GridSizeX = map.GridX;
-            HeightMap.GridSizeY = map.GridY;
+            pr.HeightMap.Map = map;
             HeightMap.HasHeightMap = false;
             HeightMap.CanApply = false;
 
-            program = BuildProgram(p, map);
-            return !string.IsNullOrWhiteSpace(program);
-        }
-
-        private string BuildProgram(ProbeDefinition p, CNC.Controls.Probing.HeightMap map)
-        {
-            double safeZ = HeightMap.SafeZ;
-            double depth = HeightMap.ProbeDepth;          // how far below the start plane the probe may travel
-            // Every point probes at this slow approach feed (no fast search pass): the surface is roughly known,
-            // so a single gentle probe avoids overshoot/false triggers on a fragile probe. Defaults to the probe's
-            // latch (slow) feed; the user can override in the Probe feed field.
-            double probeF = HeightMap.ProbeFeed > 0d ? HeightMap.ProbeFeed
-                          : p.LatchFeedRate > 0d ? p.LatchFeedRate
-                          : p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 100d;
-
-            var b = new StringBuilder();
-            void L(string s) { b.Append(s).Append('\n'); }
-
-            L("(Height map - probe a grid, report Z per point via (PRINT, HM=i,j Z=..))");
-            L(string.Format("(grid {0} x {1} points, {2} mm area, probe \"{3}\")",
-                map.SizeX, map.SizeY, string.Format(CultureInfo.InvariantCulture, "{0:0.#} x {1:0.#}", map.Delta.X, map.Delta.Y), p.Name));
-            L("(Requires grblHAL NGC expressions + a probe; #5063 = probe Z result. VALIDATE before trusting.)");
-            L("(PREREQ, connected, homed, EXPR)");
-            L("G21 G90 G94 G17 G49");
-
-            if (Area == AreaSource.FullTable)
+            // Relative probing: probe down, retract to the parked (start) Z, step to the next point. Serpentine
+            // (flip Y direction each column) to minimise travel - matched by the result read-back below.
+            pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
+            double dir = 1d;
+            int point = 0, points = map.SizeX * map.SizeY;
+            for (int x = 0; x < map.SizeX; x++)
             {
-                // Machine-referenced origin, like Surface spoilboard: park, touch off Z0 at the surface, then set
-                // the work XY origin at the inset machine corner so the grid (in work coords below) lines up.
-                double zTop = EnvMin(2) + AxisTravel(2) - Inset();
-                L("G53 G0 Z" + N(zTop));
-                L(string.Format("G53 G0 X{0} Y{1}", N(HeightMap.MinX), N(HeightMap.MinY)));
-                L("(WAITIDLE)");
-                L("(MBOX, OKCANCEL, Jog the bit/probe down until it just touches the surface, then OK to set work Z0. XY is referenced to the machine corner automatically. Cancel aborts.)");
-                L("(WAITIDLE)");
-                L("G10 L20 P0 Z0");                                          // work Z0 = surface (active WCS)
-                L(string.Format("G10 L2 P0 X{0} Y{1}", N(HeightMap.MinX), N(HeightMap.MinY)));   // work XY origin = inset corner
-            }
-            else
-            {
-                // Program-referenced: probe over the loaded job's extent in the EXISTING work coordinate system.
-                // Z0 must already be at the surface (the map stores deltas from the first probed point).
-                L("(MBOX, OKCANCEL, Probing the loaded program's area in the current work coordinates. Ensure work Z0 is at the surface, then OK. Cancel aborts.)");
-                L("(WAITIDLE)");
-            }
-
-            L("G0 Z" + N(safeZ));
-
-            // Serpentine raster over the grid: row j sweeps +X on even rows, -X on odd, to minimise travel.
-            for (int j = 0; j < map.SizeY; j++)
-            {
-                bool fwd = (j & 1) == 0;
-                for (int k = 0; k < map.SizeX; k++)
+                for (int y = 0; y < map.SizeY; y++)
                 {
-                    int i = fwd ? k : map.SizeX - 1 - k;
-                    var c = map.GetCoordinates(i, j);
-                    L(string.Format("G0 X{0} Y{1}", N(c.X), N(c.Y)));
+                    pr.Program.AddMessage(string.Format("Probing point {0} of {1}...", ++point, points));
                     if (HeightMap.SettleDwell > 0d)
-                        L("G4 P" + N(HeightMap.SettleDwell));                     // let a fragile probe release/settle first
-                    L(string.Format("G38.3 Z{0} F{1}", N(-depth), N(probeF)));   // gentle probe down to the surface
-                    L(string.Format("(PRINT, HM={0},{1} Z=#5063)", i, j));        // report the probe Z result
-                    L("G0 Z" + N(safeZ));                                          // retract before the next point
+                        pr.Program.Add("G4P" + HeightMap.SettleDwell.ToInvariantString());   // let a fragile probe release/settle
+                    pr.Program.AddProbingAction(AxisFlags.Z, true);
+                    pr.Program.AddRapidToMPos(pr.StartPosition, AxisFlags.Z);
+                    if (y < map.SizeY - 1)
+                        pr.Program.AddRapid(string.Format("Y{0}", (map.GridY * dir).ToInvariantString(model.Format)));
                 }
+                if (x < map.SizeX - 1)
+                    pr.Program.AddRapid(string.Format("X{0}", map.GridX.ToInvariantString(model.Format)));
+                dir *= -1d;
             }
 
-            L("M2");
-            return b.ToString();
+            pr.Program.Execute(true);
+            BuildMap(pr, map);
         }
 
-        private static string N(double v)
+        private void Stop_Click(object sender, RoutedEventArgs e)
         {
-            return v.ToString("0.###", CultureInfo.InvariantCulture);
+            probing?.Program.Cancel();
         }
 
-        // ---- run (Cycle Start / ActiveRun): stream stay-put and capture the PRINTed grid ----
-
-        private void Run()
+        // Build the height map from the probed positions (delta from the first point). The read-back order
+        // mirrors the serpentine probe order above so each result lands in the right grid cell.
+        private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map)
         {
-            if (model == null)
-                return;
-            if (string.IsNullOrWhiteSpace(program) && !Generate())
-                return;
-            if (string.IsNullOrWhiteSpace(program))
-                return;
-
-            z0 = null;
-            received = 0;
-            Subscribe(true);
-
-            MacroProcessor.Run(model, "Height map", program, true, stayPut: true);
-        }
-
-        // Pull each (PRINT, HM=i,j Z=z) out of the controller's console messages and drop it into the map,
-        // redrawing the surface live. Heights are stored relative to the first probed point.
-        private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName != nameof(GrblViewModel.Message))
-                return;
-
-            string msg = model.Message;
-            if (string.IsNullOrEmpty(msg) || HeightMap.Map == null)
-                return;
-
-            bool hit = false;
-            foreach (Match m in rxPoint.Matches(msg))
+            if (!(pr.IsSuccess && pr.Positions.Count == map.TotalPoints))
             {
-                if (int.TryParse(m.Groups[1].Value, out int i) &&
-                    int.TryParse(m.Groups[2].Value, out int j) &&
-                    double.TryParse(m.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double z) &&
-                    i >= 0 && i < HeightMap.Map.SizeX && j >= 0 && j < HeightMap.Map.SizeY)
-                {
-                    if (z0 == null)
-                        z0 = z;
-                    HeightMap.Map.AddPoint(i, j, Math.Round(z - z0.Value, model.Precision));
-                    received++;
-                    hit = true;
-                }
+                MessageBox.Show(string.Format("Height map probing did not complete ({0} of {1} points). {2}",
+                    pr.Positions.Count, map.TotalPoints, pr.Message), "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
 
-            if (!hit)
-                return;
+            double z0 = pr.Positions[0].Z;
+            int i = 0;
+            for (int x = 0; x < map.SizeX; x++)
+            {
+                for (int y = 0; y < map.SizeY; y++)
+                    map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
+                if (++x < map.SizeX)
+                    for (int y = map.SizeY - 1; y >= 0; y--)
+                        map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
+            }
 
+            HeightMap.Map = map;
+            HeightMap.HasHeightMap = true;
+            HeightMap.CanApply = model.IsFileLoaded;
             RefreshSurface();
-
-            if (received >= HeightMap.Map.TotalPoints)
-            {
-                HeightMap.HasHeightMap = true;
-                HeightMap.CanApply = model.IsFileLoaded;   // a job must be loaded to apply the map to it
-            }
         }
 
         // ---- apply / save / load ----
@@ -471,15 +390,13 @@ namespace GCode_Sender
         }
 
         private void AreaProgram_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.Program; }
-        private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTable; }
+        private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTravel; }
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Default the probe feed to the chosen probe's latch (slow) feed, but never clobber a value the user
-            // has set - so a fragile probe maps at the gentle approach feed out of the box, overridable per tab.
+            // Default the probe feed to the chosen probe's latch (slow) feed, without clobbering a user override.
             if (HeightMap.ProbeFeed <= 0d && cbxProbe.SelectedItem is ProbeDefinition p)
                 HeightMap.ProbeFeed = p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate;
-            InvalidateProgram();
         }
     }
 }
