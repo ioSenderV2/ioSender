@@ -649,7 +649,13 @@ namespace GCode_Sender
                                      st == StreamingState.Stop || st == StreamingState.NoFile))
                 {
                     m.PropertyChanged -= handler;
-                    Dispatcher.BeginInvoke(new System.Action(() => RunControl.Source = null));   // back to the job
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        RunControl.Source = null;   // streamer back to the loaded job
+                        // The wizard program is consumed: tear down the active program so the program view and the
+                        // green source highlight return to the loaded job (Job tab). Cycle Start then runs the job.
+                        ClearProgramPreview();
+                    }));
                 }
             };
             m.PropertyChanged += handler;

@@ -513,6 +513,10 @@ namespace GCode_Sender
             ResetResults();
             SaveInputs();
 
+            // Re-arm as the active program: a previous run tears this down (handing the source back to the job),
+            // so Generate must re-establish it so Cycle Start runs Load stock again without leaving the tab.
+            MacroProcessor.ActiveProgramName = "Load stock";
+            MacroProcessor.ActiveRun = () => Run_Click(null, null);
             MacroProcessor.ProgramPreview?.Invoke("Load stock", program);   // pop the program-view overlay as feedback
         }
 
