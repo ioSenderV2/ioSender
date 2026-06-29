@@ -321,6 +321,10 @@ namespace GCode_Sender
             }
 
             pr.Program.Execute(true);
+            // Clean up the run: the engine only auto-ends on failure, so on success we must call End() ourselves
+            // (as the old tab did) - it clears IsJobRunning (UI was left locked), unsubscribes its handlers and
+            // restores absolute mode (probing ran in G91). Without this the UI hangs and the machine stays in G91.
+            pr.Program.End(string.Empty);
             model.Message = string.Empty;   // clear the stale "Probing point N of M..." progress line
             BuildMap(pr, map);
         }
