@@ -1,16 +1,15 @@
 /*
  * CarveView.xaml.cs - part of CNC GCodeViewer
  *
- * A live 3D machine view with local g-code playback: the work envelope, a stock block, the loaded
- * program's toolpath, and a cone at the tool position - following the live machine position, or, on
- * Play, a local simulation of the program (no controller motion). Phase 1 + Play of the carve view
- * (see docs/3D-Carve-View-Design.md); real-time material removal is added later. Registered as the
- * Job tab's "3D View" center component.
+ * A live 3D machine view with local g-code playback, in WORK coordinates: the work envelope, a stock
+ * block sized to the loaded program, the program's toolpath, and a cone at the tool position - following
+ * the live work position, or, on Play, a local simulation of the program (no controller motion). Phase 2
+ * of the carve view (see docs/3D-Carve-View-Design.md); real-time material removal is added in Phase 3.
+ * Registered as the Job tab's "3D View" center component.
  *
- * Coordinate note: the envelope/grid/stock and the live cone are in MACHINE coordinates ($130-$132 /
- * MachinePosition); the toolpath + playback are in the program's (work) coordinates starting at 0,0,0.
- * They therefore differ by the work offset - acceptable for a shape/motion preview; aligning them is a
- * later refinement (offset the program by the active work origin).
+ * Coordinates: everything is in WORK coordinates so the toolpath, playback, stock and live cone all align.
+ * The toolpath/playback are the program's own (work) coordinates; the live cone uses WorkPosition; the
+ * machine envelope ($130-$132) is drawn shifted by the work offset (WorkPositionOffset) into work space.
  */
 
 using System;
@@ -32,14 +31,18 @@ namespace CNC.Controls.Viewer
         private struct Seg { public Point3D A, B; public bool Rapid; public double Len; }
 
         private GrblViewModel model;
-        private Position mpos;
+        private Position wpos;           // live WORK position (drives the cone when not playing)
         private TruncatedConeVisual3D toolCone;
         private bool framed;
 
-        // ---- playback ----
+        // ---- program / stock ----
         private readonly List<Seg> segs = new List<Seg>();
         private List<GCodeToken> builtTokens;
         private LinesVisual3D cutLines, rapidLines;
+        private Point3D bMin, bMax;     // program bounding box (work coords)
+        private bool haveBox;
+
+        // ---- playback ----
         private int segIdx;
         private double segPos;          // distance travelled into the current segment
         private bool playing;
@@ -58,29 +61,29 @@ namespace CNC.Controls.Viewer
             if (model == null && DataContext is GrblViewModel m)
             {
                 model = m;
-                mpos = model.MachinePosition;
-                if (mpos != null)
-                    mpos.PropertyChanged += Mpos_PropertyChanged;
+                wpos = model.WorkPosition;
+                if (wpos != null)
+                    wpos.PropertyChanged += Wpos_PropertyChanged;
             }
             BuildScene();
         }
 
         private void CarveView_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (mpos != null)
-                mpos.PropertyChanged -= Mpos_PropertyChanged;
+            if (wpos != null)
+                wpos.PropertyChanged -= Wpos_PropertyChanged;
             timer?.Stop();
         }
 
-        // The controller settings that size the envelope ($130-$132) and the loaded program may both arrive
-        // after this control is built, so rebuild the scene each time the view is shown.
+        // The controller settings/offsets that size + place the envelope and the loaded program may arrive after
+        // this control is built, so rebuild the scene each time the view is shown.
         private void CarveView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if ((bool)e.NewValue)
                 BuildScene();
         }
 
-        private void Mpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             UpdateTool();
         }
@@ -103,6 +106,16 @@ namespace CNC.Controls.Viewer
         private static double EnvMin(int axis) { return AxisDir(axis) > 0d ? 0d : -Travel(axis); }
         private static double EnvMax(int axis) { return AxisDir(axis) > 0d ? Travel(axis) : 0d; }
 
+        // Work offset (machine = work + WCO), 0 when unknown - used to draw the machine envelope in work space.
+        private double Wco(int axis)
+        {
+            var o = model?.WorkPositionOffset;
+            if (o == null)
+                return 0d;
+            double v = axis == 0 ? o.X : axis == 1 ? o.Y : o.Z;
+            return double.IsNaN(v) ? 0d : v;
+        }
+
         private void BuildScene()
         {
             if (viewport == null)
@@ -111,12 +124,12 @@ namespace CNC.Controls.Viewer
             viewport.Children.Clear();
             viewport.Children.Add(new DefaultLights());
 
-            double xmin = EnvMin(0), xmax = EnvMax(0);
-            double ymin = EnvMin(1), ymax = EnvMax(1);
-            double zmin = EnvMin(2), zmax = EnvMax(2);
+            // machine envelope shifted into work coordinates
+            double xmin = EnvMin(0) - Wco(0), xmax = EnvMax(0) - Wco(0);
+            double ymin = EnvMin(1) - Wco(1), ymax = EnvMax(1) - Wco(1);
+            double zmin = EnvMin(2) - Wco(2), zmax = EnvMax(2) - Wco(2);
             double xs = Math.Max(xmax - xmin, 1d), ys = Math.Max(ymax - ymin, 1d), zs = Math.Max(zmax - zmin, 1d);
 
-            // work envelope (wireframe)
             viewport.Children.Add(new BoundingBoxWireFrameVisual3D
             {
                 BoundingBox = new Rect3D(xmin, ymin, zmin, xs, ys, zs),
@@ -138,24 +151,14 @@ namespace CNC.Controls.Viewer
                 Fill = Brushes.Gray
             });
 
-            // stock block - placeholder default size at the home corner until wired to Load Stock's measured size
-            double sw = Math.Min(150d, xs), sl = Math.Min(150d, ys), sh = 19d;
-            viewport.Children.Add(new BoxVisual3D
-            {
-                Center = new Point3D(xmin + sw / 2d, ymin + sl / 2d, zmin + sh / 2d),
-                Length = sw,
-                Width = sl,
-                Height = sh,
-                Fill = new SolidColorBrush(Color.FromArgb(96, 205, 175, 125))
-            });
-
-            // loaded-program toolpath (program coordinates)
+            // stock - sized to the loaded program (so it contains the cut), top at work Z0; default block if no program
             BuildToolpath();
+            AddStock();
 
             // tool cone - tip at the cutter, widening upward
             toolCone = new TruncatedConeVisual3D
             {
-                Origin = new Point3D(xmin, ymin, zmax),
+                Origin = new Point3D(0d, 0d, 0d),
                 Normal = new Vector3D(0, 0, 1),
                 Height = Math.Max(zs * 0.2d, 15d),
                 BaseRadius = 0d,
@@ -173,8 +176,38 @@ namespace CNC.Controls.Viewer
             }
         }
 
-        // Build the ordered motion (segs) + the cut/rapid toolpath lines from the loaded program. Rebuilds only
-        // when the program (token list) changes; otherwise re-adds the cached line visuals to the cleared scene.
+        // The stock block: the program's XY bounding box plus a margin, from the deepest cut up to work Z0.
+        private void AddStock()
+        {
+            double margin = 6d, top, bottom, cx, cy, sx, sy;
+
+            if (haveBox)
+            {
+                top = Math.Max(bMax.Z, 0d);
+                bottom = Math.Min(bMin.Z, top - 1d);
+                sx = (bMax.X - bMin.X) + 2d * margin;
+                sy = (bMax.Y - bMin.Y) + 2d * margin;
+                cx = (bMin.X + bMax.X) / 2d;
+                cy = (bMin.Y + bMax.Y) / 2d;
+            }
+            else
+            {
+                top = 0d; bottom = -19d; sx = sy = 150d; cx = cy = 0d;
+            }
+
+            double h = Math.Max(top - bottom, 1d);
+            viewport.Children.Add(new BoxVisual3D
+            {
+                Center = new Point3D(cx, cy, bottom + h / 2d),
+                Length = Math.Max(sx, 1d),
+                Width = Math.Max(sy, 1d),
+                Height = h,
+                Fill = new SolidColorBrush(Color.FromArgb(96, 205, 175, 125))
+            });
+        }
+
+        // Build the ordered motion (segs) + the cut/rapid toolpath lines + bounding box from the loaded program.
+        // Rebuilds only when the program (token list) changes; otherwise re-adds the cached line visuals.
         private void BuildToolpath()
         {
             var tokens = GCode.File.Tokens;
@@ -183,6 +216,7 @@ namespace CNC.Controls.Viewer
             {
                 builtTokens = tokens;
                 segs.Clear();
+                haveBox = false;
                 StopPlayback();
 
                 var cut = new Point3DCollection();
@@ -235,18 +269,35 @@ namespace CNC.Controls.Viewer
         {
             double len = (b - a).Length;
             segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len });
+
             var coll = rapid ? rapidColl : cut;
             coll.Add(a);
             coll.Add(b);
+
+            Grow(a);
+            Grow(b);
         }
 
-        // The cone follows the live machine position when not simulating; playback owns it while playing.
+        // Cut moves define the part footprint; rapids (often above the stock at safe Z) don't grow the stock.
+        private void Grow(Point3D p)
+        {
+            if (!haveBox)
+            {
+                bMin = bMax = p;
+                haveBox = true;
+                return;
+            }
+            bMin = new Point3D(Math.Min(bMin.X, p.X), Math.Min(bMin.Y, p.Y), Math.Min(bMin.Z, p.Z));
+            bMax = new Point3D(Math.Max(bMax.X, p.X), Math.Max(bMax.Y, p.Y), Math.Max(bMax.Z, p.Z));
+        }
+
+        // The cone follows the live work position when not simulating; playback owns it while playing.
         private void UpdateTool()
         {
-            if (playing || toolCone == null || mpos == null)
+            if (playing || toolCone == null || wpos == null)
                 return;
 
-            double x = mpos.X, y = mpos.Y, z = mpos.Z;
+            double x = wpos.X, y = wpos.Y, z = wpos.Z;
             if (double.IsNaN(x)) x = 0d;
             if (double.IsNaN(y)) y = 0d;
             if (double.IsNaN(z)) z = 0d;
