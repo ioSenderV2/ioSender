@@ -68,6 +68,9 @@ namespace GCode_Sender
             {
                 if (model == null)
                     model = DataContext as GrblViewModel;
+                // Status polling is turned off when the Grbl tab is left; the probe run (WaitForIdle) needs
+                // realtime reports, and the DRO/preview want them too - so turn it back on while this tab is up.
+                model?.Poller.SetState(AppConfig.Settings.Base.PollInterval);
                 RefreshProbes();
                 DefaultArea();
                 RefreshPreview();
@@ -242,6 +245,9 @@ namespace GCode_Sender
             var pr = EnsureProbing();
             if (pr == null)
                 return;
+
+            // Ensure realtime reports are flowing (WaitForIdle waits for one) - polling may be off on this tab.
+            model.Poller.SetState(AppConfig.Settings.Base.PollInterval);
 
             // Single gentle probe at one approach feed (LatchDistance = 0 -> no fast/slow two-stage), from the
             // parked Z down by Probe depth, then retract to the parked Z. Keeps a fragile probe happy.
