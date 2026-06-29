@@ -166,7 +166,12 @@ namespace CNC.Controls
 
             // Refresh Cycle Start now (only meaningful when idle; a running/held job manages its own enables).
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
+            {
                 IsCycleStartEnabled = Source.IsLoaded || MacroProcessor.ActiveRun != null || (model.IsSDCardJob && model.SDRewind);
+                SetActiveProgramReady(MacroProcessor.ActiveRun != null && IsCycleStartEnabled);
+            }
+            else
+                SetActiveProgramReady(false);
         }
 
         public static readonly DependencyProperty IsCycleStartEnabledProperty = DependencyProperty.Register(nameof(IsCycleStartEnabled), typeof(bool), typeof(JobControl));
@@ -174,6 +179,26 @@ namespace CNC.Controls
         {
             get { return (bool)GetValue(IsCycleStartEnabledProperty); }
             set { SetValue(IsCycleStartEnabledProperty, value); }
+        }
+
+        // True when a wizard program is the active source and the machine is idle, ready to run on Cycle Start.
+        // Drives the green highlight on the Cycle Start button (XAML) - a "press me to run" cue.
+        public static readonly DependencyProperty IsActiveProgramReadyProperty = DependencyProperty.Register(nameof(IsActiveProgramReady), typeof(bool), typeof(JobControl));
+        public bool IsActiveProgramReady
+        {
+            get { return (bool)GetValue(IsActiveProgramReadyProperty); }
+            set { SetValue(IsActiveProgramReadyProperty, value); }
+        }
+
+        // Set the "ready to run the active program" cue. On the false->true edge, also drop a one-time status-line
+        // prompt ("<name> ready - press Cycle Start to run."); the markers/scroll otherwise behave as on the job.
+        private void SetActiveProgramReady(bool ready)
+        {
+            if (ready == IsActiveProgramReady)
+                return;
+            IsActiveProgramReady = ready;
+            if (ready && model != null)
+                model.Message = string.Format("{0} ready – press Cycle Start to run.", MacroProcessor.ActiveProgramName ?? "Program");
         }
 
         public static readonly DependencyProperty IsFeedHoldEnabledProperty = DependencyProperty.Register(nameof(IsFeedHoldEnabled), typeof(bool), typeof(JobControl));
@@ -1028,9 +1053,11 @@ namespace CNC.Controls
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                         IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
+                        SetActiveProgramReady(MacroProcessor.ActiveRun != null && IsCycleStartEnabled);
                         break;
 
                     case StreamingState.Send:
+                        SetActiveProgramReady(false);   // running now - drop the "press Cycle Start" cue
                         if (!string.IsNullOrEmpty(model.FileName) && !grblState.MPG)
                             model.IsJobRunning = true;
                         if (JobTimer.IsRunning)

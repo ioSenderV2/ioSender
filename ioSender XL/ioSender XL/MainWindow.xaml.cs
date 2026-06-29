@@ -254,6 +254,7 @@ namespace GCode_Sender
         // Program View button reveals the tool's program - empty or generated. Refreshes if already open.
         public void SetActiveProgram(string name, string program)
         {
+            CNC.Controls.MacroProcessor.ActiveProgramName = name;
             overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
             overlayProgramView.SetProgram(BlocksFromText(program));   // a wizard program shown like any program
 
@@ -275,6 +276,7 @@ namespace GCode_Sender
         private void ClearProgramPreview()
         {
             overlayProgramView.SetProgram(null);   // null = the loaded job
+            CNC.Controls.MacroProcessor.ActiveProgramName = null;
             CNC.Controls.MacroProcessor.ActiveRun = null;
             overlayPreviewTitle.Visibility = Visibility.Collapsed;
             overlayJobTitle.Visibility = Visibility.Visible;
@@ -616,6 +618,10 @@ namespace GCode_Sender
             prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
 
             RunControl.Source = prog;          // stream this program instead of the loaded job
+            // Show the ACTUAL streamed program in the program view so the live per-line markers (executing "@",
+            // completed "ok") and scroll track the run exactly as the Grbl tab does - the authored preview was a
+            // separate copy, so it scrolled but never marked progress. Built from the same blocks the streamer runs.
+            overlayProgramView.SetProgram(prog.Data);
             RestoreSourceOnEnd(m);             // revert to the job source when the run ends
 
             // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously

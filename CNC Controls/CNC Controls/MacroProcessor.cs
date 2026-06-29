@@ -103,6 +103,10 @@ namespace CNC.Controls
         // subscribe to re-evaluate the "configured input source" highlight (the mint background).
         public static event System.Action ActiveProgramChanged;
 
+        // Display name of the active program (set when a wizard registers it), used in the "ready - press Cycle
+        // Start" status prompt. Null when no wizard program is active.
+        public static string ActiveProgramName;
+
         // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
         // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the
         // shell. Used when Run is called with stayPut:true (Load Stock) so a tool's program runs with full flow
