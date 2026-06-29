@@ -432,8 +432,8 @@ namespace CNC.Controls.Viewer
             if (hbot >= htop) hbot = htop - 1d;
 
             double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
-            const int maxCells = 150;
-            hcell = Math.Max(Math.Max(w, h) / maxCells, 0.5d);
+            const int maxCells = 320;                       // finer grid -> sharper carve (was 150)
+            hcell = Math.Max(Math.Max(w, h) / maxCells, 0.3d);
             hnx = Math.Max(1, (int)Math.Ceiling(w / hcell));
             hny = Math.Max(1, (int)Math.Ceiling(h / hcell));
             hx0 = x0;
@@ -697,7 +697,7 @@ namespace CNC.Controls.Viewer
             }
 
             CarveTo(pos);
-            if (carveDirty && ++rebuildSkip >= 3)   // refresh the carved surface a few times/sec
+            if (carveDirty && ++rebuildSkip >= 4)   // refresh the carved surface a few times/sec (finer grid)
             {
                 rebuildSkip = 0;
                 RebuildMesh();
