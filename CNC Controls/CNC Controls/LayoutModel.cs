@@ -156,8 +156,14 @@ namespace CNC.Controls
                 var byKey = tabs.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
                 var ordered = new List<LayoutNode>();
                 foreach (var key in list)
-                    if (byKey.TryGetValue(key, out var node) && !ordered.Contains(node))
+                {
+                    // A saved tab key with no node yet (e.g. a newly introduced top-level tab) gets a fresh leaf
+                    // node so it is built rather than silently dropped.
+                    if (!byKey.TryGetValue(key, out var node))
+                        node = new LayoutNode(key);
+                    if (!ordered.Contains(node))
                         ordered.Add(node);
+                }
                 if (ordered.Count > 0)
                     tabs.Items = ordered;
             }

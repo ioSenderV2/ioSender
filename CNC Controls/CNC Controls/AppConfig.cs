@@ -368,6 +368,11 @@ namespace CNC.Controls
             set { _tabs = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
 
+        // One-shot: the Height Map tab was introduced after tab layouts started persisting, so an existing
+        // saved layout/tab-order won't include it and would filter it out. Injected once on load (then the
+        // user can hide it like any tab). See AppConfig load.
+        public bool HeightMapTabMigrated { get; set; } = false;
+
         // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)
         public List<string> PinnedFlyouts { get; set; } = new List<string>();
         // Settings:App autosave on tab-leave / close (opt-in); PromptOnSave shows a confirm/discard list of changes.
@@ -781,6 +786,28 @@ namespace CNC.Controls
             Base.Themes.Add("Dark", LibStrings.FindResource("ThemeDark"));
             Base.Themes.Add("Light", LibStrings.FindResource("ThemeLight"));
             Base.Themes.Add("White", LibStrings.FindResource("ThemeWhite"));
+
+            // One-shot: a tab introduced after layouts/tab-orders started persisting won't be in a saved tree
+            // or Config.Tabs, so it would be filtered out and never built (hence not even listed in the editor
+            // to re-add). Inject it once - into the layout tree (after Probing) and the legacy Config.Tabs if the
+            // user has a customised list - then flag it so the user can hide it afterwards like any tab.
+            if (!Base.HeightMapTabMigrated)
+            {
+                Base.HeightMapTabMigrated = true;
+
+                var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
+                if (tabsSlot != null && tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.HeightMap) < 0)
+                {
+                    int after = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.Probing);
+                    tabsSlot.Items.Insert(after >= 0 ? after + 1 : tabsSlot.Items.Count, new LayoutNode(LayoutKeys.HeightMap));
+                }
+                if (Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.HeightMap))
+                {
+                    int after = Base.Tabs.FindIndex(t => t == LayoutKeys.Probing);
+                    Base.Tabs.Insert(after >= 0 ? after + 1 : Base.Tabs.Count, LayoutKeys.HeightMap);
+                }
+                _migratedFormat = true;   // persist the injected layout/flag via the save below
+            }
 
             // Keep the layout tree's top-level tab order in sync with the legacy Config.Tabs (still the
             // editor's source until the layout editor edits the tree). Transitional - tree drives the build.
