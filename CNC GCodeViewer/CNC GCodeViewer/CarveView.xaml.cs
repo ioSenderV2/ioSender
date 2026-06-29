@@ -42,7 +42,7 @@ namespace CNC.Controls.Viewer
         private double defaultToolRadius = 3d;
         private int defaultToolShape = ShapeFlat;
         private double defaultToolAngle;
-        private double stockZ;            // stock thickness from the program's (STOCK ... Z=..) comment; 0 = unknown
+        private double stockX, stockY, stockZ;   // stock size from the program's (STOCK X=.. Y=.. Z=..) comment; 0 = unknown
 
         // current cutter geometry the carve uses (set per segment in playback, or the default for live motion)
         private double curR = 3d;
@@ -387,7 +387,7 @@ namespace CNC.Controls.Viewer
             defaultToolRadius = 3d;
             defaultToolShape = ShapeFlat;
             defaultToolAngle = 0d;
-            stockZ = 0d;
+            stockX = stockY = stockZ = 0d;
 
             var data = GCode.File.Data;
             if (data == null)
@@ -399,7 +399,11 @@ namespace CNC.Controls.Viewer
 
                 var ms = rxStock.Match(line);
                 if (ms.Success)
+                {
+                    double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockX);
+                    double.TryParse(ms.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockY);
                     double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockZ);
+                }
 
                 var m = rxTool.Match(line);
                 if (!m.Success)
@@ -451,8 +455,14 @@ namespace CNC.Controls.Viewer
             if (!haveBox)
                 return;
 
+            // Footprint: the real (STOCK X Y) when the program gives it (centred on the cut), else the toolpath
+            // bbox + margin. Never smaller than the cut extents so the toolpath always stays on the stock.
             const double margin = 6d;
-            double x0 = bMin.X - margin, y0 = bMin.Y - margin, x1 = bMax.X + margin, y1 = bMax.Y + margin;
+            double cx = (bMin.X + bMax.X) / 2d, cy = (bMin.Y + bMax.Y) / 2d;
+            double sx = (bMax.X - bMin.X) + 2d * margin, sy = (bMax.Y - bMin.Y) + 2d * margin;
+            if (stockX > 0d) sx = Math.Max(sx, stockX);
+            if (stockY > 0d) sy = Math.Max(sy, stockY);
+            double x0 = cx - sx / 2d, x1 = cx + sx / 2d, y0 = cy - sy / 2d, y1 = cy + sy / 2d;
             htop = 0d;                                       // stock top = work Z0 (the material top); rapids above don't cut
             hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
             hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness
