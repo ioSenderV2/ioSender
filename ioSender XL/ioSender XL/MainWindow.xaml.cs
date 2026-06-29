@@ -255,15 +255,10 @@ namespace GCode_Sender
         public void SetActiveProgram(string name, string program)
         {
             overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
-            overlayProgramText.Text = program ?? string.Empty;
+            overlayProgramView.SetProgram(BlocksFromText(program));   // a wizard program shown like any program
 
             overlayJobTitle.Visibility = Visibility.Collapsed;
             overlayPreviewTitle.Visibility = Visibility.Visible;
-            overlayProgramView.Visibility = Visibility.Collapsed;
-            overlayProgramText.Visibility = Visibility.Visible;
-
-            if (_programOverlay)
-                UpdateOverlay();
         }
 
         // Set the active program AND pop the overlay open - Generate's immediate feedback.
@@ -275,15 +270,26 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
-        // Return the overlay to the live job view (parsed g-code of the loaded file). Called when a job file is
-        // loaded (FileName change); the active program otherwise persists. Visibility is left unchanged.
+        // Return the program view to the loaded job. Called when a job file is loaded (FileName change); the
+        // active program otherwise persists.
         private void ClearProgramPreview()
         {
-            overlayProgramText.Text = string.Empty;
+            overlayProgramView.SetProgram(null);   // null = the loaded job
             overlayPreviewTitle.Visibility = Visibility.Collapsed;
             overlayJobTitle.Visibility = Visibility.Visible;
-            overlayProgramText.Visibility = Visibility.Collapsed;
-            overlayProgramView.Visibility = Visibility.Visible;
+        }
+
+        // A program is just a list of G-code blocks; build one from generated text so a wizard program renders
+        // in the same program view as a file/folder (no raw-text special case).
+        private static System.Collections.ObjectModel.ObservableCollection<CNC.Core.GCodeBlock> BlocksFromText(string text)
+        {
+            var blocks = new System.Collections.ObjectModel.ObservableCollection<CNC.Core.GCodeBlock>();
+            if (string.IsNullOrEmpty(text))
+                return blocks;
+            uint n = 0;
+            foreach (var raw in text.Replace("\r", string.Empty).Split('\n'))
+                blocks.Add(new CNC.Core.GCodeBlock(++n, raw, raw.Length, raw.TrimStart().StartsWith("("), false));
+            return blocks;
         }
 
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs

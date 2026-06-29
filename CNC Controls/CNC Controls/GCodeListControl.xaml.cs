@@ -42,6 +42,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -52,12 +53,22 @@ namespace CNC.Controls
     public partial class GCodeListControl : UserControl
     {
         public ScrollViewer scroll = null;
- 
+        private ObservableCollection<GCodeBlock> _program;   // null = show the loaded job (GCode.File)
+
         public GCodeListControl()
         {
             InitializeComponent();
 
             ctxMenu.DataContext = this;
+        }
+
+        // The program this view renders. A program is just a list of G-code blocks - file, folder or wizard,
+        // all the same. Pass null to fall back to the loaded job. Cuts the old hard-wired tie to GCode.File.
+        public void SetProgram(ObservableCollection<GCodeBlock> blocks)
+        {
+            _program = blocks;
+            grdGCode.DataContext = (object)_program ?? GCode.File.Data;
+            ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.IsFolderView ?? false));
         }
 
         #region Dependency properties
@@ -90,11 +101,11 @@ namespace CNC.Controls
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             scroll = UIUtils.GetScrollViewer(grdGCode);
-            grdGCode.DataContext = GCode.File.Data;
+            grdGCode.DataContext = (object)_program ?? GCode.File.Data;
             if (DataContext is GrblViewModel)
             {
                 (DataContext as GrblViewModel).PropertyChanged += GCodeListControl_PropertyChanged;
-                ApplyGrouping((DataContext as GrblViewModel).IsFolderView);
+                ApplyGrouping(_program == null && (DataContext as GrblViewModel).IsFolderView);
             }
         }
 
@@ -117,7 +128,7 @@ namespace CNC.Controls
                     break;
 
                 case nameof(GrblViewModel.IsFolderView):
-                    ApplyGrouping(((GrblViewModel)sender).IsFolderView);
+                    ApplyGrouping(_program == null && ((GrblViewModel)sender).IsFolderView);
                     break;
             }
         }
@@ -126,7 +137,7 @@ namespace CNC.Controls
         // ungrouped flat list otherwise. The DataGrid uses the default view of GCode.File.Data.
         private void ApplyGrouping(bool grouped)
         {
-            var view = CollectionViewSource.GetDefaultView(GCode.File.Data);
+            var view = CollectionViewSource.GetDefaultView(grdGCode.DataContext);
             if (view == null)
                 return;
 

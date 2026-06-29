@@ -242,13 +242,8 @@
                         <TextBlock x:Name="overlayPreviewTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
                     </Grid>
                 </Border>
-                <!-- Job view (parsed g-code) for loaded files; raw-text view for tool-generated program previews. -->
-                <Grid>
-                    <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
-                    <TextBox x:Name="overlayProgramText" Visibility="Collapsed" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
-                             Background="#FFE4F6E6" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                             TextWrapping="NoWrap" VerticalContentAlignment="Top"/>
-                </Grid>
+                <!-- One program view renders any program - loaded file/folder or a wizard's generated G-code. -->
+                <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
             </DockPanel>
         </Border>
         <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->
