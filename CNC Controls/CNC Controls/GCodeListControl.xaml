@@ -12,6 +12,18 @@
               EnableRowVirtualization="True" ScrollViewer.CanContentScroll="True"
               VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Item"
               DragEnter="grdGCode_Drag" DragOver="grdGCode_Drag" DragLeave="grdGCode_Drag" Drop="grdGCode_Drop">
+        <!-- Highlight the currently-executing line in green. The streamer marks it Sent="@" from the
+             controller's reported line number (needs line-number reporting); completed lines show "ok". -->
+        <DataGrid.RowStyle>
+            <Style TargetType="DataGridRow">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Sent}" Value="@">
+                        <Setter Property="Background" Value="#FF4CAF50"/>
+                        <Setter Property="Foreground" Value="White"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </DataGrid.RowStyle>
         <DataGrid.Columns>
             <DataGridTextColumn x:Uid="hdr_block" Header="Block" Binding="{Binding LineNum}" Width="60" MinWidth="60" MaxWidth="70"/>
             <DataGridTextColumn Header="" Binding="{Binding Sent}" Width="*" MinWidth="30" MaxWidth="60"/>
