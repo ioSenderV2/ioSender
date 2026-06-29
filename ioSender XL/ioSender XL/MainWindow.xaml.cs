@@ -616,7 +616,13 @@ namespace GCode_Sender
 
             RunControl.Source = prog;          // stream this program instead of the loaded job
             RestoreSourceOnEnd(m);             // revert to the job source when the run ends
-            RunControl.CycleStart(0);          // start streaming from the bottom run bar - no tab change
+
+            // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously
+            // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
+            // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
+            // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                new System.Action(() => RunControl.CycleStart(0)));   // stream from the bottom run bar - no tab change
         }
 
         // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
