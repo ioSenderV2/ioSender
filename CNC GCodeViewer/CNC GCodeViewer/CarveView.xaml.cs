@@ -266,7 +266,7 @@ namespace CNC.Controls.Viewer
                 Length = Math.Max(sx, 1d),
                 Width = Math.Max(sy, 1d),
                 Height = h,
-                Fill = new SolidColorBrush(Color.FromArgb(80, 150, 100, 55))   // translucent brown stock
+                Fill = new SolidColorBrush(Color.FromArgb(90, 214, 184, 140))   // translucent tan stock
             });
         }
 
@@ -469,8 +469,8 @@ namespace CNC.Controls.Viewer
             var model = new GeometryModel3D
             {
                 Geometry = carveMesh,
-                Material = MaterialHelper.CreateMaterial(Color.FromRgb(155, 105, 60)),       // brown stock surface
-                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(120, 80, 45))
+                Material = MaterialHelper.CreateMaterial(Color.FromRgb(214, 184, 140)),      // light tan stock (carve reads better)
+                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(178, 150, 110))
             };
             carveVisual = new ModelVisual3D { Content = model };
             RebuildMesh();
