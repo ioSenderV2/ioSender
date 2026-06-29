@@ -46,6 +46,7 @@ namespace CNC.Controls.Probing
     {
         private bool _hasHeightMap = false, _canApply = false, _setToolOffset = false, _addPause = false, _lockGridSizeXY = true;
         private double _minX = 0d, _minY = 0d, _maxX = 50, _maxY = 50d, _gridSizeX = 5d, _gridSizeY = 5d;
+        private double _safeZ = 5d, _probeDepth = 5d;
         private HeightMap _heightMap = null;
         private Point3DCollection _mapPoints;
         private Point3DCollection _bp;
@@ -63,6 +64,11 @@ namespace CNC.Controls.Probing
         public bool CanApply { get { return _canApply && HasHeightMap; } set { _canApply = value; OnPropertyChanged(); } }
         public bool SetToolOffset { get { return _setToolOffset; } set { _setToolOffset = value; OnPropertyChanged(); } }
         public bool AddPause { get { return _addPause; } set { _addPause = value; OnPropertyChanged(); } }
+
+        // Retract / clearance height above Z0 the probe rapids to between points (mm).
+        public double SafeZ { get { return _safeZ; } set { if (value != _safeZ) { _safeZ = value; OnPropertyChanged(); } } }
+        // How far below the start plane each probe may travel before faulting (mm).
+        public double ProbeDepth { get { return _probeDepth; } set { if (value != _probeDepth) { _probeDepth = value; OnPropertyChanged(); } } }
 
         public bool GridSizeLockXY
         {

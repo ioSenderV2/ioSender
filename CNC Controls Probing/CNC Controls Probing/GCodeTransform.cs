@@ -10,14 +10,14 @@ using System.Collections.Generic;
 
 namespace CNC.Controls.Probing
 {
-    class GCodeTransform
+    public class GCodeTransform
     {
-
-        private ProbingViewModel model;
+        public GCodeTransform()
+        {
+        }
 
         public GCodeTransform(ProbingViewModel model)
         {
-            this.model = model;
         }
 
         private Vector3 ToAbsolute(Vector3 orig, double[] values, bool isRelative = false)
@@ -32,15 +32,24 @@ namespace CNC.Controls.Probing
             return p;
         }
 
+        // Back-compat overload for the Probing panel's Height map tab.
         public void ApplyHeightMap(ProbingViewModel model)
         {
-            HeightMap map = model.HeightMap.Map;
+            ApplyHeightMap(model.Grbl, model.HeightMap.Map);
+            model.HeightMapApplied = true;
+        }
+
+        // Transform the loaded job (GCode.File) so every move follows the probed surface: segment long moves to
+        // the grid pitch and add the bilinearly-interpolated map height to each Z. Decoupled from ProbingViewModel
+        // so a standalone Height Map tab (ioSender XL) can apply a map it built via the streamer + (PRINT) path.
+        public void ApplyHeightMap(GrblViewModel grbl, HeightMap map)
+        {
             double segmentLength = Math.Min(map.GridX, map.GridY);
-            int precision = model.Grbl.Precision;
+            int precision = grbl.Precision;
 
             GCPlane plane = new GCPlane(GrblParserState.Plane == Plane.XY ? Commands.G17 : Commands.G18, 0, false);
             DistanceMode distanceMode = GrblParserState.DistanceMode;
-            Position position = new Position(model.Grbl.Position, model.Grbl.UnitFactor);
+            Position position = new Position(grbl.Position, grbl.UnitFactor);
             Vector3 pos = new Vector3(position.X, position.Y, position.Z);
 
             List<GCodeToken> newToolPath = new List<GCodeToken>();
@@ -155,14 +164,12 @@ namespace CNC.Controls.Probing
 
 //            GCodeParser.Save(@"C:\Users\terjeio\Desktop\Probing\file.nc", gc);
 
-            GCode.File.AddBlock(string.Format("Heightmap applied: {0}", model.Grbl.FileName), Core.Action.New);
+            GCode.File.AddBlock(string.Format("Heightmap applied: {0}", grbl.FileName), Core.Action.New);
 
             foreach (string block in gc)
                 GCode.File.AddBlock(block, Core.Action.Add);
 
             GCode.File.AddBlock("", Core.Action.End);
-
-            model.HeightMapApplied = true;
         }
     }
 

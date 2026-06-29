@@ -1162,6 +1162,7 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50));
+            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, "Height Map", () => new HeightMapView(), 55));
             TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70));

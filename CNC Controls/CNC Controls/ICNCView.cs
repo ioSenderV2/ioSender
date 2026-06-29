@@ -57,6 +57,7 @@ namespace CNC.Controls
         Probing,
         LatheWizards,
         LoadStock,
+        HeightMap,
         MachineSetup
     }
 

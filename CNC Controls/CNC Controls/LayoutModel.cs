@@ -59,7 +59,8 @@ namespace CNC.Controls
         // top-level tabs (== ViewType names)
         public const string Grbl = "GRBL", LoadStock = "LoadStock", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
-                            LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup";
+                            LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
+                            HeightMap = "HeightMap";
 
         // Grbl tab's center container (JobWorkspace) + slot
         public const string SlotCenter = "center";
@@ -89,6 +90,7 @@ namespace CNC.Controls
                     new LayoutNode(LayoutKeys.Offsets),
                     new LayoutNode(LayoutKeys.Settings),
                     new LayoutNode(LayoutKeys.Probing),
+                    new LayoutNode(LayoutKeys.HeightMap),
                     new LayoutNode(LayoutKeys.SDCard),
                     new LayoutNode(LayoutKeys.LatheWizards),
                     new LayoutNode(LayoutKeys.Tools,

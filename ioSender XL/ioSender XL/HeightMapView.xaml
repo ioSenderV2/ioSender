@@ -1,0 +1,132 @@
+<UserControl x:Class="GCode_Sender.HeightMapView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             xmlns:helix="clr-namespace:HelixToolkit.Wpf;assembly=HelixToolkit.Wpf"
+             mc:Ignorable="d" d:DesignHeight="560" d:DesignWidth="820">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: scrolling inputs on top, warnings + Generate/Apply/Save/Load pinned at the bottom -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,8,0">
+                    <GroupBox x:Uid="hm_grpProbe" Header="Probe">
+                        <StackPanel Orientation="Horizontal" Margin="6,4">
+                            <Label x:Uid="hm_lblProbe" Content="Probe:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox x:Uid="hm_grpArea" Header="Area to probe" Margin="0,6,0,0">
+                        <StackPanel Margin="6">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From program" GroupName="hmarea" IsChecked="True"
+                                             VerticalAlignment="Center" Checked="AreaProgram_Checked"
+                                             ToolTip="Probe over the loaded job's XY extent, in the current work coordinates."/>
+                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full table" GroupName="hmarea" Margin="18,0,0,0"
+                                             VerticalAlignment="Center" Checked="AreaTable_Checked"
+                                             ToolTip="Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <cnccontrols:NumericField Label="X:" ColonAt="20" Format="-####0.0##"
+                                    Value="{Binding HeightMap.MinX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                <cnccontrols:NumericField x:Uid="hm_width" Label="W:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
+                                    Value="{Binding HeightMap.Width, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <cnccontrols:NumericField Label="Y:" ColonAt="20" Format="-####0.0##"
+                                    Value="{Binding HeightMap.MinY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                <cnccontrols:NumericField x:Uid="hm_height" Label="H:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
+                                    Value="{Binding HeightMap.Height, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            </StackPanel>
+                            <Button x:Uid="hm_fromLimits" Content="Set from program limits" Margin="0,6,0,0" Padding="5,0"
+                                    HorizontalAlignment="Left" IsEnabled="{Binding IsFileLoaded}" Click="Limits_Click"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox x:Uid="hm_grpGrid" Header="Grid size" Margin="0,6,0,0">
+                        <StackPanel Margin="6">
+                            <StackPanel Orientation="Horizontal">
+                                <cnccontrols:NumericField Label="X:" ColonAt="25" Format="###0.0##"
+                                    Value="{Binding HeightMap.GridSizeX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                <cnccontrols:NumericField Label="Y:" ColonAt="25" Format="###0.0##" Margin="8,0,0,0"
+                                    Value="{Binding HeightMap.GridSizeY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                <CheckBox x:Uid="hm_lock" Content="Lock" Margin="12,0,0,0" VerticalAlignment="Center"
+                                    IsChecked="{Binding HeightMap.GridSizeLockXY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox x:Uid="hm_grpProbing" Header="Probing" Margin="0,6,0,0">
+                        <StackPanel Margin="6">
+                            <cnccontrols:NumericField x:Uid="hm_safez" Label="Safe Z:" ColonAt="90" Unit="mm" Format="###0.0##"
+                                ToolTip="Clearance above work Z0 the probe rapids to between points."
+                                Value="{Binding HeightMap.SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <cnccontrols:NumericField x:Uid="hm_depth" Label="Probe depth:" ColonAt="90" Unit="mm" Format="###0.0##" Margin="0,4,0,0"
+                                ToolTip="How far below the start plane each probe may travel before it faults (surface should be within this)."
+                                Value="{Binding HeightMap.ProbeDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="1" Margin="0,8,8,0">
+                <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
+                           Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
+                <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
+                           Text="This controller does not report NGC expression support ($I). The probe program needs grblHAL with expressions enabled."/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button x:Uid="hm_generate" Content="Generate" Width="80" MinHeight="26" Click="Generate_Click"/>
+                    <Button x:Uid="hm_apply" Content="Apply" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
+                            IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+                    <Button x:Uid="hm_save" Content="Save" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Save_Click"/>
+                    <Button x:Uid="hm_load" Content="Load" Width="70" MinHeight="26" Margin="8,0,0,0" Click="Load_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- Right: 3D view of the planned grid / probed surface (blue low -> red high) -->
+        <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Column="1" Margin="8,0,0,0">
+            <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
+                                   RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
+                <helix:HelixViewport3D.Camera>
+                    <PerspectiveCamera Position="0,0,100" LookDirection="0,0,-100" UpDirection="0,1,0.5" FieldOfView="61" NearPlaneDistance="0.001"/>
+                </helix:HelixViewport3D.Camera>
+                <helix:DefaultLights/>
+                <helix:MeshGeometryVisual3D MeshGeometry="{Binding HeightMap.MeshGeometry, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
+                    <helix:MeshGeometryVisual3D.Material>
+                        <MaterialGroup>
+                            <DiffuseMaterial>
+                                <DiffuseMaterial.Brush>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1" Opacity="0.5">
+                                        <LinearGradientBrush.GradientStops>
+                                            <GradientStop Color="Blue" Offset="0"/>
+                                            <GradientStop Color="Cyan" Offset="0.2"/>
+                                            <GradientStop Color="Green" Offset="0.4"/>
+                                            <GradientStop Color="Yellow" Offset="0.6"/>
+                                            <GradientStop Color="Red" Offset="0.8"/>
+                                            <GradientStop Color="Purple" Offset="1"/>
+                                        </LinearGradientBrush.GradientStops>
+                                    </LinearGradientBrush>
+                                </DiffuseMaterial.Brush>
+                            </DiffuseMaterial>
+                        </MaterialGroup>
+                    </helix:MeshGeometryVisual3D.Material>
+                </helix:MeshGeometryVisual3D>
+                <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+                <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+            </helix:HelixViewport3D>
+        </GroupBox>
+    </Grid>
+</UserControl>

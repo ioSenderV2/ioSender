@@ -115,18 +115,14 @@
                 <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
                     <local:EdgeFinderIntControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </TabItem>
-                <TabItem x:Uid="tab_loadStock" Header="Load stock">
-                    <local:LoadStockControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
+                <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
                 <TabItem x:Uid="tab_Rotation" Header="Rotation">
                     <local:RotationControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </TabItem>
                 <TabItem x:Uid="tab_Center" Header="Center finder">
                     <local:CenterFinderControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 </TabItem>
-                <TabItem x:Uid="tab_heightmap" Header="Height map">
-                    <local:HeightMapControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
+                <!-- Height map moved out to its own top-level "Height Map" tab (generate-and-run model, ioSender XL). -->
             </TabControl>
             <Grid>
                 <Grid.ColumnDefinitions>
