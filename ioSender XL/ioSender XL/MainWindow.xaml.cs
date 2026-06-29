@@ -645,8 +645,11 @@ namespace GCode_Sender
                 var st = m.StreamingState;
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
-                else if (started && (st == StreamingState.Idle || st == StreamingState.JobFinished ||
-                                     st == StreamingState.Stop || st == StreamingState.NoFile))
+                // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
+                // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
+                // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
+                // clears ActiveRun) at JobFinished would close that gate mid-finalization and hang the run.
+                else if (started && (st == StreamingState.Idle || st == StreamingState.NoFile))
                 {
                     m.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(() =>
