@@ -89,7 +89,25 @@ namespace CNC.Controls.Viewer
                 model.PropertyChanged += Model_PropertyChanged;
             }
             viewport.SizeChanged += (s, ev) => FrameIfNeeded();   // frame once the viewport has a render size
-            BuildScene();
+            ScheduleBuild();
+        }
+
+        // Build the scene on a fresh dispatcher cycle. BuildToolpath runs GCodeEmulator.Execute, which pumps the
+        // dispatcher (Machine.Reset -> GrblParserState.Get -> DoEvents); doing that directly from a layout/focus
+        // pass (e.g. the IsVisibleChanged raised while a TabItem takes focus) throws "dispatcher processing is
+        // suspended". Deferring runs it after the pass. The flag coalesces repeated requests.
+        private bool buildScheduled;
+        private void ScheduleBuild()
+        {
+            if (buildScheduled)
+                return;
+            buildScheduled = true;
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                buildScheduled = false;
+                if (IsVisible)
+                    BuildScene();
+            }), DispatcherPriority.Background);
         }
 
         private void CarveView_Unloaded(object sender, RoutedEventArgs e)
@@ -105,7 +123,7 @@ namespace CNC.Controls.Viewer
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(GrblViewModel.FileName) && IsVisible)
-                BuildScene();
+                ScheduleBuild();
         }
 
         // The controller settings/offsets that size + place the envelope and the loaded program may arrive after
@@ -113,7 +131,7 @@ namespace CNC.Controls.Viewer
         private void CarveView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if ((bool)e.NewValue)
-                BuildScene();
+                ScheduleBuild();
         }
 
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
