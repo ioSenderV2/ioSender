@@ -38,3 +38,6 @@ simulator/*
 !simulator/README.md
 !simulator/sim-build.json
 scene_debug.log
+
+# Git-Bash crash artifacts
+*.stackdump
