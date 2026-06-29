@@ -321,12 +321,13 @@ namespace GCode_Sender
             }
 
             pr.Program.Execute(true);
-            // Clean up the run: the engine only auto-ends on failure, so on success we must call End() ourselves
-            // (as the old tab did) - it clears IsJobRunning (UI was left locked), unsubscribes its handlers and
-            // restores absolute mode (probing ran in G91). Without this the UI hangs and the machine stays in G91.
-            pr.Program.End(string.Empty);
             model.Message = string.Empty;   // clear the stale "Probing point N of M..." progress line
+
+            // Build the map BEFORE End(): End() unsubscribes the engine's probe handlers, and doing it first could
+            // drop the final captured point. End() afterwards does the cleanup the engine skips on success - clears
+            // IsJobRunning (UI was left locked), unsubscribes, and restores absolute mode (probing ran in G91).
             BuildMap(pr, map);
+            pr.Program.End(string.Empty);
         }
 
         private void Stop_Click(object sender, RoutedEventArgs e)
@@ -338,6 +339,8 @@ namespace GCode_Sender
         // mirrors the serpentine probe order above so each result lands in the right grid cell.
         private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map)
         {
+            model.ResponseLog.Add(string.Format("HeightMap: captured {0} of {1} points", pr.Positions.Count, map.TotalPoints));
+
             // Build from the probed points as long as we captured one per grid point - tolerate IsSuccess being
             // cleared by a late probe-release event after the final point. Report clearly either way.
             if (pr.Positions.Count != map.TotalPoints)
