@@ -79,6 +79,9 @@
                             <cnccontrols:NumericField x:Uid="hm_feed" Label="Probe feed:" ColonAt="90" Unit="mm/min" Format="#####0" Margin="0,4,0,0"
                                 ToolTip="Feed for every probe. The surface is already roughly known, so all points probe gently at this single approach feed - no fast search pass - which avoids overshoot/false triggers on a fragile probe. Defaults to the probe's latch (slow) feed."
                                 Value="{Binding HeightMap.ProbeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <cnccontrols:NumericField x:Uid="hm_dwell" Label="Settle dwell:" ColonAt="90" Unit="s" Format="##0.0##" Margin="0,4,0,0"
+                                ToolTip="Pause before each probe so a fragile/3D probe fully releases and stops ringing after the previous touch and the move. Raise this if you get 'probe already triggered' fails partway through. 0 = none."
+                                Value="{Binding HeightMap.SettleDwell, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                         </StackPanel>
                     </GroupBox>
                 </StackPanel>

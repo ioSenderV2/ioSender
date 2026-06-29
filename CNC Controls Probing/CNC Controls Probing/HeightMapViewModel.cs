@@ -46,7 +46,7 @@ namespace CNC.Controls.Probing
     {
         private bool _hasHeightMap = false, _canApply = false, _setToolOffset = false, _addPause = false, _lockGridSizeXY = true;
         private double _minX = 0d, _minY = 0d, _maxX = 50, _maxY = 50d, _gridSizeX = 5d, _gridSizeY = 5d;
-        private double _safeZ = 5d, _probeDepth = 5d, _probeFeed = 0d;
+        private double _safeZ = 5d, _probeDepth = 5d, _probeFeed = 0d, _settleDwell = 0.5d;
         private HeightMap _heightMap = null;
         private Point3DCollection _mapPoints;
         private Point3DCollection _bp;
@@ -73,6 +73,9 @@ namespace CNC.Controls.Probing
         // points probe at this slow approach feed - no fast search pass - which avoids overshoot/false triggers on
         // a fragile probe. 0 = default to the probe definition's latch (slow) feed.
         public double ProbeFeed { get { return _probeFeed; } set { if (value != _probeFeed) { _probeFeed = value; OnPropertyChanged(); } } }
+        // Pause (seconds) before each probe so a fragile/3D probe fully releases and stops ringing after the
+        // previous touch and the move - avoids "probe already triggered" fails on repeated probing. 0 = none.
+        public double SettleDwell { get { return _settleDwell; } set { if (value != _settleDwell) { _settleDwell = value; OnPropertyChanged(); } } }
 
         public bool GridSizeLockXY
         {

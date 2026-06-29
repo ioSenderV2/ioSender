@@ -331,6 +331,8 @@ namespace GCode_Sender
                     int i = fwd ? k : map.SizeX - 1 - k;
                     var c = map.GetCoordinates(i, j);
                     L(string.Format("G0 X{0} Y{1}", N(c.X), N(c.Y)));
+                    if (HeightMap.SettleDwell > 0d)
+                        L("G4 P" + N(HeightMap.SettleDwell));                     // let a fragile probe release/settle first
                     L(string.Format("G38.3 Z{0} F{1}", N(-depth), N(probeF)));   // gentle probe down to the surface
                     L(string.Format("(PRINT, HM={0},{1} Z=#5063)", i, j));        // report the probe Z result
                     L("G0 Z" + N(safeZ));                                          // retract before the next point
