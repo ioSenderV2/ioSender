@@ -718,6 +718,13 @@ namespace CNC.Controls.Viewer
 
         private void Reset_Click(object sender, RoutedEventArgs e)
         {
+            // Restore the default orientation (the XAML iso view) so Reset always lands in the same place,
+            // even after switching to a side/top view, then zoom to fit.
+            if (viewport.Camera is PerspectiveCamera cam)
+            {
+                cam.LookDirection = new Vector3D(-1d, 1d, -1d);
+                cam.UpDirection = new Vector3D(0d, 0d, 1d);
+            }
             viewport.ZoomExtents(0);
         }
     }
