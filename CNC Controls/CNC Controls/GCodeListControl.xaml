@@ -7,7 +7,9 @@
              mc:Ignorable="d"
              d:DesignHeight="335" d:DesignWidth="400"
              Loaded="UserControl_Loaded">
-    <DataGrid x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
+    <!-- Light mint background marks this as the program view connected to the streamer (the loaded job);
+         tool previews use the plain raw-text box, so mint = "this is what Cycle Start will run". -->
+    <DataGrid x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" Background="#FFE4F6E6" RowBackground="#FFE4F6E6" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
               CanUserSortColumns="false" CanUserResizeRows="False" IsReadOnly="true" SelectionChanged="grdGCode_SelectionChanged"
               EnableRowVirtualization="True" ScrollViewer.CanContentScroll="True"
               VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Item"
