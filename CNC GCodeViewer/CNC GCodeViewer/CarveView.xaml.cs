@@ -1,28 +1,52 @@
 /*
  * CarveView.xaml.cs - part of CNC GCodeViewer
  *
- * A live 3D machine view: the work envelope, a stock block and a cone at the current tool position
- * (machine coordinates). Phase 1 of the carve view (see docs/3D-Carve-View-Design.md); real-time
- * material removal is added in a later phase. Registered as the Job tab's "3D View" center component.
+ * A live 3D machine view with local g-code playback: the work envelope, a stock block, the loaded
+ * program's toolpath, and a cone at the tool position - following the live machine position, or, on
+ * Play, a local simulation of the program (no controller motion). Phase 1 + Play of the carve view
+ * (see docs/3D-Carve-View-Design.md); real-time material removal is added later. Registered as the
+ * Job tab's "3D View" center component.
+ *
+ * Coordinate note: the envelope/grid/stock and the live cone are in MACHINE coordinates ($130-$132 /
+ * MachinePosition); the toolpath + playback are in the program's (work) coordinates starting at 0,0,0.
+ * They therefore differ by the work offset - acceptable for a shape/motion preview; aligning them is a
+ * later refinement (offset the program by the active work origin).
  */
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using HelixToolkit.Wpf;
 using CNC.Core;
+using CNC.GCode;
 
 namespace CNC.Controls.Viewer
 {
     public partial class CarveView : UserControl
     {
+        private struct Seg { public Point3D A, B; public bool Rapid; public double Len; }
+
         private GrblViewModel model;
         private Position mpos;
         private TruncatedConeVisual3D toolCone;
         private bool framed;
+
+        // ---- playback ----
+        private readonly List<Seg> segs = new List<Seg>();
+        private List<GCodeToken> builtTokens;
+        private LinesVisual3D cutLines, rapidLines;
+        private int segIdx;
+        private double segPos;          // distance travelled into the current segment
+        private bool playing;
+        private double speedMul = 1d;
+        private const double BaseSpeed = 40d;            // mm/s at 1x
+        private const double TickSeconds = 0.033d;       // ~30 fps
+        private DispatcherTimer timer;
 
         public CarveView()
         {
@@ -45,10 +69,11 @@ namespace CNC.Controls.Viewer
         {
             if (mpos != null)
                 mpos.PropertyChanged -= Mpos_PropertyChanged;
+            timer?.Stop();
         }
 
-        // The controller settings that size the envelope ($130-$132) may load after this control is built
-        // (connection is deferred), so rebuild the static scene each time the view is shown.
+        // The controller settings that size the envelope ($130-$132) and the loaded program may both arrive
+        // after this control is built, so rebuild the scene each time the view is shown.
         private void CarveView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if ((bool)e.NewValue)
@@ -124,6 +149,9 @@ namespace CNC.Controls.Viewer
                 Fill = new SolidColorBrush(Color.FromArgb(96, 205, 175, 125))
             });
 
+            // loaded-program toolpath (program coordinates)
+            BuildToolpath();
+
             // tool cone - tip at the cutter, widening upward
             toolCone = new TruncatedConeVisual3D
             {
@@ -138,16 +166,84 @@ namespace CNC.Controls.Viewer
 
             UpdateTool();
 
-            if (!framed && xs > 1d)   // frame once, when a real envelope is known
+            if (!framed && (xs > 1d || segs.Count > 0))   // frame once, when there is something to see
             {
                 framed = true;
                 viewport.ZoomExtents(0);
             }
         }
 
+        // Build the ordered motion (segs) + the cut/rapid toolpath lines from the loaded program. Rebuilds only
+        // when the program (token list) changes; otherwise re-adds the cached line visuals to the cleared scene.
+        private void BuildToolpath()
+        {
+            var tokens = GCode.File.Tokens;
+
+            if (tokens != builtTokens)
+            {
+                builtTokens = tokens;
+                segs.Clear();
+                StopPlayback();
+
+                var cut = new Point3DCollection();
+                var rapid = new Point3DCollection();
+
+                if (tokens != null)
+                {
+                    var emu = new GCodeEmulator(true);   // translate canned cycles / G28 / G30 into moves
+                    emu.SetStartPosition(new Point3D(0d, 0d, 0d));
+
+                    foreach (var a in emu.Execute(tokens))
+                    {
+                        switch (a.Token.Command)
+                        {
+                            case Commands.G0:
+                                AddSeg(a.Start, a.End, true, cut, rapid);
+                                break;
+                            case Commands.G1:
+                                AddSeg(a.Start, a.End, false, cut, rapid);
+                                break;
+                            case Commands.G2:
+                            case Commands.G3:
+                                var pts = (a.Token as GCArc).GeneratePoints(emu.Plane, a.Start.ToArray(), 5, emu.DistanceMode == DistanceMode.Incremental);
+                                var p = a.Start;
+                                foreach (var q in pts)
+                                {
+                                    AddSeg(p, q, false, cut, rapid);
+                                    p = q;
+                                }
+                                break;
+                            default:
+                                if (!a.End.Equals(a.Start))
+                                    AddSeg(a.Start, a.End, a.IsRetract, cut, rapid);
+                                break;
+                        }
+                    }
+                }
+
+                cutLines = new LinesVisual3D { Color = Color.FromRgb(80, 150, 235), Thickness = 1.4d, Points = cut };
+                rapidLines = new LinesVisual3D { Color = Color.FromRgb(120, 120, 120), Thickness = 0.6d, Points = rapid };
+            }
+
+            if (rapidLines != null)
+                viewport.Children.Add(rapidLines);
+            if (cutLines != null)
+                viewport.Children.Add(cutLines);
+        }
+
+        private void AddSeg(Point3D a, Point3D b, bool rapid, Point3DCollection cut, Point3DCollection rapidColl)
+        {
+            double len = (b - a).Length;
+            segs.Add(new Seg { A = a, B = b, Rapid = rapid, Len = len });
+            var coll = rapid ? rapidColl : cut;
+            coll.Add(a);
+            coll.Add(b);
+        }
+
+        // The cone follows the live machine position when not simulating; playback owns it while playing.
         private void UpdateTool()
         {
-            if (toolCone == null || mpos == null)
+            if (playing || toolCone == null || mpos == null)
                 return;
 
             double x = mpos.X, y = mpos.Y, z = mpos.Z;
@@ -156,6 +252,102 @@ namespace CNC.Controls.Viewer
             if (double.IsNaN(z)) z = 0d;
 
             toolCone.Origin = new Point3D(x, y, z);
+        }
+
+        // ---- playback control ----
+
+        private void Play_Click(object sender, RoutedEventArgs e)
+        {
+            if (segs.Count == 0)
+                return;
+            playing = true;
+            if (timer == null)
+            {
+                timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickSeconds * 1000d) };
+                timer.Tick += (s, ev) => StepPlayback();
+            }
+            timer.Start();
+        }
+
+        private void Pause_Click(object sender, RoutedEventArgs e)
+        {
+            playing = false;
+            timer?.Stop();
+        }
+
+        private void Stop_Click(object sender, RoutedEventArgs e)
+        {
+            StopPlayback();
+            if (segs.Count > 0 && toolCone != null)
+                toolCone.Origin = segs[0].A;   // back to the program start
+        }
+
+        private void StopPlayback()
+        {
+            playing = false;
+            timer?.Stop();
+            segIdx = 0;
+            segPos = 0d;
+        }
+
+        private void StepPlayback()
+        {
+            if (!playing || segIdx >= segs.Count)
+            {
+                playing = false;
+                timer?.Stop();
+                return;
+            }
+
+            double dist = BaseSpeed * speedMul * TickSeconds;
+            while (dist > 0d && segIdx < segs.Count)
+            {
+                double left = segs[segIdx].Len - segPos;
+                if (left <= 1e-9d)
+                {
+                    segIdx++;
+                    segPos = 0d;
+                    continue;
+                }
+                if (dist < left)
+                {
+                    segPos += dist;
+                    dist = 0d;
+                }
+                else
+                {
+                    dist -= left;
+                    segIdx++;
+                    segPos = 0d;
+                }
+            }
+
+            if (segIdx >= segs.Count)
+            {
+                if (toolCone != null)
+                    toolCone.Origin = segs[segs.Count - 1].B;
+                playing = false;
+                timer?.Stop();
+                return;
+            }
+
+            var cs = segs[segIdx];
+            double t = cs.Len > 0d ? segPos / cs.Len : 0d;
+            if (toolCone != null)
+                toolCone.Origin = new Point3D(cs.A.X + (cs.B.X - cs.A.X) * t,
+                                              cs.A.Y + (cs.B.Y - cs.A.Y) * t,
+                                              cs.A.Z + (cs.B.Z - cs.A.Z) * t);
+        }
+
+        private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            switch (cbxSpeed.SelectedIndex)
+            {
+                case 1: speedMul = 2d; break;
+                case 2: speedMul = 5d; break;
+                case 3: speedMul = 10d; break;
+                default: speedMul = 1d; break;
+            }
         }
 
         private void Reset_Click(object sender, RoutedEventArgs e)
