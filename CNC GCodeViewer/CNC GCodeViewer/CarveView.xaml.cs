@@ -37,8 +37,11 @@ namespace CNC.Controls.Viewer
         private struct ToolInfo { public double Dia; public string Shape; public double Angle; }
         private readonly Dictionary<int, ToolInfo> tools = new Dictionary<int, ToolInfo>();
         private double defaultToolRadius = 3d;
+        private double stockZ;            // stock thickness from the program's (STOCK ... Z=..) comment; 0 = unknown
         private static readonly Regex rxTool =
             new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?", RegexOptions.IgnoreCase);
+        private static readonly Regex rxStock =
+            new Regex(@"\(\s*STOCK\s+X=([0-9.]+)\s+Y=([0-9.]+)\s+Z=([0-9.]+)", RegexOptions.IgnoreCase);
 
         private GrblViewModel model;
         private Position wpos;           // live WORK position (drives the cone when not playing)
@@ -202,11 +205,13 @@ namespace CNC.Controls.Viewer
                 Fill = Brushes.Gray
             });
 
-            // stock - sized to the loaded program (so it contains the cut), top at work Z0; default block if no program
+            // stock: the solid carve mesh (deforms as the cutter passes) when a program is loaded; otherwise a
+            // plain default block. Only one of them is shown so there is no z-fighting/see-through.
             BuildToolpath();
-            AddStock();
             if (carveVisual != null)
-                viewport.Children.Add(carveVisual);   // carved top surface (deforms as the cutter passes)
+                viewport.Children.Add(carveVisual);
+            else
+                AddStock();
 
             // tool cone - tip at the cutter, widening upward
             toolCone = new TruncatedConeVisual3D
@@ -357,6 +362,7 @@ namespace CNC.Controls.Viewer
         {
             tools.Clear();
             defaultToolRadius = 3d;
+            stockZ = 0d;
 
             var data = GCode.File.Data;
             if (data == null)
@@ -364,7 +370,13 @@ namespace CNC.Controls.Viewer
 
             foreach (var b in data)
             {
-                var m = rxTool.Match(b.Data ?? string.Empty);
+                string line = b.Data ?? string.Empty;
+
+                var ms = rxStock.Match(line);
+                if (ms.Success)
+                    double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockZ);
+
+                var m = rxTool.Match(line);
                 if (!m.Success)
                     continue;
                 if (int.TryParse(m.Groups[1].Value, out int t) &&
@@ -414,8 +426,10 @@ namespace CNC.Controls.Viewer
 
             const double margin = 6d;
             double x0 = bMin.X - margin, y0 = bMin.Y - margin, x1 = bMax.X + margin, y1 = bMax.Y + margin;
-            htop = Math.Max(bMax.Z, 0d);
-            hbot = Math.Min(bMin.Z, htop - 1d);
+            htop = 0d;                                       // stock top = work Z0 (the material top); rapids above don't cut
+            hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
+            hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness
+            if (hbot >= htop) hbot = htop - 1d;
 
             double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
             const int maxCells = 150;
@@ -430,9 +444,14 @@ namespace CNC.Controls.Viewer
                 for (int j = 0; j <= hny; j++)
                     hmap[i, j] = htop;
 
-            // triangle indices are fixed for the grid; built once, only Positions change as we carve
-            var tris = new Int32Collection(hnx * hny * 6);
+            // A solid block: the (nx+1)x(ny+1) deforming top grid + 4 bottom corners, with side walls and a
+            // bottom face so it reads as a solid stock (no see-through). Indices are fixed; only Positions change.
             int stride = hnx + 1;
+            int topN = stride * (hny + 1);
+            int B0 = topN, B1 = topN + 1, B2 = topN + 2, B3 = topN + 3;   // bottom corners (x0y0,x1y0,x0y1,x1y1)
+            int TL = 0, TR = hnx, BL = hny * stride, BR = hny * stride + hnx;
+
+            var tris = new Int32Collection(hnx * hny * 6 + 36);
             for (int j = 0; j < hny; j++)
                 for (int i = 0; i < hnx; i++)
                 {
@@ -440,6 +459,11 @@ namespace CNC.Controls.Viewer
                     tris.Add(a); tris.Add(c); tris.Add(b);
                     tris.Add(b); tris.Add(c); tris.Add(d);
                 }
+            AddQuad(tris, TL, TR, B1, B0);   // front side (y0)
+            AddQuad(tris, BR, BL, B2, B3);   // back side  (y1)
+            AddQuad(tris, BL, TL, B0, B2);   // left side  (x0)
+            AddQuad(tris, TR, BR, B3, B1);   // right side (x1)
+            AddQuad(tris, B0, B1, B3, B2);   // bottom
 
             carveMesh = new MeshGeometry3D { TriangleIndices = tris };
             var model = new GeometryModel3D
@@ -452,16 +476,30 @@ namespace CNC.Controls.Viewer
             RebuildMesh();
         }
 
-        // Rebuild the surface positions from the heightmap (indices/normals: indices fixed, normals auto by WPF).
+        private static void AddQuad(Int32Collection t, int a, int b, int c, int d)
+        {
+            t.Add(a); t.Add(b); t.Add(c);
+            t.Add(a); t.Add(c); t.Add(d);
+        }
+
+        // Rebuild the solid stock positions from the heightmap: the deforming top grid + 4 bottom corners
+        // (indices fixed, normals auto by WPF).
         private void RebuildMesh()
         {
             if (carveMesh == null || hmap == null)
                 return;
 
-            var pos = new Point3DCollection((hnx + 1) * (hny + 1));
+            var pos = new Point3DCollection((hnx + 1) * (hny + 1) + 4);
             for (int j = 0; j <= hny; j++)
                 for (int i = 0; i <= hnx; i++)
                     pos.Add(new Point3D(hx0 + i * hcell, hy0 + j * hcell, hmap[i, j]));
+
+            double x1 = hx0 + hnx * hcell, y1 = hy0 + hny * hcell;
+            pos.Add(new Point3D(hx0, hy0, hbot));   // B0
+            pos.Add(new Point3D(x1, hy0, hbot));    // B1
+            pos.Add(new Point3D(hx0, y1, hbot));    // B2
+            pos.Add(new Point3D(x1, y1, hbot));     // B3
+
             carveMesh.Positions = pos;
         }
 
@@ -553,7 +591,7 @@ namespace CNC.Controls.Viewer
             playing = true;
             if (timer == null)
             {
-                timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickSeconds * 1000d) };
+                timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(TickSeconds * 1000d) };
                 timer.Tick += (s, ev) => StepPlayback();
             }
             timer.Start();
