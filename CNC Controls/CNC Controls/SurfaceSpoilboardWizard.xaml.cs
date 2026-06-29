@@ -42,8 +42,8 @@ namespace CNC.Controls
                 UpdateSummary();
                 MacroProcessor.SetActiveProgram?.Invoke("Surface spoilboard", program);   // Program View shows our program
             }
-            else
-                MacroProcessor.ClearActiveProgram?.Invoke();   // leaving: revert to the loaded-job view
+            // Leaving the tab does NOT revert the overlay - the active program persists until another tool
+            // sets it or a job file is loaded.
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);

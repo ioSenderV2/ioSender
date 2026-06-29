@@ -114,7 +114,8 @@ namespace GCode_Sender
             else
             {
                 SaveInputs();
-                MacroProcessor.ClearActiveProgram?.Invoke();   // leaving: revert to the loaded-job view
+                // Leave the active program as-is: the Program View overlay persists this tool's program even
+                // after switching tabs (it only changes when another tool sets it, or a job file is loaded).
                 // Stay subscribed when deactivated: a streamed Load Stock run switches to the Grbl tab while
                 // probing, so we must keep parsing the (PRINT PC OUT / LS_X/Y) result messages to populate the
                 // corners and raise the results popup. The handler only reacts to our own messages, so it's a

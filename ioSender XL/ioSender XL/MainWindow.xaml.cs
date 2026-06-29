@@ -140,11 +140,10 @@ namespace GCode_Sender
             };
 
             // Tools preview their generated program in the program-view overlay (raw text) via these hooks:
-            // ProgramPreview pops it open (Generate feedback); SetActiveProgram/ClearActiveProgram set what the
-            // Program View button shows as the tool's tab is entered/left (empty before Generate).
+            // ProgramPreview pops it open (Generate feedback); SetActiveProgram sets what the Program View button
+            // shows as a tool's tab is entered (empty before Generate). The overlay then persists that program.
             CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
             CNC.Controls.MacroProcessor.SetActiveProgram = (name, text) => SetActiveProgram(name, text);
-            CNC.Controls.MacroProcessor.ClearActiveProgram = () => ClearActiveProgram();
 
             // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
             // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
@@ -276,13 +275,8 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
-        // Return the overlay to the live job view (parsed g-code of the loaded file). Public alias for tools
-        // that leave their tab (the active program reverts to the loaded job); visibility is left unchanged.
-        public void ClearActiveProgram()
-        {
-            ClearProgramPreview();
-        }
-
+        // Return the overlay to the live job view (parsed g-code of the loaded file). Called when a job file is
+        // loaded (FileName change); the active program otherwise persists. Visibility is left unchanged.
         private void ClearProgramPreview()
         {
             overlayProgramText.Text = string.Empty;
