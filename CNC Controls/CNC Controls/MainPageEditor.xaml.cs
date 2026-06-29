@@ -79,6 +79,11 @@ namespace CNC.Controls
             _origFlyouts = Flyouts.Select(i => i.Name).ToArray();
             _origTabs = TabsShown.Select(t => t.Name).ToArray();
 
+            var unavailable = ComponentAvailability.Unavailable();
+            if (unavailable.Count == 0)
+                unavailable.Add(new UnavailableComponent { Label = "(none)", Reason = "All capability-gated components are available on this controller." });
+            lstUnavailable.ItemsSource = unavailable;
+
             UpdateButtons();
         }
 

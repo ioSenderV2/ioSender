@@ -73,6 +73,7 @@
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
     <Compile Include="AppConfig.cs" />
+    <Compile Include="ComponentAvailability.cs" />
     <Compile Include="ComponentRegistry.cs" />
     <Compile Include="ConfigStore.cs" />
     <Compile Include="IProgramSource.cs" />
