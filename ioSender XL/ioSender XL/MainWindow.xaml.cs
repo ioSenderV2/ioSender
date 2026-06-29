@@ -139,11 +139,12 @@ namespace GCode_Sender
                     RestoreTabOnJobEnd(m, origin);
             };
 
-            // Tools preview their generated program in the program-view overlay (raw text) via these hooks:
-            // ProgramPreview pops it open (Generate feedback); SetActiveProgram sets what the Program View button
-            // shows as a tool's tab is entered (empty before Generate). The overlay then persists that program.
+            // A wizard's generated program shows in the same program view as a file/folder. ProgramPreview pops it
+            // open (Generate feedback); SetActiveProgram sets what the Program View button shows as the tool's tab
+            // is entered; ClearActiveProgram reverts to the loaded job when the tab is left (active follows tab).
             CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
             CNC.Controls.MacroProcessor.SetActiveProgram = (name, text) => SetActiveProgram(name, text);
+            CNC.Controls.MacroProcessor.ClearActiveProgram = () => ClearProgramPreview();
 
             // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
             // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
@@ -201,9 +202,8 @@ namespace GCode_Sender
             mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
-            // A real file load (FileName set) returns the program overlay from a tool's raw-text preview to
-            // the live job view. Tools that run via the macro path (Load Stock) never set FileName, so their
-            // preview persists until the next genuine load.
+            // A real file load (FileName set) returns the program view to the live job (and drops any active
+            // wizard program), so Cycle Start streams the freshly loaded file.
             if (DataContext is GrblViewModel gvm)
                 gvm.PropertyChanged += (s, e) =>
                 {
@@ -270,11 +270,12 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
-        // Return the program view to the loaded job. Called when a job file is loaded (FileName change); the
-        // active program otherwise persists.
+        // Return the program view to the loaded job and drop any active wizard program, so Cycle Start streams the
+        // job. Called when a wizard tab is left (active follows tab) or a job file is loaded (FileName change).
         private void ClearProgramPreview()
         {
             overlayProgramView.SetProgram(null);   // null = the loaded job
+            CNC.Controls.MacroProcessor.ActiveRun = null;
             overlayPreviewTitle.Visibility = Visibility.Collapsed;
             overlayJobTitle.Visibility = Visibility.Visible;
         }
@@ -622,7 +623,7 @@ namespace GCode_Sender
             // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
             // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new System.Action(() => RunControl.CycleStart(0)));   // stream from the bottom run bar - no tab change
+                new System.Action(() => RunControl.CycleStart(0, false)));   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
         }
 
         // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:

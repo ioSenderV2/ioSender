@@ -314,7 +314,8 @@ namespace CNC.Controls
                     break;
 
                 case nameof(GrblViewModel.StartFromBlockNum):
-                    CycleStart((sender as GrblViewModel).StartFromBlockNum);
+                    // "Start from this toolpath/block" always streams the loaded job, never a wizard's program.
+                    CycleStart((sender as GrblViewModel).StartFromBlockNum, false);
                     break;
 
                     case nameof(GrblViewModel.IsMPGActive):
@@ -372,7 +373,9 @@ namespace CNC.Controls
         }
 
         public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }
-        public bool JobPending { get { return Source.IsLoaded && !JobTimer.IsRunning; } }
+        // A job is ready to start: a loaded job, or an active wizard program (so the physical Cycle Start button
+        // runs a wizard's program too, not just a loaded file). False once a job/stream is actually running.
+        public bool JobPending { get { return (Source.IsLoaded || MacroProcessor.ActiveRun != null) && !JobTimer.IsRunning; } }
 
         public bool Activate(bool activate)
         {
@@ -513,7 +516,11 @@ namespace CNC.Controls
 
         #endregion
 
-        public void CycleStart(int fromBlock)
+        // honorActiveProgram: when a wizard tab is up it registers its program as the active program
+        // (MacroProcessor.ActiveRun). A fresh (idle) Cycle Start then runs THAT instead of the loaded job - so one
+        // Cycle Start runs whatever program is active, file/folder or wizard. The internal stream-starters that
+        // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
+        public void CycleStart(int fromBlock, bool honorActiveProgram = true)
         {
             if (grblState.State == GrblStates.Hold || (grblState.State == GrblStates.Run && grblState.Substate == 1) || (grblState.State == GrblStates.Door && (grblState.Substate == 0 || grblState.Substate == 5)))
                 Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
@@ -532,6 +539,13 @@ namespace CNC.Controls
             {
                 JobTimer.Pause = false;
                 streamingHandler.Call(StreamingState.Send, false);
+            }
+            else if (honorActiveProgram && MacroProcessor.ActiveRun != null && grblState.State == GrblStates.Idle)
+            {
+                // A wizard tab is active and the machine is idle: run its program (generate-and-run, with its
+                // prompts/flow control) rather than the loaded job. It routes back here with honorActiveProgram:
+                // false to stream. Idle-gated so a Cycle Start mid-run can never re-trigger it.
+                MacroProcessor.ActiveRun();
             }
             else if (Source.IsLoaded)
             {
@@ -985,7 +999,9 @@ namespace CNC.Controls
                     case StreamingState.Idle:
                     case StreamingState.NoFile:
                         IsEnabled = !grblState.MPG;
-                        IsCycleStartEnabled = Source.IsLoaded || (model.IsSDCardJob && model.SDRewind);
+                        // Also enabled when a wizard tab is up (its program is the active program Cycle Start runs),
+                        // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
+                        IsCycleStartEnabled = Source.IsLoaded || MacroProcessor.ActiveRun != null || (model.IsSDCardJob && model.SDRewind);
                         IsStopEnabled = model.IsSDCardJob && model.SDRewind;
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                         IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;

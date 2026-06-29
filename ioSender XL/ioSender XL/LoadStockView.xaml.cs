@@ -80,12 +80,10 @@ namespace GCode_Sender
             UpdateDrawing();
         }
 
-        // Drop the generated program and disable Run until the next Generate.
+        // Drop the generated program; Cycle Start (which runs the active program) rebuilds it via Run_Click.
         private void InvalidateProgram()
         {
             program = string.Empty;
-            if (btnRun != null)
-                btnRun.IsEnabled = false;
         }
 
         private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -110,16 +108,16 @@ namespace GCode_Sender
                 UpdateExpressionWarning();
                 UpdateDrawing();
                 MacroProcessor.SetActiveProgram?.Invoke("Load stock", program);   // Program View shows our program
+                MacroProcessor.ActiveRun = () => Run_Click(null, null);            // Cycle Start runs it
             }
             else
             {
                 SaveInputs();
-                // Leave the active program as-is: the Program View overlay persists this tool's program even
-                // after switching tabs (it only changes when another tool sets it, or a job file is loaded).
-                // Stay subscribed when deactivated: a streamed Load Stock run switches to the Grbl tab while
-                // probing, so we must keep parsing the (PRINT PC OUT / LS_X/Y) result messages to populate the
-                // corners and raise the results popup. The handler only reacts to our own messages, so it's a
-                // no-op otherwise. (Previously unsubscribing here lost every result message on the streamed path.)
+                MacroProcessor.ActiveRun = null;
+                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+                // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
+                // the corners populate and the results popup is raised even if the tab is left mid-run. The
+                // handler only reacts to our own messages, so it's a no-op otherwise.
             }
         }
 
@@ -481,7 +479,6 @@ namespace GCode_Sender
 
             bool ok = usable.Count > 0;
             btnGenerate.IsEnabled = ok;
-            btnRun.IsEnabled = ok && !string.IsNullOrWhiteSpace(program);   // Run only after a Generate
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
         }
 
@@ -516,7 +513,6 @@ namespace GCode_Sender
             ResetResults();
             SaveInputs();
 
-            btnRun.IsEnabled = true;                                  // program in hand: Run is now valid
             MacroProcessor.ProgramPreview?.Invoke("Load stock", program);   // pop the program-view overlay as feedback
         }
 

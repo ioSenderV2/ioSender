@@ -79,10 +79,19 @@ namespace CNC.Controls
         public static System.Action<string, string> ProgramPreview;
 
         // Hook for the "active program" the program-view button shows: a tool sets itself as the active program
-        // (name, current program text - empty before Generate) when its tab is shown. The overlay then persists
-        // this program (it changes only when another tool sets it, or a job file is loaded). Unlike ProgramPreview
-        // this does NOT pop the overlay open - it just sets what it WOULD show. Set by ioSender XL.
+        // (name, current program text - empty before Generate) when its tab is shown. Unlike ProgramPreview this
+        // does NOT pop the overlay open - it just sets what it WOULD show. Set by ioSender XL.
         public static System.Action<string, string> SetActiveProgram;
+
+        // Return the program view to the loaded job (active-program follows the focused tab): a tool calls this
+        // when its tab is left so the Program View reverts from its program to the job. Set by ioSender XL.
+        public static System.Action ClearActiveProgram;
+
+        // The active program's run action: a tool registers its "generate-and-run" here when its tab is shown and
+        // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
+        // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)
+        // and tools no longer need their own Run button. Null = no tool active: Cycle Start streams the job.
+        public static System.Action ActiveRun;
 
         // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
         // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the

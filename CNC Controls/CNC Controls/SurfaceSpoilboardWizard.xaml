@@ -71,12 +71,11 @@
             </StackPanel>
         </StackPanel>
         </ScrollViewer>
-        <!-- Warning + Generate / Run pinned at the bottom of the input column -->
+        <!-- Warning + Generate pinned at the bottom of the input column (Cycle Start runs the generated program) -->
         <StackPanel Grid.Row="1" Margin="5,0,5,6">
             <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="btn_sbgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
-                <Button x:Uid="btn_sbrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
             </StackPanel>
         </StackPanel>
         </Grid>

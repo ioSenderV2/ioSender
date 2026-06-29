@@ -41,9 +41,13 @@ namespace CNC.Controls
                 DefaultArea();   // size the area to the in-bounds travel envelope (less margins)
                 UpdateSummary();
                 MacroProcessor.SetActiveProgram?.Invoke("Surface spoilboard", program);   // Program View shows our program
+                MacroProcessor.ActiveRun = Run;                                            // Cycle Start runs it
             }
-            // Leaving the tab does NOT revert the overlay - the active program persists until another tool
-            // sets it or a job file is loaded.
+            else
+            {
+                MacroProcessor.ActiveRun = null;
+                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+            }
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -441,7 +445,6 @@ namespace CNC.Controls
             switch ((string)((Button)sender).Tag)
             {
                 case "generate": Generate(); break;
-                case "run": Run(); break;
             }
         }
 
@@ -493,9 +496,8 @@ namespace CNC.Controls
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 
-            // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
+            // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
             program = string.Join("\r\n", BuildProgram());
-            btnRun.IsEnabled = true;
             MacroProcessor.ProgramPreview?.Invoke("Surface spoilboard", program);
         }
 

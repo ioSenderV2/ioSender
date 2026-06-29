@@ -50,9 +50,13 @@ namespace CNC.Controls
                 DetectOffsetSetting();
                 UpdateComputed();
                 MacroProcessor.SetActiveProgram?.Invoke("Auto square", program);   // Program View shows our program
+                MacroProcessor.ActiveRun = Run;                                     // Cycle Start runs it
             }
-            // Leaving the tab does NOT revert the overlay - the active program persists until another tool
-            // sets it or a job file is loaded.
+            else
+            {
+                MacroProcessor.ActiveRun = null;
+                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+            }
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -414,7 +418,6 @@ namespace CNC.Controls
             switch ((string)((Button)sender).Tag)
             {
                 case "generate": Generate(); break;
-                case "run": Run(); break;
                 case "apply": ApplyOffset(); break;
                 case "home": ReHome(); break;
             }
@@ -441,8 +444,7 @@ namespace CNC.Controls
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
-            btnRun.IsEnabled = true;
-            MacroProcessor.ProgramPreview?.Invoke("Auto square", program);
+            MacroProcessor.ProgramPreview?.Invoke("Auto square", program);   // refresh + pop the Program View
         }
 
         private void Run()

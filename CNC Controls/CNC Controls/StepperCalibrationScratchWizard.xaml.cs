@@ -78,9 +78,13 @@ namespace CNC.Controls
                     Axis = CalAxes[0].Index;
                 getAxisDetails(Axis);
                 MacroProcessor.SetActiveProgram?.Invoke("Stepper calibration", program);   // Program View shows our program
+                MacroProcessor.ActiveRun = Run;                                             // Cycle Start runs it
             }
-            // Leaving the tab does NOT revert the overlay - the active program persists until another tool
-            // sets it or a job file is loaded.
+            else
+            {
+                MacroProcessor.ActiveRun = null;
+                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+            }
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -405,10 +409,6 @@ namespace CNC.Controls
                     Generate();
                     break;
 
-                case "run":
-                    Run();
-                    break;
-
                 case "save":
                     Save();
                     break;
@@ -443,9 +443,8 @@ namespace CNC.Controls
 
             NewResolution = 0d;
 
-            // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
+            // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
             program = string.Join("\r\n", BuildProgram());
-            btnRun.IsEnabled = true;
             MacroProcessor.ProgramPreview?.Invoke("Stepper calibration", program);
         }
 
