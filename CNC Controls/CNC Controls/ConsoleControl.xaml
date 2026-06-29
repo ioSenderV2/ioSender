@@ -23,7 +23,7 @@
              MDICommand (which echoes the command into ResponseLog above), Up/Down recall the
              shared CommandLog history, and the input is locked out while a job is running - same
              as the global MDI strip. The strip is kept for the other tabs. -->
-        <DockPanel DockPanel.Dock="Bottom" Margin="5,3,5,2"
+        <DockPanel x:Name="inputRow" DockPanel.Dock="Bottom" Margin="5,3,5,2"
                    IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
             <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="3,0,5,0" Foreground="#FF888888"/>

@@ -9,11 +9,17 @@
              Loaded="UserControl_Loaded">
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" MinWidth="380" MaxWidth="440"/>
+            <ColumnDefinition Width="430"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <!-- Left: inputs -->
-        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="5,5,0,0" HorizontalAlignment="Left" MinWidth="370">
+        <!-- Left: scrolling inputs on top, Generate/Run pinned at the column bottom (shared tool layout) -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical" Margin="5,5,0,0">
             <local:NumericField x:Uid="fld_sbdiameter" Label="Bit diameter:" ColonAt="140" Format="###0.0##"
                 Value="{Binding BitDiameter, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sbmaxrpm" Label="Bit max RPM:" ColonAt="140" Format="######0"
@@ -63,22 +69,20 @@
                           ToolTip="Skip the park + Z touch-off + dust-boot prompts and reuse the work Z0 from the last run (same bit / setup, boot already fitted). Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
                           IsChecked="{Binding ReuseZ0, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
+        </StackPanel>
+        </ScrollViewer>
+        <!-- Warning + Generate / Run pinned at the bottom of the input column -->
+        <StackPanel Grid.Row="1" Margin="5,0,5,6">
+            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="btn_sbgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
                 <Button x:Uid="btn_sbrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
             </StackPanel>
-            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="5,8" HorizontalAlignment="Left" MinWidth="350" MaxWidth="430" TextWrapping="Wrap"/>
         </StackPanel>
-        <!-- Right: summary + instructions -->
+        </Grid>
+        <!-- Right: summary (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="txtSummary" Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-            <!-- Before Generate: shows the instructions. After Generate: the generated program (the run buffer). -->
-            <TextBox x:Name="txtProgram" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,0"
-                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+            <TextBlock x:Name="txtSummary" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
     </Grid>
 </UserControl>

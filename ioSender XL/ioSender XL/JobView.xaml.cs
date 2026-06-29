@@ -277,15 +277,15 @@ namespace GCode_Sender
                         if (filename.StartsWith("Wizard:"))
                         {
                             //MainWindow.EnableView(true, ViewType.GCodeViewer);
-                            gcodeRenderer.Open(GCode.File.Tokens);
+                            workspace.ShowToolpath();
                         }
                         else if (!string.IsNullOrEmpty(filename))
                         {
                             //MainWindow.GCodeViewer.Open(GCode.File.Tokens);
                             //MainWindow.EnableView(true, ViewType.GCodeViewer);
-                            GCodeSender.EnablePolling(false);
-                            gcodeRenderer.Open(GCode.File.Tokens);
-                            GCodeSender.EnablePolling(true);
+                            MainWindow.ui.RunControl.EnablePolling(false);
+                            workspace.ShowToolpath();
+                            MainWindow.ui.RunControl.EnablePolling(true);
                         }
                     }
                     break;
@@ -323,8 +323,8 @@ namespace GCode_Sender
         {
             if (activate)
             {
-                GCodeSender.RewindFile();
-                GCodeSender.CallHandler(model.IsSDCardJob ? StreamingState.Start : (GCode.File.IsLoaded ? StreamingState.Idle : StreamingState.NoFile), false);
+                MainWindow.ui.RunControl.RewindFile();
+                MainWindow.ui.RunControl.CallHandler(model.IsSDCardJob ? StreamingState.Start : (GCode.File.IsLoaded ? StreamingState.Idle : StreamingState.NoFile), false);
 
                 model.ResponseLogFilterOk = AppConfig.Settings.Base.FilterOkResponse;
 
@@ -404,7 +404,7 @@ namespace GCode_Sender
                                   : this;
             }
 
-            if (GCodeSender.Activate(activate)) {
+            if (MainWindow.ui.RunControl.Activate(activate)) {
                 showProgramLimits();
                 Task.Delay(500).ContinueWith(t => _dro?.EnableFocus());
                 Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
@@ -416,7 +416,7 @@ namespace GCode_Sender
 
         public void CloseFile()
         {
-            gcodeRenderer.Close();
+            workspace.ClearToolpath();
         }
 
         public void Setup(UIViewModel model, AppConfig profile)
@@ -500,7 +500,7 @@ namespace GCode_Sender
 
             using (new UIUtils.WaitCursor())
             {
-                GCodeSender.EnablePolling(false);
+                MainWindow.ui.RunControl.EnablePolling(false);
                 while (!GrblInfo.Get())
                 {
                     if(--timeout == 0)
@@ -524,7 +524,7 @@ namespace GCode_Sender
                     GrblSpindles.AddDefault();
                     GrblParserState.Get(true);
                 }
-                GCodeSender.EnablePolling(true);
+                MainWindow.ui.RunControl.EnablePolling(true);
             }
 
             // GrblInfo (incl. the $I-reported IP) is loaded now - remember an IP to default the Connect
@@ -537,8 +537,7 @@ namespace GCode_Sender
 
             showProgramLimits();
 
-            if (!AppConfig.Settings.GCodeViewer.IsEnabled)
-                tabGCode.Items.Remove(tab3D);
+            workspace.Set3DViewEnabled(AppConfig.Settings.GCodeViewer.IsEnabled);
 
             if (GrblInfo.LatheModeEnabled)
                 MainWindow.EnableView(true, ViewType.LatheWizards);
@@ -577,11 +576,10 @@ namespace GCode_Sender
 
         void EnableUI(bool enable)
         {
+            // Status/Signals now live in the fixed bottom run-control bar (Phase 2c), not in JobView,
+            // so there's no longer a status control to exclude here.
             foreach (UserControl control in UIUtils.FindFirstLogicalChildren<UserControl>(this))
-            {
-                if (control.Name != nameof(statusControl))
-                    control.IsEnabled = enable;
-            }
+                control.IsEnabled = enable;
             // disable ui components when in sleep mode
         }
         // Start the currently-loaded in-memory program through the real (flow-controlled) job streamer.
@@ -589,20 +587,20 @@ namespace GCode_Sender
         public void StartLoadedJob()
         {
             if (GCode.File.IsLoaded)
-                GCodeSender.CycleStart(0);
+                MainWindow.ui.RunControl.CycleStart(0);
         }
 
 #region UIevents
 
         void JobView_Load(object sender, EventArgs e)
         {
-            GCodeSender.CallHandler(StreamingState.Idle, true);
+            MainWindow.ui.RunControl.CallHandler(StreamingState.Idle, true);
         }
 
         private void JobView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible)
-                GCodeSender.Focus();
+                MainWindow.ui.RunControl.Focus();
         }
 
         private void JobView_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -643,7 +641,9 @@ namespace GCode_Sender
         // until the view is re-focused. The allowJog gate (focus in MDI/DRO/spindle/work-params) still applies.
         public bool ProcessKeyPreview(KeyEventArgs e)
         {
-            return model.Keyboard.ProcessKeypress(e, !(mdiControl.IsFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
+            // MDI now lives in the fixed bottom run-control bar (Phase 2c) - check its focus there.
+            bool mdiFocused = MainWindow.ui.MdiControl?.IsFocused ?? false;
+            return model.Keyboard.ProcessKeypress(e, !(mdiFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
 
 #endregion

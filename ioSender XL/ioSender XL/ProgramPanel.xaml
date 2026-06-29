@@ -1,0 +1,18 @@
+<UserControl x:Class="GCode_Sender.ProgramPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="300">
+    <!-- The loaded-program list with a title bar = program source (file path / folder / tool name).
+         Registered as the "Program" center component (Phase 2b step 4); inherits the GrblViewModel
+         DataContext from its host so FileName/ProgramPath bind through. -->
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
+            <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+        </Border>
+        <cnccontrols:GCodeListControl/>
+    </DockPanel>
+</UserControl>

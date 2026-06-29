@@ -68,6 +68,37 @@ namespace CNC.Controls
             chkCheckMode.Tag = StatusButton.Check;
         }
 
+        // The control has two parts - the state/check row and the Home/Unlock/Reset button row. These can be
+        // shown independently so a host can place them separately (e.g. the fixed bottom run-control bar puts
+        // State/Check up by the MDI line and the buttons down on the button row). Both default true = the
+        // normal stacked control used in the side panels (non-XL), unchanged.
+        public static readonly DependencyProperty ShowStateProperty = DependencyProperty.Register(
+            nameof(ShowState), typeof(bool), typeof(StatusControl), new PropertyMetadata(true, OnPartsChanged));
+
+        public bool ShowState
+        {
+            get { return (bool)GetValue(ShowStateProperty); }
+            set { SetValue(ShowStateProperty, value); }
+        }
+
+        public static readonly DependencyProperty ShowButtonsProperty = DependencyProperty.Register(
+            nameof(ShowButtons), typeof(bool), typeof(StatusControl), new PropertyMetadata(true, OnPartsChanged));
+
+        public bool ShowButtons
+        {
+            get { return (bool)GetValue(ShowButtonsProperty); }
+            set { SetValue(ShowButtonsProperty, value); }
+        }
+
+        private static void OnPartsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (StatusControl)d;
+            c.stateRow.Visibility = c.ShowState ? Visibility.Visible : Visibility.Collapsed;
+            c.buttonRow.Visibility = c.ShowButtons ? Visibility.Visible : Visibility.Collapsed;
+            // no top gap above the button row when the state row above it is hidden
+            c.buttonRow.Margin = c.ShowState ? new Thickness(0, 4, 0, 0) : new Thickness(0);
+        }
+
         void btn_Click(object sender, RoutedEventArgs e)
         {
             switch ((StatusButton)((Control)sender).Tag)

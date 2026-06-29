@@ -31,17 +31,12 @@
     </UserControl.Resources>
     <DockPanel Background="Transparent" MouseDown="outside_MouseDown" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
-            <cnccontrols:MDIControl x:Name="mdiControl" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            <!-- MDI / Signals / Status moved to the fixed main-window run-control bar (Phase 2c). -->
             <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Height="23"/>
         </StackPanel>
         <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" Width="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-            <!-- Signals/Status are pinned at the bottom (declared first so the DockPanel reserves the bottom strip). -->
-            <StackPanel x:Name="t2" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" DockPanel.Dock="Bottom">
-                <cnccontrols:SignalsControl x:Name="signalsControl" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                <cnccontrols:StatusControl x:Name="statusControl" Margin="0,5,0,0" VerticalAlignment="Bottom"/>
-            </StackPanel>
-            <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels); scrolls if taller than the
-                 space above Signals/Status so it never overlays them. -->
+            <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels). Signals/Status now
+                 live in the fixed bottom run-control bar (Phase 2c). -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="t1" HorizontalAlignment="Left" VerticalAlignment="Top"/>
             </ScrollViewer>
@@ -66,19 +61,8 @@
                 <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250"/>
             </ScrollViewer>
         </Grid>
-        <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,5,0,0">
-            <cnccontrols:JobControl x:Name="GCodeSender" Margin="0,5,0,0" DockPanel.Dock="Bottom"/>
-            <TabControl x:Name="tabGCode" TabStripPlacement="Bottom" DockPanel.Dock="Top" >
-                <TabItem x:Uid="tab_program" Header="Program">
-                    <cnccontrols:GCodeListControl/>
-                </TabItem>
-                <TabItem x:Uid="tab_3DView" x:Name="tab3D" Header="3D View">
-                    <cncviewer:RenderControl x:Name="gcodeRenderer"/>
-                </TabItem>
-                <TabItem x:Uid="tab_console" x:Name="tabConsole" Header="Console">
-                    <cnccontrols:ConsoleControl/>
-                </TabItem>
-            </TabControl>
-        </DockPanel>
+        <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a).
+             Run controls (JobControl) now live in the fixed main-window bottom bar (Phase 2c). -->
+        <local:JobWorkspace x:Name="workspace"/>
     </DockPanel>
 </UserControl>

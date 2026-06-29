@@ -85,6 +85,19 @@ namespace GCode_Sender
             }
 
             base.OnStartup(e);
+
+            // Show a status splash, then create the main window invisible (StartupUri removed from App.xaml).
+            // CompleteStartup connects/reads settings/validates the machine-setup steps with the splash up, then
+            // reveals the main window (on the Machine Setup tab if setup is incomplete) and closes the splash.
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+            var splash = new SplashWindow();
+            splash.Show();
+
+            var main = new MainWindow();
+            Current.MainWindow = main;
+            main.AttachSplash(splash);
+            main.Show();   // shown with Opacity 0 / not in taskbar; Window_Load -> CompleteStartup runs unseen
         }
 
         private void CurrentDomainOnUnhandledException(object sender, UnhandledExceptionEventArgs args)

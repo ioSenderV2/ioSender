@@ -51,7 +51,7 @@ using System.Windows.Controls;
 
 namespace CNC.Controls
 {
-    public class GCode
+    public class GCode : IProgramSource
     {
         private struct GCodeConverter
         {
@@ -75,8 +75,21 @@ namespace CNC.Controls
 
         public event GCodeJob.ToolChangedHandler ToolChanged = null;
 
+        private readonly bool _transient;
+
         private GCode()
         {
+            Program.FileChanged += Program_FileChanged;
+            Program.ToolChanged += Program_ToolChanged;
+        }
+
+        // Create a standalone, TRANSIENT program for a tool's generated run. It is streamed via JobControl.Source
+        // WITHOUT becoming the loaded job, so it must never mutate the shared Model (FileName / limits / Blocks)
+        // or push a header to the simulator. Model is set so the streamer can drive it; build it with AddBlock.
+        public GCode(GrblViewModel model)
+        {
+            _transient = true;
+            Model = model;
             Program.FileChanged += Program_FileChanged;
             Program.ToolChanged += Program_ToolChanged;
         }
@@ -88,6 +101,9 @@ namespace CNC.Controls
 
         private void Program_FileChanged(string filename)
         {
+            if (_transient)
+                return;   // a transient (tool-run) program never touches the shared Model or the simulator
+
             if (Model != null)
             {
                 if (filename == "")
@@ -99,6 +115,9 @@ namespace CNC.Controls
                 }
 
                 Model.FileName = filename;
+                // Default the source path to the name; LoadFolder overrides it with the full folder path,
+                // and a single file's FileName already IS its full path. Generated programs have no path.
+                Model.ProgramPath = filename;
             }
 
             if (filename != "")
@@ -211,8 +230,8 @@ namespace CNC.Controls
         {
             Program.AddBlock(block, action);
 
-            if(action == Core.Action.End)
-                Model.Blocks = Blocks;
+            if(action == Core.Action.End && !_transient)
+                Model.Blocks = Blocks;   // transient programs don't drive the job's block-count display
         }
 
         public void AddBlock(string block)
@@ -402,6 +421,7 @@ namespace CNC.Controls
             {
                 Model.IsFolderView = true;
                 Model.Blocks = Blocks;
+                Model.ProgramPath = folder;   // full folder path for the tooltip (FileName stays the leaf name)
             }
         }
 

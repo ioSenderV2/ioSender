@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
 
@@ -65,6 +66,27 @@ namespace CNC.Controls
         void override_CommandGenerated(byte[] commands, int len)
         {
             Comms.com.WriteBytes(commands, len);
+        }
+
+        // When true, hide the feed-rate readout row and show only the feed/rapids override sliders - used by
+        // the fixed bottom run-control bar, where the current feed rate is shown separately under Signals.
+        // Default false keeps the full control (readout + overrides) used elsewhere.
+        public static readonly DependencyProperty OverridesOnlyProperty = DependencyProperty.Register(
+            nameof(OverridesOnly), typeof(bool), typeof(FeedControl), new PropertyMetadata(false, OnOverridesOnlyChanged));
+
+        public bool OverridesOnly
+        {
+            get { return (bool)GetValue(OverridesOnlyProperty); }
+            set { SetValue(OverridesOnlyProperty, value); }
+        }
+
+        private static void OnOverridesOnlyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (FeedControl)d;
+            bool on = (bool)e.NewValue;
+            c.cvFeedRate.Visibility = c.lblFeedRrate.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+            c.readoutRow.Height = on ? new GridLength(0) : GridLength.Auto;
+            c.readoutRow.MinHeight = on ? 0 : 30;
         }
     }
 }

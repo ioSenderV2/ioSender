@@ -82,15 +82,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="JobWorkspace.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="LoadStockView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="MachineControlPanel.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="MachineControlWindow.xaml">
+    <Page Include="ProgramPanel.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -98,9 +98,16 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="SplashWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="JobWorkspace.xaml.cs">
+      <DependentUpon>JobWorkspace.xaml</DependentUpon>
     </Compile>
     <Compile Include="JobView.xaml.cs">
       <DependentUpon>JobView.xaml</DependentUpon>
@@ -108,15 +115,16 @@
     <Compile Include="LoadStockView.xaml.cs">
       <DependentUpon>LoadStockView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="MachineControlPanel.xaml.cs">
-      <DependentUpon>MachineControlPanel.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="MachineControlWindow.xaml.cs">
-      <DependentUpon>MachineControlWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ProgramPanel.xaml.cs">
+      <DependentUpon>ProgramPanel.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ProgramSourceConverter.cs" />
+    <Compile Include="SplashWindow.xaml.cs">
+      <DependentUpon>SplashWindow.xaml</DependentUpon>
     </Compile>
   </ItemGroup>
   <ItemGroup>

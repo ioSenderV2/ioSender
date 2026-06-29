@@ -11,11 +11,17 @@
              Loaded="UserControl_Loaded">
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" MinWidth="380" MaxWidth="440"/>
+            <ColumnDefinition Width="400"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <!-- Left: inputs -->
-        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="5,5,0,0" HorizontalAlignment="Left" MinWidth="370">
+        <!-- Left: scrolling inputs on top, Generate/Run/Save pinned at the column bottom (shared tool layout) -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical" Margin="5,5,0,0">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120"/>
                 <ComboBox x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
@@ -45,6 +51,11 @@
                 Value="{Binding RowSpacing, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_scmargin" Label="Edge margin:" ColonAt="120"
                 Value="{Binding EdgeMargin, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label Content="Min stock:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding MinStockText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" FontWeight="SemiBold"
+                           ToolTip="Smallest stock the scratch pattern fits on: span + 2x edge margin along the axis, (points-1)x row spacing + line length + 2x edge margin across it."/>
+            </StackPanel>
             <local:NumericField x:Uid="fld_scrpm" Label="Spindle RPM:" ColonAt="120" Format="#####0"
                 Value="{Binding SpindleRPM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -55,22 +66,23 @@
                     <ComboBoxItem x:Uid="cbi_toolPrompt" Content="Prompt"/>
                 </ComboBox>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
-                <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
-                <Button x:Uid="btn_scrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
-                <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
-                        IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
-            </StackPanel>
             <local:NumericField x:Uid="fld_scnewres" Label="New steps/mm:" ColonAt="120" Format="###0.000###"
                 Value="{Binding NewResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="steps/mm"/>
-            <TextBlock x:Name="txtWarnings" Foreground="Red" Margin="5,8" HorizontalAlignment="Left" MinWidth="350" TextWrapping="Wrap"/>
         </StackPanel>
-        <!-- Right: results + instructions -->
+        </ScrollViewer>
+        <!-- Generate / Run / Save pinned at the bottom of the input column -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8,5,6" HorizontalAlignment="Right">
+            <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+            <Button x:Uid="btn_scrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
+            <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
+                    IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
+        </StackPanel>
+        </Grid>
+        <!-- Right: measurements grid (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock x:Uid="txt_scresults" Grid.Row="0" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
             <DataGrid x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
@@ -93,9 +105,6 @@
                     <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
-            <!-- Before Generate: shows the instructions. After Generate: the generated program (the run buffer). -->
-            <TextBox x:Name="txtProgram" Grid.Row="2" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,6,0,0" MinHeight="150"
-                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
         </Grid>
     </Grid>
 </UserControl>

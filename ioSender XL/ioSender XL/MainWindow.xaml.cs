@@ -58,6 +58,7 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         private const string version = "2.0.47";
+        public static string Version { get { return version; } }
         public static MainWindow ui = null;
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
@@ -117,9 +118,9 @@ namespace GCode_Sender
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
-            // Let library-side generated-program runners (e.g. Surface Spoilboard) raise the floating run-control
-            // panel, which lives in this assembly.
-            CNC.Controls.MacroProcessor.RunControlPanel = m => MachineControlWindow.ShowFor(m, this);
+            // The run control is now fixed at the main-window bottom (always visible on every tab), so the
+            // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
+            // use ?.Invoke, so they no-op). Feed Hold / Stop are always reachable from the fixed bar.
 
             // When a generated program is large enough to stream through the real job streamer, bring the Grbl
             // (Job) tab forward (so the operator can watch progress / 3D and has the full run controls) and
@@ -138,10 +139,157 @@ namespace GCode_Sender
                     RestoreTabOnJobEnd(m, origin);
             };
 
+            // Tools preview their generated program in the program-view overlay (raw text) via these hooks:
+            // ProgramPreview pops it open (Generate feedback); SetActiveProgram sets what the Program View button
+            // shows as a tool's tab is entered (empty before Generate). The overlay then persists that program.
+            CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
+            CNC.Controls.MacroProcessor.SetActiveProgram = (name, text) => SetActiveProgram(name, text);
+
+            // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
+            // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
+
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
             AttachBasePropertyChangedHandler();
+            WireBarOverlays();
         }
+
+        // ---- startup splash: the window is created invisible and revealed once startup has settled ----
+        private SplashWindow _splash = null;
+        private bool _revealed = false;
+
+        public void AttachSplash(SplashWindow splash)
+        {
+            _splash = splash;
+        }
+
+        private void SetSplashStatus(string status)
+        {
+            _splash?.SetStatus(status);
+        }
+
+        // Reveal the (until-now invisible) main window and dismiss the splash. Idempotent: wired to every
+        // startup exit (connected+ready, incomplete-setup, disconnected, timeout) so it fires exactly once.
+        private void RevealMainWindow()
+        {
+            if (_revealed)
+                return;
+            _revealed = true;
+
+            Opacity = 1d;
+            ShowInTaskbar = true;
+            Activate();
+
+            if (_splash != null)
+            {
+                _splash.Close();
+                _splash = null;
+            }
+        }
+
+        // ---- bottom-bar overlays: program view (toggle) and/or console log (on command-box focus) ----
+        private bool _programOverlay = false, _consoleOverlay = false;
+
+        private void WireBarOverlays()
+        {
+            // Console log overlay follows the command box: appears when it gets focus, dismisses once focus
+            // leaves BOTH the box and the log (so you can scroll/select/copy from the log), or on Esc.
+            mdiControl.GotKeyboardFocus += (s, e) => { _consoleOverlay = true; UpdateOverlay(); };
+            mdiControl.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            overlayConsole.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
+            overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
+
+            // A real file load (FileName set) returns the program overlay from a tool's raw-text preview to
+            // the live job view. Tools that run via the macro path (Load Stock) never set FileName, so their
+            // preview persists until the next genuine load.
+            if (DataContext is GrblViewModel gvm)
+                gvm.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(GrblViewModel.FileName) && !string.IsNullOrEmpty((DataContext as GrblViewModel)?.FileName))
+                        ClearProgramPreview();
+                };
+        }
+
+        private void ConsoleOverlay_Key(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape && _consoleOverlay)
+            {
+                _consoleOverlay = false;
+                UpdateOverlay();
+                e.Handled = true;
+            }
+        }
+
+        private void ScheduleConsoleOverlayCheck()
+        {
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                if (!mdiControl.IsKeyboardFocusWithin && !overlayConsole.IsKeyboardFocusWithin)
+                {
+                    _consoleOverlay = false;
+                    UpdateOverlay();
+                }
+            }), DispatcherPriority.Input);
+        }
+
+        private void ProgramView_Toggled(object sender, RoutedEventArgs e)
+        {
+            _programOverlay = btnProgramView.IsChecked == true;
+            UpdateOverlay();
+        }
+
+        // Program view and console log share one overlay over the work area, side by side. Each column is
+        // shown (and given equal width) only when its trigger is active; the host collapses when neither is.
+        private void UpdateOverlay()
+        {
+            // Program view (right) and console log (above the command box) are independent overlays.
+            overlayProgram.Visibility = _programOverlay ? Visibility.Visible : Visibility.Collapsed;
+            overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Set what the program-view overlay shows WITHOUT opening it: a tool's program (raw text) as the
+        // "active program". Tools call this when their tab is shown (program is "" before Generate) so the
+        // Program View button reveals the tool's program - empty or generated. Refreshes if already open.
+        public void SetActiveProgram(string name, string program)
+        {
+            overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
+            overlayProgramText.Text = program ?? string.Empty;
+
+            overlayJobTitle.Visibility = Visibility.Collapsed;
+            overlayPreviewTitle.Visibility = Visibility.Visible;
+            overlayProgramView.Visibility = Visibility.Collapsed;
+            overlayProgramText.Visibility = Visibility.Visible;
+
+            if (_programOverlay)
+                UpdateOverlay();
+        }
+
+        // Set the active program AND pop the overlay open - Generate's immediate feedback.
+        public void ShowProgramPreview(string name, string program)
+        {
+            SetActiveProgram(name, program);
+            _programOverlay = true;
+            btnProgramView.IsChecked = true;   // raises ProgramView_Toggled
+            UpdateOverlay();
+        }
+
+        // Return the overlay to the live job view (parsed g-code of the loaded file). Called when a job file is
+        // loaded (FileName change); the active program otherwise persists. Visibility is left unchanged.
+        private void ClearProgramPreview()
+        {
+            overlayProgramText.Text = string.Empty;
+            overlayPreviewTitle.Visibility = Visibility.Collapsed;
+            overlayJobTitle.Visibility = Visibility.Visible;
+            overlayProgramText.Visibility = Visibility.Collapsed;
+            overlayProgramView.Visibility = Visibility.Visible;
+        }
+
+        // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
+        // reach them here instead of hosting their own.
+        public CNC.Controls.JobControl RunControl { get { return runControl; } }
+        public CNC.Controls.MDIControl MdiControl { get { return mdiControl; } }
 
         public string BaseWindowTitle { get; set; }
 
@@ -185,9 +333,15 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
+            // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
+            // before anything that resolves a tab via getTab()/getView() below.
+            RegisterBuiltinTabs();
+            BuildTabs();
+
             // Config already loaded in the constructor; here we only open the connection (deferred so
             // the main window paints first). res == 2: user cancelled / no connection - stay open
             // (disconnected) so the user can connect later via the Connect menu item.
+            SetSplashStatus("Connecting...");
             int res = AppConfig.Settings.OpenConnection(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
             bool connected = res == 0;
 
@@ -209,8 +363,8 @@ namespace GCode_Sender
                 if (view != null && view != settingsView)
                 {
                     view.Setup(UIViewModel, AppConfig.Settings);
-                    tab.IsEnabled = view.ViewType == ViewType.GRBL || view.ViewType == ViewType.GRBLConfig
-                                 || view.ViewType == ViewType.LoadStock || view.ViewType == ViewType.MachineSetup;
+                    // Initial pre-connection enable state comes from each tab's descriptor (set in
+                    // BuildTabs); the connection/JobRunning state drives enable from there on.
                 }
             }
 #if ADD_CAMERA
@@ -342,8 +496,20 @@ namespace GCode_Sender
 
             // First-run gate: with no machine saved yet, jump to the Machine Setup Wizard once the controller is
             // ready, then return to the normal UI when the user presses Apply (see ForceMachineSetupIfNeeded).
+            // The window is still invisible here - ForceMachineSetupIfNeeded reveals it (selecting the Machine
+            // Setup tab first if any step is incomplete) once the controller has reported in.
             if (connected)
+            {
+                SetSplashStatus("Validating machine...");
                 ForceMachineSetupIfNeeded();
+            }
+            else
+                RevealMainWindow();   // no controller / cancelled: show the normal UI disconnected
+
+            // Safety net: never leave the user staring at the splash if the controller never reports in.
+            var revealSafety = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+            revealSafety.Tick += (s, e) => { revealSafety.Stop(); RevealMainWindow(); };
+            revealSafety.Start();
         }
 
         private bool _machineSetupForced = false;
@@ -361,29 +527,41 @@ namespace GCode_Sender
             {
                 bool ready = !string.IsNullOrEmpty(GrblInfo.Version) && GrblSettings.IsLoaded;
                 if (!ready && ++tries < 40)   // wait up to ~10s for the controller to report version + settings
+                {
+                    SetSplashStatus(string.IsNullOrEmpty(GrblInfo.Version) ? "Reading controller..." : "Reading settings...");
                     return;
+                }
                 timer.Stop();
                 if (!ready)
+                {
+                    RevealMainWindow();   // controller never reported in: reveal the normal UI anyway
                     return;
+                }
                 // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
                 int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
                 if (step == 0 || sim)
+                {
+                    RevealMainWindow();   // setup complete (or simulator): straight to the normal UI
                     return;
+                }
 
                 // Confirm after a short settle: a connect/reset can momentarily yield a stale read - in
                 // particular the macro check (step 6) does a synchronous filesystem listing that comes back
                 // empty right after a reset, falsely flagging a step. Re-check once things have settled and
                 // only gate if still incomplete (avoids the "prompt appears but every tab is green" race).
+                SetSplashStatus("Validating setup...");
                 var confirm = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
                 confirm.Tick += (s2, e2) =>
                 {
                     confirm.Stop();
-                    if (!GrblSettings.IsLoaded)
-                        return;
-                    int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
-                    if (step2 != 0)
-                        ShowMachineSetup(step2);
+                    if (GrblSettings.IsLoaded)
+                    {
+                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                        if (step2 != 0)
+                            ShowMachineSetup(step2);   // select the Machine Setup tab before revealing
+                    }
+                    RevealMainWindow();
                 };
                 confirm.Start();
             };
@@ -410,6 +588,55 @@ namespace GCode_Sender
                 {
                     m.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(() => { if (origin != null) tabMode.SelectedItem = origin; }));
+                }
+            };
+            m.PropertyChanged += handler;
+        }
+
+        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current tab
+        // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
+        // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
+        // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code)
+        {
+            if (code == null || code.Length == 0)
+                return;
+
+            var prog = new CNC.Controls.GCode(m);                        // transient - does not mutate the job/Model
+            prog.AddBlock(name, CNC.Core.Action.New);
+            for (int i = 0; i < code.Length - 1; i++)
+                prog.AddBlock(code[i], CNC.Core.Action.Add);
+            prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
+
+            RunControl.Source = prog;          // stream this program instead of the loaded job
+            RestoreSourceOnEnd(m);             // revert to the job source when the run ends
+
+            // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously
+            // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
+            // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
+            // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                new System.Action(() => RunControl.CycleStart(0)));   // stream from the bottom run bar - no tab change
+        }
+
+        // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
+        // arm on the first running state, fire on the next terminal one, then unsubscribe.
+        private void RestoreSourceOnEnd(GrblViewModel m)
+        {
+            bool started = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = m.StreamingState;
+                if (st == StreamingState.Send || st == StreamingState.SendMDI)
+                    started = true;
+                else if (started && (st == StreamingState.Idle || st == StreamingState.JobFinished ||
+                                     st == StreamingState.Stop || st == StreamingState.NoFile))
+                {
+                    m.PropertyChanged -= handler;
+                    Dispatcher.BeginInvoke(new System.Action(() => RunControl.Source = null));   // back to the job
                 }
             };
             m.PropertyChanged += handler;
@@ -814,18 +1041,26 @@ namespace GCode_Sender
 
         private void TabMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // SelectionChanged bubbles - ignore it unless it's the TabControl's OWN tab change (a child
+            // combobox, e.g. the 3D viewer's render-mode dropdown, raises it too with non-TabItem items).
+            if (!Equals(e.OriginalSource, sender) || e.AddedItems.Count != 1)
+                return;
+
+            ICNCView nextView = getView((TabItem)e.AddedItems[0]);
+
+            // The sidebar flyouts only act on the Job tab, so only show them when it's selected (done
+            // regardless of IsReady so it tracks tab changes before a controller is connected too).
+            sidebarCanvas.Visibility = nextView != null && nextView.ViewType == ViewType.GRBL ? Visibility.Visible : Visibility.Collapsed;
+
             if (!(DataContext as GrblViewModel).IsReady)
                 return;
 
-            if (Equals(e.OriginalSource, sender) && UIViewModel.CurrentView != null && e.AddedItems.Count == 1)
+            if (UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
             {
-                ICNCView prevView = UIViewModel.CurrentView, nextView = getView((TabItem)e.AddedItems[0]);
-                if (nextView != null && nextView != UIViewModel.CurrentView)
-                {
-                    UIViewModel.CurrentView = nextView;
-                    prevView.Activate(false, nextView.ViewType);
-                    nextView.Activate(true, prevView.ViewType);
-                }
+                ICNCView prevView = UIViewModel.CurrentView;
+                UIViewModel.CurrentView = nextView;
+                prevView.Activate(false, nextView.ViewType);
+                nextView.Activate(true, prevView.ViewType);
             }
         }
 
@@ -893,58 +1128,73 @@ namespace GCode_Sender
             return tab != null;
         }
 
-        // Publish the tabs currently present (after capability filtering) so the "Edit Main Page" Tabs editor can
-        // list them, then reorder/hide them per Config.Tabs (ordered ViewType names). Settings:App is always kept
-        // visible (it hosts the editor), and an empty/invalid result falls back to the built-in order.
+        // Register the built-in tabs (ioSender XL) as descriptors. This is the one place that knows the
+        // concrete tab views; new tabs (incl. from plugins) register their own descriptor instead of
+        // editing MainWindow.xaml + the scattered enable/visibility lists. Labels are not yet localized
+        // (built-in tabs lost their LocBaml x:Uid headers in the container conversion - revisited when
+        // registered-tab localization is designed).
+        private void RegisterBuiltinTabs()
+        {
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Job", () => new JobView(), 10, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, "Load stock", () => new LoadStockView(), 20, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50));
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60,
+                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70));
+            TabRegistry.Register(new TabDescriptor(ViewType.Tools, "Tools", () => new ToolsView(), 80, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, "Machine Setup", () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
+        }
+
+        // Instantiate the tabs into the (XAML-empty) TabControl in the order given by the layout tree
+        // (AppConfig.Layout's "tabs" slot). Each node's component key maps to a registered TabDescriptor
+        // that supplies the factory/label/enable/configure. The tree is the placement authority; the
+        // descriptor is the build recipe. EnsureEssentials guarantees Settings stays reachable.
+        private void BuildTabs()
+        {
+            tabMode.Items.Clear();
+
+            var tabsSlot = AppConfig.Settings.Layout?.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot == null)
+                return;
+
+            foreach (var node in tabsSlot.Items)
+            {
+                var d = TabRegistry.DescriptorByName(node.Component);
+                if (d == null)
+                    continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                var ctl = d.Create?.Invoke();
+                if (ctl == null)
+                    continue;
+                d.Configure?.Invoke(ctl);
+                tabMode.Items.Add(new TabItem
+                {
+                    Header = d.Label,
+                    Content = ctl,
+                    IsEnabled = d.EnabledWhenDisconnected
+                });
+            }
+        }
+
+        // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main
+        // Page" Tabs editor can list them. Ordering/visibility is now driven by the layout tree (BuildTabs),
+        // which is kept in sync with the legacy Config.Tabs at load (TabOrder.Apply) - so no reorder here.
         private void PublishAndApplyTabs()
         {
-            var present = new System.Collections.Generic.List<TabItem>();
-            foreach (TabItem t in tabMode.Items)
-                present.Add(t);
-
-            var byName = new System.Collections.Generic.Dictionary<string, TabItem>();
             var infos = new System.Collections.Generic.List<CNC.Controls.TabInfo>();
-            foreach (var t in present)
+            var seen = new System.Collections.Generic.HashSet<string>();
+            foreach (TabItem t in tabMode.Items)
             {
                 // Most tabs host an ICNCView (key = ViewType); some (e.g. Trinamic tuner) host an IGrblConfigTab
                 // with no ViewType, so fall back to the TabItem's x:Name so they still appear in the editor.
                 var v = getView(t);
                 string name = v != null ? v.ViewType.ToString() : t.Name;
-                if (string.IsNullOrEmpty(name) || byName.ContainsKey(name))
+                if (string.IsNullOrEmpty(name) || !seen.Add(name))
                     continue;
-                byName[name] = t;
                 infos.Add(new CNC.Controls.TabInfo(name, t.Header?.ToString() ?? name));
             }
             CNC.Controls.TabRegistry.Publish(infos);
-
-            var order = AppConfig.Settings.Base.Tabs;
-            if (order == null || order.Count == 0)
-                return;     // default: keep built-in order and visibility
-
-            var desired = new System.Collections.Generic.List<TabItem>();
-            foreach (var name in order)
-            {
-                TabItem t;
-                if (byName.TryGetValue(name, out t) && !desired.Contains(t))
-                    desired.Add(t);
-            }
-            TabItem prot;   // Settings (hosts App settings + the Edit Main Page editor) must remain reachable
-            if (byName.TryGetValue(ViewType.GRBLConfig.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
-            // Machine Setup is the setup gate - always keep it visible even if a saved layout predates it.
-            if (byName.TryGetValue(ViewType.MachineSetup.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
-            // Tools is now a hub (tool table + calibration / spoilboard / tuning) - keep it visible too.
-            if (byName.TryGetValue(ViewType.Tools.ToString(), out prot) && !desired.Contains(prot))
-                desired.Add(prot);
-
-            if (desired.Count == 0)
-                return;     // safety: never hide everything
-
-            tabMode.Items.Clear();
-            foreach (var t in desired)
-                tabMode.Items.Add(t);
-            tabMode.SelectedIndex = 0;
         }
 
 #if ADD_CAMERA

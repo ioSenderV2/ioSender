@@ -73,6 +73,26 @@ namespace CNC.Controls
         // streamer/job control live there. Called after a large flush has been loaded into GCode.File.
         public static System.Action<GrblViewModel> RunStreamedJob;
 
+        // Hook to preview a tool's freshly generated program in the shell's program-view overlay (raw text):
+        // args are (tool name, program). Set by ioSender XL since the overlay lives there; tools call it from
+        // Generate so the program is shown - and the overlay popped open - without a direct shell reference.
+        public static System.Action<string, string> ProgramPreview;
+
+        // Hook for the "active program" the program-view button shows: a tool sets itself as the active program
+        // (name, current program text - empty before Generate) when its tab is shown. The overlay then persists
+        // this program (it changes only when another tool sets it, or a job file is loaded). Unlike ProgramPreview
+        // this does NOT pop the overlay open - it just sets what it WOULD show. Set by ioSender XL.
+        public static System.Action<string, string> SetActiveProgram;
+
+        // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
+        // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the
+        // shell. Used when Run is called with stayPut:true (Load Stock) so a tool's program runs with full flow
+        // control (Feed Hold/Stop live) yet never takes over the job view. Falls back to RunStreamedJob if unset.
+        public static System.Action<GrblViewModel, string, string[]> RunStreamedJobInPlace;
+
+        // Set per-run by Run(..., stayPut:true); consumed by StreamProgram to route to RunStreamedJobInPlace.
+        private static bool _stayPut = false;
+
         // Above this many g-code lines a single flush is streamed through the flow-controlled job streamer
         // (GCode.File + Cycle Start) instead of the MDI path. The MDI path has no character-counting flow
         // control, so a large program overruns the controller's serial buffer (hanging it) and blocks the
@@ -83,7 +103,7 @@ namespace CNC.Controls
         private static string _streamName = "Macro";
 
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool stayPut = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -92,6 +112,7 @@ namespace CNC.Controls
                 name = "Macro";
 
             _streamName = name;
+            _stayPut = stayPut;   // route any streamed flush through the in-place (stay-on-tab + restore) path
 
             // A macro whose body is a single "@<path>" line is a reference to an external file;
             // load and run that file's current contents (re-read every run, so the macro can be
@@ -316,6 +337,16 @@ namespace CNC.Controls
             }
             if (code.Count == 0)
                 return;
+
+            // stay-put run: hand the lines to the host, which captures the current job, streams without leaving
+            // the tab, and restores the job afterwards (Load Stock). Consume the flag so it can't leak.
+            bool stayPut = _stayPut;
+            _stayPut = false;
+            if (stayPut && RunStreamedJobInPlace != null)
+            {
+                RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray());
+                return;
+            }
 
             GCode.File.AddBlock(_streamName, CNC.Core.Action.New);            // names + clears the program
             for (int i = 0; i < code.Count - 1; i++)

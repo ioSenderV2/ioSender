@@ -10,7 +10,7 @@
         <GroupBox x:Uid="grp_feedrate" x:Name="grpFeedRate" Header="Feed rate" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250">
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Top" MinWidth="240">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" MinHeight="30"/>
+                    <RowDefinition x:Name="readoutRow" Height="Auto" MinHeight="30"/>
                     <RowDefinition Height="Auto" MinHeight="30"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>

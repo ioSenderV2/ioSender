@@ -12,10 +12,14 @@
             <ColumnDefinition Width="450"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <!-- Left: inputs (scrolls if the window is short). Definite width so the wrapping headers wrap and the
-             right-aligned buttons stay inside the column instead of being clipped off the right edge. -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Vertical" Margin="5,5,0,0">
+        <!-- Left: scrolling inputs on top, action buttons pinned at the column bottom (shared tool layout) -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical" Margin="5,5,0,0">
             <TextBlock x:Name="txtAxisInfo" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,6"/>
             <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
                 <TextBlock x:Uid="txt_asgangedaxis" Text="Ganged axis:" VerticalAlignment="Center" MinWidth="160"/>
@@ -64,34 +68,28 @@
             <CheckBox x:Uid="chk_asreuse" x:Name="chkReuseZ0" Content="Reuse Z0 (skip touch-off - same bit/setup)" Margin="20,6,0,0" VerticalAlignment="Center"
                       ToolTip="Skip the park + Z touch-off and reuse the work Z0 from the last run. Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
                       IsChecked="{Binding ReuseZ0, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
-                <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click"/>
-                <Button x:Uid="btn_asrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
-            </StackPanel>
-
             <Separator Margin="5,8"/>
             <TextBlock x:Uid="txt_asmeashdr" Text="Measure &amp; apply: pin the holes, register the square on the Y-leg pins, measure the gap at the X-leg pin (+ if it sits toward +Y of the blade):" TextWrapping="Wrap" Margin="5,0,5,4"/>
             <local:NumericField x:Uid="fld_asgap" Label="Measured gap:" ColonAt="160" Format="-###0.0##"
                 Value="{Binding MeasuredGap, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_asnewoffset" Label="New offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
                 Value="{Binding NewOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
+        </StackPanel>
+        </ScrollViewer>
+        <!-- Warning + action buttons pinned at the bottom of the input column -->
+        <StackPanel Grid.Row="1" Margin="5,0,5,6">
+            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_asrun" x:Name="btnRun" Content="Run" Tag="run" Focusable="False" MinWidth="70" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
                 <Button x:Uid="btn_asapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
                 <Button x:Uid="btn_ashome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
             </StackPanel>
-            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="5,8" HorizontalAlignment="Left" MinWidth="380" MaxWidth="460" TextWrapping="Wrap"/>
         </StackPanel>
-        </ScrollViewer>
-        <!-- Right: summary + program / instructions -->
+        </Grid>
+        <!-- Right: summary (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="txtSummary" Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-            <!-- Before Generate: instructions. After Generate: the generated drilling program (the run buffer). -->
-            <TextBox x:Name="txtProgram" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,0"
-                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+            <TextBlock x:Name="txtSummary" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
     </Grid>
 </UserControl>

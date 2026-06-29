@@ -107,6 +107,15 @@ namespace CNC.Controls
                 model.ConfigControls.Add(new JogConfigControl());
                 model.ConfigControls.Add(new StripGCodeConfigControl());
 
+                // Drain feature-contributed settings panels (registered explicitly or auto-discovered
+                // via ISettingsPanelProvider) so a feature adds a panel from its own file - no edit here.
+                foreach (var d in SettingsPanelRegistry.Collect())
+                {
+                    var ctl = d.Create?.Invoke();
+                    if (ctl != null)
+                        model.ConfigControls.Add(ctl);
+                }
+
                 UpdateSaveButtonVisibility();
                 AppConfig.Settings.Base.PropertyChanged += (s, e) => {
                     if (e.PropertyName == nameof(Config.AutoSaveSettings))

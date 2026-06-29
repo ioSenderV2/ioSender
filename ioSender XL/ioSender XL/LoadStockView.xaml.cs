@@ -48,12 +48,49 @@ namespace GCode_Sender
         private double? measuredX = null, measuredY = null, spoilZ = null;
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
-        private bool measureRun = false, resultShown = false;
+        private bool measureRun = false;
+        private string program = string.Empty;   // last generated probe program (run via the macro path)
 
         public LoadStockView()
         {
             InitializeComponent();
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
+            WireInputs();
+        }
+
+        // Any input edit redraws the stock outline AND invalidates a previously generated program (so Run is
+        // disabled until Generate is pressed again - the program would otherwise be stale).
+        private void WireInputs()
+        {
+            rbFL.Checked += (s, e) => InputChanged();
+            rbFR.Checked += (s, e) => InputChanged();
+            rbBL.Checked += (s, e) => InputChanged();
+            rbBR.Checked += (s, e) => InputChanged();
+            cbxProbe.SelectionChanged += (s, e) => InputChanged();
+            cbxWcs.SelectionChanged += (s, e) => InputChanged();
+            chkMeasure.Checked += (s, e) => InputChanged();
+            chkMeasure.Unchecked += (s, e) => InputChanged();
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => InputChanged());
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => InputChanged());
+        }
+
+        private void InputChanged()
+        {
+            InvalidateProgram();
+            UpdateDrawing();
+        }
+
+        // Drop the generated program and disable Run until the next Generate.
+        private void InvalidateProgram()
+        {
+            program = string.Empty;
+            if (btnRun != null)
+                btnRun.IsEnabled = false;
+        }
+
+        private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateDrawing();
         }
 
         #region ICNCView
@@ -71,10 +108,14 @@ namespace GCode_Sender
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/corner/options
                 Subscribe(true);
                 UpdateExpressionWarning();
+                UpdateDrawing();
+                MacroProcessor.SetActiveProgram?.Invoke("Load stock", program);   // Program View shows our program
             }
             else
             {
                 SaveInputs();
+                // Leave the active program as-is: the Program View overlay persists this tool's program even
+                // after switching tabs (it only changes when another tool sets it, or a job file is loaded).
                 // Stay subscribed when deactivated: a streamed Load Stock run switches to the Grbl tab while
                 // probing, so we must keep parsing the (PRINT PC OUT / LS_X/Y) result messages to populate the
                 // corners and raise the results popup. The handler only reacts to our own messages, so it's a
@@ -153,7 +194,6 @@ namespace GCode_Sender
             measuredX = measuredY = spoilZ = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
-            resultShown = false;
             ShowResult();
         }
 
@@ -162,100 +202,81 @@ namespace GCode_Sender
             int probed = 0;
             for (int i = 1; i <= 4; i++) if (cornerZ[i].HasValue) probed++;
 
-            string text = BuildResultText(probed);
-            txtResult.Text = text;
-
-            // One summary popup (outline drawing + numbers) when a measuring run has all four corners.
-            if (measureRun && !resultShown && probed == 4 && measuredX.HasValue && measuredY.HasValue)
-            {
-                resultShown = true;
-                ShowResultsPopup(text);
-            }
+            txtResult.Text = BuildResultText(probed);
+            UpdateDrawing();   // the right-panel drawing is the live result view (no separate popup)
+            btnCopySize.IsEnabled = measuredX.HasValue && measuredY.HasValue;
         }
 
-        // Results window: a scaled drawing of the four probed corners (interior angle at each, off-square
-        // corners flagged) above the size / flatness / squareness summary.
-        private void ShowResultsPopup(string summary)
+        // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
+        // ioSenderBatchPost add-in's "measured stock" field. X/Y are the footprint; Z (mean probed corner top
+        // minus the spoilboard Z) is appended when available, else X/Y only.
+        private void CopySize_Click(object sender, RoutedEventArgs e)
         {
-            // Owned by the main window (stable - survives the floating run panel closing) and Topmost so it is
-            // always visible. Shown MODELESS (Show, not ShowDialog): a modal dialog raised from the message
-            // pump while the program is still finishing can render behind the Topmost panel and block the app.
-            Window owner = Window.GetWindow(this);
-
-            var win = new Window
+            if (!(measuredX.HasValue && measuredY.HasValue))
+                return;
+            try
             {
-                Title = "Load stock - results",
-                SizeToContent = SizeToContent.WidthAndHeight,
-                ResizeMode = ResizeMode.NoResize,
-                WindowStyle = WindowStyle.ToolWindow,
-                ShowInTaskbar = false,
-                Topmost = true,
-                Owner = owner,
-                WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
-            };
-
-            var root = new StackPanel { Margin = new Thickness(14) };
-            root.Children.Add(BuildOutlineDrawing());
-            root.Children.Add(new TextBlock { Margin = new Thickness(0, 12, 0, 0), Text = summary });
-
-            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-
-            // Copy the measured stock size to the clipboard as "X Y Z" (mm) for pasting into the Fusion
-            // ioSenderBatchPost add-in's "measured stock" field (which sets the setup's stock box). X/Y are the
-            // footprint; Z is the mean of the probed corner heights. Z is dropped if no corner Z is available.
-            var copy = new Button { Content = "Copy size", MinWidth = 90, Margin = new Thickness(0, 0, 8, 0) };
-            copy.IsEnabled = measuredX.HasValue && measuredY.HasValue;
-            copy.Click += (s, e) =>
-            {
-                if (measuredX.HasValue && measuredY.HasValue)
-                {
-                    try
-                    {
-                        double? z = StockZ();
-                        string text = z.HasValue
-                            ? string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###} {2:0.###}", measuredX.Value, measuredY.Value, z.Value)
-                            : string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###}", measuredX.Value, measuredY.Value);
-                        Clipboard.SetText(text);
-                        copy.Content = "Copied";
-                    }
-                    catch { /* clipboard busy - ignore */ }
-                }
-            };
-            bar.Children.Add(copy);
-
-            var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80 };
-            ok.Click += (s, e) => win.Close();
-            bar.Children.Add(ok);
-            root.Children.Add(bar);
-
-            win.Content = root;
-            win.Show();
+                double? z = StockZ();
+                string text = z.HasValue
+                    ? string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###} {2:0.###}", measuredX.Value, measuredY.Value, z.Value)
+                    : string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###}", measuredX.Value, measuredY.Value);
+                Clipboard.SetText(text);
+            }
+            catch { /* clipboard busy - ignore */ }
         }
 
-        // Draw the probed quad (FL-FR-BR-BL) to true proportions, with each corner's interior angle.
-        // Near-square corners are black; corners off 90 deg by > 0.5 deg are flagged red.
-        private UIElement BuildOutlineDrawing()
+        // Rebuild the inline stock drawing to the current host size.
+        private void UpdateDrawing()
         {
-            const double W = 340, H = 300, margin = 48;
-            var canvas = new Canvas { Width = W, Height = H, Background = Brushes.Transparent };
-
-            if (!(Has(1) && Has(2) && Has(3) && Has(4)))
-                return canvas;
-
-            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
-            for (int i = 1; i <= 4; i++)
+            if (drawingHost == null)
+                return;
+            double w = drawingHost.ActualWidth, h = drawingHost.ActualHeight;
+            if (w < 20d || h < 20d)
             {
-                minX = Math.Min(minX, cornerX[i].Value); maxX = Math.Max(maxX, cornerX[i].Value);
-                minY = Math.Min(minY, cornerY[i].Value); maxY = Math.Max(maxY, cornerY[i].Value);
+                drawingHost.Child = null;
+                return;
             }
+            drawingHost.Child = BuildStockDrawing(w, h);
+        }
+
+        // The inline stock outline: before a measuring run, a rectangle from the approximate width/height with
+        // the chosen origin corner marked and the X/Y dimensions; after all four corners are probed, the true
+        // probed quad with the measured X/Y spans and each corner's interior angle (off-square corners in red).
+        private UIElement BuildStockDrawing(double W, double H)
+        {
+            var canvas = new Canvas { Width = W, Height = H, Background = Brushes.White };
+            const double margin = 60d;
+
+            bool measured = Has(1) && Has(2) && Has(3) && Has(4);
+
+            double[] mx = new double[5], my = new double[5];   // 1..4 = FL,FR,BL,BR
+            if (measured)
+            {
+                for (int c = 1; c <= 4; c++) { mx[c] = cornerX[c].Value; my[c] = cornerY[c].Value; }
+            }
+            else
+            {
+                double ew = Math.Max(fldWidth.Value, 1d), eh = Math.Max(fldHeight.Value, 1d);
+                mx[1] = 0d;  my[1] = 0d;     // FL
+                mx[2] = ew;  my[2] = 0d;     // FR
+                mx[3] = 0d;  my[3] = eh;     // BL
+                mx[4] = ew;  my[4] = eh;     // BR
+            }
+
+            double minX = Math.Min(Math.Min(mx[1], mx[2]), Math.Min(mx[3], mx[4]));
+            double maxX = Math.Max(Math.Max(mx[1], mx[2]), Math.Max(mx[3], mx[4]));
+            double minY = Math.Min(Math.Min(my[1], my[2]), Math.Min(my[3], my[4]));
+            double maxY = Math.Max(Math.Max(my[1], my[2]), Math.Max(my[3], my[4]));
             double spanX = Math.Max(maxX - minX, 1e-6), spanY = Math.Max(maxY - minY, 1e-6);
-            double scale = Math.Min((W - 2 * margin) / spanX, (H - 2 * margin) / spanY);
-            double offX = (W - spanX * scale) / 2, offY = (H - spanY * scale) / 2;
+            double scale = Math.Min((W - 2d * margin) / spanX, (H - 2d * margin) / spanY);
+            if (scale <= 0d || double.IsInfinity(scale) || double.IsNaN(scale))
+                return canvas;
+            double offX = (W - spanX * scale) / 2d, offY = (H - spanY * scale) / 2d;
 
             // machine X right / Y up (back) -> screen X right / Y down (flip Y)
             System.Func<int, Point> P = c => new Point(
-                offX + (cornerX[c].Value - minX) * scale,
-                H - offY - (cornerY[c].Value - minY) * scale);
+                offX + (mx[c] - minX) * scale,
+                H - offY - (my[c] - minY) * scale);
 
             var poly = new System.Windows.Shapes.Polygon
             {
@@ -267,35 +288,71 @@ namespace GCode_Sender
                 poly.Points.Add(P(c));
             canvas.Children.Add(poly);
 
-            Point ctr = new Point((P(1).X + P(2).X + P(3).X + P(4).X) / 4, (P(1).Y + P(2).Y + P(3).Y + P(4).Y) / 4);
-            string[] name = { "", "FL", "FR", "BL", "BR" };
+            // dimensions: X along the front edge (FL->FR), Y along the left edge (FL->BL)
+            double dimX = measured && measuredX.HasValue ? measuredX.Value : Math.Max(fldWidth.Value, 0d);
+            double dimY = measured && measuredY.HasValue ? measuredY.Value : Math.Max(fldHeight.Value, 0d);
+            AddDimLabel(canvas, P(1), P(2), dimX);
+            AddDimLabel(canvas, P(1), P(3), dimY);
 
-            for (int c = 1; c <= 4; c++)
+            Point ctr = new Point((P(1).X + P(2).X + P(3).X + P(4).X) / 4d, (P(1).Y + P(2).Y + P(3).Y + P(4).Y) / 4d);
+
+            // origin corner marker (the selected probe corner): red dot only.
+            int oc = CornerId(SelectedCorner);
+            Point op = P(oc);
+            var dot = new System.Windows.Shapes.Ellipse { Width = 11d, Height = 11d, Fill = Brushes.OrangeRed };
+            Canvas.SetLeft(dot, op.X - 5.5);
+            Canvas.SetTop(dot, op.Y - 5.5);
+            canvas.Children.Add(dot);
+
+            // Per-corner labels (measuring run only): interior angle (red if off-square) + stock thickness
+            // (corner top minus spoilboard Z) at every corner, placed just outside the corner.
+            if (measured)
             {
-                Point pt = P(c);
-
-                var dot = new System.Windows.Shapes.Ellipse { Width = 7, Height = 7, Fill = Brushes.DarkRed };
-                Canvas.SetLeft(dot, pt.X - 3.5);
-                Canvas.SetTop(dot, pt.Y - 3.5);
-                canvas.Children.Add(dot);
-
-                double ang = AngleAt(c);
-                var lbl = new TextBlock
+                for (int c = 1; c <= 4; c++)
                 {
-                    Text = string.Format(CultureInfo.InvariantCulture, "{0}\n{1:0.0}°", name[c], ang),
-                    FontSize = 11,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = Math.Abs(ang - 90.0) > 0.5 ? Brushes.Firebrick : Brushes.Black
-                };
+                    Point pt = P(c);
+                    double ang = AngleAt(c);
 
-                var dir = new Vector(pt.X - ctr.X, pt.Y - ctr.Y);
-                if (dir.Length > 1e-6) dir.Normalize();
-                Canvas.SetLeft(lbl, pt.X + dir.X * 24 - 14);
-                Canvas.SetTop(lbl, pt.Y + dir.Y * 24 - 14);
-                canvas.Children.Add(lbl);
+                    string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}°", ang);
+                    if (spoilZ.HasValue && cornerZ[c].HasValue)
+                        text += string.Format(CultureInfo.InvariantCulture, "\nt={0:0.0}", cornerZ[c].Value - spoilZ.Value);
+
+                    var lbl = new TextBlock
+                    {
+                        Text = text,
+                        FontSize = 11d,
+                        TextAlignment = TextAlignment.Center,
+                        Background = Brushes.White,
+                        Padding = new Thickness(2d, 0d, 2d, 0d),
+                        Foreground = Math.Abs(ang - 90.0) > 0.5 ? Brushes.Firebrick : Brushes.Black
+                    };
+                    lbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    var dir = new Vector(pt.X - ctr.X, pt.Y - ctr.Y);
+                    if (dir.Length > 1e-6) dir.Normalize();
+                    Canvas.SetLeft(lbl, pt.X + dir.X * 22d - lbl.DesiredSize.Width / 2d);
+                    Canvas.SetTop(lbl, pt.Y + dir.Y * 22d - lbl.DesiredSize.Height / 2d);
+                    canvas.Children.Add(lbl);
+                }
             }
 
             return canvas;
+        }
+
+        // A dimension label (mm) centred on the edge a->b, on a white pad so it reads over the outline.
+        private void AddDimLabel(Canvas canvas, Point a, Point b, double mm)
+        {
+            var lbl = new TextBlock
+            {
+                Text = mm.ToString("0.#", CultureInfo.InvariantCulture) + " mm",
+                FontSize = 12d,
+                Foreground = Brushes.DimGray,
+                Background = Brushes.White,
+                Padding = new Thickness(2d, 0d, 2d, 0d)
+            };
+            lbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(lbl, (a.X + b.X) / 2d - lbl.DesiredSize.Width / 2d);
+            Canvas.SetTop(lbl, (a.Y + b.Y) / 2d - lbl.DesiredSize.Height / 2d);
+            canvas.Children.Add(lbl);
         }
 
         // Interior angle (degrees) of the FL-FR-BR-BL quad at corner c, from its two neighbouring edges.
@@ -423,7 +480,8 @@ namespace GCode_Sender
                 cbxProbe.SelectedItem = usable.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe) ?? usable.FirstOrDefault();
 
             bool ok = usable.Count > 0;
-            btnGenerate.IsEnabled = btnRun.IsEnabled = ok;
+            btnGenerate.IsEnabled = ok;
+            btnRun.IsEnabled = ok && !string.IsNullOrWhiteSpace(program);   // Run only after a Generate
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
         }
 
@@ -453,10 +511,13 @@ namespace GCode_Sender
                 return;
             }
 
-            txtProgram.Text = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                           cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true);
+            program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
+                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true);
             ResetResults();
             SaveInputs();
+
+            btnRun.IsEnabled = true;                                  // program in hand: Run is now valid
+            MacroProcessor.ProgramPreview?.Invoke("Load stock", program);   // pop the program-view overlay as feedback
         }
 
         private static string SettingsPath
@@ -515,21 +576,20 @@ namespace GCode_Sender
             if (model == null)
                 return;
 
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 Generate_Click(sender, e);
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 return;
 
             measureRun = chkMeasure.IsChecked == true;
             ResetResults();
 
-            // Float the machine-control panel (status, feed hold, override, MDI) so the run can be driven
-            // without leaving this tab.
-            MachineControlWindow.ShowFor(model, Window.GetWindow(this));
+            // Run control (status, feed hold, override, MDI) is fixed at the main-window bottom and always
+            // visible (Phase 2c), so the run can be driven without leaving this tab - no floating panel needed.
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
             // confirmation. confirm:true gives the operator a final "run?" before any motion.
-            MacroProcessor.Run(model, "Load stock", txtProgram.Text, true);
+            MacroProcessor.Run(model, "Load stock", program, true, stayPut: true);
         }
 
         // Build the NGC probe program: call the tested pcorner.macro per corner (it discovers the spoilboard /

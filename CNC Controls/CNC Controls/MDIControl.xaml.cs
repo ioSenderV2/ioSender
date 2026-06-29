@@ -55,6 +55,32 @@ namespace CNC.Controls
 
         public new bool IsFocused { get { return txtMDI.IsKeyboardFocusWithin; } }
 
+        // Bare mode: drop the "MDI" group header/border and let the combobox stretch to fill - used by the
+        // fixed bottom run-control bar. Default false keeps the labelled GroupBox used in the side panels.
+        public static readonly DependencyProperty BareProperty = DependencyProperty.Register(
+            nameof(Bare), typeof(bool), typeof(MDIControl), new PropertyMetadata(false, OnBareChanged));
+
+        public bool Bare
+        {
+            get { return (bool)GetValue(BareProperty); }
+            set { SetValue(BareProperty, value); }
+        }
+
+        private static void OnBareChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (MDIControl)d;
+            if (!(bool)e.NewValue)
+                return;
+            c.grpMDI.Header = null;
+            c.grpMDI.BorderThickness = new Thickness(0);
+            c.grpMDI.Padding = new Thickness(0);
+            c.grpMDI.HorizontalAlignment = HorizontalAlignment.Stretch;
+            c.grpMDI.VerticalAlignment = VerticalAlignment.Center;
+            c.txtMDI.Width = double.NaN;                       // fill the DockPanel (use remaining space)
+            c.txtMDI.HorizontalAlignment = HorizontalAlignment.Stretch;
+            c.txtMDI.Height = c.btnSend.Height = 26;           // ~20% taller than the default 22
+        }
+
         public static readonly DependencyProperty CommandProperty = DependencyProperty.Register(nameof(Command), typeof(string), typeof(MDIControl), new PropertyMetadata(""));
         public string Command
         {

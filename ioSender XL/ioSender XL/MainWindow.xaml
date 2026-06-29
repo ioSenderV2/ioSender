@@ -13,6 +13,7 @@
         mc:Ignorable="d"
         Background="#FFE5E5E5"
         Title="Sender ({0})" Height="640" Width="925" MinHeight="700" MinWidth="1250"
+        Opacity="0" ShowInTaskbar="False"
         Loaded="Window_Load"
         SizeChanged="Window_SizeChanged"
         Closing="Window_Closing"
@@ -148,6 +149,61 @@
                 <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
             </StatusBarItem>
         </StatusBar>
+        <!-- Single, always-visible machine-control cluster (Phase 2c) - replaced the former floating
+             run-control window and the Grbl-tab's lower-left controls. Signals + Status (state/check +
+             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop / Rewind) +
+             Feed/rapid override + MDI. Docked just above the status bar, full width, present on every tab so
+             Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">
+            <Grid Margin="6,4">
+                <!-- Left column expands (MDI line stretches until State/Check meets the middle column); the
+                     middle (Signals/feed) and right (overrides) columns are content-sized and sit adjacent. -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- Left: top line = MDI (fills) + State/Check (right); bottom line = all buttons.
+                     Column is auto-sized to the button row, so the MDI line never extends past Rewind. -->
+                <Grid Grid.Column="0" VerticalAlignment="Center">
+                    <!-- Content-height rows: the bar is only as tall as the MDI line + a gap + the button row,
+                         and the middle/right columns are scaled to fit this height (not the other way round). -->
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="True">
+                        <cnccontrols:StatusControl DockPanel.Dock="Right" ShowButtons="False" Margin="10,0,12,0" VerticalAlignment="Center"/>
+                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
+                        <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Center"/>
+                        <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Center" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                    </StackPanel>
+                </Grid>
+                <!-- Middle: signal indicators (flush to top, enlarged to use the spare width) + current feed
+                     rate under them. -->
+                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="18,0,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">
+                    <cnccontrols:SignalsControl VerticalAlignment="Top" Margin="0">
+                        <cnccontrols:SignalsControl.LayoutTransform>
+                            <ScaleTransform ScaleX="1.15" ScaleY="1.15"/>
+                        </cnccontrols:SignalsControl.LayoutTransform>
+                    </cnccontrols:SignalsControl>
+                    <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
+                        <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
+                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" Width="52" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                        <Label Content="{Binding Path=FeedrateUnit, Mode=OneWay}" Padding="2,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+                <!-- Right: feed / rapids override controls, given ~25% more room. -->
+                <cnccontrols:FeedControl Grid.Column="2" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
+                    <cnccontrols:FeedControl.LayoutTransform>
+                        <ScaleTransform ScaleX="1.1" ScaleY="1.1"/>
+                    </cnccontrols:FeedControl.LayoutTransform>
+                </cnccontrols:FeedControl>
+            </Grid>
+        </Border>
         <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,34,0,0">
             <ItemsControl x:Name="xx" Width="22" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
@@ -162,59 +218,45 @@
             <cnccontrols:MachinePositionFlyout x:Name="mposFlyout" Visibility="Hidden" Canvas.Right="22"/>
             <cnccontrols:THCMonitorControl x:Name="thcControl" Visibility="Hidden" Canvas.Right="22"/>
         </Canvas>
-        <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" DockPanel.Dock="Left" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
+        <Grid DockPanel.Dock="Left">
+        <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
             <TabControl.Resources>
                 <Style TargetType="{x:Type TabItem}">
                     <Setter Property="Height" Value="32" />
                     <Setter Property="MinWidth" Value="40" />
                 </Style>
             </TabControl.Resources>
-            <TabItem x:Uid="tab_grbl" x:Name="tabGrbl" Header="Grbl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <local:JobView x:Name="Grbl"/>
-            </TabItem>
-            <TabItem x:Uid="tab_loadStock" x:Name="tabLoadStock" Header="Load stock">
-                <local:LoadStockView x:Name="loadStockView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_offsets" x:Name="tabOffsets" Header="Offsets">
-                <cnccontrols:OffsetView x:Name="offsetControl"/>
-            </TabItem>
-            <TabItem x:Uid="tab_grblConfig" x:Name="tabConfig" Header="Settings" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <cnccontrols:GrblConfigView x:Name="configControl" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-            </TabItem>
-            <!---
-            <TabItem x:Uid="tab_3DView" x:Name="tabViewer" Header="3D View">
-                <cncviewer:Viewer x:Name="viewer"/>
-            </TabItem>
-            -->
-            <TabItem x:Uid="tab_probing" x:Name="tabProbing" Header="Probing">
-                <cncprobingcontrols:ProbingView x:Name="probingView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_sdCard" x:Name="tabSDCard" Header="SD Card">
-                <cnccontrols:SDCardView x:Name="SDCardView" FileSelected="SDCardView_FileSelected"/>
-            </TabItem>
-            <TabItem x:Uid="tab_latheWizards" x:Name="tabLatheWizards" Header="Lathe Wizards">
-                <cnclathecontrols:LatheWizardsView x:Name="latheWizards"/>
-            </TabItem>
-            <TabItem x:Uid="tab_tools" x:Name="tabTools" Header="Tools">
-                <cnccontrols:ToolsView x:Name="toolsView"/>
-            </TabItem>
-            <TabItem x:Uid="tab_machineSetup" x:Name="tabMachineSetup" Header="Machine Setup">
-                <cnccontrols:MachineSetupView x:Name="machineSetupView"/>
-            </TabItem>
-            <!--
-                <TabItem x:Name="tabTurning" Header="Turning">
-                    <Grid Background="#FFE5E5E5">
-                        <cnc:TurningWizard x:Name="toolTurning" HorizontalAlignment="Left" Height="515" VerticalAlignment="Top" Width="875"/>
-                    </Grid>
-                </TabItem>
-                <TabItem x:Name="tabFacing" Header="Facing">
-                    <Grid Background="#FFE5E5E5">
-                        <WindowsFormsHost HorizontalAlignment="Left" Height="515" VerticalAlignment="Top" Width="875">
-                            <cnc:FacingWizard x:Name="toolFacing" AutoScaleMode="Inherit"/>
-                        </WindowsFormsHost>
-                    </Grid>
-                </TabItem>
--->
+            <!-- Tabs are built in code from TabRegistry (Phase 1: MainWindow is a container).
+                 See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
         </TabControl>
+        <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
+        <!-- Program view always pops on the RIGHT. -->
+        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="560" Margin="0,60,0,0"
+                Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
+            <DockPanel>
+                <!-- Title = program source (loaded file/folder) or, in preview mode, the generating tool's name. -->
+                <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
+                    <Grid>
+                        <TextBlock x:Name="overlayJobTitle" Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                        <TextBlock x:Name="overlayPreviewTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+                <!-- Job view (parsed g-code) for loaded files; raw-text view for tool-generated program previews. -->
+                <Grid>
+                    <cnccontrols:GCodeListControl x:Name="overlayProgramView"/>
+                    <TextBox x:Name="overlayProgramText" Visibility="Collapsed" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                             Background="#FFF8F8F8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             TextWrapping="NoWrap" VerticalContentAlignment="Top"/>
+                </Grid>
+            </DockPanel>
+        </Border>
+        <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->
+        <Border x:Name="overlayConsole" HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="300" Margin="6,0,0,0"
+                Width="{Binding ElementName=mdiControl, Path=ActualWidth}"
+                Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
+            <cnccontrols:ConsoleControl x:Name="overlayConsoleView" LogOnly="True"/>
+        </Border>
+        </Grid>
     </DockPanel>
 </Window>

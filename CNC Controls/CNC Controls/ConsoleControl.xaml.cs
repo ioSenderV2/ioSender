@@ -65,6 +65,24 @@ namespace CNC.Controls
             txtInput.AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(txtInput_KeyDown), true);
         }
 
+        // LogOnly: hide the inline input prompt and show just the scrollback - used by the run-control
+        // bar's console overlay, where the bar's command box is the input. Default false = full console
+        // (input + log), as on the Console tab.
+        public static readonly DependencyProperty LogOnlyProperty = DependencyProperty.Register(
+            nameof(LogOnly), typeof(bool), typeof(ConsoleControl), new PropertyMetadata(false, OnLogOnlyChanged));
+
+        public bool LogOnly
+        {
+            get { return (bool)GetValue(LogOnlyProperty); }
+            set { SetValue(LogOnlyProperty, value); }
+        }
+
+        private static void OnLogOnlyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (ConsoleControl)d;
+            c.inputRow.Visibility = (bool)e.NewValue ? Visibility.Collapsed : Visibility.Visible;
+        }
+
         // Terminal-style prompt: route the typed line through the same MDI command the global
         // MDI strip uses (it echoes the command into ResponseLog), recording it in the shared
         // MDIHistory; Up/Down recall it.

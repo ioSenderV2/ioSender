@@ -3709,7 +3709,7 @@ namespace CNC.Core
         internal static void Suspend()
         {
             suspend = true;
-            Comms.com.PurgeQueue();
+            Comms.com?.PurgeQueue();   // no-op if no connection (queries may run before connect)
         }
 
         internal static void Resume()

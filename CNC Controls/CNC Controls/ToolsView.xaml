@@ -7,27 +7,7 @@
              mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
-    <TabControl x:Name="tabTools" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
-        <TabItem x:Uid="tab_toolTable" x:Name="tabToolTable" Header="Tool table">
-            <local:ToolView x:Name="toolControl"/>
-        </TabItem>
-        <TabItem x:Uid="tab_stepperCalibration" x:Name="tabStepperCalibration" Header="Stepper calibration">
-            <local:StepperCalibrationWizard x:Name="calibWizard"/>
-        </TabItem>
-        <TabItem x:Uid="tab_stepperCalibrationScratch" x:Name="tabStepperCalibrationScratch" Header="Stepper calibration (scratch)">
-            <local:StepperCalibrationScratchWizard x:Name="calibScratchWizard"/>
-        </TabItem>
-        <TabItem x:Uid="tab_surfaceSpoilboard" x:Name="tabSurfaceSpoilboard" Header="Surface spoilboard">
-            <local:SurfaceSpoilboardWizard x:Name="surfaceSpoilboardWizard"/>
-        </TabItem>
-        <TabItem x:Uid="tab_autoSquare" x:Name="tabAutoSquare" Header="Squareness">
-            <local:AutoSquareWizard x:Name="autoSquareWizard"/>
-        </TabItem>
-        <TabItem x:Uid="tab_trinamic" x:Name="tabTrinamic" Header="Trinamic tuner">
-            <local:TrinamicView x:Name="toolTrinamic"/>
-        </TabItem>
-        <TabItem x:Uid="tab_pidTuner" x:Name="tabPIDTuner" Header="PID Tuner">
-            <local:PIDLogView x:Name="toolPIDTuner"/>
-        </TabItem>
-    </TabControl>
+    <!-- Sub-tabs are built in code from the layout tree's Tools/"tools" slot (Phase 2b step 3).
+         See RegisterTools()/BuildTools() in ToolsView.xaml.cs. -->
+    <TabControl x:Name="tabTools" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged"/>
 </UserControl>

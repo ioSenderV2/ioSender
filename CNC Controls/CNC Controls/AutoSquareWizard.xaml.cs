@@ -24,6 +24,7 @@ namespace CNC.Controls
     public partial class AutoSquareWizard : UserControl, IGrblConfigTab
     {
         private GrblViewModel model = null;
+        private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
         private bool _paramsLoaded = false;
         private GrblSettingDetails _offset = null;   // the controller's squaring-offset setting (or null)
         private int _gangedAxis = 1;                 // 0=X, 1=Y, 2=Z (derived from the offset setting id)
@@ -48,7 +49,10 @@ namespace CNC.Controls
             {
                 DetectOffsetSetting();
                 UpdateComputed();
+                MacroProcessor.SetActiveProgram?.Invoke("Auto square", program);   // Program View shows our program
             }
+            // Leaving the tab does NOT revert the overlay - the active program persists until another tool
+            // sets it or a job file is loaded.
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
@@ -436,8 +440,9 @@ namespace CNC.Controls
                                 "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            txtProgram.Text = string.Join("\r\n", BuildProgram());
+            program = string.Join("\r\n", BuildProgram());
             btnRun.IsEnabled = true;
+            MacroProcessor.ProgramPreview?.Invoke("Auto square", program);
         }
 
         private void Run()
@@ -445,11 +450,10 @@ namespace CNC.Controls
             if (model == null)
                 return;
             Generate();   // always rebuild from the current settings (Dry run / Reuse Z0 / offsets)
-            if (string.IsNullOrWhiteSpace(txtProgram.Text))
+            if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.RunControlPanel?.Invoke(model);
-            bool ok = MacroProcessor.Run(model, DryRun ? "Auto square dry run" : "Auto square holes", txtProgram.Text, true);
+            bool ok = MacroProcessor.Run(model, DryRun ? "Auto square dry run" : "Auto square holes", program, true);
 
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry
             // run you can untick Dry run and Run again to cut at the same Z0 without touching off again.
@@ -520,17 +524,6 @@ namespace CNC.Controls
                 cbxGangedAxis.SelectedIndex = Math.Max(0, Math.Min(2, _gangedAxis));
 
             DetectOffsetSetting();
-
-            txtProgram.Text =
-                "Tunes a ganged, auto-squared gantry by adjusting the controller's squaring-OFFSET setting (Phil Barrett's method). The firmware must already be built with the axis ganged + auto-squared.\n\n" +
-                "1. Set Ganged axis to your auto-squared axis (usually Y - the offset is only writable for that axis). Home the machine. Enter your square's ACTUAL blade & tongue lengths (e.g. 609.6 / 406.4 mm for a 24x16in square); the tool insets the holes from those so the square's edge overhangs each far hole. Fit the drill bit.\n" +
-                "2. Press Generate, then Run. It moves to the centre of the bed; jog Z until the bit just touches, OK - then it peck-drills the L: two corner holes (one out each leg) + a far X hole + a far Y hole.\n" +
-                "3. Drop a pin in each hole. Lay the square in the corner (its inside-corner relief radius sits over the undrilled vertex): push the tongue's inside edge against BOTH Y-leg pins.\n" +
-                "4. Now look at the blade against the two X-leg pins: if it touches both, the gantry is already square. If not, it touches one pin and there's a gap to the other - measure that gap. Sign: enter it NEGATIVE if the gap is at the near (corner-side) X pin, POSITIVE if at the far X pin.\n" +
-                "5. Press Apply offset - it converts the gap (gap ÷ the X-pin span, times the rail span) into a squaring-offset change, writes the setting and re-homes.\n" +
-                "6. VALIDATE: nudge X/Y offset a little (to clean board) and Run again to drill a FRESH L with the corrected gantry, then re-measure step 4 - the gap should shrink toward 0. Repeat until square. If the gap got BIGGER after the first apply, the sign was backwards - enter it with the opposite sign and apply again (the firmware sign convention is build-specific).\n\n" +
-                "Tip: tick Dry run to step through the hole positions at safe Z (spindle off) and confirm they clear your dog/insert holes; use X/Y offset to nudge the pattern off existing holes. When happy, untick Dry run and Run again - Reuse Z0 is auto-ticked, so it cuts at the same touch-off (keep the same drill bit in).\n\n" +
-                "Notes: holes are peck-drilled with the spindle ON - keep the bit sharp and the peck light (1/16\" snaps easily). Assumes a Y-ganged gantry (motors at the X rails); the rail span defaults to the X travel.";
 
             UpdateComputed();
         }
