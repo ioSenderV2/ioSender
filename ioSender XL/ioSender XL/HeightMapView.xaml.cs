@@ -313,6 +313,7 @@ namespace GCode_Sender
             }
 
             pr.Program.Execute(true);
+            model.Message = string.Empty;   // clear the stale "Probing point N of M..." progress line
             BuildMap(pr, map);
         }
 
@@ -325,10 +326,13 @@ namespace GCode_Sender
         // mirrors the serpentine probe order above so each result lands in the right grid cell.
         private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map)
         {
-            if (!(pr.IsSuccess && pr.Positions.Count == map.TotalPoints))
+            // Build from the probed points as long as we captured one per grid point - tolerate IsSuccess being
+            // cleared by a late probe-release event after the final point. Report clearly either way.
+            if (pr.Positions.Count != map.TotalPoints)
             {
-                MessageBox.Show(string.Format("Height map probing did not complete ({0} of {1} points). {2}",
-                    pr.Positions.Count, map.TotalPoints, pr.Message), "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(string.Format("Height map captured {0} of {1} probe points, so it can't be built.{2}",
+                    pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message),
+                    "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -347,6 +351,8 @@ namespace GCode_Sender
             HeightMap.HasHeightMap = true;
             HeightMap.CanApply = model.IsFileLoaded;
             RefreshSurface();
+            model.Message = string.Format("Height map complete: {0} points, Z range {1} to {2} mm.",
+                map.TotalPoints, Math.Round(map.MinHeight, model.Precision).ToInvariantString(), Math.Round(map.MaxHeight, model.Precision).ToInvariantString());
         }
 
         // ---- apply / save / load ----
