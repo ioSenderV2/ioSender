@@ -71,9 +71,6 @@
     <Compile Include="CsSelectControl.xaml.cs">
       <DependentUpon>CsSelectControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ProbeHeaderControl.xaml.cs">
-      <DependentUpon>ProbeHeaderControl.xaml</DependentUpon>
-    </Compile>
     <Compile Include="EdgeFinderControl.xaml.cs">
       <DependentUpon>EdgeFinderControl.xaml</DependentUpon>
     </Compile>
@@ -131,10 +128,6 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="CsSelectControl.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ProbeHeaderControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

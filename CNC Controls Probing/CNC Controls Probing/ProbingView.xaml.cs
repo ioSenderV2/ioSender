@@ -396,5 +396,11 @@ namespace CNC.Controls.Probing
             }
         }
 
+        private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count == 1 && ((ComboBox)sender).IsDropDownOpen)
+                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, ((Probe)e.AddedItems[0]).Id));
+        }
+
     }
 }
