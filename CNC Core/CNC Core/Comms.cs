@@ -83,6 +83,20 @@ namespace CNC.Core
         bool EventMode { get; set; }
         Action<int> ByteReceived { get; set; }
 
+        // Optional tap for ok/error acks, invoked ON THE READ THREAD the instant a reply is assembled -
+        // before (and in addition to) the DataReceived marshal to the UI thread. The streamer thread
+        // installs this so job flow control never waits on a busy UI dispatcher. Null (the default) =
+        // exactly today's behaviour. Implementations must call it only for "ok"/"error" replies and must
+        // not block (the handler does a non-blocking enqueue).
+        Action<string> AckSink { get; set; }
+
+        // When true, multi-byte writes (WriteBytes/WriteString) are SYNCHRONOUS so back-to-back job lines
+        // from the streamer thread can't overlap (a fire-and-forget async write would throw "a write is
+        // already in progress"). The streamer sets this true for the duration of a job. Default false =
+        // the proven non-blocking path. Single-byte real-time writes (WriteByte) are unaffected and stay
+        // non-blocking, so Reset/Feed-Hold/overrides are never delayed by a streamer write.
+        bool BlockingWrites { get; set; }
+
         bool IsReconnecting { get; }
 
         void Close();

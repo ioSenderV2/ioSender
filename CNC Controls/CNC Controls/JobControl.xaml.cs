@@ -86,12 +86,17 @@ namespace CNC.Controls
         // and never send past an in-flight probe until it completes - so a streamed probe macro can't race lines
         // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
         private bool jobHasProbe = false, probePending = false;
-        private const int ProbeLookahead = 10;
+        internal const int ProbeLookahead = 10;
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
         private JobData job;
         private int missed = 0;
+
+        // Background send/ack pump - owns flow control off the UI thread for cutting jobs (check mode keeps the
+        // legacy streamer). When pumpActive, ResponseReceived's accounting is skipped (the pump owns it).
+        private StreamPump pump;
+        private volatile bool pumpActive = false;
 
         private StreamingHandlerFn[] streamingHandlers = new StreamingHandlerFn[(int)StreamingHandler.Max];
         private StreamingHandlerFn streamingHandler;
@@ -297,6 +302,7 @@ namespace CNC.Controls
 
         private void OnStop(object sender, EventArgs e)
         {
+            AbortPump();
             JobTimer.Stop();
             job.Stopped = true;
             streamingHandler.Call(StreamingState.Stop, true);
@@ -353,7 +359,10 @@ namespace CNC.Controls
                     // lost connection (idle-time loss is already surfaced by the poller). Only fires while a
                     // job is active, so it cannot affect normal streaming.
                     if ((sender as GrblViewModel).IsConnectionLost && (model.IsJobRunning || JobTimer.IsRunning))
+                    {
+                        AbortPump();
                         streamingHandler.Call(StreamingState.Stop, true);
+                    }
                     break;
 
                 case nameof(GrblViewModel.MDI):
@@ -413,6 +422,7 @@ namespace CNC.Controls
                     break;
 
                 case nameof(GrblViewModel.GrblReset):
+                    AbortPump();
                     JobTimer.Stop();
                     streamingHandler.Call(StreamingState.Stop, true);
                     break;
@@ -553,6 +563,7 @@ namespace CNC.Controls
 
         void btnStop_Click(object sender, RoutedEventArgs e)
         {
+            AbortPump();
             streamingHandler.Call(StreamingState.Stop, true);
         }
 
@@ -580,6 +591,8 @@ namespace CNC.Controls
                 model.Message = string.Empty;
                 job.ToolChanged = false;
                 job.ToolChangeLine = -1;
+                if (pumpActive)
+                    pump.Suspended = false;   // resume consuming acks for the buffered (and M6) lines
                 Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
             }
             else if(JobTimer.IsRunning)
@@ -646,8 +659,46 @@ namespace CNC.Controls
                     while (res == null)
                         EventUtils.DoEvents();
 
-                    SendNextLine();
+                    // The send/ack flow control runs on a dedicated background thread (StreamPump) so UI load
+                    // can never stall motion. Check mode ($C) keeps the legacy UI-thread streamer: it reports
+                    // every line's error and keeps going (the pump stops on first error), and there is no motion
+                    // to stutter, so the pump gives no benefit there.
+                    if (!job.IsChecking)
+                    {
+                        if (pump == null)
+                            pump = new StreamPump(model, Dispatcher);
+                        pumpActive = true;
+                        pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
+                                   AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
+                                   OnPumpJobFinished, OnPumpError);
+                    }
+                    else
+                        SendNextLine();
                 }
+            }
+        }
+
+        // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.
+        private void OnPumpJobFinished()
+        {
+            pumpActive = false;
+            streamingHandler.Call(StreamingState.JobFinished, true);
+        }
+
+        private void OnPumpError(string response)
+        {
+            pumpActive = false;
+            job.HasError = model.IsGrblHAL;
+            streamingHandler.Call(StreamingState.Error, true);
+        }
+
+        // Stop the background pump (Stop/Reset/Alarm/connection-lost). Idempotent.
+        private void AbortPump()
+        {
+            if (pumpActive)
+            {
+                pumpActive = false;
+                pump?.Abort();
             }
         }
 
@@ -1178,9 +1229,14 @@ namespace CNC.Controls
                 case GrblStates.Tool:
                     if (grblState.State != GrblStates.Jog)
                     {
-                        if (JobTimer.IsRunning && job.PendingLine > 0 && !model.IsSDCardJob)
+                        // In pump mode read the pump's progress mirror, and suspend it so jog/MDI acks during the
+                        // tool change aren't consumed as job-line acks (resumed from CycleStart's Tool branch).
+                        int pendingLine = pumpActive ? pump.PendingLine : job.PendingLine;
+                        if (pumpActive)
+                            pump.Suspended = true;
+                        if (JobTimer.IsRunning && pendingLine > 0 && !model.IsSDCardJob)
                         {
-                            job.ToolChangeLine = job.PendingLine - 1;
+                            job.ToolChangeLine = pendingLine - 1;
                             Source.Data[job.ToolChangeLine].Sent = "pending";
                         //      ResponseReceived("pending");
                         }
@@ -1221,6 +1277,7 @@ namespace CNC.Controls
                     break;
 
                 case GrblStates.Alarm:
+                    AbortPump();
                     grblState.State = newstate.State;
                     grblState.Substate = newstate.Substate;
                     streamingHandler.Call(StreamingState.Stop, false);
@@ -1241,7 +1298,12 @@ namespace CNC.Controls
             if (Comms.com == null)
                 return;
 
-            if (streamingHandler.Count)
+            // When the background pump is driving the job it owns all flow-control accounting (off the UI
+            // thread). Skip the accounting here; the MDI/Reset switch below still runs on the UI thread.
+            if (pumpActive)
+            {
+            }
+            else if (streamingHandler.Count)
             {
                 //if(response == "pending")
                 //{
