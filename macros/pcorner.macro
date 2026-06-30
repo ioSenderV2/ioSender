@@ -63,7 +63,12 @@ O<pcorner> SUB
     G53 G0 Z0
     G53 G0 X[#<rx>] Y[#<ry>]
     G53 G1 Z[#5163] F1000           ; controlled descent (~0.25 of rapids) to the stored G28 Z - safer to watch than a rapid plunge
-    G38.2 Z-140 F[#<_ls_searchf>]                ; short slow probe to the spoilboard from there (not from machine top)
+    ; SAFETY: bound the spoilboard probe to a SHORT reach below the G28 Z start. If the probe fails to trip
+    ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
+    ; straight into - through - the spoilboard before alarming. Capping the seek to ~12 mm below the start
+    ; means a dead probe alarms after a few mm instead. So set the G28 Z reference within ~10 mm above the
+    ; spoilboard. G54 was zeroed above, so work Z == machine Z here and #5163 (the G28 machine Z) is the datum.
+    G38.2 Z[#5163 - 12] F[#<_ls_searchf>]        ; slow probe to the spoilboard, capped 12 mm below the G28 Z start
     G91 G0 Z2
     G38.2 Z-5 F[#<_ls_latchf>]
     #<_z_spoil> = #5063
@@ -82,7 +87,10 @@ O<pcorner> SUB
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
   G53 G0 X[#<rx> + [30 * #<sx>]] Y[#<ry> + [30 * #<sy>]]
-  G38.2 Z-140 F[#<_ls_searchf>]
+  ; SAFETY: the stock top always sits ABOVE the spoilboard, so cap this probe just below the discovered
+  ; spoilboard Z (#<_z_spoil>, published by the DISCOVER pass that always runs first) rather than seeking a
+  ; deep machine target - a dead/mis-wired probe then alarms at the board instead of driving to -140.
+  G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]
   G91 G0 Z2
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
