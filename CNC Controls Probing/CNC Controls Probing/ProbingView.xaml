@@ -63,20 +63,20 @@
         <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
         <TabControl x:Name="tab" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
             <TabItem x:Uid="tab_toolOffset" Header="Tool length offset">
-                <local:ToolLengthControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <local:ToolLengthControl/>
             </TabItem>
             <TabItem x:Uid="tab_edgeInternal" Header="Edge finder, external">
                 <local:EdgeFinderControl/>
             </TabItem>
             <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
-                <local:EdgeFinderIntControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <local:EdgeFinderIntControl/>
             </TabItem>
             <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
             <TabItem x:Uid="tab_Rotation" Header="Rotation">
-                <local:RotationControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <local:RotationControl/>
             </TabItem>
             <TabItem x:Uid="tab_Center" Header="Center finder">
-                <local:CenterFinderControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <local:CenterFinderControl/>
             </TabItem>
             <!-- Height map moved out to its own top-level "Height Map" tab (generate-and-run model, ioSender XL). -->
         </TabControl>
