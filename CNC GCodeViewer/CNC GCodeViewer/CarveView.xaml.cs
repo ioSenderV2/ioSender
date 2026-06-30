@@ -641,12 +641,24 @@ namespace CNC.Controls.Viewer
             if (double.IsNaN(y)) y = 0d;
             if (double.IsNaN(z)) z = 0d;
 
+            var p = new Point3D(x, y, z);
+            toolCone.Origin = p;         // always track the live cutter (cheap)
+
+            // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is expensive and
+            // runs on the UI thread - the SAME thread that pumps the job stream, since serial acks arrive via
+            // Dispatcher.BeginInvoke (SerialStream). Carving on every status report while a job streams steals the
+            // thread from SendNextLine, the controller's planner buffer drains, and motion stutters. So only carve
+            // when this view is on screen AND no job is running; the Play button still gives the full offline carve.
+            if (!IsVisible || model == null || model.IsJobRunning)
+            {
+                haveLast = false;        // resume cleanly later - no false cut from a stale last position
+                return;
+            }
+
             curR = defaultToolRadius;    // live motion uses the default (lowest) tool geometry
             curShape = defaultToolShape;
             curAngle = defaultToolAngle;
 
-            var p = new Point3D(x, y, z);
-            toolCone.Origin = p;
             CarveTo(p);                  // live machine motion carves the stock too
             PushMesh();                  // status-poll rate is low, so push each update
         }
