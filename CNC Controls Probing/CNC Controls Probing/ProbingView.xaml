@@ -43,61 +43,32 @@
         </Style>
     </UserControl.Resources>
     <DockPanel Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <!-- Slim shared rail: probe selection + global probe knobs. Each tab carries its own operation
-             geometry + action picker (Tools-tab layout). All bound to the shared ProbingViewModel. -->
-        <ScrollViewer x:Name="dp" DockPanel.Dock="Left" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="5,5,5,0">
-            <StackPanel x:Name="rail" Orientation="Vertical" Width="195"
-                        IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                    <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cbxProfile" IsEditable="True" VerticalAlignment="Center" Width="110" MinHeight="22"
-                        ItemsSource="{Binding Path=Profiles}"
-                        SelectedItem="{Binding Path=Profile, Mode=TwoWay}"
-                        DisplayMemberPath="Name"
-                        SelectedValuePath="Id" />
-                    <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." VerticalAlignment="Center" Width="22" MinHeight="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
-                        <Button.ContextMenu>
-                            <ContextMenu x:Name="cm">
-                                <MenuItem x:Uid="mnu_add" x:Name="mnuAdd" Header="Add" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_update" x:Name="mnuUpdate" Header="Update" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_delete" x:Name="mnuDelete" Header="Delete" Click="mnu_Click"/>
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,5" Visibility="{Binding Path=MultiProbe, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}">
-                    <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cbxProbe" Width="110" Height="22" VerticalAlignment="Center" Margin="6,0,0,0"
-                          DisplayMemberPath="Name" SelectedValuePath="Id" ItemsSource="{Binding Path=Grbl.Probes}" SelectedValue="{Binding Path=Grbl.Probe, Mode=OneWay}"
-                          IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
-                          SelectionChanged="cbxProbe_SelectionChanged"/>
-                </StackPanel>
-                <GroupBox x:Uid="grp_search" Header="Search">
-                    <StackPanel Orientation="Vertical">
-                        <Controls:NumericField x:Uid="lbl_searchFeed" Label="Feed:" ToolTip="Feed rate for initial probing move" Unit="mm/min" Format="###0" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}" ColonAt="62" Margin="0,2,0,0"/>
-                        <Controls:NumericField x:Uid="lbl_probingDistance" Label="Distance:" Tooltip2="Max. distance for probing moves" Value="{Binding Path=ProbeDistance, Mode=TwoWay}" ColonAt="62" Margin="0,2,0,0" Style="{StaticResource ErrorStyle}"/>
-                    </StackPanel>
-                </GroupBox>
-                <GroupBox x:Uid="grp_latch" Header="Latch">
-                    <StackPanel Orientation="Vertical">
-                        <Controls:NumericField x:Uid="lbl_latchFeed" Label="Feed:" ToolTip="Feed rate for second slow probing move" Unit="mm/min" Format="###0" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}" ColonAt="62" Margin="0,2,0,0"/>
-                        <Controls:NumericField x:Uid="lbl_latchDistance" Label="Distance:" Tooltip2="Distance to retract for second slow probing move, set to 0 to skip" Value="{Binding Path=LatchDistance, Mode=TwoWay}" ColonAt="62" Margin="0,2,0,0" Style="{StaticResource ErrorStyle}"/>
-                    </StackPanel>
-                </GroupBox>
-                <GroupBox x:Uid="grp_probe" Header="Probe">
-                    <StackPanel Orientation="Vertical">
-                        <Controls:NumericField x:Uid="lbl_rapidsFeed" Label="Rapids feed:" ToolTip="Feed rate for rapid moves, set to 0 to use controller setting" Format="###0" Unit="mm/min" Value="{Binding Path=RapidsFeedRate, Mode=TwoWay}" ColonAt="80" Margin="0,2,0,0"/>
-                        <Controls:NumericField x:Uid="fld_diameter" Label="Tip diameter:" ToolTip="Probe tip / tool diameter" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}" IsEnabled="{Binding Path=ProbeDiameterEnable}" ColonAt="80" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </GroupBox>
-                <Button x:Uid="btn_macros" Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
-                        IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
-                        Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
-                        HorizontalAlignment="Left" Height="25" Width="135" Margin="0,8,0,0"/>
-            </StackPanel>
-        </ScrollViewer>
+        <!-- Thin global top bar: profile presets (left) + pre/post macros (right). The probe selector,
+             feed overrides and action mode are standardized inside each tab via ProbeHeaderControl. -->
+        <DockPanel DockPanel.Dock="Top" Margin="8,5,8,0" LastChildFill="False">
+            <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxProfile" IsEditable="True" VerticalAlignment="Center" Width="155" MinHeight="22" Margin="4,0,0,0"
+                ItemsSource="{Binding Path=Profiles}"
+                SelectedItem="{Binding Path=Profile, Mode=TwoWay}"
+                DisplayMemberPath="Name"
+                SelectedValuePath="Id"
+                IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
+            <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." VerticalAlignment="Center" Width="22" MinHeight="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
+                <Button.ContextMenu>
+                    <ContextMenu x:Name="cm">
+                        <MenuItem x:Uid="mnu_add" x:Name="mnuAdd" Header="Add" Click="mnu_Click"/>
+                        <MenuItem x:Uid="mnu_update" x:Name="mnuUpdate" Header="Update" Click="mnu_Click"/>
+                        <MenuItem x:Uid="mnu_delete" x:Name="mnuDelete" Header="Delete" Click="mnu_Click"/>
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+            <Button x:Uid="btn_macros" DockPanel.Dock="Right" Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
+                    IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
+                    Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
+                    VerticalAlignment="Center" Height="25" Width="130"/>
+        </DockPanel>
         <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
-        <TabControl x:Name="tab" Margin="5,10,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
+        <TabControl x:Name="tab" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
             <TabItem x:Uid="tab_toolOffset" Header="Tool length offset">
                 <local:ToolLengthControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
             </TabItem>
