@@ -1197,7 +1197,11 @@ namespace CNC.Controls
             // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
             // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
             // there too (Idle re-enables Cycle Start after a run, Hold/Tool/Alarm behave as on the Grbl tab).
-            if (isActive || MacroProcessor.ActiveRun != null) switch(newstate.State)
+            // Also while a job/stream is actually running (JobTimer): a stay-put run (Load Stock) finishes on a
+            // non-Grbl tab and parks in AwaitIdle waiting for the controller's final Idle - if its active program
+            // was already torn down, neither flag above is set and that Idle would be dropped, leaving the bar
+            // stuck "running" until Stop is pressed. JobTimer is live for exactly that finishing window.
+            if (isActive || MacroProcessor.ActiveRun != null || JobTimer.IsRunning) switch(newstate.State)
             {
                 case GrblStates.Idle:
                     streamingHandler.Call(StreamingState.Idle, true);
