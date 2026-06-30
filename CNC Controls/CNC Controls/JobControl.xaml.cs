@@ -93,8 +93,8 @@ namespace CNC.Controls
         private JobData job;
         private int missed = 0;
 
-        // Experimental background send/ack pump (AppConfig.Settings.Base.UseStreamerThread). When pumpActive,
-        // the pump owns flow control off the UI thread; ResponseReceived's accounting is skipped for the job.
+        // Background send/ack pump - owns flow control off the UI thread for cutting jobs (check mode keeps the
+        // legacy streamer). When pumpActive, ResponseReceived's accounting is skipped (the pump owns it).
         private StreamPump pump;
         private volatile bool pumpActive = false;
 
@@ -659,11 +659,11 @@ namespace CNC.Controls
                     while (res == null)
                         EventUtils.DoEvents();
 
-                    // Experimental: drive the send/ack flow control from a background thread so UI load can't
-                    // stall motion. Falls back to the UI-thread streamer for check mode (distinct accounting).
-                    bool usePump = AppConfig.Settings.Base.UseStreamerThread && !job.IsChecking;
-                    model.ResponseLog.Add(usePump ? "[stream] pump thread" : "[stream] UI thread (legacy)");
-                    if (usePump)
+                    // The send/ack flow control runs on a dedicated background thread (StreamPump) so UI load
+                    // can never stall motion. Check mode ($C) keeps the legacy UI-thread streamer: it reports
+                    // every line's error and keeps going (the pump stops on first error), and there is no motion
+                    // to stutter, so the pump gives no benefit there.
+                    if (!job.IsChecking)
                     {
                         if (pump == null)
                             pump = new StreamPump(model, Dispatcher);
