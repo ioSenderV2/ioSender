@@ -64,6 +64,8 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
+        public Action<string> AckSink { get; set; }
+
         public TelnetStream(string host, Dispatcher dispatcher)
         {
             Comms.com = this;
@@ -377,6 +379,9 @@ namespace CNC.Core
             {
                 Reply = reply;
                 state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
+                if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
+                    AckSink(reply);
                 // Marshal to the UI thread ASYNCHRONOUSLY (BeginInvoke, not Invoke): a synchronous Invoke
                 // blocks this read thread until the UI thread is free, so a busy UI (e.g. a heavy 3D view)
                 // stalls reads - and therefore the stream acks. BeginInvoke keeps reads flowing regardless

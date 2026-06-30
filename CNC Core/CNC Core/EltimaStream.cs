@@ -72,6 +72,8 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
+        public Action<string> AckSink { get; set; }
+
 #if RESPONSELOG
         StreamWriter log = null;
 #endif
@@ -352,6 +354,10 @@ namespace CNC.Core
                             Dispatcher.BeginInvoke(DataReceived, Reply);
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+
+                        // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
+                        if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
+                            AckSink(Reply);
                     }
                 }
                 else

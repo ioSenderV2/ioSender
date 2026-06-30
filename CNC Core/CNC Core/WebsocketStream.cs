@@ -64,6 +64,8 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
+        public Action<string> AckSink { get; set; }
+
         public WebsocketStream(string host, Dispatcher dispatcher)
         {
             Comms.com = this;
@@ -314,6 +316,9 @@ namespace CNC.Core
             {
                 Reply = reply;
                 state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
+                if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
+                    AckSink(reply);
                 // Async marshal (BeginInvoke, not Invoke): a synchronous Invoke blocks this read thread on a
                 // busy UI, stalling reads and acks. BeginInvoke keeps reads flowing; the per-call reply value
                 // is captured (strings are immutable) so order/content are preserved (see TelnetStream).

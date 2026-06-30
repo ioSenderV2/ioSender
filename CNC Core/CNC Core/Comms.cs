@@ -83,6 +83,13 @@ namespace CNC.Core
         bool EventMode { get; set; }
         Action<int> ByteReceived { get; set; }
 
+        // Optional tap for ok/error acks, invoked ON THE READ THREAD the instant a reply is assembled -
+        // before (and in addition to) the DataReceived marshal to the UI thread. The streamer thread
+        // installs this so job flow control never waits on a busy UI dispatcher. Null (the default) =
+        // exactly today's behaviour. Implementations must call it only for "ok"/"error" replies and must
+        // not block (the handler does a non-blocking enqueue).
+        Action<string> AckSink { get; set; }
+
         bool IsReconnecting { get; }
 
         void Close();
