@@ -1077,24 +1077,32 @@ namespace CNC.Core
 
         public OpStatus ReadParameter(string line, ref int pos, out double value)
         {
-            char c = line[pos];
-
             value = 0d;
             WasExpression = true;
             LastError = OpStatus.OK;
+
+            // Nothing left to read (e.g. a trailing '=' or a truncated/controller-only expression the bounding-box
+            // emulator evaluates). Fail gracefully instead of indexing past the end.
+            if (pos < 0 || pos >= line.Length)
+            {
+                WasExpression = false;
+                return LastError = OpStatus.BadNumberFormat;
+            }
+
+            char c = line[pos];
 
             if (c == '#')
             {
                 pos++;
 
-                if (line[pos] == '<')
+                if (pos < line.Length && line[pos] == '<')
                 {
                     int end = ++pos;
 
                     while (end < line.Length && line[end] != '>')
                         end++;
 
-                    if (line[end] == '>')
+                    if (end < line.Length && line[end] == '>')
                     {
                         if (!GetNamedParameter(line.Substring(pos, end - pos), out value))
                             LastError = OpStatus.BadNumberFormat;
@@ -1160,7 +1168,7 @@ namespace CNC.Core
 
             pos = end + 1;
 
-            return (LastError = line[end] == ')' ? OpStatus.OK : OpStatus.BadComment);
+            return (LastError = (end < line.Length && line[end] == ')') ? OpStatus.OK : OpStatus.BadComment);
         }
 
         public OpStatus ReadSetParameter(string line, ref int pos)
@@ -1168,17 +1176,21 @@ namespace CNC.Core
             double value;
             OpStatus status = OpStatus.BadNumberFormat;
 
-            if (line[++pos] == '<')
+            // Bounds-safe throughout: this also evaluates controller-only expressions when the bounding-box
+            // emulator runs over a probe/macro program, so malformed/truncated input must fail, not throw.
+            if (pos + 1 < line.Length && line[pos + 1] == '<')
             {
+                pos++;
                 int end = ++pos;
 
                 while (end < line.Length && line[end] != '>')
                     end++;
 
-                if(line[end] == '>' && line[++end] == '=')
+                if (end + 1 < line.Length && line[end] == '>' && line[end + 1] == '=')
                 {
+                    end++;                                      // step onto '='
                     string param = line.Substring(pos, end - pos - 1);
-                    pos = ++end;
+                    pos = ++end;                                // first char after '='
                     ReadParameter(line, ref pos, out value);
                     SetNamedParameter(param, value);
                 }
@@ -1188,7 +1200,7 @@ namespace CNC.Core
                 double param;
                 if ((status = ReadParameter(line, ref pos, out param)) == OpStatus.OK)
                 {
-                    if (line[pos] == '=')
+                    if (pos < line.Length && line[pos] == '=')
                     {
                         pos++;
                         ReadParameter(line, ref pos, out value);

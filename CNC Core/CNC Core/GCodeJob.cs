@@ -289,28 +289,33 @@ namespace CNC.Core
                 stopWatch.Start();
 #endif
 
-                // Calculate program limits (bounding box)
-
+                // Calculate program limits (bounding box). Wrapped so an exotic program the emulator can't fully
+                // evaluate (e.g. a controller-side NGC probe/macro program full of #-expressions and O-words, like
+                // Load Stock) yields a partial/empty box rather than taking down the load/run with a parse fault.
                 BoundingBox.Reset();
 
-                GCodeEmulator emu = new GCodeEmulator(true);
-
-                foreach (var cmd in emu.Execute(Tokens))
+                try
                 {
-                    if (cmd.Token is GCArc)
-                        BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                    else if (cmd.Token is GCCubicSpline)
-                        BoundingBox.AddBoundingBox((cmd.Token as GCCubicSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                    else if (cmd.Token is GCQuadraticSpline)
-                        BoundingBox.AddBoundingBox((cmd.Token as GCQuadraticSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                    else if (cmd.Token is GCAxisCommand9)
+                    GCodeEmulator emu = new GCodeEmulator(true);
+
+                    foreach (var cmd in emu.Execute(Tokens))
                     {
-                        if (GrblInfo.LatheUVWModeEnabled)
-                            BoundingBox.AddBoundingBox((cmd.Token as GCAxisCommand9).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                        else
-                            BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
+                        if (cmd.Token is GCArc)
+                            BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                        else if (cmd.Token is GCCubicSpline)
+                            BoundingBox.AddBoundingBox((cmd.Token as GCCubicSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                        else if (cmd.Token is GCQuadraticSpline)
+                            BoundingBox.AddBoundingBox((cmd.Token as GCQuadraticSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                        else if (cmd.Token is GCAxisCommand9)
+                        {
+                            if (GrblInfo.LatheUVWModeEnabled)
+                                BoundingBox.AddBoundingBox((cmd.Token as GCAxisCommand9).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                            else
+                                BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
+                        }
                     }
                 }
+                catch { /* unparseable expression program - leave whatever box was accumulated */ }
 
                 BoundingBox.Conclude();
 
