@@ -56,6 +56,10 @@ namespace CNC.Controls
         private int distance = 2, feedrate = 2;
         private double limitSwitchesClearance = .5d, position = 0d;
         private bool jogIsContinuous = false;   // last jog was continuous (selected Continuous, or a Shift/Ctrl+Shift speed tier) - so cancel on release
+        private System.Windows.Threading.DispatcherTimer holdTimer;  // tap-vs-hold timer for a UI arrow while Continuous is selected
+        private string holdCmd;                 // the axis command captured on press, decided on release/timeout
+        private bool holdFired;                 // the hold threshold elapsed -> a continuous jog was started
+        private const int HoldThresholdMs = 250;
         private KeypressHandler keyboard;
         private static bool keyboardMappingsOk = false;
         private static volatile int jogAxis = -1;
@@ -471,7 +475,17 @@ namespace CNC.Controls
             return state == GrblStates.Idle || state == GrblStates.Jog || state == GrblStates.Tool;
         }
 
+        // How the no-modifier UI-jog path resolves its distance: Auto honours the Continuous checkbox (the
+        // default for keyboard/controller callers), Step forces one discrete increment (a tap), Continuous
+        // forces a continuous jog (a hold) regardless of the checkbox.
+        private enum JogKind { Auto, Step, Continuous }
+
         private void JogCommand(string cmd)
+        {
+            JogCommand(cmd, JogKind.Auto);
+        }
+
+        private void JogCommand(string cmd, JogKind kind)
         {
             GrblViewModel model = DataContext as GrblViewModel;
 
@@ -497,7 +511,15 @@ namespace CNC.Controls
                 else if (mods == (ModifierKeys.Control | ModifierKeys.Shift))   // Ctrl+Shift -> slow continuous
                 { jogDistance = -1d; jogFeed = jogcfg.SlowFeedrate; }
                 else                                                            // no modifier -> selected preset
-                { jogDistance = JogData.Distance; jogFeed = JogData.FeedRate; }
+                {
+                    jogFeed = JogData.FeedRate;
+                    if (kind == JogKind.Step)                                    // tap while Continuous -> one discrete step
+                        jogDistance = JogData.SelectedDistance;
+                    else if (kind == JogKind.Continuous)                         // hold while Continuous -> continuous jog
+                        jogDistance = -1d;
+                    else                                                         // Auto -> honour the Continuous checkbox
+                        jogDistance = JogData.Distance;
+                }
                 jogIsContinuous = jogDistance == -1d;
 
                 var distance = (jogDistance == -1 ? GrblInfo.MaxTravel.Values[axis] : jogDistance) * (cmd[1] == '-' ? -1d : 1d);
@@ -553,12 +575,57 @@ namespace CNC.Controls
 
         private void JogButton_JogStart(object sender, EventArgs e)
         {
-            JogCommand((string)(sender as JogButton).Tag == "stop" ? "stop" : (string)(sender as JogButton).Content);
+            string cmd = (string)(sender as JogButton).Tag == "stop" ? "stop" : (string)(sender as JogButton).Content;
+
+            if (cmd == "stop") {
+                JogCommand("stop");
+                return;
+            }
+
+            // "Continuous" is timer-based: a tap (press + quick release) moves one discrete step at the selected
+            // distance; pressing and holding past the threshold starts a true continuous jog (cancelled on
+            // release). So when Continuous is selected and no modifier is held, defer the move - JogButton_JogEnd
+            // turns a quick release into a single step, HoldTimer_Tick turns a held press into continuous motion.
+            // Discrete-step mode and the Shift/Ctrl modifier tiers keep their immediate behaviour.
+            ModifierKeys mods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
+            if (mods == ModifierKeys.None && JogData.StepSize == JogViewModel.JogStep.Continuous)
+            {
+                holdCmd = cmd;
+                holdFired = false;
+                if (holdTimer == null) {
+                    holdTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HoldThresholdMs) };
+                    holdTimer.Tick += HoldTimer_Tick;
+                }
+                holdTimer.Start();
+            }
+            else
+                JogCommand(cmd);
+        }
+
+        private void HoldTimer_Tick(object sender, EventArgs e)
+        {
+            holdTimer.Stop();
+            holdFired = true;
+            JogCommand(holdCmd, JogKind.Continuous);   // held past the threshold -> start the continuous jog
         }
 
         private void JogButton_JogEnd(object sender, EventArgs e)
         {
-            if (jogIsContinuous)   // continuous (selected Continuous, or a Shift/Ctrl+Shift speed tier) - stop on release
+            if (holdTimer != null && holdTimer.IsEnabled)   // released before the threshold -> tap -> one discrete step
+            {
+                holdTimer.Stop();
+                JogCommand(holdCmd, JogKind.Step);
+                return;
+            }
+
+            if (holdFired)   // a hold-started continuous jog -> stop on release
+            {
+                holdFired = false;
+                JogCommand("stop");
+                return;
+            }
+
+            if (jogIsContinuous)   // modifier-tier continuous (Shift / Ctrl+Shift) - stop on release
                 JogCommand("stop");
         }
 
