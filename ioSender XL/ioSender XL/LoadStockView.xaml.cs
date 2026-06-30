@@ -695,22 +695,28 @@ namespace GCode_Sender
             }
 
             L(string.Format("(--- set work origin at the {0} corner ---)", cornerName));
-            if (measure && applyRotation)
-            {
-                // Tie the stock's skew to the work coordinate system: the front edge c1->c2 (work +X) gives the
-                // rotation; G10 L2 R<deg> stores it in the WCS (grblHAL ROTATION_ENABLE), so EVERY program run in
-                // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
-                L("#<rot> = ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
-                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>] R[#<rot>]", pCode(wcsP)));
-                L("(PRINT, LS_ROT=#<rot>)");
-            }
-            else
-                // No skew applied: set origin AND clear any rotation a previous stock left on this WCS (R0).
-                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>] R0", pCode(wcsP)));
+            // Origin ONLY here - never put the rotation R word in this block. The R word (incl. R0) only exists on
+            // firmware built with ROTATION_ENABLE; on firmware without it ANY "G10 L2 ... R..." block fails with
+            // error:20 and HALTS the program - so the work origin would not be set, G54 not activated, and the
+            // machine never parks at G30 (the reported "stuck, no G30, must Stop + park by hand"). Keep the
+            // origin-setting block bulletproof on every controller.
+            L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
             L(wcs + "  (activate the coordinate system)");
 
             L("(--- park at G30 ---)");
             EmitGotoG30(L);
+
+            // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
+            // G10 L2 R<deg> stores the rotation in the WCS (grblHAL ROTATION_ENABLE), so every later program run in
+            // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
+            // Emitted only when the user asked for it; positioned last so that if the firmware lacks ROTATION_ENABLE
+            // (error:20) the worst case is "no rotation" - the origin is already set and the machine already parked.
+            if (measure && applyRotation)
+            {
+                L("#<rot> = ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
+                L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
+                L("(PRINT, LS_ROT=#<rot>)");
+            }
             L("M2");
 
             return b.ToString();
