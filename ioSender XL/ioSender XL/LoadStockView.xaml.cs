@@ -658,6 +658,12 @@ namespace GCode_Sender
             L(string.Format("#<_ls_rad> = {0}", N(r)));   // probe tip radius (global, read by pcorner)
             L(string.Format("#<_ls_searchf> = {0}", N(p.ProbeFeedRate)));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
+            // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
+            // face-probe start height is the stock top minus a few mm; when the stock sits low (top near the Z
+            // travel bottom) that target can fall below reachable Z and a G53 move to it trips Alarm:2 (soft
+            // limit). pcorner clamps start_z to this. Assumes Z homes to the top and travels negative (the usual
+            // case); 1 mm above the absolute limit. -9999 (= no clamp) when travel ($132) is unknown/zero.
+            L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d)));
 
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);

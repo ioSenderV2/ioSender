@@ -699,10 +699,14 @@ namespace CNC.Controls
                 case "":
                     return null;
                 case "homed":
-                    // Read fresh from the $# [HOME:...] mask (grblHAL sys.homed.mask), not the
-                    // cached HomedState which can stay stale after a position-loss alarm. >0 means
-                    // at least one axis is homed; 0 = unhomed; -1 = could not be read (fail closed).
-                    return GrblWorkParameters.HomedMask > 0 ? null : "the machine is not homed";
+                    // Prefer the fresh $# [HOME:...] mask (grblHAL sys.homed.mask) - it survives a position-loss
+                    // alarm that leaves the cached HomedState stale. >0 = homed, 0 = unhomed. But if $# could not
+                    // be read (-1: timed out / no [HOME:] line) DON'T fail closed - fall back to the live homed
+                    // state, otherwise a homed machine is wrongly reported "not homed" (and every $#-derived
+                    // prereq - G28/G30/G59.3 - fails with it).
+                    if (GrblWorkParameters.HomedMask >= 0)
+                        return GrblWorkParameters.HomedMask > 0 ? null : "the machine is not homed";
+                    return model.HomedState == HomedState.Homed ? null : "the machine is not homed";
                 case "tlo":
                 case "tloref":
                     return model.IsTloReferenceSet ? null : "the tool length offset reference is not set";

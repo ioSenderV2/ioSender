@@ -2000,7 +2000,10 @@ namespace CNC.Core
                     response => dataReceived(response),
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
-                    400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETNGCPARAMETERS));
+                    // $# can be a long report (every WCS + G28/G30/G92/TLO/PRB/HOME, and more with rotation) and
+                    // [HOME:..] is one of the LAST lines - too short a timeout truncates it and HomedMask never gets
+                    // set. 1500 ms is ample on USB/serial and harmless when the report returns quickly.
+                    1500, () => Comms.com.WriteCommand(GrblConstants.CMD_GETNGCPARAMETERS));
             }).Start();
 
             while (res == null)

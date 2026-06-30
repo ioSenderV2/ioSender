@@ -110,6 +110,13 @@ O<pcorner> SUB
   o30 ELSE
     #<_start_z> = [#<_z_top> - 4]
   o30 ENDIF
+  ; SAFETY: never position the probe below the machine's Z soft-limit floor (#<_ls_zfloor>, passed by Load Stock
+  ; from $132). When the stock sits low - its top near the Z travel bottom - start_z = top-4 can fall below
+  ; reachable Z, and the G53 G0 descent to it trips Alarm:2 (soft limit). Clamp up to the floor; the side face is
+  ; still contacted since the face seek is horizontal from start_z.
+  o32 IF [#<_start_z> LT #<_ls_zfloor>]
+    #<_start_z> = #<_ls_zfloor>
+  o32 ENDIF
   (PRINT, PC start_z=#<_start_z>)
 
   ; ================= X face probe =================
