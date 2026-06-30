@@ -59,10 +59,9 @@ namespace CNC.Controls.Probing
 
         private bool probeTriggered = false, probeDisconnected = false, cycleStartSignal = false, wasMetric = true;
         private ProbingViewModel model = null;
-        private ProbingProfiles profiles = new ProbingProfiles();
         private GrblViewModel grbl = null;
         private IInputElement focusedControl = null;
-        private CollectionViewSource probeView = null;   // per-tab filtered probe list (toolsetter only on Tool length)
+        private CollectionViewSource probeView = null;   // per-tab filtered probe-definition list
 
         public ProbingView()
         {
@@ -73,8 +72,6 @@ namespace CNC.Controls.Probing
         {
             if (!keyboardMappingsOk && DataContext is GrblViewModel)
             {
-                profiles.Load();
-
                 grbl = (DataContext as GrblViewModel);
                 KeypressHandler keyboard = grbl.Keyboard;
 
@@ -84,12 +81,22 @@ namespace CNC.Controls.Probing
                 keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
                 keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
 
-                DataContext = model = new ProbingViewModel(DataContext as GrblViewModel, profiles);
+                // Probing parameters come from the shared probe library (Settings: App > Edit Probe
+                // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
+                if (ProbeDefinitions.Items.Count == 0)
+                {
+                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ThreeDProbe });
+                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ToolSetter });
+                    ProbeDefinitions.Renumber();
+                    ProbeDefinitions.Save();
+                }
 
-                // The probe dropdown lists the controller's probe inputs (primary, toolsetter, secondary).
-                // Filter per tab: the toolsetter is only relevant on Tool length; the workpiece-probing tabs
-                // (edge/centre/rotation) hide it. Driven from a CollectionViewSource, refreshed on tab change.
-                probeView = new CollectionViewSource { Source = model.Grbl.Probes };
+                DataContext = model = new ProbingViewModel(DataContext as GrblViewModel);
+
+                // The dropdown lists probe definitions, filtered per tab by type: the tool setter only on
+                // Tool length; the workpiece-probing tabs (edge/centre/rotation) show 3D probe / edge finder
+                // / touch plate. Refreshed on tab change.
+                probeView = new CollectionViewSource { Source = model.ProbeDefs };
                 probeView.Filter += ProbeView_Filter;
                 cbxProbe.ItemsSource = probeView.View;
 
@@ -97,30 +104,37 @@ namespace CNC.Controls.Probing
             }
         }
 
-        // Probe input id convention (Grbl.Probes): 0 = primary (workpiece), 1 = toolsetter, 2 = secondary.
-        private static bool ProbeValidForTab(Probe p, ProbingType type)
+        private static bool ProbeValidForTab(ProbeDefinition p, ProbingType type)
         {
-            return p.Id != 1 || type == ProbingType.ToolLength;   // toolsetter only on Tool length
+            // Tool length uses a tool setter; the workpiece-probing tabs use a 3D probe / edge finder / touch plate.
+            return type == ProbingType.ToolLength ? p.ProbeType == ProbeType.ToolSetter : p.ProbeType != ProbeType.ToolSetter;
         }
 
         private void ProbeView_Filter(object sender, FilterEventArgs e)
         {
-            e.Accepted = !(e.Item is Probe p) || model == null || ProbeValidForTab(p, model.ProbingType);
+            e.Accepted = !(e.Item is ProbeDefinition p) || model == null || ProbeValidForTab(p, model.ProbingType);
         }
 
-        // If the active probe is not valid for the selected tab, switch the controller to the first valid one.
+        // Tell the controller which physical probe input to use for the selected definition (tool setter -> 1).
+        private void SelectControllerProbe(ProbeDefinition p)
+        {
+            if (model == null || p == null)
+                return;
+            int id = p.ProbeType == ProbeType.ToolSetter ? 1 : 0;
+            if (model.Grbl.Probe != id)
+                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, id));
+        }
+
+        // If the selected definition is not valid for the current tab, pick the first valid one.
         private void EnsureValidProbe()
         {
-            if (model == null || model.Grbl.Probes.Count == 0)
+            if (model == null)
                 return;
 
-            var current = model.Grbl.Probes.FirstOrDefault(p => p.Id == model.Grbl.Probe);
-            if (current != null && ProbeValidForTab(current, model.ProbingType))
-                return;
+            if (model.SelectedProbe == null || !ProbeValidForTab(model.SelectedProbe, model.ProbingType))
+                model.SelectedProbe = ProbeDefinitions.Items.FirstOrDefault(p => ProbeValidForTab(p, model.ProbingType));
 
-            var valid = model.Grbl.Probes.FirstOrDefault(p => ProbeValidForTab(p, model.ProbingType));
-            if (valid != null && valid.Id != model.Grbl.Probe)
-                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, valid.Id));
+            SelectControllerProbe(model.SelectedProbe);
         }
 
         private void addCameraPosition(Position position)
@@ -344,46 +358,6 @@ namespace CNC.Controls.Probing
 
         #endregion
 
-        private void mnu_Click(object sender, RoutedEventArgs e)
-        {
-            switch ((string)((MenuItem)sender).Name)
-            {
-                case "mnuAdd":
-                    cbxProfile.SelectedValue = profiles.Add(cbxProfile.Text, model);                
-                    break;
-
-                case "mnuUpdate":
-                    if(model.Profile != null)
-                        profiles.Update(model.Profile.Id, cbxProfile.Text, model);
-                    break;
-
-                case "mnuDelete":
-                    if (model.Profile != null && profiles.Delete(model.Profile.Id))
-                        cbxProfile.SelectedValue = profiles.Profiles[0].Id;
-                    break;
-            }
-
-            profiles.Save();
-        }
-
-        private void btnAddProfile_Click(object sender, RoutedEventArgs e)
-        {
-            if (model.Profile == null || model.Profile.Name != cbxProfile.Text)
-            {
-                mnuAdd.IsEnabled = true;
-                mnuUpdate.IsEnabled = false;
-                mnuDelete.IsEnabled = false;
-            }
-            else
-            {
-                mnuAdd.IsEnabled = false;
-                mnuUpdate.IsEnabled = true;
-                mnuDelete.IsEnabled = model.Profiles.Count > 1;
-            }
-            cm.PlacementTarget = sender as Button;
-            cm.IsOpen = true;
-        }
-
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
             if (!(e.Handled = ProcessKeyPreview(e)))
@@ -435,8 +409,10 @@ namespace CNC.Controls.Probing
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (e.AddedItems.Count == 1 && ((ComboBox)sender).IsDropDownOpen)
-                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, ((Probe)e.AddedItems[0]).Id));
+            // SelectedItem is bound to model.SelectedProbe (copies the definition's params into the VM);
+            // here we just point the controller at the matching physical probe input.
+            if (e.AddedItems.Count == 1 && e.AddedItems[0] is ProbeDefinition p)
+                SelectControllerProbe(p);
         }
 
     }

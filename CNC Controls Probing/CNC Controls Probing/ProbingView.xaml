@@ -43,45 +43,22 @@
         </Style>
     </UserControl.Resources>
     <DockPanel Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <!-- Common top section: the fields shared by every tab - profile presets, probe selector, feed-rate
-             overrides - plus the pre/post macros button (docked right). Reflows on narrow windows. -->
+        <!-- Common top section: select the probe (from the shared probe library, Settings: App > Edit Probe
+             Definitions). Its parameters drive every tab. Pre/post macros button docked right. -->
         <DockPanel DockPanel.Dock="Top" Margin="8,5,8,2">
             <Button x:Uid="btn_macros" DockPanel.Dock="Right" Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
                     IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                     Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
                     VerticalAlignment="Center" Height="25" Width="130" Margin="10,0,0,0"/>
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,2">
-                    <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cbxProfile" IsEditable="True" VerticalAlignment="Center" Width="150" MinHeight="22" Margin="4,0,0,0"
-                        ItemsSource="{Binding Path=Profiles}"
-                        SelectedItem="{Binding Path=Profile, Mode=TwoWay}"
-                        DisplayMemberPath="Name"
-                        SelectedValuePath="Id"
-                        IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
-                    <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." VerticalAlignment="Center" Width="22" MinHeight="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
-                        <Button.ContextMenu>
-                            <ContextMenu x:Name="cm">
-                                <MenuItem x:Uid="mnu_add" x:Name="mnuAdd" Header="Add" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_update" x:Name="mnuUpdate" Header="Update" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_delete" x:Name="mnuDelete" Header="Delete" Click="mnu_Click"/>
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,2" Visibility="{Binding Path=MultiProbe, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}">
-                    <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
-                    <!-- ItemsSource is a per-tab filtered view set in code (toolsetter only on Tool length). -->
-                    <ComboBox x:Name="cbxProbe" Width="130" Height="22" VerticalAlignment="Center" Margin="4,0,0,0"
-                          DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding Path=Grbl.Probe, Mode=OneWay}"
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
+                <!-- ItemsSource is a per-tab filtered view set in code (by ProbeType). Selecting a definition
+                     copies its parameters into the view model (SelectedProbe setter). -->
+                <ComboBox x:Name="cbxProbe" Width="200" Height="22" VerticalAlignment="Center" Margin="4,0,0,0"
+                          DisplayMemberPath="Name" SelectedItem="{Binding Path=SelectedProbe, Mode=TwoWay}"
                           IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                           SelectionChanged="cbxProbe_SelectionChanged"/>
-                </StackPanel>
-                <Controls:NumericField x:Uid="lbl_searchFeed" Label="Search feed:" ToolTip="Feed rate for initial probing move" Unit="mm/min" Format="###0" ColonAt="72" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,16,2"
-                          IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
-                <Controls:NumericField x:Uid="lbl_latchFeed" Label="Latch feed:" ToolTip="Feed rate for second slow probing move" Unit="mm/min" Format="###0" ColonAt="72" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,0,2"
-                          IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
-            </WrapPanel>
+            </StackPanel>
         </DockPanel>
         <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
         <TabControl x:Name="tab" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">

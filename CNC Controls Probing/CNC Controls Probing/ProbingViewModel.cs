@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Collections.ObjectModel;
 using CNC.Core;
@@ -103,12 +104,12 @@ namespace CNC.Controls.Probing
         private Center _center = Center.None;
         private int _coordinateSystem = 0, _passes = 1;
         private ProbingType _probingType = ProbingType.None;
-        private ProbingProfile _profile;
+        private ProbeDefinition _selectedProbe;
         private CancellationToken cancellationToken = new CancellationToken();
 
         public Program Program;
 
-        public ProbingViewModel (GrblViewModel grblmodel, ProbingProfiles profile)
+        public ProbingViewModel (GrblViewModel grblmodel)
         {
             Grbl = grblmodel;
 
@@ -116,8 +117,10 @@ namespace CNC.Controls.Probing
 
             Program = new Program(this);
 
-            Profiles = profile.Profiles;
-            Profile = profile.Profiles[0];
+            // Parameters come from the shared probe library (Settings: App > Edit Probe Definitions),
+            // the same source the Load Stock tab uses. Default to the first definition; ProbingView
+            // picks the right one per tab (toolsetter on Tool length, workpiece probe elsewhere).
+            SelectedProbe = ProbeDefinitions.Items.FirstOrDefault();
 
             HeightMap.PropertyChanged += HeightMap_PropertyChanged;
             Measurement.PropertyChanged += Measurement_PropertyChanged;
@@ -404,29 +407,33 @@ namespace CNC.Controls.Probing
         public Position StartPosition { get; private set; } = new Position();
         public HeightMapViewModel HeightMap { get; private set; } = new HeightMapViewModel();
         public ObservableCollection<CoordinateSystem> CoordinateSystems { get; private set; } = new ObservableCollection<CoordinateSystem>();
-        public ObservableCollection<ProbingProfile> Profiles { get; private set; }
-        public ProbingProfile Profile
+        // The shared probe library (Settings: App > Edit Probe Definitions), filtered per tab in ProbingView.
+        public ObservableCollection<ProbeDefinition> ProbeDefs { get { return ProbeDefinitions.Items; } }
+
+        // Selecting a probe copies its parameters into the view model - the engine and per-tab logic read
+        // these properties unchanged. Replaces the retired probing Profiles. Names mirror ProbeDefinition.
+        public ProbeDefinition SelectedProbe
         {
-            get { return _profile; }
+            get { return _selectedProbe; }
             set
             {
-                if ((_profile = value) != null)
+                if ((_selectedProbe = value) != null)
                 {
-                    RapidsFeedRate = _profile.RapidsFeedRate;
-                    ProbeFeedRate = _profile.ProbeFeedRate;
-                    LatchFeedRate = _profile.LatchFeedRate;
-                    ProbeDistance = _profile.ProbeDistance;
-                    LatchDistance = _profile.LatchDistance;
-                    ProbeDiameter = _profile.ProbeDiameter;
-                    Offset = _profile.Offset;
-                    XYClearance = _profile.XYClearance;
-                    ProbeOffsetX = _profile.ProbeOffsetX;
-                    ProbeOffsetY = _profile.ProbeOffsetY;
-                    Depth = _profile.Depth;
-                    TouchPlateHeight = _profile.TouchPlateHeight;
-                    TouchPlateIsXY = _profile.TouchPlateIsXY;
-                    FixtureHeight = _profile.FixtureHeight;
+                    RapidsFeedRate = value.RapidsFeedRate;
+                    ProbeFeedRate = value.ProbeFeedRate;
+                    LatchFeedRate = value.LatchFeedRate;
+                    ProbeDistance = value.ProbeDistance;
+                    LatchDistance = value.LatchDistance;
+                    ProbeDiameter = value.ProbeDiameter;
+                    XYClearance = value.XYClearance;
+                    ProbeOffsetX = value.ProbeOffsetX;
+                    ProbeOffsetY = value.ProbeOffsetY;
+                    Depth = value.Depth;
+                    TouchPlateHeight = value.PlateThickness;   // touch plate Z offset (work Z0 = top - thickness)
+                    TouchPlateIsXY = value.ProbeType == ProbeType.TouchPlate;
+                    FixtureHeight = value.SetterHeight;         // tool setter trigger height (G59.3 fixture)
                 }
+                OnPropertyChanged();
             }
         }
 
