@@ -82,12 +82,9 @@ namespace CNC.Controls.Probing
                 keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
                 keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
 
-                DRO.DataContext = grbl;
                 DataContext = model = new ProbingViewModel(DataContext as GrblViewModel, profiles);
 
                 grbl.OnCameraProbe += addCameraPosition;
-
-                showDRO();
             }
         }
 
@@ -208,12 +205,6 @@ namespace CNC.Controls.Probing
                     cycleStartSignal = signals.HasFlag(Signals.CycleStart);
                     break;
             }
-        }
-
-        private void ProbingView_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            showDRO();
-            showProbeProperties();
         }
 
         #region Methods and properties required by CNCView interface
@@ -411,43 +402,5 @@ namespace CNC.Controls.Probing
                 model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, ((Probe)e.AddedItems[0]).Id));
         }
 
-        // https://stackoverflow.com/questions/5707143/how-to-get-the-width-height-of-a-collapsed-control-in-wpf
-
-        private void showProbeProperties()
-        {
-            double height;
-
-            if (probeProperties.Visibility == Visibility.Collapsed)
-            {
-                probeProperties.Visibility = Visibility.Hidden;
-                probeProperties.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                height = probeProperties.DesiredSize.Height;
-                probeProperties.Visibility = Visibility.Collapsed;
-            }
-            else
-                height = probeProperties.ActualHeight;
-
-            probeProperties.Visibility = (t1.ActualHeight - (Clearances.TranslatePoint(new Point(0, Clearances.ActualHeight), dp).Y + Position.ActualHeight) + probeProperties.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void showDRO()
-        {
-            double width;
-
-            if (droPanel.Visibility == Visibility.Collapsed)
-            {
-                droPanel.Visibility = Visibility.Hidden;
-                droPanel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                width = droPanel.DesiredSize.Width;
-                droPanel.Visibility = Visibility.Collapsed;
-            }
-            else
-                width = droPanel.ActualWidth;
-
-            droPanel.Visibility = (tab.ActualWidth + width + t1.ActualWidth + 20) < ActualWidth ? Visibility.Visible : Visibility.Collapsed;
-            // Let the left panel size to its content (DRO + parameters) so it scales with text size /
-            // DPI instead of being clamped to fixed 240/460 px and truncating labels.
-            dp.Width = double.NaN;
-        }
     }
 }
