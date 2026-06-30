@@ -686,3 +686,35 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSDCard:System.String.$
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLatheWizards:System.String.$Content,None,True,True,,Lathe Wizards
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTools:System.String.$Content,None,True,True,,Tools
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabMachineSetup:System.String.$Content,None,True,True,,Machine Setup
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_overview:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Overview
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_head:System.Windows.Controls.TextBlock.Text,Text,True,True,,Setting up your machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_body:System.Windows.Controls.TextBlock.Text,Text,True,True,,This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s1:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s2:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position - the corner your machine homes to.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s3:System.Windows.Controls.TextBlock.Text,Text,True,True,,"3 · Axis information - travel, max rate and steps/mm for each axis."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s4:System.Windows.Controls.TextBlock.Text,Text,True,True,,"4 · Homing &amp; limits - limit switches, homing and soft limits."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s5:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions - the probes fitted to this machine.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s6:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros - install the controller-side macro set.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_foot:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_machine:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_homePos:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_axis:System.Windows.Controls.TextBlock.Text,Text,True,True,,3 · Axis information
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_homing:System.Windows.Controls.TextBlock.Text,Text,True,True,,4 · Homing &amp; limits
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_probes:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_probesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_ctrlMacros:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_ctrlMacrosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_installMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros…
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_refreshMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Refresh
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Windows.Controls.ContentControl.Content,Button,True,True,,Preview
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the settings that will change when you Apply. Enabled once you make a change.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabToolTable:System.String.$Content,None,True,True,,Tool table
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperCal:System.String.$Content,None,True,True,,Stepper calibration
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperScratch:System.String.$Content,None,True,True,,Stepper calibration (scratch)
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSurfaceSpoilboard:System.String.$Content,None,True,True,,Surface spoilboard
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSquareness:System.String.$Content,None,True,True,,Squareness
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTrinamic:System.String.$Content,None,True,True,,Trinamic tuner
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabPID:System.String.$Content,None,True,True,,PID Tuner

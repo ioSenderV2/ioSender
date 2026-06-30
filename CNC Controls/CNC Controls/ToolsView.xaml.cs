@@ -26,13 +26,20 @@ namespace CNC.Controls
         // its own code + a node in the default layout's Tools slot - no edit to this view's markup.
         private static void RegisterTools()
         {
-            ComponentRegistry.Register(LayoutKeys.ToolTable, "Tool table", () => new ToolView());
-            ComponentRegistry.Register(LayoutKeys.StepperCal, "Stepper calibration", () => new StepperCalibrationWizard());
-            ComponentRegistry.Register(LayoutKeys.StepperScratch, "Stepper calibration (scratch)", () => new StepperCalibrationScratchWizard());
-            ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, "Surface spoilboard", () => new SurfaceSpoilboardWizard());
-            ComponentRegistry.Register(LayoutKeys.Squareness, "Squareness", () => new AutoSquareWizard());
-            ComponentRegistry.Register(LayoutKeys.Trinamic, "Trinamic tuner", () => new TrinamicView());
-            ComponentRegistry.Register(LayoutKeys.PID, "PID Tuner", () => new PIDLogView());
+            ComponentRegistry.Register(LayoutKeys.ToolTable, L("TabToolTable", "Tool table"), () => new ToolView());
+            ComponentRegistry.Register(LayoutKeys.StepperCal, L("TabStepperCal", "Stepper calibration"), () => new StepperCalibrationWizard());
+            ComponentRegistry.Register(LayoutKeys.StepperScratch, L("TabStepperScratch", "Stepper calibration (scratch)"), () => new StepperCalibrationScratchWizard());
+            ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, L("TabSurfaceSpoilboard", "Surface spoilboard"), () => new SurfaceSpoilboardWizard());
+            ComponentRegistry.Register(LayoutKeys.Squareness, L("TabSquareness", "Squareness"), () => new AutoSquareWizard());
+            ComponentRegistry.Register(LayoutKeys.Trinamic, L("TabTrinamic", "Trinamic tuner"), () => new TrinamicView());
+            ComponentRegistry.Register(LayoutKeys.PID, L("TabPID", "PID Tuner"), () => new PIDLogView());
+        }
+
+        // Localized component label via LibStrings, falling back to the English literal if absent.
+        private static string L(string key, string fallback)
+        {
+            string s = LibStrings.FindResource(key);
+            return string.IsNullOrEmpty(s) ? fallback : s;
         }
 
         // Build the sub-tabs from the layout tree's Tools/"tools" slot (order = tree order).

@@ -708,3 +708,87 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSDCard:System.String.$
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLatheWizards:System.String.$Content,None,True,True,,Lathe Wizards
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTools:System.String.$Content,None,True,True,,Tools
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabMachineSetup:System.String.$Content,None,True,True,,Machine Setup
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_title:System.Windows.Controls.TextBlock.Text,Text,True,True,,Machine setup
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_intro:System.Windows.Controls.TextBlock.Text,Text,True,True,,Work through the step tabs below. Nothing is sent to the controller until you press Apply.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_overview:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Overview
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_head:System.Windows.Controls.TextBlock.Text,Text,True,True,,Setting up your machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_body:System.Windows.Controls.TextBlock.Text,Text,True,True,,This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s1:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s2:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position - the corner your machine homes to.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s3:System.Windows.Controls.TextBlock.Text,Text,True,True,,"3 · Axis information - travel, max rate and steps/mm for each axis."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s4:System.Windows.Controls.TextBlock.Text,Text,True,True,,"4 · Homing &amp; limits - limit switches, homing and soft limits."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s5:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions - the probes fitted to this machine.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s6:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros - install the controller-side macro set.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_foot:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_machine:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_startFrom:System.Windows.Controls.TextBlock.Text,Text,True,True,,Start from your machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.Controls.ContentControl.Content,Button,True,True,,Firmware info…
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the controller's $I build/version information.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_pickHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_homePos:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cnv_homeBox:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Click the top corner where your machine homes (looking down from above the front; Z homes at the top).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cornerFL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Front-left (X min, Y min)"
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cornerFR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Front-right (X max, Y min)"
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cornerBL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Back-left (X min, Y max)"
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cornerBR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Back-right (X max, Y max)"
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_axis:System.Windows.Controls.TextBlock.Text,Text,True,True,,3 · Axis information
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axisHelp:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Travel is the physical reach in mm (the stored soft-limit travel reserves twice the pull-off). Rate is max feed (mm/min, deg/min for rotaries). Steps/mm comes from your drive - 0 leaves it untouched. Tick Invert dir ($3) to flip an axis, NC limit ($5) for normally-closed switches, Home min ($23) to home an axis toward its minimum (negative) end - kept in sync with the home-corner picture above (Z is fixed to the top). The Live dot lights when grbl sees that limit input."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_axis:System.Windows.Controls.TextBlock.Text,Text,True,True,,Axis
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_travel:System.Windows.Controls.TextBlock.Text,Text,True,True,,Travel (mm)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_rate:System.Windows.Controls.TextBlock.Text,Text,True,True,,Rate (mm/min)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_steps:System.Windows.Controls.TextBlock.Text,Text,True,True,,Steps/mm
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_invert:System.Windows.Controls.TextBlock.Text,Text,True,True,,Invert dir ($3)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_nclimit:System.Windows.Controls.TextBlock.Text,Text,True,True,,NC limit ($5)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_homemin:System.Windows.Controls.TextBlock.Text,Text,True,True,,Home min ($23)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,hdr_live:System.Windows.Controls.TextBlock.Text,Text,True,True,,Live
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axTravel:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum travel for this axis in mm - sets the soft-limit extent (grbl $130-$132).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axRate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum feed rate for this axis in mm/min (grbl $110-$112).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axSteps:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Steps per millimetre for this axis (grbl $100-$102).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axInvert:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick to reverse this axis's motion direction (grbl $3 direction-invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axLimitNC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis's limit switches are wired normally-closed (grbl $5 invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axHomeMin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis homes toward its minimum end; untick to home toward the maximum end (grbl $23).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_homing:System.Windows.Controls.TextBlock.Text,Text,True,True,,4 · Homing &amp; limits
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_limitSwitches:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,My machine has limit switches
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_limitSwitches:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Tick if your axes have limit/home switches wired. With switches, hard limits ($21) are enabled automatically (change that later in Basic settings) and homing becomes available."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_homing:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Enable homing ($22)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_homing:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Run a homing cycle on connect to find machine zero using the limit switches. Required for soft limits, force-set-origin and click-to-jog."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_forceOrigin:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Force set origin at home ($22 bit 3)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_forceOrigin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After homing, set machine zero at the home corner so each axis travels positive per its homing direction. Needed for the home-corner choice and the 3D view to match the real machine - reconnect after applying."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_softLimits:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Enable soft limits ($20)
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_softLimits:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Stop any move that would exceed the travel you entered, with a clean controlled stop. Requires homing; also enables click-to-jog in the 3D view."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_pulloff:System.Windows.Controls.TextBlock.Text,Text,True,True,,Pull-off / back-off ($27):
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_pulloff:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Distance each axis backs off the switch after it trips, in mm. Also the clearance reserved at both ends of travel."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fld_pulloff:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Distance each axis backs off the switch after it trips, in mm. Also the clearance reserved at both ends of travel."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_locate:System.Windows.Controls.TextBlock.Text,Text,True,True,,Locate feed rate ($24):
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_locate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Slow feed for the second, precise approach to the switch (mm/min). Lower gives more repeatable homing."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fld_locate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Slow feed for the second, precise approach to the switch (mm/min). Lower gives more repeatable homing."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_seek:System.Windows.Controls.TextBlock.Text,Text,True,True,,Seek rate ($25):
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_seek:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Fast feed for the first approach that finds the switch (mm/min).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fld_seek:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Fast feed for the first approach that finds the switch (mm/min).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_debounce:System.Windows.Controls.TextBlock.Text,Text,True,True,,Debounce ms ($26):
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_debounce:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fld_debounce:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_probes:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_probesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_ctrlMacros:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_ctrlMacrosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_installMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros…
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_refreshMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Refresh
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.Controls.ContentControl.Content,Button,True,True,,Forget machine
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear the remembered machine. The Machine Setup tab will reappear on the next launch (does not change controller settings).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reload
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Discard edits and re-read the current settings from the controller.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Windows.Controls.ContentControl.Content,Button,True,True,,Preview
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the settings that will change when you Apply. Enabled once you make a change.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the changed settings to the controller.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabToolTable:System.String.$Content,None,True,True,,Tool table
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperCal:System.String.$Content,None,True,True,,Stepper calibration
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperScratch:System.String.$Content,None,True,True,,Stepper calibration (scratch)
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSurfaceSpoilboard:System.String.$Content,None,True,True,,Surface spoilboard
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSquareness:System.String.$Content,None,True,True,,Squareness
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTrinamic:System.String.$Content,None,True,True,,Trinamic tuner
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabPID:System.String.$Content,None,True,True,,PID Tuner

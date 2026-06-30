@@ -31,6 +31,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/MachineSetupWizard.xaml', 'CNC.Controls.WPF'),
 ]
 
 # LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..
@@ -60,7 +61,7 @@ def prop_for(tag, attr):
         return None
     if attr == 'ToolTip':
         return ('System.Windows.FrameworkElement.ToolTip', 'ToolTip', 'True', 'True')
-    if attr == 'Header' and tag in ('GroupBox', 'Expander'):
+    if attr == 'Header' and tag in ('GroupBox', 'Expander', 'TabItem', 'HeaderedContentControl'):
         return ('System.Windows.Controls.HeaderedContentControl.Header', 'Label', 'True', 'True')
     if attr == 'Content' and tag in CONTENT_CATEGORY:
         return ('System.Windows.Controls.ContentControl.Content', CONTENT_CATEGORY[tag], 'True', 'True')
