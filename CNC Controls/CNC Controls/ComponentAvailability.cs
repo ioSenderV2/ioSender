@@ -45,6 +45,8 @@ namespace CNC.Controls
 
             if (!GrblInfo.HasProbe)
                 Add("Probing", "No probe is configured.");
+            else if (!GrblSettings.ReportProbeCoordinates)
+                Add("Probing", "Probe coordinate reporting is off ($10 - enable it to use probing).");
 
             return list;
         }

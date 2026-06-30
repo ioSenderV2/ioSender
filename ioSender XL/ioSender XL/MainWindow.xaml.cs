@@ -1157,16 +1157,20 @@ namespace GCode_Sender
         // registered-tab localization is designed).
         private void RegisterBuiltinTabs()
         {
+            // Availability is binary: every tab is selectable (enabledWhenDisconnected: true - no silent
+            // "greyed until connected"), and a tab that needs a capability the controller lacks is REMOVED on
+            // connect (JobView.Setup) and listed, with the reason, in Edit Main Page > Unavailable
+            // (ComponentAvailability). Tabs that only need a live controller stay available and act on connect.
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Job", () => new JobView(), 10, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, "Load stock", () => new LoadStockView(), 20, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30));
+            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50));
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, "Height Map", () => new HeightMapView(), 55, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60,
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60, enabledWhenDisconnected: true,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70));
-            TabRegistry.Register(new TabDescriptor(ViewType.Tools, "Tools", () => new ToolsView(), 80, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Tools, "Tools", () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, "Machine Setup", () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
         }
 

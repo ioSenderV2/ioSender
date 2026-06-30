@@ -560,8 +560,13 @@ namespace GCode_Sender
             // sub-tab is empty in that case. (Previously this hid the whole tab when NumTools == 0.)
             MainWindow.EnableView(true, ViewType.Tools);
 
-            if(GrblInfo.HasProbe && GrblSettings.ReportProbeCoordinates)
+            // Probing needs a probe AND probe-coordinate reporting; without them it can do nothing, so REMOVE it
+            // (and it's listed, with the reason, in Edit Main Page > Unavailable) rather than leave it greyed.
+            // Height Map stays (it can still load/apply a saved .map offline), gated at run time instead.
+            if (GrblInfo.HasProbe && GrblSettings.ReportProbeCoordinates)
                 MainWindow.EnableView(true, ViewType.Probing);
+            else
+                MainWindow.ShowView(false, ViewType.Probing);
 
             MainWindow.EnableView(true, ViewType.LoadStock);   // front-door tool - always available
 
