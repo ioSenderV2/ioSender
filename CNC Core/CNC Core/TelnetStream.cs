@@ -376,9 +376,14 @@ namespace CNC.Core
             if (replies != null) foreach (string reply in replies)
             {
                 Reply = reply;
-                state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                if (Reply.Length != 0 && DataReceived != null)
-                    Dispatcher.Invoke(DataReceived, Reply);
+                state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                // Marshal to the UI thread ASYNCHRONOUSLY (BeginInvoke, not Invoke): a synchronous Invoke
+                // blocks this read thread until the UI thread is free, so a busy UI (e.g. a heavy 3D view)
+                // stalls reads - and therefore the stream acks. BeginInvoke keeps reads flowing regardless
+                // of UI load; the reply value is captured per call (strings are immutable) so order and
+                // content are preserved, and dispatching outside lock(input) keeps the no-deadlock fix.
+                if (reply.Length != 0 && DataReceived != null)
+                    Dispatcher.BeginInvoke(DataReceived, reply);
             }
 
             try

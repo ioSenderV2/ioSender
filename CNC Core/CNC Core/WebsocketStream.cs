@@ -313,9 +313,12 @@ namespace CNC.Core
             if (replies != null) foreach (string reply in replies)
             {
                 Reply = reply;
-                state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                if (Reply.Length != 0 && DataReceived != null)
-                    Dispatcher.Invoke(DataReceived, Reply);
+                state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
+                // Async marshal (BeginInvoke, not Invoke): a synchronous Invoke blocks this read thread on a
+                // busy UI, stalling reads and acks. BeginInvoke keeps reads flowing; the per-call reply value
+                // is captured (strings are immutable) so order/content are preserved (see TelnetStream).
+                if (reply.Length != 0 && DataReceived != null)
+                    Dispatcher.BeginInvoke(DataReceived, reply);
             }
         }
     }
