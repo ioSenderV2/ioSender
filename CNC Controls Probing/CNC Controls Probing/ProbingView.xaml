@@ -72,9 +72,8 @@
                 <local:EdgeFinderIntControl/>
             </TabItem>
             <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
-            <TabItem x:Uid="tab_Rotation" Header="Rotation">
-                <local:RotationControl/>
-            </TabItem>
+            <!-- Rotation tab retired: stock skew is now applied as a work-coordinate-system rotation by the
+                 Load stock tab (G10 L2 R), inherited by any program. RotationControl.* kept dormant. -->
             <TabItem x:Uid="tab_Center" Header="Center finder">
                 <local:CenterFinderControl/>
             </TabItem>

@@ -509,7 +509,7 @@ namespace GCode_Sender
             }
 
             program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true);
+                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true, chkRotate.IsChecked == true);
             ResetResults();
             SaveInputs();
 
@@ -539,6 +539,7 @@ namespace GCode_Sender
                     fldHeight.Value = s.Height;
                     cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                     chkMeasure.IsChecked = s.Measure;
+                    chkRotate.IsChecked = s.ApplyRotation;
                     rbFL.IsChecked = s.Corner == "FrontLeft";
                     rbFR.IsChecked = s.Corner == "FrontRight";
                     rbBL.IsChecked = s.Corner == "BackLeft";
@@ -562,6 +563,7 @@ namespace GCode_Sender
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
+                    ApplyRotation = chkRotate.IsChecked == true,
                     Probe = (cbxProbe.SelectedItem as ProbeDefinition)?.Name ?? string.Empty
                 };
                 var xs = new XmlSerializer(typeof(LoadStockSettings));
@@ -597,7 +599,7 @@ namespace GCode_Sender
         // Start Job conventions: (PREREQ ...) verbatim, G30 park + install, safe-Z go-to. Origin = the selected
         // corner (probed FIRST from G28, which discovers start_z); the other three reuse that start_z and are
         // referenced from the probed origin + the (conservative) estimated size.
-        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure)
+        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius -> edge comp
             string cornerName = Name(corner);
@@ -693,7 +695,18 @@ namespace GCode_Sender
             }
 
             L(string.Format("(--- set work origin at the {0} corner ---)", cornerName));
-            L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
+            if (measure && applyRotation)
+            {
+                // Tie the stock's skew to the work coordinate system: the front edge c1->c2 (work +X) gives the
+                // rotation; G10 L2 R<deg> stores it in the WCS (grblHAL ROTATION_ENABLE), so EVERY program run in
+                // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
+                L("#<rot> = ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
+                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>] R[#<rot>]", pCode(wcsP)));
+                L("(PRINT, LS_ROT=#<rot>)");
+            }
+            else
+                // No skew applied: set origin AND clear any rotation a previous stock left on this WCS (R0).
+                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>] R0", pCode(wcsP)));
             L(wcs + "  (activate the coordinate system)");
 
             L("(--- park at G30 ---)");
@@ -776,6 +789,7 @@ namespace GCode_Sender
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;
+        public bool ApplyRotation = true;   // set the WCS rotation from the measured skew (G10 L2 R)
         public string Probe = string.Empty;
     }
 }
