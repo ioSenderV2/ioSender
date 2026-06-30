@@ -6,10 +6,9 @@
              xmlns:system="clr-namespace:System;assembly=mscorlib"
              xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              xmlns:local="clr-namespace:CNC.Controls.Probing"
-             mc:Ignorable="d" 
+             mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900"
-             Loaded="UserControl_Loaded"
-             SizeChanged="ProbingView_SizeChanged">
+             Loaded="UserControl_Loaded">
     <UserControl.Resources>
         <system:String x:Uid="str_runMacro" x:Key="RunMacro">Run {0} macro?</system:String>
         <system:String x:Uid="str_jogActive" x:Key="JogActive">Keyboard jogging active</system:String>
@@ -44,108 +43,41 @@
         </Style>
     </UserControl.Resources>
     <DockPanel Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-            <StackPanel x:Name="droPanel" Visibility ="Collapsed" Margin="0,0,5,0" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Top" DockPanel.Dock="Left">
-                <Controls:DROControl x:Name="DRO" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-            </StackPanel>
-            <StackPanel x:Name="t1" Height="Auto" HorizontalAlignment="Left" VerticalAlignment="Stretch" DockPanel.Dock="Right" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsVisibleConverter}}">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,5" HorizontalAlignment="Stretch">
-                    <Label x:Uid="lbl_profile" x:Name="lblProfile" Content="Profile:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="cbxProfile" IsEditable="True"  HorizontalAlignment="Left" VerticalAlignment="Center" Width="155" MinHeight="22"
-                        ItemsSource="{Binding Path=Profiles}"
-                        SelectedItem="{Binding Path=Profile, Mode=TwoWay}"
-                        DisplayMemberPath="Name"
-                        SelectedValuePath="Id" 
-                    />
-                    <Button x:Uid="btn_addProfile" x:Name="btnAddProfile" Content="..." HorizontalAlignment="Right" VerticalAlignment="Center" Width="22" MinHeight="22" Focusable="False" Click="btnAddProfile_Click" Margin="4,0,0,0">
-                        <Button.ContextMenu>
-                            <ContextMenu x:Name="cm">
-                                <MenuItem x:Uid="mnu_add" x:Name="mnuAdd" Header="Add" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_update" x:Name="mnuUpdate" Header="Update" Click="mnu_Click"/>
-                                <MenuItem x:Uid="mnu_delete" x:Name="mnuDelete" Header="Delete" Click="mnu_Click"/>
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
-                </StackPanel>
-                <GroupBox x:Uid="grp_probeTipOrTool" Header="Probe tip/tool">
-                    <Controls:NumericField x:Uid="fld_diameter" Label="Diameter:" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}" IsEnabled="{Binding Path=ProbeDiameterEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                </GroupBox>
-                <GroupBox x:Uid="grp_touchOrFixture" Header="Touch plate/fixture height">
-                    <StackPanel Orientation="Vertical">
-                        <Controls:NumericField x:Uid="fld_touchPlate" Visibility="{Binding Path=ProbeFixture, Converter={StaticResource IsNotVisibleConverter}}"  Label="Touch plate:" Value="{Binding Path=TouchPlateHeight, Mode=TwoWay}" IsEnabled="{Binding Path=TouchPlateHeightEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        <Controls:NumericField x:Uid="fld_fixture" Visibility="{Binding Path=ProbeFixture, Converter={StaticResource IsVisibleConverter}}" Label="Fixture:" Value="{Binding Path=FixtureHeight, Mode=TwoWay}" IsEnabled="{Binding Path=FixtureHeightEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                    </StackPanel>
-                </GroupBox>
-                <GroupBox x:Uid="grp_distanceAndSpeed" Header="Probing distances and speed">
-                    <StackPanel Orientation="Vertical" Grid.IsSharedSizeScope="True">
-                        <Controls:NumericField x:Uid="lbl_rapidsFeed" Label="Rapids feed rate:" ToolTip="Feed rate for rapid moves, set to 0 to use controller setting" Format="###0" Unit="mm/min" Value="{Binding Path=RapidsFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        <Controls:NumericField x:Uid="lbl_searchFeed" Label="Search feed rate:" ToolTip="Feed rate for initial probing move" Unit="mm/min" Format="###0" Value="{Binding Path=ProbeFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        <Controls:NumericField x:Uid="lbl_latchFeed" Label="Latch feed rate:" ToolTip="Feed rate for second slow probing move" Unit="mm/min" Format="###0" Value="{Binding Path=LatchFeedRate, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        <Controls:NumericField x:Uid="lbl_probingDistance" Label="Probing distance:" Tooltip2="Max. distance for probing moves" Value="{Binding Path=ProbeDistance, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
-                        <Controls:NumericField x:Uid="lbl_latchDistance" Label="Latch distance:" Tooltip2="Distance to retract for second slow probing move, set to 0 to skip" Value="{Binding Path=LatchDistance, Mode=TwoWay}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
-                    </StackPanel>
-                </GroupBox>
-                <GroupBox x:Uid="grp_clearances" x:Name="Clearances" Header="Probing clearances">
-                    <StackPanel Orientation="Vertical" Grid.IsSharedSizeScope="True">
-                        <Controls:NumericField x:Uid="fld_xyClearance" Label="XY Clearance:" Tooltip2="Initial distance away from face to probe" Value="{Binding Path=XYClearance, Mode=TwoWay}" IsEnabled="{Binding Path=XYOffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
-                        <Controls:NumericField x:Uid="fld_offset" Label="Offset:" ToolTip="Distance from corner to probe" Value="{Binding Path=Offset, Mode=TwoWay}" IsEnabled="{Binding Path=OffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        <Controls:NumericField x:Uid="fld_depth" Label="Depth:" ToolTip="Z offset from current position where probing will take place" Value="{Binding Depth, Mode=TwoWay}" IsEnabled="{Binding XYOffsetEnable}" ColonAt="102" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                    </StackPanel>
-                </GroupBox>
-                <GroupBox x:Uid="grp_prbeProperties" x:Name="probeProperties" Header="Probe/touchplate XY offsets" Visibility="Collapsed" IsEnabled="{Binding Path=XYOffsetEnable}">
-                    <StackPanel Orientation="Vertical">
-                        <StackPanel Orientation="Horizontal">
-                            <Controls:NumericField x:Uid="fld_probeOffsetX" Label="X:" ToolTip="X offset from probe to controlled point" Value="{Binding Path=ProbeOffsetX, Mode=TwoWay}" ColonAt="20" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                            <Controls:NumericField x:Uid="fld_probeOffsetY" Label="Y:" ToolTip="Y offset from probe to controlled point" Value="{Binding Path=ProbeOffsetY, Mode=TwoWay}" ColonAt="20" HorizontalAlignment="Left" Margin="0,2,0,0" VerticalAlignment="Top"/>
-                        </StackPanel>
-                        <CheckBox x:Uid="lbl_touchPlateXY" Content="Is touch plate" ToolTip="Offsets are horizontal thickness of touchplate" Margin="19,0,0,0" IsChecked="{Binding Path=TouchPlateIsXY}" IsEnabled="{Binding Path=TouchPlateXYEnabled}" />
-                    </StackPanel>
-                </GroupBox>
-                <TextBlock x:Name="Position" Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Height="25" Width="235" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
-            </StackPanel>
-        </DockPanel>
-        <StackPanel DockPanel.Dock="Right" Margin="0,10,0,0" Width="635" HorizontalAlignment="Left" VerticalAlignment="Top">
-            <TabControl x:Name="tab" HorizontalAlignment="Stretch" VerticalAlignment="Top" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
-                <TabItem x:Uid="tab_toolOffset" Header="Tool length offset">
-                    <local:ToolLengthControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
-                <TabItem x:Uid="tab_edgeInternal" Header="Edge finder, external">
-                    <local:EdgeFinderControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
-                <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
-                    <local:EdgeFinderIntControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
-                <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
-                <TabItem x:Uid="tab_Rotation" Header="Rotation">
-                    <local:RotationControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
-                <TabItem x:Uid="tab_Center" Header="Center finder">
-                    <local:CenterFinderControl HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                </TabItem>
-                <!-- Height map moved out to its own top-level "Height Map" tab (generate-and-run model, ioSender XL). -->
-            </TabControl>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="125"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" TextWrapping="Wrap" Height="70" Margin="0,2,0,0" Width="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
-                <LineBreak/>
-                <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
-                </TextBlock>
-                <StackPanel Orientation="Vertical" Grid.Column="1" Margin="5,5,0,0">
-                    <ComboBox x:Name="cbxProbe" HorizontalAlignment="Left" Width="120" Height="22" Margin="0,0,0,5"
-                          DisplayMemberPath="Name" SelectedValuePath="Id" ItemsSource="{Binding Path=Grbl.Probes}" SelectedValue="{Binding Path=Grbl.Probe, Mode=OneWay}"
-                          Visibility="{Binding Path=MultiProbe, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}"
+        <!-- Common top section: select the probe (from the shared probe library, Settings: App > Edit Probe
+             Definitions). Its parameters drive every tab. Pre/post macros button docked right. -->
+        <DockPanel DockPanel.Dock="Top" Margin="8,5,8,2">
+            <Button x:Uid="btn_macros" DockPanel.Dock="Right" Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
+                    IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
+                    Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
+                    VerticalAlignment="Center" Height="25" Width="130" Margin="10,0,0,0"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
+                <!-- ItemsSource is a per-tab filtered view set in code (by ProbeType). Selecting a definition
+                     copies its parameters into the view model (SelectedProbe setter). -->
+                <ComboBox x:Name="cbxProbe" MinWidth="200" MinHeight="22" VerticalAlignment="Center" Margin="4,0,0,0"
+                          DisplayMemberPath="Name" SelectedItem="{Binding Path=SelectedProbe, Mode=TwoWay}"
                           IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                           SelectionChanged="cbxProbe_SelectionChanged"/>
-                <Button Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
-                        IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
-                        Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
-                        HorizontalAlignment="Left" Height="25" Width="120" Margin="0,0,0,0"/>
-                </StackPanel>
-            </Grid>
-        </StackPanel>
+            </StackPanel>
+        </DockPanel>
+        <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
+        <TabControl x:Name="tab" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
+            <TabItem x:Uid="tab_toolOffset" Header="Tool length offset">
+                <local:ToolLengthControl/>
+            </TabItem>
+            <TabItem x:Uid="tab_edgeInternal" Header="Edge finder, external">
+                <local:EdgeFinderControl/>
+            </TabItem>
+            <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
+                <local:EdgeFinderIntControl/>
+            </TabItem>
+            <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
+            <!-- Rotation tab retired: stock skew is now applied as a work-coordinate-system rotation by the
+                 Load stock tab (G10 L2 R), inherited by any program. RotationControl.* kept dormant. -->
+            <TabItem x:Uid="tab_Center" Header="Center finder">
+                <local:CenterFinderControl/>
+            </TabItem>
+            <!-- Height map moved out to its own top-level "Height Map" tab (generate-and-run model, ioSender XL). -->
+        </TabControl>
     </DockPanel>
 </UserControl>

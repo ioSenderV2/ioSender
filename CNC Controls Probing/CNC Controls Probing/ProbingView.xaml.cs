@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System.Windows;
 using System.Linq;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Threading.Tasks;
@@ -58,9 +59,9 @@ namespace CNC.Controls.Probing
 
         private bool probeTriggered = false, probeDisconnected = false, cycleStartSignal = false, wasMetric = true;
         private ProbingViewModel model = null;
-        private ProbingProfiles profiles = new ProbingProfiles();
         private GrblViewModel grbl = null;
         private IInputElement focusedControl = null;
+        private CollectionViewSource probeView = null;   // per-tab filtered probe-definition list
 
         public ProbingView()
         {
@@ -71,8 +72,6 @@ namespace CNC.Controls.Probing
         {
             if (!keyboardMappingsOk && DataContext is GrblViewModel)
             {
-                profiles.Load();
-
                 grbl = (DataContext as GrblViewModel);
                 KeypressHandler keyboard = grbl.Keyboard;
 
@@ -82,13 +81,60 @@ namespace CNC.Controls.Probing
                 keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
                 keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
 
-                DRO.DataContext = grbl;
-                DataContext = model = new ProbingViewModel(DataContext as GrblViewModel, profiles);
+                // Probing parameters come from the shared probe library (Settings: App > Edit Probe
+                // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
+                if (ProbeDefinitions.Items.Count == 0)
+                {
+                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ThreeDProbe });
+                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ToolSetter });
+                    ProbeDefinitions.Renumber();
+                    ProbeDefinitions.Save();
+                }
+
+                DataContext = model = new ProbingViewModel(DataContext as GrblViewModel);
+
+                // The dropdown lists probe definitions, filtered per tab by type: the tool setter only on
+                // Tool length; the workpiece-probing tabs (edge/centre/rotation) show 3D probe / edge finder
+                // / touch plate. Refreshed on tab change.
+                probeView = new CollectionViewSource { Source = model.ProbeDefs };
+                probeView.Filter += ProbeView_Filter;
+                cbxProbe.ItemsSource = probeView.View;
 
                 grbl.OnCameraProbe += addCameraPosition;
-
-                showDRO();
             }
+        }
+
+        private static bool ProbeValidForTab(ProbeDefinition p, ProbingType type)
+        {
+            // Tool length uses a tool setter; the workpiece-probing tabs use a 3D probe / edge finder / touch plate.
+            return type == ProbingType.ToolLength ? p.ProbeType == ProbeType.ToolSetter : p.ProbeType != ProbeType.ToolSetter;
+        }
+
+        private void ProbeView_Filter(object sender, FilterEventArgs e)
+        {
+            e.Accepted = !(e.Item is ProbeDefinition p) || model == null || ProbeValidForTab(p, model.ProbingType);
+        }
+
+        // Tell the controller which physical probe input to use for the selected definition (tool setter -> 1).
+        private void SelectControllerProbe(ProbeDefinition p)
+        {
+            if (model == null || p == null)
+                return;
+            int id = p.ProbeType == ProbeType.ToolSetter ? 1 : 0;
+            if (model.Grbl.Probe != id)
+                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, id));
+        }
+
+        // If the selected definition is not valid for the current tab, pick the first valid one.
+        private void EnsureValidProbe()
+        {
+            if (model == null)
+                return;
+
+            if (model.SelectedProbe == null || !ProbeValidForTab(model.SelectedProbe, model.ProbingType))
+                model.SelectedProbe = ProbeDefinitions.Items.FirstOrDefault(p => ProbeValidForTab(p, model.ProbingType));
+
+            SelectControllerProbe(model.SelectedProbe);
         }
 
         private void addCameraPosition(Position position)
@@ -210,12 +256,6 @@ namespace CNC.Controls.Probing
             }
         }
 
-        private void ProbingView_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            showDRO();
-            showProbeProperties();
-        }
-
         #region Methods and properties required by CNCView interface
 
         public ViewType ViewType { get { return ViewType.Probing; } }
@@ -318,46 +358,6 @@ namespace CNC.Controls.Probing
 
         #endregion
 
-        private void mnu_Click(object sender, RoutedEventArgs e)
-        {
-            switch ((string)((MenuItem)sender).Name)
-            {
-                case "mnuAdd":
-                    cbxProfile.SelectedValue = profiles.Add(cbxProfile.Text, model);                
-                    break;
-
-                case "mnuUpdate":
-                    if(model.Profile != null)
-                        profiles.Update(model.Profile.Id, cbxProfile.Text, model);
-                    break;
-
-                case "mnuDelete":
-                    if (model.Profile != null && profiles.Delete(model.Profile.Id))
-                        cbxProfile.SelectedValue = profiles.Profiles[0].Id;
-                    break;
-            }
-
-            profiles.Save();
-        }
-
-        private void btnAddProfile_Click(object sender, RoutedEventArgs e)
-        {
-            if (model.Profile == null || model.Profile.Name != cbxProfile.Text)
-            {
-                mnuAdd.IsEnabled = true;
-                mnuUpdate.IsEnabled = false;
-                mnuDelete.IsEnabled = false;
-            }
-            else
-            {
-                mnuAdd.IsEnabled = false;
-                mnuUpdate.IsEnabled = true;
-                mnuDelete.IsEnabled = model.Profiles.Count > 1;
-            }
-            cm.PlacementTarget = sender as Button;
-            cm.IsOpen = true;
-        }
-
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
             if (!(e.Handled = ProcessKeyPreview(e)))
@@ -390,6 +390,8 @@ namespace CNC.Controls.Probing
                         model.CoordinateMode = ProbingViewModel.CoordMode.G10;
                     model.AllowMeasure = false;
                     model.ProbingType = view.ProbingType;
+                    probeView?.View.Refresh();   // re-filter the probe list for the new tab
+                    EnsureValidProbe();
                     model.Message = string.Empty;
                     model.PreviewEnable = false;
 
@@ -407,47 +409,11 @@ namespace CNC.Controls.Probing
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (e.AddedItems.Count == 1 && ((ComboBox)sender).IsDropDownOpen)
-                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, ((Probe)e.AddedItems[0]).Id));
+            // SelectedItem is bound to model.SelectedProbe (copies the definition's params into the VM);
+            // here we just point the controller at the matching physical probe input.
+            if (e.AddedItems.Count == 1 && e.AddedItems[0] is ProbeDefinition p)
+                SelectControllerProbe(p);
         }
 
-        // https://stackoverflow.com/questions/5707143/how-to-get-the-width-height-of-a-collapsed-control-in-wpf
-
-        private void showProbeProperties()
-        {
-            double height;
-
-            if (probeProperties.Visibility == Visibility.Collapsed)
-            {
-                probeProperties.Visibility = Visibility.Hidden;
-                probeProperties.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                height = probeProperties.DesiredSize.Height;
-                probeProperties.Visibility = Visibility.Collapsed;
-            }
-            else
-                height = probeProperties.ActualHeight;
-
-            probeProperties.Visibility = (t1.ActualHeight - (Clearances.TranslatePoint(new Point(0, Clearances.ActualHeight), dp).Y + Position.ActualHeight) + probeProperties.ActualHeight) > height ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void showDRO()
-        {
-            double width;
-
-            if (droPanel.Visibility == Visibility.Collapsed)
-            {
-                droPanel.Visibility = Visibility.Hidden;
-                droPanel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                width = droPanel.DesiredSize.Width;
-                droPanel.Visibility = Visibility.Collapsed;
-            }
-            else
-                width = droPanel.ActualWidth;
-
-            droPanel.Visibility = (tab.ActualWidth + width + t1.ActualWidth + 20) < ActualWidth ? Visibility.Visible : Visibility.Collapsed;
-            // Let the left panel size to its content (DRO + parameters) so it scales with text size /
-            // DPI instead of being clamped to fixed 240/460 px and truncating labels.
-            dp.Width = double.NaN;
-        }
     }
 }

@@ -57,6 +57,9 @@
                             </ComboBox>
                         </StackPanel>
                         <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe far faces)" IsChecked="True" Margin="0,6,0,2" VerticalAlignment="Center"/>
+                        <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
+                                  IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                  ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
                     </StackPanel>
                 </GroupBox>
             </ScrollViewer>

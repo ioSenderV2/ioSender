@@ -32,7 +32,6 @@ namespace GCode_Sender
 
         private GrblViewModel model = null;
         private ProbingViewModel probing = null;     // the Probing engine + its view model (created lazily)
-        private ProbingProfiles profiles = null;
 
         // The map/area/grid/viewport bindings (the Probing library's sub-VM, reused).
         public HeightMapViewModel HeightMap { get; } = new HeightMapViewModel();
@@ -89,11 +88,7 @@ namespace GCode_Sender
             if (model == null)
                 return null;
             if (probing == null)
-            {
-                profiles = new ProbingProfiles();
-                profiles.Load();
-                probing = new ProbingViewModel(model, profiles);
-            }
+                probing = new ProbingViewModel(model);   // params come from the shared probe library now
             return probing;
         }
 
