@@ -56,6 +56,14 @@ namespace GCode_Sender
 
         public App()
         {
+            // Pin the resource assembly to this exe BEFORE InitializeComponent loads App.xaml (the first
+            // pack-resource access). Under the VS debugger / hosting process GetEntryAssembly() can resolve to a
+            // different assembly, so the default lookup fails to find ioSender's compiled BAML and startup dies
+            // with "Cannot locate resource 'splashwindow.xaml'". Setting it explicitly fixes that regardless of
+            // how the process was launched.
+            if (System.Windows.Application.ResourceAssembly == null)
+                System.Windows.Application.ResourceAssembly = System.Reflection.Assembly.GetExecutingAssembly();
+
             AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
             Application.Current.DispatcherUnhandledException += DispatcherOnUnhandledException;
             TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
