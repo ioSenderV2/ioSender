@@ -68,6 +68,7 @@ namespace CNC.Core
         public event DataReceivedHandler DataReceived;
 
         public Action<string> AckSink { get; set; }
+        public bool BlockingWrites { get; set; }   // Eltima writes are already synchronous; no-op here
 
 #if RESPONSELOG
         StreamWriter log = null;

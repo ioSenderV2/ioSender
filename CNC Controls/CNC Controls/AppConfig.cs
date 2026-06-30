@@ -283,6 +283,10 @@ namespace CNC.Controls
         // 2/4/... = that many times faster, 0 = as fast as the host can (motion finishes near-instantly).
         // Edit in App.config; not exposed in Settings:App yet.
         public double SimulatorSpeedup { get; set; } = 1.0;
+        // Experimental: run the job send/ack pump on a dedicated background thread (off the UI thread) so
+        // heavy UI work (3D view, grid scroll) can't stall motion. Default off; edit in App.config to try it.
+        // Falls back to the legacy UI-thread streamer for SD-card and $C check-mode jobs.
+        public bool UseStreamerThread { get; set; } = false;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;

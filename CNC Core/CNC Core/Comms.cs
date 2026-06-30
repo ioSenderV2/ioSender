@@ -90,6 +90,13 @@ namespace CNC.Core
         // not block (the handler does a non-blocking enqueue).
         Action<string> AckSink { get; set; }
 
+        // When true, multi-byte writes (WriteBytes/WriteString) are SYNCHRONOUS so back-to-back job lines
+        // from the streamer thread can't overlap (a fire-and-forget async write would throw "a write is
+        // already in progress"). The streamer sets this true for the duration of a job. Default false =
+        // the proven non-blocking path. Single-byte real-time writes (WriteByte) are unaffected and stay
+        // non-blocking, so Reset/Feed-Hold/overrides are never delayed by a streamer write.
+        bool BlockingWrites { get; set; }
+
         bool IsReconnecting { get; }
 
         void Close();

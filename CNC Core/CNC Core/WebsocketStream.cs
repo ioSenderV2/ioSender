@@ -61,6 +61,7 @@ namespace CNC.Core
         public event DataReceivedHandler DataReceived;
 
         public Action<string> AckSink { get; set; }
+        public bool BlockingWrites { get; set; }   // websocket Send is already synchronous; no-op here
 
         public WebsocketStream(string host, Dispatcher dispatcher)
         {

@@ -61,6 +61,7 @@ namespace CNC.Core
         public event DataReceivedHandler DataReceived;
 
         public Action<string> AckSink { get; set; }
+        public bool BlockingWrites { get; set; }   // network writes are already synchronous; no-op here
 
         public TelnetStream(string host, Dispatcher dispatcher)
         {

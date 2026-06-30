@@ -65,6 +65,7 @@ namespace CNC.Core
         public event DataReceivedHandler DataReceived;
 
         public Action<string> AckSink { get; set; }
+        public bool BlockingWrites { get; set; }
 
         // Raw serial log, enabled at runtime by the -debugfile <path> launch arg (Resources.DebugFile).
         // Written from the comms thread, so it survives a frozen UI - the only log available after a hang.
@@ -364,7 +365,15 @@ namespace CNC.Core
             try
             {
                 if (serialPort != null && serialPort.IsOpen)
-                    serialPort.BaseStream.WriteAsync(bytes, 0, len);
+                {
+                    // BlockingWrites (streamer-thread job lines): synchronous Write so back-to-back lines
+                    // from one thread can't overlap on the BaseStream. It blocks only the streamer thread
+                    // (desired backpressure), never the UI. Default path stays fire-and-forget WriteAsync.
+                    if (BlockingWrites)
+                        serialPort.BaseStream.Write(bytes, 0, len);
+                    else
+                        serialPort.BaseStream.WriteAsync(bytes, 0, len);
+                }
             }
             catch (Exception ex)
             {
