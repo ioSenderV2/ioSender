@@ -195,7 +195,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_edgeExtDescription" Text="Find work X/Y zero (and optionally Z) on the OUTSIDE of a workpiece. Click an edge, corner or the centre (Z) in the picker, jog the probe over the green dot, then Start. Tick Probe Z to also touch the top and set Z0. The result is applied as a coordinate-system origin (G10), a temporary offset (G92), or just measured. Probe: 3D probe or edge/touch plate."/>
+                <Run x:Uid="str_edgeExtDescription" Text="Use to re-establish X/Y zero on an already-mounted part or fixture, or to reference a specific outside edge. Click a corner for both axes, or a single face for one axis; tick Probe Z to also set Z0. Jog the probe over the green dot, then Start. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. For fresh rectangular stock, the Load Stock tab is usually faster. Probe: 3D probe or edge/touch plate."/>
                 <LineBreak/><LineBreak/>
                 <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
                 <LineBreak/><LineBreak/>

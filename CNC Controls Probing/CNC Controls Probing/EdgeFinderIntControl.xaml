@@ -178,7 +178,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_edgeIntDescription" Text="Find work X/Y zero (and optionally Z) on an INTERNAL feature - a hole, bore or pocket - by probing outward to its walls. Place the probe inside the feature, click the wall, corner or centre in the picker, then Start. Tick Probe Z to also set Z0. The result is applied as a coordinate-system origin (G10), a temporary offset (G92), or just measured. Probe: 3D probe."/>
+                <Run x:Uid="str_edgeIntDescription" Text="Use to set X/Y zero on an INTERNAL feature - a hole, bore or pocket - when the reference is a wall or corner inside the part rather than an outside edge. Place the probe inside the feature, click the wall, corner or centre, then Start. Tick Probe Z to also set Z0. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. Probe: 3D probe."/>
                 <LineBreak/><LineBreak/>
                 <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
                 <LineBreak/><LineBreak/>

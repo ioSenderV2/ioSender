@@ -58,7 +58,7 @@
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Vertical" Margin="5,0,5,0">
                     <local:CsSelectControl/>
-                    <GroupBox x:Uid="grp_workpieceOffset" Header="Workpiece offset" Margin="0,4,0,0">
+                    <GroupBox x:Uid="grp_workpieceOffset" Header="Also set work origin" ToolTip="As well as the angle, probe a second edge to find the X0,Y0 corner and set the work origin." Margin="0,4,0,0">
                         <CheckBox x:Uid="lbl_addOffset" Content="Determine X0,Y0 for right angled workpiece" ToolTip="Adds a probe point on the left edge." IsChecked="{Binding Path=AddAction, Mode=TwoWay}" Margin="5,7,0,5" VerticalAlignment="Center"/>
                     </GroupBox>
                     <GroupBox x:Uid="grp_RotationCenter" Header="Rotation center" Margin="0,4,0,0" ToolTip="Click to select rotation center relative to job, if not selected X0,Y0 is used.">
@@ -102,7 +102,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_rotationDescription" Text="Measure how far the workpiece is rotated (skewed) from the machine axes, then rotate the G-code to match - so you don't have to physically re-square the stock. Click an edge, probe two points along it; the measured angle is shown, and Apply rotates the loaded program about the chosen centre. Optionally also locates the X0,Y0 corner of a right-angled part. Probe: 3D probe or touch plate."/>
+                <Run x:Uid="str_rotationDescription" Text="Use when the workpiece is clamped at an angle (not square to the machine): this measures the skew and rotates the loaded G-code to match, so you don't have to re-clamp it square. Click an edge, probe two points along it; the angle is shown, and Apply rotates the program about the chosen centre. Tick 'Also set work origin' to also find the X0,Y0 corner in the same run. Probe: 3D probe or touch plate."/>
                 <LineBreak/><LineBreak/>
                 <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
                 <LineBreak/><LineBreak/>

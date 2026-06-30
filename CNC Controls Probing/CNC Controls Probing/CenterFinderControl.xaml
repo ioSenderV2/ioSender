@@ -110,7 +110,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_centerDescription" Text="Find and zero on the centre of a feature. Enter the nominal size, choose Inside (a bore/pocket) or Outside (a boss / round / rectangular part), position the probe near the centre, then Start - it probes opposing sides and sets the origin at the midpoint, in X, Y or both. Use more passes for higher accuracy. Probe: 3D probe or touch plate."/>
+                <Run x:Uid="str_centerDescription" Text="Use to zero on the CENTRE of a feature - round stock, a bore, a boss, or an existing hole - which a corner probe can't give you. Enter the nominal size, choose Inside (a bore/pocket) or Outside (a boss / round / rectangular part), position the probe near the centre, then Start - it probes opposing sides and sets the origin at the midpoint, in X, Y or both. More passes = higher accuracy. Probe: 3D probe or touch plate."/>
                 <LineBreak/><LineBreak/>
                 <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
                 <LineBreak/><LineBreak/>

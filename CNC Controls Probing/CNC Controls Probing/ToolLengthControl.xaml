@@ -43,7 +43,7 @@
                     <Border Margin="0,10,0,0" Visibility="{Binding Path=Grbl.IsToolOffsetActive, Converter={StaticResource IsVisibleConverter}}" Background="Salmon" HorizontalAlignment="Left" VerticalAlignment="Center" CornerRadius="2" Width="186" Height="28">
                         <Button x:Uid="lbl_clearToolOffset" Content="Clear tool length offset" HorizontalAlignment="Center" VerticalAlignment="Center" Width="180" Height="22" Click="clearToolOffset_Click"/>
                     </Border>
-                    <GroupBox x:Uid="grp_workpieceOffset" Header="Workpiece offset" Visibility="{Binding Path=ProbeFixture, Converter={StaticResource IsNotVisibleConverter}}" Margin="0,8,0,0">
+                    <GroupBox x:Uid="grp_workpieceOffset" Header="Also set work origin" ToolTip="After measuring, also set work Z0 from this touch-off on the job (using the touch-plate thickness)." Visibility="{Binding Path=ProbeFixture, Converter={StaticResource IsNotVisibleConverter}}" Margin="0,8,0,0">
                         <StackPanel>
                             <CheckBox x:Uid="lbl_addOffset" Content="Add offset" IsChecked="{Binding Path=AddAction, Mode=TwoWay}" Margin="5,7,0,5" VerticalAlignment="Center"/>
                             <local:CsSelectControl IsEnabled="{Binding Path=AddAction}" Margin="5,0,0,0"/>
@@ -70,7 +70,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_toolLengthDescription" Text="Probe Z down onto a toolsetter or touch plate to measure tool length and set the Z reference. Touch plate on the job sets work Z0 for the tool now in the spindle. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so after a tool change the new tool can be re-measured to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline that other tools measure against; Clear removes the active offset (G49). Probe: toolsetter / Z touch plate."/>
+                <Run x:Uid="str_toolLengthDescription" Text="Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."/>
                 <LineBreak/><LineBreak/>
                 <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
             </TextBlock>
