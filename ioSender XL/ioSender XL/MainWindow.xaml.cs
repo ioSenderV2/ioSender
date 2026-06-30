@@ -280,6 +280,14 @@ namespace GCode_Sender
             CNC.Controls.MacroProcessor.ActiveRun = null;
             overlayPreviewTitle.Visibility = Visibility.Collapsed;
             overlayJobTitle.Visibility = Visibility.Visible;
+
+            // Close the preview overlay rather than leave it showing the loaded job: a generated preview pops
+            // OPEN (ShowProgramPreview) as Generate feedback, so when that program is cleared (run finished, or
+            // the wizard tab left) it should pop CLOSED again - not be replaced by the loaded file/folder program.
+            _programOverlay = false;
+            if (btnProgramView != null)
+                btnProgramView.IsChecked = false;
+            UpdateOverlay();
         }
 
         // A program is just a list of G-code blocks; build one from generated text so a wizard program renders

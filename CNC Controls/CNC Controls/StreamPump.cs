@@ -38,6 +38,26 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
+    // Lightweight file tracer for diagnosing stay-put/macro streaming (Load Stock). Writes to
+    // %TEMP%\iosender-loadstock.log. Cleared at the start of each small (<200-block) run so each
+    // reproduction is self-contained; large cutting jobs are not traced (Enabled=false) to avoid bloat.
+    internal static class PumpLog
+    {
+        private static readonly object gate = new object();
+        public static bool Enabled = false;
+        public static readonly string FilePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "iosender-loadstock.log");
+
+        public static void Clear() { try { System.IO.File.WriteAllText(FilePath, string.Empty); } catch { } }
+
+        public static void W(string msg)
+        {
+            if (!Enabled)
+                return;
+            try { lock (gate) System.IO.File.AppendAllText(FilePath, DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + "\r\n"); }
+            catch { }
+        }
+    }
+
     public class StreamPump
     {
         // one in-flight line awaiting its ack; Index = -1 for the synthetic M0 a breakpoint appends
@@ -114,6 +134,11 @@ namespace CNC.Controls
             cts = new CancellationTokenSource();
             acks = new BlockingCollection<string>();
 
+            // PumpLog is enabled/cleared by MacroProcessor for stay-put macro runs (Load Stock); normal jobs leave
+            // it disabled. Just record the pump's start parameters when tracing is on.
+            PumpLog.W(string.Format("PUMP START from={0} pgmEnd={1} blocks={2} serialSize={3} useBuffering={4} sendComments={5}",
+                fromBlock, pgmEndLine, source?.Blocks, serialSize, useBuffering, sendComments));
+
             Comms.com.BlockingWrites = true;
             // Tap acks straight off the read thread. Dropped while Suspended (tool change) so jog/MDI acks
             // are not mistaken for job-line acks - they fall through to the UI path, which ignores them.
@@ -142,6 +167,7 @@ namespace CNC.Controls
         // An O-word/macro program (Load Stock) can hit this. Handled on the pump thread via the ack channel.
         public void KickIdle()
         {
+            PumpLog.W(string.Format("KICK requested  aborted={0}", aborted));
             if (!aborted && acks != null)
                 try { acks.Add(IdleKick); } catch { }
         }
@@ -185,7 +211,10 @@ namespace CNC.Controls
             while (sendIdx >= 0 && !aborted)
             {
                 if (probePending)               // hold everything while a streamed probe is in flight
+                {
+                    PumpLog.W(string.Format("HOLD barrier  sendIdx={0} inflight={1} used={2}", sendIdx, inflight.Count, serialUsed));
                     break;
+                }
 
                 GCodeBlock block = source.Data[sendIdx];
                 string line = block.Data;
@@ -216,6 +245,7 @@ namespace CNC.Controls
                     serialUsed += len;
                     inflight.Enqueue(new Sent(sendIdx, len));
                     Comms.com.WriteString(line + '\r');
+                    PumpLog.W(string.Format("SEND idx={0} len={1} used={2} inflight={3} last={4}  '{5}'", sendIdx, len, serialUsed, inflight.Count, isLast, line));
 
                     if (block.BreakAt)
                     {
@@ -233,7 +263,10 @@ namespace CNC.Controls
                     // executes). Hold the stream until the CALL has fully completed (everything outstanding acked).
                     if (line.IndexOf("G38", StringComparison.OrdinalIgnoreCase) >= 0 ||
                         line.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
                         probePending = jobHasProbe = true;
+                        PumpLog.W(string.Format("BARRIER set @idx={0}", sendIdx));
+                    }
 
                     sendIdx = isLast ? -1 : sendIdx + 1;
 
@@ -241,7 +274,10 @@ namespace CNC.Controls
                         break;
                 }
                 else
+                {
+                    PumpLog.W(string.Format("HOLD bufferfull sendIdx={0} used={1} need={2} inflight={3}", sendIdx, serialUsed, serialSize - len, inflight.Count));
                     break;                          // buffer full / probe look-ahead cap reached
+                }
             }
         }
 
@@ -255,10 +291,15 @@ namespace CNC.Controls
             if (serialUsed < 0)
                 serialUsed = 0;
 
+            PumpLog.W(string.Format("ACK  idx={0} used={1} inflight={2} sendIdx={3} barrier={4}  '{5}'", s.Index, serialUsed, inflight.Count, sendIdx, probePending, ack));
+
             // probe barrier clears once everything outstanding (including the G38, whose ok arrives only after
             // the probe finishes) has been acked.
             if (probePending && inflight.Count == 0)
+            {
                 probePending = false;
+                PumpLog.W("BARRIER clear");
+            }
 
             if (s.Index >= 0)                        // a real program line (not the synthetic M0)
             {
@@ -279,6 +320,7 @@ namespace CNC.Controls
 
             if (sendIdx < 0 && inflight.Count == 0)  // everything sent and acked
             {
+                PumpLog.W("JOB FINISHED (all sent+acked)");
                 aborted = true;
                 dispatcher.BeginInvoke(onJobFinished);
                 return;
@@ -291,6 +333,7 @@ namespace CNC.Controls
         // controller has drained its buffer, so any serialUsed/inflight left is from acks we never saw.
         private void OnIdleKick()
         {
+            PumpLog.W(string.Format("KICK handled  sendIdx={0} inflight={1} used={2} barrier={3} aborted={4}", sendIdx, inflight.Count, serialUsed, probePending, aborted));
             if (aborted)
                 return;
 

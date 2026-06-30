@@ -137,6 +137,14 @@ namespace CNC.Controls
             _streamName = name;
             _stayPut = stayPut;   // route any streamed flush through the in-place (stay-on-tab + restore) path
 
+            // Trace stay-put macro runs (Load Stock) to %TEMP%\iosender-loadstock.log for diagnosis.
+            PumpLog.Enabled = stayPut;
+            if (stayPut)
+            {
+                PumpLog.Clear();
+                PumpLog.W("RUN START name=" + name);
+            }
+
             // A macro whose body is a single "@<path>" line is a reference to an external file;
             // load and run that file's current contents (re-read every run, so the macro can be
             // developed by editing the file - no copy/paste back into ioSender).
@@ -332,6 +340,9 @@ namespace CNC.Controls
             // buffer outstanding, so realtime commands take effect at once and the UI stays live. No-motion
             // setup bursts (a few G10/G54/#-set lines between prompts) stay on the quick MDI path.
             bool mustStream = canStream && (hasFeed || hasCall || n > StreamLineThreshold);
+
+            PumpLog.W(string.Format("FLUSH n={0} hasCall={1} hasFeed={2} hasOwordOrExpr={3} exprSupported={4} canStream={5} mustStream={6} stayPut={7}",
+                n, hasCall, hasFeed, hasOwordOrExpr, GrblInfo.ExpressionsSupported, canStream, mustStream, _stayPut));
 
             if (mustStream)
             {

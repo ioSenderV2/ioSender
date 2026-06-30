@@ -683,6 +683,7 @@ namespace CNC.Controls
         // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.
         private void OnPumpJobFinished()
         {
+            PumpLog.W("OnPumpJobFinished -> JobFinished, state=" + grblState.State);
             pumpActive = false;
             streamingHandler.Count = false;   // pump owned flow control; stop legacy line accounting so a late/trailing response can't re-enter it
             streamingHandler.Call(StreamingState.JobFinished, true);
@@ -722,6 +723,7 @@ namespace CNC.Controls
                 idleKickTimer.Tick += (s, e) =>
                 {
                     idleKickTimer.Stop();
+                    PumpLog.W(string.Format("IDLEKICK timer fire  pumpActive={0} state={1}", pumpActive, grblState.State));
                     if (pumpActive && grblState.State == GrblStates.Idle)
                         pump?.KickIdle();
                 };
@@ -1223,6 +1225,9 @@ namespace CNC.Controls
             // M2) is never sent and the run never finalises. Arm a short timer whenever the controller goes idle
             // mid-pump; if it's still idle when it fires, nudge the pump (KickIdle) to resume/finish. Cancel on
             // any non-idle report so it never fires during real motion.
+            if (pumpActive || JobTimer.IsRunning)
+                PumpLog.W(string.Format("STATE {0} (sub {1})  pumpActive={2} streamingState={3}", newstate.State, newstate.Substate, pumpActive, streamingState));
+
             if (newstate.State != GrblStates.Idle)
                 idleKickTimer?.Stop();
             else if (pumpActive)
