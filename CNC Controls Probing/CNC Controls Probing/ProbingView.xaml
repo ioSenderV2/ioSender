@@ -54,7 +54,7 @@
                 <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
                 <!-- ItemsSource is a per-tab filtered view set in code (by ProbeType). Selecting a definition
                      copies its parameters into the view model (SelectedProbe setter). -->
-                <ComboBox x:Name="cbxProbe" Width="200" Height="22" VerticalAlignment="Center" Margin="4,0,0,0"
+                <ComboBox x:Name="cbxProbe" MinWidth="200" MinHeight="22" VerticalAlignment="Center" Margin="4,0,0,0"
                           DisplayMemberPath="Name" SelectedItem="{Binding Path=SelectedProbe, Mode=TwoWay}"
                           IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                           SelectionChanged="cbxProbe_SelectionChanged"/>
