@@ -58,10 +58,6 @@ namespace CNC.Core
         private readonly Reconnector reconnector;
         private volatile bool closing = false;
 
-        // Serialises all writes: the UI thread (real-time bytes, MDI), the streamer thread (job lines)
-        // and the poll timer all write concurrently. Keeps each line/command atomic on the stream.
-        private readonly object writeLock = new object();
-
         public event DataReceivedHandler DataReceived;
 
         public Action<string> AckSink { get; set; }
@@ -218,11 +214,8 @@ namespace CNC.Core
         {
             try
             {
-                lock (writeLock)
-                {
-                    if (ipstream != null && IsOpen)
-                        ipstream.Write(new byte[1] { data }, 0, 1);
-                }
+                if (ipstream != null && IsOpen)
+                    ipstream.Write(new byte[1] { data }, 0, 1);
             }
             catch (Exception ex)
             {
@@ -234,11 +227,8 @@ namespace CNC.Core
         {
             try
             {
-                lock (writeLock)
-                {
-                    if (ipstream != null && IsOpen)
-                        ipstream.Write(bytes, 0, len);
-                }
+                if (ipstream != null && IsOpen)
+                    ipstream.Write(bytes, 0, len);
             }
             catch (Exception ex)
             {

@@ -57,12 +57,6 @@ namespace CNC.Core
         private volatile Comms.State state = Comms.State.ACK;
         private Dispatcher Dispatcher { get; set; }
 
-        // Serialises all writes to the port. Three threads now write concurrently: the UI thread
-        // (real-time bytes, MDI), the streamer thread (job lines), and the poll timer (status-report
-        // byte). Without this a status byte can splice into the middle of a job line. Reads are
-        // independent (full duplex) and guarded separately by lock(input).
-        private readonly object writeLock = new object();
-
         private readonly string portParams;
         private readonly string portName;
         private readonly int resetDelay;
@@ -356,11 +350,8 @@ namespace CNC.Core
         {
             try
             {
-                lock (writeLock)
-                {
-                    if (serialPort != null && serialPort.IsOpen)
-                        serialPort.BaseStream.Write(new byte[1] { data }, 0, 1);
-                }
+                if (serialPort != null && serialPort.IsOpen)
+                    serialPort.BaseStream.Write(new byte[1] { data }, 0, 1);
             }
             catch (Exception ex)
             {
@@ -372,15 +363,8 @@ namespace CNC.Core
         {
             try
             {
-                // Synchronous Write (not WriteAsync): with concurrent writers a fire-and-forget
-                // WriteAsync would let two writes overlap on the BaseStream ("a write is already in
-                // progress"), splicing bytes. Holding writeLock around a synchronous write keeps each
-                // line/command atomic. It returns as soon as the OS buffers the bytes.
-                lock (writeLock)
-                {
-                    if (serialPort != null && serialPort.IsOpen)
-                        serialPort.BaseStream.Write(bytes, 0, len);
-                }
+                if (serialPort != null && serialPort.IsOpen)
+                    serialPort.BaseStream.WriteAsync(bytes, 0, len);
             }
             catch (Exception ex)
             {
@@ -416,11 +400,8 @@ namespace CNC.Core
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(command);
                 try
                 {
-                    lock (writeLock)
-                    {
-                        if (serialPort != null && serialPort.IsOpen)
-                            serialPort.BaseStream.Write(bytes, 0, bytes.Length);
-                    }
+                    if (serialPort != null && serialPort.IsOpen)
+                        serialPort.BaseStream.Write(bytes, 0, bytes.Length);
                 }
                 catch (Exception ex)
                 {
