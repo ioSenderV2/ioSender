@@ -58,6 +58,10 @@ namespace CNC.Core
         private readonly Reconnector reconnector;
         private volatile bool closing = false;
 
+        // Serialises all writes: the UI thread (real-time bytes, MDI), the streamer thread (job lines)
+        // and the poll timer all write concurrently. Keeps each line/command atomic on the socket.
+        private readonly object writeLock = new object();
+
         public event DataReceivedHandler DataReceived;
 
         public WebsocketStream(string host, Dispatcher dispatcher)
@@ -164,8 +168,11 @@ namespace CNC.Core
         {
             try
             {
-                if (websocket != null && IsOpen)
-                    websocket.Send(new byte[1] { data });
+                lock (writeLock)
+                {
+                    if (websocket != null && IsOpen)
+                        websocket.Send(new byte[1] { data });
+                }
             }
             catch (Exception ex)
             {
@@ -177,8 +184,11 @@ namespace CNC.Core
         {
             try
             {
-                if (websocket != null && IsOpen)
-                    websocket.Send(bytes);
+                lock (writeLock)
+                {
+                    if (websocket != null && IsOpen)
+                        websocket.Send(bytes);
+                }
             }
             catch (Exception ex)
             {

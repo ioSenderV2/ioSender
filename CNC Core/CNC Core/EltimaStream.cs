@@ -56,6 +56,11 @@ namespace CNC.Core
         private StringBuilder input = new StringBuilder(400);
         private volatile Comms.State state = Comms.State.ACK;
         private Dispatcher Dispatcher { get; set; }
+
+        // Serialises all writes: the UI thread (real-time bytes, MDI), the streamer thread (job lines)
+        // and the poll timer all write concurrently. Keeps each line/command atomic on the port.
+        private readonly object writeLock = new object();
+
         public bool EventMode { get; set; } = true;
         public Action<int> ByteReceived { get; set; }
 
@@ -246,17 +251,20 @@ namespace CNC.Core
 
         public void WriteByte(byte data)
         {
-            serialPort.Write(ref data, 1);
+            lock (writeLock)
+                serialPort.Write(ref data, 1);
         }
 
         public void WriteBytes(byte[] bytes, int len)
         {
-            serialPort.Write(ref bytes[0], len);
+            lock (writeLock)
+                serialPort.Write(ref bytes[0], len);
         }
 
         public void WriteString(string data)
         {
-            serialPort.WriteStr(data);
+            lock (writeLock)
+                serialPort.WriteStr(data);
 #if RESPONSELOG
             log.WriteLine(data);
             log.Flush();
@@ -272,7 +280,8 @@ namespace CNC.Core
             else
             {
                 command += "\r";
-                serialPort.WriteStr(command);
+                lock (writeLock)
+                    serialPort.WriteStr(command);
             }
         }
 
