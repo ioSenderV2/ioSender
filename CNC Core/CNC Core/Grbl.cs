@@ -1056,6 +1056,10 @@ namespace CNC.Core
             private set { _forceSetOrigin = value; }
         }
         public static bool ExpressionsSupported { get; private set; } = false;
+        // Coordinate-system rotation (G68/G69, G10 L2 P.. R<deg>) - firmware built with ROTATION_ENABLE, reported
+        // as "WCSROT" in $I [NEWOPT:..]. Used to gate the Load Stock skew->WCS rotation so it is never emitted on
+        // firmware that would reject the R word with error:20.
+        public static bool RotationSupported { get; private set; } = false;
         public static int NumAxes
         {
             get { return _numAxes; }
@@ -1448,7 +1452,7 @@ namespace CNC.Core
 
                     case "NEWOPT":
                         NewOptions = valuepair[1];
-                        HasATC = AtcMacrosRequired = HasYModem = false;   // re-evaluated from this $I's flags below
+                        HasATC = AtcMacrosRequired = HasYModem = RotationSupported = false;   // re-evaluated from this $I's flags below
                         string[] s2 = valuepair[1].Split(',');
                         foreach (string value in s2)
                         {
@@ -1475,6 +1479,10 @@ namespace CNC.Core
 
                                     case "EXPR":
                                         ExpressionsSupported = true;
+                                        break;
+
+                                    case "WCSROT":
+                                        RotationSupported = true;
                                         break;
 
                                     case "TC":

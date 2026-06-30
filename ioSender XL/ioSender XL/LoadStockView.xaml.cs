@@ -106,6 +106,9 @@ namespace GCode_Sender
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/corner/options
                 Subscribe(true);
                 UpdateExpressionWarning();
+                // Only offer the skew->WCS rotation when the controller supports it (reports WCSROT in $I): on
+                // firmware without ROTATION_ENABLE the G10 L2 R word errors:20, so hide the option entirely.
+                chkRotate.Visibility = GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
                 UpdateDrawing();
                 MacroProcessor.SetActiveProgram?.Invoke("Load stock", program);   // Program View shows our program
                 MacroProcessor.ActiveRun = () => Run_Click(null, null);            // Cycle Start runs it
@@ -711,7 +714,10 @@ namespace GCode_Sender
             // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
             // Emitted only when the user asked for it; positioned last so that if the firmware lacks ROTATION_ENABLE
             // (error:20) the worst case is "no rotation" - the origin is already set and the machine already parked.
-            if (measure && applyRotation)
+            // Only emit the rotation when the controller actually supports it (reports WCSROT in $I): on firmware
+            // without ROTATION_ENABLE the G10 L2 R word errors:20, so gating it here means the R line is never sent
+            // to a controller that would reject it - Load Stock always completes, with rotation when available.
+            if (measure && applyRotation && GrblInfo.RotationSupported)
             {
                 L("#<rot> = ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
                 L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
