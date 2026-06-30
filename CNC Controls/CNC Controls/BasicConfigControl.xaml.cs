@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
 using System.Windows.Controls;
 
 namespace CNC.Controls
@@ -44,11 +45,22 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for BasicConfigControl.xaml
     /// </summary>
-    public partial class BasicConfigControl : UserControl
+    public partial class BasicConfigControl : UserControl, IRestartRequired
     {
+        public event EventHandler<RestartRequiredEventArgs> RestartRequired;
+
         public BasicConfigControl()
         {
             InitializeComponent();
+
+            // Max buffer size (streamer flow-control window) is latched once at job-view init, and reset delay is
+            // captured into the serial stream at connect - both only take effect at startup, so a change needs a
+            // restart. The other basic settings here are applied live / on next use.
+            if (AppConfig.Settings.Base != null)
+                AppConfig.Settings.Base.PropertyChanged += (s, e) => {
+                    if (e.PropertyName == nameof(Config.MaxBufferSize) || e.PropertyName == nameof(Config.ResetDelay))
+                        RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply the buffer/reset-delay change."));
+                };
         }
     }
 }

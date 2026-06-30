@@ -121,6 +121,18 @@ namespace CNC.Controls
                     if (e.PropertyName == nameof(Config.AutoSaveSettings))
                         UpdateSaveButtonVisibility();
                 };
+
+                // Any settings panel that flags a restart-only change (IRestartRequired) lights up the Restart
+                // button. Each panel owns that knowledge for its own settings, so a new feature needs no edit
+                // here. Hook the panels present now plus any added later (the viewer/camera/probing panels are
+                // added to ConfigControls from their own code, possibly after this Setup runs).
+                foreach (var c in model.ConfigControls)
+                    HookRestart(c);
+                model.ConfigControls.CollectionChanged += (s, e) => {
+                    if (e.NewItems != null)
+                        foreach (var c in e.NewItems.OfType<UserControl>())
+                            HookRestart(c);
+                };
             }
         }
 
@@ -174,12 +186,24 @@ namespace CNC.Controls
             {
                 AppConfig.Settings.Save();
                 if (dlg.Changed)
-                {
-                    // A layout/tab change needs a restart - enable the Restart button and flag it in the status line.
-                    btnRestart.IsEnabled = true;
-                    Grbl.GrblViewModel.Message = "Restart required to apply main page / tab layout changes.";
-                }
+                    EnableRestart("Restart required to apply main page / tab layout changes.");
             }
+        }
+
+        // Surface the Restart button (relaunch to apply) for a setting that only takes effect at startup. Shown
+        // even when the layout editor is unavailable, so a restart-only change always has an affordance.
+        private void EnableRestart(string message)
+        {
+            btnRestart.Visibility = Visibility.Visible;
+            btnRestart.IsEnabled = true;
+            Grbl.GrblViewModel.Message = message;
+        }
+
+        private readonly HashSet<object> restartHooked = new HashSet<object>();
+        private void HookRestart(UserControl c)
+        {
+            if (c is IRestartRequired rr && restartHooked.Add(c))
+                rr.RestartRequired += (s, e) => EnableRestart(e.Message);
         }
 
         private void btnRestart_Click(object sender, RoutedEventArgs e)

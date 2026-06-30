@@ -44,6 +44,22 @@ namespace CNC.Controls
         IEnumerable<SettingsPanelDescriptor> GetSettingsPanels();
     }
 
+    public class RestartRequiredEventArgs : EventArgs
+    {
+        public string Message { get; }
+        public RestartRequiredEventArgs(string message) { Message = message; }
+    }
+
+    // A Settings:App panel implements this to declare that one of its settings only takes effect at startup,
+    // so changing it needs an app restart. The panel raises RestartRequired (with a reason) when such a setting
+    // changes; AppConfigView then surfaces the Restart button. This keeps the "needs restart" knowledge with the
+    // feature that owns the setting, and is precise - a panel raises it only for its restart-only settings, not
+    // its live ones. Works whether the panel is added via the registry or directly to UIViewModel.ConfigControls.
+    public interface IRestartRequired
+    {
+        event EventHandler<RestartRequiredEventArgs> RestartRequired;
+    }
+
     public static class SettingsPanelRegistry
     {
         private static readonly List<SettingsPanelDescriptor> _explicit = new List<SettingsPanelDescriptor>();

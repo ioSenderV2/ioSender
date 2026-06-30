@@ -240,7 +240,7 @@ namespace CNC.Controls
     [Serializable]
     public class Config : ViewModelBase
     {
-        private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300;
+        private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _preferNetwork = false;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
@@ -273,7 +273,7 @@ namespace CNC.Controls
         // When set, after a serial/USB connection whose $I reports an IP, ioSender probes <ip>:23 and, if it
         // answers, automatically switches the connection to the network (status line: "Connection migrated...").
         public bool PreferNetwork { get { return _preferNetwork; } set { if (_preferNetwork != value) { _preferNetwork = value; OnPropertyChanged(); } } }
-        public int ResetDelay { get; set; } = 2000;
+        public int ResetDelay { get { return _resetDelay; } set { _resetDelay = value; OnPropertyChanged(); } }
         // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch
         // it first (a 127.0.0.1:port target is otherwise indistinguishable from a real network controller).
         public bool StartSimulator { get; set; } = false;

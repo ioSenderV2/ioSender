@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
 using System.Windows.Controls;
 
 namespace CNC.Controls.Viewer
@@ -44,11 +45,22 @@ namespace CNC.Controls.Viewer
     /// <summary>
     /// Interaction logic for ConfigControl.xaml
     /// </summary>
-    public partial class ConfigControl : UserControl
+    public partial class ConfigControl : UserControl, IRestartRequired
     {
+        public event EventHandler<RestartRequiredEventArgs> RestartRequired;
+
         public ConfigControl()
         {
             InitializeComponent();
+
+            // Enabling/disabling the 3D view adds/removes a tab, applied only at startup - so that change needs a
+            // restart. The other viewer settings here (grid/axes/colours/tool/...) are applied live by the
+            // renderer, so they don't - only IsEnabled raises the restart cue.
+            if (AppConfig.Settings.GCodeViewer != null)
+                AppConfig.Settings.GCodeViewer.PropertyChanged += (s, e) => {
+                    if (e.PropertyName == nameof(GCodeViewerConfig.IsEnabled))
+                        RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply the 3D view enable/disable."));
+                };
         }
     }
 }
