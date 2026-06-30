@@ -69,6 +69,7 @@ namespace CNC.Controls
         private BlockingCollection<string> acks;
         private CancellationTokenSource cts;
         private volatile bool aborted;
+        private int ackCount;           // diagnostics: report buffer fill every N acks
 
         // ---- cross-thread state ----
         public volatile int PendingLine;    // last acked real line - read by JobControl for the tool-change boundary
@@ -100,6 +101,7 @@ namespace CNC.Controls
             sendIdx = fromBlock;
             this.pgmEndLine = pgmEndLine;
             serialUsed = 0;
+            ackCount = 0;
             started = probePending = jobHasProbe = false;
             inflight.Clear();
             while (sentMarks.TryDequeue(out _)) { }
@@ -261,6 +263,17 @@ namespace CNC.Controls
             }
 
             SendNext();
+
+            // Diagnostics: report controller-buffer fill periodically. If 'buf' stays near serialSize during a
+            // stutter, the sender is keeping up and the controller/G-code is the bottleneck; if it sits near 0,
+            // the stream is starving. Coarse (every 250 acks) to avoid flooding the console.
+            if (++ackCount % 250 == 0)
+            {
+                int buf = serialUsed, q = inflight.Count, idx = sendIdx;
+                dispatcher.BeginInvoke((System.Action)(() =>
+                    model.ResponseLog.Add("[pump] buf " + buf + "/" + serialSize + " q" + q + " line " + idx)),
+                    DispatcherPriority.Background);
+            }
         }
 
         // ---- display marshaling (coalesced, Background priority) ----

@@ -661,7 +661,9 @@ namespace CNC.Controls
 
                     // Experimental: drive the send/ack flow control from a background thread so UI load can't
                     // stall motion. Falls back to the UI-thread streamer for check mode (distinct accounting).
-                    if (AppConfig.Settings.Base.UseStreamerThread && !job.IsChecking)
+                    bool usePump = AppConfig.Settings.Base.UseStreamerThread && !job.IsChecking;
+                    model.ResponseLog.Add(usePump ? "[stream] pump thread" : "[stream] UI thread (legacy)");
+                    if (usePump)
                     {
                         if (pump == null)
                             pump = new StreamPump(model, Dispatcher);
