@@ -85,4 +85,16 @@
     <system:String x:Uid="str_hmLoadTitle" x:Key="HmLoadTitle">Load height map</system:String>
     <system:String x:Uid="str_hmFileFilter" x:Key="HmFileFilter">Height map files (*.map)|*.map|All files (*.*)|*.*</system:String>
     <system:String x:Uid="str_readyCycleStart" x:Key="ReadyCycleStart">{0} ready - press Cycle Start to run.</system:String>
+    <!-- Surface spoilboard wizard messages. -->
+    <system:String x:Uid="str_sbOverlapHigh" x:Key="SbOverlapHigh">Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.</system:String>
+    <system:String x:Uid="str_sbNoTravel" x:Key="SbNoTravel">Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first.</system:String>
+    <system:String x:Uid="str_sbNoArea" x:Key="SbNoArea">Set the area width and height first (they default to the machine travel envelope).</system:String>
+    <system:String x:Uid="str_sbRpmHigh" x:Key="SbRpmHigh">Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?</system:String>
+    <!-- Auto square wizard messages. -->
+    <system:String x:Uid="str_asNoTravel" x:Key="AsNoTravel">Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.</system:String>
+    <system:String x:Uid="str_asNoOffset" x:Key="AsNoOffset">No auto-square offset setting on this controller.</system:String>
+    <system:String x:Uid="str_asCaution" x:Key="AsCaution">\n\nCAUTION: {0:0.0} mm is a lot of offset - on a rigid gantry it will rack the frame and may bind. If so, the gantry is mechanically out of square (Y rails out of phase) and must be corrected there first.</system:String>
+    <system:String x:Uid="str_asChangeConfirm" x:Key="AsChangeConfirm">Change {0} (${1}) from {2} to {3} mm, then re-home to apply?{4}\n\nIf the gantry is LESS square after re-homing, enter the gap with the opposite sign and apply again (the firmware's sign convention is build-specific).</system:String>
+    <system:String x:Uid="str_asWriteFailed" x:Key="AsWriteFailed">Could not write ${0}. If the controller reported "setting not available", the {1} axis is not the ganged / auto-squared one - select the correct Ganged axis and try again.</system:String>
+    <system:String x:Uid="str_asHomeNow" x:Key="AsHomeNow">Home the machine now (required to apply the new squaring offset)?</system:String>
 </ResourceDictionary>

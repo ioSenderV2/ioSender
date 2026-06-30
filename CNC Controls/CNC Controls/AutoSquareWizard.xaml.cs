@@ -439,8 +439,7 @@ namespace CNC.Controls
                 return;
             if (XLeg() <= 0d || YLeg() <= 0d)
             {
-                MessageBox.Show("Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.",
-                                "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("AsNoTravel"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
@@ -467,7 +466,7 @@ namespace CNC.Controls
         {
             if (_offset == null)
             {
-                MessageBox.Show("No auto-square offset setting on this controller.", "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (Math.Abs(MeasuredGap) <= 0d || XLeg() <= 0d)
@@ -475,10 +474,9 @@ namespace CNC.Controls
 
             double newVal = NewOffset;   // already clamped to the setting range in UpdateComputed
             string caution = Math.Abs(newVal) > LargeOffsetWarn
-                ? string.Format("\n\nCAUTION: {0:0.0} mm is a lot of offset - on a rigid gantry it will rack the frame and may bind. If so, the gantry is mechanically out of square (Y rails out of phase) and must be corrected there first.", newVal)
+                ? string.Format(Loc("AsCaution"), newVal)
                 : string.Empty;
-            if (MessageBox.Show(string.Format(
-                    "Change {0} (${1}) from {2} to {3} mm, then re-home to apply?{4}\n\nIf the gantry is LESS square after re-homing, enter the gap with the opposite sign and apply again (the firmware's sign convention is build-specific).",
+            if (MessageBox.Show(string.Format(Loc("AsChangeConfirm"),
                     _offset.Name, _offset.Id, F(CurrentOffset), F(newVal), caution),
                     "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                 return;
@@ -493,7 +491,7 @@ namespace CNC.Controls
                 ReHome();
             }
             else
-                MessageBox.Show(string.Format("Could not write ${0}. If the controller reported \"setting not available\", the {1} axis is not the ganged / auto-squared one - select the correct Ganged axis and try again.", _offset.Id, "XYZ"[_gangedAxis]),
+                MessageBox.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
                                 "Auto square", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
@@ -501,10 +499,13 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
-            if (MessageBox.Show("Home the machine now (required to apply the new squaring offset)?",
+            if (MessageBox.Show(Loc("AsHomeNow"),
                     "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
                 model.ExecuteCommand("$H");
         }
+
+        // Localized message via LibStrings, with \n expanded to real newlines.
+        private static string Loc(string key) => LibStrings.FindResource(key).Replace("\\n", "\n");
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {

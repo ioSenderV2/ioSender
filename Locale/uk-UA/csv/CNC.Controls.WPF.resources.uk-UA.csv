@@ -805,3 +805,13 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSaveTitle:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmLoadTitle:System.String.$Content,None,True,True,,Load height map
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmFileFilter:System.String.$Content,None,True,True,,Height map files (*.map)|*.map|All files (*.*)|*.*
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_readyCycleStart:System.String.$Content,None,True,True,,{0} ready - press Cycle Start to run.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbOverlapHigh:System.String.$Content,None,True,True,,Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoTravel:System.String.$Content,None,True,True,,"Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoArea:System.String.$Content,None,True,True,,Set the area width and height first (they default to the machine travel envelope).
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbRpmHigh:System.String.$Content,None,True,True,,Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoTravel:System.String.$Content,None,True,True,,Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoOffset:System.String.$Content,None,True,True,,No auto-square offset setting on this controller.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asCaution:System.String.$Content,None,True,True,,"\n\nCAUTION: {0:0.0} mm is a lot of offset - on a rigid gantry it will rack the frame and may bind. If so, the gantry is mechanically out of square (Y rails out of phase) and must be corrected there first."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asChangeConfirm:System.String.$Content,None,True,True,,"Change {0} (${1}) from {2} to {3} mm, then re-home to apply?{4}\n\nIf the gantry is LESS square after re-homing, enter the gap with the opposite sign and apply again (the firmware's sign convention is build-specific)."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asWriteFailed:System.String.$Content,None,True,True,,"Could not write ${0}. If the controller reported ""setting not available"", the {1} axis is not the ganged / auto-squared one - select the correct Ganged axis and try again."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asHomeNow:System.String.$Content,None,True,True,,Home the machine now (required to apply the new squaring offset)?

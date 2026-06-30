@@ -474,25 +474,22 @@ namespace CNC.Controls
 
             if (StepoverMM() <= 0d)
             {
-                MessageBox.Show("Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.",
-                                "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("SbOverlapHigh"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (MaxArea(0) <= 0d || MaxArea(1) <= 0d)
             {
-                MessageBox.Show("Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first.",
-                                "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("SbNoTravel"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             DefaultArea();   // fill / clamp the area to the in-bounds envelope
             if (WidthMM <= 0d || HeightMM <= 0d)
             {
-                MessageBox.Show("Set the area width and height first (they default to the machine travel envelope).",
-                                "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("SbNoArea"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!(DryRun || OutlineOnly) && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
-                MessageBox.Show(string.Format("Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?", SpindleRPM, BitMaxRPM),
+                MessageBox.Show(string.Format(Loc("SbRpmHigh"), SpindleRPM, BitMaxRPM),
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 
@@ -500,6 +497,9 @@ namespace CNC.Controls
             program = string.Join("\r\n", BuildProgram());
             MacroProcessor.ProgramPreview?.Invoke("Surface spoilboard", program);
         }
+
+        // Localized message via LibStrings, with \n expanded to real newlines.
+        private static string Loc(string key) => LibStrings.FindResource(key).Replace("\\n", "\n");
 
         private void cbxTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

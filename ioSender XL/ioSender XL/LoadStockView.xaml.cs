@@ -503,7 +503,7 @@ namespace GCode_Sender
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
             {
-                MessageBox.Show("Select a probe definition first (Machine Setup Wizard > Probe definitions).",
+                MessageBox.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
                     "Load stock", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
