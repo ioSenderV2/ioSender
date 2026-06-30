@@ -492,6 +492,15 @@ namespace GCode_Sender
                     GCode.File.Load(AppConfig.Settings.FileName);
                 }));
             }
+            else if (!string.IsNullOrEmpty(AppConfig.Settings.FolderName))
+            {
+                // --LoadFolder: combine the folder of per-toolpath files on startup (Restore-Fusion-rapids
+                // honours the App setting; no prompt on the unattended startup path).
+                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new System.Action(() =>
+                {
+                    GCode.File.LoadFolder(AppConfig.Settings.FolderName, AppConfig.Settings.Base.RestoreFusionRapids);
+                }));
+            }
 
             IGCodeConverter c = new Excellon2GCode();
             GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);

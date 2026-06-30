@@ -243,7 +243,7 @@ namespace CNC.Controls
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _preferNetwork = false;
-        private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
+        private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true, _restoreFusionRapids = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -265,6 +265,9 @@ namespace CNC.Controls
         // clears any fixtures/stock standing up in Z instead of cutting a diagonal. Needs homing + soft limits;
         // falls back to a single move otherwise.
         public bool SafeGotoZ { get { return _safeGotoZ; } set { _safeGotoZ = value; OnPropertyChanged(); } }
+        // Load Folder: always restore the rapid moves Fusion 360 Personal Edition downgrades to feed moves
+        // (G1 -> G0), without prompting each time. Also used for a --LoadFolder startup load.
+        public bool RestoreFusionRapids { get { return _restoreFusionRapids; } set { _restoreFusionRapids = value; OnPropertyChanged(); } }
         public string PortParams { get; set; } = "COMn:115200,N,8,1";
         // Default host for the Connect dialog's network tab: the most recent IP successfully connected to.
         // Empty until first set - seeded from the controller's $I-reported IP on a serial connection, then
@@ -398,6 +401,8 @@ namespace CNC.Controls
         private string _startupPort = string.Empty, _startupBaud = string.Empty;
 
         public string FileName { get; private set; }
+        // Folder of per-toolpath .nc files to preload on startup (--LoadFolder). Transient (CLI only).
+        public string FolderName { get; private set; }
 
         private static readonly Lazy<AppConfig> settings = new Lazy<AppConfig>(() => new AppConfig());
 
@@ -746,6 +751,24 @@ namespace CNC.Controls
                     case "-islegacy":
                         CNC.Core.Resources.IsLegacyController = true;
                         break;
+
+                    // Preload a program on startup: --LoadFile <path> opens a single g-code file,
+                    // --LoadFolder <path> combines a folder of per-toolpath .nc files (as Load Folder does).
+                    case "--loadfile":
+                        {
+                            var f = GetArg(args, p++);
+                            if (!string.IsNullOrEmpty(f) && File.Exists(f))
+                                FileName = f;
+                            break;
+                        }
+
+                    case "--loadfolder":
+                        {
+                            var d = GetArg(args, p++);
+                            if (!string.IsNullOrEmpty(d) && Directory.Exists(d))
+                                FolderName = d;
+                            break;
+                        }
 
                     default:
                         if (!args[p - 1].EndsWith(".exe") && File.Exists(args[p - 1]))

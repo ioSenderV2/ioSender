@@ -323,7 +323,8 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(folder))
                 return;
 
-            bool restoreRapids = MessageBox.Show(
+            // When the App setting is on, always restore rapids without asking; otherwise prompt per load.
+            bool restoreRapids = AppConfig.Settings.Base.RestoreFusionRapids || MessageBox.Show(
                 "Restore rapid moves that Fusion Personal Use downgraded to feed moves (G1 → G0)?",
                 "Load Folder", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
 
