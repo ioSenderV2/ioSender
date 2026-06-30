@@ -267,7 +267,8 @@ def _apply_stock_to_setup(setup, x_mm, y_mm, z_mm):
     except Exception as ex:
         return 'no setup parameters (%s)' % ex
 
-    results = []
+    detail = []
+    failed = [False]
 
     def _get(name):
         try:
@@ -279,32 +280,36 @@ def _apply_stock_to_setup(setup, x_mm, y_mm, z_mm):
         try:
             p = prm.itemByName(name)
             if p is None:
-                results.append('%s: missing' % name)
+                detail.append('%s: missing' % name)
+                failed[0] = True
                 return False
             p.expression = expr
-            results.append('%s := %s' % (name, expr))
+            detail.append('%s := %s' % (name, expr))
             return True
         except Exception as ex:
-            results.append('%s FAILED(%s): %s' % (name, expr, ex))
+            detail.append('%s FAILED(%s): %s' % (name, expr, ex))
+            failed[0] = True
             return False
 
-    # The fixed-box dimension parameters (these set cleanly).
+    # The fixed-box dimension parameters.
     _set('job_stockFixedX', '%g mm' % x_mm)
     _set('job_stockFixedY', '%g mm' % y_mm)
     if z_mm is not None:
         _set('job_stockFixedZ', '%g mm' % z_mm)
 
-    # Ensure "fixed size box" mode so the dims above are absolute (not relative to the model). The enum id
-    # varies; report the current value (a valid id, so we learn the naming) and try known candidates until
-    # one is accepted. If the setup is already a fixed box the dims alone are enough.
+    # Ensure "fixed size box" mode so the dims are absolute. 'fixedbox' is the confirmed id; if the setup is
+    # already a fixed box no change is needed. Other candidates are a fallback for older/odd Fusion versions.
     cur = _get('job_stockMode')
-    results.append('job_stockMode current=%r' % cur)
     if cur not in ('fixedbox', 'fixed', 'mode_fixedbox'):
-        for cand in ('fixedbox', 'fixed', 'fixedsizebox', 'fixedsize', 'box_fixed', 'mode_fixedbox'):
-            if _set('job_stockMode', cand):
-                break
+        if not any(_set('job_stockMode', c) for c in
+                   ('fixedbox', 'fixed', 'fixedsizebox', 'fixedsize', 'box_fixed', 'mode_fixedbox')):
+            detail.append('job_stockMode current=%r (could not switch to a fixed box)' % cur)
+            failed[0] = True
 
-    return '; '.join(results)
+    if failed[0]:
+        return '; '.join(detail)
+    return '%g x %g x %s mm (fixed box)' % (
+        x_mm, y_mm, ('%g' % z_mm) if z_mm is not None else 'Z unchanged')
 
 
 # ---------------------------------------------------------------------------
