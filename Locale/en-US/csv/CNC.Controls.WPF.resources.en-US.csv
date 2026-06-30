@@ -676,3 +676,13 @@ CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scro
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scmargin:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,lbl_sctool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scnewres:CNC.Controls.NumericField.Unit,None,False,True,,steps/mm
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabJob:System.String.$Content,None,True,True,,Job
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Load stock
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabOffsets:System.String.$Content,None,True,True,,Offsets
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSettings:System.String.$Content,None,True,True,,Settings
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabProbing:System.String.$Content,None,True,True,,Probing
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabHeightMap:System.String.$Content,None,True,True,,Height Map
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSDCard:System.String.$Content,None,True,True,,SD Card
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLatheWizards:System.String.$Content,None,True,True,,Lathe Wizards
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTools:System.String.$Content,None,True,True,,Tools
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabMachineSetup:System.String.$Content,None,True,True,,Machine Setup

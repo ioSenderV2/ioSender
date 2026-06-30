@@ -24,7 +24,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCALES = ['de-DE', 'en-US', 'hu-HU', 'pt-BR', 'ru-RU', 'uk-UA', 'zh-CN']
 
-# XAML files to scan, paired with their built assembly's resource base name.
+# XAML view files to scan, paired with their built assembly's resource base name.
 TARGETS = [
     ('ioSender XL/ioSender XL/HeightMapView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/LoadStockView.xaml', 'ioSender'),
@@ -32,6 +32,14 @@ TARGETS = [
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),
 ]
+
+# LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..
+# entry becomes a libstrings.baml row (System.String.$Content). Paired with the built assembly.
+LIBSTRINGS = [
+    ('CNC Controls/CNC Controls/LibStrings.xaml', 'CNC.Controls.WPF'),
+]
+
+STR_RE = re.compile(r'<system:String\b[^>]*?\bx:Uid="([^"]+)"[^>]*?>(.*?)</system:String>', re.DOTALL)
 
 # Localizable attributes we extract, in a stable order.
 ATTRS = ['Content', 'Header', 'Label', 'Unit', 'Text', 'ToolTip']
@@ -100,6 +108,23 @@ def rows_for(xaml_path, assembly):
     return out
 
 
+def rows_for_libstrings(xaml_path, assembly):
+    """Rows for a LibStrings.xaml ResourceDictionary: each <system:String x:Uid=..>value entry."""
+    with open(os.path.join(REPO, xaml_path), encoding='utf-8') as f:
+        text = f.read()
+    resname = '%s.g.en-US.resources:%s' % (assembly, baml_name(xaml_path))
+    out, seen = [], set()
+    for m in STR_RE.finditer(text):
+        uid, val = m.group(1), m.group(2)
+        field1 = '%s:System.String.$Content' % uid
+        key = (resname, field1)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((key, [resname, field1, 'None', 'True', 'True', '', val]))
+    return out
+
+
 def existing_keys(path):
     keys = set()
     if not os.path.exists(path):
@@ -114,8 +139,9 @@ def existing_keys(path):
 def main():
     dry = '--dry-run' in sys.argv
     grand = 0
-    for xaml, assembly in TARGETS:
-        rows = rows_for(xaml, assembly)
+    jobs = [(x, a, rows_for) for (x, a) in TARGETS] + [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS]
+    for xaml, assembly, builder in jobs:
+        rows = builder(xaml, assembly)
         for loc in LOCALES:
             path = os.path.join(REPO, 'Locale', loc, 'csv', '%s.resources.%s.csv' % (assembly, loc))
             have = existing_keys(path)

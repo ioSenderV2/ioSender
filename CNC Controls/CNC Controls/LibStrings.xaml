@@ -52,4 +52,15 @@
     <system:String x:Uid="str_valNoCheckMode" x:Key="ValNoCheckMode">The controller did not enter check mode ($C) - validation aborted.</system:String>
     <system:String x:Uid="str_valSetupRejected" x:Key="ValSetupRejected">The controller rejected a basic set-up command - validation aborted.</system:String>
     <system:String x:Uid="str_lfNoToolpaths" x:Key="LfNoToolpathFiles">No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.</system:String>
+    <!-- Top-level tab labels (built in code by ioSender XL's RegisterBuiltinTabs). -->
+    <system:String x:Uid="str_tabJob" x:Key="TabJob">Job</system:String>
+    <system:String x:Uid="str_tabLoadStock" x:Key="TabLoadStock">Load stock</system:String>
+    <system:String x:Uid="str_tabOffsets" x:Key="TabOffsets">Offsets</system:String>
+    <system:String x:Uid="str_tabSettings" x:Key="TabSettings">Settings</system:String>
+    <system:String x:Uid="str_tabProbing" x:Key="TabProbing">Probing</system:String>
+    <system:String x:Uid="str_tabHeightMap" x:Key="TabHeightMap">Height Map</system:String>
+    <system:String x:Uid="str_tabSDCard" x:Key="TabSDCard">SD Card</system:String>
+    <system:String x:Uid="str_tabLatheWizards" x:Key="TabLatheWizards">Lathe Wizards</system:String>
+    <system:String x:Uid="str_tabTools" x:Key="TabTools">Tools</system:String>
+    <system:String x:Uid="str_tabMachineSetup" x:Key="TabMachineSetup">Machine Setup</system:String>
 </ResourceDictionary>

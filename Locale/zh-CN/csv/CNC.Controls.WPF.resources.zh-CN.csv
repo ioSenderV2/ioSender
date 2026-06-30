@@ -693,3 +693,18 @@ CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scne
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,btn_scgen:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,btn_scsave:System.Windows.Controls.ContentControl.Content,Button,True,True,,Save steps/mm
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,txt_scresults:System.Windows.Controls.TextBlock.Text,Text,True,True,,Measured results - enter the measured spacing for each pair after running:
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_scNoAxisRes:System.String.$Content,None,True,True,,Current steps/mm is not available for the selected axis.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_lfNoToolpaths:System.String.$Content,None,True,True,,No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabJob:System.String.$Content,None,True,True,,Job
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Load stock
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabOffsets:System.String.$Content,None,True,True,,Offsets
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSettings:System.String.$Content,None,True,True,,Settings
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabProbing:System.String.$Content,None,True,True,,Probing
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabHeightMap:System.String.$Content,None,True,True,,Height Map
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSDCard:System.String.$Content,None,True,True,,SD Card
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLatheWizards:System.String.$Content,None,True,True,,Lathe Wizards
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTools:System.String.$Content,None,True,True,,Tools
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabMachineSetup:System.String.$Content,None,True,True,,Machine Setup

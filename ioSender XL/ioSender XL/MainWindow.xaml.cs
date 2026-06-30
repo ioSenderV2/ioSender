@@ -1161,17 +1161,25 @@ namespace GCode_Sender
             // "greyed until connected"), and a tab that needs a capability the controller lacks is REMOVED on
             // connect (JobView.Setup) and listed, with the reason, in Edit Main Page > Unavailable
             // (ComponentAvailability). Tabs that only need a live controller stay available and act on connect.
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, "Job", () => new JobView(), 10, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, "Load stock", () => new LoadStockView(), 20, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, "Offsets", () => new OffsetView(), 30, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, "Settings", () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Probing, "Probing", () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, "Height Map", () => new HeightMapView(), 55, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, "SD Card", () => new SDCardView(), 60, enabledWhenDisconnected: true,
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 10, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, TabLabel("TabLoadStock", "Load stock"), () => new LoadStockView(), 20, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 30, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 55, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: true,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, "Lathe Wizards", () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Tools, "Tools", () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, "Machine Setup", () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Wizards"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
+        }
+
+        // Localized tab label via LibStrings, falling back to the English literal if the resource is missing
+        // (so a typo'd key or unloaded resource can never blank a tab header).
+        private static string TabLabel(string key, string fallback)
+        {
+            string s = CNC.Controls.LibStrings.FindResource(key);
+            return string.IsNullOrEmpty(s) ? fallback : s;
         }
 
         // Instantiate the tabs into the (XAML-empty) TabControl in the order given by the layout tree
