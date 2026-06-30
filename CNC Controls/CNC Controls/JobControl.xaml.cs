@@ -198,7 +198,7 @@ namespace CNC.Controls
                 return;
             IsActiveProgramReady = ready;
             if (ready && model != null)
-                model.Message = string.Format("{0} ready – press Cycle Start to run.", MacroProcessor.ActiveProgramName ?? "Program");
+                model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program");
         }
 
         public static readonly DependencyProperty IsFeedHoldEnabledProperty = DependencyProperty.Register(nameof(IsFeedHoldEnabled), typeof(bool), typeof(JobControl));

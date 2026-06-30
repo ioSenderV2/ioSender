@@ -212,6 +212,10 @@ namespace GCode_Sender
 
         // ---- run: probe the grid through the Probing engine (mirrors the original Height map tab) ----
 
+        // Localized string via LibStrings, with \n expanded to real newlines. Empty (missing key) is harmless
+        // for these transient messages; the keys are added alongside in LibStrings.xaml.
+        private static string Loc(string key) => CNC.Controls.LibStrings.FindResource(key).Replace("\\n", "\n");
+
         private void Start_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -220,7 +224,7 @@ namespace GCode_Sender
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Height map could not start:\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Loc("HmStartError") + "\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -230,15 +234,14 @@ namespace GCode_Sender
                 model = DataContext as GrblViewModel ?? CNC.Core.Grbl.GrblViewModel;
             if (model == null)
             {
-                MessageBox.Show("No controller is connected.", "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("HmNoController"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
             {
-                MessageBox.Show("Select a probe definition first (Machine Setup Wizard > Probe definitions).",
-                    "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("HmSelectProbe"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -267,18 +270,18 @@ namespace GCode_Sender
 
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
             {
-                MessageBox.Show(string.Format("Could not move to the map origin / reach Idle. Controller state: {0}.\r\n\r\nConnect, home and clear any alarm, then try again.", model.GrblState.State),
+                MessageBox.Show(string.Format(Loc("HmNotIdle"), model.GrblState.State),
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!pr.VerifyProbe())
             {
-                MessageBox.Show("The probe is not ready (not connected, or already triggered).", "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("HmProbeNotReady"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!pr.Program.Init())
             {
-                MessageBox.Show(string.IsNullOrEmpty(pr.Message) ? "Probing could not be started (machine not idle, not homed, or position unknown)." : pr.Message,
+                MessageBox.Show(string.IsNullOrEmpty(pr.Message) ? Loc("HmInitFailed") : pr.Message,
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
@@ -345,7 +348,7 @@ namespace GCode_Sender
             // cleared by a late probe-release event after the final point. Report clearly either way.
             if (pr.Positions.Count != map.TotalPoints)
             {
-                MessageBox.Show(string.Format("Height map captured {0} of {1} probe points, so it can't be built.{2}",
+                MessageBox.Show(string.Format(Loc("HmCaptureShort"),
                     pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message),
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -366,7 +369,7 @@ namespace GCode_Sender
             HeightMap.HasHeightMap = true;
             HeightMap.CanApply = model.IsFileLoaded;
             RefreshSurface();
-            model.Message = string.Format("Height map complete: {0} points, Z range {1} to {2} mm.",
+            model.Message = string.Format(Loc("HmComplete"),
                 map.TotalPoints, Math.Round(map.MinHeight, model.Precision).ToInvariantString(), Math.Round(map.MaxHeight, model.Precision).ToInvariantString());
         }
 
@@ -378,8 +381,7 @@ namespace GCode_Sender
                 return;
             if (!model.IsFileLoaded)
             {
-                MessageBox.Show("Load the program to compensate first - Apply rewrites the loaded job to follow the surface.",
-                    "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                MessageBox.Show(Loc("HmApplyNeedsJob"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -401,14 +403,14 @@ namespace GCode_Sender
             if (HeightMap.Map == null)
                 return;
 
-            var file = new SaveFileDialog { AddExtension = true, Title = "Save height map", Filter = "Height map files (*.map)|*.map|All files (*.*)|*.*" };
+            var file = new SaveFileDialog { AddExtension = true, Title = Loc("HmSaveTitle"), Filter = Loc("HmFileFilter") };
             if (file.ShowDialog() == true)
                 HeightMap.Map.Save(file.FileName);
         }
 
         private void Load_Click(object sender, RoutedEventArgs e)
         {
-            var file = new OpenFileDialog { Title = "Load height map", Filter = "Height map files (*.map)|*.map|All files (*.*)|*.*" };
+            var file = new OpenFileDialog { Title = Loc("HmLoadTitle"), Filter = Loc("HmFileFilter") };
             if (file.ShowDialog() == true)
                 LoadMap(file.FileName);
         }

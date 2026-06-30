@@ -71,4 +71,18 @@
     <system:String x:Uid="str_tabSquareness" x:Key="TabSquareness">Squareness</system:String>
     <system:String x:Uid="str_tabTrinamic" x:Key="TabTrinamic">Trinamic tuner</system:String>
     <system:String x:Uid="str_tabPID" x:Key="TabPID">PID Tuner</system:String>
+    <!-- Height Map tab messages (newlines as \n, expanded in code; {0}.. are string.Format args). -->
+    <system:String x:Uid="str_hmSelectProbe" x:Key="HmSelectProbe">Select a probe definition first (Machine Setup Wizard &gt; Probe definitions).</system:String>
+    <system:String x:Uid="str_hmNoController" x:Key="HmNoController">No controller is connected.</system:String>
+    <system:String x:Uid="str_hmStartError" x:Key="HmStartError">Height map could not start:</system:String>
+    <system:String x:Uid="str_hmNotIdle" x:Key="HmNotIdle">Could not move to the map origin / reach Idle. Controller state: {0}.\n\nConnect, home and clear any alarm, then try again.</system:String>
+    <system:String x:Uid="str_hmProbeNotReady" x:Key="HmProbeNotReady">The probe is not ready (not connected, or already triggered).</system:String>
+    <system:String x:Uid="str_hmInitFailed" x:Key="HmInitFailed">Probing could not be started (machine not idle, not homed, or position unknown).</system:String>
+    <system:String x:Uid="str_hmCaptureShort" x:Key="HmCaptureShort">Height map captured {0} of {1} probe points, so it can't be built.{2}</system:String>
+    <system:String x:Uid="str_hmComplete" x:Key="HmComplete">Height map complete: {0} points, Z range {1} to {2} mm.</system:String>
+    <system:String x:Uid="str_hmApplyNeedsJob" x:Key="HmApplyNeedsJob">Load the program to compensate first - Apply rewrites the loaded job to follow the surface.</system:String>
+    <system:String x:Uid="str_hmSaveTitle" x:Key="HmSaveTitle">Save height map</system:String>
+    <system:String x:Uid="str_hmLoadTitle" x:Key="HmLoadTitle">Load height map</system:String>
+    <system:String x:Uid="str_hmFileFilter" x:Key="HmFileFilter">Height map files (*.map)|*.map|All files (*.*)|*.*</system:String>
+    <system:String x:Uid="str_readyCycleStart" x:Key="ReadyCycleStart">{0} ready - press Cycle Start to run.</system:String>
 </ResourceDictionary>

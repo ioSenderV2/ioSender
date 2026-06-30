@@ -792,3 +792,16 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSurfaceSpoilboard:Syst
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSquareness:System.String.$Content,None,True,True,,Squareness
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTrinamic:System.String.$Content,None,True,True,,Trinamic tuner
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabPID:System.String.$Content,None,True,True,,PID Tuner
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSelectProbe:System.String.$Content,None,True,True,,Select a probe definition first (Machine Setup Wizard &gt; Probe definitions).
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmNoController:System.String.$Content,None,True,True,,No controller is connected.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmStartError:System.String.$Content,None,True,True,,Height map could not start:
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmNotIdle:System.String.$Content,None,True,True,,"Could not move to the map origin / reach Idle. Controller state: {0}.\n\nConnect, home and clear any alarm, then try again."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmProbeNotReady:System.String.$Content,None,True,True,,"The probe is not ready (not connected, or already triggered)."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmInitFailed:System.String.$Content,None,True,True,,"Probing could not be started (machine not idle, not homed, or position unknown)."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmCaptureShort:System.String.$Content,None,True,True,,"Height map captured {0} of {1} probe points, so it can't be built.{2}"
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmComplete:System.String.$Content,None,True,True,,"Height map complete: {0} points, Z range {1} to {2} mm."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmApplyNeedsJob:System.String.$Content,None,True,True,,Load the program to compensate first - Apply rewrites the loaded job to follow the surface.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSaveTitle:System.String.$Content,None,True,True,,Save height map
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmLoadTitle:System.String.$Content,None,True,True,,Load height map
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmFileFilter:System.String.$Content,None,True,True,,Height map files (*.map)|*.map|All files (*.*)|*.*
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_readyCycleStart:System.String.$Content,None,True,True,,{0} ready - press Cycle Start to run.
