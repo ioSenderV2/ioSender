@@ -225,7 +225,14 @@ namespace CNC.Controls
                         Comms.com.WriteString("M0" + '\r');
                     }
 
-                    if (line.IndexOf("G38", StringComparison.OrdinalIgnoreCase) >= 0)
+                    // Barrier on a streamed probe (G38) AND on an O-word CALL: an O<...> CALL runs a controller-
+                    // side macro that itself moves/probes (e.g. Load Stock's pcorner.macro, whose G38s are in the
+                    // macro - not in this streamed line - so the G38 test alone never fired for it). Piling the
+                    // lines that follow into the controller's RX while that macro runs breaks grblHAL's O-word
+                    // handling and stalls the run right after the CALL (the tail - final G30 park + M2 - never
+                    // executes). Hold the stream until the CALL has fully completed (everything outstanding acked).
+                    if (line.IndexOf("G38", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        line.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0)
                         probePending = jobHasProbe = true;
 
                     sendIdx = isLast ? -1 : sendIdx + 1;
@@ -289,9 +296,11 @@ namespace CNC.Controls
 
             if (sendIdx >= 0)
             {
-                // Lines remain but the pump believed the buffer was full: it's actually empty, so drop the stale
-                // in-flight accounting and resume sending the remainder (e.g. the final G30 park + M2).
+                // Lines remain but the pump believed the buffer was full (or is holding the O-word/probe barrier):
+                // the controller is idle, so its buffer is empty and the in-flight CALL/probe has finished. Drop
+                // the stale accounting, release the barrier, and resume sending the remainder (final G30 + M2).
                 serialUsed = 0;
+                probePending = false;
                 inflight.Clear();
                 SendNext();
                 // If that was the last of it (nothing left to send AND nothing newly queued), finish now.
