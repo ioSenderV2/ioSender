@@ -52,3 +52,49 @@ ioSender.g.en-US.resources:mainwindow.baml,tab_tools:System.Windows.Controls.Hea
 ioSender.g.en-US.resources:mainwindow.baml,tab_turning:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Токарна обробка
 ioSender.g.uk-UA.resources:mainwindow.baml,mnu_validate:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Validate controller...
 ioSender.g.uk-UA.resources:mainwindow.baml,mnu_loadFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load _Folder...
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpProbe:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Probe
+ioSender.g.en-US.resources:heightmapview.baml,hm_lblProbe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpArea:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Area to probe
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,From program
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe over the loaded job's XY extent, in the current work coordinates."
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Full table
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."
+ioSender.g.en-US.resources:heightmapview.baml,hm_width:CNC.Controls.NumericField.Label,None,False,True,,W:
+ioSender.g.en-US.resources:heightmapview.baml,hm_height:CNC.Controls.NumericField.Label,None,False,True,,H:
+ioSender.g.en-US.resources:heightmapview.baml,hm_fromLimits:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set from program limits
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpGrid:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Grid size
+ioSender.g.en-US.resources:heightmapview.baml,hm_lock:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Lock
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpProbing:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Probing
+ioSender.g.en-US.resources:heightmapview.baml,hm_depth:CNC.Controls.NumericField.Label,None,False,True,,Probe depth:
+ioSender.g.en-US.resources:heightmapview.baml,hm_depth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:heightmapview.baml,hm_depth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How far DOWN from the parked (start) Z each probe searches before it faults. Park Z at a small safe clearance above the surface, then this must be at least that clearance plus the surface variation."
+ioSender.g.en-US.resources:heightmapview.baml,hm_feed:CNC.Controls.NumericField.Label,None,False,True,,Probe feed:
+ioSender.g.en-US.resources:heightmapview.baml,hm_feed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+ioSender.g.en-US.resources:heightmapview.baml,hm_feed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Feed for every probe. The surface is already roughly known, so all points probe gently at this single approach feed - no fast search pass - which avoids overshoot/false triggers on a fragile probe. Defaults to the probe's latch (slow) feed."
+ioSender.g.en-US.resources:heightmapview.baml,hm_dwell:CNC.Controls.NumericField.Label,None,False,True,,Settle dwell:
+ioSender.g.en-US.resources:heightmapview.baml,hm_dwell:CNC.Controls.NumericField.Unit,None,False,True,,s
+ioSender.g.en-US.resources:heightmapview.baml,hm_dwell:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pause before each probe so a fragile/3D probe fully releases and stops ringing after the previous touch and the move. Raise this if you get 'probe already triggered' fails partway through. 0 = none.
+ioSender.g.en-US.resources:heightmapview.baml,hm_start:System.Windows.Controls.ContentControl.Content,Button,True,True,,Start
+ioSender.g.en-US.resources:heightmapview.baml,hm_stop:System.Windows.Controls.ContentControl.Content,Button,True,True,,Stop
+ioSender.g.en-US.resources:heightmapview.baml,hm_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
+ioSender.g.en-US.resources:heightmapview.baml,hm_save:System.Windows.Controls.ContentControl.Content,Button,True,True,,Save
+ioSender.g.en-US.resources:heightmapview.baml,hm_load:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpSteps:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Steps
+ioSender.g.en-US.resources:heightmapview.baml,hm_grpView:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Surface
+ioSender.g.en-US.resources:loadstockview.baml,ls_grpSetup:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Probe and stock
+ioSender.g.en-US.resources:loadstockview.baml,ls_lblProbe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
+ioSender.g.en-US.resources:loadstockview.baml,ls_lblCorner:System.Windows.Controls.ContentControl.Content,Label,True,True,,Stock corner:
+ioSender.g.en-US.resources:loadstockview.baml,ls_rbBL:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Back-left
+ioSender.g.en-US.resources:loadstockview.baml,ls_rbBR:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Back-right
+ioSender.g.en-US.resources:loadstockview.baml,ls_rbFL:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Front-left
+ioSender.g.en-US.resources:loadstockview.baml,ls_rbFR:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Front-right
+ioSender.g.en-US.resources:loadstockview.baml,ls_width:CNC.Controls.NumericField.Label,None,False,True,,Approx. width (X):
+ioSender.g.en-US.resources:loadstockview.baml,ls_width:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:loadstockview.baml,ls_height:CNC.Controls.NumericField.Label,None,False,True,,Approx. height (Y):
+ioSender.g.en-US.resources:loadstockview.baml,ls_height:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:loadstockview.baml,ls_lblWcs:System.Windows.Controls.ContentControl.Content,Label,True,True,,Set origin in:
+ioSender.g.en-US.resources:loadstockview.baml,ls_measure:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Measure stock size (probe far faces)
+ioSender.g.en-US.resources:loadstockview.baml,ls_generate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
+ioSender.g.en-US.resources:loadstockview.baml,ls_copysize:System.Windows.Controls.ContentControl.Content,Button,True,True,,Copy size
+ioSender.g.en-US.resources:loadstockview.baml,ls_copysize:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field.
+ioSender.g.en-US.resources:loadstockview.baml,ls_grpDrawing:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Stock
