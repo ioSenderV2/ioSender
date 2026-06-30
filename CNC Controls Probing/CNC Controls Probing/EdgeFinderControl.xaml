@@ -80,20 +80,6 @@
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Vertical" Margin="5,0,5,0">
                     <local:CsSelectControl/>
-                    <GroupBox x:Uid="grp_workpiece" Header="Workpiece">
-                        <StackPanel Orientation="Vertical" Margin="0,2,0,2">
-                            <Controls:NumericField x:Uid="lbl_height" Label="Height:" ColonAt="95" Value="{Binding Path=WorkpieceHeight, Mode=TwoWay}" IsEnabled="{Binding Path=ProbeZ}" Margin="0,2,0,0"/>
-                            <Controls:NumericField x:Uid="lbl_touchPlate" Label="Touch plate:" ColonAt="95" Value="{Binding Path=TouchPlateHeight, Mode=TwoWay}" IsEnabled="{Binding Path=TouchPlateHeightEnable}" Margin="0,2,0,0"/>
-                            <Controls:NumericField x:Uid="lbl_edgeoffsetxy" ColonAt="95" Label="Edge offset:" ToolTip="Set to 0 to use 0.5 x probe/tool diameter" Value="{Binding Path=WorkpieceXYEdgeOffset, Mode=TwoWay}" Margin="0,2,0,0">
-                                <Controls:NumericField.IsEnabled>
-                                    <MultiBinding Converter="{StaticResource LogicalAndConverter}">
-                                        <Binding Path="ProbeZ"/>
-                                        <Binding Path="ProbeVerticalEdge"/>
-                                    </MultiBinding>
-                                </Controls:NumericField.IsEnabled>
-                            </Controls:NumericField>
-                        </StackPanel>
-                    </GroupBox>
                     <GroupBox x:Uid="grp_clearances" Header="Clearances">
                         <StackPanel Orientation="Vertical">
                             <Controls:NumericField x:Uid="fld_xyClearance" Label="XY clearance:" ColonAt="95" Tooltip2="Initial distance away from face to probe" Value="{Binding Path=XYClearance, Mode=TwoWay}" IsEnabled="{Binding Path=XYOffsetEnable}" Margin="0,2,0,0"/>
@@ -114,6 +100,8 @@
                         <CheckBox x:Uid="lbl_probeZ" Content="Probe Z" VerticalAlignment="Center" IsChecked="{Binding Path=ProbeZ}" IsEnabled="{Binding ElementName=probez, Path=IsChecked, Converter={StaticResource IsNotRunningConverter}}"/>
                         <CheckBox x:Uid="lbl_preview" Content="Preview" Margin="15,0,0,0" VerticalAlignment="Center" IsChecked="{Binding Path=PreviewEnable}"/>
                     </StackPanel>
+                    <!-- Touch-plate thickness only matters when also probing Z through a plate; hidden otherwise. -->
+                    <Controls:NumericField x:Uid="lbl_touchPlate" Label="Touch plate:" ColonAt="95" ToolTip="Touch plate thickness when probing Z through a plate (0 for a bare-surface 3D probe)" Value="{Binding Path=TouchPlateHeight, Mode=TwoWay}" Visibility="{Binding Path=ProbeZ, Converter={StaticResource ToVisibleConverter}}" Margin="0,0,0,4"/>
                     <Grid x:Uid="grd_action" ToolTip="Click edge, corner or center to select probing action." Width="180" Height="180" Margin="0,4,0,4" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="60" />
