@@ -25,6 +25,9 @@ namespace CNC.Controls
         Queue<string> Commands { get; }
         GCodeParser Parser { get; }
         GrblViewModel Model { get; }
+        // Set when streaming marks any block's Sent status; lets ClearStatus skip the full block scan (and its
+        // per-row change notifications) when nothing was streamed since the last clear.
+        bool StatusDirty { get; set; }
         void ClearStatus();
     }
 }

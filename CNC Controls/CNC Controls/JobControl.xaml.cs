@@ -610,6 +610,7 @@ namespace CNC.Controls
             else if (Source.IsLoaded)
             {
                 model.Message = model.RunTime = string.Empty;
+                Source.StatusDirty = true;   // a run is about to mark block Sent status; let ClearStatus know there's something to clear
                 if(job.ToolChanged)
                 {
                     job.ToolChanged = false;

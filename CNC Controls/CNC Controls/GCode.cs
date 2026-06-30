@@ -239,11 +239,21 @@ namespace CNC.Controls
             Program.AddBlock(block);
         }
 
+        // Set by the streamer (CycleStart) when a run begins marking block Sent status; cleared here. Lets the
+        // common case - re-entering the Job tab on an idle, never-/already-cleared program - skip the full
+        // O(blocks) scan, which for a 300k+ line program was needless work on every tab activation.
+        public bool StatusDirty { get; set; }
+
         public void ClearStatus()
         {
+            if (!StatusDirty)
+                return;
+
             foreach (var row in Program.Blocks)
                 if (row.Sent != string.Empty)
                     row.Sent = string.Empty;
+
+            StatusDirty = false;
         }
 
         public void Drag(object sender, DragEventArgs e)

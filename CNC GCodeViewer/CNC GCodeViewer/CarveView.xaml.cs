@@ -182,10 +182,39 @@ namespace CNC.Controls.Viewer
             return double.IsNaN(v) ? 0d : v;
         }
 
+        // Signature of the inputs that shape the scene: the program (identity + size) plus the machine envelope
+        // and work offset that size/place it. Re-showing the tab rebuilds only when one of these actually
+        // changed - otherwise the retained visuals (including the live-carved mesh) just re-render.
+        private string lastSceneSig;
+        private string SceneSignature()
+        {
+            int cnt = GCode.File.Tokens?.Count ?? 0;
+            string name = model?.FileName ?? string.Empty;
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}",
+                cnt, name,
+                EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
+                EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
+                EnvMin(2) - Wco(2), EnvMax(2) - Wco(2));
+        }
+
         private void BuildScene()
         {
             if (viewport == null)
                 return;
+
+            // Skip the (expensive) clear-and-rebuild when nothing that shapes the scene has changed since the
+            // last build and the scene is still populated. Re-adding the full carve mesh (300k+ triangles for a
+            // large program) on every IsVisibleChanged is what made returning to the Job tab stall for ~1-2 s;
+            // when unchanged the retained visuals re-render for free - just refresh the tool cone + framing.
+            string sig = SceneSignature();
+            if (sig == lastSceneSig && viewport.Children.Count > 0)
+            {
+                UpdateTool();
+                FrameIfNeeded();
+                return;
+            }
+            lastSceneSig = sig;
 
             viewport.Children.Clear();
             viewport.Children.Add(new DefaultLights());
