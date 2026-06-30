@@ -683,12 +683,14 @@ namespace CNC.Controls
         private void OnPumpJobFinished()
         {
             pumpActive = false;
+            streamingHandler.Count = false;   // pump owned flow control; stop legacy line accounting so a late/trailing response can't re-enter it
             streamingHandler.Call(StreamingState.JobFinished, true);
         }
 
         private void OnPumpError(string response)
         {
             pumpActive = false;
+            streamingHandler.Count = false;
             job.HasError = model.IsGrblHAL;
             streamingHandler.Call(StreamingState.Error, true);
         }
@@ -699,6 +701,7 @@ namespace CNC.Controls
             if (pumpActive)
             {
                 pumpActive = false;
+                streamingHandler.Count = false;
                 pump?.Abort();
             }
         }
@@ -1321,6 +1324,14 @@ namespace CNC.Controls
                 if (probePending && job.ACKPending == 0)
                     probePending = false;
 
+                // A response can still arrive after the program finished/aborted, or after the streamer was
+                // pointed back at the loaded job (a stay-put macro run - e.g. Load Stock probing one corner then
+                // tearing down - leaves the job source empty when no file is loaded). The line accounting below
+                // indexes Source.Data, so ignore a response whose PendingLine is past the current (possibly
+                // empty) program rather than throwing IndexOutOfRange.
+                if (job.PendingLine >= 0 && job.PendingLine < Source.Data.Count)
+                {
+
                 if (!job.IsSDFile && (job.IsChecking || (string)Source.Data[job.PendingLine].Sent == "*"))
                     job.serialUsed = Math.Max(0, job.serialUsed - (int)Source.Data[job.PendingLine].Length);
 
@@ -1371,6 +1382,8 @@ namespace CNC.Controls
                     if(!job.IsChecking || job.PendingLine % 250 == 0)
                         model.BlockExecuting = job.PendingLine;
                 }
+
+                }   // end PendingLine bounds guard
             }
             else if (response == "ok")
                 missed++;
