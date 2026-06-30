@@ -97,6 +97,7 @@ namespace CNC.Controls
         // legacy streamer). When pumpActive, ResponseReceived's accounting is skipped (the pump owns it).
         private StreamPump pump;
         private volatile bool pumpActive = false;
+        private System.Windows.Threading.DispatcherTimer idleKickTimer;   // nudges a stalled pump when the controller sits idle mid-run
 
         private StreamingHandlerFn[] streamingHandlers = new StreamingHandlerFn[(int)StreamingHandler.Max];
         private StreamingHandlerFn streamingHandler;
@@ -704,6 +705,29 @@ namespace CNC.Controls
                 streamingHandler.Count = false;
                 pump?.Abort();
             }
+            idleKickTimer?.Stop();
+        }
+
+        // (Re)arm the pump-stall watchdog: if the controller is still idle a short while from now while the pump
+        // still thinks a job is in flight, the pump has stalled - nudge it to resume sending / finish. One-shot;
+        // re-armed on each idle report and cancelled by any non-idle report (see GrblStateChanged).
+        private void ArmIdleKick()
+        {
+            if (idleKickTimer == null)
+            {
+                idleKickTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromMilliseconds(700)
+                };
+                idleKickTimer.Tick += (s, e) =>
+                {
+                    idleKickTimer.Stop();
+                    if (pumpActive && grblState.State == GrblStates.Idle)
+                        pump?.KickIdle();
+                };
+            }
+            idleKickTimer.Stop();
+            idleKickTimer.Start();
         }
 
         public void SendRTCommand(string command)
@@ -1193,6 +1217,16 @@ namespace CNC.Controls
         {
             if (grblState.State == GrblStates.Jog)
                 model.IsJobRunning = false;
+
+            // Pump-stall watchdog: a pump-streamed run (e.g. Load Stock's O-word/probe program) can deadlock
+            // with the controller idle but the pump believing its buffer is full, so the tail (final G30 park +
+            // M2) is never sent and the run never finalises. Arm a short timer whenever the controller goes idle
+            // mid-pump; if it's still idle when it fires, nudge the pump (KickIdle) to resume/finish. Cancel on
+            // any non-idle report so it never fires during real motion.
+            if (newstate.State != GrblStates.Idle)
+                idleKickTimer?.Stop();
+            else if (pumpActive)
+                ArmIdleKick();
 
             // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
             // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine

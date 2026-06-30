@@ -132,6 +132,20 @@ namespace CNC.Controls
             cts?.Cancel();                  // unblock the ack Take
         }
 
+        // Sentinel pushed through the ack channel by KickIdle so the nudge is handled on the pump thread (the
+        // owner of serialUsed/inflight/sendIdx) - never touch that accounting from the UI thread.
+        private const string IdleKick = "\0idlekick";
+
+        // Called from the UI thread when the controller is confirmed idle while the pump still believes a job is
+        // streaming - i.e. the pump stalled (it thinks the controller's buffer is full, but an idle controller has
+        // drained it, so some acks must have been missed; or all lines were sent but a tail ack never arrived).
+        // An O-word/macro program (Load Stock) can hit this. Handled on the pump thread via the ack channel.
+        public void KickIdle()
+        {
+            if (!aborted && acks != null)
+                try { acks.Add(IdleKick); } catch { }
+        }
+
         private void Run()
         {
             try
@@ -144,7 +158,10 @@ namespace CNC.Controls
                     catch (OperationCanceledException) { break; }
                     if (aborted)
                         break;
-                    OnAck(ack);
+                    if (ack == IdleKick)
+                        OnIdleKick();
+                    else
+                        OnAck(ack);
                 }
             }
             catch (Exception)
@@ -261,6 +278,35 @@ namespace CNC.Controls
             }
 
             SendNext();
+        }
+
+        // The controller is confirmed idle but we still think a job is in flight (see KickIdle). An idle
+        // controller has drained its buffer, so any serialUsed/inflight left is from acks we never saw.
+        private void OnIdleKick()
+        {
+            if (aborted)
+                return;
+
+            if (sendIdx >= 0)
+            {
+                // Lines remain but the pump believed the buffer was full: it's actually empty, so drop the stale
+                // in-flight accounting and resume sending the remainder (e.g. the final G30 park + M2).
+                serialUsed = 0;
+                inflight.Clear();
+                SendNext();
+                // If that was the last of it (nothing left to send AND nothing newly queued), finish now.
+                if (sendIdx < 0 && inflight.Count == 0)
+                {
+                    aborted = true;
+                    dispatcher.BeginInvoke(onJobFinished);
+                }
+            }
+            else if (inflight.Count > 0)
+            {
+                // Everything was sent; only a tail ack is missing and the controller is idle - the job is done.
+                aborted = true;
+                dispatcher.BeginInvoke(onJobFinished);
+            }
         }
 
         // ---- display marshaling (coalesced, Background priority) ----
