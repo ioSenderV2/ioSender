@@ -636,22 +636,31 @@ namespace CNC.Controls.Viewer
             if (playing || toolCone == null || wpos == null)
                 return;
 
+            // The 3D simulation is OFF while a real job streams. Every update here - even moving the tool cone -
+            // runs on the UI thread, which is also the job line-pump: serial acks arrive via Dispatcher.BeginInvoke
+            // (SerialStream), so ResponseReceived -> SendNextLine executes on the dispatcher. Any per-report work
+            // here competes with it, the controller's planner buffer drains, and motion stutters. Freeze the whole
+            // view for the duration of the job; it resumes on the next report once the job ends. The Play button
+            // still gives the full offline carve simulation.
+            if (model != null && model.IsJobRunning)
+            {
+                haveLast = false;        // resume cleanly later - no false cut from a stale last position
+                return;
+            }
+
             double x = wpos.X, y = wpos.Y, z = wpos.Z;
             if (double.IsNaN(x)) x = 0d;
             if (double.IsNaN(y)) y = 0d;
             if (double.IsNaN(z)) z = 0d;
 
             var p = new Point3D(x, y, z);
-            toolCone.Origin = p;         // always track the live cutter (cheap)
+            toolCone.Origin = p;         // track the live cutter (cheap) when idle
 
-            // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is expensive and
-            // runs on the UI thread - the SAME thread that pumps the job stream, since serial acks arrive via
-            // Dispatcher.BeginInvoke (SerialStream). Carving on every status report while a job streams steals the
-            // thread from SendNextLine, the controller's planner buffer drains, and motion stutters. So only carve
-            // when this view is on screen AND no job is running; the Play button still gives the full offline carve.
-            if (!IsVisible || model == null || model.IsJobRunning)
+            // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is the expensive
+            // part - only do it when the view is actually on screen.
+            if (!IsVisible)
             {
-                haveLast = false;        // resume cleanly later - no false cut from a stale last position
+                haveLast = false;
                 return;
             }
 
