@@ -269,6 +269,12 @@ def _apply_stock_to_setup(setup, x_mm, y_mm, z_mm):
 
     results = []
 
+    def _get(name):
+        try:
+            return prm.itemByName(name).value.value
+        except Exception:
+            return None
+
     def _set(name, expr):
         try:
             p = prm.itemByName(name)
@@ -279,15 +285,24 @@ def _apply_stock_to_setup(setup, x_mm, y_mm, z_mm):
             results.append('%s := %s' % (name, expr))
             return True
         except Exception as ex:
-            results.append('%s FAILED: %s' % (name, ex))
+            results.append('%s FAILED(%s): %s' % (name, expr, ex))
             return False
 
-    # Force "fixed size box" mode so the X/Y/Z below are absolute dimensions (not offsets from the model).
-    _set('job_stockMode', 'mode_fixedbox')
+    # The fixed-box dimension parameters (these set cleanly).
     _set('job_stockFixedX', '%g mm' % x_mm)
     _set('job_stockFixedY', '%g mm' % y_mm)
     if z_mm is not None:
         _set('job_stockFixedZ', '%g mm' % z_mm)
+
+    # Ensure "fixed size box" mode so the dims above are absolute (not relative to the model). The enum id
+    # varies; report the current value (a valid id, so we learn the naming) and try known candidates until
+    # one is accepted. If the setup is already a fixed box the dims alone are enough.
+    cur = _get('job_stockMode')
+    results.append('job_stockMode current=%r' % cur)
+    if cur not in ('fixedbox', 'fixed', 'mode_fixedbox'):
+        for cand in ('fixedbox', 'fixed', 'fixedsizebox', 'fixedsize', 'box_fixed', 'mode_fixedbox'):
+            if _set('job_stockMode', cand):
+                break
 
     return '; '.join(results)
 
