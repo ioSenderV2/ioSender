@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System.Windows;
 using System.Linq;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Threading.Tasks;
@@ -61,6 +62,7 @@ namespace CNC.Controls.Probing
         private ProbingProfiles profiles = new ProbingProfiles();
         private GrblViewModel grbl = null;
         private IInputElement focusedControl = null;
+        private CollectionViewSource probeView = null;   // per-tab filtered probe list (toolsetter only on Tool length)
 
         public ProbingView()
         {
@@ -84,8 +86,41 @@ namespace CNC.Controls.Probing
 
                 DataContext = model = new ProbingViewModel(DataContext as GrblViewModel, profiles);
 
+                // The probe dropdown lists the controller's probe inputs (primary, toolsetter, secondary).
+                // Filter per tab: the toolsetter is only relevant on Tool length; the workpiece-probing tabs
+                // (edge/centre/rotation) hide it. Driven from a CollectionViewSource, refreshed on tab change.
+                probeView = new CollectionViewSource { Source = model.Grbl.Probes };
+                probeView.Filter += ProbeView_Filter;
+                cbxProbe.ItemsSource = probeView.View;
+
                 grbl.OnCameraProbe += addCameraPosition;
             }
+        }
+
+        // Probe input id convention (Grbl.Probes): 0 = primary (workpiece), 1 = toolsetter, 2 = secondary.
+        private static bool ProbeValidForTab(Probe p, ProbingType type)
+        {
+            return p.Id != 1 || type == ProbingType.ToolLength;   // toolsetter only on Tool length
+        }
+
+        private void ProbeView_Filter(object sender, FilterEventArgs e)
+        {
+            e.Accepted = !(e.Item is Probe p) || model == null || ProbeValidForTab(p, model.ProbingType);
+        }
+
+        // If the active probe is not valid for the selected tab, switch the controller to the first valid one.
+        private void EnsureValidProbe()
+        {
+            if (model == null || model.Grbl.Probes.Count == 0)
+                return;
+
+            var current = model.Grbl.Probes.FirstOrDefault(p => p.Id == model.Grbl.Probe);
+            if (current != null && ProbeValidForTab(current, model.ProbingType))
+                return;
+
+            var valid = model.Grbl.Probes.FirstOrDefault(p => ProbeValidForTab(p, model.ProbingType));
+            if (valid != null && valid.Id != model.Grbl.Probe)
+                model.Grbl.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, valid.Id));
         }
 
         private void addCameraPosition(Position position)
@@ -381,6 +416,8 @@ namespace CNC.Controls.Probing
                         model.CoordinateMode = ProbingViewModel.CoordMode.G10;
                     model.AllowMeasure = false;
                     model.ProbingType = view.ProbingType;
+                    probeView?.View.Refresh();   // re-filter the probe list for the new tab
+                    EnsureValidProbe();
                     model.Message = string.Empty;
                     model.PreviewEnable = false;
 

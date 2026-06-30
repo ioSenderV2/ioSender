@@ -71,8 +71,9 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,2" Visibility="{Binding Path=MultiProbe, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}">
                     <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
+                    <!-- ItemsSource is a per-tab filtered view set in code (toolsetter only on Tool length). -->
                     <ComboBox x:Name="cbxProbe" Width="130" Height="22" VerticalAlignment="Center" Margin="4,0,0,0"
-                          DisplayMemberPath="Name" SelectedValuePath="Id" ItemsSource="{Binding Path=Grbl.Probes}" SelectedValue="{Binding Path=Grbl.Probe, Mode=OneWay}"
+                          DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding Path=Grbl.Probe, Mode=OneWay}"
                           IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                           SelectionChanged="cbxProbe_SelectionChanged"/>
                 </StackPanel>

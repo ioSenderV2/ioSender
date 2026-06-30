@@ -221,6 +221,8 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
+                <Run x:Uid="str_edgeExtDescription" Text="Find work X/Y zero (and optionally Z) on the OUTSIDE of a workpiece. Click an edge, corner or the centre (Z) in the picker, jog the probe over the green dot, then Start. Tick Probe Z to also touch the top and set Z0. The result is applied as a coordinate-system origin (G10), a temporary offset (G92), or just measured. Probe: 3D probe or edge/touch plate."/>
+                <LineBreak/><LineBreak/>
                 <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
                 <LineBreak/><LineBreak/>
                 <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
