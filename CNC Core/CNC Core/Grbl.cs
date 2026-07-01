@@ -1251,9 +1251,14 @@ namespace CNC.Core
                 double stepsmm;
                 do
                 {
+                    // One axis per iteration: read THIS axis's resolution ($10x) and max travel ($13x), then
+                    // advance. The old code did i++ on BOTH lines, so it skipped every other axis and read the
+                    // wrong $13x - leaving MaxTravel.X and .Z at 0 (and .Y read from $132). That broke anything
+                    // using MaxTravel (jog soft-limit clamp, Go To Centre, Load Stock's Z-floor probe guard).
                     stepsmm = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + i);
-                    TravelResolution.Values[i++] = 1d / stepsmm;
-                    MaxTravel.Values[i++] = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + i); ;
+                    TravelResolution.Values[i] = 1d / stepsmm;
+                    MaxTravel.Values[i] = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + i);
+                    i++;
                 } while (!double.IsNaN(stepsmm) && i < TravelResolution.Values.Length);
             }
             else foreach (int i in AxisFlags.ToIndices())
