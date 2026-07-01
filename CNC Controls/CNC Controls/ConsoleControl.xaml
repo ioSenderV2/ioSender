@@ -27,9 +27,13 @@
                    IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
             <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="3,0,5,0" Foreground="#FF888888"/>
+            <!-- AcceptsReturn so a MULTI-LINE PASTE is preserved and shown (grows up to MaxLines, then scrolls);
+                 Enter still SENDS every line (txtInput_KeyDown handles Return and marks it handled, so no newline
+                 is inserted). Single-line typing stays one line. -->
             <TextBox x:Name="txtInput" x:Uid="txt_mdiInput" Tag="MDI" FontFamily="Consolas" FontSize="11" MinHeight="22"
-                     VerticalContentAlignment="Center"
-                     ToolTip="Enter a command (MDI). Up/Down recalls history, Esc clears."/>
+                     AcceptsReturn="True" MaxLines="8" VerticalContentAlignment="Center"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                     ToolTip="Enter a command (MDI). Paste multiple lines to send them all on Enter. Up/Down recalls history, Esc clears."/>
         </DockPanel>
         <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                  local:TextBoxUtilities.AlwaysScrollToEnd="True" FontSize="10" FontFamily="Verdana"

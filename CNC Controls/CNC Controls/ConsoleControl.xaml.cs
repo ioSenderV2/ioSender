@@ -97,13 +97,27 @@ namespace CNC.Controls
             {
                 case Key.Return:
                     {
-                        string cmd = tb.Text.Trim();
-                        if (!string.IsNullOrEmpty(cmd) && model.MDICommand.CanExecute(null))
+                        // Send each line: a single typed line is the common case, but a MULTI-LINE PASTE sends
+                        // every non-empty line in order (one MDI command each) - so you can paste a block of
+                        // commands and fire them all with one Enter.
+                        var lines = tb.Text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+                        bool sent = false;
+                        if (model.MDICommand.CanExecute(null))
                         {
                             if (model.GrblError != 0)
                                 model.ExecuteCommand("");   // clear a pending error first, as the MDI strip does
-                            model.MDICommand.Execute(cmd);
-                            model.AddMDIHistory(cmd);
+                            foreach (var raw in lines)
+                            {
+                                string cmd = raw.Trim();
+                                if (cmd.Length == 0)
+                                    continue;
+                                model.MDICommand.Execute(cmd);
+                                model.AddMDIHistory(cmd);
+                                sent = true;
+                            }
+                        }
+                        if (sent)
+                        {
                             tb.Clear();
                             historyIndex = -1;
                         }
