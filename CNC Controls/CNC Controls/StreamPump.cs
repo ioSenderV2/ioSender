@@ -99,6 +99,9 @@ namespace CNC.Controls
         private readonly ConcurrentQueue<KeyValuePair<int, string>> sentMarks = new ConcurrentQueue<KeyValuePair<int, string>>();
         private volatile int latestBlock = -1, latestScroll = -1;
         private int drainPending = 0;
+        // Count of modal-reset prolog lines (source.Commands) sent ahead of the first block on a mid-program
+        // start; their acks are swallowed in Run so they don't advance job-line accounting.
+        private int preambleAcks = 0;
 
         public StreamPump(GrblViewModel model, Dispatcher dispatcher)
         {
@@ -144,6 +147,20 @@ namespace CNC.Controls
             // are not mistaken for job-line acks - they fall through to the UI path, which ignores them.
             Comms.com.AckSink = ack => { if (!Suspended) acks.Add(ack); };
 
+            // Re-establish modal state for a mid-program start (units / plane / distance mode): "Start from this
+            // toolpath" queues a G90 G94 / G17 / G21 prolog on source.Commands. The legacy streamer drained that
+            // via SendNextLine, but this pump streams source.Data directly - so send those lines here, FIRST,
+            // ahead of the first block. Their acks are swallowed in Run (they are not job lines). Without this the
+            // run inherits whatever units the controller was left in; if it was G20, the toolpath's literal mm
+            // coordinates are read as inches -> targets off the table -> Alarm:2 soft limit on the first rapid.
+            preambleAcks = 0;
+            if (source.Commands != null)
+                while (source.Commands.Count > 0)
+                {
+                    Comms.com.WriteCommand(source.Commands.Dequeue());
+                    preambleAcks++;
+                }
+
             thread = new Thread(Run) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "StreamPump" };
             thread.Start();
         }
@@ -184,6 +201,11 @@ namespace CNC.Controls
                     catch (OperationCanceledException) { break; }
                     if (aborted)
                         break;
+                    if (preambleAcks > 0 && ack != IdleKick)
+                    {
+                        preambleAcks--;     // swallow a modal-reset prolog ack - not a job line
+                        continue;
+                    }
                     if (ack == IdleKick)
                         OnIdleKick();
                     else
