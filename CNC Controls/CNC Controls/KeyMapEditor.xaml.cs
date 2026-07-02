@@ -421,7 +421,9 @@ namespace CNC.Controls
                 new ActionItem(ControllerAction.JogZPlus, "Jog Z +", "Jog the Z axis +" + zp + jogNote),
                 new ActionItem(ControllerAction.JogZMinus, "Jog Z −", "Jog the Z axis −" + zm + jogNote),
                 new ActionItem(ControllerAction.JogStepIncrease, "Jog speed +", "Select the next-faster UI jog speed preset (2×4 grid)."),
-                new ActionItem(ControllerAction.JogStepDecrease, "Jog speed −", "Select the next-slower UI jog speed preset (2×4 grid).")
+                new ActionItem(ControllerAction.JogStepDecrease, "Jog speed −", "Select the next-slower UI jog speed preset (2×4 grid)."),
+                new ActionItem(ControllerAction.JogDistanceIncrease, "Jog distance +", "Select the next-larger UI jog distance preset (2×4 grid)."),
+                new ActionItem(ControllerAction.JogDistanceDecrease, "Jog distance −", "Select the next-smaller UI jog distance preset (2×4 grid).")
             };
         }
 

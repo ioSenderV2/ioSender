@@ -135,6 +135,7 @@ namespace CNC.Controls
                 gvm.JogDistanceProvider = () => JogData.SelectedDistance;
                 gvm.JogFeedProvider = () => JogData.SelectedFeedrate;
                 gvm.CycleJogFeed = dir => JogData.FeedIndex = JogData.FeedIndex + dir;   // controller bumpers
+                gvm.CycleJogDistance = dir => JogData.DistanceIndex = JogData.DistanceIndex + dir;   // assignable controller action
 
                 if (!keyboardMappingsOk)
                 {

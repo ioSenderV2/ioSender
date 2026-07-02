@@ -51,7 +51,9 @@ namespace CNC.Core
         JogZPlus,
         JogZMinus,
         JogStepIncrease,
-        JogStepDecrease
+        JogStepDecrease,
+        JogDistanceIncrease,
+        JogDistanceDecrease
     }
 
     public class ControllerMapper
@@ -270,6 +272,14 @@ namespace CNC.Core
                     break;
                 case ControllerAction.JogStepDecrease:
                     if (grbl.CycleJogFeed != null) grbl.CycleJogFeed(-1); else AdjustStep(0.1d);
+                    break;
+                // Distance +/- step the on-screen UI jog distance preset (2x4 grid); fall back to the step-size
+                // multiplier only when no UI jog panel is loaded to provide the callback.
+                case ControllerAction.JogDistanceIncrease:
+                    if (grbl.CycleJogDistance != null) grbl.CycleJogDistance(1); else AdjustStep(10d);
+                    break;
+                case ControllerAction.JogDistanceDecrease:
+                    if (grbl.CycleJogDistance != null) grbl.CycleJogDistance(-1); else AdjustStep(0.1d);
                     break;
             }
         }
