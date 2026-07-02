@@ -157,6 +157,7 @@ namespace CNC.Controls
             // Grbl tab is not active, so refresh the Cycle Start enable directly when the active program changes -
             // otherwise the bar's enables stay frozen and Cycle Start looks dead on the wizard tab.
             MacroProcessor.ActiveProgramChanged += OnActiveProgramChanged;
+            ProgramView.ActiveChanged += OnActiveProgramChanged;   // a connected ProgramView is an active program too
         }
 
         private void OnActiveProgramChanged()
@@ -167,18 +168,23 @@ namespace CNC.Controls
             // A wizard program is a runnable source even though the Grbl tab isn't active. Keep status reports
             // flowing so the bar's state machine (GrblStateChanged, relaxed below) stays live - otherwise its
             // enables freeze and Cycle Start re-disables after the first run.
-            if (MacroProcessor.ActiveRun != null)
+            if (HasActiveProgram)
                 EnablePolling(true);
 
             // Refresh Cycle Start now (only meaningful when idle; a running/held job manages its own enables).
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
             {
-                IsCycleStartEnabled = Source.IsLoaded || MacroProcessor.ActiveRun != null || (model.IsSDCardJob && model.SDRewind);
-                SetActiveProgramReady(MacroProcessor.ActiveRun != null && IsCycleStartEnabled);
+                IsCycleStartEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                SetActiveProgramReady(HasActiveProgram && IsCycleStartEnabled);
             }
             else
                 SetActiveProgramReady(false);
         }
+
+        // An "active program" the streamer can run with no loaded job: the legacy MacroProcessor.ActiveRun (tools
+        // not yet migrated) OR a connected ProgramView (stack top). Both coexist during the ProgramView migration;
+        // ProgramView.Active is null until a view connects, so this is inert for tools still on ActiveRun.
+        private static bool HasActiveProgram { get { return MacroProcessor.ActiveRun != null || ProgramView.Active != null; } }
 
         public static readonly DependencyProperty IsCycleStartEnabledProperty = DependencyProperty.Register(nameof(IsCycleStartEnabled), typeof(bool), typeof(JobControl));
         public bool IsCycleStartEnabled
@@ -433,7 +439,7 @@ namespace CNC.Controls
         public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }
         // A job is ready to start: a loaded job, or an active wizard program (so the physical Cycle Start button
         // runs a wizard's program too, not just a loaded file). False once a job/stream is actually running.
-        public bool JobPending { get { return (Source.IsLoaded || MacroProcessor.ActiveRun != null) && !JobTimer.IsRunning; } }
+        public bool JobPending { get { return (Source.IsLoaded || HasActiveProgram) && !JobTimer.IsRunning; } }
 
         public bool Activate(bool activate)
         {
@@ -1129,12 +1135,12 @@ namespace CNC.Controls
                         IsEnabled = !grblState.MPG;
                         // Also enabled when a wizard tab is up (its program is the active program Cycle Start runs),
                         // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
-                        IsCycleStartEnabled = Source.IsLoaded || MacroProcessor.ActiveRun != null || (model.IsSDCardJob && model.SDRewind);
+                        IsCycleStartEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
                         IsStopEnabled = model.IsSDCardJob && model.SDRewind;
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                         IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
-                        SetActiveProgramReady(MacroProcessor.ActiveRun != null && IsCycleStartEnabled);
+                        SetActiveProgramReady(HasActiveProgram && IsCycleStartEnabled);
                         break;
 
                     case StreamingState.Send:
@@ -1240,7 +1246,7 @@ namespace CNC.Controls
             // non-Grbl tab and parks in AwaitIdle waiting for the controller's final Idle - if its active program
             // was already torn down, neither flag above is set and that Idle would be dropped, leaving the bar
             // stuck "running" until Stop is pressed. JobTimer is live for exactly that finishing window.
-            if (isActive || MacroProcessor.ActiveRun != null || JobTimer.IsRunning) switch(newstate.State)
+            if (isActive || HasActiveProgram || JobTimer.IsRunning) switch(newstate.State)
             {
                 case GrblStates.Idle:
                     streamingHandler.Call(StreamingState.Idle, true);

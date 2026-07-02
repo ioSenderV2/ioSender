@@ -49,6 +49,15 @@ namespace GCode_Sender
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
+
+        // Load Stock's OWN program view (the ProgramView refactor): created lazily, titled "Load Stock", connected
+        // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
+        private CNC.Controls.ProgramView programView;
+        private void EnsureProgramView()
+        {
+            if (programView == null)
+                programView = new CNC.Controls.ProgramView { Title = "Load Stock" };
+        }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
         public LoadStockView()
@@ -109,15 +118,22 @@ namespace GCode_Sender
                 // Only offer the skew->WCS rotation when the controller supports it (reports WCSROT in $I): on
                 // firmware without ROTATION_ENABLE the G10 L2 R word errors:20, so hide the option entirely.
                 chkRotate.Visibility = GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
+                // The puck TLO reference goes through M6 (tc.macro) - only offer it when the controller has ATC.
+                chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
                 UpdateDrawing();
-                MacroProcessor.SetActiveProgram?.Invoke("Load stock", program);   // Program View shows our program
+                if (!string.IsNullOrEmpty(program))
+                {
+                    EnsureProgramView();
+                    programView.SetProgramText(program);
+                    programView.Connect();     // Load Stock's OWN view (titled "Load Stock") shows in the overlay
+                }
                 MacroProcessor.ActiveRun = () => Run_Click(null, null);            // Cycle Start runs it
             }
             else
             {
                 SaveInputs();
                 MacroProcessor.ActiveRun = null;
-                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+                programView?.Disconnect();                     // active program follows the focused tab
                 // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
                 // the corners populate and the results popup is raised even if the tab is left mid-run. The
                 // handler only reacts to our own messages, so it's a no-op otherwise.
@@ -512,7 +528,8 @@ namespace GCode_Sender
             }
 
             program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true, chkRotate.IsChecked == true);
+                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true, chkRotate.IsChecked == true,
+                                   chkSetTloRef.IsChecked == true);
             ResetResults();
             SaveInputs();
 
@@ -520,7 +537,9 @@ namespace GCode_Sender
             // so Generate must re-establish it so Cycle Start runs Load stock again without leaving the tab.
             MacroProcessor.ActiveProgramName = "Load stock";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
-            MacroProcessor.ProgramPreview?.Invoke("Load stock", program);   // pop the program-view overlay as feedback
+            EnsureProgramView();
+            programView.SetProgramText(program);
+            programView.Connect();   // Load Stock owns its ProgramView; the overlay hosts it and it titles itself
         }
 
         private static string SettingsPath
@@ -543,6 +562,7 @@ namespace GCode_Sender
                     cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                     chkMeasure.IsChecked = s.Measure;
                     chkRotate.IsChecked = s.ApplyRotation;
+                    chkSetTloRef.IsChecked = s.SetTloRef;
                     rbFL.IsChecked = s.Corner == "FrontLeft";
                     rbFR.IsChecked = s.Corner == "FrontRight";
                     rbBL.IsChecked = s.Corner == "BackLeft";
@@ -567,6 +587,7 @@ namespace GCode_Sender
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
                     ApplyRotation = chkRotate.IsChecked == true,
+                    SetTloRef = chkSetTloRef.IsChecked == true,
                     Probe = (cbxProbe.SelectedItem as ProbeDefinition)?.Name ?? string.Empty
                 };
                 var xs = new XmlSerializer(typeof(LoadStockSettings));
@@ -602,7 +623,7 @@ namespace GCode_Sender
         // Start Job conventions: (PREREQ ...) verbatim, G30 park + install, safe-Z go-to. Origin = the selected
         // corner (probed FIRST from G28, which discovers start_z); the other three reuse that start_z and are
         // referenced from the probed origin + the (conservative) estimated size.
-        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation)
+        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius -> edge comp
             string cornerName = Name(corner);
@@ -655,6 +676,14 @@ namespace GCode_Sender
             L("(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)");
             L("G21 G90 G94 G17");
             L("G49");
+            // Clear any stale WCS rotation BEFORE probing. pcorner's face probes are work-coordinate G38.2 moves, so
+            // a rotation on this WCS (NVS garbage after enabling ROTATION_ENABLE, or one a previous Load Stock run
+            // wrote) rotates every probe target -> shifts the measured corners -> inflates the skew, and compounds
+            // run-over-run ("never touched the stock but the skew keeps growing"). Zero it so each measurement is
+            // clean; the true measured skew is applied at the end. Only on firmware that reports WCSROT ($I) - the
+            // R word errors:20 on plain builds.
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));
             L(string.Format("#<_ls_rad> = {0}", N(r)));   // probe tip radius (global, read by pcorner)
             L(string.Format("#<_ls_searchf> = {0}", N(p.ProbeFeedRate)));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
@@ -676,6 +705,20 @@ namespace GCode_Sender
             L("#<c1x> = #<_corner_x>");
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
+
+            // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == start_job.macro
+            // (origin + TLO ref). The 3D probe is already in the spindle (installed at the top), so this is the
+            // M6 T8 "reference" path in tc.macro: reset the ref, probe the puck at G59.3, store the probe machine-Z
+            // as #<_tlo_ref>, park at G30. Emitted right after corner 1 while WCO is still 0, so the remaining
+            // corners (probed in work coords) and the end-of-run origin block are unaffected. Needs ATC + a
+            // toolsetter at G59.3 (both already in the PREREQ). tc.macro is what applies the ref on later M6s.
+            if (setTloRef)
+            {
+                L("(--- set tool-length reference at the puck (probe already in spindle) ---)");
+                L("#<_tlo_ref> = 0");
+                L("M6 T8");
+                L("(WAITIDLE)");
+            }
 
             if (measure)
             {
@@ -703,17 +746,19 @@ namespace GCode_Sender
                 L("(PRINT, LS_Y=#<size_y>)");
             }
 
+            // Park at G30 BEFORE setting the origin, so every G53 move in this program runs with WCO=0. Firmware
+            // bug: once a non-zero WCS offset is active, G53 moves false-alarm (the offset is applied to the G53
+            // machine target -> Y drops below travel -> Alarm:2). Origin-last keeps the park (and the M6 T8 TLO
+            // reference emitted after corner 1) at WCO=0, where G53 behaves.
+            L("(--- park at G30 (before the origin - keeps all G53 moves at WCO=0) ---)");
+            EmitGotoG30(L);
+
             L(string.Format("(--- set work origin at the {0} corner ---)", cornerName));
-            // Origin ONLY here - never put the rotation R word in this block. The R word (incl. R0) only exists on
-            // firmware built with ROTATION_ENABLE; on firmware without it ANY "G10 L2 ... R..." block fails with
-            // error:20 and HALTS the program - so the work origin would not be set, G54 not activated, and the
-            // machine never parks at G30 (the reported "stuck, no G30, must Stop + park by hand"). Keep the
-            // origin-setting block bulletproof on every controller.
+            // Origin ONLY here - never the rotation R word (that goes in the separate block below). The R word
+            // (incl. R0) only exists on ROTATION_ENABLE firmware; without it ANY "G10 L2 ... R..." errors:20 and
+            // HALTS the program. This block stays bulletproof on every controller.
             L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
             L(wcs + "  (activate the coordinate system)");
-
-            L("(--- park at G30 ---)");
-            EmitGotoG30(L);
 
             // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
             // G10 L2 R<deg> stores the rotation in the WCS (grblHAL ROTATION_ENABLE), so every later program run in
@@ -783,11 +828,15 @@ namespace GCode_Sender
         }
 
         // Safe-Z go-to G30 (probe-install / park): lift to machine top, traverse X/Y, descend - never a bare diagonal.
+        // Every G53 SPECIFIES X and Y (held at the current machine position via #<_abs_x>/#<_abs_y>, then at the G30
+        // X/Y) instead of leaving them implicit. A firmware bug sign-flips the parser base of a homing-direction-
+        // inverted ($23) axis after a G53 move, so a G53 with that axis "unmoved" (e.g. a bare "G53 G0 Z0") targets
+        // it from the flipped base -> false Alarm:2. Naming the axis uses the literal value and dodges the bug.
         private static void EmitGotoG30(System.Action<string> L)
         {
-            L("G53 G0 Z0");
-            L("G53 G0 X[#5181] Y[#5182]");
-            L("G53 G0 Z[#5183]");
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
+            L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
+            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
         }
 
         // P-word for G10 L2 (P1=G54..P6=G59).
@@ -808,6 +857,7 @@ namespace GCode_Sender
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;
         public bool ApplyRotation = true;   // set the WCS rotation from the measured skew (G10 L2 R)
+        public bool SetTloRef = false;      // reference the puck TLO after corner 1 (Load Stock == start_job)
         public string Probe = string.Empty;
     }
 }

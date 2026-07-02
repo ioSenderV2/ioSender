@@ -43,19 +43,33 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.AutoSquare; } }
 
+        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
+        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
+        private ProgramView programView;
+        private void EnsureProgramView()
+        {
+            if (programView == null)
+                programView = new ProgramView { Title = "Auto Square" };
+        }
+
         public void Activate(bool activate)
         {
             if (activate)
             {
                 DetectOffsetSetting();
                 UpdateComputed();
-                MacroProcessor.SetActiveProgram?.Invoke("Auto square", program);   // Program View shows our program
+                if (!string.IsNullOrEmpty(program))
+                {
+                    EnsureProgramView();
+                    programView.SetProgramText(program);
+                    programView.Connect();     // this tool's own view shows in the overlay
+                }
                 MacroProcessor.ActiveRun = Run;                                     // Cycle Start runs it
             }
             else
             {
                 MacroProcessor.ActiveRun = null;
-                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+                programView?.Disconnect();                     // active program follows the focused tab
             }
 
             if (model != null)
@@ -443,7 +457,9 @@ namespace CNC.Controls
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.ProgramPreview?.Invoke("Auto square", program);   // refresh + pop the Program View
+            EnsureProgramView();
+            programView.SetProgramText(program);
+            programView.Connect();   // refresh + show this tool's own view
         }
 
         private void Run()

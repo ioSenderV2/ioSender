@@ -60,6 +60,8 @@
                         <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
                                   IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
                                   ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
+                        <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference (Start Job)" IsChecked="False" Margin="0,2,0,2" VerticalAlignment="Center"
+                                  ToolTip="After corner 1 is probed, reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle). With Measure unchecked this makes Load Stock equivalent to start_job.macro - it sets the work origin AND the TLO reference. Requires ATC and a toolsetter at G59.3."/>
                     </StackPanel>
                 </GroupBox>
             </ScrollViewer>

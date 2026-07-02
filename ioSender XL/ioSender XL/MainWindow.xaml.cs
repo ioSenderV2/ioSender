@@ -139,12 +139,10 @@ namespace GCode_Sender
                     RestoreTabOnJobEnd(m, origin);
             };
 
-            // A wizard's generated program shows in the same program view as a file/folder. ProgramPreview pops it
-            // open (Generate feedback); SetActiveProgram sets what the Program View button shows as the tool's tab
-            // is entered; ClearActiveProgram reverts to the loaded job when the tab is left (active follows tab).
-            CNC.Controls.MacroProcessor.ProgramPreview = (name, text) => ShowProgramPreview(name, text);
-            CNC.Controls.MacroProcessor.SetActiveProgram = (name, text) => SetActiveProgram(name, text);
-            CNC.Controls.MacroProcessor.ClearActiveProgram = () => ClearProgramPreview();
+            // Every producer (Load/Load Folder and each wizard) owns its ProgramView and connects it; host the
+            // connected view in the overlay with its own title bar. Wizards (AutoShow) pop it open as Generate
+            // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
+            CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
 
             // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
             // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
@@ -202,13 +200,13 @@ namespace GCode_Sender
             mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
-            // A real file load (FileName set) returns the program view to the live job (and drops any active
-            // wizard program), so Cycle Start streams the freshly loaded file.
+            // A real file/folder load creates the job's own program view and connects it (ProgramView refactor):
+            // the overlay hosts it like any tool's view, and Cycle Start streams the freshly loaded file.
             if (DataContext is GrblViewModel gvm)
                 gvm.PropertyChanged += (s, e) =>
                 {
-                    if (e.PropertyName == nameof(GrblViewModel.FileName) && !string.IsNullOrEmpty((DataContext as GrblViewModel)?.FileName))
-                        ClearProgramPreview();
+                    if (e.PropertyName == nameof(GrblViewModel.FileName))
+                        OnJobFileChanged((DataContext as GrblViewModel)?.FileName);
                 };
         }
 
@@ -249,28 +247,6 @@ namespace GCode_Sender
             overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // Set what the program-view overlay shows WITHOUT opening it: a tool's program (raw text) as the
-        // "active program". Tools call this when their tab is shown (program is "" before Generate) so the
-        // Program View button reveals the tool's program - empty or generated. Refreshes if already open.
-        public void SetActiveProgram(string name, string program)
-        {
-            CNC.Controls.MacroProcessor.ActiveProgramName = name;
-            overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
-            overlayProgramView.SetProgram(BlocksFromText(program));   // a wizard program shown like any program
-
-            overlayJobTitle.Visibility = Visibility.Collapsed;
-            overlayPreviewTitle.Visibility = Visibility.Visible;
-        }
-
-        // Set the active program AND pop the overlay open - Generate's immediate feedback.
-        public void ShowProgramPreview(string name, string program)
-        {
-            SetActiveProgram(name, program);
-            _programOverlay = true;
-            btnProgramView.IsChecked = true;   // raises ProgramView_Toggled
-            UpdateOverlay();
-        }
-
         // Return the program view to the loaded job and drop any active wizard program, so Cycle Start streams the
         // job. Called when a wizard tab is left (active follows tab) or a job file is loaded (FileName change).
         private void ClearProgramPreview()
@@ -290,17 +266,55 @@ namespace GCode_Sender
             UpdateOverlay();
         }
 
+        // The loaded job's own program view (ProgramView refactor): Load File / Load Folder create+connect it so
+        // the overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
+        // case. It renders via SetProgram(null) (the null == loaded-job convention) so it keeps the live streamed
+        // collection, the mint source highlight and folder outline grouping; AutoShow is off so a load doesn't
+        // pop the overlay open.
+        private CNC.Controls.ProgramView jobProgramView;
+        private void OnJobFileChanged(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName))
+            {
+                jobProgramView?.Disconnect();   // file closed: drop the job view (overlay reverts to the empty state)
+                return;
+            }
+            if (jobProgramView == null)
+                jobProgramView = new CNC.Controls.ProgramView { AutoShow = false };
+            jobProgramView.Title = System.IO.Path.GetFileName(fileName.TrimEnd('\\', '/'));
+            jobProgramView.SetProgram(null);   // null == the loaded job (GCode.File.Data) - the streamed collection
+            jobProgramView.Connect();
+        }
+
         // A program is just a list of G-code blocks; build one from generated text so a wizard program renders
         // in the same program view as a file/folder (no raw-text special case).
-        private static System.Collections.ObjectModel.ObservableCollection<CNC.Core.GCodeBlock> BlocksFromText(string text)
+        // Host the connected ProgramView (a tool that owns its own view) in the overlay, or revert to the shared/
+        // job view when none is connected. The connected view brings its own title bar, so overlayTitleBar hides.
+        private void OnOverlayActiveChanged()
         {
-            var blocks = new System.Collections.ObjectModel.ObservableCollection<CNC.Core.GCodeBlock>();
-            if (string.IsNullOrEmpty(text))
-                return blocks;
-            uint n = 0;
-            foreach (var raw in text.Replace("\r", string.Empty).Split('\n'))
-                blocks.Add(new CNC.Core.GCodeBlock(++n, raw, raw.Length, raw.TrimStart().StartsWith("("), false));
-            return blocks;
+            var active = CNC.Controls.ProgramView.Active;
+            if (active != null)
+            {
+                overlayActiveHost.Content = active;
+                overlayActiveHost.Visibility = Visibility.Visible;
+                overlayProgramView.Visibility = Visibility.Collapsed;
+                overlayTitleBar.Visibility = Visibility.Collapsed;   // the connected view carries its own title
+                // A wizard's view (AutoShow) pops the overlay OPEN as Generate feedback; the loaded job (AutoShow
+                // false) is hosted but the overlay stays/returns closed - loading a file, or a wizard run ending,
+                // shouldn't fling it open over the work area (the persistent Job-tab list already shows the job).
+                _programOverlay = active.AutoShow;
+                btnProgramView.IsChecked = active.AutoShow;
+            }
+            else
+            {
+                overlayActiveHost.Content = null;
+                overlayActiveHost.Visibility = Visibility.Collapsed;
+                overlayProgramView.Visibility = Visibility.Visible;
+                overlayTitleBar.Visibility = Visibility.Visible;
+                _programOverlay = false;
+                btnProgramView.IsChecked = false;
+            }
+            UpdateOverlay();
         }
 
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
@@ -638,7 +652,20 @@ namespace GCode_Sender
             // Show the ACTUAL streamed program in the program view so the live per-line markers (executing "@",
             // completed "ok") and scroll track the run exactly as the Grbl tab does - the authored preview was a
             // separate copy, so it scrolled but never marked progress. Built from the same blocks the streamer runs.
-            overlayProgramView.SetProgram(prog.Data);
+            // Point the ACTUAL streamed program at the view so the live per-line markers ("@"/"ok") and scroll
+            // track the run. A tool that owns its ProgramView (Load Stock) gets its own view marked (and it carries
+            // its own title); tools still on the shared overlay use it, and only then does the overlay title need
+            // forcing to the running program's name (a connected view titles itself).
+            var connected = CNC.Controls.ProgramView.Active;
+            if (connected != null)
+                connected.SetProgram(prog.Data);
+            else
+            {
+                overlayProgramView.SetProgram(prog.Data);
+                overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
+                overlayJobTitle.Visibility = Visibility.Collapsed;
+                overlayPreviewTitle.Visibility = Visibility.Visible;
+            }
             RestoreSourceOnEnd(m);             // revert to the job source when the run ends
 
             // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously
@@ -672,6 +699,9 @@ namespace GCode_Sender
                     Dispatcher.BeginInvoke(new System.Action(() =>
                     {
                         RunControl.Source = null;   // streamer back to the loaded job
+                        var top = CNC.Controls.ProgramView.Active;   // release the wizard's own view, never the job's
+                        if (top != null && top != jobProgramView)
+                            top.Disconnect();
                         // The wizard program is consumed: tear down the active program so the program view and the
                         // green source highlight return to the loaded job (Job tab). Cycle Start then runs the job.
                         ClearProgramPreview();

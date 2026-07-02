@@ -73,20 +73,6 @@ namespace CNC.Controls
         // streamer/job control live there. Called after a large flush has been loaded into GCode.File.
         public static System.Action<GrblViewModel> RunStreamedJob;
 
-        // Hook to preview a tool's freshly generated program in the shell's program-view overlay (raw text):
-        // args are (tool name, program). Set by ioSender XL since the overlay lives there; tools call it from
-        // Generate so the program is shown - and the overlay popped open - without a direct shell reference.
-        public static System.Action<string, string> ProgramPreview;
-
-        // Hook for the "active program" the program-view button shows: a tool sets itself as the active program
-        // (name, current program text - empty before Generate) when its tab is shown. Unlike ProgramPreview this
-        // does NOT pop the overlay open - it just sets what it WOULD show. Set by ioSender XL.
-        public static System.Action<string, string> SetActiveProgram;
-
-        // Return the program view to the loaded job (active-program follows the focused tab): a tool calls this
-        // when its tab is left so the Program View reverts from its program to the job. Set by ioSender XL.
-        public static System.Action ClearActiveProgram;
-
         // The active program's run action: a tool registers its "generate-and-run" here when its tab is shown and
         // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
         // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)

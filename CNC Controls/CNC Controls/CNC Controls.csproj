@@ -114,6 +114,9 @@
     <Compile Include="GCodeListControl.xaml.cs">
       <DependentUpon>GCodeListControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ProgramView.xaml.cs">
+      <DependentUpon>ProgramView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GCodeRotate.cs" />
     <Compile Include="GCodeRotateDialog.xaml.cs">
       <DependentUpon>GCodeRotateDialog.xaml</DependentUpon>
@@ -413,6 +416,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="GCodeListControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProgramView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

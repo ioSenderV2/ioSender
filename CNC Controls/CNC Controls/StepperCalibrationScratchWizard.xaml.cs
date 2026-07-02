@@ -69,6 +69,15 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.StepperCalibrationScratch; } }
 
+        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
+        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
+        private ProgramView programView;
+        private void EnsureProgramView()
+        {
+            if (programView == null)
+                programView = new ProgramView { Title = "Stepper Calibration" };
+        }
+
         public void Activate(bool activate)
         {
             if (activate)
@@ -77,13 +86,18 @@ namespace CNC.Controls
                 if (CalAxes.Count > 0 && CalAxes.FirstOrDefault(a => a.Index == Axis) == null)
                     Axis = CalAxes[0].Index;
                 getAxisDetails(Axis);
-                MacroProcessor.SetActiveProgram?.Invoke("Stepper calibration", program);   // Program View shows our program
+                if (!string.IsNullOrEmpty(program))
+                {
+                    EnsureProgramView();
+                    programView.SetProgramText(program);
+                    programView.Connect();     // this tool's own view shows in the overlay
+                }
                 MacroProcessor.ActiveRun = Run;                                             // Cycle Start runs it
             }
             else
             {
                 MacroProcessor.ActiveRun = null;
-                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+                programView?.Disconnect();                     // active program follows the focused tab
             }
 
             if (model != null)
@@ -445,7 +459,9 @@ namespace CNC.Controls
 
             // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.ProgramPreview?.Invoke("Stepper calibration", program);
+            EnsureProgramView();
+            programView.SetProgramText(program);
+            programView.Connect();
         }
 
         private void Save()

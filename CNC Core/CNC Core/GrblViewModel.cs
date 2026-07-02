@@ -55,7 +55,7 @@ namespace CNC.Core
         private bool has_wco = false, _hasFans = false, _multiProbe = false;
         private SDState _sdMounted = SDState.Unmounted;
         private bool _flood, _mist, _fan0, _toolChange, _reset, _isMPos, _isJobRunning, _isProbeSuccess, _pgmEnd, _isParserStateLive, _isTloRefSet;
-        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _autoReporting = false, _isFolderView = false;
+        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _autoReporting = false, _isFolderView = false, _isLoading = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
         private bool? _mpg;
         private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _autoReportInterval = 0, _spindle_num = 0;
@@ -651,6 +651,9 @@ namespace CNC.Core
         // True when the loaded program was assembled from a folder of per-toolpath
         // files (GCode.LoadFolder) - the Program list then renders as a grouped outline.
         public bool IsFolderView { get { return _isFolderView; } set { if (_isFolderView != value) { _isFolderView = value; OnPropertyChanged(); } } }
+        // True while a file/folder is being read+parsed on the background loader. The program view(s) show a
+        // Wait cursor while it is set; the rest of the UI stays responsive. See GCode.BackgroundLoad.
+        public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }
         public string FsCwd { get { return _fsCwd; } private set { _fsCwd = value; OnPropertyChanged(); } }
         public bool IsPhysicalFileLoaded { get { return _fileName != string.Empty && (_fileName.StartsWith(@"\\") || _fileName[1] == ':'); } }
         public bool? IsMPGActive { get { return _mpg; } private set { if (_mpg != value) { _mpg = value; OnPropertyChanged(); } } }

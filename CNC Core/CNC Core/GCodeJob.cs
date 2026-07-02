@@ -58,7 +58,12 @@ namespace CNC.Core
     public class GCodeBlock : ViewModelBase
     {
         private bool _break;
-        private string _data, _sent = string.Empty;
+        private uint _lineNum;
+        private long _explicitLineNum = -1;
+        private string _data, _dataDisplay = string.Empty, _blockDisplay = string.Empty, _sent = string.Empty;
+
+        private static readonly System.Text.RegularExpressions.Regex _nWord =
+            new System.Text.RegularExpressions.Regex(@"^\s*[Nn](\d+)\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
 
         public GCodeBlock (uint lineNum, string block, int length, bool isComment, bool programEnd)
         {
@@ -69,9 +74,37 @@ namespace CNC.Core
             ProgramEnd = programEnd;
         }
 
-        public uint LineNum { get; set; }
+        public uint LineNum { get { return _lineNum; } set { _lineNum = value; RefreshDisplay(); } }
         public int Length { get; set; }
-        public string Data { get { return _data; } set { _data = value; OnPropertyChanged(); } }
+        public string Data { get { return _data; } set { _data = value; RefreshDisplay(); OnPropertyChanged(); } }
+
+        // Program list display: the Block column shows the program line number and the Data column hides the N
+        // word - while Data itself stays intact for streaming (the controller needs the N word for line-number
+        // progress reporting). The Block sequence continues across unnumbered lines (previous + 1) and jumps to
+        // an explicit N when present, so O<...> calls / comments still get an in-sequence number. BlockDisplay is
+        // assigned by a collection pass (GCodeListControl.SetProgram) that has the ordering; the fallback here
+        // keeps it non-blank if that pass has not run.
+        public bool HasExplicitLineNum { get { return _explicitLineNum >= 0; } }
+        public long ExplicitLineNum { get { return _explicitLineNum; } }
+        public string DataDisplay { get { return _dataDisplay; } }
+        public string BlockDisplay
+        {
+            get { return _blockDisplay; }
+            set { if (_blockDisplay != value) { _blockDisplay = value; OnPropertyChanged(); } }
+        }
+
+        private void RefreshDisplay()
+        {
+            var m = _data != null ? _nWord.Match(_data) : System.Text.RegularExpressions.Match.Empty;
+            if (m.Success && long.TryParse(m.Groups[1].Value, out _explicitLineNum))
+                _dataDisplay = _data.Substring(m.Length);
+            else {
+                _explicitLineNum = -1;
+                _dataDisplay = _data ?? string.Empty;
+            }
+            BlockDisplay = _explicitLineNum >= 0 ? _explicitLineNum.ToString() : _lineNum.ToString();
+            OnPropertyChanged(nameof(DataDisplay));
+        }
         public string Sent {
             get { return _sent; }
             set { _sent = BreakAt ? "BRK " + value : value; OnPropertyChanged(); }
@@ -144,6 +177,11 @@ namespace CNC.Core
         // Reset to true by Reset().
         public bool AddLineNumbers { get; set; } = true;
 
+        // Optional sink for parsed blocks. When set (a background load), AddStamped/ParseFileLines route parsed
+        // blocks HERE instead of straight into the bound ObservableCollection - so the expensive parse runs off
+        // the UI thread and the caller batches the collection adds onto the UI thread itself. Null = normal path.
+        public System.Action<GCodeBlock> BlockConsumer;
+
         public List<GCodeToken> Tokens { get { return Parser.Tokens; } }
         public GcodeBoundingBox BoundingBox { get; private set; } = new GcodeBoundingBox();
         public GCodeParser Parser { get; private set; } = new GCodeParser();
@@ -153,6 +191,24 @@ namespace CNC.Core
 
         public bool LoadFile(string filename, bool addLineNumber = false)
         {
+            AddBlock(filename, Action.New);
+
+            bool ok = ParseFileLines(filename, addLineNumber);
+
+            if (ok)
+                AddBlock("", Action.End);
+            else
+                CloseFile();
+
+            return ok;
+        }
+
+        // The per-line read/parse loop of a single file, WITHOUT the New/End bookends - so a background loader can
+        // call AddBlock(Action.New) on the UI thread, run THIS on a worker thread (blocks routed through the
+        // BlockConsumer sink), then finalize (ComputeLimits + RaiseFileChanged) once the buffered blocks are
+        // flushed. The parse itself is unchanged from the old inline LoadFile; only blocks.Add became Emit.
+        public bool ParseFileLines(string filename, bool addLineNumber = false)
+        {
             bool ok = true, isComment;
             uint ln;
 
@@ -161,8 +217,6 @@ namespace CNC.Core
             StreamReader sr = file.OpenText();
 
             string block = sr.ReadLine();
-
-            AddBlock(filename, Action.New);
 
             while (block != null)
             {
@@ -183,14 +237,14 @@ namespace CNC.Core
                         } else
                             LineNumber++;
 
-                        blocks.Add(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
+                        Emit(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
                             LineNumber++;
                             if (addLineNumber)
                                 block = "N" + (LineNumber).ToString() + block;
-                            blocks.Add(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
+                            Emit(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                         }
                     }
                     block = sr.ReadLine();
@@ -205,11 +259,6 @@ namespace CNC.Core
             }
 
             sr.Close();
-
-            if (ok)
-                AddBlock("", Action.End);
-            else
-                CloseFile();
 
             return ok;
         }
@@ -284,50 +333,50 @@ namespace CNC.Core
 
             if (action == Action.End)
             {
-#if DEBUG
-                System.Diagnostics.Stopwatch stopWatch = new System.Diagnostics.Stopwatch();
-                stopWatch.Start();
-#endif
-
-                // Calculate program limits (bounding box). Wrapped so an exotic program the emulator can't fully
-                // evaluate (e.g. a controller-side NGC probe/macro program full of #-expressions and O-words, like
-                // Load Stock) yields a partial/empty box rather than taking down the load/run with a parse fault.
-                BoundingBox.Reset();
-
-                try
-                {
-                    GCodeEmulator emu = new GCodeEmulator(true);
-
-                    foreach (var cmd in emu.Execute(Tokens))
-                    {
-                        if (cmd.Token is GCArc)
-                            BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                        else if (cmd.Token is GCCubicSpline)
-                            BoundingBox.AddBoundingBox((cmd.Token as GCCubicSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                        else if (cmd.Token is GCQuadraticSpline)
-                            BoundingBox.AddBoundingBox((cmd.Token as GCQuadraticSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                        else if (cmd.Token is GCAxisCommand9)
-                        {
-                            if (GrblInfo.LatheUVWModeEnabled)
-                                BoundingBox.AddBoundingBox((cmd.Token as GCAxisCommand9).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
-                            else
-                                BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
-                        }
-                    }
-                }
-                catch { /* unparseable expression program - leave whatever box was accumulated */ }
-
-                BoundingBox.Conclude();
-
-#if DEBUG
-                stopWatch.Stop();
-#endif
-
-                //GCodeParser.Save(@"d:\tokens.xml", Parser.Tokens);
-                //GCodeParser.Save(@"d:\file.nc", GCodeParser.TokensToGCode(Parser.Tokens));
-
+                ComputeLimits();
                 FileChanged?.Invoke(filename);
             }
+        }
+
+        // Calculate program limits (bounding box) by emulating the parsed tokens. Touches only Tokens + BoundingBox
+        // (no UI, no collection) so it is safe to run on a worker thread. Wrapped so an exotic program the emulator
+        // can't fully evaluate (e.g. a controller-side NGC probe/macro program full of #-expressions and O-words,
+        // like Load Stock) yields a partial/empty box rather than taking down the load/run with a parse fault.
+        public void ComputeLimits()
+        {
+            BoundingBox.Reset();
+
+            try
+            {
+                GCodeEmulator emu = new GCodeEmulator(true);
+
+                foreach (var cmd in emu.Execute(Tokens))
+                {
+                    if (cmd.Token is GCArc)
+                        BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                    else if (cmd.Token is GCCubicSpline)
+                        BoundingBox.AddBoundingBox((cmd.Token as GCCubicSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                    else if (cmd.Token is GCQuadraticSpline)
+                        BoundingBox.AddBoundingBox((cmd.Token as GCQuadraticSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                    else if (cmd.Token is GCAxisCommand9)
+                    {
+                        if (GrblInfo.LatheUVWModeEnabled)
+                            BoundingBox.AddBoundingBox((cmd.Token as GCAxisCommand9).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
+                        else
+                            BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
+                    }
+                }
+            }
+            catch { /* unparseable expression program - leave whatever box was accumulated */ }
+
+            BoundingBox.Conclude();
+        }
+
+        // Fire FileChanged on demand - used by the background loader to raise it on the UI thread, after the
+        // buffered blocks have been flushed to the bound collection and the limits computed.
+        public void RaiseFileChanged()
+        {
+            FileChanged?.Invoke(filename);
         }
 
         public void AddBlock(string block)
@@ -343,7 +392,17 @@ namespace CNC.Core
                 b.IsSectionStart = true;
                 sectionStartPending = false;
             }
-            blocks.Add(b);
+            Emit(b);
+        }
+
+        // Route a parsed block either to the background-load sink (worker thread) or straight to the bound
+        // collection (normal synchronous path). See BlockConsumer.
+        private void Emit(GCodeBlock b)
+        {
+            if (BlockConsumer != null)
+                BlockConsumer(b);
+            else
+                blocks.Add(b);
         }
 
         public void CloseFile()

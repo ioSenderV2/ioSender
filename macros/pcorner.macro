@@ -125,11 +125,14 @@ O<pcorner> SUB
   G53 G0 Z[#<_safe_z>]              ; retract only to just above the stock top (top + 5), not machine top
   G53 G0 X[#<rx>] Y[#<ry> + [30 * #<sy>]]
   G53 G0 Z[#<_start_z>]
-  G91 G38.2 X[35 * #<sx>] F[#<_ls_searchf>]
-  G0 X[-4 * #<sx>]                  ; back off enough for the deflecting ball to RELEASE before the slow re-probe
-  G38.2 X[6 * #<sx>] F[#<_ls_latchf>]            ; (2 mm left it stuck triggered -> Alarm:4 "not in initial state"; 4 mm clears it)
+  ; ABSOLUTE seeks (not G91): a G91 move right after a G53 mis-computes on a $23-inverted axis
+  ; (firmware bug - target sign-flips -> false Alarm:2). Current X is #<rx>, so seek to an absolute X.
+  G38.2 X[#<rx> + [35 * #<sx>]] F[#<_ls_searchf>]      ; coarse seek toward the X face
+  #<x_c1> = #5061
+  G0 X[#<x_c1> - [4 * #<sx>]]                          ; back off so the deflecting ball RELEASES before the slow re-probe
+  G38.2 X[#<x_c1> + [6 * #<sx>]] F[#<_ls_latchf>]      ; slow re-probe (2 mm back-off left it stuck triggered -> Alarm:4; 4 mm clears it)
   #<x_trig> = #5061
-  G0 X[-10 * #<sx>]
+  G0 X[#<x_trig> - [10 * #<sx>]]
   G90
   (PRINT, PC x_trig=#<x_trig>)
 
@@ -138,11 +141,13 @@ O<pcorner> SUB
   ; into the stock's X range, then seek toward the Y face. Never a diagonal at probing depth.
   G53 G0 Y[#<ry>]
   G53 G0 X[#<rx> + [30 * #<sx>]]
-  G91 G38.2 Y[35 * #<sy>] F[#<_ls_searchf>]      ; bigger back-off + longer slow re-probe (see X face above)
-  G0 Y[-4 * #<sy>]
-  G38.2 Y[6 * #<sy>] F[#<_ls_latchf>]
+  ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
+  G38.2 Y[#<ry> + [35 * #<sy>]] F[#<_ls_searchf>]      ; coarse seek toward the Y face
+  #<y_c1> = #5062
+  G0 Y[#<y_c1> - [4 * #<sy>]]                          ; back off before the slow re-probe
+  G38.2 Y[#<y_c1> + [6 * #<sy>]] F[#<_ls_latchf>]      ; slow re-probe
   #<y_trig> = #5062
-  G0 Y[-10 * #<sy>]
+  G0 Y[#<y_trig> - [10 * #<sy>]]
   G90
   (PRINT, PC y_trig=#<y_trig>)
 

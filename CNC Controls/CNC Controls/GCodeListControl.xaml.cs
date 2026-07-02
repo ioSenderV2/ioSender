@@ -76,9 +76,27 @@ namespace CNC.Controls
         public void SetProgram(ObservableCollection<GCodeBlock> blocks)
         {
             _program = blocks;
-            grdGCode.DataContext = (object)_program ?? GCode.File.Data;
+            object list = (object)_program ?? GCode.File.Data;
+            if (list is System.Collections.IEnumerable en)
+                AssignBlockNumbers(en);
+            grdGCode.DataContext = list;
             ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.IsFolderView ?? false));
             RefreshSourceHighlight();
+        }
+
+        // Block column = a continuous program line-number sequence: jump to an explicit N word when a line carries
+        // one, otherwise continue previous + 1 (so O<...> calls, comments and any unnumbered line get a sensible,
+        // in-sequence number). Runs on the displayed collection each SetProgram; BlockDisplay only raises a change
+        // when it actually differs, so re-binds during a run do not churn the grid.
+        private static void AssignBlockNumbers(System.Collections.IEnumerable blocks)
+        {
+            long n = 0;
+            foreach (var o in blocks)
+                if (o is GCodeBlock b)
+                {
+                    n = b.HasExplicitLineNum ? b.ExplicitLineNum : n + 1;
+                    b.BlockDisplay = n.ToString();
+                }
         }
 
         // Mint the background only when this view shows the streamer's configured input source: the active
@@ -153,6 +171,14 @@ namespace CNC.Controls
 
                 case nameof(GrblViewModel.IsFolderView):
                     ApplyGrouping(_program == null && ((GrblViewModel)sender).IsFolderView);
+                    break;
+
+                case nameof(GrblViewModel.IsLoading):
+                    // Scope the "busy" hourglass to the program list only (the rest of the UI stays responsive
+                    // while a file/folder loads on the background thread). ForceCursor so it shows over the rows.
+                    bool loading = ((GrblViewModel)sender).IsLoading;
+                    Cursor = loading ? System.Windows.Input.Cursors.Wait : null;
+                    ForceCursor = loading;
                     break;
             }
         }

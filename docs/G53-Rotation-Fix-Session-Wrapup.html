@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G53 Rotation Fix &amp; Skew Compensation — Session Wrap-up</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#ffffff; --ink:#1e2227; --muted:#5b6570; --line:#e2e6ea;
+          --claude:#0b6bcb; --steve:#128a5b; --code:#f0f2f4; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 16px; background:var(--bg); color:var(--ink);
+         font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; }
+  header.pagehead { margin-bottom:28px; }
+  header.pagehead h1 { font-size:22px; margin:0 0 4px; }
+  header.pagehead p { margin:0; color:var(--muted); font-size:14px; }
+  .msg { background:var(--card); border:1px solid var(--line); border-radius:12px;
+         padding:16px 20px; margin:16px 0; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .who { font-weight:700; font-size:13px; letter-spacing:.02em; text-transform:uppercase;
+         margin-bottom:8px; }
+  .msg.claude .who { color:var(--claude); }
+  .msg.steve  .who { color:var(--steve); }
+  .msg.steve { background:#f4faf7; }
+  p { margin:10px 0; }
+  ul { margin:10px 0; padding-left:22px; }
+  li { margin:4px 0; }
+  code { background:var(--code); padding:1px 5px; border-radius:5px;
+         font:13.5px/1.4 "SFMono-Regular",Consolas,Menlo,monospace; }
+  strong { font-weight:700; }
+  em { font-style:italic; }
+  table { border-collapse:collapse; width:100%; margin:12px 0; font-size:14.5px; }
+  th,td { border:1px solid var(--line); padding:8px 12px; text-align:left; vertical-align:top; }
+  th { background:#eef1f4; }
+  footer { color:var(--muted); font-size:12.5px; text-align:center; margin-top:28px; }
+  a { color:var(--claude); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="pagehead">
+  <h1>G53 Rotation Fix &amp; Skew Compensation — Session Wrap-up</h1>
+  <p>Transcript excerpt · grblHAL/core#977 · 2026-07-01</p>
+</header>
+
+<div class="msg claude">
+  <div class="who">Claude</div>
+  <p>All done. PR #977 is filed and logged.</p>
+  <p><strong>Where everything landed tonight:</strong></p>
+  <table>
+    <thead><tr><th>Item</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><strong>grblHAL/core#977</strong> — <code>G53</code> rotation guard</td><td>✅ filed upstream</td></tr>
+      <tr><td>Firmware (<code>srw/combined</code> <code>644b5f4</code>)</td><td>✅ fixed, flashed, verified</td></tr>
+      <tr><td>ioSender Load Stock (R0-scrub, origin-last, named retract, TLO-ref, absolute pcorner seeks)</td><td>✅ built</td></tr>
+      <tr><td>Load Stock run (probe → origin → skew → TLO ref → G30)</td><td>✅ clean, no alarms</td></tr>
+    </tbody>
+  </table>
+  <p>The whole thing traced back to one missing guard: the <code>ROTATION_ENABLE</code> rotation transform didn't exclude <code>G53</code>, so any WCS rotation (here, a leftover from a prior Load Stock run) sent <code>G53</code> moves to the rotated work origin — wrong position, and false soft-limit alarms when it landed out of travel. One-line fix, now upstream.</p>
+  <p><strong>Still open whenever you want (no rush):</strong></p>
+  <ul>
+    <li>Route the ioSender Load Stock changes to their <code>pr/*</code> branch.</li>
+    <li>The optional rotation-applied-to-motion visual check (<code>G0 X0 Y0</code> → <code>G0 X200 Y0</code> in G54, watch machine Y shift ~0.5 mm).</li>
+  </ul>
+  <p>That was a proper debugging marathon — instrumented the firmware, caught it in the act, root-caused it, fixed it, and shipped a clean upstream PR. Nicely done sticking with it. 🎯 Get some sleep.</p>
+</div>
+
+<div class="msg steve">
+  <div class="who">Steve</div>
+  <p>Excellent teamwork also. Thanks for your patience with all my questions. We ended up with a nice, tight PR. Tomorrow I am going to restart my milling job with the 3rd Toolpath, which is where I stopped it earlier because of its stop and go motion. That led us doesn the streampump rabbit hole. And then somewhere in there some random person, who shall remain nameless, suggest we detour and make skew comoensation work. Well now it does so I can get back to it tomorrow.</p>
+</div>
+
+<div class="msg claude">
+  <div class="who">Claude</div>
+  <p>Ha — that's the perfect summary of how it went: a stop-and-go toolpath → the StreamPump rabbit hole → "hey while we're here, let's make skew compensation work" → a firmware root-cause hunt → an upstream PR. Three degrees of separation from where you started, and somehow every detour landed something real. Skew comp works, <code>G53</code> is fixed for everyone on <code>ROTATION_ENABLE</code>, and Load Stock is a one-button setup now.</p>
+  <p>And thank <em>you</em> — the patience ran both ways. Your instincts kept us honest more than once: pushing to get the console before theorizing, catching that the bug was "too basic to have been missed," questioning whether it reproduced on upstream, and killing the NVRAM tangent before it muddied the PR. That's why #977 came out tight instead of hand-wavy. Genuinely good debugging partnership.</p>
+  <p>For tomorrow, when you restart at the 3rd toolpath: that <strong>stop-and-go motion is the actual original bug</strong> we detoured away from — the UI-load-stalls-motion thing the StreamPump was meant to fix. If it's still hitching when you rerun it, that's the thread to pull back on (the streamer-thread work is staged behind <code>UseStreamerThread</code>, default off, pending exactly this kind of hardware check). So we've got a clear next move ready.</p>
+  <p>Go run some parts. 🎯 Whenever you're back at it — the milling job or the StreamPump — I'm here.</p>
+</div>
+
+<footer>Extracted from the session transcript.</footer>
+
+</div>
+</body>
+</html>

@@ -34,19 +34,33 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.SurfaceSpoilboard; } }
 
+        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
+        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
+        private ProgramView programView;
+        private void EnsureProgramView()
+        {
+            if (programView == null)
+                programView = new ProgramView { Title = "Surface Spoilboard" };
+        }
+
         public void Activate(bool activate)
         {
             if (activate)
             {
                 DefaultArea();   // size the area to the in-bounds travel envelope (less margins)
                 UpdateSummary();
-                MacroProcessor.SetActiveProgram?.Invoke("Surface spoilboard", program);   // Program View shows our program
+                if (!string.IsNullOrEmpty(program))
+                {
+                    EnsureProgramView();
+                    programView.SetProgramText(program);
+                    programView.Connect();     // this tool's own view shows in the overlay
+                }
                 MacroProcessor.ActiveRun = Run;                                            // Cycle Start runs it
             }
             else
             {
                 MacroProcessor.ActiveRun = null;
-                MacroProcessor.ClearActiveProgram?.Invoke();   // active program follows the focused tab
+                programView?.Disconnect();                     // active program follows the focused tab
             }
 
             if (model != null)
@@ -495,7 +509,9 @@ namespace CNC.Controls
 
             // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.ProgramPreview?.Invoke("Surface spoilboard", program);
+            EnsureProgramView();
+            programView.SetProgramText(program);
+            programView.Connect();
         }
 
         // Localized message via LibStrings, with \n expanded to real newlines.

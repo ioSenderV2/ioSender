@@ -331,8 +331,61 @@ namespace CNC.Controls
             LoadFolder(folder, restoreRapids);
         }
 
+        // Read + parse a (potentially huge) program on a background thread so the rest of the UI stays responsive,
+        // flushing parsed blocks onto the UI thread in batches so rows appear as the files are read. Only the
+        // program view(s) show a Wait cursor (Model.IsLoading) while it runs. 'parse' runs on the worker thread -
+        // it must route blocks through Program.BlockConsumer (done automatically by AddBlock/ParseFileLines) and
+        // finish with Program.ComputeLimits(); 'onDone' runs on the UI thread after the final flush (raise
+        // FileChanged, set Model.Blocks, ...).
+        private async void BackgroundLoad(System.Action parse, System.Action onDone)
+        {
+            var dispatcher = System.Windows.Application.Current.Dispatcher;
+            var buffer = new List<GCodeBlock>(8192);
+            const int BatchSize = 4000;
+
+            if (Model != null)
+                Model.IsLoading = true;
+
+            // Worker-thread sink: buffer parsed blocks, marshalling a batch to the UI thread whenever it fills.
+            // dispatcher.Invoke (synchronous) gives natural backpressure so the buffer can't run away on a huge file.
+            Program.BlockConsumer = b =>
+            {
+                buffer.Add(b);
+                if (buffer.Count >= BatchSize)
+                {
+                    var batch = buffer.ToArray();
+                    buffer.Clear();
+                    dispatcher.Invoke((System.Action)(() => { foreach (var x in batch) Program.Blocks.Add(x); }));
+                }
+            };
+
+            try
+            {
+                await System.Threading.Tasks.Task.Run(parse);
+
+                // Final flush - we resume here on the UI thread, so add straight to the bound collection.
+                foreach (var x in buffer)
+                    Program.Blocks.Add(x);
+
+                onDone?.Invoke();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Error loading program: " + e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+            finally
+            {
+                Program.BlockConsumer = null;
+                if (Model != null)
+                    Model.IsLoading = false;
+            }
+        }
+
         public void LoadFolder(string folder, bool restoreRapids)
         {
+            if (Model != null && Model.IsLoading)
+                return;   // a background load is already in progress - ignore a re-entrant request
+
             var ops = FusionFolderLoader.MatchFolder(folder);
 
             if (ops.Count == 0)
@@ -342,22 +395,22 @@ namespace CNC.Controls
                 return;
             }
 
-            // Combine can be a big (multi-MB / 100k+ line) program. Keep the list ungrouped while
-            // bulk-adding so the bound DataGrid stays cheap, and pump messages periodically so the
-            // STA thread doesn't trip a ContextSwitchDeadlock; group once at the end.
+            // Combine can be a big (multi-MB / 100k+ line) program - so read + parse on a background thread with
+            // incremental UI flush (see BackgroundLoad). Clear + reset on the UI thread first; use the folder's
+            // leaf name as the "filename" (not a real path, so the sender won't treat it as a reloadable file).
             if (Model != null)
                 Model.IsFolderView = false;
 
-            using (new UIUtils.WaitCursor())
+            Program.AddBlock(new DirectoryInfo(folder.TrimEnd('\\', '/')).Name, Core.Action.New);
+
+            // Match a normal file load: only prepend N<line> numbers when the user has enabled both controller
+            // line numbers and the "add line numbers" option.
+            Program.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
+
+            var toolTablePath = FusionFolderLoader.MatchToolTable(folder);
+
+            BackgroundLoad(() =>
             {
-                // Use the folder's leaf name as the "filename" - not a real path, so the
-                // sender won't treat it as a reloadable on-disk single file.
-                Program.AddBlock(new DirectoryInfo(folder.TrimEnd('\\', '/')).Name, Core.Action.New);
-
-                // Match a normal file load: only prepend N<line> numbers when the user has enabled
-                // both controller line numbers and the "add line numbers" option.
-                Program.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
-
                 // File prolog (also re-sent before a toolpath when starting a run partway through).
                 Program.BeginSection("Program start");
                 foreach (var line in FusionFolderLoader.Prolog)
@@ -366,7 +419,6 @@ namespace CNC.Controls
                 // Tool table (e.g. 0_tooltable.nc): loaded first, verbatim, so its (TOOL ...) comments reach
                 // the controller / simulator before the first tool change. Comments are preserved here (the
                 // per-op files below still get their headers stripped).
-                var toolTablePath = FusionFolderLoader.MatchToolTable(folder);
                 if (toolTablePath != null)
                 {
                     try
@@ -382,7 +434,6 @@ namespace CNC.Controls
                     catch { }
                 }
 
-                int sincePump = 0;
                 foreach (var op in ops)
                 {
                     string content;
@@ -411,33 +462,32 @@ namespace CNC.Controls
                     if (!FusionFolderLoader.ContainsToolChange(op.Body))
                         Program.AddBlock("M6 T" + op.Tool); // M0 swap-pause is handled by the controller's tc.macro
                     foreach (var line in op.Body)
-                    {
                         Program.AddBlock(line);
-                        if (++sincePump >= 2000)
-                        {
-                            sincePump = 0;
-                            EventUtils.DoEvents();
-                        }
-                    }
                 }
 
                 Program.BeginSection("Program end");
                 Program.AddBlock("M5");
                 Program.AddBlock("M30");
 
-                Program.AddBlock("", Core.Action.End);
-            }
-
-            if (Model != null)
+                Program.ComputeLimits();                    // bounding box on the worker thread
+            },
+            () =>
             {
-                Model.IsFolderView = true;
-                Model.Blocks = Blocks;
-                Model.ProgramPath = folder;   // full folder path for the tooltip (FileName stays the leaf name)
-            }
+                Program.RaiseFileChanged();                 // FileName + limits (sets ProgramPath = leaf name)
+                if (Model != null)
+                {
+                    Model.IsFolderView = true;
+                    Model.Blocks = Blocks;
+                    Model.ProgramPath = folder;             // override with the full folder path for the tooltip
+                }
+            });
         }
 
         public void Load(string filename)
         {
+            if (Model != null && Model.IsLoading)
+                return;   // a background load is already in progress - ignore a re-entrant request
+
             if (Model != null)
                 Model.IsFolderView = false;
 
@@ -455,12 +505,28 @@ namespace CNC.Controls
                 }
             }
 
-            using (new UIUtils.WaitCursor())
-            {
-                Program.LoadFile(filename, GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers);
-            }
+            // Read + parse on a background thread (see BackgroundLoad) so a large single file doesn't freeze the
+            // UI. Clear + reset on the UI thread first; the per-line parse loop runs on the worker thread.
+            Program.AddBlock(filename, Core.Action.New);
+            bool addLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
+            bool[] ok = { true };
 
-            Model.Blocks = Blocks;
+            BackgroundLoad(() =>
+            {
+                ok[0] = Program.ParseFileLines(filename, addLineNumbers);
+                if (ok[0])
+                    Program.ComputeLimits();
+            },
+            () =>
+            {
+                if (ok[0])
+                {
+                    Program.RaiseFileChanged();
+                    Model.Blocks = Blocks;
+                }
+                else
+                    Close();   // aborted mid-parse: discard the partial load
+            });
         }
 
         public void Save()
