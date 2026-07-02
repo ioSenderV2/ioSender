@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Proposed Pull Requests — ioSender</title>
+<title>Features &amp; Fixes — ioSender</title>
 <style>
   @page { size: A4; margin: 18mm 16mm; }
   * { box-sizing: border-box; }
@@ -53,8 +53,8 @@
 </head>
 <body>
 
-<h1>Proposed Pull Requests</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>31 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;31 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is consumed wholesale or cherry-picked.</div>
+<h1>Features &amp; Fixes</h1>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>34 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;34 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
@@ -92,6 +92,7 @@
 <tr><td>Surface Spoilboard &mdash; machine-referenced facing (Z-only touch-off, Reuse Z0, finish pass, leveling check)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr29">29</a></td></tr>
 <tr><td>Load Stock &mdash; corner-probe stock size/flatness/skew/thickness, results popup, Copy size &rarr; Fusion add-in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr30">30</a></td></tr>
 <tr><td>Squareness (Auto Square) &mdash; drill an L, measure, write the ganged-axis squaring offset + re-home</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr31">31</a></td></tr>
+<tr><td>Probe definition diagrams &mdash; per-type schematic in the probe editor labelling the measurements to enter</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr34">34</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -99,6 +100,14 @@
 <tr><td>Load Folder &mdash; assemble per-toolpath <code>.nc</code> files into one outlined program (+ Fusion add-in)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr6">6</a><span class="star">&#9733;</span></td></tr>
 <tr><td>SD + LittleFS browser &amp; file manager &mdash; multi-filesystem, View/Edit/Create/Upload via Notepad</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr14">14</a></td></tr>
 <tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a> +<a href="#pr14">14</a></td></tr>
+</table>
+
+<h3>Program view &amp; G-code</h3>
+<table>
+<tr><td>Reusable program view &mdash; file / folder / each wizard gets its own view; one Cycle Start runs the active one</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
+<tr><td>Background file / folder loading &mdash; big programs parse on a worker thread; the UI stays responsive, rows fill as read</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
+<tr><td>Continuous block numbering &mdash; explicit <code>N</code> words shown in the Block column and hidden from the G-code column</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
+<tr><td>Explain G-code on hover &mdash; plain-language tooltip per line (or a whole selection), for novices</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr33">33</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -153,7 +162,10 @@
 <tr><td class="n">29</td><td><a href="#pr29">Surface Spoilboard &mdash; machine-referenced facing tool</a></td><td class="mono">pr/surface-spoilboard</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+673</span> <span class="del">0</span></td></tr>
 <tr><td class="n">30</td><td><a href="#pr30">Load Stock &mdash; corner-probe stock measurement</a></td><td class="mono">pr/load-stock</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1125</span> <span class="del">0</span></td></tr>
 <tr><td class="n">31</td><td><a href="#pr31">Squareness (Auto Square) &mdash; ganged-gantry offset tool</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+686</span> <span class="del">0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (31 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">211</span> <span class="del">0</span> <span class="add">+77</span><br><span class="k">Lines:</span> <span class="add">+21650</span> <span class="del">-1547</span></td></tr>
+<tr><td class="n">32</td><td><a href="#pr32">Program view as a reusable object + background loading</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+830</span> <span class="del">-184</span></td></tr>
+<tr><td class="n">33</td><td><a href="#pr33">Explain G-code on hover (novice tooltips)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+453</span> <span class="del">0</span></td></tr>
+<tr><td class="n">34</td><td><a href="#pr34">Probe definition diagrams</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+142</span> <span class="del">-22</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (34 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">237</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23075</span> <span class="del">-1753</span></td></tr>
 </table>
 </div>
 
@@ -1172,6 +1184,91 @@
   <li><strong>Measure-only gauge:</strong> on a build without the offset setting it still drills + measures to show how far out of square the gantry is (correct mechanically). Dry run + Reuse Z0.</li>
 </ul>
 <p class="foot">In the integration build. Note: the squaring offset is fine-trim only &mdash; a grossly racked gantry must be corrected mechanically first.</p>
+</div>
+</div>
+
+<!-- ===== PR 32 ===== -->
+<div class="pr">
+<h2 id="pr32"><span class="badge">PR 32</span>Program view as a reusable object + background loading</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (shared program-view / streamer / loader core).</div>
+  <div><span class="label">Depends on</span>The macro&rarr;job streamer (<a href="#pr11">PR 11</a>); touches the shared program view used by every tab.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/ProgramView.xaml(.cs)</td><td class="num add">129</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GCodeJob.cs</td><td class="num add">108</td><td class="num del">49</td></tr>
+<tr><td class="mono">CNC Controls/GCode.cs</td><td class="num add">99</td><td class="num del">33</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml(.cs)</td><td class="num add">79</td><td class="num del">44</td></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml(.cs)</td><td class="num add">68</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/GCodeListControl.xaml(.cs)</td><td class="num add">29</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/{AutoSquare,SurfaceSpoilboard,StepperCalibration}Wizard.xaml.cs</td><td class="num add">57</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml.cs</td><td class="num add">13</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/MacroProcessor.cs</td><td class="num">0</td><td class="num del">14</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">13</td><td class="num del">8</td></tr>
+<tr><td class="mono">docs/ (2 design/session notes)</td><td class="num add">224</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GrblViewModel.cs, CNC Core.csproj</td><td class="num add">11</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>&ldquo;A program is a program&rdquo;, taken further: the single shared program overlay becomes a standalone, streamer-connectable <code>ProgramView</code> object, and the loader stops blocking the UI.</p>
+<ul>
+  <li><strong>Reusable program view:</strong> Load File, Load Folder and each wizard create their own <code>ProgramView</code> and <code>Connect()</code> it to a push/pop stack &mdash; the overlay hosts whichever is active, and the loaded job is no longer a special &ldquo;null&rdquo; case. One Cycle Start runs the active view.</li>
+  <li><strong>Continuous block numbering:</strong> an explicit <code>N</code> word is shown in the Block column and hidden from the G-code column (Data stays intact for streaming); unnumbered lines (O-word calls, comments) continue previous + 1.</li>
+  <li><strong>Background loading:</strong> Load File / Load Folder parse on a worker thread &mdash; the per-line parse and the end-of-load bounding-box emulation run off the UI thread, blocks flush to the bound list in batches (rows appear as files are read), and a program-view-scoped wait cursor replaces the global one. A 322k-line folder combine no longer freezes the app.</li>
+  <li><strong>Also shipped here:</strong> Load Stock &ldquo;set tool-length reference&rdquo; option (Start Job parity) and the absolute-seek <code>pcorner.macro</code> (workaround for the G53-then-G91-on-inverted-axis firmware bug, filed upstream).</li>
+</ul>
+<p class="foot">In the integration build; hardware-tested (Load Stock, single-file and folder loads, background load).</p>
+</div>
+</div>
+
+<!-- ===== PR 33 ===== -->
+<div class="pr">
+<h2 id="pr33"><span class="badge">PR 33</span>Explain G-code on hover (novice tooltips)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (wires into the shared program view).</div>
+  <div><span class="label">Depends on</span>The program view (<a href="#pr32">PR 32</a>) and the G-code parser&rsquo;s semantic tokens.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/GCodeExplainer.cs</td><td class="num add">372</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/GCodeListControl.xaml(.cs)</td><td class="num add">80</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Makes the program view teach: hovering a line shows a plain-language explanation of what the G-code does &mdash; aimed at novices.</p>
+<ul>
+  <li><strong>Token-based:</strong> builds the explanation from the parser&rsquo;s own semantic tokens (keyed to a block by line number), so it inherits the parser&rsquo;s modal state &mdash; a bare <code>X10 Y0</code> continuation still reads correctly as a rapid or a cut.</li>
+  <li><strong>Line or selection:</strong> hovering one line explains it (&ldquo;Cutting move to X 125.4, Y 0; feed 800 mm/min&rdquo;); hovering a line within a multi-row selection gives a line-by-line breakdown.</li>
+  <li><strong>Full coverage:</strong> a complete G/M-code dictionary plus a raw-line lexer fallback explain bare modal codes (e.g. <code>G54</code>) and views without parsed tokens. Computed lazily per row; skipped (thread-safe) while a background load is still parsing.</li>
+  <li><strong>Localizable:</strong> English for now, but every phrase is produced in one place so it can move to LibStrings later.</li>
+</ul>
+<p class="foot">In the integration build; hardware-verified.</p>
+</div>
+</div>
+
+<!-- ===== PR 34 ===== -->
+<div class="pr">
+<h2 id="pr34"><span class="badge">PR 34</span>Probe definition diagrams</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (the shared probe-definition editor).</div>
+  <div><span class="label">Depends on</span>The probe-definition library / editor.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/ProbeDefinitionEditDialog.xaml</td><td class="num add">136</td><td class="num del">22</td></tr>
+<tr><td class="mono">CNC Controls/ProbeDefinitionEditDialog.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>The probe definition editor now shows a labelled schematic beside the fields, so a novice can see what each measurement means.</p>
+<ul>
+  <li><strong>Per-type drawing:</strong> switched with the Type dropdown &mdash; 3D touch probe, touch plate, tool setter and edge finder each draw their shape and dimension the key measurements the user enters (tip / ball / bit diameter, plate thickness, lip width, setter height, spin speed).</li>
+  <li><strong>Touch-plate lip:</strong> drawn as a down-protruding hook whose inner face registers against the stock side (aluminium).</li>
+  <li><strong>Pure vector</strong> (Canvas + Viewbox), toggled with the same show/hide as the fields &mdash; no image assets, theme-friendly.</li>
+</ul>
+<p class="foot">In the integration build.</p>
 </div>
 </div>
 

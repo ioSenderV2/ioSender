@@ -8,15 +8,15 @@ run, or cherry-pick from this fork, start here.
 - **`Overview.html` / `Overview.pdf`** — the big picture across all three coordinated forks (this
   sender, the grblHAL **Simulator**, and the iMXRT1062 **firmware**): goals, each fork's PRs, the
   `apply-prs` composer, and effort/scale.
-- **`ProposedPRs.html` / `ProposedPRs.pdf`** — every PR in this repo: branch, diff stats, description,
-  dependencies.
+- **`FeaturesAndFixes.html` / `FeaturesAndFixes.pdf`** — every feature/fix in this repo: branch (or
+  integration-resident), diff stats, description, dependencies. (Formerly `ProposedPRs.*`.)
 
 ## Build (Windows only — WPF, .NET Framework 4.6.2)
 - Open **`ioSender XL/ioSender XL.sln`** in Visual Studio 2022, build **Release** — or:
   `msbuild "ioSender XL/ioSender XL.sln" -t:Build -p:Configuration=Release`
 - Needs the .NET Framework 4.6.2 targeting pack. A couple of external DLLs (RP.Math, websocket-sharp)
   are referenced by relative `..\..\` paths; if a clean build can't resolve `RP.Math` or is missing
-  `App.config`, see PR 1 in `ProposedPRs`.
+  `App.config`, see PR 1 in `FeaturesAndFixes`.
 - **macOS / Linux:** not supported — WPF is Windows-only. Run in a Windows VM (the Simulator and
   firmware forks *do* build cross-platform; see `Overview.html`).
 
