@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System.Data;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -45,6 +46,7 @@ using System.Windows.Media;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CNC.Core;
+using CNC.GCode;
 
 namespace CNC.Controls
 {
@@ -128,6 +130,78 @@ namespace CNC.Controls
             private set { SetValue(MultipleSelectedProperty, value); }
         }
         #endregion
+
+        // Plain-language explanation tooltip. Computed lazily on open for just the hovered row (never
+        // precomputed - a program can be 300k+ lines). If the hovered row is part of a multi-row selection,
+        // explain every selected line; otherwise explain the one line. Uses the loaded program's parsed
+        // tokens (GCode.File.Tokens, keyed to a block by LineNumber); a view without matching tokens (e.g.
+        // a wizard's own program) falls back to describing the raw text.
+        private void Row_ToolTipOpening(object sender, ToolTipEventArgs e)
+        {
+            var row = sender as DataGridRow;
+            var block = row?.Item as GCodeBlock;
+            if (row == null || block == null)
+            {
+                e.Handled = true;   // no content to show (e.g. a group header)
+                return;
+            }
+
+            row.ToolTip = new TextBlock {
+                Text = BuildExplanation(block),
+                FontFamily = new FontFamily("Consolas"),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 720
+            };
+        }
+
+        private string BuildExplanation(GCodeBlock block)
+        {
+            // A background load appends to GCode.File.Tokens on a worker thread - don't enumerate it mid-load
+            // (the parse is still running, or its tail ComputeLimits) or the read races the writer.
+            if ((DataContext as GrblViewModel)?.IsLoading == true)
+                return "Program is still loading…";
+
+            try
+            {
+                var tokens = GCode.File.Tokens;
+                var selected = grdGCode.SelectedItems;
+
+                // Multi-row selection that includes the hovered row -> line-by-line breakdown of the selection.
+                if (selected != null && selected.Count > 1 && selected.Contains(block))
+                {
+                    var blocks = selected.OfType<GCodeBlock>().ToList();
+                    blocks.Sort((a, b) => a.LineNum.CompareTo(b.LineNum));   // program order, not click order
+                    return GCodeExplainer.ExplainSelection(blocks, TokenMapFor(tokens, blocks));
+                }
+
+                var lineTokens = tokens?.Where(t => t.LineNumber == block.LineNum).ToList();
+                return GCodeExplainer.ExplainBlock(block, lineTokens);
+            }
+            catch (System.InvalidOperationException)
+            {
+                // Tokens changed under us (a load raced the hover) - explain from the raw text, never throw.
+                return GCodeExplainer.ExplainBlock(block, null);
+            }
+        }
+
+        // Group the program's tokens by LineNumber, but only for the lines we need (the selection).
+        private static Dictionary<uint, List<GCodeToken>> TokenMapFor(List<GCodeToken> tokens, List<GCodeBlock> blocks)
+        {
+            var map = new Dictionary<uint, List<GCodeToken>>();
+            if (tokens == null)
+                return map;
+
+            var wanted = new HashSet<uint>(blocks.Select(b => b.LineNum));
+            foreach (var t in tokens)
+                if (wanted.Contains(t.LineNumber))
+                {
+                    if (!map.TryGetValue(t.LineNumber, out var list))
+                        map[t.LineNumber] = list = new List<GCodeToken>();
+                    list.Add(t);
+                }
+
+            return map;
+        }
 
         private void grdGCode_Drag(object sender, DragEventArgs e)
         {

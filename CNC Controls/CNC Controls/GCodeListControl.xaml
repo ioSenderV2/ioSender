@@ -19,6 +19,12 @@
              controller's reported line number (needs line-number reporting); completed lines show "ok". -->
         <DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
+                <!-- Plain-language "what does this line do" tooltip (GCodeExplainer), computed lazily per row
+                     on open. The " " placeholder is required so ToolTipOpening fires; the handler replaces it. -->
+                <Setter Property="ToolTip" Value=" "/>
+                <Setter Property="ToolTipService.InitialShowDelay" Value="450"/>
+                <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
+                <EventSetter Event="ToolTipOpening" Handler="Row_ToolTipOpening"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Sent}" Value="@">
                         <Setter Property="Background" Value="#FF4CAF50"/>
