@@ -122,30 +122,13 @@ namespace GCode_Sender
             // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
             // use ?.Invoke, so they no-op). Feed Hold / Stop are always reachable from the fixed bar.
 
-            // When a generated program is large enough to stream through the real job streamer, bring the Grbl
-            // (Job) tab forward (so the operator can watch progress / 3D and has the full run controls) and
-            // start it via the public CycleStart path. When the job ends, return to the tab it was launched
-            // from (e.g. Tools > Auto square) so iterative tools don't strand the operator on the Grbl tab.
-            CNC.Controls.MacroProcessor.RunStreamedJob = m =>
-            {
-                TabItem origin = tabMode.SelectedItem as TabItem;
-                TabItem tab = getTab(ViewType.GRBL);
-                if (tab != null)
-                    tabMode.SelectedItem = tab;
-                var jv = getView(tab) as JobView;
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                    new System.Action(() => jv?.StartLoadedJob()));
-                if (origin != null && origin != tab)
-                    RestoreTabOnJobEnd(m, origin);
-            };
-
             // Every producer (Load/Load Folder and each wizard) owns its ProgramView and connects it; host the
             // connected view in the overlay with its own title bar. Wizards (AutoShow) pop it open as Generate
             // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
             CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
 
-            // Stay-put streamed run (Load Stock): stream the generated program through the flow-controlled
-            // streamer without leaving the current tab, then restore the user's loaded job when it finishes.
+            // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
+            // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
             CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
 
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
@@ -272,6 +255,25 @@ namespace GCode_Sender
         // collection, the mint source highlight and folder outline grouping; AutoShow is off so a load doesn't
         // pop the overlay open.
         private CNC.Controls.ProgramView jobProgramView;
+
+        // A plain streamed macro (not a tool that owns its own view) runs in this dedicated view, so it shows in
+        // its own overlay with live markers and never overwrites the loaded job. Reused across macro runs.
+        private CNC.Controls.ProgramView _macroRunView;
+        private System.Windows.Threading.DispatcherTimer _macroRunViewTimer;
+        private void EnsureMacroRunView()
+        {
+            if (_macroRunView == null)
+                _macroRunView = new CNC.Controls.ProgramView();
+            if (_macroRunViewTimer == null)
+            {
+                // The run view has no tab to close it and holds nothing useful once the run is done, so auto-
+                // dismiss it 20 s after it stops streaming (a new run/burst re-uses it and cancels the timer).
+                // On fire, disconnect it - the overlay reverts to the view beneath (the loaded job, or none).
+                _macroRunViewTimer = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromSeconds(20) };
+                _macroRunViewTimer.Tick += (s, e) => { _macroRunViewTimer.Stop(); _macroRunView.Disconnect(); };
+            }
+        }
+
         private void OnJobFileChanged(string fileName)
         {
             if (string.IsNullOrEmpty(fileName))
@@ -608,31 +610,6 @@ namespace GCode_Sender
             timer.Start();
         }
 
-        // After a tool-launched streamed job (which jumps to the Grbl tab) finishes, hop back to the tab it was
-        // started from so iterative tools (e.g. Auto square: drill -> measure -> apply -> repeat) don't strand
-        // the operator on the Grbl tab. Watches StreamingState: arm on the first running state, restore on the
-        // next terminal one, then unsubscribe.
-        private void RestoreTabOnJobEnd(GrblViewModel m, TabItem origin)
-        {
-            bool started = false;
-            System.ComponentModel.PropertyChangedEventHandler handler = null;
-            handler = (s, e) =>
-            {
-                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
-                    return;
-                var st = m.StreamingState;
-                if (st == StreamingState.Send || st == StreamingState.SendMDI)
-                    started = true;
-                else if (started && (st == StreamingState.Idle || st == StreamingState.JobFinished ||
-                                     st == StreamingState.Stop || st == StreamingState.NoFile))
-                {
-                    m.PropertyChanged -= handler;
-                    Dispatcher.BeginInvoke(new System.Action(() => { if (origin != null) tabMode.SelectedItem = origin; }));
-                }
-            };
-            m.PropertyChanged += handler;
-        }
-
         // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current tab
         // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
         // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
@@ -649,26 +626,23 @@ namespace GCode_Sender
             prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
 
             RunControl.Source = prog;          // stream this program instead of the loaded job
-            // Show the ACTUAL streamed program in the program view so the live per-line markers (executing "@",
-            // completed "ok") and scroll track the run exactly as the Grbl tab does - the authored preview was a
-            // separate copy, so it scrolled but never marked progress. Built from the same blocks the streamer runs.
-            // Point the ACTUAL streamed program at the view so the live per-line markers ("@"/"ok") and scroll
-            // track the run. A tool that owns its ProgramView (Load Stock) gets its own view marked (and it carries
-            // its own title); tools still on the shared overlay use it, and only then does the overlay title need
-            // forcing to the running program's name (a connected view titles itself).
+            // Mark the ACTUAL streamed program in a ProgramView so the live per-line markers ("@"/"ok") and scroll
+            // track the run. A tool that owns its view (a wizard) marks its own; a plain macro - no tool view, or
+            // only the loaded-job view is active - gets a dedicated run view, so a run never overwrites the job.
             var connected = CNC.Controls.ProgramView.Active;
-            if (connected != null)
+            if (connected != null && connected != jobProgramView)
                 connected.SetProgram(prog.Data);
             else
             {
-                overlayProgramView.SetProgram(prog.Data);
-                overlayPreviewTitle.Text = string.IsNullOrEmpty(name) ? "Generated program" : name;
-                overlayJobTitle.Visibility = Visibility.Collapsed;
-                overlayPreviewTitle.Visibility = Visibility.Visible;
+                EnsureMacroRunView();
+                _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
+                _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
+                _macroRunView.SetProgram(prog.Data);
+                _macroRunView.Connect();
             }
             RestoreSourceOnEnd(m, prog);       // revert to the job source when THIS burst ends
 
-            // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously
+            // Defer CycleStart to a clean dispatcher cycle. Starting it synchronously
             // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
             // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
             // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
@@ -707,6 +681,13 @@ namespace GCode_Sender
                         // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
                         if (RunControl.Source == prog)
                             RunControl.Source = null;
+                        // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
+                        // it); a tool's own view is left alone - it closes on tab-leave.
+                        if (_macroRunViewTimer != null && CNC.Controls.ProgramView.Active == _macroRunView)
+                        {
+                            _macroRunViewTimer.Stop();
+                            _macroRunViewTimer.Start();
+                        }
                     }));
                 }
             };

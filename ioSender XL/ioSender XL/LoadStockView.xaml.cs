@@ -615,7 +615,7 @@ namespace GCode_Sender
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
             // confirmation. confirm:true gives the operator a final "run?" before any motion.
-            MacroProcessor.Run(model, "Load stock", program, true, stayPut: true);
+            MacroProcessor.Run(model, "Load stock", program, true);
         }
 
         // Build the NGC probe program: call the tested pcorner.macro per corner (it discovers the spoilboard /

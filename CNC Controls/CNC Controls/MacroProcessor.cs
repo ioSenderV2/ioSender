@@ -68,11 +68,6 @@ namespace CNC.Controls
         // direct reference to it.
         public static System.Action<GrblViewModel> RunControlPanel;
 
-        // Hook to run the just-loaded in-memory program through the real job streamer: the host (ioSender XL)
-        // brings the Grbl (Job) tab forward and calls JobControl.CycleStart(0). Set by the shell because the
-        // streamer/job control live there. Called after a large flush has been loaded into GCode.File.
-        public static System.Action<GrblViewModel> RunStreamedJob;
-
         // The active program's run action: a tool registers its "generate-and-run" here when its tab is shown and
         // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
         // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)
@@ -93,14 +88,11 @@ namespace CNC.Controls
         // Start" status prompt. Null when no wizard program is active.
         public static string ActiveProgramName;
 
-        // Hook to stream a generated program through the job streamer WITHOUT leaving the current tab, then
-        // restore the user's previously loaded job when it finishes: args are (model, name, lines). Set by the
-        // shell. Used when Run is called with stayPut:true (Load Stock) so a tool's program runs with full flow
-        // control (Feed Hold/Stop live) yet never takes over the job view. Falls back to RunStreamedJob if unset.
+        // Hook to stream a generated program with full flow control (Feed Hold/Stop live) WITHOUT touching the
+        // loaded job: args are (model, name, lines). Set by the shell (ioSender XL). EVERY streamed run goes
+        // through this - a tool that owns a ProgramView streams into it, a plain macro gets its own run view -
+        // so a run never overwrites the loaded program or hijacks the Job tab.
         public static System.Action<GrblViewModel, string, string[]> RunStreamedJobInPlace;
-
-        // Set per-run by Run(..., stayPut:true); consumed by StreamProgram to route to RunStreamedJobInPlace.
-        private static bool _stayPut = false;
 
         // Above this many g-code lines a single flush is streamed through the flow-controlled job streamer
         // (GCode.File + Cycle Start) instead of the MDI path. The MDI path has no character-counting flow
@@ -112,7 +104,7 @@ namespace CNC.Controls
         private static string _streamName = "Macro";
 
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool stayPut = false)
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -121,15 +113,6 @@ namespace CNC.Controls
                 name = "Macro";
 
             _streamName = name;
-            _stayPut = stayPut;   // route any streamed flush through the in-place (stay-on-tab + restore) path
-
-            // Trace stay-put macro runs (Load Stock) to %TEMP%\iosender-loadstock.log for diagnosis.
-            PumpLog.Enabled = stayPut;
-            if (stayPut)
-            {
-                PumpLog.Clear();
-                PumpLog.W("RUN START name=" + name);
-            }
 
             // A macro whose body is a single "@<path>" line is a reference to an external file;
             // load and run that file's current contents (re-read every run, so the macro can be
@@ -327,12 +310,12 @@ namespace CNC.Controls
             // setup bursts (a few G10/G54/#-set lines between prompts) stay on the quick MDI path.
             bool mustStream = canStream && (hasFeed || hasCall || n > StreamLineThreshold);
 
-            PumpLog.W(string.Format("FLUSH n={0} hasCall={1} hasFeed={2} hasOwordOrExpr={3} exprSupported={4} canStream={5} mustStream={6} stayPut={7}",
-                n, hasCall, hasFeed, hasOwordOrExpr, GrblInfo.ExpressionsSupported, canStream, mustStream, _stayPut));
+            PumpLog.W(string.Format("FLUSH n={0} hasCall={1} hasFeed={2} hasOwordOrExpr={3} exprSupported={4} canStream={5} mustStream={6}",
+                n, hasCall, hasFeed, hasOwordOrExpr, GrblInfo.ExpressionsSupported, canStream, mustStream));
 
             if (mustStream)
             {
-                if (RunStreamedJob == null)
+                if (RunStreamedJobInPlace == null)
                 {
                     // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
                     ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
@@ -345,7 +328,9 @@ namespace CNC.Controls
                 model.ExecuteMacro(code);
         }
 
-        // Load the accumulated g-code into the in-memory program and start it on the normal job streamer.
+        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView, WITHOUT touching
+        // the loaded job. A run flushes several bursts (a park move, then each O<...> CALL); every one takes this
+        // path, so a run never overwrites the loaded program or hijacks the Job tab.
         private static void StreamProgram(GrblViewModel model, string[] lines)
         {
             var code = new List<string>();
@@ -358,24 +343,7 @@ namespace CNC.Controls
             if (code.Count == 0)
                 return;
 
-            // stay-put run: hand the lines to the host, which captures the current job, streams without leaving
-            // the tab, and restores the job afterwards (Load Stock). EVERY flush of a stay-put run must take this
-            // path - a Load Stock run flushes several times (the park move, then each O<...> CALL), so the flag
-            // must NOT be consumed here or later bursts leak into GCode.File (the Job view). Run() re-establishes
-            // _stayPut per run (StreamProgram is only ever reached from within a Run), so it can't leak across runs.
-            if (_stayPut && RunStreamedJobInPlace != null)
-            {
-                RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray());
-                return;
-            }
-
-            GCode.File.AddBlock(_streamName, CNC.Core.Action.New);            // names + clears the program
-            for (int i = 0; i < code.Count - 1; i++)
-                GCode.File.AddBlock(code[i], CNC.Core.Action.Add);
-            GCode.File.AddBlock(code[code.Count - 1], CNC.Core.Action.End);   // finalize (sets Model.Blocks)
-
-            // Host brings the Job tab forward and starts the flow-controlled stream (JobControl.CycleStart(0)).
-            RunStreamedJob.Invoke(model);
+            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray());
         }
 
         // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -

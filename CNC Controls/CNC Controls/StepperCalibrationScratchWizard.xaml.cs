@@ -441,7 +441,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Stepper calibration", program, true, stayPut: true);
+            MacroProcessor.Run(model, "Stepper calibration", program, true);
         }
 
         private void Generate()

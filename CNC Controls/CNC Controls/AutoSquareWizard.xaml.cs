@@ -470,7 +470,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            bool ok = MacroProcessor.Run(model, DryRun ? "Auto square dry run" : "Auto square holes", program, true, stayPut: true);
+            bool ok = MacroProcessor.Run(model, DryRun ? "Auto square dry run" : "Auto square holes", program, true);
 
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry
             // run you can untick Dry run and Run again to cut at the same Z0 without touching off again.
