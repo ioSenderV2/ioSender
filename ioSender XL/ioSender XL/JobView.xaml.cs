@@ -576,7 +576,53 @@ namespace GCode_Sender
             if (GrblInfo.THCMode && thcFlyout == null)
                 MainWindow.UIViewModel.SidebarItems.Add(thcFlyout = new SidebarItem(MainWindow.ui.thcControl));
 
+            // Keep the bundled simulator in step with THIS controller's build: derive its option signature and,
+            // if the cached sim doesn't match, fetch/build a matching one so a later "connect to simulator" runs
+            // a faithful copy. Real controllers only (skip when we're already talking to our own simulator).
+            TriggerMatchedSimulatorCheck();
+
             return true;
+        }
+
+        // Fire-and-forget: read the connected controller's options and ensure the bundled simulator matches.
+        // Runs on a background thread (network I/O), never blocks connect, and surfaces only a brief status line.
+        // A first-time signature dispatches a CI build and then polls for it so the match is ready without a
+        // reconnect; an already-built signature is installed from the local or remote cache immediately.
+        private void TriggerMatchedSimulatorCheck()
+        {
+            if (!GrblInfo.IsGrblHAL || CNC.Controls.SimulatorManager.IsSimulatorRunning)
+                return;   // meaningful only for a real grblHAL controller
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string sig, detail;
+                    var r = CNC.Controls.SimulatorManager.EnsureMatchedSimulator(out sig, out detail);
+                    switch (r)
+                    {
+                        case CNC.Controls.SimulatorManager.MatchResult.InstalledFromCache:
+                        case CNC.Controls.SimulatorManager.MatchResult.InstalledFromRelease:
+                            PostMessage("Simulator matched to controller (build " + sig + ").");
+                            break;
+                        case CNC.Controls.SimulatorManager.MatchResult.BuildTriggered:
+                            PostMessage("Building a matching simulator (build " + sig + ")...");
+                            if (CNC.Controls.SimulatorManager.PollForMatchedRelease(sig))
+                                PostMessage("Matching simulator ready (build " + sig + ").");
+                            break;
+                        case CNC.Controls.SimulatorManager.MatchResult.Failed:
+                            System.Diagnostics.Debug.WriteLine("Matched simulator: " + detail);
+                            break;
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Matched simulator: " + ex.Message); }
+            });
+        }
+
+        private void PostMessage(string text)
+        {
+            try { Dispatcher.BeginInvoke((System.Action)(() => model.Message = text)); }
+            catch { }
         }
 
         void EnableUI(bool enable)

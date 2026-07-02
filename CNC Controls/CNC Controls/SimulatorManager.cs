@@ -470,5 +470,314 @@ namespace CNC.Controls
                 catch { break; }
             }
         }
+
+        // ---- Option-matched simulator -------------------------------------------------------------
+        //
+        // Keep the bundled simulator's build in step with whatever controller ioSender is connected to,
+        // so a probe/rotation/multi-axis feature behaves on the sim exactly as on the real firmware.
+        //
+        // Flow (EnsureMatchedSimulator): read the controller's options from GrblInfo -> a set of compile
+        // SYMBOLS -> a short SIGNATURE. If grblHAL_sim.exe already matches that signature, done. Else look
+        // for a locally-cached grblHAL_sim-<sig>.exe; else download a sim-<sig> release from the fork (a
+        // shared remote cache, public - no token); else dispatch the parameterized build-matched-sim CI
+        // workflow (the only step that needs a token) and let the next connect pick up the result.
+
+        // Fork hosting the build-matched-sim workflow and the sim-<sig> release cache.
+        public const string SimulatorRepo = "stevenrwood/Simulator";
+        public const string MatchedWorkflowFile = "build-matched-sim.yml";
+        // ref the dispatch runs on - the fork's default branch, which carries the workflow.
+        public const string MatchedWorkflowRef = "integration";
+        // Records which option signature the active grblHAL_sim.exe was built for.
+        private const string SigMarkerName = "grblHAL_sim.sig";
+
+        public enum MatchResult { AlreadyCurrent, InstalledFromCache, InstalledFromRelease, BuildTriggered, Failed }
+
+        // Signatures already dispatched this session, so a reconnect while a build is still running does not
+        // queue a duplicate CI run (the build's sim-<sig> release isn't up yet, so the release probe misses).
+        private static readonly System.Collections.Generic.HashSet<string> _dispatched =
+            new System.Collections.Generic.HashSet<string>();
+
+        // Map the connected controller's build options (GrblInfo) to the simulator's compile symbols, and
+        // derive a stable signature from them. Identical option sets always yield the same symbols and the
+        // same signature (hence the same cached exe / sim-<sig> release). The template baked into the fork's
+        // CMakeLists already fixes littlefs/expressions/etc; only the behaviour-affecting, controller-reported
+        // options are mapped here.
+        public static string BuildOptionSymbols(out string signature)
+        {
+            var symbols = new System.Collections.Generic.List<string>();
+
+            // Axis count is the headline option - a 4-axis controller needs a 4-axis sim.
+            symbols.Add("N_AXIS=" + CNC.Core.GrblInfo.NumAxes);
+
+            // A probe input (G38.x) - exercised by the Load Stock / probing flows.
+            if (CNC.Core.GrblInfo.HasProbe)
+                symbols.Add("PROBE_ENABLE=1");
+
+            // Coordinate-system rotation (WCSROT): match it so the Load Stock skew->WCS rotation can be
+            // validated on the sim exactly as on the real controller.
+            if (CNC.Core.GrblInfo.RotationSupported)
+                symbols.Add("ROTATION_ENABLE=1");
+
+            symbols.Sort(StringComparer.Ordinal);   // canonical order -> stable signature
+            string flags = string.Join(" ", symbols);
+            signature = ShortHash(flags);
+            return flags;
+        }
+
+        private static string ShortHash(string s)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] h = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(s ?? string.Empty));
+                var sb = new System.Text.StringBuilder(12);
+                for (int i = 0; i < 6; i++)
+                    sb.Append(h[i].ToString("x2"));   // 12 hex chars - short but collision-safe here
+                return sb.ToString();
+            }
+        }
+
+        private static string CachedSimPath(string sig)
+        {
+            return System.IO.Path.Combine(SimulatorDir(), "grblHAL_sim-" + sig + ".exe");
+        }
+
+        // Signature the active grblHAL_sim.exe currently matches (null if unknown/none).
+        public static string ActiveSignature()
+        {
+            try
+            {
+                string p = System.IO.Path.Combine(SimulatorDir(), SigMarkerName);
+                if (System.IO.File.Exists(p))
+                    return System.IO.File.ReadAllText(p).Trim();
+            }
+            catch { }
+            return null;
+        }
+
+        private static void SetActiveSignature(string sig)
+        {
+            try { System.IO.File.WriteAllText(System.IO.Path.Combine(SimulatorDir(), SigMarkerName), sig); }
+            catch { }
+        }
+
+        // Make the cached grblHAL_sim-<sig>.exe the active grblHAL_sim.exe and record its signature.
+        private static bool Activate(string cachedPath, string sig, out string error)
+        {
+            error = null;
+            try
+            {
+                string active = System.IO.Path.Combine(SimulatorDir(), SimulatorExeName);
+                if (!string.Equals(cachedPath, active, StringComparison.OrdinalIgnoreCase))
+                    System.IO.File.Copy(cachedPath, active, true);
+                SetActiveSignature(sig);
+                return true;
+            }
+            catch (System.IO.IOException ioex)
+            {
+                error = "could not install the matched simulator (is it running?): " + ioex.Message;
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // GET the sim-<sig> release asset (public, no token) into the local cache, then activate it.
+        // Returns false (e.g. a 404 "not built yet") so the caller can fall back to dispatching a build.
+        private static bool DownloadMatchedRelease(string sig, out string error)
+        {
+            error = null;
+            string url = "https://github.com/" + SimulatorRepo + "/releases/download/sim-" + sig + "/" + SimulatorExeName;
+            try
+            {
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                req.Method = "GET";
+                req.UserAgent = "ioSender";
+                req.Timeout = req.ReadWriteTimeout = 2 * 60 * 1000;
+
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                {
+                    if (resp.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        error = "the release server returned " + (int)resp.StatusCode + ".";
+                        return false;
+                    }
+                    byte[] bytes;
+                    using (var src = resp.GetResponseStream())
+                    using (var ms = new System.IO.MemoryStream())
+                    {
+                        src.CopyTo(ms);
+                        bytes = ms.ToArray();
+                    }
+                    if (bytes.Length < 2 || bytes[0] != (byte)'M' || bytes[1] != (byte)'Z')
+                    {
+                        error = "the release asset was not an executable.";
+                        return false;
+                    }
+                    System.IO.Directory.CreateDirectory(SimulatorDir());
+                    System.IO.File.WriteAllBytes(CachedSimPath(sig), bytes);
+                }
+                return Activate(CachedSimPath(sig), sig, out error);
+            }
+            catch (System.Net.WebException wex)
+            {
+                error = "no sim-" + sig + " release yet (" + wex.Message + ").";
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // Token used ONLY to dispatch the build workflow (downloads are public). Read from the GH_TOKEN /
+        // GITHUB_TOKEN environment variable (process first, then the persisted User scope); null if unset.
+        public static string GitHubToken()
+        {
+            foreach (var name in new[] { "GH_TOKEN", "GITHUB_TOKEN" })
+                foreach (var scope in new[] { EnvironmentVariableTarget.Process, EnvironmentVariableTarget.User })
+                {
+                    try
+                    {
+                        string v = Environment.GetEnvironmentVariable(name, scope);
+                        if (!string.IsNullOrWhiteSpace(v))
+                            return v.Trim();
+                    }
+                    catch { }
+                }
+            return null;
+        }
+
+        private static string JsonEscape(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return string.Empty;
+            return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        // POST a workflow_dispatch for build-matched-sim (sig + build_flags). GitHub answers 204 on success.
+        // Needs a token with 'workflow' scope; without one, returns a helpful manual gh command as the error.
+        private static bool DispatchBuild(string sig, string flags, out string error)
+        {
+            error = null;
+            string token = GitHubToken();
+            if (string.IsNullOrEmpty(token))
+            {
+                error = "no matching simulator (signature " + sig + ") and no GH_TOKEN set to build one.\n" +
+                        "Set a GitHub token with 'workflow' scope in GH_TOKEN, or build it manually:\n" +
+                        "  gh workflow run " + MatchedWorkflowFile + " -R " + SimulatorRepo +
+                        " --ref " + MatchedWorkflowRef + " -f sig=" + sig + " -f build_flags=\"" + flags + "\"";
+                return false;
+            }
+            try
+            {
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                string url = "https://api.github.com/repos/" + SimulatorRepo +
+                             "/actions/workflows/" + MatchedWorkflowFile + "/dispatches";
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                req.Method = "POST";
+                req.UserAgent = "ioSender";
+                req.Accept = "application/vnd.github+json";
+                req.Headers.Add("Authorization", "Bearer " + token);
+                req.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+                req.ContentType = "application/json";
+                req.Timeout = req.ReadWriteTimeout = 30 * 1000;
+
+                string body = "{\"ref\":\"" + MatchedWorkflowRef + "\",\"inputs\":{\"sig\":\"" +
+                              JsonEscape(sig) + "\",\"build_flags\":\"" + JsonEscape(flags) + "\"}}";
+                byte[] payload = System.Text.Encoding.UTF8.GetBytes(body);
+                req.ContentLength = payload.Length;
+                using (var rs = req.GetRequestStream())
+                    rs.Write(payload, 0, payload.Length);
+
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                {
+                    if ((int)resp.StatusCode == 204 || resp.StatusCode == System.Net.HttpStatusCode.NoContent)
+                        return true;
+                    error = "the workflow dispatch returned " + (int)resp.StatusCode + ".";
+                    return false;
+                }
+            }
+            catch (System.Net.WebException wex)
+            {
+                error = "the workflow dispatch failed: " + wex.Message;
+                try
+                {
+                    if (wex.Response != null)
+                        using (var s = wex.Response.GetResponseStream())
+                        using (var r = new System.IO.StreamReader(s))
+                        {
+                            string m = r.ReadToEnd();
+                            if (!string.IsNullOrWhiteSpace(m))
+                                error += " - " + m.Trim();
+                        }
+                }
+                catch { }
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // Ensure grblHAL_sim.exe matches the connected controller's options. Non-blocking with respect to a
+        // CI build: if a matched sim isn't available yet it dispatches the build and returns BuildTriggered,
+        // leaving any existing sim in place to use meanwhile (the next connect picks up the finished build).
+        // Blocking on network I/O (release probe / dispatch) - call from a background thread.
+        public static MatchResult EnsureMatchedSimulator(out string signature, out string detail)
+        {
+            detail = null;
+            string flags = BuildOptionSymbols(out signature);
+
+            // 1. Already the active build?
+            if (signature == ActiveSignature() && FindExecutable(SimulatorExeName) != null)
+                return MatchResult.AlreadyCurrent;
+
+            // 2. Cached locally from a previous build?
+            if (System.IO.File.Exists(CachedSimPath(signature)))
+            {
+                if (Activate(CachedSimPath(signature), signature, out detail))
+                    return MatchResult.InstalledFromCache;
+                return MatchResult.Failed;
+            }
+
+            // 3. Available as a sim-<sig> release (shared remote cache, public download)?
+            string relErr;
+            if (DownloadMatchedRelease(signature, out relErr))
+                return MatchResult.InstalledFromRelease;
+
+            // 4. Not built yet - dispatch the parameterized CI build (needs a token). Skip a re-dispatch if we
+            // already kicked this signature off this session (its release just isn't published yet).
+            if (_dispatched.Contains(signature))
+            {
+                detail = "a matching simulator (signature " + signature + ") is still building.";
+                return MatchResult.BuildTriggered;
+            }
+
+            string dispErr;
+            if (DispatchBuild(signature, flags, out dispErr))
+            {
+                _dispatched.Add(signature);
+                detail = "building a matching simulator (signature " + signature +
+                         "); it will be installed on the next connect once ready.";
+                return MatchResult.BuildTriggered;
+            }
+
+            detail = dispErr;
+            return MatchResult.Failed;
+        }
+
+        // Poll for a just-dispatched sim-<sig> release to appear and install it when it does. Intended to run
+        // on a background thread after EnsureMatchedSimulator returned BuildTriggered, so the matched sim is
+        // ready without a reconnect. Gives up after the timeout (a build is a few minutes); harmless if it
+        // does - the next connect will find the release. Returns true if it installed the matched sim.
+        public static bool PollForMatchedRelease(string sig, int timeoutSeconds = 600)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                System.Threading.Thread.Sleep(20 * 1000);   // builds take minutes; poll gently
+                string err;
+                if (DownloadMatchedRelease(sig, out err))
+                    return true;
+            }
+            return false;
+        }
     }
 }
