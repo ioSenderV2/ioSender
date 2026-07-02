@@ -666,7 +666,7 @@ namespace GCode_Sender
                 overlayJobTitle.Visibility = Visibility.Collapsed;
                 overlayPreviewTitle.Visibility = Visibility.Visible;
             }
-            RestoreSourceOnEnd(m);             // revert to the job source when the run ends
+            RestoreSourceOnEnd(m, prog);       // revert to the job source when THIS burst ends
 
             // Defer CycleStart to a clean dispatcher cycle (as RunStreamedJob does). Starting it synchronously
             // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
@@ -678,7 +678,7 @@ namespace GCode_Sender
 
         // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
         // arm on the first running state, fire on the next terminal one, then unsubscribe.
-        private void RestoreSourceOnEnd(GrblViewModel m)
+        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog)
         {
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
@@ -698,13 +698,15 @@ namespace GCode_Sender
                     m.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(() =>
                     {
-                        RunControl.Source = null;   // streamer back to the loaded job
-                        var top = CNC.Controls.ProgramView.Active;   // release the wizard's own view, never the job's
-                        if (top != null && top != jobProgramView)
-                            top.Disconnect();
-                        // The wizard program is consumed: tear down the active program so the program view and the
-                        // green source highlight return to the loaded job (Job tab). Cycle Start then runs the job.
-                        ClearProgramPreview();
+                        // Revert the streamer to the loaded job, but ONLY if this burst's transient is still the
+                        // source. A stay-put run (Load Stock) streams several bursts back-to-back (the park move,
+                        // then each O<...> CALL); each reverts its own source at its idle, and the guard stops a
+                        // finishing burst from clobbering the source a later burst already set. The tool's own
+                        // ProgramView stays connected across ALL bursts (so each is marked in it and the Job view
+                        // is never touched); the full teardown - disconnect the view, clear the active program -
+                        // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
+                        if (RunControl.Source == prog)
+                            RunControl.Source = null;
                     }));
                 }
             };

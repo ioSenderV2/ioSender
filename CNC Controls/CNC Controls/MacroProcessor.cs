@@ -359,10 +359,11 @@ namespace CNC.Controls
                 return;
 
             // stay-put run: hand the lines to the host, which captures the current job, streams without leaving
-            // the tab, and restores the job afterwards (Load Stock). Consume the flag so it can't leak.
-            bool stayPut = _stayPut;
-            _stayPut = false;
-            if (stayPut && RunStreamedJobInPlace != null)
+            // the tab, and restores the job afterwards (Load Stock). EVERY flush of a stay-put run must take this
+            // path - a Load Stock run flushes several times (the park move, then each O<...> CALL), so the flag
+            // must NOT be consumed here or later bursts leak into GCode.File (the Job view). Run() re-establishes
+            // _stayPut per run (StreamProgram is only ever reached from within a Run), so it can't leak across runs.
+            if (_stayPut && RunStreamedJobInPlace != null)
             {
                 RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray());
                 return;
