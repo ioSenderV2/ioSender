@@ -473,7 +473,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            bool ok = MacroProcessor.Run(model, "Surface spoilboard", program, true);
+            bool ok = MacroProcessor.Run(model, "Surface spoilboard", program, true, stayPut: true);
 
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry run
             // or outline check you can untick Dry run / Outline only and Run again to cut at the same Z0.
