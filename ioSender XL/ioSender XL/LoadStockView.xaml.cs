@@ -862,7 +862,12 @@ namespace GCode_Sender
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;
-        public bool ApplyRotation = true;   // set the WCS rotation from the measured skew (G10 L2 R)
+        // Default OFF: setting a WCS rotation (G10 L2 R) arms a grblHAL rotation-transform bug on affected
+        // firmware - a garbage runtime rotation is applied to far-from-origin G54 moves, throwing the first
+        // cut rapid off the table (false Alarm:2 soft limit) on the NEXT program run, even for a ~0.1 deg
+        // skew. Load Stock itself stays clean (it scrubs R0 before probing); the rotation only bites the
+        // program that runs after. Opt in only on firmware with the rotation transform fixed.
+        public bool ApplyRotation = false;   // set the WCS rotation from the measured skew (G10 L2 R)
         public bool SetTloRef = false;      // reference the puck TLO after corner 1 (Load Stock == start_job)
         public string Probe = string.Empty;
     }
