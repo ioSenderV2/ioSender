@@ -5,34 +5,148 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        d:DesignHeight="260" d:DesignWidth="340"
-        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="340"
+        d:DesignHeight="300" d:DesignWidth="560"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Probe definition" Icon="App.ico">
-    <StackPanel Margin="12">
-        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-            <Label x:Uid="pd_type" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cbxType" Width="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
-                <ComboBoxItem x:Uid="pd_type3d" Content="3D touch probe" Tag="ThreeDProbe"/>
-                <ComboBoxItem x:Uid="pd_typePlate" Content="Touch plate" Tag="TouchPlate"/>
-                <ComboBoxItem x:Uid="pd_typeSetter" Content="Tool setter" Tag="ToolSetter"/>
-                <ComboBoxItem x:Uid="pd_typeEdge" Content="Edge finder" Tag="EdgeFinder"/>
-            </ComboBox>
+    <Window.Resources>
+        <!-- Dimension-annotation styling shared by the per-type schematics. -->
+        <SolidColorBrush x:Key="DimBrush" Color="#FF1565C0"/>
+        <Style x:Key="DimLine" TargetType="Line">
+            <Setter Property="Stroke" Value="{StaticResource DimBrush}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+        </Style>
+        <Style x:Key="DimText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
+        </Style>
+    </Window.Resources>
+    <DockPanel Margin="12">
+        <!-- Type selector spans the top. -->
+        <StackPanel DockPanel.Dock="Top">
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label x:Uid="pd_type" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <ComboBox x:Name="cbxType" Width="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
+                    <ComboBoxItem x:Uid="pd_type3d" Content="3D touch probe" Tag="ThreeDProbe"/>
+                    <ComboBoxItem x:Uid="pd_typePlate" Content="Touch plate" Tag="TouchPlate"/>
+                    <ComboBoxItem x:Uid="pd_typeSetter" Content="Tool setter" Tag="ToolSetter"/>
+                    <ComboBoxItem x:Uid="pd_typeEdge" Content="Edge finder" Tag="EdgeFinder"/>
+                </ComboBox>
+            </StackPanel>
+            <Separator Margin="0,7"/>
         </StackPanel>
-        <Separator Margin="0,7"/>
-        <!-- Essentials only - the speeds/distances live behind 'Edit motion params'. Visibility + the diameter
-             label are set per type in code-behind. -->
-        <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Ball diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
-        <local:NumericField x:Name="fldSpin" x:Uid="pd_spin" Label="Spin speed:" ColonAt="120" Unit="RPM" Format="#####0" ToolTip="Spinning edge-finder speed; 0 = does not spin." Margin="0,2,0,0" Value="{Binding Path=SpinRPM, Mode=TwoWay}"/>
-        <DockPanel Margin="0,14,0,0">
+
+        <!-- Buttons span the bottom. -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
             <Button x:Uid="pd_motion" x:Name="btnMotion" Content="Edit motion params…" DockPanel.Dock="Left" Padding="10,2" MinHeight="24" Click="btnMotion_Click"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="pd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" Width="75" MinHeight="24" IsDefault="True"/>
                 <Button x:Uid="pd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" Width="75" MinHeight="24" Margin="6,0,0,0"/>
             </StackPanel>
         </DockPanel>
-    </StackPanel>
+
+        <!-- Fields on the left, a per-type schematic on the right. -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Essentials only - the speeds/distances live behind 'Edit motion params'. Visibility + the diameter
+                 label are set per type in code-behind. -->
+            <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Ball diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldSpin" x:Uid="pd_spin" Label="Spin speed:" ColonAt="120" Unit="RPM" Format="#####0" ToolTip="Spinning edge-finder speed; 0 = does not spin." Margin="0,2,0,0" Value="{Binding Path=SpinRPM, Mode=TwoWay}"/>
+            </StackPanel>
+
+            <!-- Per-type schematic: shows the probe shape and labels the key measurement(s) to enter. One Canvas
+                 per type, toggled in code-behind (UpdateFieldVisibility) like the fields; Viewbox scales them. -->
+            <Border Grid.Column="1" Margin="16,0,0,0" Width="212" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="#FFFAFAFA">
+                <Viewbox Stretch="Uniform" Margin="8">
+                    <Grid Width="220" Height="250">
+
+                        <!-- 3D touch probe: wide body, thin stylus, ruby tip ball. -->
+                        <Canvas x:Name="drwThreeD">
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="63" Canvas.Top="2" Text="Ball diameter"/>
+                            <Line Style="{StaticResource DimLine}" X1="74" Y1="20" X2="146" Y2="20"/>
+                            <Line Style="{StaticResource DimLine}" X1="74" Y1="16" X2="74" Y2="34"/>
+                            <Line Style="{StaticResource DimLine}" X1="146" Y1="16" X2="146" Y2="34"/>
+                            <Rectangle Canvas.Left="74" Canvas.Top="34" Width="72" Height="88" RadiusX="8" RadiusY="8" Fill="#FFB0C4DE" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <Rectangle Canvas.Left="106" Canvas.Top="122" Width="8" Height="62" Fill="#FF9AA7B4" Stroke="#FF4A6070"/>
+                            <Ellipse Canvas.Left="100" Canvas.Top="182" Width="20" Height="20" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.5"/>
+                            <Line Style="{StaticResource DimLine}" X1="100" Y1="222" X2="120" Y2="222"/>
+                            <Line Style="{StaticResource DimLine}" X1="100" Y1="204" X2="100" Y2="226"/>
+                            <Line Style="{StaticResource DimLine}" X1="120" Y1="204" X2="120" Y2="226"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="82" Canvas.Top="228" Text="Tip diameter"/>
+                        </Canvas>
+
+                        <!-- Touch plate (aluminium): flat plate on the stock top; a lip protrudes DOWN from the
+                             overhanging edge, its inside face registering against the stock's side. Bit touches top. -->
+                        <Canvas x:Name="drwPlate" Visibility="Collapsed">
+                            <Rectangle Canvas.Left="64" Canvas.Top="54" Width="16" Height="68" Fill="#FF9AA7B4" Stroke="#FF4A6070"/>
+                            <Line Style="{StaticResource DimLine}" X1="64" Y1="44" X2="80" Y2="44"/>
+                            <Line Style="{StaticResource DimLine}" X1="64" Y1="40" X2="64" Y2="54"/>
+                            <Line Style="{StaticResource DimLine}" X1="80" Y1="40" X2="80" Y2="54"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="38" Canvas.Top="24" Text="Bit diameter"/>
+                            <!-- plate top (overhangs the stock edge) -->
+                            <Rectangle Canvas.Left="40" Canvas.Top="122" Width="136" Height="18" Fill="#FFBFC6CC" Stroke="#FF848B92"/>
+                            <!-- lip: protrudes down from the plate edge; its inner face registers on the stock side -->
+                            <Rectangle Canvas.Left="120" Canvas.Top="140" Width="56" Height="16" Fill="#FFBFC6CC" Stroke="#FF848B92"/>
+                            <!-- stock -->
+                            <Rectangle Canvas.Left="40" Canvas.Top="140" Width="80" Height="86" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <!-- plate thickness (vertical, left of the plate) -->
+                            <Line Style="{StaticResource DimLine}" X1="32" Y1="122" X2="32" Y2="140"/>
+                            <Line Style="{StaticResource DimLine}" X1="28" Y1="122" X2="36" Y2="122"/>
+                            <Line Style="{StaticResource DimLine}" X1="28" Y1="140" X2="36" Y2="140"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="12" Canvas.Top="124" Text="Plate thickness">
+                                <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
+                            </TextBlock>
+                            <!-- lip width: under the lip, stock edge / lip inner face (x=120) to lip outer edge (x=176) -->
+                            <Line Style="{StaticResource DimLine}" X1="120" Y1="170" X2="176" Y2="170"/>
+                            <Line Style="{StaticResource DimLine}" X1="120" Y1="156" X2="120" Y2="170"/>
+                            <Line Style="{StaticResource DimLine}" X1="176" Y1="156" X2="176" Y2="170"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="128" Canvas.Top="172" Text="Lip width"/>
+                        </Canvas>
+
+                        <!-- Tool setter: spring-loaded puck on the table; the tool touches its plunger. -->
+                        <Canvas x:Name="drwSetter" Visibility="Collapsed">
+                            <Rectangle Canvas.Left="104" Canvas.Top="40" Width="12" Height="86" Fill="#FF9AA7B4" Stroke="#FF4A6070"/>
+                            <Polygon Points="104,126 116,126 110,138" Fill="#FF4A6070"/>
+                            <Rectangle Canvas.Left="92" Canvas.Top="138" Width="36" Height="10" Fill="#FF6E7B88" Stroke="#FF3A4650"/>
+                            <Rectangle Canvas.Left="80" Canvas.Top="148" Width="60" Height="62" RadiusX="4" RadiusY="4" Fill="#FFB0C4DE" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <Rectangle Canvas.Left="24" Canvas.Top="210" Width="172" Height="14" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <!-- setter height: table top (y=210) to trigger/plunger top (y=138) -->
+                            <Line Style="{StaticResource DimLine}" X1="56" Y1="138" X2="56" Y2="210"/>
+                            <Line Style="{StaticResource DimLine}" X1="52" Y1="138" X2="80" Y2="138"/>
+                            <Line Style="{StaticResource DimLine}" X1="52" Y1="210" X2="80" Y2="210"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="38" Canvas.Top="150" Text="Setter height">
+                                <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
+                            </TextBlock>
+                        </Canvas>
+
+                        <!-- Edge finder: cylinder in the spindle with an offset tip; touches the stock side. -->
+                        <Canvas x:Name="drwEdge" Visibility="Collapsed">
+                            <Rectangle Canvas.Left="96" Canvas.Top="18" Width="28" Height="24" Fill="#FF9AA7B4" Stroke="#FF4A6070"/>
+                            <Rectangle Canvas.Left="98" Canvas.Top="42" Width="24" Height="104" Fill="#FFB0C4DE" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <Rectangle Canvas.Left="101" Canvas.Top="146" Width="18" Height="40" Fill="#FF9AA7B4" Stroke="#FF4A6070"/>
+                            <!-- stock edge to the right -->
+                            <Rectangle Canvas.Left="140" Canvas.Top="150" Width="70" Height="80" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <!-- spin indicator -->
+                            <Path Stroke="{StaticResource DimBrush}" StrokeThickness="1.2" Data="M 92,30 A 20,10 0 1 1 128,30"/>
+                            <Polygon Points="128,26 134,31 126,35" Fill="{StaticResource DimBrush}"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="70" Canvas.Top="2" Text="Spin speed (0 = no spin)"/>
+                            <!-- tip diameter -->
+                            <Line Style="{StaticResource DimLine}" X1="101" Y1="204" X2="119" Y2="204"/>
+                            <Line Style="{StaticResource DimLine}" X1="101" Y1="186" X2="101" Y2="208"/>
+                            <Line Style="{StaticResource DimLine}" X1="119" Y1="186" X2="119" Y2="208"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="82" Canvas.Top="210" Text="Tip diameter"/>
+                        </Canvas>
+                    </Grid>
+                </Viewbox>
+            </Border>
+        </Grid>
+    </DockPanel>
 </Window>

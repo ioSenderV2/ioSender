@@ -83,6 +83,12 @@ namespace CNC.Controls
             Show(fldLip, type == ProbeType.TouchPlate);
             Show(fldSetter, type == ProbeType.ToolSetter);
             Show(fldSpin, type == ProbeType.EdgeFinder);
+
+            // The schematic follows the type - shape + the key measurement labels for that probe.
+            Show(drwThreeD, type == ProbeType.ThreeDProbe);
+            Show(drwPlate, type == ProbeType.TouchPlate);
+            Show(drwSetter, type == ProbeType.ToolSetter);
+            Show(drwEdge, type == ProbeType.EdgeFinder);
         }
 
         private void btnMotion_Click(object sender, RoutedEventArgs e)
