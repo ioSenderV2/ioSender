@@ -54,7 +54,7 @@
 <body>
 
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>34 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;34 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>37 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;37 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
@@ -75,6 +75,7 @@
 <tr><td>3D view: Ctrl+click to jog (retracts Z first) + per-axis $23 orientation fix</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr20">20</a></td></tr>
 <tr><td>Keyboard jog keeps working when focus drifts off the Job view</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr22">22</a></td></tr>
 <tr><td>High-DPI / 125&ndash;150% text-scaling layout</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr7">7</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Assignable <em>Jog distance +/&minus;</em> controller actions &mdash; step the jog distance preset (separate from jog speed)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr35">35</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -93,6 +94,7 @@
 <tr><td>Load Stock &mdash; corner-probe stock size/flatness/skew/thickness, results popup, Copy size &rarr; Fusion add-in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr30">30</a></td></tr>
 <tr><td>Squareness (Auto Square) &mdash; drill an L, measure, write the ganged-axis squaring offset + re-home</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr31">31</a></td></tr>
 <tr><td>Probe definition diagrams &mdash; per-type schematic in the probe editor labelling the measurements to enter</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr34">34</a></td></tr>
+<tr><td>Probe input follows the selected probe type &mdash; tool setter &rarr; <code>Q1</code>, else the main probe &rarr; <code>Q0</code> (guards a stale selection)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr36">36</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -107,7 +109,8 @@
 <tr><td>Reusable program view &mdash; file / folder / each wizard gets its own view; one Cycle Start runs the active one</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
 <tr><td>Background file / folder loading &mdash; big programs parse on a worker thread; the UI stays responsive, rows fill as read</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
 <tr><td>Continuous block numbering &mdash; explicit <code>N</code> words shown in the Block column and hidden from the G-code column</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
-<tr><td>Explain G-code on hover &mdash; plain-language tooltip per line (or a whole selection), for novices</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr33">33</a></td></tr>
+<tr><td>Explain G-code on hover &mdash; plain-language per line/selection (decodes parameters, O-word CALLs, expressions); click the balloon to copy</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr33">33</a></td></tr>
+<tr><td>One in-place streaming path &mdash; every wizard/macro runs in its own view; a run never overwrites the loaded job</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr37">37</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -163,9 +166,12 @@
 <tr><td class="n">30</td><td><a href="#pr30">Load Stock &mdash; corner-probe stock measurement</a></td><td class="mono">pr/load-stock</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1125</span> <span class="del">0</span></td></tr>
 <tr><td class="n">31</td><td><a href="#pr31">Squareness (Auto Square) &mdash; ganged-gantry offset tool</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+686</span> <span class="del">0</span></td></tr>
 <tr><td class="n">32</td><td><a href="#pr32">Program view as a reusable object + background loading</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+830</span> <span class="del">-184</span></td></tr>
-<tr><td class="n">33</td><td><a href="#pr33">Explain G-code on hover (novice tooltips)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+453</span> <span class="del">0</span></td></tr>
+<tr><td class="n">33</td><td><a href="#pr33">Explain G-code on hover (novice tooltips)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+805</span> <span class="del">-39</span></td></tr>
 <tr><td class="n">34</td><td><a href="#pr34">Probe definition diagrams</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+142</span> <span class="del">-22</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (34 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">237</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23075</span> <span class="del">-1753</span></td></tr>
+<tr><td class="n">35</td><td><a href="#pr35">Jog distance +/&minus; controller actions</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">36</td><td><a href="#pr36">Probe input follows the selected probe type</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">0</span></td></tr>
+<tr><td class="n">37</td><td><a href="#pr37">One in-place streaming path (stayPut removed)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-110</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (37 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">247</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23522</span> <span class="del">-1904</span></td></tr>
 </table>
 </div>
 
@@ -1232,8 +1238,8 @@
 </div>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
-<tr><td class="mono">CNC Core/GCodeExplainer.cs</td><td class="num add">372</td><td class="num">0</td></tr>
-<tr><td class="mono">CNC Controls/GCodeListControl.xaml(.cs)</td><td class="num add">80</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GCodeExplainer.cs</td><td class="num add">634</td><td class="num del">19</td></tr>
+<tr><td class="mono">CNC Controls/GCodeListControl.xaml(.cs)</td><td class="num add">170</td><td class="num del">20</td></tr>
 <tr><td class="mono">CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
@@ -1242,6 +1248,8 @@
   <li><strong>Token-based:</strong> builds the explanation from the parser&rsquo;s own semantic tokens (keyed to a block by line number), so it inherits the parser&rsquo;s modal state &mdash; a bare <code>X10 Y0</code> continuation still reads correctly as a rapid or a cut.</li>
   <li><strong>Line or selection:</strong> hovering one line explains it (&ldquo;Cutting move to X 125.4, Y 0; feed 800 mm/min&rdquo;); hovering a line within a multi-row selection gives a line-by-line breakdown.</li>
   <li><strong>Full coverage:</strong> a complete G/M-code dictionary plus a raw-line lexer fallback explain bare modal codes (e.g. <code>G54</code>) and views without parsed tokens. Computed lazily per row; skipped (thread-safe) while a background load is still parsing.</li>
+  <li><strong>Reads real programs:</strong> a bracket/parameter-aware lexer explains expression operands (<code>G53 G0 X[#5181]</code>), decodes the well-known <code>#5xxx</code> parameters (G28/G30 positions, probe result, WCS offsets), names O-word CALLs by the <code>/&lt;name&gt;.macro</code> file they run + their arguments, and reads G10 (WCS origin/rotation), <code>G65 P5</code> (probe-input select) and <code>#</code>-assignments plainly.</li>
+  <li><strong>Click to copy:</strong> the hover balloon is an interactive popup &mdash; click it to copy the explanation to the clipboard (a plain tooltip can&rsquo;t be moused into).</li>
   <li><strong>Localizable:</strong> English for now, but every phrase is produced in one place so it can move to LibStrings later.</li>
 </ul>
 <p class="foot">In the integration build; hardware-verified.</p>
@@ -1269,6 +1277,82 @@
   <li><strong>Pure vector</strong> (Canvas + Viewbox), toggled with the same show/hide as the fields &mdash; no image assets, theme-friendly.</li>
 </ul>
 <p class="foot">In the integration build.</p>
+</div>
+</div>
+
+<!-- ===== PR 35 ===== -->
+<div class="pr">
+<h2 id="pr35"><span class="badge">PR 35</span>Jog distance +/&minus; controller actions</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (the controller mapper + jog panel).</div>
+  <div><span class="label">Depends on</span>Xbox / game-controller support (<a href="#pr8">PR 8</a>) and the jog panel.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/ControllerMapper.cs</td><td class="num add">11</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/GrblViewModel.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Two new assignable controller actions that step the on-screen jog <em>distance</em> preset (the 2&times;4 grid), distinct from the existing <em>Jog speed +/&minus;</em> which step the feed preset.</p>
+<ul>
+  <li><strong>Jog distance +/&minus;</strong> appear in the Controller-tab action list; assign them to any button (no default binding).</li>
+  <li>Adds <code>GrblViewModel.CycleJogDistance</code>, wired by the jog panel to the distance index (clamped to the four presets).</li>
+</ul>
+<p class="foot">In the integration build.</p>
+</div>
+</div>
+
+<!-- ===== PR 36 ===== -->
+<div class="pr">
+<h2 id="pr36"><span class="badge">PR 36</span>Probe input follows the selected probe type</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (Load Stock / Height Map + GrblInfo).</div>
+  <div><span class="label">Depends on</span>The probe-definition library, Load Stock (<a href="#pr30">PR 30</a>) and Height Map.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/Grbl.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/HeightMapView.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>The program-generating tools now select the controller probe input from the chosen probe&rsquo;s type &mdash; the same rule the Probing page already uses &mdash; so a stale selection can&rsquo;t send a 3D-probe descent to the wrong input and drive into the work.</p>
+<ul>
+  <li><strong>Rule:</strong> Load Stock and Height Map emit <code>G65 P5 Q&lt;n&gt;</code> for the selected probe &mdash; tool setter &rarr; <code>Q1</code>, else the main probe &rarr; <code>Q0</code>.</li>
+  <li><strong>Why:</strong> an interrupted tool-setter cycle (<code>tc.macro</code>) can leave <code>G65 P5 Q1</code> selected; a later probe would then watch the tool-setter line and stab the spoilboard.</li>
+  <li>Gated on new <code>GrblInfo.HasToolSetter</code> (only meaningful when a tool setter exists to select between).</li>
+</ul>
+<p class="foot">In the integration build; hardware-verified (Load Stock).</p>
+</div>
+</div>
+
+<!-- ===== PR 37 ===== -->
+<div class="pr">
+<h2 id="pr37"><span class="badge">PR 37</span>One in-place streaming path (stayPut removed)</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (MacroProcessor + the shell run path).</div>
+  <div><span class="label">Depends on</span>The reusable program view (<a href="#pr32">PR 32</a>) and the macro&rarr;job streamer (<a href="#pr11">PR 11</a>).</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">49</td><td class="num del">66</td></tr>
+<tr><td class="mono">CNC Controls/MacroProcessor.cs</td><td class="num add">12</td><td class="num del">43</td></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>With each program view self-contained, the old <code>stayPut</code> flag and the &ldquo;stream-in-place vs load-into-the-job&rdquo; fork were a relic of the single shared job view. Collapsed to one path.</p>
+<ul>
+  <li><strong>One streaming path:</strong> every streamed macro/wizard run streams a transient with full flow control (Feed Hold/Stop stay live) and <strong>never touches the loaded job</strong> (<code>GCode.File</code>) or the Job tab. Before, wizards other than Load Stock replaced your loaded program when they ran.</li>
+  <li><strong>Own view per run:</strong> a tool that owns a program view (a wizard) marks its own; a plain streamed macro gets a dedicated run view (titled with the macro name) that auto-dismisses ~20&nbsp;s after it finishes.</li>
+  <li><strong>Multi-burst safe:</strong> a run flushes several bursts (a park move, then each <code>O&lt;...&gt; CALL</code>); the streamer source reverts per burst, guarded so a finishing burst can&rsquo;t clobber the next, and the view stays connected across all of them.</li>
+  <li>Deletes the <code>stayPut</code> param, the <code>RunStreamedJob</code> job-clobber path + its wiring, and the orphaned tab-restore helper &mdash; a net code removal.</li>
+</ul>
+<p class="foot">In the integration build; hardware-verified via a clean Load Stock run (multi-burst / directives / O-words). Not yet exercised on hardware: the plain-macro run view (only a large <em>streaming</em> flyout macro reaches it).</p>
 </div>
 </div>
 
