@@ -244,6 +244,12 @@ namespace GCode_Sender
             if (pr == null)
                 return;
 
+            // Watch the correct probe input for the chosen probe (main probe for height mapping), the same rule the
+            // Probing page uses. Guards against a stale tool-setter selection (G65 P5 Q1 left by an interrupted
+            // tc.macro) sending the descent to the wrong input. Only when the controller has a tool setter.
+            if (GrblInfo.HasToolSetter)
+                model.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
+
             // Ensure realtime reports are flowing (WaitForIdle waits for one) - polling may be off on this tab.
             model.Poller.SetState(AppConfig.Settings.Base.PollInterval);
 

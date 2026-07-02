@@ -1106,6 +1106,10 @@ namespace CNC.Core
         public static string IpAddress { get; private set; } = string.Empty;
         public static bool HasPIDLog { get; private set; }
         public static bool HasProbe { get { return Probes.Count != 0; } }
+        // True when the controller reports a tool-setter probe (Id 1) - i.e. there is a second probe input to
+        // select between with G65 P5 Q<n>. Used to guard the "select the main probe" (Q0) preamble a 3D-probe
+        // routine emits so a stale tool-setter selection can't send its G38.2 to the wrong input.
+        public static bool HasToolSetter { get { return Probes.Any(p => p.Id == 1); } }
         public static bool HasRTC { get; private set; } = false;
         public static bool HasVariableSpindle { get; private set; } = false;
         public static bool HasReversableSpindle { get; private set; } = true;

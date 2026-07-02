@@ -676,6 +676,12 @@ namespace GCode_Sender
             L("(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)");
             L("G21 G90 G94 G17");
             L("G49");
+            // Select the probe input for the chosen probe (tool setter -> 1, else the main probe -> 0), the same
+            // rule the Probing page uses (SelectControllerProbe). Guards against a stale selection from an
+            // interrupted tool-setter cycle (tc.macro leaves G65 P5 Q1) sending this 3D-probe descent to the wrong
+            // input and driving into the work. Only when the controller has a tool setter to select between.
+            if (GrblInfo.HasToolSetter)
+                L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
             // Clear any stale WCS rotation BEFORE probing. pcorner's face probes are work-coordinate G38.2 moves, so
             // a rotation on this WCS (NVS garbage after enabling ROTATION_ENABLE, or one a previous Load Stock run
             // wrote) rotates every probe target -> shifts the measured corners -> inflates the skew, and compounds
