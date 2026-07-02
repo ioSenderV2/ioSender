@@ -136,22 +136,73 @@ namespace CNC.Controls
         // explain every selected line; otherwise explain the one line. Uses the loaded program's parsed
         // tokens (GCode.File.Tokens, keyed to a block by LineNumber); a view without matching tokens (e.g.
         // a wizard's own program) falls back to describing the raw text.
-        private void Row_ToolTipOpening(object sender, ToolTipEventArgs e)
-        {
-            var row = sender as DataGridRow;
-            var block = row?.Item as GCodeBlock;
-            if (row == null || block == null)
-            {
-                e.Handled = true;   // no content to show (e.g. a group header)
-                return;
-            }
+        // --- Hover explanation balloon (interactive Popup - click to copy) ------------------------------
+        // A ToolTip can't be moused into and clicked, so the explanation is a StaysOpen Popup driven by two
+        // hover timers: show ~450 ms after the pointer settles on a row; close ~250 ms after it leaves the row
+        // AND the balloon (the gap lets the pointer travel onto the balloon to click it).
+        private System.Windows.Threading.DispatcherTimer _explainShow, _explainClose;
+        private DataGridRow _hoverRow;
+        private string _explainText = string.Empty;
 
-            row.ToolTip = new TextBlock {
-                Text = BuildExplanation(block),
-                FontFamily = new FontFamily("Consolas"),
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 720
-            };
+        private void EnsureExplainTimers()
+        {
+            if (_explainShow != null)
+                return;
+            _explainShow = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(450) };
+            _explainShow.Tick += (s, e) => { _explainShow.Stop(); ShowExplain(); };
+            _explainClose = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(250) };
+            _explainClose.Tick += (s, e) => { _explainClose.Stop(); explainPopup.IsOpen = false; };
+        }
+
+        private void Row_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            EnsureExplainTimers();
+            _hoverRow = sender as DataGridRow;
+            _explainClose.Stop();
+            _explainShow.Stop();
+            if (_hoverRow?.Item is GCodeBlock)
+                _explainShow.Start();
+        }
+
+        private void Row_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _explainShow.Stop();
+            if (explainPopup.IsOpen)
+                _explainClose.Start();   // grace period to let the pointer reach the balloon
+        }
+
+        private void ShowExplain()
+        {
+            var block = _hoverRow?.Item as GCodeBlock;
+            if (block == null || !_hoverRow.IsMouseOver)
+                return;
+            _explainText = BuildExplanation(block);
+            explainText.Text = _explainText;
+            explainHint.Text = "click to copy";
+            explainPopup.PlacementTarget = _hoverRow;
+            explainPopup.IsOpen = false;   // force a reposition when moving between rows
+            explainPopup.IsOpen = true;
+        }
+
+        private void ExplainPopup_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _explainClose?.Stop();   // pointer is on the balloon - keep it open
+        }
+
+        private void ExplainPopup_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _explainClose?.Start();
+        }
+
+        private void ExplainPopup_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(_explainText ?? string.Empty);
+                explainHint.Text = "copied ✓";
+            }
+            catch { }
+            e.Handled = true;
         }
 
         private string BuildExplanation(GCodeBlock block)
@@ -163,7 +214,10 @@ namespace CNC.Controls
 
             try
             {
-                var tokens = GCode.File.Tokens;
+                // Only the loaded-job view (_program == null) matches GCode.File.Tokens by line number; a view
+                // showing its OWN program (a wizard's, via SetProgram(blocks)) must NOT borrow the job's tokens -
+                // its LineNums would collide with unrelated job lines. Pass null -> explain from the raw text.
+                var tokens = _program == null ? GCode.File.Tokens : null;
                 var selected = grdGCode.SelectedItems;
 
                 // Multi-row selection that includes the hovered row -> line-by-line breakdown of the selection.

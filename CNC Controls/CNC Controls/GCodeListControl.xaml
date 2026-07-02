@@ -10,6 +10,7 @@
     <!-- A light mint background marks the program view that is the streamer's configured input source - i.e.
          the program Cycle Start will run. Applied in code (RefreshSourceHighlight) only to that view, so when
          a wizard is the active source its program view is mint and the loaded-job view is not (and vice versa). -->
+    <Grid>
     <DataGrid x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
               CanUserSortColumns="false" CanUserResizeRows="False" IsReadOnly="true" SelectionChanged="grdGCode_SelectionChanged"
               EnableRowVirtualization="True" ScrollViewer.CanContentScroll="True"
@@ -19,12 +20,11 @@
              controller's reported line number (needs line-number reporting); completed lines show "ok". -->
         <DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
-                <!-- Plain-language "what does this line do" tooltip (GCodeExplainer), computed lazily per row
-                     on open. The " " placeholder is required so ToolTipOpening fires; the handler replaces it. -->
-                <Setter Property="ToolTip" Value=" "/>
-                <Setter Property="ToolTipService.InitialShowDelay" Value="450"/>
-                <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
-                <EventSetter Event="ToolTipOpening" Handler="Row_ToolTipOpening"/>
+                <!-- Hovering a row shows a plain-language explanation balloon (GCodeExplainer). It is an
+                     interactive Popup (not a ToolTip) so the mouse can move into it and click to copy the text -
+                     a plain ToolTip is dismissed the moment the pointer leaves the row. See Row_MouseEnter. -->
+                <EventSetter Event="MouseEnter" Handler="Row_MouseEnter"/>
+                <EventSetter Event="MouseLeave" Handler="Row_MouseLeave"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Sent}" Value="@">
                         <Setter Property="Background" Value="#FF4CAF50"/>
@@ -82,4 +82,20 @@
             </GroupStyle>
         </DataGrid.GroupStyle>
     </DataGrid>
+
+    <!-- Interactive explanation balloon: shown on row hover, stays open while the mouse is over it, and
+         copies its text to the clipboard when clicked (StaysOpen so it can be moused into; open/close is
+         driven by the hover timers in code-behind). -->
+    <Popup x:Name="explainPopup" StaysOpen="True" AllowsTransparency="True" Placement="Bottom">
+        <Border Background="#FFFFFFE1" BorderBrush="#FF767676" BorderThickness="1" Padding="7,5" MaxWidth="720"
+                Cursor="Hand" MouseEnter="ExplainPopup_MouseEnter" MouseLeave="ExplainPopup_MouseLeave"
+                MouseLeftButtonDown="ExplainPopup_Click">
+            <StackPanel>
+                <TextBlock x:Name="explainText" FontFamily="Consolas" TextWrapping="Wrap"/>
+                <TextBlock x:Name="explainHint" Text="click to copy" FontSize="10" FontStyle="Italic"
+                           Foreground="#FF8C8C8C" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+    </Popup>
+    </Grid>
 </UserControl>
