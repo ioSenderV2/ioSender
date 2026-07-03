@@ -141,6 +141,6 @@ Everything is additive until step 7 (freeze). If a V2 repo is wrong, delete it a
 ---
 
 ## Open questions for the morning
-- V2 repo names / new org? (§2.2)
-- Firmware: full split or tag‑only? (§2.6)
+- ~~V2 home / repo names~~ **DECIDED: a GitHub org, repos keep existing names** (§2.2). Org **name** still to pick.
+- Firmware: full split or tag‑only? (§2.6) — leaning **tag‑only**.
 - Confirm the diagram content + that `Overview.html` (superset) is the right home/name. (§3)
