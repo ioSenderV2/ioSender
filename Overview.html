@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Features &amp; Fixes — ioSender</title>
+<title>ioSender V2 &mdash; Overview</title>
 <style>
+
   @page { size: A4; margin: 18mm 16mm; }
   * { box-sizing: border-box; }
   body { font-family: "Segoe UI", Arial, sans-serif; color: #1b1f23; font-size: 11pt; line-height: 1.45; }
@@ -49,10 +50,107 @@
   .t-chg { color:#d97706; font-weight:700; font-size:8pt; }
   .t-fix { color:#cf222e; font-weight:700; font-size:8pt; }
   .star { color:#b08800; }
+  /* ---- Overview map section (superset of the changelog below) ---- */
+  .ov-hero { margin: 0 0 6px; }
+  .ov-lead { color:#57606a; font-size:10.5pt; margin: 0 0 16px; max-width: 60em; }
+  .ov-diagram { border:1px solid #d0d7de; border-radius:8px; padding:14px; margin:0 0 18px; background:#fbfcfd; }
+  .ov-diagram svg { width:100%; height:auto; display:block; }
+  .ov-cap { color:#57606a; font-size:9.5pt; margin:8px 2px 0; }
+  .ov-wire { border:1px solid #d0d7de; border-radius:8px; padding:12px 16px; margin:0 0 18px; }
+  .ov-wire h3 { font-size:11.5pt; color:#0a3069; margin:2px 0 8px; }
+  .ov-wire table { width:100%; border-collapse:collapse; font-size:10pt; }
+  .ov-wire td { padding:4px 8px; border-bottom:1px solid #eaeef2; vertical-align:top; }
+  .ov-wire td.repo { white-space:nowrap; width:210px; }
+  .ov-wire td.repo code { color:#0a3069; font-weight:600; }
+  .ov-divider { border:0; border-top:2px solid #d0d7de; margin:26px 0 4px; }
+  .ov-sectlabel { color:#8c959f; font-size:9pt; letter-spacing:0.06em; text-transform:uppercase; margin:0 0 -6px; }
+  #features-and-fixes { page-break-before: always; }
 </style>
 </head>
 <body>
 
+<h1 class="ov-hero">ioSender&nbsp;V2 &mdash; Overview</h1>
+<div class="ov-lead">
+An enhanced <strong>all-in-one</strong> grblHAL / Grbl g&#8209;code sender. ioSender&nbsp;V2 is the ongoing offshoot of
+<code>stevenrwood/ioSender</code> (itself a one-time fork of <code>terjeio/ioSender</code>), severed from upstream at the
+<strong>PR&#8209;era cutoff</strong>. There are no composable feature branches and nothing is submitted upstream any more &mdash;
+the product is the <code>master</code> branch, consumed whole. This page maps how V2 came to be and how its repos wire together
+at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
+</div>
+
+<div class="ov-diagram">
+<svg viewBox="0 0 960 340" role="img" aria-label="Lineage: upstream forked once into the PR-era archive, which becomes ioSender V2 at the cutoff">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowcut" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#0a3069"/>
+    </marker>
+    <marker id="arrowx" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#cf222e"/>
+    </marker>
+  </defs>
+
+  <!-- return path: no PRs back -->
+  <path d="M 360,150 C 300,60 180,60 130,118" fill="none" stroke="#cf222e" stroke-width="1.6"
+        stroke-dasharray="5 4" marker-end="url(#arrowx)"/>
+  <text x="250" y="52" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12.5" fill="#cf222e" font-weight="600">&#10007; no PRs back &mdash; upstream no longer submitted to</text>
+
+  <!-- Upstream box -->
+  <rect x="24" y="118" width="200" height="120" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="124" y="142" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#1b1f23" font-weight="700">Upstream</text>
+  <text x="124" y="158" text-anchor="middle" font-family="Segoe UI, Arial" font-size="10" fill="#57606a">frozen origin</text>
+  <text x="124" y="182" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#0a3069">terjeio/ioSender</text>
+  <text x="124" y="200" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#0a3069">grblHAL/Simulator</text>
+  <text x="124" y="218" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#0a3069">grblHAL/core</text>
+
+  <!-- forked once arrow -->
+  <line x1="224" y1="178" x2="330" y2="178" stroke="#57606a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="277" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="11" fill="#57606a" font-style="italic">forked once</text>
+
+  <!-- Archive box -->
+  <rect x="332" y="120" width="268" height="140" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="466" y="144" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#1b1f23" font-weight="700">PR&#8209;era archive</text>
+  <text x="466" y="160" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9.5" fill="#57606a">frozen @ tag <tspan font-family="Consolas, monospace">pr-era-cutoff</tspan></text>
+  <text x="466" y="184" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="#0a3069">stevenrwood/ioSender &#183; /Simulator</text>
+  <text x="466" y="200" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="#0a3069">/core &#183; /iMXRT1062</text>
+  <text x="466" y="222" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9.5" fill="#57606a">master + pr/* + apply&#8209;prs + ProposedPRs</text>
+  <text x="466" y="240" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9.5" fill="#1a7f37" font-weight="600">&#10003; upstream&#8209;submittable</text>
+
+  <!-- cutoff dotted arrow -->
+  <line x1="600" y1="190" x2="702" y2="190" stroke="#0a3069" stroke-width="1.8" stroke-dasharray="2 4" marker-end="url(#arrowcut)"/>
+  <text x="651" y="182" text-anchor="middle" font-family="Segoe UI, Arial" font-size="11" fill="#0a3069" font-weight="600">cutoff</text>
+
+  <!-- V2 box (link) -->
+  <a xlink:href="#features-and-fixes" href="#features-and-fixes">
+    <rect x="704" y="140" width="232" height="100" rx="8" fill="#0a3069" stroke="#0a3069" stroke-width="1.5"/>
+    <text x="820" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" fill="#ffffff" font-weight="700">ioSender&nbsp;V2</text>
+    <text x="820" y="188" text-anchor="middle" font-family="Segoe UI, Arial" font-size="10" fill="#cdd9ec">the offshoot &#183; all&#8209;in&#8209;one</text>
+    <text x="820" y="212" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#ffffff">github.com/ioSenderV2</text>
+    <text x="820" y="230" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9.5" fill="#9ec1f0" text-decoration="underline">&#8595; jump to the changelog</text>
+  </a>
+
+  <text x="820" y="262" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9" fill="#8c959f">(dotted line = the cutoff / offshoot point)</text>
+</svg>
+<div class="ov-cap"><strong>One</strong> fork from each upstream &rarr; the PR&#8209;era archive (everything up to the cutoff, still submittable) &rarr; a dotted hand&#8209;off across the cutoff to <strong>ioSender&nbsp;V2</strong>, where all development now happens. Upstream is a frozen origin with the return path severed.</div>
+</div>
+
+<div class="ov-wire">
+<h3>V2 repos &amp; how they wire together at runtime</h3>
+<p class="foot" style="margin:0 0 8px">All under the <code>ioSenderV2</code> org, keeping their original names (only the owner changed). Full git history is preserved back to the upstream fork point.</p>
+<table>
+<tr><td class="repo"><code>ioSenderV2/ioSender</code></td><td>The WPF sender app (this document lives here). Talks to the controller over USB&nbsp;serial or Telnet/WebSocket.</td></tr>
+<tr><td class="repo"><code>ioSenderV2/iMXRT1062</code></td><td>The grblHAL firmware build (Teensy&nbsp;4.1 driver superproject + <code>core</code> submodule) the app connects to.</td></tr>
+<tr><td class="repo"><code>ioSenderV2/core</code></td><td>grblHAL core &mdash; consumed as the firmware&rsquo;s submodule; carries the shared g&#8209;code engine fixes (e.g. the WCS&#8209;rotation transform).</td></tr>
+<tr><td class="repo"><code>ioSenderV2/Simulator</code></td><td><strong>Option&#8209;matched simulator.</strong> On connect the app reads the controller&rsquo;s build options &rarr; a 12&#8209;hex signature, then pulls a matching sim from this repo&rsquo;s <code>sim-&lt;sig&gt;</code> releases (a shared build cache), dispatching the <code>build-matched-sim</code> CI to produce one if absent. Every download is public; a token is only needed to <em>trigger</em> a build.</td></tr>
+</table>
+</div>
+
+<hr class="ov-divider">
+<p class="ov-sectlabel">The full changelog &mdash; every feature &amp; fix in the V2 build</p>
+
+<section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
 <div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>41 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
@@ -1261,6 +1359,7 @@
 <p class="foot">In the integration build. Built up over several phases (envelope / stock / tool cone &rarr; toolpath + Play &rarr; dexel carve); the validate-controller 3D visualization (<a href="#pr16">#16</a>) uses the same scene.</p>
 </div>
 </div>
+</section>
 
 </body>
 </html>

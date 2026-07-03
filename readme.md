@@ -10,17 +10,13 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 ---
 
-#### This fork — an enhanced all-in-one build
+#### ioSender V2 — an enhanced all-in-one build
 
-This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a large set of enhancements and fixes delivered as **one all-in-one build** on the `integration` branch — not a menu of separately-selectable branches. It is developed against the fork's own `master`; the original upstream (`terjeio/ioSender`) is no longer tracked or submitted to.
+This is [`ioSenderV2/ioSender`](https://github.com/ioSenderV2/ioSender) — **ioSender V2**, the ongoing offshoot of the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork (itself a one-time fork of `terjeio/ioSender`). It carries a large set of enhancements and fixes delivered as **one all-in-one build** on `master` — not a menu of separately-selectable branches. Severed from upstream at the PR-era cutoff; the original upstream is no longer tracked or submitted to.
 
-**See [`FeaturesAndFixes.pdf`](FeaturesAndFixes.pdf)** ([`FeaturesAndFixes.html`](FeaturesAndFixes.html)) for the full changelog — every feature and fix with file-level diff stats and a description.
+**See [`Overview.pdf`](Overview.pdf)** ([`Overview.html`](Overview.html)) — the one document: how V2 came off the PR-era archive, how the V2 repos wire together, and the **full changelog** (every feature and fix with file-level diff stats and a description) folded in as the [`#features-and-fixes`](Overview.html#features-and-fixes) section.
 
-Branches:
-- `master` — the fork baseline (an upstream release plus the first handful of fixes).
-- `integration` (default) — `master` plus every enhancement; this is the build you run.
-
-To use it, clone and build the `integration` branch (build notes below) — it is consumed whole.
+`master` (default) is the whole product — clone and build it (build notes below); it is consumed whole. The upstream-submittable PR-era history lives frozen in the archive repo [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) at tag `pr-era-cutoff`.
 
 #### Edge pre-releases
 
