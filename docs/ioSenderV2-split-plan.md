@@ -28,15 +28,23 @@ split resolves.
    current `integration` tip. So the "cutoff" is conceptual, not a single divergence commit. Action: on each
    existing fork, tag the current `integration` tip `ioSenderV2-root` (so V2's origin is findable) and tag the
    PR‑era tip `pr-era-cutoff`. *(No content moves at tagging time — tags are just labels.)*
-2. **V2 repo names.** Proposal: `ioSenderV2`, `SimulatorV2`, `iMXRT1062V2`, `coreV2`, `Plugin_*V2`. Alternative:
-   keep the same names under a new GitHub org (e.g. `ioSenderV2/*`) so the code‑level names don't change. **Decide.**
+2. **V2 home = a GitHub org (DECIDED).** Create a GitHub **organization** (a shared account you own via your
+   existing login — *not* a separate login) and put the V2 repos under it with their **existing names**
+   (`ioSender`, `Simulator`, `iMXRT1062`, `core`, plugins). Two wins: (a) cross‑refs change the **owner only**
+   (`stevenrwood/Simulator` → `<org>/Simulator`), no `*V2` renames; (b) orgs support **multiple owners / ownership
+   transfer** — the "when I'm no longer around to maintain it" handoff. A PAT with `repo`+`workflow` scope granted
+   org access works exactly as today (matched‑sim CI etc. unchanged apart from the owner in the URL). **Org name TBD**
+   (e.g. `ioSenderV2`).
 3. **V2 default branch.** `master` vs `main` vs `integration`. Proposal: `master` (V2's own baseline == its
    product; no separate integration needed since there are no composable branches anymore).
 4. **History.** Keep full history in V2 (shared back to the upstream fork point — preserves provenance and
    `git blame`) vs. a squashed clean root at cutoff. Proposal: **keep full history** — V2 *is* the continuation.
-5. **`apply-prs` home.** It is PR‑era tooling → it belongs in the **archive**, not V2. So V2 drops
-   `tools/apply-prs.py`, `forks.json`, `gen-manifest.py`. (Reverses tonight's "keep it in the tree" — that was
-   right for one‑repo, wrong once the archive exists to hold it.)
+5. **`apply-prs` home = keep it in V2 too (DECIDED).** Rationale (user): if V2 ever takes outside contributors
+   it'll adopt a PR model and the tooling may be useful then. Nuance: a *normal* contributor flow (fork V2 → PR
+   against V2's `master`) is plain GitHub and wouldn't use the `apply-prs` **composer** specifically (it composes
+   single‑feature branches off `master` for *upstream* submission) — but it costs nothing to keep, so V2 retains
+   `tools/apply-prs.py`/`forks.json`/`gen-manifest.py`. The archive keeps its copy too. (Reverses last night's
+   "belongs only in the archive" note.)
 6. **Firmware is special.** The firmware isn't one repo with an `integration` branch — it's a superproject
    (`iMXRT1062`, branch `srw/local-build-config`) + submodule forks (`core` @ `srw/combined`, `Plugin_networking`,
    `Plugin_SD_card`) + per‑PR branches for upstream. Its "PR‑era" = the per‑PR fork branches; its "V2 build" =
