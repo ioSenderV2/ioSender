@@ -10,47 +10,17 @@ Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) f
 
 ---
 
-#### This fork — proposed enhancements
+#### This fork — an enhanced all-in-one build
 
-This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a stack of proposed enhancements, each kept as a **clean, single-feature branch** (`pr/*`) that diffs against `master` so it can be reviewed — and picked up — independently.
+This is the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork. It carries a large set of enhancements and fixes delivered as **one all-in-one build** on the `integration` branch — not a menu of separately-selectable branches. It is developed against the fork's own `master`; the original upstream (`terjeio/ioSender`) is no longer tracked or submitted to.
 
-**New here? Start with [`Overview.pdf`](Overview.pdf)** ([`Overview.html`](Overview.html)) — the big picture across all three coordinated forks (this **sender**, the grblHAL **Simulator**, and the iMXRT1062 **firmware**): goals & process, each fork's PRs, the `apply-prs` composer with examples, and links to every tracker.
+**See [`FeaturesAndFixes.pdf`](FeaturesAndFixes.pdf)** ([`FeaturesAndFixes.html`](FeaturesAndFixes.html)) for the full changelog — every feature and fix with file-level diff stats and a description.
 
-**See [`ProposedPRs.pdf`](ProposedPRs.pdf) for this repo's full PR list**: every PR with its branch name, file-level diff stats, a description, and any stacking/dependency notes. (Same content as [`ProposedPRs.html`](ProposedPRs.html) if you'd rather open it in a browser.)
+Branches:
+- `master` — the fork baseline (an upstream release plus the first handful of fixes).
+- `integration` (default) — `master` plus every enhancement; this is the build you run.
 
-Branch model:
-- `master` = the upstream release plus PRs 1&ndash;8 and 24 already integrated.
-- Each remaining enhancement lives on its own `pr/<name>` branch off `master`. A few are **stacked** on another PR (e.g. the ATC macros branch builds on the SD-card filesystem branch) — `ProposedPRs.html` lists each branch's *Depends on*.
-
-##### Apply one (or more) to your own fork
-
-Add this fork as a remote and fetch the branches:
-
-```bash
-git remote add srw https://github.com/stevenrwood/ioSender.git
-git fetch srw
-```
-
-Then pick up a single PR. Look up its branch name (and any parent it stacks on) in `ProposedPRs.html`, then either **merge the branch** as-is:
-
-```bash
-git merge srw/pr/<branch>
-```
-
-or **cherry-pick just its commits** onto your current branch (handy when your base differs from this fork's `master`):
-
-```bash
-# the commits a pr/* branch adds on top of master
-git cherry-pick master..srw/pr/<branch>
-```
-
-For a **stacked** PR, apply its parent first (or cherry-pick from the parent instead of `master`):
-
-```bash
-git cherry-pick srw/pr/<parent-branch>..srw/pr/<branch>
-```
-
-Each branch touches a distinct, self-contained set of files, so independent PRs combine without conflicts; resolve any only where two PRs intentionally share a file (noted in the tracker).
+To use it, clone and build the `integration` branch (build notes below) — it is consumed whole.
 
 #### Edge pre-releases
 
