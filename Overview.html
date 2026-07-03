@@ -138,12 +138,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <div class="ov-wire">
 <h3>V2 repos &amp; how they wire together at runtime</h3>
-<p class="foot" style="margin:0 0 8px">All under the <code>ioSenderV2</code> org, keeping their original names (only the owner changed). Full git history is preserved back to the upstream fork point.</p>
+<p class="foot" style="margin:0 0 8px">The app and simulator moved to the <code>ioSenderV2</code> org (original names kept, full git history preserved). The grblHAL <strong>firmware</strong> was <em>not</em> migrated &mdash; its deep submodule web makes it all&#8209;or&#8209;nothing, so it stays in the frozen fork, referenced by the <code>pr-era-cutoff</code> tag.</p>
 <table>
 <tr><td class="repo"><code>ioSenderV2/ioSender</code></td><td>The WPF sender app (this document lives here). Talks to the controller over USB&nbsp;serial or Telnet/WebSocket.</td></tr>
-<tr><td class="repo"><code>ioSenderV2/iMXRT1062</code></td><td>The grblHAL firmware build (Teensy&nbsp;4.1 driver superproject + <code>core</code> submodule) the app connects to.</td></tr>
-<tr><td class="repo"><code>ioSenderV2/core</code></td><td>grblHAL core &mdash; consumed as the firmware&rsquo;s submodule; carries the shared g&#8209;code engine fixes (e.g. the WCS&#8209;rotation transform).</td></tr>
 <tr><td class="repo"><code>ioSenderV2/Simulator</code></td><td><strong>Option&#8209;matched simulator.</strong> On connect the app reads the controller&rsquo;s build options &rarr; a 12&#8209;hex signature, then pulls a matching sim from this repo&rsquo;s <code>sim-&lt;sig&gt;</code> releases (a shared build cache), dispatching the <code>build-matched-sim</code> CI to produce one if absent. Every download is public; a token is only needed to <em>trigger</em> a build.</td></tr>
+<tr><td class="repo"><code>stevenrwood/iMXRT1062</code><br><span class="foot">firmware &middot; tag&#8209;only</span></td><td>The grblHAL firmware build (Teensy&nbsp;4.1 driver superproject + <code>core</code> submodule at <code>srw/combined</code>, incl. the WCS&#8209;rotation transform fix) the app connects to. Stays in the fork &mdash; build branch <code>srw/local-build-config</code>, frozen reference at tag <code>pr-era-cutoff</code>.</td></tr>
 </table>
 </div>
 

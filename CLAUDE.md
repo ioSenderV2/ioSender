@@ -20,11 +20,14 @@ Upstream is no longer tracked or submitted to; the product is the `master` branc
 - **macOS / Linux:** not supported — WPF is Windows-only. Run in a Windows VM. (The sibling grblHAL
   **Simulator** and iMXRT1062 **firmware** repos do build cross-platform.)
 
-## Repos (all under the `ioSenderV2` org, original names kept)
+## Repos
+App + simulator live under the `ioSenderV2` org (original names kept, full history preserved):
 - `ioSenderV2/ioSender` — this WPF sender app.
-- `ioSenderV2/iMXRT1062` — the grblHAL firmware (Teensy 4.1 driver + `core` submodule) the app connects to.
-- `ioSenderV2/core` — grblHAL core, consumed as the firmware's submodule.
 - `ioSenderV2/Simulator` — the option-matched grblHAL simulator (`build-matched-sim` CI + `sim-<sig>` releases).
+
+The grblHAL firmware was **not** migrated (its submodule web makes it all-or-nothing) — it stays in the fork, frozen-referenced at tag `pr-era-cutoff`:
+- `stevenrwood/iMXRT1062` — firmware superproject; build branch `srw/local-build-config`.
+- `stevenrwood/core` — grblHAL core submodule; build branch `srw/combined` (carries the WCS-rotation fix).
 
 ## Branch model
 - **`master`** (default) = the whole all-in-one product. There are no composable `pr/*` branches and nothing
