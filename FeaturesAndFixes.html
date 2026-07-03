@@ -1254,8 +1254,9 @@
   <li><strong>Machine scene, always on:</strong> the work envelope, axes and a live tool cone are shown whenever the machine is homed, even with no program loaded &mdash; a persistent sense of where the tool is in the work area.</li>
   <li><strong>Program-sized stock:</strong> the stock block is sized to the program (its real footprint read from a <code>(STOCK X Y)</code> comment), drawn solid with the correct top, in work coordinates aligned to the toolpath.</li>
   <li><strong>Material-removal carve:</strong> a dexel / height-field carve removes material as the tool moves, using the <em>real cutter bottom profile</em> (flat / ball / V-bit) on a fine grid, so the carved surface matches the actual tool. Toolpath lines hide during playback to reveal the cut and restore on stop.</li>
-  <li><strong>Local Play:</strong> press Play to animate the program (or Cycle Start to watch the real job) and watch the carve build up; Reset view restores the default orientation, and a pale stock theme keeps the cut visible.</li>
-  <li><strong>Performance:</strong> in-place dirty-cell mesh updates (no per-frame realloc), the scene build deferred off the layout pass, and the view frozen while a job streams so the carve never competes with motion.</li>
+  <li><strong>Play a preview:</strong> press Play for a machine-free preview that animates the program and builds the carve; Reset view restores the default orientation, and a pale stock theme keeps the cut visible.</li>
+  <li><strong>Real machine vs. simulator:</strong> streaming to a <em>real</em> machine <strong>disables</strong> the carve &mdash; the view freezes so it never competes with motion-critical streaming. To watch the carve run in step with execution, connect to the <strong>simulator</strong> and Cycle&nbsp;Start there.</li>
+  <li><strong>Performance:</strong> in-place dirty-cell mesh updates (no per-frame realloc) and the scene build deferred off the layout pass.</li>
 </ul>
 <p class="foot">In the integration build. Built up over several phases (envelope / stock / tool cone &rarr; toolpath + Play &rarr; dexel carve); the validate-controller 3D visualization (<a href="#pr16">#16</a>) uses the same scene.</p>
 </div>
