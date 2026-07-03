@@ -54,7 +54,7 @@
 <body>
 
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>40 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>41 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -111,6 +111,7 @@
 <tr><td>Continuous block numbering &mdash; explicit <code>N</code> words shown in the Block column and hidden from the G-code column</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr32">32</a></td></tr>
 <tr><td>Explain G-code on hover &mdash; plain-language per line/selection (decodes parameters, O-word CALLs, expressions); click the balloon to copy</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr33">33</a></td></tr>
 <tr><td>One in-place streaming path &mdash; every wizard/macro runs in its own view; a run never overwrites the loaded job</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr37">37</a></td></tr>
+<tr><td>Live 3D carve view &mdash; watch the stock get machined away (program-sized stock, real cutter profile flat/ball/V-bit, Play / Cycle&nbsp;Start playback) instead of just toolpath lines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr41">41</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -174,7 +175,8 @@
 <tr><td class="n">38</td><td><a href="#pr38">Match the bundled simulator to the connected controller</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+355</span> <span class="del">0</span></td></tr>
 <tr><td class="n">39</td><td><a href="#pr39">Re-establish modal state on a mid-program start</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+22</span> <span class="del">0</span></td></tr>
 <tr><td class="n">40</td><td><a href="#pr40">Load Stock &ldquo;apply work rotation&rdquo; defaults off</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (40 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">251</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23905</span> <span class="del">-1905</span></td></tr>
+<tr><td class="n">41</td><td><a href="#pr41">Live 3D toolpath + material-removal carve view</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+1107</span> <span class="del">-62</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (41 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">255</span> <span class="del">0</span> <span class="add">+84</span><br><span class="k">Lines:</span> <span class="add">+25012</span> <span class="del">-1967</span></td></tr>
 </table>
 </div>
 
@@ -1231,6 +1233,31 @@
   <li>The real fix is in the firmware rotation transform (<code>gcode.c</code>: <code>bit(idx)</code>&rarr;<code>bit(idx_0)</code>), now fixed and flashed; once hardware-verified the default can go back on.</li>
 </ul>
 <p class="foot">In the integration build. A guard against the firmware rotation bug until the firmware fix is hardware-verified.</p>
+</div>
+</div>
+
+<!-- ===== PR 41 ===== -->
+<div class="pr">
+<h2 id="pr41"><span class="badge">#41</span>Live 3D toolpath + material-removal carve view</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC GCodeViewer/CarveView.xaml.cs</td><td class="num add">850</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">190</td><td class="num del">54</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CarveView.xaml</td><td class="num add">36</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/ConfigControl.xaml.cs</td><td class="num add">13</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC GCodeViewer/RenderControl.xaml</td><td class="num add">11</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>A live 3D <strong>carve view</strong> in the toolpath viewer &mdash; not just lines on screen, but the stock being <em>machined away</em> as the program runs, so you can see the finished shape before you cut it.</p>
+<ul>
+  <li><strong>Machine scene, always on:</strong> the work envelope, axes and a live tool cone are shown whenever the machine is homed, even with no program loaded &mdash; a persistent sense of where the tool is in the work area.</li>
+  <li><strong>Program-sized stock:</strong> the stock block is sized to the program (its real footprint read from a <code>(STOCK X Y)</code> comment), drawn solid with the correct top, in work coordinates aligned to the toolpath.</li>
+  <li><strong>Material-removal carve:</strong> a dexel / height-field carve removes material as the tool moves, using the <em>real cutter bottom profile</em> (flat / ball / V-bit) on a fine grid, so the carved surface matches the actual tool. Toolpath lines hide during playback to reveal the cut and restore on stop.</li>
+  <li><strong>Local Play:</strong> press Play to animate the program (or Cycle Start to watch the real job) and watch the carve build up; Reset view restores the default orientation, and a pale stock theme keeps the cut visible.</li>
+  <li><strong>Performance:</strong> in-place dirty-cell mesh updates (no per-frame realloc), the scene build deferred off the layout pass, and the view frozen while a job streams so the carve never competes with motion.</li>
+</ul>
+<p class="foot">In the integration build. Built up over several phases (envelope / stock / tool cone &rarr; toolpath + Play &rarr; dexel carve); the validate-controller 3D visualization (<a href="#pr16">#16</a>) uses the same scene.</p>
 </div>
 </div>
 
