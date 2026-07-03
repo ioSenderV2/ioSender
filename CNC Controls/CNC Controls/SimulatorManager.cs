@@ -32,7 +32,7 @@ namespace CNC.Controls
         // "sim-latest" release asset. Preferred over the web builder (which compiles a stock upstream sim that
         // cannot home). Change the owner here if the fork lives elsewhere.
         public const string SimulatorReleaseUrl =
-            "https://github.com/stevenrwood/Simulator/releases/download/sim-latest/grblHAL_sim.exe";
+            "https://github.com/ioSenderV2/Simulator/releases/download/sim-latest/grblHAL_sim.exe";
 
         // User-editable build definition (a "Save selection" JSON exported from the web builder, Simulator/WIN64).
         // Shipped in the simulator folder so the feature set can be changed without a rebuild; a built-in copy is
@@ -482,11 +482,11 @@ namespace CNC.Controls
         // shared remote cache, public - no token); else dispatch the parameterized build-matched-sim CI
         // workflow (the only step that needs a token) and let the next connect pick up the result.
 
-        // Fork hosting the build-matched-sim workflow and the sim-<sig> release cache.
-        public const string SimulatorRepo = "stevenrwood/Simulator";
+        // Repo hosting the build-matched-sim workflow and the sim-<sig> release cache (ioSender V2 org).
+        public const string SimulatorRepo = "ioSenderV2/Simulator";
         public const string MatchedWorkflowFile = "build-matched-sim.yml";
-        // ref the dispatch runs on - the fork's default branch, which carries the workflow.
-        public const string MatchedWorkflowRef = "integration";
+        // ref the dispatch runs on - the repo's default branch, which carries the workflow.
+        public const string MatchedWorkflowRef = "master";
         // Records which option signature the active grblHAL_sim.exe was built for.
         private const string SigMarkerName = "grblHAL_sim.sig";
 
