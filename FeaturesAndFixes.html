@@ -54,7 +54,7 @@
 <body>
 
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>37 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;37 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>40 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;40 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
@@ -171,7 +171,10 @@
 <tr><td class="n">35</td><td><a href="#pr35">Jog distance +/&minus; controller actions</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">36</td><td><a href="#pr36">Probe input follows the selected probe type</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">0</span></td></tr>
 <tr><td class="n">37</td><td><a href="#pr37">One in-place streaming path (stayPut removed)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-110</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (37 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">247</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23522</span> <span class="del">-1904</span></td></tr>
+<tr><td class="n">38</td><td><a href="#pr38">Match the bundled simulator to the connected controller</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+355</span> <span class="del">0</span></td></tr>
+<tr><td class="n">39</td><td><a href="#pr39">Re-establish modal state on a mid-program start</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+22</span> <span class="del">0</span></td></tr>
+<tr><td class="n">40</td><td><a href="#pr40">Load Stock &ldquo;apply work rotation&rdquo; defaults off</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (40 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">251</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23905</span> <span class="del">-1905</span></td></tr>
 </table>
 </div>
 
@@ -1353,6 +1356,74 @@
   <li>Deletes the <code>stayPut</code> param, the <code>RunStreamedJob</code> job-clobber path + its wiring, and the orphaned tab-restore helper &mdash; a net code removal.</li>
 </ul>
 <p class="foot">In the integration build; hardware-verified via a clean Load Stock run (multi-burst / directives / O-words). Not yet exercised on hardware: the plain-macro run view (only a large <em>streaming</em> flyout macro reaches it).</p>
+</div>
+</div>
+
+<!-- ===== PR 38 ===== -->
+<div class="pr">
+<h2 id="pr38"><span class="badge">PR 38</span>Match the bundled simulator to the connected controller</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (<code>SimulatorManager</code> + the <code>JobView.InitSystem</code> connect hook). Pairs with the <code>build-matched-sim.yml</code> workflow on the Simulator fork.</div>
+  <div><span class="label">Depends on</span>The bundled-simulator infrastructure (Connect dialog Simulator tab; web-builder / release download).</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/SimulatorManager.cs</td><td class="num add">309</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/JobView.xaml.cs</td><td class="num add">46</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>Keeps the bundled grblHAL simulator in step with whatever controller you connect to, so a probe / rotation / multi-axis feature behaves on the sim exactly as on the real firmware.</p>
+<ul>
+  <li><strong>Options &rarr; signature:</strong> on connect, the controller&rsquo;s behaviour-affecting build options (axis count, probe, WCS rotation) are read from <code>GrblInfo</code> into a set of compile symbols and a short 12-hex signature.</li>
+  <li><strong>Cache ladder:</strong> already-active build &rarr; locally-cached <code>grblHAL_sim-&lt;sig&gt;.exe</code> &rarr; a <code>sim-&lt;sig&gt;</code> release on the fork (public download, no token) &rarr; otherwise dispatch the parameterized <code>build-matched-sim</code> CI and pick up the result. The set of <code>sim-&lt;sig&gt;</code> releases acts as a shared remote build cache.</li>
+  <li><strong>Token only to dispatch:</strong> a GitHub token (<code>GH_TOKEN</code>, <code>workflow</code> scope) is needed only to trigger a build &mdash; every download is public. Runs on a background thread off <code>InitSystem</code>, never blocks connect, is skipped when talking to our own simulator, and won&rsquo;t re-dispatch an in-flight signature.</li>
+</ul>
+<p class="foot">In the integration build; the Simulator-fork CI (<code>build-matched-sim.yml</code>) validated green end-to-end (dispatch &rarr; per-signature release &rarr; public download). The real on-connect round-trip is pending a hardware spot-check.</p>
+</div>
+</div>
+
+<!-- ===== PR 39 ===== -->
+<div class="pr">
+<h2 id="pr39"><span class="badge">PR 39</span>Re-establish modal state on a mid-program start</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (<code>StreamPump</code>).</div>
+  <div><span class="label">Depends on</span>The background send/ack streamer (<code>StreamPump</code>).</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/StreamPump.cs</td><td class="num add">22</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>&ldquo;Start from this toolpath&rdquo; queues a <code>G90 G94 / G17 / G21</code> prolog to re-establish modal state (the folder combiner strips each per-op file&rsquo;s header, where <code>G21</code> lived). The legacy streamer drained that queue, but the <code>StreamPump</code> streams <code>source.Data</code> directly and never touched <code>source.Commands</code> &mdash; so the prolog was silently dropped on a mid-program start.</p>
+<ul>
+  <li><strong>Symptom:</strong> a mid-program start inherited whatever units the controller was left in; in <code>G20</code> the toolpath&rsquo;s literal-mm coordinates read as inches &rarr; targets off the table.</li>
+  <li><strong>Fix:</strong> the pump now sends the queued <code>source.Commands</code> lines first, ahead of the first block, and swallows their acks so they don&rsquo;t advance job-line accounting. Full runs from the top were unaffected (there the prolog is prepended as real blocks).</li>
+</ul>
+<p class="foot">In the integration build. A latent correctness fix for any pump-based run-from-block.</p>
+</div>
+</div>
+
+<!-- ===== PR 40 ===== -->
+<div class="pr">
+<h2 id="pr40"><span class="badge">PR 40</span>Load Stock &ldquo;apply work rotation&rdquo; defaults off</h2>
+<div class="meta">
+  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (Load Stock).</div>
+  <div><span class="label">Depends on</span>The Load Stock skew&rarr;WCS rotation feature.</div>
+  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
+</div>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/LoadStockView.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+</table>
+<div class="desc">
+<p>Setting a WCS rotation via <code>G10 L2 R</code> armed a grblHAL rotation-transform bug (a rotated <code>G54</code> move with both X and Y double-applied the second axis&rsquo;s offset) that soft-limited the <em>next</em> program&rsquo;s first cut rapid. Reproduced on hardware: a &minus;0.08&deg; measured skew crashed the following job; clearing the rotation let it run.</p>
+<ul>
+  <li>Default the skew&rarr;WCS rotation <strong>off</strong> so Load Stock never silently arms it; the checkbox stays for opt-in.</li>
+  <li>The real fix is in the firmware rotation transform (<code>gcode.c</code>: <code>bit(idx)</code>&rarr;<code>bit(idx_0)</code>), now fixed and flashed; once hardware-verified the default can go back on.</li>
+</ul>
+<p class="foot">In the integration build. A guard against the firmware rotation bug until the firmware fix is hardware-verified.</p>
 </div>
 </div>
 
