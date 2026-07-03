@@ -37,8 +37,9 @@ split resolves.
    (e.g. `ioSenderV2`).
 3. **V2 default branch.** `master` vs `main` vs `integration`. Proposal: `master` (V2's own baseline == its
    product; no separate integration needed since there are no composable branches anymore).
-4. **History.** Keep full history in V2 (shared back to the upstream fork point — preserves provenance and
-   `git blame`) vs. a squashed clean root at cutoff. Proposal: **keep full history** — V2 *is* the continuation.
+4. **History = keep full history (DECIDED).** V2 keeps the complete history shared back to the upstream fork
+   point — preserves provenance and `git blame`. V2 *is* the continuation, not a fresh root. (Seeding is a plain
+   `git push`, so this is the default anyway — no squash/graft step.)
 5. **`apply-prs` home = keep it in V2 too (DECIDED).** Rationale (user): if V2 ever takes outside contributors
    it'll adopt a PR model and the tooling may be useful then. Nuance: a *normal* contributor flow (fork V2 → PR
    against V2's `master`) is plain GitHub and wouldn't use the `apply-prs` **composer** specifically (it composes
@@ -57,12 +58,17 @@ split resolves.
 
 ## 3. Docs & the lineage diagram
 
-**Naming (recommended):**
+**Naming + consolidation (DECIDED — fold FeaturesAndFixes into Overview):**
 - **Archive** keeps its `Overview.html` (V1 cross‑fork PR‑era map) + `ProposedPRs.html`, untouched — plus a one‑line
   "→ this became **ioSender V2**" pointer at the top.
-- **V2** gets a **superset `Overview.html`** (the map: lineage diagram + the V2 cross‑fork runtime wiring) **and**
-  `FeaturesAndFixes.html` (the changelog). `Overview.html` as the name is right: V2's Overview is a strict superset
-  of V1's (it adds the V2 half + the runtime picture).
+- **V2** gets a **single superset `Overview.html`** that is the one document: lineage diagram → V2 cross‑fork runtime
+  wiring → **the full FeaturesAndFixes changelog folded in as the final section** (anchor `#features-and-fixes`).
+  `Overview.html` is the right name: it's a strict superset of V1's Overview (adds the V2 half + runtime picture +
+  the changelog). **`FeaturesAndFixes.html` is retired as a standalone file** — its content lives inside Overview.
+  - *Mechanics:* copy the changelog's `<style>` + `<body>` content into an `<section id="features-and-fixes">` at the
+    bottom of Overview.html (namespace/prefix any clashing CSS class names so the map styles and changelog styles
+    don't collide), regenerate the single PDF. `readme.md`/`CLAUDE.md` "read first" pointer → `Overview.html` (was
+    `FeaturesAndFixes.*`). Keep an `git mv`‑style redirect note if any external link pointed at the old filename.
 
 **The diagram** (lives in V2's `Overview.html`; a self‑contained inline SVG, build‑doc style):
 
@@ -74,15 +80,16 @@ split resolves.
     │ grblHAL/core+drv  │────┐ │ │        ═══ PR-era archive ═══            ┈┈┈ cutoff ┈┈┈
     └───────────────────┘    │ │ └──▶ stevenrwood/ioSender  (master + pr/*  ┊
              ▲               │ └────▶ stevenrwood/Simulator   + apply-prs +  ┊   ⇢ ┌──────────────┐
-             │               └──────▶ stevenrwood/core…       ProposedPRs)   ┊     │ ioSender V2  │──▶ link:
-             │                                                (submittable)  ┊     │  (offshoot)  │  FeaturesAndFixes.html
+             │               └──────▶ stevenrwood/core…       ProposedPRs)   ┊     │ ioSender V2  │──▶ jumps to
+             │                                                (submittable)  ┊     │  (offshoot)  │  #features-and-fixes
              └────────  ✗  no PRs back — upstream no longer submitted to  ───┘     └──────────────┘
                                                                             (dotted line = the cutoff / offshoot)
 ```
 
 Says at a glance: **one** fork from each upstream → the PR‑era archive (up to the cutoff) → a **dotted line**
-across the cutoff to the **ioSender V2** box, which is a **hyperlink to `FeaturesAndFixes.html`**. Upstream is a
-frozen origin with the return path severed. *(Build the actual SVG when V2's `Overview.html` is created.)*
+across the cutoff to the **ioSender V2** box, which is an **in‑page link to the `#features-and-fixes` section
+below** (the changelog now lives in this same Overview.html). Upstream is a frozen origin with the return path
+severed. *(Build the actual SVG when V2's `Overview.html` is created.)*
 
 ---
 
@@ -95,9 +102,11 @@ Do ioSender end‑to‑end first, verify, then repeat for Simulator; firmware pe
 3. **Seed V2:** `git remote add v2 …/ioSenderV2.git` → `git push v2 integration:master` (+ `--tags` for V2‑relevant tags).
    V2's `master` == today's `integration`, full history.
 4. **Set** V2 default branch = `master`; enable Actions.
-5. **Clean V2 of PR‑era artifacts:** remove `tools/apply-prs.py`, `forks.json`, `gen-manifest.py`; add the superset
-   `Overview.html` (with the diagram); `FeaturesAndFixes.html` already present. Update `readme.md`/`CLAUDE.md` sibling
-   references to the V2 repos.
+5. **Clean V2 of PR‑era artifacts + consolidate docs:** *(apply-prs stays — see §2.5.)* Build the superset
+   `Overview.html` = lineage diagram + runtime wiring + the `FeaturesAndFixes.html` changelog folded in as
+   `<section id="features-and-fixes">` (namespace clashing CSS); regenerate the single PDF; **remove the standalone
+   `FeaturesAndFixes.html`/`.pdf`**. Update `readme.md`/`CLAUDE.md` "read first" pointer → `Overview.html`, and sibling
+   repo references to the V2 org.
 6. **Repoint cross‑repo code:** `SimulatorManager.SimulatorRepo` `stevenrwood/Simulator` → `stevenrwood/SimulatorV2`
    (and the workflow file / dispatch + release‑download URLs). Confirm the `GH_TOKEN` scope covers the new repo.
 7. **Freeze the existing fork:** delete (or reset‑to‑cutoff) its `integration` branch — V2 lives in `ioSenderV2` now;
@@ -143,4 +152,4 @@ Everything is additive until step 7 (freeze). If a V2 repo is wrong, delete it a
 ## Open questions for the morning
 - ~~V2 home / repo names~~ **DECIDED: a GitHub org, repos keep existing names** (§2.2). Org **name** still to pick.
 - Firmware: full split or tag‑only? (§2.6) — leaning **tag‑only**.
-- Confirm the diagram content + that `Overview.html` (superset) is the right home/name. (§3)
+- ~~Confirm doc naming~~ **DECIDED: single superset `Overview.html`; fold FeaturesAndFixes in as `#features-and-fixes`; keep full history** (§2.4, §3). Diagram content still to draw.
