@@ -54,27 +54,27 @@
 <body>
 
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>40 improvements in the <code>integration</code> build.</strong> PRs 1&ndash;27 are composable branches (PR 8 stacks on PR 3; PRs 9-10 on the integrated keymap/Xbox base; PRs 11-15 off master; PRs 16-17 stack on PR 15; PRs 18-24 off master; PR 25 stacks on PR 14; PRs 26-27 off master); PRs 28&ndash;40 are <em>integration-resident</em> &mdash; they share the macro&rarr;job streamer / program-view / Tools-tab hosting, so they are not carved into standalone composable branches. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>) &nbsp;·&nbsp; <strong>upstream submission abandoned</strong> &mdash; the fork is a self-contained improvement, consumed wholesale or cherry-picked.</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>40 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
-<div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. <span class="star">&#9733;</span> = already in the fork&rsquo;s <code>master</code> baseline (PRs 1&ndash;8, 24); the rest are the selectable PRs. Hard dependencies: 16&rarr;15, 17&rarr;15, 25&rarr;14.</div>
+<div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
 
 <h3 class="first">Connectivity &amp; reliability</h3>
 <table>
 <tr><td>Connect to USB / Ethernet / simulator, with a Connect/Reconnect menu, remembered host and opt-in prefer-network</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr15">15</a></td></tr>
-<tr><td>Validate controller &mdash; streams a capability-tailored test in check mode (no motion), reports pass/fail + 3D preview</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr16">16</a> +<a href="#pr15">15</a></td></tr>
-<tr><td>Restore main-window <em>position</em> across launches (was size only)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr17">17</a> +<a href="#pr15">15</a></td></tr>
-<tr><td>Survive connection loss / SD-card swap &mdash; guarded writes + auto-reconnect instead of crashing</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr4">4</a><span class="star">&#9733;</span></td></tr>
-<tr><td>Telnet / websocket modal-dialog UI deadlock</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr24">24</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Validate controller &mdash; streams a capability-tailored test in check mode (no motion), reports pass/fail + 3D preview</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr16">16</a></td></tr>
+<tr><td>Restore main-window <em>position</em> across launches (was size only)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr17">17</a></td></tr>
+<tr><td>Survive connection loss / SD-card swap &mdash; guarded writes + auto-reconnect instead of crashing</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr4">4</a></td></tr>
+<tr><td>Telnet / websocket modal-dialog UI deadlock</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr24">24</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
 <table>
 <tr><td>Configurable main page &mdash; Edit Main Page editor, pinnable flyouts, assignable jog panels, per-offset Go/Set buttons</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr9">9</a></td></tr>
-<tr><td>Native Xbox / game-controller support &mdash; analog-stick jog, remappable buttons, live Controller tab</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr8">8</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Native Xbox / game-controller support &mdash; analog-stick jog, remappable buttons, live Controller tab</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr8">8</a></td></tr>
 <tr><td>3D view: Ctrl+click to jog (retracts Z first) + per-axis $23 orientation fix</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr20">20</a></td></tr>
 <tr><td>Keyboard jog keeps working when focus drifts off the Job view</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr22">22</a></td></tr>
-<tr><td>High-DPI / 125&ndash;150% text-scaling layout</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr7">7</a><span class="star">&#9733;</span></td></tr>
+<tr><td>High-DPI / 125&ndash;150% text-scaling layout</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr7">7</a></td></tr>
 <tr><td>Assignable <em>Jog distance +/&minus;</em> controller actions &mdash; step the jog distance preset (separate from jog speed)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr35">35</a></td></tr>
 </table>
 
@@ -82,7 +82,7 @@
 <table>
 <tr><td>Machine Setup Wizard &mdash; guided first-run machine description (catalog, home-corner picker, per-axis table)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr21">21</a></td></tr>
 <tr><td>grbl:Settings &mdash; change-from-startup highlight, granular revert, per-Save restore points, bitfield tooltips</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr18">18</a></td></tr>
-<tr><td>Stepper calibration (scratch) tab &mdash; long-span V-bit steps/mm</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr5">5</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Stepper calibration (scratch) tab &mdash; long-span V-bit steps/mm</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr5">5</a></td></tr>
 <tr><td>Safe-Z on Go To &mdash; lift / traverse / descend instead of a diagonal rapid</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr23">23</a></td></tr>
 <tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
 <tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
@@ -99,9 +99,9 @@
 
 <h3>Files, SD card &amp; ATC</h3>
 <table>
-<tr><td>Load Folder &mdash; assemble per-toolpath <code>.nc</code> files into one outlined program (+ Fusion add-in)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr6">6</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Load Folder &mdash; assemble per-toolpath <code>.nc</code> files into one outlined program (+ Fusion add-in)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr6">6</a></td></tr>
 <tr><td>SD + LittleFS browser &amp; file manager &mdash; multi-filesystem, View/Edit/Create/Upload via Notepad</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr14">14</a></td></tr>
-<tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a> +<a href="#pr14">14</a></td></tr>
+<tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -117,7 +117,7 @@
 <table>
 <tr><td>Macro manager dialog (grid, F-key assign, confirm-on-run flag) + run-only macro flyout</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr10">10</a></td></tr>
 <tr><td>Macro pre-processor directives &mdash; PREREQ / MBOX / WAITIDLE / PROMPT / <code>@path</code></td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr11">11</a></td></tr>
-<tr><td>In-app Key Mappings editor + console state persistence</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr3">3</a><span class="star">&#9733;</span></td></tr>
+<tr><td>In-app Key Mappings editor + console state persistence</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr3">3</a></td></tr>
 <tr><td>Console: inline terminal command prompt + output right-click menu (Clear / Save)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr19">19</a></td></tr>
 </table>
 
@@ -126,55 +126,55 @@
 <tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
 <tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
 <tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
-<tr><td>Show Motor Fault / Warning signals in the Signals display</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr2">2</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Show Motor Fault / Warning signals in the Signals display</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr2">2</a></td></tr>
 <tr><td>Build documentation &mdash; Mega-XL upgrade notes + repeatable tool-change guide</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr13">13</a></td></tr>
-<tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a><span class="star">&#9733;</span></td></tr>
+<tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a></td></tr>
 </table>
 </div>
 
 <div class="toc">
 <table>
-<tr><td class="n">1</td><td><a href="#pr1">Bug Fixes for released ioSender</a></td><td class="mono">pr/fix-rp-math-build</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+28</span> <span class="del">-10</span></td></tr>
-<tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="mono">pr/motor-signals</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+5</span> <span class="del">-32</span></td></tr>
-<tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="mono">pr/keymapping_editor</td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+1224</span> <span class="del">-15</span></td></tr>
-<tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="mono">pr/connection-loss-reconnect</td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+522</span> <span class="del">-63</span></td></tr>
-<tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="mono">pr/stepper-calibration-scratch</td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+773</span> <span class="del">-2</span></td></tr>
-<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="mono">pr/load-folder</td><td class="sz"><span class="k">Files:</span> <span class="chg">28</span> <span class="del">0</span> <span class="add">+8</span><br><span class="k">Lines:</span> <span class="add">+1634</span> <span class="del">-8</span></td></tr>
-<tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="mono">pr/highdpi-layout</td><td class="sz"><span class="k">Files:</span> <span class="chg">27</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+126</span> <span class="del">-109</span></td></tr>
-<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="mono">pr/xbox-mapping</td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+2255</span> <span class="del">-687</span></td></tr>
-<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="mono">pr/main-page-layout</td><td class="sz"><span class="k">Files:</span> <span class="chg">31</span> <span class="del">0</span> <span class="add">+20</span><br><span class="k">Lines:</span> <span class="add">+2835</span> <span class="del">-119</span></td></tr>
-<tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="mono">pr/macro-editor</td><td class="sz"><span class="k">Files:</span> <span class="chg">16</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+598</span> <span class="del">-26</span></td></tr>
-<tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="mono">pr/macro-processor</td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+723</span> <span class="del">-21</span></td></tr>
-<tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="mono">pr/onboarding-tooltips</td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+283</span> <span class="del">-28</span></td></tr>
-<tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="mono">pr/build-docs</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+8</span><br><span class="k">Lines:</span> <span class="add">+2662</span> <span class="del">0</span></td></tr>
-<tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="mono">pr/sdcard-filesystems</td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+945</span> <span class="del">-135</span></td></tr>
-<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="mono">pr/connect-simulator</td><td class="sz"><span class="k">Files:</span> <span class="chg">26</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1151</span> <span class="del">-68</span></td></tr>
-<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="mono">pr/validate</td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+1208</span> <span class="del">-38</span></td></tr>
-<tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="mono">pr/window-restore</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+60</span> <span class="del">-7</span></td></tr>
-<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="mono">pr/grbl-settings</td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+659</span> <span class="del">-43</span></td></tr>
-<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="mono">pr/mdi-console</td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+220</span> <span class="del">-21</span></td></tr>
-<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="mono">pr/click-to-jog</td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+206</span> <span class="del">-60</span></td></tr>
-<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="mono">pr/machine-setup-wizard</td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1740</span> <span class="del">-1</span></td></tr>
-<tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="mono">pr/keyboard-jog-focus</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+23</span> <span class="del">-1</span></td></tr>
-<tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="mono">pr/safe-z-goto</td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+54</span> <span class="del">-8</span></td></tr>
-<tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="mono">pr/telnet-deadlock-fix</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-10</span></td></tr>
-<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="mono">pr/atc-macros</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+804</span> <span class="del">-10</span></td></tr>
-<tr><td class="n">26</td><td><a href="#pr26">Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</a></td><td class="mono">pr/editable-predefined-offsets</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+21</span> <span class="del">-2</span></td></tr>
-<tr><td class="n">27</td><td><a href="#pr27">Dialogs &mdash; center owner-less modal dialogs</a></td><td class="mono">pr/dialog-centering</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-2</span></td></tr>
-<tr><td class="n">28</td><td><a href="#pr28">Machine Setup restructure + Tools tab + setup gate</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+237</span> <span class="del">-21</span></td></tr>
-<tr><td class="n">29</td><td><a href="#pr29">Surface Spoilboard &mdash; machine-referenced facing tool</a></td><td class="mono">pr/surface-spoilboard</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+673</span> <span class="del">0</span></td></tr>
-<tr><td class="n">30</td><td><a href="#pr30">Load Stock &mdash; corner-probe stock measurement</a></td><td class="mono">pr/load-stock</td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1125</span> <span class="del">0</span></td></tr>
-<tr><td class="n">31</td><td><a href="#pr31">Squareness (Auto Square) &mdash; ganged-gantry offset tool</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+686</span> <span class="del">0</span></td></tr>
-<tr><td class="n">32</td><td><a href="#pr32">Program view as a reusable object + background loading</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+830</span> <span class="del">-184</span></td></tr>
-<tr><td class="n">33</td><td><a href="#pr33">Explain G-code on hover (novice tooltips)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+805</span> <span class="del">-39</span></td></tr>
-<tr><td class="n">34</td><td><a href="#pr34">Probe definition diagrams</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+142</span> <span class="del">-22</span></td></tr>
-<tr><td class="n">35</td><td><a href="#pr35">Jog distance +/&minus; controller actions</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-2</span></td></tr>
-<tr><td class="n">36</td><td><a href="#pr36">Probe input follows the selected probe type</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">0</span></td></tr>
-<tr><td class="n">37</td><td><a href="#pr37">One in-place streaming path (stayPut removed)</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-110</span></td></tr>
-<tr><td class="n">38</td><td><a href="#pr38">Match the bundled simulator to the connected controller</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+355</span> <span class="del">0</span></td></tr>
-<tr><td class="n">39</td><td><a href="#pr39">Re-establish modal state on a mid-program start</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+22</span> <span class="del">0</span></td></tr>
-<tr><td class="n">40</td><td><a href="#pr40">Load Stock &ldquo;apply work rotation&rdquo; defaults off</a></td><td class="mono">integration</td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (40 PRs)</td><td class="mono"></td><td class="sz"><span class="k">Files:</span> <span class="chg">251</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23905</span> <span class="del">-1905</span></td></tr>
+<tr><td class="n">1</td><td><a href="#pr1">Bug Fixes for released ioSender</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+28</span> <span class="del">-10</span></td></tr>
+<tr><td class="n">2</td><td><a href="#pr2">Surface Motor Fault / Warning signals</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+5</span> <span class="del">-32</span></td></tr>
+<tr><td class="n">3</td><td><a href="#pr3">Console persistence + Key Mappings editor</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+1224</span> <span class="del">-15</span></td></tr>
+<tr><td class="n">4</td><td><a href="#pr4">Connection-loss handling + auto-reconnect</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+522</span> <span class="del">-63</span></td></tr>
+<tr><td class="n">5</td><td><a href="#pr5">Stepper calibration (scratch) tab</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+773</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">6</td><td><a href="#pr6">Load Folder + Fusion batch-post add-in</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">28</span> <span class="del">0</span> <span class="add">+8</span><br><span class="k">Lines:</span> <span class="add">+1634</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">7</td><td><a href="#pr7">High-DPI / large-text layout</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">27</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+126</span> <span class="del">-109</span></td></tr>
+<tr><td class="n">8</td><td><a href="#pr8">Xbox controller + Key Mappings editor polish</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+2255</span> <span class="del">-687</span></td></tr>
+<tr><td class="n">9</td><td><a href="#pr9">Configurable main page + flyouts + jog panels (XL)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">31</span> <span class="del">0</span> <span class="add">+20</span><br><span class="k">Lines:</span> <span class="add">+2835</span> <span class="del">-119</span></td></tr>
+<tr><td class="n">10</td><td><a href="#pr10">Macro manager + run-only flyout</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">16</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+598</span> <span class="del">-26</span></td></tr>
+<tr><td class="n">11</td><td><a href="#pr11">Macro Processor Enhancements</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+723</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">12</td><td><a href="#pr12">Onboarding tooltips</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+283</span> <span class="del">-28</span></td></tr>
+<tr><td class="n">13</td><td><a href="#pr13">Build documentation (Mega-XL notes + tool-change guide)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+8</span><br><span class="k">Lines:</span> <span class="add">+2662</span> <span class="del">0</span></td></tr>
+<tr><td class="n">14</td><td><a href="#pr14">SD + LittleFS file browser &amp; file manager</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+945</span> <span class="del">-135</span></td></tr>
+<tr><td class="n">15</td><td><a href="#pr15">USB / Ethernet / simulator connection support + Connect menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">26</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1151</span> <span class="del">-68</span></td></tr>
+<tr><td class="n">16</td><td><a href="#pr16">Validate controller (check-mode g-code conformance test)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+1208</span> <span class="del">-38</span></td></tr>
+<tr><td class="n">17</td><td><a href="#pr17">Restore main window position across launches</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+60</span> <span class="del">-7</span></td></tr>
+<tr><td class="n">18</td><td><a href="#pr18">grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+659</span> <span class="del">-43</span></td></tr>
+<tr><td class="n">19</td><td><a href="#pr19">Console &mdash; inline terminal-style command prompt</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+220</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">20</td><td><a href="#pr20">3D view &mdash; Ctrl+click to jog + per-axis orientation</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+206</span> <span class="del">-60</span></td></tr>
+<tr><td class="n">21</td><td><a href="#pr21">grbl:Settings &mdash; Machine Setup Wizard</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1740</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">22</td><td><a href="#pr22">Keyboard jog &mdash; keep active when Job-view focus drifts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+23</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">23</td><td><a href="#pr23">Go To &mdash; optional safe-Z (lift, traverse, descend)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+54</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">24</td><td><a href="#pr24">comms &mdash; fix telnet/websocket UI deadlock</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-10</span></td></tr>
+<tr><td class="n">25</td><td><a href="#pr25">ATC tool-change macro provisioning (Install ATC + Start Job)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+5</span><br><span class="k">Lines:</span> <span class="add">+804</span> <span class="del">-10</span></td></tr>
+<tr><td class="n">26</td><td><a href="#pr26">Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+21</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">27</td><td><a href="#pr27">Dialogs &mdash; center owner-less modal dialogs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">28</td><td><a href="#pr28">Machine Setup restructure + Tools tab + setup gate</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+237</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">29</td><td><a href="#pr29">Surface Spoilboard &mdash; machine-referenced facing tool</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+673</span> <span class="del">0</span></td></tr>
+<tr><td class="n">30</td><td><a href="#pr30">Load Stock &mdash; corner-probe stock measurement</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1125</span> <span class="del">0</span></td></tr>
+<tr><td class="n">31</td><td><a href="#pr31">Squareness (Auto Square) &mdash; ganged-gantry offset tool</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+686</span> <span class="del">0</span></td></tr>
+<tr><td class="n">32</td><td><a href="#pr32">Program view as a reusable object + background loading</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+830</span> <span class="del">-184</span></td></tr>
+<tr><td class="n">33</td><td><a href="#pr33">Explain G-code on hover (novice tooltips)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+805</span> <span class="del">-39</span></td></tr>
+<tr><td class="n">34</td><td><a href="#pr34">Probe definition diagrams</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+142</span> <span class="del">-22</span></td></tr>
+<tr><td class="n">35</td><td><a href="#pr35">Jog distance +/&minus; controller actions</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">36</td><td><a href="#pr36">Probe input follows the selected probe type</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">0</span></td></tr>
+<tr><td class="n">37</td><td><a href="#pr37">One in-place streaming path (stayPut removed)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-110</span></td></tr>
+<tr><td class="n">38</td><td><a href="#pr38">Match the bundled simulator to the connected controller</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+355</span> <span class="del">0</span></td></tr>
+<tr><td class="n">39</td><td><a href="#pr39">Re-establish modal state on a mid-program start</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+22</span> <span class="del">0</span></td></tr>
+<tr><td class="n">40</td><td><a href="#pr40">Load Stock &ldquo;apply work rotation&rdquo; defaults off</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (40 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">251</span> <span class="del">0</span> <span class="add">+82</span><br><span class="k">Lines:</span> <span class="add">+23905</span> <span class="del">-1905</span></td></tr>
 </table>
 </div>
 
@@ -184,22 +184,18 @@
   <p style="margin:6px 0; font-size:10pt; color:#57606a">Separate repos &mdash; no build dependency. The coupling is runtime / protocol: the simulator only exercises a feature when the ioSender PR below drives it over the socket. (Simulator PR numbers refer to that fork&rsquo;s <code>proposed-prs</code> tracker.)</p>
   <table class="files">
   <tr><th>ioSender PR</th><th>Used by Simulator PR</th><th>Coupling</th></tr>
-  <tr><td><a href="#pr6">PR 6</a> load-folder</td><td>sim-view (3D carve)</td><td><code>PushHeaderToSimulator()</code> sends the program&rsquo;s leading <code>(STOCK &hellip;)</code> / <code>(TOOL &hellip;)</code> comments so the carve knows stock size + cutter geometry.</td></tr>
-  <tr><td><a href="#pr11">PR 11</a> macro-processor</td><td>littlefs</td><td><code>O&lt;name&gt; CALL</code> forwarding resolves macros stored on the simulator&rsquo;s <code>/littlefs</code>.</td></tr>
-  <tr><td><a href="#pr14">PR 14</a> sdcard-filesystems</td><td>littlefs, ymodem-socket</td><td>File browser + YModem uploader that puts files onto the simulator filesystem.</td></tr>
-  <tr><td><a href="#pr15">PR 15</a> connect-simulator</td><td>sim-view, persistence-reboot, sim-core base</td><td>Connects to the standalone sim; <em>always-send-comments</em> forces <code>(TOOL)</code>/<code>(STOCK)</code> through for the carve; (vestigial) download of the <code>sim-latest</code> CI build; &ldquo;My Machine&rdquo; EEPROM uses the sim&rsquo;s settings persistence.</td></tr>
-  <tr><td><a href="#pr25">PR 25</a> atc-macros</td><td>ymodem-socket, littlefs, sim-probe</td><td>&ldquo;Install ATC macros&rdquo; uploads via YModem to <code>/littlefs</code>; the Start-Job / <code>probe_tfl</code> cycle drives the modelled probe surfaces.</td></tr>
+  <tr><td><a href="#pr6">#6</a> load-folder</td><td>sim-view (3D carve)</td><td><code>PushHeaderToSimulator()</code> sends the program&rsquo;s leading <code>(STOCK &hellip;)</code> / <code>(TOOL &hellip;)</code> comments so the carve knows stock size + cutter geometry.</td></tr>
+  <tr><td><a href="#pr11">#11</a> macro-processor</td><td>littlefs</td><td><code>O&lt;name&gt; CALL</code> forwarding resolves macros stored on the simulator&rsquo;s <code>/littlefs</code>.</td></tr>
+  <tr><td><a href="#pr14">#14</a> sdcard-filesystems</td><td>littlefs, ymodem-socket</td><td>File browser + YModem uploader that puts files onto the simulator filesystem.</td></tr>
+  <tr><td><a href="#pr15">#15</a> connect-simulator</td><td>sim-view, persistence-reboot, sim-core base</td><td>Connects to the standalone sim; <em>always-send-comments</em> forces <code>(TOOL)</code>/<code>(STOCK)</code> through for the carve; (vestigial) download of the <code>sim-latest</code> CI build; &ldquo;My Machine&rdquo; EEPROM uses the sim&rsquo;s settings persistence.</td></tr>
+  <tr><td><a href="#pr25">#25</a> atc-macros</td><td>ymodem-socket, littlefs, sim-probe</td><td>&ldquo;Install ATC macros&rdquo; uploads via YModem to <code>/littlefs</code>; the Start-Job / <code>probe_tfl</code> cycle drives the modelled probe surfaces.</td></tr>
   </table>
   <p class="foot">For the full virtual-CNC experience, run <strong>ioSender@<code>integration</code></strong> against <strong>Simulator@<code>integration</code></strong> &mdash; a bundle (the firmware-submodule fixes ride along inside the sim). Full matrix (Simulator &rarr; ioSender, with strength) is in the Simulator fork&rsquo;s <code>ProposedPRs.html</code>.</p>
 </div>
 
-<!-- ============ PR 1 ============ -->
+<!-- ============ #1 ============ -->
 <div class="pr">
-<h2 id="pr1"><span class="badge">PR 1</span>Bug Fixes for released ioSender</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/fix-rp-math-build</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/fix-rp-math-build</a></div>
-</div>
+<h2 id="pr1"><span class="badge">#1</span>Bug Fixes for released ioSender</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">.gitattributes</td><td class="num add">3</td><td class="num">2</td></tr>
@@ -220,13 +216,9 @@
 </div>
 </div>
 
-<!-- ============ PR 2 ============ -->
+<!-- ============ #2 ============ -->
 <div class="pr">
-<h2 id="pr2"><span class="badge">PR 2</span>Surface Motor Fault and Motor Warning signals in Signals display</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/motor-signals</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/motor-signals</a></div>
-</div>
+<h2 id="pr2"><span class="badge">#2</span>Surface Motor Fault and Motor Warning signals in Signals display</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SignalsControl.xaml</td><td class="num add">2</td><td class="num del">30</td></tr>
@@ -237,13 +229,9 @@
 </div>
 </div>
 
-<!-- ============ PR 3 ============ -->
+<!-- ============ #3 ============ -->
 <div class="pr">
-<h2 id="pr3"><span class="badge">PR 3</span>Persist console state and add an in-app Key Mappings editor</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/keymapping_editor</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/keymapping_editor</a></div>
-</div>
+<h2 id="pr3"><span class="badge">#3</span>Persist console state and add an in-app Key Mappings editor</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">14</td><td class="num">0</td></tr>
@@ -276,13 +264,9 @@
 </div>
 </div>
 
-<!-- ============ PR 4 ============ -->
+<!-- ============ #4 ============ -->
 <div class="pr">
-<h2 id="pr4"><span class="badge">PR 4</span>Fix unhandled exceptions on connection loss (e.g. SD card swap)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/connection-loss-reconnect</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/connection-loss-reconnect</a></div>
-</div>
+<h2 id="pr4"><span class="badge">#4</span>Fix unhandled exceptions on connection loss (e.g. SD card swap)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
@@ -309,13 +293,9 @@
 </div>
 </div>
 
-<!-- ============ PR 5 ============ -->
+<!-- ============ #5 ============ -->
 <div class="pr">
-<h2 id="pr5"><span class="badge">PR 5</span>Add Stepper calibration (scratch) tab to grbl:Settings</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/stepper-calibration-scratch</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/stepper-calibration-scratch</a></div>
-</div>
+<h2 id="pr5"><span class="badge">#5</span>Add Stepper calibration (scratch) tab to grbl:Settings</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
@@ -337,13 +317,9 @@
 </div>
 </div>
 
-<!-- ============ PR 6 ============ -->
+<!-- ============ #6 ============ -->
 <div class="pr">
-<h2 id="pr6"><span class="badge">PR 6</span>Add "Load Folder": load a folder of per-toolpath .nc files as one outlined program</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/load-folder</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/load-folder</a></div>
-</div>
+<h2 id="pr6"><span class="badge">#6</span>Add "Load Folder": load a folder of per-toolpath .nc files as one outlined program</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">.gitattributes</td><td class="num add">3</td><td class="num del">2</td></tr>
@@ -387,13 +363,9 @@
 </div>
 </div>
 
-<!-- ============ PR 7 ============ -->
+<!-- ============ #7 ============ -->
 <div class="pr">
-<h2 id="pr7"><span class="badge">PR 7</span>Improve high-DPI / large-text-size layout across the UI</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/highdpi-layout</code></div>
-  <div><span class="label">Compare</span><a href="https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout">https://github.com/terjeio/ioSender/compare/master...stevenrwood:ioSender:pr/highdpi-layout</a></div>
-</div>
+<h2 id="pr7"><span class="badge">#7</span>Improve high-DPI / large-text-size layout across the UI</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls Camera/.../ConfigControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
@@ -433,14 +405,9 @@
 </div>
 </div>
 
-<!-- ============ PR 8 ============ -->
+<!-- ============ #8 ============ -->
 <div class="pr">
-<h2 id="pr8"><span class="badge">PR 8</span>Native Xbox controller support (+ Key Mappings editor polish)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/xbox-mapping</code></div>
-  <div><span class="label">Depends on</span>PR 3 (<code>pr/keymapping_editor</code>) — this branch is stacked on it; the figures below are the delta on top of PR 3.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/keymapping_editor...pr/xbox-mapping">https://github.com/stevenrwood/ioSender/compare/pr/keymapping_editor...pr/xbox-mapping</a></div>
-</div>
+<h2 id="pr8"><span class="badge">#8</span>Native Xbox controller support (+ Key Mappings editor polish)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Core/CNC Core/XInput.cs</td><td class="num add">160</td><td class="num">0</td></tr>
@@ -468,14 +435,9 @@
 </div>
 </div>
 
-<!-- ============ PR 9 ============ -->
+<!-- ============ #9 ============ -->
 <div class="pr">
-<h2 id="pr9"><span class="badge">PR 9</span>Configurable main page + flyouts + jog panels (ioSender XL)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/main-page-layout</code></div>
-  <div><span class="label">Depends on</span>The integrated Key Mappings + Xbox base in <code>master</code> (PRs 3 &amp; 8); the figures below are the delta on top of that base.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/main-page-layout">https://github.com/stevenrwood/ioSender/compare/master...pr/main-page-layout</a></div>
-</div>
+<h2 id="pr9"><span class="badge">#9</span>Configurable main page + flyouts + jog panels (ioSender XL)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">141</td><td class="num del">20</td></tr>
@@ -538,14 +500,9 @@
 </div>
 </div>
 
-<!-- ============ PR 10 ============ -->
+<!-- ============ #10 ============ -->
 <div class="pr">
-<h2 id="pr10"><span class="badge">PR 10</span>Macro manager + run-only flyout</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/macro-editor</code></div>
-  <div><span class="label">Depends on</span>The integrated base in <code>master</code> (the button sits next to PR 3's "Edit Key Bindings" on Settings:App); the figures below are the delta on top.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/macro-editor">https://github.com/stevenrwood/ioSender/compare/master...pr/macro-editor</a></div>
-</div>
+<h2 id="pr10"><span class="badge">#10</span>Macro manager + run-only flyout</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MacroManagerDialog.xaml.cs</td><td class="num add">316</td><td class="num">0</td></tr>
@@ -568,18 +525,13 @@
   <li><strong>Edit</strong> edits the macro's definition (inline G-code, or the <code>@&lt;path&gt;</code> reference line) and reads it back; <strong>View</strong> opens what it points to — the referenced file for an <code>@&lt;path&gt;</code> macro (created if missing, to author a new one), otherwise the code. <strong>Create</strong>/<strong>Delete</strong> add and remove rows.</li>
   <li>The <strong>macro flyout</strong> is now run-only: a macro-name dropdown plus a <strong>Run</strong> button (the Edit button is gone — editing lives in the manager). It pre-selects the most recently run macro, persisted in <code>Config.LastMacroId</code> and updated from every run path (flyout, toolbar, F-keys), falling back to the first.</li>
 </ul>
-<p>The macro's function key is decoupled from its <code>Id</code> via a new <code>Macro.FKey</code> field (legacy configs migrated on load: <code>Id n</code> keeps <code>Fn</code>). The <code>@&lt;path&gt;</code> <em>run-time</em> resolution — loading and running the referenced file, with directive processing — is provided by <strong>PR 11</strong>; this PR adds the manager/flyout support for authoring, viewing, and repointing references.</p>
+<p>The macro's function key is decoupled from its <code>Id</code> via a new <code>Macro.FKey</code> field (legacy configs migrated on load: <code>Id n</code> keeps <code>Fn</code>). The <code>@&lt;path&gt;</code> <em>run-time</em> resolution — loading and running the referenced file, with directive processing — is provided by <strong>#11</strong>; this PR adds the manager/flyout support for authoring, viewing, and repointing references.</p>
 </div>
 </div>
 
-<!-- ============ PR 11 ============ -->
+<!-- ============ #11 ============ -->
 <div class="pr">
-<h2 id="pr11"><span class="badge">PR 11</span>Macro Processor Enhancements</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/macro-processor</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent of PR 10. The two are complementary: PR 10's manager <em>authors</em> macros, this <em>executes</em> them.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/macro-processor">https://github.com/stevenrwood/ioSender/compare/master...pr/macro-processor</a></div>
-</div>
+<h2 id="pr11"><span class="badge">#11</span>Macro Processor Enhancements</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">582</td><td class="num">0</td></tr>
@@ -600,20 +552,15 @@
   <li><strong><code>(MBOX, [buttons,] message)</code></strong> &mdash; modal hold; <code>OK</code>/<code>OKCANCEL</code>/<code>YESNO</code>, Cancel/No aborts the rest.</li>
   <li><strong><code>(WAITIDLE)</code></strong> &mdash; hold streaming until the controller finishes what was sent and returns to Idle &mdash; needed after a controller-side job such as <code>$F=&lt;file&gt;</code>, which acks immediately and drops sender input while it runs.</li>
   <li><strong><code>(PROMPT param, default [, label])</code></strong> &mdash; collect input values in a single up-front dialog and bind them two ways: assign the globals on the controller (so <code>$F=</code> files can read them) and substitute the references in the streamed body.</li>
-  <li><strong><code>@&lt;path&gt;</code></strong> &mdash; a macro whose body is a single <code>@&lt;path&gt;</code> line is a reference to an external file: that file's current contents are loaded and run in its place, re-read on every run &mdash; so a macro can be developed by editing the file directly. The loaded contents go through the same directive pipeline. (PR 10 adds the manager/flyout support for authoring and repointing these references.)</li>
+  <li><strong><code>@&lt;path&gt;</code></strong> &mdash; a macro whose body is a single <code>@&lt;path&gt;</code> line is a reference to an external file: that file's current contents are loaded and run in its place, re-read on every run &mdash; so a macro can be developed by editing the file directly. The loaded contents go through the same directive pipeline. (#10 adds the manager/flyout support for authoring and repointing these references.)</li>
 </ul>
 <p>Supporting core changes so macros stream cleanly to an NGC-capable controller, all in the spirit of &ldquo;don&rsquo;t reject what the controller can evaluate&rdquo;: <code>ExecuteMacro</code> now inherits the controller&rsquo;s expression support (as file streaming already did) and forwards verbatim any line its own parser cannot handle; <code>GCodeParser</code> recognises <strong>named O-word subroutine calls</strong> (<code>O&lt;name&gt; CALL […]</code>) and forwards them to the controller, which resolves the named sub from its filesystem; and the <code>$#</code> <code>[HOME:…:mask]</code> homed-axes mask is parsed for the authoritative <code>homed</code> check.</p>
 </div>
 </div>
 
-<!-- ============ PR 12 ============ -->
+<!-- ============ #12 ============ -->
 <div class="pr">
-<h2 id="pr12"><span class="badge">PR 12</span>Onboarding tooltips</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/onboarding-tooltips</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent. Aimed at users new to CNC.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/onboarding-tooltips">https://github.com/stevenrwood/ioSender/compare/master...pr/onboarding-tooltips</a></div>
-</div>
+<h2 id="pr12"><span class="badge">#12</span>Onboarding tooltips</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">50</td><td class="num">0</td></tr>
@@ -634,14 +581,9 @@
 </div>
 </div>
 
-<!-- ============ PR 13 ============ -->
+<!-- ============ #13 ============ -->
 <div class="pr">
-<h2 id="pr13"><span class="badge">PR 13</span>Build documentation: Mega-XL upgrade notes + repeatable tool-change guide</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/build-docs</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent. Documentation only — no code or build changes.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/build-docs">https://github.com/stevenrwood/ioSender/compare/master...pr/build-docs</a></div>
-</div>
+<h2 id="pr13"><span class="badge">#13</span>Build documentation: Mega-XL upgrade notes + repeatable tool-change guide</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">docs/Mega-XL-Upgrades.html</td><td class="num add">840</td><td class="num">0</td></tr>
@@ -659,14 +601,9 @@
 </div>
 </div>
 
-<!-- ============ PR 14 ============ -->
+<!-- ============ #14 ============ -->
 <div class="pr">
-<h2 id="pr14"><span class="badge">PR 14</span>SD + LittleFS file browser &amp; file manager on the SD Card tab</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/sdcard-filesystems</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/sdcard-filesystems">https://github.com/stevenrwood/ioSender/compare/master...pr/sdcard-filesystems</a></div>
-</div>
+<h2 id="pr14"><span class="badge">#14</span>SD + LittleFS file browser &amp; file manager on the SD Card tab</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">505</td><td class="num del">111</td></tr>
@@ -696,14 +633,9 @@
 </div>
 </div>
 
-<!-- ============ PR 15 ============ -->
+<!-- ============ #15 ============ -->
 <div class="pr">
-<h2 id="pr15"><span class="badge">PR 15</span>USB / Ethernet / simulator connection support + Connect menu</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/connect-simulator</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/connect-simulator">https://github.com/stevenrwood/ioSender/compare/master...pr/connect-simulator</a></div>
-</div>
+<h2 id="pr15"><span class="badge">#15</span>USB / Ethernet / simulator connection support + Connect menu</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">474</td><td class="num">0</td></tr>
@@ -748,14 +680,9 @@
 </div>
 </div>
 
-<!-- ============ PR 16 ============ -->
+<!-- ============ #16 ============ -->
 <div class="pr">
-<h2 id="pr16"><span class="badge">PR 16</span>Validate controller (check-mode g-code conformance test)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/validate</code></div>
-  <div><span class="label">Depends on</span>Stacked on <code>pr/connect-simulator</code> (PR 15).</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/validate">https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/validate</a></div>
-</div>
+<h2 id="pr16"><span class="badge">#16</span>Validate controller (check-mode g-code conformance test)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">1091</td><td class="num">0</td></tr>
@@ -768,7 +695,7 @@
 <tr><td class="mono">Locale/*/csv/ioSender.resources.*.csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
 </table>
 <div class="desc">
-<p>Replaces the placeholder <em>Validate controller</em> action (PR 15) with a real, in-app conformance test: it streams a g-code program tailored to the connected controller's reported capabilities and reports which commands it accepts &mdash; without moving the machine.</p>
+<p>Replaces the placeholder <em>Validate controller</em> action (#15) with a real, in-app conformance test: it streams a g-code program tailored to the connected controller's reported capabilities and reports which commands it accepts &mdash; without moving the machine.</p>
 <ul>
   <li><strong>Capability-tailored test:</strong> generated from <code>$I</code> build options, axis count, <code>$32</code> mode, tool count, aux-I/O counts and the work coordinate systems present, so a feature the firmware was never built with is not tested (and cannot be reported as a false failure).</li>
   <li><strong>Check mode, no motion:</strong> streamed in <code>$C</code> check mode and parsed only &mdash; the machine never moves, so homing and a clear envelope are not required. One feature per line, so an <code>error:N</code> pinpoints exactly which command the controller rejected.</li>
@@ -777,18 +704,13 @@
   <li><strong>Progress &amp; results:</strong> a small non-modal panel shows a live pass/fail tally and the current test as it streams; on completion a <em>View Summary</em> button opens the full report (grouped by category, error code/message per failure, the pre-run parameter snapshot, Copy-to-clipboard). The controller is left in <code>Idle</code> with check mode off.</li>
   <li><strong>3D visualization:</strong> the passed bounded-motion features are assembled into a runnable program (absolute <code>G90</code> moves at a fast feed) and loaded into the buffer, so the user can press Cycle&nbsp;Start and watch the toolpath run in the 3D view via the normal job path. The viewer also gains an <em>always-active machine scene</em> (work envelope, axes and a live tool cone shown when homed even with no program loaded), plus fixes to the tool/executed-trail animation subscription and a bounded executed-trail advance (an out-of-range block was an unbounded spin).</li>
 </ul>
-<p class="foot">Right-click the <strong>Target</strong> status item &rarr; <em>Validate controller</em>. Builds clean on <code>pr/connect-simulator</code>; the only failures on a stock grblHAL are commands it genuinely does not implement (e.g. <code>G90.1</code>, <code>G61.1</code>, <code>G64</code>, <code>M52</code>; <code>M56</code> needs parking-override enabled).</p>
+<p class="foot">Right-click the <strong>Target</strong> status item &rarr; <em>Validate controller</em>. Builds clean; the only failures on a stock grblHAL are commands it genuinely does not implement (e.g. <code>G90.1</code>, <code>G61.1</code>, <code>G64</code>, <code>M52</code>; <code>M56</code> needs parking-override enabled).</p>
 </div>
 </div>
 
-<!-- ============ PR 17 ============ -->
+<!-- ============ #17 ============ -->
 <div class="pr">
-<h2 id="pr17"><span class="badge">PR 17</span>Restore main window position across launches</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/window-restore</code></div>
-  <div><span class="label">Depends on</span>Stacked on <code>pr/connect-simulator</code> (PR 15) &mdash; the restore runs in its <code>CompleteStartup</code>.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/window-restore">https://github.com/stevenrwood/ioSender/compare/pr/connect-simulator...pr/window-restore</a></div>
-</div>
+<h2 id="pr17"><span class="badge">#17</span>Restore main window position across launches</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">58</td><td class="num del">7</td></tr>
@@ -800,18 +722,13 @@
   <li><strong>Position persisted:</strong> new <code>WindowLeft</code>/<code>WindowTop</code> settings, saved on close (using <code>RestoreBounds</code> when maximized so the un-maximized rectangle is stored) and restored on startup &mdash; but only when the saved rectangle lands on a currently-connected monitor (checked against the whole virtual desktop), so a window saved on a since-removed screen can't open off-screen.</li>
   <li><strong>Takes effect immediately:</strong> the live "save" flag was only set at startup, so toggling the option mid-session did nothing until a restart. It now updates live and captures + persists the current placement the instant the option is enabled.</li>
 </ul>
-<p class="foot">Builds clean on <code>pr/connect-simulator</code>. Stacked there because the size/position restore lives in that branch's <code>CompleteStartup</code>; the underlying <code>KeepWindowSize</code> option is from <code>master</code>.</p>
+<p class="foot">Builds clean. The size/position restore builds on the connection support&rsquo;s <code>CompleteStartup</code>; the underlying <code>KeepWindowSize</code> option is from the ioSender baseline.</p>
 </div>
 </div>
 
-<!-- ============ PR 18 ============ -->
+<!-- ============ #18 ============ -->
 <div class="pr">
-<h2 id="pr18"><span class="badge">PR 18</span>grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/grbl-settings</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/grbl-settings">https://github.com/stevenrwood/ioSender/compare/master...pr/grbl-settings</a></div>
-</div>
+<h2 id="pr18"><span class="badge">#18</span>grbl:Settings &mdash; live edits, change highlight, revert &amp; snapshots</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">356</td><td class="num del">15</td></tr>
@@ -837,14 +754,9 @@
 </div>
 </div>
 
-<!-- ============ PR 19 ============ -->
+<!-- ============ #19 ============ -->
 <div class="pr">
-<h2 id="pr19"><span class="badge">PR 19</span>Console &mdash; inline terminal-style command prompt</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/mdi-console</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/mdi-console">https://github.com/stevenrwood/ioSender/compare/master...pr/mdi-console</a></div>
-</div>
+<h2 id="pr19"><span class="badge">#19</span>Console &mdash; inline terminal-style command prompt</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">117</td><td class="num">0</td></tr>
@@ -869,14 +781,9 @@
 </div>
 </div>
 
-<!-- ============ PR 20 ============ -->
+<!-- ============ #20 ============ -->
 <div class="pr">
-<h2 id="pr20"><span class="badge">PR 20</span>3D view &mdash; Ctrl+click to jog + per-axis orientation</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/click-to-jog</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/click-to-jog">master&hellip;pr/click-to-jog</a></div>
-</div>
+<h2 id="pr20"><span class="badge">#20</span>3D view &mdash; Ctrl+click to jog + per-axis orientation</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/Renderer.xaml.cs</td><td class="num add">164</td><td class="num del">52</td></tr>
@@ -898,14 +805,9 @@
 </div>
 </div>
 
-<!-- ============ PR 21 ============ -->
+<!-- ============ #21 ============ -->
 <div class="pr">
-<h2 id="pr21"><span class="badge">PR 21</span>grbl:Settings &mdash; Machine Setup Wizard</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/machine-setup-wizard</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/machine-setup-wizard">master&hellip;pr/machine-setup-wizard</a></div>
-</div>
+<h2 id="pr21"><span class="badge">#21</span>grbl:Settings &mdash; Machine Setup Wizard</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">795</td><td class="num">0</td></tr>
@@ -926,23 +828,18 @@
   <li><strong>Out of the way:</strong> sits as the <em>last</em> grbl:Settings tab (rarely needed after initial commissioning), so Basic settings is the default tab.</li>
   <li><strong>Machine catalog:</strong> a built-in catalog (<code>MachineCatalog.cs</code>) of common hobby machines as manufacturer&nbsp;&rarr;&nbsp;product&nbsp;&rarr;&nbsp;model drop-downs (or a custom X&times;Y), each carrying a sensible home corner and force-set-origin default; the first entry is a generic XYZ machine with limit switches. Picking a model pre-fills the page, which the user then confirms or tweaks.</li>
   <li><strong>Axis table:</strong> an editable per-axis grid &mdash; travel limit (<code>$130-$132</code>), max rate (<code>$110-$112</code>), steps/mm (<code>$100-$102</code>), invert direction (<code>$3</code>) and normally-closed limit (<code>$5</code>) &mdash; edited in place.</li>
-  <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>) and auto-enables force-set-origin (<code>$22</code> bit&nbsp;3) on grblHAL; Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">PR 20</a>). The axis table also carries a per-axis <strong>Home min (<code>$23</code>)</strong> checkbox kept in sync with the picture, so the homing direction is visible/editable per axis (Z's box is locked to &ldquo;top&rdquo;).</li>
+  <li><strong>Home corner:</strong> a clickable isometric box &mdash; click the corner where the machine homes &mdash; sets the X/Y homing directions (<code>$23</code>) and auto-enables force-set-origin (<code>$22</code> bit&nbsp;3) on grblHAL; Z is fixed to the top of the gantry. This is the same convention that orients the 3D view (<a href="#pr20">#20</a>). The axis table also carries a per-axis <strong>Home min (<code>$23</code>)</strong> checkbox kept in sync with the picture, so the homing direction is visible/editable per axis (Z's box is locked to &ldquo;top&rdquo;).</li>
   <li><strong>Homing &amp; limits:</strong> hard limits (<code>$21</code>) default on, with the remaining global questions as a short list and the explanatory help moved into per-input tooltips. A right-justified <em>Firmware Info</em> button shows the live <code>$I</code> build output in a non-modal dialog.</li>
   <li><strong>Remembered &amp; forgettable:</strong> the chosen machine is saved (<code>AppConfig.LastMachine</code>) and restored next launch &mdash; keeping the live controller values over the catalog preset on restore &mdash; and a <em>Forget machine</em> button clears it so the wizard reappears next time.</li>
   <li><strong>Correct write order &amp; honest errors:</strong> grblHAL rejects soft limits (<code>$20=1</code>) unless homing is enabled (<code>error:10</code>). Apply now enables homing by the user's intent (writing <code>$22</code> even on a fresh controller where it is currently off, instead of gating on the live state) and writes soft limits in a second pass &mdash; after <code>$22</code> &mdash; since <code>GrblSettings.Save()</code> writes in ascending id order. Soft limits are only requested when homing will be on. On failure it lists the exact rejected <code>$</code> settings and the controller's reason rather than a generic &ldquo;failed to write settings&rdquo;.</li>
 </ul>
-<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller and the bundled simulator; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut. The first-run gate that forces the wizard to the foreground until a machine is applied &mdash; and its skip-when-connected-to-the-simulator behaviour &mdash; depend on connection-side plumbing and ride along in the integration branch rather than this stand-alone PR. The &ldquo;copy this machine into the simulator&rsquo;s My Machine profile&rdquo; action now lives on the grbl:Settings tab (<a href="#pr15">PR 15</a>).</p>
+<p class="foot">Builds clean off <code>master</code> (CNC Controls and the full ioSender solution). UI verified by the author against a live controller and the bundled simulator; interactive <code>$3</code> direction-verify and homing-cycle-order editing were intentionally left out of this first cut. The first-run gate that forces the wizard to the foreground until a machine is applied &mdash; and its skip-when-connected-to-the-simulator behaviour &mdash; depend on connection-side plumbing and ride along in the integration branch rather than this stand-alone PR. The &ldquo;copy this machine into the simulator&rsquo;s My Machine profile&rdquo; action now lives on the grbl:Settings tab (<a href="#pr15">#15</a>).</p>
 </div>
 </div>
 
-<!-- ============ PR 22 ============ -->
+<!-- ============ #22 ============ -->
 <div class="pr">
-<h2 id="pr22"><span class="badge">PR 22</span>Keyboard jog &mdash; keep active when Job-view focus drifts</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/keyboard-jog-focus</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/keyboard-jog-focus">master&hellip;pr/keyboard-jog-focus</a></div>
-</div>
+<h2 id="pr22"><span class="badge">#22</span>Keyboard jog &mdash; keep active when Job-view focus drifts</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">19</td><td class="num">0</td></tr>
@@ -959,14 +856,9 @@
 </div>
 </div>
 
-<!-- ============ PR 23 ============ -->
+<!-- ============ #23 ============ -->
 <div class="pr">
-<h2 id="pr23"><span class="badge">PR 23</span>Go To &mdash; optional safe-Z (lift, traverse, descend)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/safe-z-goto</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/safe-z-goto">master&hellip;pr/safe-z-goto</a></div>
-</div>
+<h2 id="pr23"><span class="badge">#23</span>Go To &mdash; optional safe-Z (lift, traverse, descend)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/GotoBaseControl.xaml.cs</td><td class="num add">34</td><td class="num del">8</td></tr>
@@ -985,14 +877,9 @@
 </div>
 </div>
 
-<!-- ============ PR 24 ============ -->
+<!-- ============ #24 ============ -->
 <div class="pr">
-<h2 id="pr24"><span class="badge">PR 24</span>comms &mdash; fix telnet/websocket UI deadlock</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/telnet-deadlock-fix</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/telnet-deadlock-fix">master&hellip;pr/telnet-deadlock-fix</a></div>
-</div>
+<h2 id="pr24"><span class="badge">#24</span>comms &mdash; fix telnet/websocket UI deadlock</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">17</td><td class="num del">6</td></tr>
@@ -1004,18 +891,13 @@
   <li><strong>The deadlock:</strong> <code>ReadComplete</code> ran a synchronous <code>Dispatcher.Invoke(DataReceived)</code> <em>while holding</em> <code>lock(input)</code>. The UI thread's <code>PurgeQueue</code> also takes <code>lock(input)</code>, so once the dispatcher was busy (a modal pumping its own message loop) the read callback waited on the UI thread while the UI thread waited on the lock &mdash; a classic cyclic wait that hung the app.</li>
   <li><strong>The fix:</strong> extract the complete replies from the buffer <em>under</em> the lock, then release it <em>before</em> dispatching them to <code>DataReceived</code>. The serial and Eltima streams already dispatched after releasing the lock (via <code>BeginInvoke</code>); this brings telnet/websocket in line.</li>
 </ul>
-<p class="foot">Builds clean off upstream <code>master</code> (2.0.47); a pure comms-layer fix, no UI or feature change. Surfaced while testing the ATC Start Job sequence (PR 25), whose install-probe MBOX hold kept an active telnet poll &mdash; exactly the deadlock window.</p>
+<p class="foot">Builds clean off upstream <code>master</code> (2.0.47); a pure comms-layer fix, no UI or feature change. Surfaced while testing the ATC Start Job sequence (#25), whose install-probe MBOX hold kept an active telnet poll &mdash; exactly the deadlock window.</p>
 </div>
 </div>
 
-<!-- ============ PR 25 ============ -->
+<!-- ============ #25 ============ -->
 <div class="pr">
-<h2 id="pr25"><span class="badge">PR 25</span>ATC tool-change macro provisioning (Install ATC + Start Job)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/atc-macros</code></div>
-  <div><span class="label">Depends on</span>Stacked on <code>pr/sdcard-filesystems</code> (PR 14, for the SD&nbsp;Card tab's filesystem upload). Runtime: the Start&nbsp;Job macro's directives + <code>O&lt;cal&gt;&nbsp;CALL</code> forwarding need <code>pr/macro-processor</code> (PR 11).</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/pr/sdcard-filesystems...pr/atc-macros">pr/sdcard-filesystems&hellip;pr/atc-macros</a></div>
-</div>
+<h2 id="pr25"><span class="badge">#25</span>ATC tool-change macro provisioning (Install ATC + Start Job)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">369</td><td class="num">0</td></tr>
@@ -1044,14 +926,9 @@
 </div>
 </div>
 
-<!-- ===== PR 26 ===== -->
+<!-- ===== #26 ===== -->
 <div class="pr">
-<h2 id="pr26"><span class="badge">PR 26</span>Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/editable-predefined-offsets</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/editable-predefined-offsets">master&hellip;pr/editable-predefined-offsets</a></div>
-</div>
+<h2 id="pr26"><span class="badge">#26</span>Offsets &mdash; editable G28/G30 (Set rapids &amp; stores)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">−</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml.cs</td><td class="num add">21</td><td class="num del">2</td></tr>
@@ -1066,14 +943,9 @@
 </div>
 </div>
 
-<!-- ===== PR 27 ===== -->
+<!-- ===== #27 ===== -->
 <div class="pr">
-<h2 id="pr27"><span class="badge">PR 27</span>Dialogs &mdash; center owner-less modal dialogs</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/dialog-centering</code></div>
-  <div><span class="label">Depends on</span>Off <code>master</code>, independent.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...pr/dialog-centering">master&hellip;pr/dialog-centering</a></div>
-</div>
+<h2 id="pr27"><span class="badge">#27</span>Dialogs &mdash; center owner-less modal dialogs</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/CNC Controls/MPGPending.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
@@ -1090,14 +962,9 @@
 </div>
 </div>
 
-<!-- ===== PR 28 ===== -->
+<!-- ===== #28 ===== -->
 <div class="pr">
-<h2 id="pr28"><span class="badge">PR 28</span>Machine Setup restructure + Tools tab + guided setup gate</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (reworks shared tab hosting; not a standalone composable branch).</div>
-  <div><span class="label">Depends on</span>Builds on <a href="#pr21">PR 21</a> (Machine Setup Wizard) and <a href="#pr18">PR 18</a> (grbl:Settings).</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build (the tab hosting is shared across features, so it is not carved into its own branch).</div>
-</div>
+<h2 id="pr28"><span class="badge">#28</span>Machine Setup restructure + Tools tab + guided setup gate</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/ToolsView.xaml</td><td class="num add">33</td><td class="num">0</td></tr>
@@ -1109,22 +976,17 @@
 <p>Reorganises the top-level UI into a clearer commissioning flow.</p>
 <ul>
   <li><strong>Settings &rarr; Grbl + App sub-tabs:</strong> the controller (<code>$</code>) settings and the sender&rsquo;s own preferences are split into two sub-tabs instead of one long page.</li>
-  <li><strong>New Machine Setup top-level tab:</strong> an overview plus six colour-coded step-tabs, with a startup <em>gate</em> that leads a new user to the first incomplete step (step 6 queries the controller filesystem via <code>AtcMacros.GetStatus</code> for macro status). Reworks the Machine Setup Wizard (<a href="#pr21">PR 21</a>) into the step-tab form.</li>
-  <li><strong>New Tools container:</strong> a single home (<code>ToolsView</code>) for the commissioning/tuning tools &mdash; Stepper calibration &amp; scratch, Surface Spoilboard (<a href="#pr29">PR 29</a>), Squareness (<a href="#pr31">PR 31</a>), Trinamic and PID &mdash; via the <code>IGrblConfigTab</code> contract; top-level Trinamic/PID dropped.</li>
+  <li><strong>New Machine Setup top-level tab:</strong> an overview plus six colour-coded step-tabs, with a startup <em>gate</em> that leads a new user to the first incomplete step (step 6 queries the controller filesystem via <code>AtcMacros.GetStatus</code> for macro status). Reworks the Machine Setup Wizard (<a href="#pr21">#21</a>) into the step-tab form.</li>
+  <li><strong>New Tools container:</strong> a single home (<code>ToolsView</code>) for the commissioning/tuning tools &mdash; Stepper calibration &amp; scratch, Surface Spoilboard (<a href="#pr29">#29</a>), Squareness (<a href="#pr31">#31</a>), Trinamic and PID &mdash; via the <code>IGrblConfigTab</code> contract; top-level Trinamic/PID dropped.</li>
   <li><strong>Inline grids:</strong> a probe-definition grid (step 5) and a macro-status grid (step 6) surface state without leaving the wizard.</li>
 </ul>
-<p class="foot">In the integration build. The bulk of the wizard body lives in <a href="#pr21">PR 21</a>; this entry covers the hosting/restructure (Tools container + sub-tabs + gate). Localization CSVs for the new/renamed tabs are still pending.</p>
+<p class="foot">In the integration build. The bulk of the wizard body lives in <a href="#pr21">#21</a>; this entry covers the hosting/restructure (Tools container + sub-tabs + gate). Localization CSVs for the new/renamed tabs are still pending.</p>
 </div>
 </div>
 
-<!-- ===== PR 29 ===== -->
+<!-- ===== #29 ===== -->
 <div class="pr">
-<h2 id="pr29"><span class="badge">PR 29</span>Surface Spoilboard &mdash; machine-referenced facing tool</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/surface-spoilboard</code> (off <code>master</code>); the in-integration version uses the macro&rarr;job streamer + Tools tab.</div>
-  <div><span class="label">Depends on</span>Tools container (<a href="#pr28">PR 28</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>, integration).</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...stevenrwood:ioSender:pr/surface-spoilboard">https://github.com/stevenrwood/ioSender/compare/master...pr/surface-spoilboard</a></div>
-</div>
+<h2 id="pr29"><span class="badge">#29</span>Surface Spoilboard &mdash; machine-referenced facing tool</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/SurfaceSpoilboardWizard.xaml</td><td class="num add">84</td><td class="num">0</td></tr>
@@ -1143,14 +1005,9 @@
 </div>
 </div>
 
-<!-- ===== PR 30 ===== -->
+<!-- ===== #30 ===== -->
 <div class="pr">
-<h2 id="pr30"><span class="badge">PR 30</span>Load Stock &mdash; corner-probe stock measurement</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>pr/load-stock</code> (off <code>master</code>); the in-integration version uses the macro&rarr;job streamer.</div>
-  <div><span class="label">Depends on</span>ATC macros / <code>pcorner.macro</code> on LittleFS (<a href="#pr25">PR 25</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>) + probe definitions.</div>
-  <div><span class="label">Compare</span><a href="https://github.com/stevenrwood/ioSender/compare/master...stevenrwood:ioSender:pr/load-stock">https://github.com/stevenrwood/ioSender/compare/master...pr/load-stock</a></div>
-</div>
+<h2 id="pr30"><span class="badge">#30</span>Load Stock &mdash; corner-probe stock measurement</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">ioSender XL/LoadStockView.xaml</td><td class="num add">102</td><td class="num">0</td></tr>
@@ -1164,21 +1021,16 @@
 <ul>
   <li><strong>Corner probe via <code>pcorner.macro</code>:</strong> an inline grblHAL NGC program calls the controller-side corner-probe macro per corner; probe feeds come from the selected 3D probe definition (no hardcoded feeds).</li>
   <li><strong>Outputs:</strong> XY footprint, per-corner Z (flatness), squareness (skew + diagonal &Delta;), and stock thickness (top &minus; spoilboard reference). A results popup draws the probed quad with corner angles.</li>
-  <li><strong>Copy size:</strong> one click puts <code>X Y Z</code> on the clipboard to paste into the Fusion <code>ioSenderBatchPost</code> add-in (<a href="#pr6">PR 6</a>) &mdash; round-trips the measured stock into the simulator <code>(STOCK)</code> line.</li>
+  <li><strong>Copy size:</strong> one click puts <code>X Y Z</code> on the clipboard to paste into the Fusion <code>ioSenderBatchPost</code> add-in (<a href="#pr6">#6</a>) &mdash; round-trips the measured stock into the simulator <code>(STOCK)</code> line.</li>
   <li><strong>Floating run-control panel</strong> (<code>MachineControlWindow</code>) so the probe run can be driven without leaving the tab.</li>
 </ul>
 <p class="foot">In the integration build; hardware-tested (427&times;427 mm stock).</p>
 </div>
 </div>
 
-<!-- ===== PR 31 ===== -->
+<!-- ===== #31 ===== -->
 <div class="pr">
-<h2 id="pr31"><span class="badge">PR 31</span>Squareness (Auto Square) &mdash; ganged-gantry offset tool</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (hosted in the Tools container).</div>
-  <div><span class="label">Depends on</span>Tools container (<a href="#pr28">PR 28</a>) + the macro&rarr;job streamer (<a href="#pr11">PR 11</a>).</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr31"><span class="badge">#31</span>Squareness (Auto Square) &mdash; ganged-gantry offset tool</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/AutoSquareWizard.xaml</td><td class="num add">97</td><td class="num">0</td></tr>
@@ -1196,14 +1048,9 @@
 </div>
 </div>
 
-<!-- ===== PR 32 ===== -->
+<!-- ===== #32 ===== -->
 <div class="pr">
-<h2 id="pr32"><span class="badge">PR 32</span>Program view as a reusable object + background loading</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (shared program-view / streamer / loader core).</div>
-  <div><span class="label">Depends on</span>The macro&rarr;job streamer (<a href="#pr11">PR 11</a>); touches the shared program view used by every tab.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr32"><span class="badge">#32</span>Program view as a reusable object + background loading</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/ProgramView.xaml(.cs)</td><td class="num add">129</td><td class="num">0</td></tr>
@@ -1231,14 +1078,9 @@
 </div>
 </div>
 
-<!-- ===== PR 33 ===== -->
+<!-- ===== #33 ===== -->
 <div class="pr">
-<h2 id="pr33"><span class="badge">PR 33</span>Explain G-code on hover (novice tooltips)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (wires into the shared program view).</div>
-  <div><span class="label">Depends on</span>The program view (<a href="#pr32">PR 32</a>) and the G-code parser&rsquo;s semantic tokens.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr33"><span class="badge">#33</span>Explain G-code on hover (novice tooltips)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Core/GCodeExplainer.cs</td><td class="num add">634</td><td class="num del">19</td></tr>
@@ -1259,14 +1101,9 @@
 </div>
 </div>
 
-<!-- ===== PR 34 ===== -->
+<!-- ===== #34 ===== -->
 <div class="pr">
-<h2 id="pr34"><span class="badge">PR 34</span>Probe definition diagrams</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (the shared probe-definition editor).</div>
-  <div><span class="label">Depends on</span>The probe-definition library / editor.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr34"><span class="badge">#34</span>Probe definition diagrams</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/ProbeDefinitionEditDialog.xaml</td><td class="num add">136</td><td class="num del">22</td></tr>
@@ -1283,14 +1120,9 @@
 </div>
 </div>
 
-<!-- ===== PR 35 ===== -->
+<!-- ===== #35 ===== -->
 <div class="pr">
-<h2 id="pr35"><span class="badge">PR 35</span>Jog distance +/&minus; controller actions</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (the controller mapper + jog panel).</div>
-  <div><span class="label">Depends on</span>Xbox / game-controller support (<a href="#pr8">PR 8</a>) and the jog panel.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr35"><span class="badge">#35</span>Jog distance +/&minus; controller actions</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Core/ControllerMapper.cs</td><td class="num add">11</td><td class="num del">1</td></tr>
@@ -1308,14 +1140,9 @@
 </div>
 </div>
 
-<!-- ===== PR 36 ===== -->
+<!-- ===== #36 ===== -->
 <div class="pr">
-<h2 id="pr36"><span class="badge">PR 36</span>Probe input follows the selected probe type</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (Load Stock / Height Map + GrblInfo).</div>
-  <div><span class="label">Depends on</span>The probe-definition library, Load Stock (<a href="#pr30">PR 30</a>) and Height Map.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr36"><span class="badge">#36</span>Probe input follows the selected probe type</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Core/Grbl.cs</td><td class="num add">4</td><td class="num">0</td></tr>
@@ -1333,14 +1160,9 @@
 </div>
 </div>
 
-<!-- ===== PR 37 ===== -->
+<!-- ===== #37 ===== -->
 <div class="pr">
-<h2 id="pr37"><span class="badge">PR 37</span>One in-place streaming path (stayPut removed)</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (MacroProcessor + the shell run path).</div>
-  <div><span class="label">Depends on</span>The reusable program view (<a href="#pr32">PR 32</a>) and the macro&rarr;job streamer (<a href="#pr11">PR 11</a>).</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr37"><span class="badge">#37</span>One in-place streaming path (stayPut removed)</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">49</td><td class="num del">66</td></tr>
@@ -1359,14 +1181,9 @@
 </div>
 </div>
 
-<!-- ===== PR 38 ===== -->
+<!-- ===== #38 ===== -->
 <div class="pr">
-<h2 id="pr38"><span class="badge">PR 38</span>Match the bundled simulator to the connected controller</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (<code>SimulatorManager</code> + the <code>JobView.InitSystem</code> connect hook). Pairs with the <code>build-matched-sim.yml</code> workflow on the Simulator fork.</div>
-  <div><span class="label">Depends on</span>The bundled-simulator infrastructure (Connect dialog Simulator tab; web-builder / release download).</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr38"><span class="badge">#38</span>Match the bundled simulator to the connected controller</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/SimulatorManager.cs</td><td class="num add">309</td><td class="num">0</td></tr>
@@ -1383,14 +1200,9 @@
 </div>
 </div>
 
-<!-- ===== PR 39 ===== -->
+<!-- ===== #39 ===== -->
 <div class="pr">
-<h2 id="pr39"><span class="badge">PR 39</span>Re-establish modal state on a mid-program start</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (<code>StreamPump</code>).</div>
-  <div><span class="label">Depends on</span>The background send/ack streamer (<code>StreamPump</code>).</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr39"><span class="badge">#39</span>Re-establish modal state on a mid-program start</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">CNC Controls/StreamPump.cs</td><td class="num add">22</td><td class="num">0</td></tr>
@@ -1405,14 +1217,9 @@
 </div>
 </div>
 
-<!-- ===== PR 40 ===== -->
+<!-- ===== #40 ===== -->
 <div class="pr">
-<h2 id="pr40"><span class="badge">PR 40</span>Load Stock &ldquo;apply work rotation&rdquo; defaults off</h2>
-<div class="meta">
-  <div><span class="label">Branch</span><code>integration</code> &mdash; integration-resident (Load Stock).</div>
-  <div><span class="label">Depends on</span>The Load Stock skew&rarr;WCS rotation feature.</div>
-  <div><span class="label">Compare</span>Part of the <code>integration</code> build.</div>
-</div>
+<h2 id="pr40"><span class="badge">#40</span>Load Stock &ldquo;apply work rotation&rdquo; defaults off</h2>
 <table class="files">
 <tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
 <tr><td class="mono">ioSender XL/LoadStockView.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
