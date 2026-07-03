@@ -182,17 +182,17 @@
 
 <!-- ============ Cross-repo dependencies ============ -->
 <div style="border:1px solid #d0d7de; border-left:4px solid #6a4a00; border-radius:6px; background:#f6f8fa; padding:8px 12px; margin:14px 0;">
-  <strong>Cross-repo: which of these PRs the <code>stevenrwood/Simulator</code> fork relies on.</strong>
-  <p style="margin:6px 0; font-size:10pt; color:#57606a">Separate repos &mdash; no build dependency. The coupling is runtime / protocol: the simulator only exercises a feature when the ioSender PR below drives it over the socket. (Simulator PR numbers refer to that fork&rsquo;s <code>proposed-prs</code> tracker.)</p>
+  <strong>Cross-repo: which ioSender features the <code>stevenrwood/Simulator</code> fork exercises.</strong>
+  <p style="margin:6px 0; font-size:10pt; color:#57606a"><strong>No build dependency, and all-or-nothing</strong> &mdash; you run the whole <code>Simulator@integration</code> build against ioSender (not a chosen subset), so this table is informational rather than something to satisfy. The coupling is runtime / protocol: the simulator only exercises a feature when the ioSender change below drives it over the socket.</p>
   <table class="files">
-  <tr><th>ioSender PR</th><th>Used by Simulator PR</th><th>Coupling</th></tr>
-  <tr><td><a href="#pr6">#6</a> load-folder</td><td>sim-view (3D carve)</td><td><code>PushHeaderToSimulator()</code> sends the program&rsquo;s leading <code>(STOCK &hellip;)</code> / <code>(TOOL &hellip;)</code> comments so the carve knows stock size + cutter geometry.</td></tr>
-  <tr><td><a href="#pr11">#11</a> macro-processor</td><td>littlefs</td><td><code>O&lt;name&gt; CALL</code> forwarding resolves macros stored on the simulator&rsquo;s <code>/littlefs</code>.</td></tr>
-  <tr><td><a href="#pr14">#14</a> sdcard-filesystems</td><td>littlefs, ymodem-socket</td><td>File browser + YModem uploader that puts files onto the simulator filesystem.</td></tr>
-  <tr><td><a href="#pr15">#15</a> connect-simulator</td><td>sim-view, persistence-reboot, sim-core base</td><td>Connects to the standalone sim; <em>always-send-comments</em> forces <code>(TOOL)</code>/<code>(STOCK)</code> through for the carve; (vestigial) download of the <code>sim-latest</code> CI build; &ldquo;My Machine&rdquo; EEPROM uses the sim&rsquo;s settings persistence.</td></tr>
-  <tr><td><a href="#pr25">#25</a> atc-macros</td><td>ymodem-socket, littlefs, sim-probe</td><td>&ldquo;Install ATC macros&rdquo; uploads via YModem to <code>/littlefs</code>; the Start-Job / <code>probe_tfl</code> cycle drives the modelled probe surfaces.</td></tr>
+  <tr><th>ioSender feature</th><th>Simulator feature it lights up</th><th>Coupling</th></tr>
+  <tr><td><a href="#pr6">#6</a> Load Folder</td><td>3D carve view</td><td><code>PushHeaderToSimulator()</code> sends the program&rsquo;s leading <code>(STOCK &hellip;)</code> / <code>(TOOL &hellip;)</code> comments so the carve knows stock size + cutter geometry.</td></tr>
+  <tr><td><a href="#pr11">#11</a> macro pre-processor</td><td>littlefs macros</td><td><code>O&lt;name&gt; CALL</code> forwarding resolves macros stored on the simulator&rsquo;s <code>/littlefs</code>.</td></tr>
+  <tr><td><a href="#pr14">#14</a> SD / filesystem browser</td><td>littlefs, YModem</td><td>File browser + YModem uploader that puts files onto the simulator filesystem.</td></tr>
+  <tr><td><a href="#pr15">#15</a> connect-to-simulator</td><td>3D carve view, settings persistence, sim core</td><td>Connects to the standalone sim; <em>always-send-comments</em> forces <code>(TOOL)</code>/<code>(STOCK)</code> through for the carve; &ldquo;My Machine&rdquo; EEPROM uses the sim&rsquo;s settings persistence.</td></tr>
+  <tr><td><a href="#pr25">#25</a> ATC macro provisioning</td><td>YModem, littlefs, probe surfaces</td><td>&ldquo;Install ATC macros&rdquo; uploads via YModem to <code>/littlefs</code>; the Start-Job / <code>probe_tfl</code> cycle drives the modelled probe surfaces.</td></tr>
   </table>
-  <p class="foot">For the full virtual-CNC experience, run <strong>ioSender@<code>integration</code></strong> against <strong>Simulator@<code>integration</code></strong> &mdash; a bundle (the firmware-submodule fixes ride along inside the sim). Full matrix (Simulator &rarr; ioSender, with strength) is in the Simulator fork&rsquo;s <code>ProposedPRs.html</code>.</p>
+  <p class="foot">For the full virtual-CNC experience, run <strong>ioSender@<code>integration</code></strong> against <strong>Simulator@<code>integration</code></strong> &mdash; one all-in-one bundle each (the firmware-submodule fixes ride along inside the sim). The matched-simulator feature (<a href="#pr38">#38</a>) builds an option-matched sim automatically.</p>
 </div>
 
 <!-- ============ #1 ============ -->
