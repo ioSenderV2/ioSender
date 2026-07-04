@@ -137,8 +137,12 @@ namespace CNC.Controls
             var model = DataContext as GrblViewModel;
             bool connected = model != null;
             bool alarm = connected && model.GrblState.State == GrblStates.Alarm;
-            miReset.IsEnabled = connected;
-            miUnlock.IsEnabled = alarm;
+            // Alarm 11 = "homing required": unlocking leaves the machine unhomed (position unreliable), so the
+            // only real recovery is to home. Steer to Home-only in that state (the toolbar Reset/Unlock buttons
+            // remain if the operator deliberately wants them).
+            bool homingRequired = alarm && model.GrblState.Substate == 11;
+            miReset.IsEnabled = connected && !homingRequired;
+            miUnlock.IsEnabled = alarm && !homingRequired;
             miHome.IsEnabled = connected;
         }
 
