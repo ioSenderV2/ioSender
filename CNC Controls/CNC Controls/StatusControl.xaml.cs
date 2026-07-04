@@ -129,5 +129,58 @@ namespace CNC.Controls
                     break;
             }
         }
+
+        // Right-click the State field -> escalating recovery. Unlock lights up only in Alarm (Reset/Home
+        // are valid from any state). Reset always available when connected.
+        void stateMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            var model = DataContext as GrblViewModel;
+            bool connected = model != null;
+            miReset.IsEnabled = connected;
+            miUnlock.IsEnabled = connected && model.GrblState.State == GrblStates.Alarm;
+            miHome.IsEnabled = connected;
+        }
+
+        void stateMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender == miReset)
+                RecoverTo(0);       // Reset
+            else if (sender == miUnlock)
+                RecoverTo(1);       // Reset + Unlock
+            else if (sender == miHome)
+                RecoverTo(2);       // Reset + Unlock + Home
+        }
+
+        // Escalating recovery: each level performs the lower ones first. The soft reset warm-restarts the
+        // controller, so Unlock/Home are deferred until it is back and the prior step has settled.
+        private void RecoverTo(int level)
+        {
+            var model = DataContext as GrblViewModel;
+            if (model == null)
+                return;
+
+            if (model.GrblState.State == GrblStates.Alarm && model.GrblState.Substate == 10 && model.Signals.Value.HasFlag(Signals.EStop))
+            {
+                MessageBox.Show((string)FindResource("ClearEStop"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            Grbl.Reset();
+            if (level < 1)
+                return;
+
+            RunAfter(1000, () => {
+                model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+                if (level >= 2)
+                    RunAfter(300, () => model.ExecuteCommand(GrblConstants.CMD_HOMING));
+            });
+        }
+
+        private static void RunAfter(int ms, System.Action action)
+        {
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(ms) };
+            t.Tick += (s, e) => { t.Stop(); action(); };
+            t.Start();
+        }
     }
 }

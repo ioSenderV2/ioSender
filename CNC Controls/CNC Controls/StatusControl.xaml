@@ -55,7 +55,20 @@
                      Background="{Binding Path=GrblState, Converter={StaticResource ToColorConverter}}"
                      ToolTip="{Binding Path=GrblState, Converter={StaticResource ToTooltipConverter}}"
                      ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="400"
-             />
+             >
+                <TextBox.ContextMenu>
+                    <!-- Escalating recovery from the State field: each item does the ones above it first
+                         (Reset / Reset+Unlock / Reset+Unlock+Home). See StatusControl.RecoverTo. -->
+                    <ContextMenu Opened="stateMenu_Opened">
+                        <MenuItem x:Name="miReset" Header="Reset" Click="stateMenu_Click"
+                                  ToolTip="Soft-reset the controller (stays locked in Alarm)."/>
+                        <MenuItem x:Name="miUnlock" Header="Unlock" Click="stateMenu_Click"
+                                  ToolTip="Reset, then unlock ($X) - clears the alarm and re-enables motion."/>
+                        <MenuItem x:Name="miHome" Header="Home" Click="stateMenu_Click"
+                                  ToolTip="Reset, unlock, then home ($H) - full recovery with position re-established."/>
+                    </ContextMenu>
+                </TextBox.ContextMenu>
+            </TextBox>
             <CheckBox x:Name="chkCheckMode" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center" Click="btn_Click"
                 IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}">
                 <CheckBox.IsEnabled>
