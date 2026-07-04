@@ -130,50 +130,91 @@ namespace CNC.Controls
             }
         }
 
-        // Right-click the State field -> escalating recovery. Unlock lights up only in Alarm (Reset/Home
-        // are valid from any state). Reset always available when connected.
+        // Right-click the State field -> adaptive recovery. Each item is a goal that runs only the steps the
+        // current alarm needs. "Reset and Unlock" lights up in Alarm; Reset/Home are valid when connected.
         void stateMenu_Opened(object sender, RoutedEventArgs e)
         {
             var model = DataContext as GrblViewModel;
             bool connected = model != null;
+            bool alarm = connected && model.GrblState.State == GrblStates.Alarm;
             miReset.IsEnabled = connected;
-            miUnlock.IsEnabled = connected && model.GrblState.State == GrblStates.Alarm;
+            miUnlock.IsEnabled = alarm;
             miHome.IsEnabled = connected;
         }
+
+        private enum RecoverGoal { Reset, Unlock, Home }
 
         void stateMenu_Click(object sender, RoutedEventArgs e)
         {
             if (sender == miReset)
-                RecoverTo(0);       // Reset
+                Recover(RecoverGoal.Reset);
             else if (sender == miUnlock)
-                RecoverTo(1);       // Reset + Unlock
+                Recover(RecoverGoal.Unlock);
             else if (sender == miHome)
-                RecoverTo(2);       // Reset + Unlock + Home
+                Recover(RecoverGoal.Home);
         }
 
-        // Escalating recovery: each level performs the lower ones first. The soft reset warm-restarts the
-        // controller, so Unlock/Home are deferred until it is back and the prior step has settled.
-        private void RecoverTo(int level)
+        // Adaptive recovery toward a goal. Reset is the primitive. Unlock/Home first clear the alarm with the
+        // minimum needed - try $X, and only if that doesn't clear it (the alarm code wants a reset first) fall
+        // back to reset + $X - then home if that was the goal. Steps already satisfied are skipped.
+        private void Recover(RecoverGoal goal)
         {
             var model = DataContext as GrblViewModel;
-            if (model == null)
+            if (model == null || EStopBlocks(model))
                 return;
 
-            if (model.GrblState.State == GrblStates.Alarm && model.GrblState.Substate == 10 && model.Signals.Value.HasFlag(Signals.EStop))
+            if (goal == RecoverGoal.Reset)
             {
-                MessageBox.Show((string)FindResource("ClearEStop"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                Grbl.Reset();
                 return;
             }
 
-            Grbl.Reset();
-            if (level < 1)
-                return;
+            ClearAlarmThen(model, goal == RecoverGoal.Home);
+        }
 
-            RunAfter(1000, () => {
-                model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
-                if (level >= 2)
-                    RunAfter(300, () => model.ExecuteCommand(GrblConstants.CMD_HOMING));
+        // Clear the alarm (if any) with the least disruptive path, then optionally home.
+        private void ClearAlarmThen(GrblViewModel model, bool home)
+        {
+            if (model.GrblState.State != GrblStates.Alarm)
+            {
+                if (home)
+                    model.ExecuteCommand(GrblConstants.CMD_HOMING);
+                return;
+            }
+
+            // Light touch first: try to unlock without a reset.
+            model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+            RunAfter(400, () =>
+            {
+                if (model.GrblState.State == GrblStates.Alarm)
+                {
+                    // $X didn't clear it -> this alarm needs a reset first. Reset, wait for the warm-restart, unlock.
+                    Grbl.Reset();
+                    RunAfter(1000, () =>
+                    {
+                        model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+                        if (home)
+                            RunAfter(400, () =>
+                            {
+                                if (model.GrblState.State != GrblStates.Alarm)
+                                    model.ExecuteCommand(GrblConstants.CMD_HOMING);
+                            });
+                    });
+                }
+                else if (home)
+                    model.ExecuteCommand(GrblConstants.CMD_HOMING);
             });
+        }
+
+        // A physical E-stop can't be cleared in software - surface the same message the Reset button does.
+        private bool EStopBlocks(GrblViewModel model)
+        {
+            if (model.GrblState.State == GrblStates.Alarm && model.GrblState.Substate == 10 && model.Signals.Value.HasFlag(Signals.EStop))
+            {
+                MessageBox.Show((string)FindResource("ClearEStop"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return true;
+            }
+            return false;
         }
 
         private static void RunAfter(int ms, System.Action action)

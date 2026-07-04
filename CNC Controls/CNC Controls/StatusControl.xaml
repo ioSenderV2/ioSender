@@ -57,15 +57,15 @@
                      ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="400"
              >
                 <TextBox.ContextMenu>
-                    <!-- Escalating recovery from the State field: each item does the ones above it first
-                         (Reset / Reset+Unlock / Reset+Unlock+Home). See StatusControl.RecoverTo. -->
+                    <!-- Adaptive recovery from the State field: each item is a GOAL that runs only the steps
+                         the current alarm actually needs (see StatusControl.Recover). -->
                     <ContextMenu Opened="stateMenu_Opened">
                         <MenuItem x:Name="miReset" Header="Reset" Click="stateMenu_Click"
-                                  ToolTip="Soft-reset the controller (stays locked in Alarm)."/>
-                        <MenuItem x:Name="miUnlock" Header="Unlock" Click="stateMenu_Click"
-                                  ToolTip="Reset, then unlock ($X) - clears the alarm and re-enables motion."/>
-                        <MenuItem x:Name="miHome" Header="Home" Click="stateMenu_Click"
-                                  ToolTip="Reset, unlock, then home ($H) - full recovery with position re-established."/>
+                                  ToolTip="Soft-reset the controller."/>
+                        <MenuItem x:Name="miUnlock" Header="Reset and Unlock" Click="stateMenu_Click"
+                                  ToolTip="Clear the alarm: unlock ($X), and reset first only if the alarm won't clear without it. Ends unlocked."/>
+                        <MenuItem x:Name="miHome" Header="Reset, unlock and home" Click="stateMenu_Click"
+                                  ToolTip="Clear the alarm (unlock, reset first only if needed), then home ($H). Skips the steps already satisfied."/>
                     </ContextMenu>
                 </TextBox.ContextMenu>
             </TextBox>
