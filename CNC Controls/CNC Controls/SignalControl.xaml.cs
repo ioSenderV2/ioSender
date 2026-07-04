@@ -68,7 +68,8 @@ namespace CNC.Controls
             var c = d as SignalControl;
             bool set = (bool)e.NewValue;
             c.btnLED.Background = set ? LEDOn : LEDOff;          // kept in sync (hidden) in case the LED is re-shown
-            c.btnLabel.Foreground = set ? LabelOn : c.LabelOff;  // triggered signal -> red letter
+            c.btnLabel.Foreground = set ? LabelOn : c.LabelOff;  // triggered signal -> bold red letter (small font)
+            c.btnLabel.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
         }
 
         public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(nameof(Label), typeof(string), typeof(SignalControl), new PropertyMetadata());
