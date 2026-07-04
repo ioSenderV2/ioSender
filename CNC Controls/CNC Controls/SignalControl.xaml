@@ -27,6 +27,9 @@
     </UserControl.Resources>
     <StackPanel HorizontalAlignment="Left" Height="30" VerticalAlignment="Top">
         <Button x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
-        <Button x:Name="btnLabel" Focusable="False" Content="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Padding="0" HorizontalAlignment="Center" Margin="0,3,0,0" VerticalAlignment="Top" Width="16" Height="12" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" FontSize="10" FontFamily="Global User Interface"/>
+        <Grid Width="16" Height="16" HorizontalAlignment="Center" Margin="0,1,0,0" VerticalAlignment="Top">
+            <Ellipse x:Name="ellSignal" Width="15" Height="15" Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" FontFamily="Global User Interface"/>
+        </Grid>
     </StackPanel>
 </UserControl>

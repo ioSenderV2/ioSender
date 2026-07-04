@@ -45,16 +45,16 @@ namespace CNC.Controls
 {
     public partial class SignalControl : UserControl
     {
-        static Brush LEDOn = Brushes.Red, LEDOff = Brushes.LightGray, LabelOn = Brushes.Red;
-        Brush LabelOff;
+        static readonly Brush HiFill = Brushes.Red, LabelSet = Brushes.Black;
+        Brush LabelOff, EllOff;
 
         public SignalControl()
         {
             InitializeComponent();
 
-            LEDOff = btnLED.Background;
-            LabelOff = btnLabel.Foreground;
-            btnLED.Visibility = Visibility.Hidden;   // the letter itself now signals the triggered state (turns red)
+            btnLED.Visibility = Visibility.Hidden;   // replaced by a red circle behind the letter
+            LabelOff = txtSignal.Foreground;
+            EllOff = ellSignal.Fill;                 // Transparent when clear
         }
 
         public static readonly DependencyProperty IsSetProperty = DependencyProperty.Register(nameof(IsSet), typeof(bool), typeof(SignalControl), new PropertyMetadata(false, new PropertyChangedCallback(OnIsSetChanged)));
@@ -67,9 +67,9 @@ namespace CNC.Controls
         {
             var c = d as SignalControl;
             bool set = (bool)e.NewValue;
-            c.btnLED.Background = set ? LEDOn : LEDOff;          // kept in sync (hidden) in case the LED is re-shown
-            c.btnLabel.Foreground = set ? LabelOn : c.LabelOff;  // triggered signal -> bold red letter (small font)
-            c.btnLabel.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
+            c.ellSignal.Fill = set ? HiFill : c.EllOff;              // red disc behind a triggered signal
+            c.txtSignal.Foreground = set ? LabelSet : c.LabelOff;    // bold black letter on top when set
+            c.txtSignal.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
         }
 
         public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(nameof(Label), typeof(string), typeof(SignalControl), new PropertyMetadata());
