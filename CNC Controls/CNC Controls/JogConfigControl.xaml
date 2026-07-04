@@ -17,12 +17,14 @@
                 <!-- Jog-cancel-on-key-up warning applies to legacy Grbl only. -->
                 <Image HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0" Source="Resources/StatusAnnotations_Warning_16xLG_color.png" Visibility="{Binding Path=IsGrbl, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsVisibleConverter}}" ToolTip="Warning! - Grbl has outstanding bug(s) in jog cancel (on key up)."/>
             </StackPanel>
-            <local:NumericField x:Uid="fld_fastFeedrate" Label="Fast feedrate:" Localization.Attributes = "$Content (Inherit)" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.FastFeedrate, Mode=TwoWay}" ToolTip="Feed rate for fast keyboard jogging (e.g. while holding the fast-jog modifier key) - for quickly crossing the table."/>
-            <local:NumericField x:Uid="fld_fastDistance" Label="Fast distance:" ColonAt="160" Value="{Binding Path=Jog.FastDistance, Mode=TwoWay}" ToolTip="How far each fast keyboard jog moves."/>
-            <local:NumericField x:Uid="fld_slowFeedrate" Label="Slow feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.SlowFeedrate, Mode=TwoWay}" ToolTip="Feed rate for normal/slow keyboard jogging - for careful positioning near the work."/>
-            <local:NumericField x:Uid="fld_slowDistance" Label="Slow distance:" ColonAt="160" Value="{Binding Path=Jog.SlowDistance, Mode=TwoWay}" ToolTip="How far each slow keyboard jog moves."/>
-            <local:NumericField x:Uid="fld_stepFeedrate" Label="Step feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.StepFeedrate, Mode=TwoWay}" ToolTip="Feed rate for single-step jogs - each keypress moves exactly one step distance."/>
-            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay}" ToolTip="Fixed distance moved per single-step (Ctrl) keyboard jog."/>
+            <!-- UpdateSourceTrigger=LostFocus so an edit commits (and the live status/firmware-jog push fires) once
+                 when the field loses focus, not on every keystroke. -->
+            <local:NumericField x:Uid="fld_fastFeedrate" Label="Fast feedrate:" Localization.Attributes = "$Content (Inherit)" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.FastFeedrate, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="Feed rate for fast keyboard jogging (e.g. while holding the fast-jog modifier key) - for quickly crossing the table."/>
+            <local:NumericField x:Uid="fld_fastDistance" Label="Fast distance:" ColonAt="160" Value="{Binding Path=Jog.FastDistance, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="How far each fast keyboard jog moves."/>
+            <local:NumericField x:Uid="fld_slowFeedrate" Label="Slow feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.SlowFeedrate, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="Feed rate for normal/slow keyboard jogging - for careful positioning near the work."/>
+            <local:NumericField x:Uid="fld_slowDistance" Label="Slow distance:" ColonAt="160" Value="{Binding Path=Jog.SlowDistance, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="How far each slow keyboard jog moves."/>
+            <local:NumericField x:Uid="fld_stepFeedrate" Label="Step feedrate:" ColonAt="160" Unit="mm/min" Format="###0" Value="{Binding Path=Jog.StepFeedrate, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="Feed rate for single-step jogs - each keypress moves exactly one step distance."/>
+            <local:NumericField x:Uid="fld_stepDistance" Label="Step distance:" ColonAt="160" Value="{Binding Path=Jog.StepDistance, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ToolTip="Fixed distance moved per single-step (Ctrl) keyboard jog."/>
         </StackPanel>
     </GroupBox>
 </UserControl>
