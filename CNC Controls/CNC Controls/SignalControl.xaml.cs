@@ -45,13 +45,16 @@ namespace CNC.Controls
 {
     public partial class SignalControl : UserControl
     {
-        static Brush LEDOn = Brushes.Red, LEDOff = Brushes.LightGray;
+        static Brush LEDOn = Brushes.Red, LEDOff = Brushes.LightGray, LabelOn = Brushes.Red;
+        Brush LabelOff;
 
         public SignalControl()
         {
             InitializeComponent();
 
             LEDOff = btnLED.Background;
+            LabelOff = btnLabel.Foreground;
+            btnLED.Visibility = Visibility.Hidden;   // the letter itself now signals the triggered state (turns red)
         }
 
         public static readonly DependencyProperty IsSetProperty = DependencyProperty.Register(nameof(IsSet), typeof(bool), typeof(SignalControl), new PropertyMetadata(false, new PropertyChangedCallback(OnIsSetChanged)));
@@ -62,7 +65,10 @@ namespace CNC.Controls
         }
         private static void OnIsSetChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            (d as SignalControl).btnLED.Background = (bool)e.NewValue ? LEDOn : LEDOff;
+            var c = d as SignalControl;
+            bool set = (bool)e.NewValue;
+            c.btnLED.Background = set ? LEDOn : LEDOff;          // kept in sync (hidden) in case the LED is re-shown
+            c.btnLabel.Foreground = set ? LabelOn : c.LabelOff;  // triggered signal -> red letter
         }
 
         public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(nameof(Label), typeof(string), typeof(SignalControl), new PropertyMetadata());
