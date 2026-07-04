@@ -84,6 +84,17 @@ namespace CNC.Controls
         public static JogViewModel JogData { get; private set; }
         public string MenuLabel { get { return (string)FindResource("MenuLabel"); } }
 
+        // Arrows-only mode for embedding (e.g. the run bar): hide the Distance/Feed selector column and pull the
+        // arrow pad flush left, so only the jog buttons show. The distance/feed selection then comes from the Jog
+        // tab / UI Jogging panel via the shared JogData.
+        public static readonly DependencyProperty ArrowsOnlyProperty =
+            DependencyProperty.Register(nameof(ArrowsOnly), typeof(bool), typeof(JogBaseControl), new PropertyMetadata(false));
+        public bool ArrowsOnly
+        {
+            get { return (bool)GetValue(ArrowsOnlyProperty); }
+            set { SetValue(ArrowsOnlyProperty, value); }
+        }
+
         private void Model_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(GrblViewModel.MachinePosition) || e.PropertyName == nameof(GrblViewModel.GrblState))
@@ -116,11 +127,11 @@ namespace CNC.Controls
 
                 // If the user placed the "UI Jogging" slider panel (main page or flyout), it now
                 // provides the distance/feed selection - hide the in-panel radio selectors.
-                if (MainPanelRegistry.LayoutEnabled &&
-                     (AppConfig.Settings.Base.MainPanels.Contains("UIJogging") || AppConfig.Settings.Base.LeftPanels.Contains("UIJogging") || AppConfig.Settings.Base.FlyoutItems.Contains("UIJogging")))
+                if (ArrowsOnly || (MainPanelRegistry.LayoutEnabled &&
+                     (AppConfig.Settings.Base.MainPanels.Contains("UIJogging") || AppConfig.Settings.Base.LeftPanels.Contains("UIJogging") || AppConfig.Settings.Base.FlyoutItems.Contains("UIJogging"))))
                 {
                     selectorPanel.Visibility = Visibility.Collapsed;
-                    arrowPanel.Margin = new Thickness(5, 10, 5, 0);
+                    arrowPanel.Margin = ArrowsOnly ? new Thickness(0) : new Thickness(5, 10, 5, 0);
                 }
 
                 // Controller (Xbox) jogging mirrors the on-screen UI jog panel's selected distance/feed (the 2x4

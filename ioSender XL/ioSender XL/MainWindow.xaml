@@ -170,7 +170,7 @@
                 <Grid Grid.Column="0" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Left">
                         <!-- MDI line: width tied to the button row so its right edge (Send) aligns with Program. -->
@@ -185,11 +185,12 @@
                         <!-- State: / Check directly under Home/Unlock/Reset. -->
                         <cnccontrols:StatusControl ShowButtons="False" HorizontalAlignment="Left" Margin="0,7,0,0"/>
                     </StackPanel>
-                    <!-- Shrunk-down copy of the Jog-tab jog control, in the space freed to the right of the
-                         (trimmed) MDI / buttons. Shares JogData with the Jog tab, so the selection stays in sync. -->
-                    <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
+                    <!-- Shrunk-down copy of the Jog-tab jog control (arrows only - selection comes from the Jog
+                         tab via shared JogData), centred in the space between the Program button and the signals
+                         column. -->
+                    <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" ArrowsOnly="True" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <cnccontrols:JogBaseControl.LayoutTransform>
-                            <ScaleTransform ScaleX="0.55" ScaleY="0.55"/>
+                            <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
                         </cnccontrols:JogBaseControl.LayoutTransform>
                     </cnccontrols:JogBaseControl>
                 </Grid>
