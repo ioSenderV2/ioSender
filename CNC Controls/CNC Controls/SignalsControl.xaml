@@ -98,8 +98,8 @@
             <!-- centered header, default font size -->
             <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" Width="200"/>
         </GroupBox.Header>
-        <DockPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="36" Width="205">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="-5,0,0,0" VerticalAlignment="Center" Width="Auto" DockPanel.Dock="Left">
+        <DockPanel HorizontalAlignment="Left" VerticalAlignment="Center" Height="28" Width="205">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="-7,0,0,0" VerticalAlignment="Center" Width="Auto" DockPanel.Dock="Left">
                 <local:SignalControl Label="X" IsSet="{Binding Path=Signals[(core:Signals)LimitX], Mode=OneWay}"/>
                 <local:SignalControl Label="Y" IsSet="{Binding Path=Signals[(core:Signals)LimitY], Mode=OneWay}" Style="{StaticResource YAxisVisibleStyle}"/>
                 <local:SignalControl Label="Z" IsSet="{Binding Path=Signals[(core:Signals)LimitZ], Mode=OneWay}" Style="{StaticResource ZAxisVisibleStyle}"/>
