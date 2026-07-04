@@ -52,7 +52,7 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
-            btnLED.Visibility = Visibility.Hidden;   // replaced by a red circle behind the letter
+            btnLED.Visibility = Visibility.Collapsed;   // replaced by the red circle behind the letter
             LabelOff = txtSignal.Foreground;
             EllOff = ellSignal.Fill;                 // Transparent when clear
         }

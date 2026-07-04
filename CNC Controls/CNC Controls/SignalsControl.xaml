@@ -13,7 +13,7 @@
                 <ResourceDictionary Source="SharedStyles.xaml"/>
                 <ResourceDictionary>
                     <Style TargetType="local:SignalControl">
-                        <Setter Property="Width" Value="18"/>
+                        <Setter Property="Width" Value="22"/>
                         <Setter Property="Height" Value="35"/>
                         <Setter Property="VerticalAlignment" Value="Center"/>
                         <Setter Property="Padding" Value="0"/>
@@ -95,8 +95,8 @@
     </UserControl.Resources>
     <GroupBox x:Name="grpSignals" HorizontalAlignment="Left" VerticalAlignment="Top" Height="60" Width="216">
         <GroupBox.Header>
-            <!-- centered header, ~25% smaller than the default 12 -->
-            <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" Width="200" FontSize="9"/>
+            <!-- centered header, default font size -->
+            <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" Width="200"/>
         </GroupBox.Header>
         <DockPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="36" Width="205">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="3,0,0,0" VerticalAlignment="Center" Width="Auto" DockPanel.Dock="Left">
