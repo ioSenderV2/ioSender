@@ -79,12 +79,13 @@ namespace CNC.Controls
         {
             grbl = model;
 
-            bool useFirmwareJog = false;
-
             if (GrblSettings.IsLoaded)
             {
                 double val;
-                if ((useFirmwareJog = !(val = GrblSettings.GetDouble(GrblSetting.JogStepDistance)).Equals(double.NaN)))
+                // grblHAL exposes firmware $ jog settings; these seed the initial values, but the App Jog config
+                // below is authoritative for ioSender's keyboard jog and is pushed live (updateConfig), so an
+                // edit on Settings:App applies at once.
+                if (!(val = GrblSettings.GetDouble(GrblSetting.JogStepDistance)).Equals(double.NaN))
                     jogDistance[(int)JogMode.Step] = val;
                 if (!(val = GrblSettings.GetDouble(GrblSetting.JogSlowDistance)).Equals(double.NaN))
                     jogDistance[(int)JogMode.Slow] = val;
@@ -101,11 +102,12 @@ namespace CNC.Controls
                 model.IsMetric = GrblSettings.GetString(GrblSetting.ReportInches) != "1";
             }
 
-            if (!useFirmwareJog)
-            {
-                AppConfig.Settings.Jog.PropertyChanged += Jog_PropertyChanged;
-                updateConfig();
-            }
+            // The App-level Jog config is authoritative for ioSender's keyboard jogging on ALL controllers:
+            // subscribe and push it live so editing the jog distances/speeds on Settings:App applies immediately
+            // (and the status-bar "Jog step" refreshes). Previously this was skipped whenever the controller
+            // exposed firmware $ jog settings (grblHAL), which left the App fields inert and the readout stale.
+            AppConfig.Settings.Jog.PropertyChanged += Jog_PropertyChanged;
+            updateConfig();
         }
 
         private void Jog_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
