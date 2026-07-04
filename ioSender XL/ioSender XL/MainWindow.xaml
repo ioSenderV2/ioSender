@@ -173,11 +173,16 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" LastChildFill="True">
-                        <cnccontrols:StatusControl DockPanel.Dock="Right" ShowButtons="False" Margin="10,0,12,0" VerticalAlignment="Center"/>
-                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" VerticalAlignment="Center"/>
+                        <!-- Small X/Y/Z jog pad where the State readout used to sit. -->
+                        <cnccontrols:JogPadControl DockPanel.Dock="Right" Margin="10,0,12,0" VerticalAlignment="Top"/>
+                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" VerticalAlignment="Top" Margin="0,5,0,0"/>
                     </DockPanel>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
-                        <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Center"/>
+                        <!-- Home/Unlock/Reset buttons with State: / Check directly beneath them. -->
+                        <StackPanel Orientation="Vertical" VerticalAlignment="Top">
+                            <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Top"/>
+                            <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                        </StackPanel>
                         <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Center" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                     </StackPanel>
