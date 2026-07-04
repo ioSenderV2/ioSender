@@ -165,27 +165,28 @@
                 </Grid.ColumnDefinitions>
                 <!-- Left: top line = MDI (fills) + State/Check (right); bottom line = all buttons.
                      Column is auto-sized to the button row, so the MDI line never extends past Rewind. -->
+                <!-- Left region: three evenly-spaced lines (MDI / run buttons / State) in column 0, with the
+                     jog pad in column 1 filling the space freed by trimming the MDI to the button-row width. -->
                 <Grid Grid.Column="0" VerticalAlignment="Center">
-                    <!-- Content-height rows: the bar is only as tall as the MDI line + a gap + the button row,
-                         and the middle/right columns are scaled to fit this height (not the other way round). -->
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0" LastChildFill="True">
-                        <!-- Small X/Y/Z jog pad where the State readout used to sit. -->
-                        <cnccontrols:JogPadControl DockPanel.Dock="Right" Margin="10,0,12,0" VerticalAlignment="Top"/>
-                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" VerticalAlignment="Top" Margin="0,5,0,0"/>
-                    </DockPanel>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
-                        <!-- Home/Unlock/Reset buttons with State: / Check directly beneath them. -->
-                        <StackPanel Orientation="Vertical" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Left">
+                        <!-- MDI line: width tied to the button row so its right edge (Send) aligns with Program. -->
+                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" HorizontalAlignment="Left" Margin="0,5,0,0"
+                                                Width="{Binding ElementName=buttonRow, Path=ActualWidth}"/>
+                        <!-- Button line: every run button on one baseline (all top-aligned, equal height). -->
+                        <StackPanel x:Name="buttonRow" Orientation="Horizontal" Margin="0,7,0,0">
                             <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Top"/>
-                            <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                            <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Top"/>
+                            <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </StackPanel>
-                        <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Center" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                        <!-- State: / Check directly under Home/Unlock/Reset. -->
+                        <cnccontrols:StatusControl ShowButtons="False" HorizontalAlignment="Left" Margin="0,7,0,0"/>
                     </StackPanel>
+                    <!-- Small X/Y/Z jog pad in the space freed to the right of the (trimmed) MDI / buttons. -->
+                    <cnccontrols:JogPadControl x:Name="jogPad" Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center"/>
                 </Grid>
                 <!-- Middle: signal indicators (flush to top, enlarged to use the spare width) + current feed
                      rate under them. -->
