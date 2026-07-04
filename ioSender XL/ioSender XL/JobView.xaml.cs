@@ -58,6 +58,54 @@ namespace GCode_Sender
         private bool? initOK = null;
         private bool isBooted = false, isCameraClaimed = false, holdActivated = false;
         private GrblViewModel model;
+        private bool jogConfigHooked = false;
+
+        // Push the App jog config into the (CNC.Core) keyboard handler. That handler can't see AppConfig, so the
+        // Controls layer owns this - called at startup and again whenever the App jog config changes (below), so
+        // edits on Settings:App apply live to the Ctrl keyboard jog and the status-bar "Jog step" readout.
+        private void ApplyJogConfig()
+        {
+            if (model == null)
+                return;
+            var jog = AppConfig.Settings.Jog;
+            model.Keyboard.JogStepDistance = jog.StepDistance;
+            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = jog.SlowDistance;
+            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = jog.FastDistance;
+            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = jog.StepFeedrate;
+            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = jog.SlowFeedrate;
+            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = jog.FastFeedrate;
+            model.Keyboard.DefaultSpeedFast = jog.DefaultSpeedFast;
+            model.Keyboard.IsJoggingEnabled = jog.KeyboardEnable;
+        }
+
+        // When the controller exposes firmware jog settings ($50-$55, HasFirmwareJog), mirror an edited App jog
+        // value down to the matching controller setting - only when Idle, and only if it actually differs (avoids
+        // redundant EEPROM writes and the read-back it triggers).
+        private void WriteFirmwareJog(string prop)
+        {
+            if (model == null || !GrblInfo.HasFirmwareJog || model.GrblState.State != GrblStates.Idle)
+                return;
+
+            var jog = AppConfig.Settings.Jog;
+            grblHALSetting setting;
+            double val;
+            switch (prop)
+            {
+                case nameof(JogConfig.StepFeedrate): setting = grblHALSetting.JogStepSpeed; val = jog.StepFeedrate; break;
+                case nameof(JogConfig.SlowFeedrate): setting = grblHALSetting.JogSlowSpeed; val = jog.SlowFeedrate; break;
+                case nameof(JogConfig.FastFeedrate): setting = grblHALSetting.JogFastSpeed; val = jog.FastFeedrate; break;
+                case nameof(JogConfig.StepDistance): setting = grblHALSetting.JogStepDistance; val = jog.StepDistance; break;
+                case nameof(JogConfig.SlowDistance): setting = grblHALSetting.JogSlowDistance; val = jog.SlowDistance; break;
+                case nameof(JogConfig.FastDistance): setting = grblHALSetting.JogFastDistance; val = jog.FastDistance; break;
+                default: return;
+            }
+
+            double cur = GrblSettings.GetDouble(setting);
+            if (!double.IsNaN(cur) && Math.Abs(cur - val) < 1e-9)
+                return;
+
+            model.ExecuteCommand("$" + ((int)setting).ToString() + "=" + val.ToInvariantString());
+        }
         private IInputElement focusedControl = null;
         private Controller Controller = null;
         private SidebarItem thcFlyout = null;
@@ -372,17 +420,20 @@ namespace GCode_Sender
                 if (GCode.File.IsLoaded)
                     MainWindow.ui.WindowTitle = ((GrblViewModel)DataContext).FileName;
 
-                model.Keyboard.JogStepDistance = AppConfig.Settings.Jog.StepDistance;
-                model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowDistance;
-                model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastDistance;
-                model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = AppConfig.Settings.Jog.StepFeedrate;
-                model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = AppConfig.Settings.Jog.SlowFeedrate;
-                model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = AppConfig.Settings.Jog.FastFeedrate;
-                model.Keyboard.DefaultSpeedFast = AppConfig.Settings.Jog.DefaultSpeedFast;
-
                 // Keyboard jogging is its own always-available input; KeyboardEnable (default on) is the master
                 // switch. IsContinuousJoggingEnabled stays driven by controller capability (set in Grbl.cs).
-                model.Keyboard.IsJoggingEnabled = AppConfig.Settings.Jog.KeyboardEnable;
+                ApplyJogConfig();
+                if (!jogConfigHooked)
+                {
+                    jogConfigHooked = true;
+                    // Live: re-push to the keyboard handler on any App jog change (so Settings:App edits apply at
+                    // once - Ctrl-jog + the status-bar readout), and - when the controller has firmware jog
+                    // ($50-$55, HasFirmwareJog) - mirror the edited value down to the controller's setting too.
+                    AppConfig.Settings.Jog.PropertyChanged += (s, e) => {
+                        ApplyJogConfig();
+                        WriteFirmwareJog(e.PropertyName);
+                    };
+                }
 
                 model.IgnoreNextCycleStart = true;
             }
