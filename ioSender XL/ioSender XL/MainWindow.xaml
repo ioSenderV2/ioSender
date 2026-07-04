@@ -185,8 +185,13 @@
                         <!-- State: / Check directly under Home/Unlock/Reset. -->
                         <cnccontrols:StatusControl ShowButtons="False" HorizontalAlignment="Left" Margin="0,7,0,0"/>
                     </StackPanel>
-                    <!-- Small X/Y/Z jog pad in the space freed to the right of the (trimmed) MDI / buttons. -->
-                    <cnccontrols:JogPadControl x:Name="jogPad" Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center"/>
+                    <!-- Shrunk-down copy of the Jog-tab jog control, in the space freed to the right of the
+                         (trimmed) MDI / buttons. Shares JogData with the Jog tab, so the selection stays in sync. -->
+                    <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
+                        <cnccontrols:JogBaseControl.LayoutTransform>
+                            <ScaleTransform ScaleX="0.55" ScaleY="0.55"/>
+                        </cnccontrols:JogBaseControl.LayoutTransform>
+                    </cnccontrols:JogBaseControl>
                 </Grid>
                 <!-- Middle: signal indicators (flush to top, enlarged to use the spare width) + current feed
                      rate under them. -->

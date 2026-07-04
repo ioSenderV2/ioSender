@@ -292,9 +292,6 @@
     <Compile Include="KeyboardJoggingControl.xaml.cs">
       <DependentUpon>KeyboardJoggingControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="JogPadControl.xaml.cs">
-      <DependentUpon>JogPadControl.xaml</DependentUpon>
-    </Compile>
     <Compile Include="SignalControl.xaml.cs">
       <DependentUpon>SignalControl.xaml</DependentUpon>
     </Compile>
@@ -617,10 +614,6 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="SharedStyles.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="JogPadControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
