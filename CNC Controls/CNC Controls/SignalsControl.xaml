@@ -93,7 +93,11 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_signals" x:Name="grpSignals" Header="Signals" HorizontalAlignment="Left" VerticalAlignment="Top" Height="60" Width="216">
+    <GroupBox x:Name="grpSignals" HorizontalAlignment="Left" VerticalAlignment="Top" Height="60" Width="216">
+        <GroupBox.Header>
+            <!-- centered header, ~25% smaller than the default 12 -->
+            <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" Width="200" FontSize="9"/>
+        </GroupBox.Header>
         <DockPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="36" Width="205">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="3,0,0,0" VerticalAlignment="Center" Width="Auto" DockPanel.Dock="Left">
                 <local:SignalControl Label="X" IsSet="{Binding Path=Signals[(core:Signals)LimitX], Mode=OneWay}"/>

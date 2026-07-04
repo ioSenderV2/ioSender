@@ -29,7 +29,7 @@
         <Button x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
         <Grid Width="16" Height="16" HorizontalAlignment="Center" Margin="0,1,0,0" VerticalAlignment="Top">
             <Ellipse x:Name="ellSignal" Width="15" Height="15" Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" FontFamily="Global User Interface"/>
+            <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" FontFamily="Global User Interface"/>
         </Grid>
     </StackPanel>
 </UserControl>
