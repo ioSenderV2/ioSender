@@ -220,7 +220,7 @@ namespace CNC.Controls
         public double MeasuredGap { get { return (double)GetValue(MeasuredGapProperty); } set { SetValue(MeasuredGapProperty, value); } }
 
         public static readonly DependencyProperty CurrentOffsetProperty =
-            DependencyProperty.Register(nameof(CurrentOffset), typeof(double), typeof(AutoSquareWizard), new PropertyMetadata(0d, OnParam));
+            DependencyProperty.Register(nameof(CurrentOffset), typeof(double), typeof(AutoSquareWizard), new PropertyMetadata(0d, (d, e) => ((AutoSquareWizard)d).OnCurrentOffsetChanged()));
         public double CurrentOffset { get { return (double)GetValue(CurrentOffsetProperty); } set { SetValue(CurrentOffsetProperty, value); } }
 
         public static readonly DependencyProperty NewOffsetProperty =
@@ -295,12 +295,13 @@ namespace CNC.Controls
         // Guards the two-way gap<->offset sync so setting one computed field doesn't recurse into the other.
         private bool _syncing;
 
-        // Forward: measured gap (or a geometry change) -> the new offset. Then refresh the readout + diagram.
+        // Forward: measured gap (or a geometry change) -> the new offset (absolute: the offset this gap
+        // implies, railSpan/lever * gap). Then refresh the readout + diagram.
         private void UpdateComputed()
         {
             if (!_syncing)
             {
-                double raw = CurrentOffset + OffsetDelta();
+                double raw = OffsetDelta();
                 _syncing = true;
                 NewOffset = HasRange ? Math.Max(_offset.Min, Math.Min(_offset.Max, raw)) : raw;
                 _syncing = false;
@@ -310,17 +311,28 @@ namespace CNC.Controls
         }
 
         // Inverse: the operator typed a target offset -> back-compute the gap that produces it
-        // (gap = delta * lever / railSpan). Enter EITHER the measured gap or a desired offset; the other follows.
+        // (gap = offset * lever / railSpan). Enter EITHER the measured gap or a desired offset; the other follows.
         private void OnOffsetEdited()
         {
             if (_syncing)
                 return;
             double lever = Lever(), railSpan = RailSpan();
             _syncing = true;
-            MeasuredGap = (railSpan > 0d && lever > 0d) ? (NewOffset - CurrentOffset) * lever / railSpan : 0d;
+            MeasuredGap = (railSpan > 0d && lever > 0d) ? NewOffset * lever / railSpan : 0d;
             _syncing = false;
             RefreshReadout();
             DrawDiagram();
+        }
+
+        // On load / axis change the current offset is (re)read; seed the gap field with the gap it implies so
+        // the round trip shows New offset == Current offset and Apply stays disabled until something changes.
+        private void OnCurrentOffsetChanged()
+        {
+            double lever = Lever(), railSpan = RailSpan();
+            _syncing = true;
+            MeasuredGap = (railSpan > 0d && lever > 0d) ? CurrentOffset * lever / railSpan : 0d;
+            _syncing = false;
+            UpdateComputed();
         }
 
         private void RefreshReadout()
@@ -342,7 +354,7 @@ namespace CNC.Controls
                 txtWarnings.Text = warn;
 
             if (btnApply != null)
-                btnApply.IsEnabled = !measureOnly && Math.Abs(MeasuredGap) > 0d && travelSet;
+                btnApply.IsEnabled = !measureOnly && travelSet && Math.Abs(NewOffset - CurrentOffset) > 1e-6;
 
             if (txtSummary != null)
             {
@@ -353,8 +365,8 @@ namespace CNC.Controls
                     txtSummary.Text = string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → gantry ~{4:0.000} mm out of square across the {5:0} mm rail span. Measure-only (no offset setting) - correct mechanically.",
                         XLeg(), YLeg(), MeasuredGap, Lever(), delta, RailSpan());
                 else
-                    txtSummary.Text = string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → offset Δ {4:0.000} mm (rail span {5:0})  ·  new offset {6:0.000} mm",
-                        XLeg(), YLeg(), MeasuredGap, Lever(), delta, RailSpan(), NewOffset);
+                    txtSummary.Text = string.Format("L legs +{0:0}/{1:0} mm  ·  gap {2:0.000} mm over {3:0} mm span → new offset {4:0.000} mm (Δ {5:+0.000;-0.000;0} from {6:0.000})  ·  rail span {7:0}",
+                        XLeg(), YLeg(), MeasuredGap, Lever(), NewOffset, NewOffset - CurrentOffset, CurrentOffset, RailSpan());
             }
         }
 
@@ -577,6 +589,7 @@ namespace CNC.Controls
             {
                 case "generate": Generate(); break;
                 case "apply": ApplyOffset(); break;
+                case "clear": ClearOffset(); break;
                 case "home": ReHome(); break;
             }
         }
@@ -629,10 +642,10 @@ namespace CNC.Controls
                 MessageBox.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (Math.Abs(MeasuredGap) <= 0d || XLeg() <= 0d)
+            if (XLeg() <= 0d || Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
                 return;
 
-            double newVal = NewOffset;   // already clamped to the setting range in UpdateComputed
+            double newVal = NewOffset;   // clamped to the setting range in UpdateComputed
             string caution = Math.Abs(newVal) > LargeOffsetWarn
                 ? string.Format(Loc("AsCaution"), newVal)
                 : string.Empty;
@@ -644,10 +657,32 @@ namespace CNC.Controls
             _offset.Value = newVal.ToString(CultureInfo.InvariantCulture);
             if (GrblSettings.Save())
             {
-                CurrentOffset = ParseValue(_offset.Value);
-                MeasuredGap = 0d;
-                DetectOffsetSetting();   // refresh the readout
-                UpdateComputed();
+                DetectOffsetSetting();   // re-read: CurrentOffset -> newVal, re-seeds the implied gap, disables Apply
+                ReHome();
+            }
+            else
+                MessageBox.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
+                                "Auto square", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        // Clear button next to Current offset: write the squaring offset = 0 and re-home (quicker than MDI $17x=0).
+        private void ClearOffset()
+        {
+            if (_offset == null)
+            {
+                MessageBox.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+            if (Math.Abs(CurrentOffset) <= 1e-6)
+                return;   // already zero
+            if (MessageBox.Show(string.Format("Reset {0} (${1}) to 0 and re-home?", _offset.Name, _offset.Id),
+                    "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                return;
+
+            _offset.Value = "0";
+            if (GrblSettings.Save())
+            {
+                DetectOffsetSetting();   // CurrentOffset -> 0, seeds gap 0, disables Apply
                 ReHome();
             }
             else

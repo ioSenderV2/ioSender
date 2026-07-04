@@ -30,8 +30,12 @@
                     <ComboBoxItem x:Uid="cbi_asaxisz" Content="Z"/>
                 </ComboBox>
             </StackPanel>
-            <local:NumericField x:Uid="fld_asoffset" Label="Current offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
-                Value="{Binding CurrentOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+            <StackPanel Orientation="Horizontal">
+                <local:NumericField x:Uid="fld_asoffset" Label="Current offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
+                    Value="{Binding CurrentOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+                <Button x:Uid="btn_asclear" Content="Clear" Tag="clear" Focusable="False" MinWidth="50" MinHeight="22" Margin="8,0,0,0" VerticalAlignment="Center" Click="Button_Click"
+                        ToolTip="Reset the squaring offset ($17x) to 0 and re-home - quicker than typing $17x=0 in MDI."/>
+            </StackPanel>
 
             <Separator Margin="5,8"/>
             <TextBlock x:Uid="txt_asholehdr" Text="Reference holes (drill an L: corner + one along each axis at the framing-square arm lengths):" TextWrapping="Wrap" Margin="5,0,5,4"/>
