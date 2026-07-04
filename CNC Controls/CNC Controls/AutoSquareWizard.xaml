@@ -69,11 +69,13 @@
                       ToolTip="Skip the park + Z touch-off and reuse the work Z0 from the last run. Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
                       IsChecked="{Binding ReuseZ0, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
             <Separator Margin="5,8"/>
-            <TextBlock x:Uid="txt_asmeashdr" Text="Measure &amp; apply: pin the holes, register the square on the Y-leg pins, measure the gap at the X-leg pin (+ if it sits toward +Y of the blade):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <TextBlock x:Uid="txt_asmeashdr" Text="Measure &amp; apply: pin the holes, register the square on the Y-leg pins, measure the gap at the X-leg pin (+ if it sits toward +Y of the blade). Enter either the gap or a target offset - the other is computed:" TextWrapping="Wrap" Margin="5,0,5,4"/>
             <local:NumericField x:Uid="fld_asgap" Label="Measured gap:" ColonAt="160" Format="-###0.0##"
+                ToolTip="The gap you measured at the X-leg pin. Sets the New offset. (Leave 0 if you'd rather type the offset directly.)"
                 Value="{Binding MeasuredGap, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
-            <local:NumericField x:Uid="fld_asnewoffset" Label="New offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
-                Value="{Binding NewOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_asnewoffset" Label="New offset:" ColonAt="160" Format="###0.000###"
+                ToolTip="The offset that will be written. Type a target here to back-compute the gap it corresponds to, or leave it to be computed from the measured gap."
+                Value="{Binding NewOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
         </StackPanel>
         </ScrollViewer>
         <!-- Warning + action buttons pinned at the bottom of the input column -->
@@ -86,9 +88,20 @@
             </StackPanel>
         </StackPanel>
         </Grid>
-        <!-- Right: summary (the generated program previews in the bottom Program View, not here) -->
+        <!-- Right: scaled diagram (top) / instructions / result formula (bottom). The generated program itself
+             previews in the bottom Program View, not here. -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <TextBlock x:Name="txtSummary" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" MinHeight="120"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
+                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged"/>
+            </Border>
+            <TextBlock x:Uid="txt_asinstr" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
+                       Text="1. Set the framing square's blade &amp; tongue and the drill settings.  2. Generate, then Cycle Start &#8211; it drills the L (red +).  3. Pin the holes, register the square on the two Y-leg pins, and measure the gap at the X-leg pin (arrows).  4. Enter the gap (or a target offset) &#8211; the other is computed &#8211; then Apply offset and Re-home."/>
+            <TextBlock x:Name="txtSummary" Grid.Row="2" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
     </Grid>
 </UserControl>

@@ -17,6 +17,8 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -222,7 +224,7 @@ namespace CNC.Controls
         public double CurrentOffset { get { return (double)GetValue(CurrentOffsetProperty); } set { SetValue(CurrentOffsetProperty, value); } }
 
         public static readonly DependencyProperty NewOffsetProperty =
-            DependencyProperty.Register(nameof(NewOffset), typeof(double), typeof(AutoSquareWizard), new PropertyMetadata(0d));
+            DependencyProperty.Register(nameof(NewOffset), typeof(double), typeof(AutoSquareWizard), new PropertyMetadata(0d, (d, e) => ((AutoSquareWizard)d).OnOffsetEdited()));
         public double NewOffset { get { return (double)GetValue(NewOffsetProperty); } set { SetValue(NewOffsetProperty, value); } }
 
         #endregion
@@ -290,19 +292,48 @@ namespace CNC.Controls
 
         private bool HasRange { get { return _offset != null && _offset.Max > _offset.Min; } }
 
+        // Guards the two-way gap<->offset sync so setting one computed field doesn't recurse into the other.
+        private bool _syncing;
+
+        // Forward: measured gap (or a geometry change) -> the new offset. Then refresh the readout + diagram.
         private void UpdateComputed()
+        {
+            if (!_syncing)
+            {
+                double raw = CurrentOffset + OffsetDelta();
+                _syncing = true;
+                NewOffset = HasRange ? Math.Max(_offset.Min, Math.Min(_offset.Max, raw)) : raw;
+                _syncing = false;
+            }
+            RefreshReadout();
+            DrawDiagram();
+        }
+
+        // Inverse: the operator typed a target offset -> back-compute the gap that produces it
+        // (gap = delta * lever / railSpan). Enter EITHER the measured gap or a desired offset; the other follows.
+        private void OnOffsetEdited()
+        {
+            if (_syncing)
+                return;
+            double lever = Lever(), railSpan = RailSpan();
+            _syncing = true;
+            MeasuredGap = (railSpan > 0d && lever > 0d) ? (NewOffset - CurrentOffset) * lever / railSpan : 0d;
+            _syncing = false;
+            RefreshReadout();
+            DrawDiagram();
+        }
+
+        private void RefreshReadout()
         {
             bool measureOnly = _offset == null;
             double delta = OffsetDelta();
             double raw = CurrentOffset + delta;
-            NewOffset = HasRange ? Math.Max(_offset.Min, Math.Min(_offset.Max, raw)) : raw;
-
             bool travelSet = XLeg() > 0d && YLeg() > 0d;
 
             string warn = string.Empty;
             if (!travelSet)
                 warn = "Set max travel ($130-$132) first - the hole positions are referenced to the homed envelope.";
-            else if (!measureOnly && HasRange && raw != NewOffset)
+            else if (!measureOnly && HasRange && Math.Abs(raw - NewOffset) > 1e-6)
                 warn = string.Format("New offset would exceed the setting range {0}..{1} mm and was clamped - check the measurement.", F(_offset.Min), F(_offset.Max));
             else if (!measureOnly && Math.Abs(NewOffset) > LargeOffsetWarn)
                 warn = string.Format("Offset {0:0.0} mm is large - that much racking can bind a rigid gantry. If it binds, the gantry is mechanically out of square (Y rails out of phase) - fix that first; the squaring offset is fine-trim only.", NewOffset);
@@ -327,18 +358,129 @@ namespace CNC.Controls
             }
         }
 
+        #region Right-panel diagram (bed + framing square + red-+ holes + gap arrows)
+
+        private void canvasDiagram_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            DrawDiagram();
+        }
+
+        private static readonly Brush BedFill = new SolidColorBrush(Color.FromRgb(0xF6, 0xF8, 0xFA));
+        private static readonly Brush BedEdge = new SolidColorBrush(Color.FromRgb(0x8C, 0x95, 0x9F));
+        private static readonly Brush SquareBrush = new SolidColorBrush(Color.FromRgb(0x0A, 0x30, 0x69));
+        private static readonly Brush HoleBrush = new SolidColorBrush(Color.FromRgb(0xCF, 0x22, 0x2E));
+        private static readonly Brush GapBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+
+        // Scale drawing of the bed, the framing square (L) over the hole pattern, red-+ holes and gap arrows.
+        private void DrawDiagram()
+        {
+            var cv = canvasDiagram;
+            if (cv == null)
+                return;
+            cv.Children.Clear();
+
+            double W = cv.ActualWidth, H = cv.ActualHeight;
+            if (W < 40d || H < 40d)
+                return;
+
+            const double margin = 30d;
+            double bedW = AxisTravel(0), bedH = AxisTravel(1);
+            if (bedW <= 0d || bedH <= 0d)
+            {
+                AddText(cv, "Set max travel ($130-$132) to preview the hole pattern.", margin, margin, W - 2d * margin, Brushes.Gray);
+                return;
+            }
+
+            double scale = Math.Min((W - 2d * margin) / bedW, (H - 2d * margin) / bedH);
+            double drawW = bedW * scale, drawH = bedH * scale;
+            double bx = (W - drawW) / 2d, by = (H - drawH) / 2d;
+
+            // machine coord -> canvas point (machine X grows right, machine Y grows up so flip vertically)
+            Func<double, double, Point> M2C = (mx, my) =>
+                new Point(bx + (mx - EnvMin(0)) * scale, by + drawH - (my - EnvMin(1)) * scale);
+
+            var bed = new Rectangle { Width = drawW, Height = drawH, Stroke = BedEdge, StrokeThickness = 1d, Fill = BedFill };
+            Canvas.SetLeft(bed, bx); Canvas.SetTop(bed, by);
+            cv.Children.Add(bed);
+            AddText(cv, "bed " + bedW.ToString("0") + " x " + bedH.ToString("0") + " mm", bx + 3d, by + 1d, drawW, Brushes.Gray);
+
+            double xleg = XLeg(), yleg = YLeg();
+            double cx = HoleOrigin(0, xleg), cy = HoleOrigin(1, yleg);
+            Point corner = M2C(cx, cy), xfar = M2C(cx + xleg, cy), yfar = M2C(cx, cy + yleg);
+
+            // framing square: the L, blade along corner->xfar, tongue along corner->yfar
+            cv.Children.Add(new Polyline { Stroke = SquareBrush, StrokeThickness = 3d, StrokeLineJoin = PenLineJoin.Miter,
+                Points = new PointCollection { xfar, corner, yfar } });
+            AddText(cv, "blade " + BladeLength.ToString("0"), (corner.X + xfar.X) / 2d - 22d, (corner.Y + xfar.Y) / 2d + 3d, 90d, SquareBrush);
+            AddText(cv, "tongue " + TongueLength.ToString("0"), yfar.X + 4d, (corner.Y + yfar.Y) / 2d - 8d, 90d, SquareBrush);
+
+            // red-+ holes
+            if (CornerOffset > 0d)
+            {
+                AddPlus(cv, M2C(cx + Math.Min(CornerOffset, xleg), cy));
+                AddPlus(cv, M2C(cx, cy + Math.Min(CornerOffset, yleg)));
+            }
+            else
+                AddPlus(cv, corner);
+            AddPlus(cv, xfar);
+            AddPlus(cv, yfar);
+
+            // gap arrows: the two X-leg pins where the blade edge should touch - a gap there is the out-of-square.
+            Point xnear = M2C(cx + (CornerOffset > 0d ? Math.Min(CornerOffset, xleg) : 0d), cy);
+            AddArrow(cv, xfar, "gap?");
+            AddArrow(cv, xnear, "gap?");
+        }
+
+        private static void AddPlus(Canvas cv, Point p)
+        {
+            const double r = 5d;
+            cv.Children.Add(Seg(p.X - r, p.Y, p.X + r, p.Y, HoleBrush, 2d));
+            cv.Children.Add(Seg(p.X, p.Y - r, p.X, p.Y + r, HoleBrush, 2d));
+        }
+
+        private static Line Seg(double x1, double y1, double x2, double y2, Brush b, double t)
+        {
+            return new Line { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Stroke = b, StrokeThickness = t };
+        }
+
+        private static void AddArrow(Canvas cv, Point tip, string label)
+        {
+            Point tail = new Point(tip.X + 24d, tip.Y + 20d);
+            cv.Children.Add(Seg(tail.X, tail.Y, tip.X, tip.Y, GapBrush, 1.5d));
+            Vector dir = new Vector(tip.X - tail.X, tip.Y - tail.Y);
+            if (dir.Length > 0d) dir.Normalize();
+            Vector perp = new Vector(-dir.Y, dir.X);
+            var head = new Polygon { Fill = GapBrush, Points = new PointCollection {
+                tip,
+                new Point(tip.X - dir.X * 8d + perp.X * 4d, tip.Y - dir.Y * 8d + perp.Y * 4d),
+                new Point(tip.X - dir.X * 8d - perp.X * 4d, tip.Y - dir.Y * 8d - perp.Y * 4d) } };
+            cv.Children.Add(head);
+            AddText(cv, label, tail.X + 1d, tail.Y - 2d, 44d, GapBrush);
+        }
+
+        private static void AddText(Canvas cv, string s, double x, double y, double w, Brush b)
+        {
+            var t = new TextBlock { Text = s, Foreground = b, TextWrapping = TextWrapping.Wrap, Width = w, FontSize = 10d };
+            Canvas.SetLeft(t, x); Canvas.SetTop(t, y);
+            cv.Children.Add(t);
+        }
+
+        #endregion
+
         // Peck-drill one hole at work (x,y): plunge in PeckDepth steps to -DrillDepth, retracting above the
         // surface each peck to clear chips, then rapid back near the bottom for the next peck.
         private void Drill(List<string> lines, double x, double y, string label)
         {
             lines.Add(string.Format("({0} at X{1} Y{2})", label, F(x), F(y)));
-            lines.Add(string.Format("G0 X{0} Y{1}", F(x), F(y)));
+            lines.Add(string.Format("G0 X{0} Y{1}", F(x), F(y)));   // travel over the hole with Z retracted
+            lines.Add("G0 Z" + F(SafeZ));                            // drop to safe Z above this hole
             double clear = 1d, z = 0d;
             double peck = PeckDepth > 0d ? PeckDepth : DrillDepth;
+            lines.Add(string.Format("G0 Z{0}", F(clear)));          // rapid down to just above the surface
             while (z > -DrillDepth + 1e-6)
             {
                 double zn = Math.Max(z - peck, -DrillDepth);
-                lines.Add(string.Format("G1 Z{0} F{1}", F(zn), F(PlungeFeed)));
+                lines.Add(string.Format("G1 Z{0} F{1}", F(zn), F(PlungeFeed))); // feed-plunge this peck
                 lines.Add(string.Format("G0 Z{0}", F(clear)));      // retract above the surface to clear chips
                 z = zn;
                 if (z > -DrillDepth + 1e-6)
@@ -380,7 +522,9 @@ namespace CNC.Controls
             // / leg changes and lets ReuseZ0 reuse just the Z touch-off.
             lines.Add(string.Format("G10 L2 P1 X{0} Y{1}", F(ox), F(oy)));
             lines.Add("G54");
-            lines.Add("G0 Z" + F(SafeZ));
+            // Retract Z to the top of travel BEFORE any XY move, so the tool travels over the bed fully
+            // raised and only descends once it is above a hole (each Drill/DryHole drops to safe Z there).
+            lines.Add("G53 G0 Z" + F(zTop));
 
             // Build the reference-hole list. Corner offset > 0 -> two corner holes (one out each leg) so a
             // framing square with an inside-corner radius still registers; the vertex itself is left undrilled.
