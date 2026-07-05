@@ -183,6 +183,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Safe-Z on Go To &mdash; lift / traverse / descend instead of a diagonal rapid</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr23">23</a></td></tr>
 <tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
 <tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
+<tr><td>Settings redesign &mdash; flat tab strip, free-text <code>$</code>-setting search (with match nav), grbl-settings autosave, dialog editors folded in as tabs</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr42">42</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -1356,6 +1357,39 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
   <li><strong>Performance:</strong> in-place dirty-cell mesh updates (no per-frame realloc) and the scene build deferred off the layout pass.</li>
 </ul>
 <p class="foot">In the integration build. Built up over several phases (envelope / stock / tool cone &rarr; toolpath + Play &rarr; dexel carve); the validate-controller 3D visualization (<a href="#pr16">#16</a>) uses the same scene.</p>
+</div>
+</div>
+
+<!-- ===== #42 ===== -->
+<div class="pr">
+<h2 id="pr42"><span class="badge">#42</span>Settings redesign &mdash; flat tab strip + searchable Grbl settings</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">359</td><td class="num del">56</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">156</td><td class="num del">26</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">66</td><td class="num del">40</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml</td><td class="num add">41</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/BasicConfigControl.xaml</td><td class="num add">27</td><td class="num del">14</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigControl.xaml</td><td class="num add">27</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">19</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/MacroManagerDialog.xaml.cs</td><td class="num add">14</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Core/Grbl.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SettingsPanelRegistry.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfigView.xaml(.cs) <em>(retired)</em></td><td class="num">0</td><td class="num del">373</td></tr>
+<tr><td class="mono">Camera / Probing / Lathe / Jog config panels (widen + wrap)</td><td class="num add">19</td><td class="num del">10</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">184</td><td class="num">0</td></tr>
+</table>
+<div class="desc">
+<p>The Settings area was two tabs &mdash; <strong>Grbl</strong> and an <strong>App&nbsp;Settings</strong> page that was a wall of GroupBoxes plus a row of buttons that each opened a modal dialog. It&rsquo;s now a single <strong>flat tab strip</strong>: <em>Grbl&nbsp;&middot;&nbsp;App&nbsp;&middot;&nbsp;Jogging&nbsp;&middot;&nbsp;G&nbsp;Code&nbsp;&middot;&nbsp;Keyboard&nbsp;&amp;&nbsp;Controller&nbsp;&middot;&nbsp;Macros&nbsp;&middot;&nbsp;Main&nbsp;Page</em>.</p>
+<ul>
+  <li><strong>Free-text Grbl search:</strong> a leading <code>$</code> means &ldquo;setting id&rdquo; &mdash; <code>$53</code> jumps to it, <code>$5?</code> expands all of <code>$50&ndash;$59</code>; anything else (a word like <code>Jog</code> or a bare number like <code>10</code>) matches every setting whose <em>name or value</em> contains it. Matching groups auto-expand and matches are highlighted; an <strong>&ldquo;n of m&rdquo;</strong> readout plus up/down arrows (and <strong>F3</strong>/<strong>F4</strong>, Enter) step through them.</li>
+  <li><strong>Grbl-settings autosave:</strong> an opt-in toggle (default <strong>off</strong> &mdash; these are <code>$</code> writes to hardware) with a companion &ldquo;prompt before auto-saving&rdquo;; when on, the manual Save button on the Grbl tab hides, mirroring the App-settings autosave.</li>
+  <li><strong>Editors folded in as tabs:</strong> the Key&nbsp;Bindings, Macros and Main&nbsp;Page editors were modal <code>Window</code>s launched by buttons &mdash; they&rsquo;re now inline tabs (converted to <code>UserControl</code>s) that <em>save on leave</em> instead of OK/Cancel. The Key&nbsp;Bindings tab only pauses controller dispatch while it is actually shown.</li>
+  <li><strong>App/Jogging/G&nbsp;Code:</strong> the config panels are bucketed by type into the three tabs; App&nbsp;&amp;&nbsp;Jogging columns are 25% wider, Camera&nbsp;+&nbsp;Probing share one column, and panels stretch to fill their column so long labels wrap instead of clipping.</li>
+  <li><strong>Under the hood:</strong> <code>AppConfigView</code> is retired &mdash; its Save/Restart footer, restart-hooking and auto-save-on-leave moved into the settings host. New strings localized across all seven locales.</li>
+</ul>
+<p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0); on-hardware review of the high-DPI arrow buttons and panel wrapping pending.</p>
 </div>
 </div>
 </section>

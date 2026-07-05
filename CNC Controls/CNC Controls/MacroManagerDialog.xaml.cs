@@ -28,7 +28,7 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for MacroManagerDialog.xaml
     /// </summary>
-    public partial class MacroManagerDialog : Window
+    public partial class MacroManagerDialog : UserControl, ISettingsEditorTab
     {
         private readonly ObservableCollection<CNC.GCode.Macro> macros;
         private readonly List<string> tempFiles = new List<string>();
@@ -43,11 +43,18 @@ namespace CNC.Controls
             this.macros = macros;
 
             grdMacros.ItemsSource = macros;
-            if (macros.Count > 0)
+            if (macros != null && macros.Count > 0)
                 grdMacros.SelectedIndex = 0;
 
             UpdateButtons();
-            Closed += MacroManagerDialog_Closed;
+            Unloaded += MacroManagerDialog_Unloaded;
+        }
+
+        // Save-on-leave: edits mutate the shared macros collection live, so persistence is all that's needed
+        // when the Macros tab is left. Called by the settings host on tab-switch / view-leave.
+        public void Commit()
+        {
+            AppConfig.Settings.Save();
         }
 
         private CNC.GCode.Macro Selected { get { return grdMacros.SelectedItem as CNC.GCode.Macro; } }
@@ -183,11 +190,6 @@ namespace CNC.Controls
                 macros.Remove(macro);
         }
 
-        private void btnClose_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
         // If the macro is an "@<path>" reference, return the resolved file path (relative paths
         // against the config folder); otherwise null. Mirrors MacroProcessor's run-time resolver.
         private static string GetReferencedFilePath(string code)
@@ -247,12 +249,15 @@ namespace CNC.Controls
             }
         }
 
-        private void MacroManagerDialog_Closed(object sender, EventArgs e)
+        // Fires when the Macros tab is switched away from (control leaves the visual tree). Clean up the temp
+        // files written for external editing; they're recreated on demand when the tab is used again.
+        private void MacroManagerDialog_Unloaded(object sender, RoutedEventArgs e)
         {
             foreach (var path in tempFiles)
             {
                 try { File.Delete(path); } catch { /* still open / already gone - leave it for the OS to clean */ }
             }
+            tempFiles.Clear();
         }
     }
 

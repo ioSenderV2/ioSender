@@ -9,7 +9,8 @@
              mc:Ignorable="d" 
              d:DesignHeight="480" d:DesignWidth="980"
              Loaded="ConfigView_Loaded"
-             SizeChanged="ConfigView_SizeChanged">
+             SizeChanged="ConfigView_SizeChanged"
+             KeyDown="ConfigView_KeyDown">
     <UserControl.Resources>
         <system:String x:Uid="str_saveSettings" x:Key="SaveSettings">Settings changed, save now?</system:String>
         <system:String x:Uid="str_settingsWritten" x:Key="SettingsWritten">All settings written to {0} in the sender folder.</system:String>
@@ -73,6 +74,15 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- Search highlight: matching settings in the tree get a soft background. Bound to GrblSettingDetails.IsMatch;
+             on a GrblSettingGroup (no such property) the trigger simply never fires. -->
+        <Style x:Key="MatchRowStyle" TargetType="StackPanel">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMatch}" Value="True">
+                    <Setter Property="Background" Value="#FFFFE08A" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- Row context menu for the classic-grbl DataGrid (kept out of the row Style, which
              cannot host event handlers). DataContext resolves to the row's GrblSettingDetails. -->
         <ContextMenu x:Key="SettingRowMenu">
@@ -85,7 +95,21 @@
                 <RowDefinition Height="6*"/>
                 <RowDefinition Height="96*"/>
             </Grid.RowDefinitions>
-            <local:NumericField x:Uid="fld_findSetting" x:Name="searchField" Label="Setting:" Unit="" ToolTip="Search for setting" Format="###0" ColonAt="60" Margin="10,5,0,0" VerticalAlignment="Bottom" KeyDown="searchField_KeyDown" />
+            <StackPanel x:Name="searchPanel" Orientation="Horizontal" Margin="10,5,0,0" VerticalAlignment="Bottom">
+                <TextBlock x:Uid="lbl_searchSetting" Text="Search:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <!-- Search text and the "n of m" readout share one border/background: the TextBox is borderless
+                     inside a Border that also holds the count, so they read as a single field. -->
+                <Border BorderBrush="#FFABADB3" BorderThickness="1" Background="White" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Uid="fld_searchSetting" x:Name="searchBox" Width="300" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
+                                 TextChanged="searchBox_TextChanged" KeyDown="searchBox_KeyDown"
+                                 ToolTip="Search settings: $53 jumps to a setting; $5? expands all of $50-$59; text like Jog (or a bare number like 10) highlights every setting whose name or value contains it. Enter / F3 = next match, F4 = previous."/>
+                        <TextBlock x:Name="txtMatchCount" VerticalAlignment="Center" Margin="6,0,8,0" Foreground="#FF606060" MinWidth="56"/>
+                    </StackPanel>
+                </Border>
+                <Button x:Uid="btn_matchPrev" x:Name="btnMatchPrev" Content="▲" MinWidth="26" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchPrev_Click" IsEnabled="False" ToolTip="Previous match (F4)"/>
+                <Button x:Uid="btn_matchNext" x:Name="btnMatchNext" Content="▼" MinWidth="26" Padding="4,1" Margin="2,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchNext_Click" IsEnabled="False" ToolTip="Next match (F3)"/>
+            </StackPanel>
             <TreeView x:Name="treeView" Grid.Row="1" HorizontalAlignment="Left" Margin="10,5,0,10" VerticalAlignment="Stretch" Width="390" SelectedItemChanged="treeView_SelectedItemChanged" Grid.RowSpan="2">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type cnccore:GrblSettingGroup}" ItemsSource="{Binding Settings}" >
@@ -99,7 +123,7 @@
                         </StackPanel>
                     </HierarchicalDataTemplate>
                     <DataTemplate DataType="{x:Type cnccore:GrblSettingDetails}" >
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel Orientation="Horizontal" Style="{StaticResource MatchRowStyle}">
                             <StackPanel.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem x:Uid="mnu_revertStartup2" Header="Revert to value at startup" IsEnabled="{Binding IsModified}" Click="settingRevertStartup_Click" />

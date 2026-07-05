@@ -244,6 +244,7 @@ namespace CNC.Controls
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _preferNetwork = false;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true, _restoreFusionRapids = false;
+        private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -381,6 +382,10 @@ namespace CNC.Controls
         // Settings:App autosave on tab-leave / close (opt-in); PromptOnSave shows a confirm/discard list of changes.
         public bool AutoSaveSettings { get { return _autoSaveSettings; } set { _autoSaveSettings = value; OnPropertyChanged(); } }
         public bool PromptOnSave { get { return _promptOnSave; } set { _promptOnSave = value; OnPropertyChanged(); } }
+        // Grbl (controller $) settings autosave on leaving the Grbl tab (opt-in, default off - $ writes go to
+        // hardware). When off, leaving the tab with unsaved changes still prompts "save now?" (legacy behavior).
+        public bool AutoSaveGrblSettings { get { return _autoSaveGrblSettings; } set { _autoSaveGrblSettings = value; OnPropertyChanged(); } }
+        public bool PromptOnGrblSave { get { return _promptOnGrblSave; } set { _promptOnGrblSave = value; OnPropertyChanged(); } }
 
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();

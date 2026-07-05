@@ -6,8 +6,19 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="240" d:DesignWidth="310">
-    <GroupBox x:Uid="grb_mainConfig" x:Name="grpBasic" Header="Main" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310">
-        <StackPanel HorizontalAlignment="Left">
+    <GroupBox x:Uid="grb_mainConfig" x:Name="grpBasic" Header="Main" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310">
+        <StackPanel HorizontalAlignment="Stretch">
+            <!-- Wrap long checkbox labels (their string content renders through a TextBlock) so they flow to a
+                 second line instead of clipping at the column edge. -->
+            <StackPanel.Resources>
+                <Style TargetType="CheckBox">
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                </Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="TextWrapping" Value="Wrap"/>
+                </Style>
+            </StackPanel.Resources>
             <Grid x:Name="grid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="160"/>
@@ -19,18 +30,20 @@
             <local:NumericField x:Uid="fld_resetDelay" Label="Reset delay:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=ResetDelay, Mode=TwoWay}" ToolTip="Delay to allow controller to finish booting before communication starts."/>
             <local:NumericField x:Uid="fld_pollInterval" Label="Poll interval:" ColonAt="160" Unit="ms" Format="###0" Value="{Binding Path=PollInterval, Mode=TwoWay}" ToolTip="Time between status request sent to controller."/>
             <local:NumericField x:Uid="fld_maxBuffer" Label="Max buffer:" ColonAt="160" Unit="bytes" Format="###0" Value="{Binding Path=MaxBufferSize, Mode=TwoWay}" ToolTip="Maximum serial buffer size utilized (limited to 90% of reported value)."/>
-            <CheckBox x:Uid="lbl_agressiveBuffering" Content="Agressive buffering" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=UseBuffering, Mode=TwoWay}" ToolTip="Buffers more than one GCode block in controller for smoother execution. For grblHAL only!"/>
-            <CheckBox x:Uid="lbl_keepMdiFocus" Content="Keep MDI focus" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=KeepMdiFocus, Mode=TwoWay}" ToolTip="Keeps the cursor in the MDI command box after you send a command, so you can type the next one without clicking back into it."/>
-            <CheckBox x:Uid="lbl_FilterOk" Content='Filter "ok" response' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=FilterOkResponse, Mode=TwoWay}" ToolTip="Enable if ok responses overwhelm console logging, typically happens when sending lots of short commands."/>
-            <CheckBox x:Uid="lbl_autoCompressGcode" Content='Auto-compress gcode on transforms' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=AutoCompress, Mode=TwoWay}" ToolTip="Removes superfluous gcode command elements."/>
-            <CheckBox x:Uid="lbl_restoreWindowSize" Content='Restore last window size on startup' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=KeepWindowSize, Mode=TwoWay}" ToolTip="Restore window size on next startup."/>
-            <CheckBox x:Uid="lbl_sendComments" Content='Send comments' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=SendComments, Mode=TwoWay}" ToolTip="Stream G-code comments (in parentheses) to the controller instead of stripping them - useful if the controller displays (MSG,...) comments; leave off to save a little bandwidth."/>
-            <CheckBox x:Uid="lbl_preferNetwork" Content='Prefer network connection if available' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=PreferNetwork, Mode=TwoWay}" ToolTip="After connecting over USB/serial, if the controller reports an IP address (via $I) and its telnet port (23) responds, automatically switch the connection to the network."/>
-            <CheckBox x:Uid="lbl_addLineNumbers" Content='Add line numbers' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=AddLineNumbers, Mode=TwoWay}" ToolTip="Add linenumbers if the controller is configured to report them."/>
-            <CheckBox x:Uid="lbl_autoSaveSettings" Content='Auto-save settings on exit' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveSettings, Mode=TwoWay}" ToolTip="Save App settings automatically when leaving this tab or closing, instead of using the Save settings button."/>
-            <CheckBox x:Uid="lbl_promptOnSave" Content='Prompt before auto-saving' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="25,0,0,0" IsChecked="{Binding Path=PromptOnSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveSettings}" ToolTip="Show a confirm/discard list of changed settings before auto-saving."/>
-            <CheckBox x:Uid="lbl_safeGotoZ" Content='Safe Z on Go To' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=SafeGotoZ, Mode=TwoWay}" ToolTip="When going to a work-coordinate origin (G54-G59.3), G28 or G30, first lift Z to machine top, then move X/Y, then descend - so the move clears any fixtures or stock standing up in Z. Requires homing and soft limits ($20) on; otherwise a single move is used."/>
-            <CheckBox x:Uid="lbl_restoreFusionRapids" Content='Load Folder restores Fusion Personal rapids' HorizontalContentAlignment="Left" HorizontalAlignment="Left" Margin="5,0,0,0" IsChecked="{Binding Path=RestoreFusionRapids, Mode=TwoWay}" ToolTip="Fusion 360 Personal Edition downgrades rapid (G0) retracts/repositions to feed moves (G1). When enabled, Load Folder always converts them back to rapids without asking each time (also applies to a --LoadFolder startup load)."/>
+            <CheckBox x:Uid="lbl_agressiveBuffering" Content="Agressive buffering" Margin="5,0,0,0" IsChecked="{Binding Path=UseBuffering, Mode=TwoWay}" ToolTip="Buffers more than one GCode block in controller for smoother execution. For grblHAL only!"/>
+            <CheckBox x:Uid="lbl_keepMdiFocus" Content="Keep MDI focus" Margin="5,0,0,0" IsChecked="{Binding Path=KeepMdiFocus, Mode=TwoWay}" ToolTip="Keeps the cursor in the MDI command box after you send a command, so you can type the next one without clicking back into it."/>
+            <CheckBox x:Uid="lbl_FilterOk" Content='Filter "ok" response' Margin="5,0,0,0" IsChecked="{Binding Path=FilterOkResponse, Mode=TwoWay}" ToolTip="Enable if ok responses overwhelm console logging, typically happens when sending lots of short commands."/>
+            <CheckBox x:Uid="lbl_autoCompressGcode" Content='Auto-compress gcode on transforms' Margin="5,0,0,0" IsChecked="{Binding Path=AutoCompress, Mode=TwoWay}" ToolTip="Removes superfluous gcode command elements."/>
+            <CheckBox x:Uid="lbl_restoreWindowSize" Content='Restore last window size on startup' Margin="5,0,0,0" IsChecked="{Binding Path=KeepWindowSize, Mode=TwoWay}" ToolTip="Restore window size on next startup."/>
+            <CheckBox x:Uid="lbl_sendComments" Content='Send comments' Margin="5,0,0,0" IsChecked="{Binding Path=SendComments, Mode=TwoWay}" ToolTip="Stream G-code comments (in parentheses) to the controller instead of stripping them - useful if the controller displays (MSG,...) comments; leave off to save a little bandwidth."/>
+            <CheckBox x:Uid="lbl_preferNetwork" Content='Prefer network connection if available' Margin="5,0,0,0" IsChecked="{Binding Path=PreferNetwork, Mode=TwoWay}" ToolTip="After connecting over USB/serial, if the controller reports an IP address (via $I) and its telnet port (23) responds, automatically switch the connection to the network."/>
+            <CheckBox x:Uid="lbl_addLineNumbers" Content='Add line numbers' Margin="5,0,0,0" IsChecked="{Binding Path=AddLineNumbers, Mode=TwoWay}" ToolTip="Add linenumbers if the controller is configured to report them."/>
+            <CheckBox x:Uid="lbl_autoSaveSettings" Content='Auto-save settings on exit' Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveSettings, Mode=TwoWay}" ToolTip="Save App settings automatically when leaving this tab or closing, instead of using the Save settings button."/>
+            <CheckBox x:Uid="lbl_promptOnSave" Content='Prompt before auto-saving' Margin="25,0,0,0" IsChecked="{Binding Path=PromptOnSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveSettings}" ToolTip="Show a confirm/discard list of changed settings before auto-saving."/>
+            <CheckBox x:Uid="lbl_autoSaveGrblSettings" Content="Auto-save grbl settings on leave" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveGrblSettings, Mode=TwoWay}" ToolTip="When leaving the Grbl settings tab with unsaved changes, write them to the controller automatically instead of prompting. Off by default - these are controller ($) settings that change machine behaviour."/>
+            <CheckBox x:Uid="lbl_promptOnGrblSave" Content="Prompt before auto-saving" Margin="25,0,0,0" IsChecked="{Binding Path=PromptOnGrblSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveGrblSettings}" ToolTip="Ask before writing changed grbl ($) settings to the controller when leaving the tab, instead of writing them silently."/>
+            <CheckBox x:Uid="lbl_safeGotoZ" Content='Safe Z on Go To' Margin="5,0,0,0" IsChecked="{Binding Path=SafeGotoZ, Mode=TwoWay}" ToolTip="When going to a work-coordinate origin (G54-G59.3), G28 or G30, first lift Z to machine top, then move X/Y, then descend - so the move clears any fixtures or stock standing up in Z. Requires homing and soft limits ($20) on; otherwise a single move is used."/>
+            <CheckBox x:Uid="lbl_restoreFusionRapids" Content='Load Folder restores Fusion Personal rapids' Margin="5,0,0,0" IsChecked="{Binding Path=RestoreFusionRapids, Mode=TwoWay}" ToolTip="Fusion 360 Personal Edition downgrades rapid (G0) retracts/repositions to feed moves (G1). When enabled, Load Folder always converts them back to rapids without asking each time (also applies to a --LoadFolder startup load)."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

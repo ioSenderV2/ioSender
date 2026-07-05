@@ -22,7 +22,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class KeyMapEditor : Window
+    public partial class KeyMapEditor : UserControl, ISettingsEditorTab
     {
         private readonly KeypressHandler keyboard;
         private readonly GrblViewModel model;
@@ -31,6 +31,7 @@ namespace CNC.Controls
         private readonly Dictionary<string, GroupRowState> groupStates = new Dictionary<string, GroupRowState>();
         private KeyMapGroupStateConverter groupStateConverter;
         private BindingRow capturing = null;
+        private bool _controllerHooked = false;   // controller dispatch paused + live events hooked (while tab visible)
 
         /// <summary>Action choices for the Controller tab dropdowns (bound from XAML).</summary>
         public List<ActionItem> ActionItems { get; private set; }
@@ -45,10 +46,51 @@ namespace CNC.Controls
             groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 
             LoadRows();
-            LoadController();
+            LoadController();   // builds the row data only; the live dispatch-pause + controller event hooks
+                                // happen in KeyMapEditor_Loaded/_Unloaded so they apply only while this tab is shown.
 
             PreviewKeyDown += KeyMapEditor_PreviewKeyDown;
-            Closed += KeyMapEditor_Closed;
+            Loaded += KeyMapEditor_Loaded;
+            Unloaded += KeyMapEditor_Unloaded;
+        }
+
+        // Save-on-leave: apply the edited bindings to the live keyboard handler + controller map, persist the
+        // key mappings and app settings, and re-register the console hotkey. This is the former Ok_Click plus the
+        // work the AppConfigView caller used to do after the modal returned OK. Called by the host on tab-leave.
+        public void Commit()
+        {
+            keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
+            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
+
+            var console = rows.FirstOrDefault(r => r.IsConsole);
+            if (console != null)
+                AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
+                    ? string.Empty
+                    : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
+
+            if (model.ControllerMapper != null)
+            {
+                var m = model.ControllerMapper;
+                foreach (var r in controllerRows)
+                    m.SetAction(r.Button, r.Action);
+
+                m.AnalogJogEnabled = chkAnalogEnabled.IsChecked == true;
+                int dz;
+                if (int.TryParse(txtDeadzone.Text, out dz))
+                    m.DeadzonePercent = Math.Max(0, Math.Min(95, dz));
+                double fs;
+                if (double.TryParse(txtFeedScale.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fs))
+                    m.FeedScale = Math.Max(0.1d, Math.Min(10d, fs));
+                m.InvertX = chkInvertX.IsChecked == true;
+                m.InvertY = chkInvertY.IsChecked == true;
+                m.InvertZ = chkInvertZ.IsChecked == true;
+
+                m.SaveMap();
+            }
+
+            keyboard.SaveMappings(CNC.Core.Resources.ConfigPath + "KeyMap0.xml");
+            AppConfig.Settings.Save();
+            AppConfig.NotifyConsoleShortcutChanged();
         }
 
         private void LoadRows()
@@ -265,42 +307,11 @@ namespace CNC.Controls
             }
         }
 
-        private void Ok_Click(object sender, RoutedEventArgs e)
-        {
-            keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
-            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
-
-            var console = rows.FirstOrDefault(r => r.IsConsole);
-            if (console != null)
-                AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
-                    ? string.Empty
-                    : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
-
-            if (model.ControllerMapper != null)
-            {
-                var m = model.ControllerMapper;
-                foreach (var r in controllerRows)
-                    m.SetAction(r.Button, r.Action);
-
-                m.AnalogJogEnabled = chkAnalogEnabled.IsChecked == true;
-                int dz;
-                if (int.TryParse(txtDeadzone.Text, out dz))
-                    m.DeadzonePercent = Math.Max(0, Math.Min(95, dz));
-                double fs;
-                if (double.TryParse(txtFeedScale.Text, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fs))
-                    m.FeedScale = Math.Max(0.1d, Math.Min(10d, fs));
-                m.InvertX = chkInvertX.IsChecked == true;
-                m.InvertY = chkInvertY.IsChecked == true;
-                m.InvertZ = chkInvertZ.IsChecked == true;
-
-                m.SaveMap();
-            }
-
-            DialogResult = true;
-        }
-
         // ---- Controller tab ------------------------------------------------------------------
 
+        // Build the controller-tab row data. The live parts (pausing machine dispatch, hooking connect/poll
+        // events) are deferred to KeyMapEditor_Loaded so they engage only while this tab is actually visible -
+        // otherwise merely having the settings view open would freeze controller dispatch.
         private void LoadController()
         {
             ActionItems = BuildActionItems();
@@ -311,8 +322,6 @@ namespace CNC.Controls
                 return;
             }
 
-            // Pause machine dispatch so pressing buttons to test/assign here cannot move the machine.
-            model.ControllerMapper.Enabled = false;
             model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
@@ -338,13 +347,30 @@ namespace CNC.Controls
             chkInvertZ.IsChecked = m.InvertZ;
 
             UpdateControllerStatus();
+        }
+
+        // Tab shown: pause machine dispatch (so testing controller buttons here can't move the machine) and hook
+        // live controller status/poll events. Paired with _Unloaded; guarded so re-entry doesn't double-hook.
+        private void KeyMapEditor_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_controllerHooked || model.Controller == null || model.ControllerMapper == null)
+                return;
+
+            _controllerHooked = true;
+            model.ControllerMapper.Enabled = false;
+            UpdateControllerStatus();
             model.Controller.Connected += Controller_StatusChanged;
             model.Controller.Disconnected += Controller_StatusChanged;
             model.Controller.Polled += Controller_Polled;
         }
 
-        private void KeyMapEditor_Closed(object sender, EventArgs e)
+        // Tab hidden / view left: unhook and resume machine dispatch.
+        private void KeyMapEditor_Unloaded(object sender, RoutedEventArgs e)
         {
+            if (!_controllerHooked)
+                return;
+
+            _controllerHooked = false;
             if (model.Controller != null)
             {
                 model.Controller.Connected -= Controller_StatusChanged;

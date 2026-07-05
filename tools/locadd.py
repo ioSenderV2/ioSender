@@ -32,6 +32,9 @@ TARGETS = [
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MachineSetupWizard.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/GrblConfigView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
 ]
 
 # LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..

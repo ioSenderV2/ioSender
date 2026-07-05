@@ -6,9 +6,9 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="250" d:DesignWidth="310">
-    <GroupBox x:Uid="grp_uiJogging" x:Name="grp_uiJog" Header="UI jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" MinWidth="310"
+    <GroupBox x:Uid="grp_uiJogging" x:Name="grp_uiJog" Header="UI jogging" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310"
               ToolTip="Four distance presets and four speed presets for the on-screen jog panel. Distance and speed are chosen with separate selectors, so any distance can be paired with any speed. 0 is the smallest/slowest, 3 the largest/fastest.">
-        <StackPanel HorizontalAlignment="Left" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <local:NumericField x:Uid="lbl_distance3" Label="Distance 3:" ColonAt="160" Unit="mm" Format="###0.0##" Value="{Binding Path=JogUiMetric.Distance3, Mode=TwoWay}" ToolTip="On-screen jog distance preset 3 (largest step)."/>
             <local:NumericField x:Uid="lbl_distance2" Label="Distance 2:" ColonAt="160" Unit="mm" Format="###0.0##" Value="{Binding Path=JogUiMetric.Distance2, Mode=TwoWay}" ToolTip="On-screen jog distance preset 2."/>
             <local:NumericField x:Uid="lbl_distance1" Label="Distance 1:" ColonAt="160" Unit="mm" Format="###0.0##" Value="{Binding Path=JogUiMetric.Distance1, Mode=TwoWay}" ToolTip="On-screen jog distance preset 1."/>

@@ -10,8 +10,8 @@
         <local:BoolToVisibleConverter x:Key="IsVisibleConverter" />
         <local:LogicalNotConverter x:Key="BooleanNotConverter" />
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_kbdJogging" x:Name="grpJog" Header="Keyboard jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310">
-        <StackPanel HorizontalAlignment="Left" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
+    <GroupBox x:Uid="grp_kbdJogging" x:Name="grpJog" Header="Keyboard jogging" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <StackPanel x:Uid="pnl_kbdJogging" Orientation="Horizontal">
                 <CheckBox x:Uid="lbl_enable" Content="Enable" IsChecked="{Binding Path=Jog.KeyboardEnable, Mode=TwoWay}" Margin="160,3,0,3" ToolTip="Turn keyboard jogging on or off. On by default."/>
                 <!-- Jog-cancel-on-key-up warning applies to legacy Grbl only. -->

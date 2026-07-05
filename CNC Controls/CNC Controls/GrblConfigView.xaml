@@ -4,15 +4,48 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:CNC.Controls"
+             xmlns:system="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
-    <TabControl x:Name="tabConfig" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
-        <TabItem x:Uid="tab_basicConfig" x:Name="tabBasicConfig" Header="Grbl">
-            <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-        </TabItem>
-        <TabItem x:Uid="tab_appConfigSub" x:Name="tabAppConfig" Header="App Settings">
-            <local:AppConfigView x:Name="appConfig"/>
-        </TabItem>
-    </TabControl>
+    <UserControl.Resources>
+        <Style x:Key="ConfigButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90" />
+            <Setter Property="MaxWidth" Value="150" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+    </UserControl.Resources>
+    <DockPanel>
+        <!-- Shared footer for the App-settings side (hidden on the Grbl tab, which has its own Save/Reload).
+             Save settings shows only when app-config autosave is off; Restart appears when a restart-only change fires. -->
+        <StackPanel x:Name="footer" DockPanel.Dock="Bottom" Orientation="Horizontal" Visibility="Collapsed">
+            <Button x:Uid="btn_saveSettings" x:Name="btnSave" Content="Save settings" Margin="5" Padding="5,0" Click="btnSave_Click" Style="{StaticResource ConfigButtonStyle}"/>
+            <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Width="90" Margin="5" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply changes that only take effect at startup. Enabled once such a change is made."/>
+        </StackPanel>
+        <TabControl x:Name="tabConfig" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+            <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl">
+                <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </TabItem>
+            <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <WrapPanel x:Name="pnlApp" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem x:Uid="tab_joggingConfig" x:Name="tabJogging" Header="Jogging">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <WrapPanel x:Name="pnlJogging" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="315" Margin="5"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller"/>
+            <TabItem x:Uid="tab_macrosConfig" x:Name="tabMacros" Header="Macros"/>
+            <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page"/>
+        </TabControl>
+    </DockPanel>
 </UserControl>

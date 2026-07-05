@@ -8,6 +8,7 @@
  *
  */
 
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -16,8 +17,11 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class MainPageEditor : Window
+    public partial class MainPageEditor : UserControl, IRestartRequired, ISettingsEditorTab
     {
+        // Fires (once) when Commit() applied a layout/tab change, so the settings host lights up its Restart button.
+        public event EventHandler<RestartRequiredEventArgs> RestartRequired;
+
         private const int MaxMainPanels = 8;
         private const int MaxLeftPanels = 6;
         private const string ProtectedTab = "AppConfig";   // Settings:App must always stay reachable
@@ -279,7 +283,10 @@ namespace CNC.Controls
             }
         }
 
-        private void btnOK_Click(object sender, RoutedEventArgs e)
+        // Save-on-leave: write the buckets back to config and persist. If anything changed since the tab was
+        // entered, signal the host to surface its Restart button (the new layout applies on next launch). Called
+        // by the settings host on tab-switch / view-leave. Baselines reset after so a second leave won't re-fire.
+        public void Commit()
         {
             Changed = !Main.Select(i => i.Name).SequenceEqual(_origMain)
                    || !Left.Select(i => i.Name).SequenceEqual(_origLeft)
@@ -287,7 +294,16 @@ namespace CNC.Controls
                    || !TabsShown.Select(t => t.Name).SequenceEqual(_origTabs);
 
             ApplyChanges();
-            DialogResult = true;
+            AppConfig.Settings.Save();
+
+            if (Changed)
+            {
+                RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply main page / tab layout changes."));
+                _origMain = Main.Select(i => i.Name).ToArray();
+                _origLeft = Left.Select(i => i.Name).ToArray();
+                _origFlyouts = Flyouts.Select(i => i.Name).ToArray();
+                _origTabs = TabsShown.Select(t => t.Name).ToArray();
+            }
         }
     }
 }

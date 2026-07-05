@@ -1,14 +1,13 @@
-<Window x:Class="CNC.Controls.KeyMapEditor"
+<UserControl x:Class="CNC.Controls.KeyMapEditor"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        x:Uid="dlg_editKeyMappings" Title="Edit Key Mappings" Height="560" Width="520" MinHeight="360" MinWidth="440"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        d:DesignHeight="560" d:DesignWidth="520"
         FocusManager.IsFocusScope="True">
-    <Window.Resources>
+    <UserControl.Resources>
         <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
         <local:KeyMapGroupExpandedConverter x:Key="GroupExpanded"/>
         <local:KeyMapGroupStateConverter x:Key="GroupState"/>
@@ -42,7 +41,7 @@
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#FFB0B0B0"/>
         </Style>
-    </Window.Resources>
+    </UserControl.Resources>
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -249,10 +248,8 @@
             <TextBlock x:Name="lblConflict" DockPanel.Dock="Left" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Uid="btn_reset" Content="Reset" MinWidth="80" Margin="4,0" Padding="5,2" Click="Reset_Click"/>
-                <Button x:Uid="btn_ok" Content="OK" MinWidth="80" Margin="4,0" Padding="5,2" IsDefault="True" Click="Ok_Click"/>
-                <Button x:Uid="btn_cancel" Content="Cancel" MinWidth="80" Margin="4,0" Padding="5,2" IsCancel="True"/>
+                <Button x:Uid="btn_reset" Content="Reset all to defaults" MinWidth="80" Margin="4,0" Padding="5,2" Click="Reset_Click"/>
             </StackPanel>
         </DockPanel>
     </Grid>
-</Window>
+</UserControl>

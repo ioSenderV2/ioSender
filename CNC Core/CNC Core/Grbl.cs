@@ -2985,6 +2985,16 @@ namespace CNC.Core
         public double Max { get; internal set; }
         public bool AllowNull { get; internal set; }
         public bool RebootRequired { get; internal set; }
+
+        // Search highlight: set true by the settings-search box for every setting matching the current query
+        // (id / id-prefix / name+value substring), cleared before each new search. Drives a tree DataTrigger.
+        private bool _isMatch = false;
+        public bool IsMatch
+        {
+            get { return _isMatch; }
+            set { if (_isMatch != value) { _isMatch = value; OnPropertyChanged(); } }
+        }
+
         public string Description {
             get
             {

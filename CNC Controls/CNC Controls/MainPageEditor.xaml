@@ -1,12 +1,11 @@
-<Window x:Class="CNC.Controls.MainPageEditor"
+<UserControl x:Class="CNC.Controls.MainPageEditor"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        x:Uid="dlg_editMainPage" Title="Edit Main Page" Height="560" Width="580" MinHeight="440" MinWidth="500"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+        d:DesignHeight="560" d:DesignWidth="580">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -119,9 +118,7 @@
         </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Uid="txt_restartNote" Text="Changes take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
-            <Button x:Uid="btn_ok" Content="OK" MinWidth="80" IsDefault="True" Click="btnOK_Click" Margin="0,0,6,0"/>
-            <Button x:Uid="btn_cancel" Content="Cancel" MinWidth="80" IsCancel="True"/>
+            <TextBlock x:Uid="txt_restartNote" Text="Changes are applied when you leave this tab and take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
         </StackPanel>
     </Grid>
-</Window>
+</UserControl>

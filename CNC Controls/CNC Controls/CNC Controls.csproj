@@ -150,9 +150,6 @@
     <Compile Include="GrblAlarmList.xaml.cs">
       <DependentUpon>GrblAlarmList.xaml</DependentUpon>
     </Compile>
-    <Compile Include="AppConfigView.xaml.cs">
-      <DependentUpon>AppConfigView.xaml</DependentUpon>
-    </Compile>
     <Compile Include="KeyMapEditor.xaml.cs">
       <DependentUpon>KeyMapEditor.xaml</DependentUpon>
     </Compile>
@@ -448,10 +445,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="GotoControl.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="AppConfigView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

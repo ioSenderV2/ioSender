@@ -7,8 +7,8 @@
              xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="140" d:DesignWidth="310">
-    <GroupBox x:Name="grpLathe" Header="Lathe" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310">
-        <StackPanel HorizontalAlignment="Left" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top" Width="235">
+    <GroupBox x:Name="grpLathe" Header="Lathe" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="140"/>

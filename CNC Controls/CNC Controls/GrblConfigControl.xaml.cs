@@ -71,7 +71,7 @@ namespace CNC.Controls
             model = (DataContext as WidgetViewModel).Grbl;
 
             dgrSettings.Visibility = GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
-            searchField.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
+            searchPanel.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             treeView.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             details.Visibility = GrblInfo.HasEnums && curSetting == null ? Visibility.Hidden : Visibility.Visible;
 
@@ -86,6 +86,15 @@ namespace CNC.Controls
             }
 
             UpdateValidation();
+            UpdateGrblSaveButton();
+        }
+
+        // Hide the manual Save button when grbl-settings autosave is on (it saves on leave), mirroring how the
+        // App-settings Save button hides when app autosave is on.
+        private void UpdateGrblSaveButton()
+        {
+            bool autoSave = AppConfig.Settings.Base != null && AppConfig.Settings.Base.AutoSaveGrblSettings;
+            btnSave.Visibility = autoSave ? Visibility.Collapsed : Visibility.Visible;
         }
 
         #region Methods required by GrblConfigTab interface
@@ -98,6 +107,7 @@ namespace CNC.Controls
             {
                 btnSave.IsEnabled = !model.IsCheckMode;
                 model.Message = string.Empty;
+                UpdateGrblSaveButton();
 
                 if (activate)
                 {
@@ -123,7 +133,16 @@ namespace CNC.Controls
 
                     if (GrblSettings.HasChanges())
                     {
-                        if (MessageBox.Show((string)FindResource("SaveSettings"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+                        // $ writes go to hardware. Silent autosave only when the user has both enabled autosave
+                        // AND turned the confirm off; otherwise prompt (autosave off = legacy safety prompt;
+                        // autosave on + prompt on = confirm before writing).
+                        var cfg = AppConfig.Settings.Base;
+                        bool autoSave = cfg != null && cfg.AutoSaveGrblSettings;
+                        bool prompt = !autoSave || (cfg != null && cfg.PromptOnGrblSave);
+
+                        if (!prompt)
+                            GrblSettings.Save();
+                        else if (MessageBox.Show((string)FindResource("SaveSettings"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
                             GrblSettings.Save();
                     }
                 }
@@ -192,7 +211,6 @@ namespace CNC.Controls
                 canvas.Children.Clear();
                 curSetting.Dispose();
             }
-            searchField.Value = setting.Id;
             txtDescription.Text = setting.Description;
             curSetting = new Widget(this, new WidgetProperties(setting), canvas);
             curSetting.IsEnabled = true;
@@ -438,39 +456,151 @@ namespace CNC.Controls
                 details.Visibility = Visibility.Hidden;
         }
 
-        private void searchField_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if(e.Key == System.Windows.Input.Key.Return && e.IsDown)
-            {
-                var setting = GrblSettings.Get((GrblSetting)searchField.Value);
+        // Free-text settings search. A leading '$' means "this is a setting id" ($53 = setting 53, $5? / $5* =
+        // all ids starting with 5, i.e. $50-$59); anything else (a bare number like 10, or a word like Jog) is a
+        // case-insensitive substring match over the setting NAME and current VALUE. Description is deliberately
+        // never matched - its getter does a per-setting serial round-trip ($SED). On TextChanged every group with
+        // a match is expanded, the matches highlighted, and the first selected; the "n of m" readout + up/down
+        // arrows (and F3/F4, Enter) step through the matches.
+        private readonly List<GrblSettingDetails> _matches = new List<GrblSettingDetails>();
+        private int _matchIndex = -1;
 
-                if (setting != null)
+        private void searchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplySearch(searchBox.Text);
+        }
+
+        private void searchBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Return && e.IsDown)
+            {
+                NavMatch(1);
+                e.Handled = true;
+            }
+        }
+
+        // F3 = next match, F4 = previous - handled at the control level so they work whether focus is in the
+        // search box or the tree. Marked handled so they don't bubble to global (macro F-key) handling.
+        private void ConfigView_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.F3) { NavMatch(1); e.Handled = true; }
+            else if (e.Key == System.Windows.Input.Key.F4) { NavMatch(-1); e.Handled = true; }
+        }
+
+        private void btnMatchNext_Click(object sender, RoutedEventArgs e) { NavMatch(1); }
+        private void btnMatchPrev_Click(object sender, RoutedEventArgs e) { NavMatch(-1); }
+
+        private void ApplySearch(string query)
+        {
+            foreach (var s in GrblSettings.Settings)   // clear previous highlights
+                s.IsMatch = false;
+            _matches.Clear();
+            _matchIndex = -1;
+
+            query = (query ?? string.Empty).Trim();
+            if (query.Length > 0)
+            {
+                if (query.StartsWith("$"))
                 {
-                    foreach (object g in treeView.Items)
+                    string body = query.Substring(1);
+                    bool prefix = body.EndsWith("?") || body.EndsWith("*");
+                    if (prefix)
+                        body = body.Substring(0, body.Length - 1);
+
+                    if (body.Length > 0 && body.All(char.IsDigit))
+                        _matches.AddRange(prefix
+                            ? GrblSettings.Settings.Where(s => s.Id.ToString().StartsWith(body))
+                            : GrblSettings.Settings.Where(s => s.Id.ToString() == body));
+                }
+                else
+                    _matches.AddRange(GrblSettings.Settings.Where(s =>
+                        (s.Name != null && s.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (s.Value != null && s.Value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)));
+            }
+
+            foreach (var s in _matches)
+                s.IsMatch = true;
+
+            ExpandGroups(_matches);
+
+            if (_matches.Count > 0)
+            {
+                _matchIndex = 0;
+                SelectMatch(_matchIndex);
+            }
+            UpdateMatchUi(query.Length > 0);
+        }
+
+        // Step to the next (+1) / previous (-1) match, wrapping around.
+        private void NavMatch(int dir)
+        {
+            if (_matches.Count == 0)
+                return;
+            _matchIndex = ((_matchIndex + dir) % _matches.Count + _matches.Count) % _matches.Count;
+            SelectMatch(_matchIndex);
+            UpdateMatchUi(true);
+        }
+
+        // Expand every tree group that contains a match (no selection). Child TreeViewItem containers don't
+        // exist until the parent group is expanded and its layout updated, so callers that then select a child
+        // must UpdateLayout() first (see SelectMatch).
+        private void ExpandGroups(List<GrblSettingDetails> matches)
+        {
+            var groupIds = new HashSet<int>(matches.Select(m => m.GroupId));
+            foreach (object g in treeView.Items)
+            {
+                var group = g as GrblSettingGroup;
+                if (group == null || !groupIds.Contains(group.Id))
+                    continue;
+                var gitm = (TreeViewItem)treeView.ItemContainerGenerator.ContainerFromItem(g);
+                if (gitm != null)
+                {
+                    gitm.IsExpanded = true;
+                    gitm.UpdateLayout();
+                }
+            }
+        }
+
+        // Select and scroll to the match at index i.
+        private void SelectMatch(int i)
+        {
+            if (i < 0 || i >= _matches.Count)
+                return;
+
+            var setting = _matches[i];
+            foreach (object g in treeView.Items)
+            {
+                var group = g as GrblSettingGroup;
+                if (group == null || group.Id != setting.GroupId)
+                    continue;
+                var gitm = (TreeViewItem)treeView.ItemContainerGenerator.ContainerFromItem(g);
+                if (gitm == null)
+                    return;
+                gitm.IsExpanded = true;
+                gitm.UpdateLayout();
+                gitm.BringIntoView();
+                foreach (object s in gitm.Items)
+                {
+                    if ((s as GrblSettingDetails)?.Id == setting.Id)
                     {
-                        if ((g as GrblSettingGroup).Id == setting.GroupId)
+                        var sitm = (TreeViewItem)gitm.ItemContainerGenerator.ContainerFromItem(s);
+                        if (sitm != null)
                         {
-                            TreeViewItem gitm = (TreeViewItem)treeView.ItemContainerGenerator.ContainerFromItem(g);
-                            gitm.IsExpanded = true;
-                            gitm.UpdateLayout();
-                            gitm.BringIntoView();
-                            foreach (object s in gitm.Items)
-                            {
-                                if ((s as GrblSettingDetails).Id == setting.Id)
-                                {
-                                    TreeViewItem sitm = (TreeViewItem)gitm.ItemContainerGenerator.ContainerFromItem(s);
-                                    if (sitm != null)
-                                    {
-                                        sitm.IsSelected = true;
-                                        sitm.BringIntoView();
-//                                        sitm.Focus();
-                                    }
-                                }
-                            }
+                            sitm.IsSelected = true;
+                            sitm.BringIntoView();
                         }
+                        return;
                     }
                 }
             }
+        }
+
+        private void UpdateMatchUi(bool hasQuery)
+        {
+            btnMatchPrev.IsEnabled = btnMatchNext.IsEnabled = _matches.Count > 0;
+            txtMatchCount.Text = _matches.Count > 0
+                ? string.Format("{0} of {1}", _matchIndex + 1, _matches.Count)
+                : (hasQuery ? "no matches" : string.Empty);
         }
 
         private void ConfigView_SizeChanged(object sender, SizeChangedEventArgs e)

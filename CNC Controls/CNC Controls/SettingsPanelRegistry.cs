@@ -50,6 +50,14 @@ namespace CNC.Controls
         public RestartRequiredEventArgs(string message) { Message = message; }
     }
 
+    // A settings tab whose edits persist when the tab is left (rather than via an OK button). The host calls
+    // Commit() when switching away from the tab or leaving the settings view. Implemented by the editor tabs
+    // (key bindings / macros / main page) that were converted from modal dialogs to inline tabs.
+    public interface ISettingsEditorTab
+    {
+        void Commit();
+    }
+
     // A Settings:App panel implements this to declare that one of its settings only takes effect at startup,
     // so changing it needs an app restart. The panel raises RestartRequired (with a reason) when such a setting
     // changes; AppConfigView then surfaces the Restart button. This keeps the "needs restart" knowledge with the

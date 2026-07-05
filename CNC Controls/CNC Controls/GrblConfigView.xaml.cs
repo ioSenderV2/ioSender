@@ -1,4 +1,4 @@
-﻿/*
+/*
  * GrblConfigView.xaml.cs - part of CNC Probing library
  *
  * v0.46 / 2025-06-05 / Io Engineering (Terje Io)
@@ -37,17 +37,40 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Xml.Serialization;
 using CNC.Core;
 
 namespace CNC.Controls
 {
     /// <summary>
-    /// Interaction logic for ConfigView.xaml
+    /// The Settings view: a single flat tab strip -
+    /// Grbl (controller $ settings + search) | App | Jogging | G Code | Keyboard &amp; Controller | Macros | Main Page.
+    /// The App/Jogging/G Code tabs bucket the app-config panels by type; the last three host editors that were
+    /// converted from modal dialogs to inline tabs (save-on-leave). This view also owns the shared Save/Restart
+    /// footer and the app-config auto-save-on-leave behaviour (formerly AppConfigView).
     /// </summary>
     public partial class GrblConfigView : UserControl, ICNCView
     {
+        private UIViewModel model;
+        private GrblViewModel grblmodel;
+        private string settingsSnapshot;    // serialized Config captured when the view is entered (for autosave/diff)
+        private readonly HashSet<object> restartHooked = new HashSet<object>();
+
+        // Inline editor tabs (built lazily on first show).
+        private KeyMapEditor keyMapTab;
+        private MacroManagerDialog macrosTab;
+        private MainPageEditor mainPageTab;
+
+        // Camera + Probing share one vertical column on the App tab (both are short panels).
+        private StackPanel _camProbeColumn;
+
         public GrblConfigView()
         {
             InitializeComponent();
@@ -60,7 +83,22 @@ namespace CNC.Controls
 
         public void Activate(bool activate, ViewType chgMode)
         {
-            ActivateTab(tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem, activate);
+            if (grblmodel != null)
+                grblmodel.Message = string.Empty;
+
+            var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
+
+            if (activate)
+            {
+                settingsSnapshot = SerializeConfig(AppConfig.Settings.Base);
+                ApplyPanelVisibility();
+                EnterTab(cur);
+            }
+            else
+            {
+                LeaveTab(cur);
+                AutoSaveOnLeave();
+            }
         }
 
         // We've talked to a controller (version known) and the machine has not been set up via the wizard yet -
@@ -84,69 +122,139 @@ namespace CNC.Controls
 
         public void CloseFile()
         {
-
-            //if (!string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
-            //    MainWindow.EnableView(true, ViewType.TrinamicTuner);
-            //else
-            //    MainWindow.ShowView(false, ViewType.TrinamicTuner);
-
-
-            //if (GrblInfo.HasPIDLog)
-            //    MainWindow.EnableView(true, ViewType.PIDTuner);
-            //else
-            //    MainWindow.ShowView(false, ViewType.PIDTuner);
-
         }
 
         public void Setup(UIViewModel model, AppConfig profile)
         {
-            // The App Settings sub-tab (AppConfigView, an ICNCView) owns the app-config controls; forward
-            // Setup to it so they are initialised even though it is no longer a top-level tab.
-            foreach (UserControl uc in UIUtils.FindLogicalChildren<UserControl>(this))
-                if (uc is AppConfigView app)
-                {
-                    ((ICNCView)app).Setup(model, profile);
-                    break;
-                }
+            if (this.model != null)
+                return;
+
+            this.model = model;
+            grblmodel = DataContext as GrblViewModel;
+
+            _camProbeColumn = new StackPanel { Orientation = Orientation.Vertical };
+
+            // App-config panels bind to the Config object.
+            pnlApp.DataContext = pnlJogging.DataContext = pnlGCode.DataContext = profile.Base;
+
+            // Build the built-in panels, then drain any feature-contributed panels registered via the registry.
+            // Feature panels (Camera/Probing/Viewer/Lathe) also self-add to model.ConfigControls from their own
+            // views - usually after this Setup - so bucket present controls now and react to later additions.
+            model.ConfigControls.Add(new BasicConfigControl());
+            model.ConfigControls.Add(new JogUiConfigControl());
+            model.ConfigControls.Add(new JogConfigControl());
+            model.ConfigControls.Add(new StripGCodeConfigControl());
+
+            foreach (var d in SettingsPanelRegistry.Collect())
+            {
+                var ctl = d.Create?.Invoke();
+                if (ctl != null)
+                    model.ConfigControls.Add(ctl);
+            }
+
+            foreach (var c in model.ConfigControls)
+            {
+                Bucket(c);
+                HookRestart(c);
+            }
+            model.ConfigControls.CollectionChanged += (s, e) => {
+                if (e.NewItems != null)
+                    foreach (var c in e.NewItems.OfType<UserControl>())
+                    {
+                        Bucket(c);
+                        HookRestart(c);
+                    }
+            };
+
+            // The Main Page editor is only meaningful when the main-page/tab layout is user-editable.
+            if (!MainPanelRegistry.LayoutEnabled)
+                tabConfig.Items.Remove(tabMainPage);
+
+            UpdateSaveButtonVisibility();
+            AppConfig.Settings.Base.PropertyChanged += (s, e) => {
+                if (e.PropertyName == nameof(Config.AutoSaveSettings))
+                    UpdateSaveButtonVisibility();
+            };
         }
 
         #endregion
 
-        private  TabItem getTab(GrblConfigType tabtype)
+        private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            TabItem tab = null;
-
-            foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(tabConfig))
-            {
-                var view = getView(tabitem);
-                if (view != null && view.GrblConfigType == tabtype)
-                {
-                    tab = tabitem;
-                    break;
-                }
-            }
-
-            return tab;
         }
 
-        private static IGrblConfigTab getView(TabItem tab)
-        {
-            IGrblConfigTab view = null;
+        #region Tab bucketing and per-tab lifecycle
 
-            foreach (UserControl uc in UIUtils.FindLogicalChildren<UserControl>(tab))
+        // Place a config panel into the tab that owns its category. Built-ins are matched by concrete type;
+        // feature panels live in other assemblies (CNC Controls can't reference them) so they're matched by
+        // full type name. Unknown panels default to the App tab.
+        private void Bucket(UserControl c)
+        {
+            var panel = TargetPanel(c);
+            if (panel == null)
+                return;
+
+            // Place the shared Camera/Probing column into the App tab the first time it's needed.
+            if (ReferenceEquals(panel, _camProbeColumn) && !pnlApp.Children.Contains(_camProbeColumn))
+                pnlApp.Children.Add(_camProbeColumn);
+
+            if (c.Parent is Panel prev && !ReferenceEquals(prev, panel))
+                prev.Children.Remove(c);
+
+            if (!panel.Children.Contains(c))
+                panel.Children.Add(c);
+        }
+
+        private Panel TargetPanel(UserControl c)
+        {
+            if (c is BasicConfigControl)
+                return pnlApp;
+            if (c is JogUiConfigControl || c is JogConfigControl)
+                return pnlJogging;
+            if (c is StripGCodeConfigControl)
+                return pnlGCode;
+
+            switch (c.GetType().FullName)
             {
-                if (uc is IGrblConfigTab)
-                {
-                    view = (IGrblConfigTab)uc;
-                    break;
-                }
+                case "CNC.Controls.Viewer.ConfigControl":
+                    return pnlGCode;
+                case "CNC.Controls.Camera.ConfigControl":
+                case "CNC.Controls.Probing.ConfigControl":
+                    return _camProbeColumn;   // Camera + Probing share one column
+                case "CNC.Controls.Lathe.ConfigControl":
+                    return pnlApp;
             }
 
-            return view;
+            return pnlApp;
+        }
+
+        // Central runtime visibility (mirrors the old AppConfigView.Activate): hide keyboard-jog config when the
+        // controller itself owns jog settings ($50-$55), and hide the camera panel when no camera is present.
+        private void ApplyPanelVisibility()
+        {
+            if (model == null)
+                return;
+
+            foreach (var control in model.ConfigControls)
+            {
+                if (control is JogConfigControl jc)
+                {
+                    if (GrblSettings.GetString(grblHALSetting.JogStepSpeed) != null)
+                        control.Visibility = Visibility.Collapsed;
+                    else
+                    {
+                        control.Visibility = Visibility.Visible;
+                        jc.IsGrbl = !GrblInfo.IsGrblHAL;
+                    }
+                }
+                else if (control is ICameraConfig && model.Camera != null && !model.Camera.HasCamera)
+                    control.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // KeyMap and Main Page host their own inner TabControls - ignore their bubbled selection changes.
             if (!Equals(e.OriginalSource, sender))
                 return;
 
@@ -157,41 +265,236 @@ namespace CNC.Controls
             var removed = e.RemovedItems.Count == 1 ? e.RemovedItems[0] as TabItem : null;
             var added = e.AddedItems[0] as TabItem;
 
-            // Defer: a child's Activate may pump the dispatcher (DoEvents while waiting on the controller),
-            // which throws if it runs during the layout pass that generated this nested TabControl's items.
+            // Defer: a child's activation may pump the dispatcher (DoEvents while waiting on the controller),
+            // which throws if it runs during the layout pass that generated this TabControl's items.
             Dispatcher.BeginInvoke((System.Action)(() =>
             {
-                if (removed != null)
-                    ActivateTab(removed, false);
-                ActivateTab(added, true);
+                LeaveTab(removed);
+                EnterTab(added);
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        // Activate/deactivate a sub-tab's content. Most are IGrblConfigTab (Activate(bool)); the App Settings
-        // tab hosts AppConfigView (ICNCView) - it MUST get Activate(false) on leave so its auto-save-on-leave
-        // runs, otherwise edited app settings are silently lost.
-        private void ActivateTab(TabItem tab, bool activate)
+        private void EnterTab(TabItem tab)
         {
             if (tab == null)
                 return;
 
-            var cfg = getView(tab);
-            if (cfg != null)
-            {
-                cfg.Activate(activate);
-                return;
-            }
+            UpdateFooterForTab(tab);
+            EnsureEditorTab(tab);
 
-            foreach (UserControl uc in UIUtils.FindLogicalChildren<UserControl>(tab))
-                if (uc is ICNCView view)
+            if (tab == tabGrbl)
+                basicConfig.Activate(true);
+        }
+
+        private void LeaveTab(TabItem tab)
+        {
+            if (tab == null)
+                return;
+
+            if (tab == tabGrbl)
+                basicConfig.Activate(false);
+            else if (tab.Content is ISettingsEditorTab editor)
+                editor.Commit();   // Keyboard & Controller / Macros / Main Page: save-on-leave
+        }
+
+        // Build an editor tab's content the first time it is shown.
+        private void EnsureEditorTab(TabItem tab)
+        {
+            if (tab == tabKeys && keyMapTab == null && tab.Content == null)
+            {
+                if (Grbl.GrblViewModel?.Keyboard != null)
                 {
-                    view.Activate(activate, ViewType.AppConfig);
+                    keyMapTab = new KeyMapEditor(Grbl.GrblViewModel);
+                    tab.Content = keyMapTab;
+                }
+                else
+                    tab.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
+                        Text = "Key mappings are not available until a controller is connected." };
+            }
+            else if (tab == tabMacros && macrosTab == null && tab.Content == null)
+            {
+                if (AppConfig.Settings.Macros != null)
+                {
+                    macrosTab = new MacroManagerDialog(AppConfig.Settings.Macros);
+                    tab.Content = macrosTab;
+                }
+                else
+                    tab.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
+                        Text = "Macros are not available." };
+            }
+            else if (tab == tabMainPage && mainPageTab == null && tab.Content == null)
+            {
+                mainPageTab = new MainPageEditor();
+                mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
+                tab.Content = mainPageTab;
+            }
+        }
+
+        #endregion
+
+        #region Footer (Save settings / Restart) + restart hooking
+
+        private void UpdateFooterForTab(TabItem tab)
+        {
+            // The Grbl tab has its own Reload/Save/Backup/Restore; the shared footer is for the App-settings side.
+            footer.Visibility = tab == tabGrbl ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void UpdateSaveButtonVisibility()
+        {
+            btnSave.Visibility = AppConfig.Settings.Base != null && AppConfig.Settings.Base.AutoSaveSettings
+                ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void btnSave_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppConfig.Settings.Save())
+                Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");
+        }
+
+        // Surface the Restart button (relaunch to apply) for a setting that only takes effect at startup.
+        private void EnableRestart(string message)
+        {
+            footer.Visibility = Visibility.Visible;
+            btnRestart.Visibility = Visibility.Visible;
+            btnRestart.IsEnabled = true;
+            Grbl.GrblViewModel.Message = message;
+        }
+
+        private void HookRestart(UserControl c)
+        {
+            if (c is IRestartRequired rr && restartHooked.Add(c))
+                rr.RestartRequired += (s, e) => EnableRestart(e.Message);
+        }
+
+        private void btnRestart_Click(object sender, RoutedEventArgs e)
+        {
+            AppConfig.Settings.Save();
+            try
+            {
+                System.Diagnostics.Process.Start(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                Application.Current.Shutdown();
+            }
+            catch { }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
+        }
+
+        #endregion
+
+        #region App-config autosave on view-leave (opt-in)
+
+        private void AutoSaveOnLeave()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg == null || !cfg.AutoSaveSettings || settingsSnapshot == null)
+                return;
+
+            string current = SerializeConfig(cfg);
+            if (current == null || current == settingsSnapshot)
+                return;     // nothing changed
+
+            if (cfg.PromptOnSave)
+            {
+                var changes = new List<string>();
+                DiffObject(string.Empty, DeserializeConfig(settingsSnapshot), cfg, changes);
+
+                if (changes.Count > 0)
+                {
+                    var msg = "Save these setting changes?\n\n" + string.Join("\n", changes);
+                    if (MessageBox.Show(msg, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    {
+                        AppConfig.Settings.Save();
+                        settingsSnapshot = SerializeConfig(cfg);
+                    }
+                    else
+                        CopyScalars(DeserializeConfig(settingsSnapshot), cfg);   // discard edits
                     return;
                 }
+            }
+
+            AppConfig.Settings.Save();
+            settingsSnapshot = current;
         }
 
-        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        private static string SerializeConfig(Config c)
         {
+            try
+            {
+                var xs = new XmlSerializer(typeof(Config));
+                using (var sw = new StringWriter())
+                {
+                    xs.Serialize(sw, c);
+                    return sw.ToString();
+                }
+            }
+            catch { return null; }
         }
+
+        private static Config DeserializeConfig(string xml)
+        {
+            var xs = new XmlSerializer(typeof(Config));
+            using (var sr = new StringReader(xml))
+                return (Config)xs.Deserialize(sr);
+        }
+
+        private static bool IsScalar(Type t)
+        {
+            return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(double) || t == typeof(decimal);
+        }
+
+        // List scalar property differences (incl. nested Jog / JogUi config) as "Name: old -> new".
+        private static void DiffObject(string prefix, object oldO, object newO, List<string> changes)
+        {
+            if (oldO == null || newO == null)
+                return;
+
+            foreach (var p in oldO.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || p.GetIndexParameters().Length > 0 || Attribute.IsDefined(p, typeof(XmlIgnoreAttribute)))
+                    continue;
+
+                object ov, nv;
+                try { ov = p.GetValue(oldO); nv = p.GetValue(newO); } catch { continue; }
+
+                if (IsScalar(p.PropertyType))
+                {
+                    if (!Equals(ov, nv))
+                        changes.Add(string.Format("  {0}{1}: {2} → {3}", prefix, p.Name, ov, nv));
+                }
+                else if (p.PropertyType == typeof(JogConfig) || p.PropertyType == typeof(JogUIConfig))
+                    DiffObject(p.Name + ".", ov, nv, changes);
+                else if (p.PropertyType == typeof(string[]))
+                {
+                    var oa = ov as string[];
+                    var na = nv as string[];
+                    if (oa != null && na != null && !oa.SequenceEqual(na))
+                        changes.Add(string.Format("  {0}{1}: {2} → {3}", prefix, p.Name, string.Join(",", oa), string.Join(",", na)));
+                }
+            }
+        }
+
+        // Copy scalar property values from src into dst (used to discard unsaved edits on the live Config).
+        private static void CopyScalars(object src, object dst)
+        {
+            if (src == null || dst == null)
+                return;
+
+            foreach (var p in src.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || p.GetIndexParameters().Length > 0 || Attribute.IsDefined(p, typeof(XmlIgnoreAttribute)))
+                    continue;
+
+                if (IsScalar(p.PropertyType))
+                {
+                    if (p.CanWrite)
+                    {
+                        try { var v = p.GetValue(src); if (!Equals(v, p.GetValue(dst))) p.SetValue(dst, v); } catch { }
+                    }
+                }
+                else if (p.PropertyType == typeof(JogConfig) || p.PropertyType == typeof(JogUIConfig))
+                    CopyScalars(p.GetValue(src), p.GetValue(dst));
+            }
+        }
+
+        #endregion
     }
 }
