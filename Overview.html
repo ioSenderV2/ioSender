@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>41 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>44 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -184,6 +184,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
 <tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
 <tr><td>Settings redesign &mdash; flat tab strip, free-text <code>$</code>-setting search (with match nav), grbl-settings autosave, dialog editors folded in as tabs</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr42">42</a></td></tr>
+<tr><td>Per-user config folder + standalone <code>.xml</code> folded into <code>App.config</code> sections (<code>ConfigPanel&lt;T&gt;</code> wizards, curated defaults); console output search + font size, shared reset footer, bindable ResetAndUnlock</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr43">43</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -193,6 +194,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Squareness (Auto Square) &mdash; drill an L, measure, write the ganged-axis squaring offset + re-home</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr31">31</a></td></tr>
 <tr><td>Probe definition diagrams &mdash; per-type schematic in the probe editor labelling the measurements to enter</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr34">34</a></td></tr>
 <tr><td>Probe input follows the selected probe type &mdash; tool setter &rarr; <code>Q1</code>, else the main probe &rarr; <code>Q0</code> (guards a stale selection)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr36">36</a></td></tr>
+<tr><td>Start Job (was Load Stock) &mdash; first tab, connection-gated tabs, auto 3D-probe at the front-left origin, writes <code>start_job.macro</code>; new Verify skew pass (re-touch each corner in the rotated frame); flyout persistence &amp; offset-Set fixes</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr44">44</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -274,7 +276,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">39</td><td><a href="#pr39">Re-establish modal state on a mid-program start</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+22</span> <span class="del">0</span></td></tr>
 <tr><td class="n">40</td><td><a href="#pr40">Load Stock &ldquo;apply work rotation&rdquo; defaults off</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">41</td><td><a href="#pr41">Live 3D toolpath + material-removal carve view</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+1107</span> <span class="del">-62</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (41 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">255</span> <span class="del">0</span> <span class="add">+84</span><br><span class="k">Lines:</span> <span class="add">+25012</span> <span class="del">-1967</span></td></tr>
+<tr><td class="n">42</td><td><a href="#pr42">Settings redesign &mdash; flat tab strip + searchable Grbl settings</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">23</span> <span class="del">2</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+935</span> <span class="del">-542</span></td></tr>
+<tr><td class="n">43</td><td><a href="#pr43">Per-user config folder + standalone config folded into App.config</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">27</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1269</span> <span class="del">-369</span></td></tr>
+<tr><td class="n">44</td><td><a href="#pr44">Start Job workflow + Verify skew, flyout &amp; offset fixes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+369</span> <span class="del">-182</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (44 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">322</span> <span class="del">2</span> <span class="add">+87</span><br><span class="k">Lines:</span> <span class="add">+27585</span> <span class="del">-3060</span></td></tr>
 </table>
 </div>
 
@@ -1391,6 +1396,53 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 </ul>
 <p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0); on-hardware review of the high-DPI arrow buttons and panel wrapping pending.</p>
 </div>
+</div>
+
+<!-- ===== #43 ===== -->
+<div class="pr">
+<h2 id="pr43"><span class="badge">#43</span>Per-user config folder + standalone config folded into App.config</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">258</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConfigPanel.cs</td><td class="num add">97</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LoadStockConfig.cs</td><td class="num add">37</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/Default-App.config</td><td class="num add">64</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerMapper.cs</td><td class="num add">82</td><td class="num del">27</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/KeypressHandler.cs</td><td class="num add">102</td><td class="num del">63</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinition.cs</td><td class="num add">32</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsPanelRegistry.cs</td><td class="num add">43</td><td class="num">0</td></tr>
+<tr><td class="mono">Surface/AutoSquare/StepperScratch Wizard .xaml(.cs) &mdash; ConfigPanel conversion (3 wizards)</td><td class="num add">121</td><td class="num del">187</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml(.cs)</td><td class="num add">162</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl + GrblConfigView .xaml(.cs)</td><td class="num add">143</td><td class="num del">63</td></tr>
+<tr><td class="mono">Basic/StripGCode/Jog/JogUi ConfigControl + KeyMapEditor + JobControl</td><td class="num add">126</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs, GrblViewModel.cs</td><td class="num add">2</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>App.config now lives per-user in <code>%AppData%\ioSender</code>: on first run the existing app-folder config (plus key maps, probe defs, macros and settings backups) is moved there, and the app-folder copy ships read-only as the reset-to-default template. The standalone <code>.xml</code> files each feature used to write next to it are folded in as <code>App.config</code> sections.</p><ul>
+<li><strong>Section fold-in:</strong> ProbeDefinitions, the game-controller map, key mappings, and the Surface&nbsp;Spoilboard / Auto&nbsp;Square / Stepper&nbsp;calibration / Load&nbsp;Stock parameter blobs become sections; a one-time importer reads any legacy file then deletes it. A new <code>ConfigPanel&lt;T&gt;</code> base gives the wizards save/restore of their section from a single DTO.</li>
+<li><strong>Curated defaults:</strong> a shipped <code>Default-App.config</code> is the factory template (auto-saves default off) and the source for &ldquo;Reset to default&rdquo;.</li>
+<li><strong>Settings/console polish:</strong> the console gains an output search bar + a font-size control; the Settings tabs share one Save/Restart/Reset footer (Grbl sub-row for reload/backup/restore/copy-to-sim); panels opt into &ldquo;Reset to default&rdquo;; <em>ResetAndUnlock</em> is a bindable keyboard action; a key binding reads as &ldquo;modified&rdquo; only when it differs from its value at startup.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0); first-run migration is best-effort and idempotent. On-hardware migration spot-check pending.</p></div>
+</div>
+
+<!-- ===== #44 ===== -->
+<div class="pr">
+<h2 id="pr44"><span class="badge">#44</span>Start Job workflow + Verify skew, flyout &amp; offset fixes</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/LoadStockView.xaml(.cs)</td><td class="num add">229</td><td class="num del">127</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml(.cs)</td><td class="num add">88</td><td class="num del">12</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">6</td><td class="num del">19</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">7</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml.cs</td><td class="num add">26</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LibStrings.xaml + Locale/*/csv (7 locales)</td><td class="num add">8</td><td class="num del">8</td></tr>
+</table>
+<div class="desc"><p>Load&nbsp;Stock is reworked into <strong>Start&nbsp;Job</strong> &mdash; the first tab, the guided front end for setting a run up before the Job tab cuts it.</p><ul>
+<li><strong>Workflow:</strong> the operational tabs are disabled until a controller connects; startup lands on the Job tab so its handshake reads <code>$I</code>. Start&nbsp;Job auto-selects the configured 3D probe (no picker), zeroes at the front-left corner, and writes <code>start_job.macro</code> so the seeded macro/F-key runs the same sequence.</li>
+<li><strong>Verify skew:</strong> a new pass re-touches each corner in the rotated work frame &mdash; the back corners twice (ideal rectangle, then the probed corner) so the gap reads out the stock&rsquo;s out-of-square amount &mdash; then parks at G30. The measured-skew rotation sign is corrected (grblHAL <code>G10&nbsp;L2&nbsp;R</code> aligns with <code>-atan2(dy,dx)</code>).</li>
+<li><strong>Flyout &amp; offset fixes:</strong> pinned sidebar flyouts stay open across tab switches; a flyout <em>Set</em> writes the offset directly (it was silently dropped by the streamer-state gate); the Offsets tab <em>Set&nbsp;All</em> skips the rapid-to-target confirmation when the machine is already there.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Start&nbsp;Job macro run + Verify&nbsp;skew validated on hardware; a separate 3D-view stock-orientation issue is tracked.</p></div>
 </div>
 </section>
 
