@@ -196,6 +196,9 @@
     <Compile Include="JogConfigControl.xaml.cs">
       <DependentUpon>JogConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="JogPresetSelector.xaml.cs">
+      <DependentUpon>JogPresetSelector.xaml</DependentUpon>
+    </Compile>
     <Compile Include="JogControl.xaml.cs">
       <DependentUpon>JogControl.xaml</DependentUpon>
     </Compile>
@@ -463,6 +466,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="JogConfigControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="JogPresetSelector.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

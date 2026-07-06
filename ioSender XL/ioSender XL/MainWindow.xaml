@@ -183,8 +183,17 @@
                             <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Top"/>
                             <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </StackPanel>
-                        <!-- State: / Check directly under Home/Unlock/Reset. -->
-                        <cnccontrols:StatusControl ShowButtons="False" HorizontalAlignment="Left" Margin="0,7,0,0"/>
+                        <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
+                             spinners on the same line. Width is tied to the button row so the selector's right
+                             edge ("Feed") aligns with the Program button's right edge above. -->
+                        <Grid Margin="0,7,0,0" Width="{Binding ElementName=buttonRow, Path=ActualWidth}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <cnccontrols:StatusControl Grid.Column="0" ShowButtons="False" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            <cnccontrols:JogPresetSelector Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
                     <!-- Shrunk-down copy of the Jog-tab jog control (arrows only - selection comes from the Jog
                          tab via shared JogData), centred in the space between the Program button and the signals

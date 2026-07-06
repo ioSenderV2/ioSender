@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" WindowStartupLocation="CenterScreen" SizeToContent="WidthAndHeight"
-        Topmost="False" Icon="App.ico">
+        Topmost="True" Icon="App.ico">
     <Border Background="#FF2D2D30" CornerRadius="6" BorderBrush="#FF3F3F46" BorderThickness="1" Padding="34,26">
         <StackPanel Width="320">
             <TextBlock Text="ioSender XL" FontSize="22" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>

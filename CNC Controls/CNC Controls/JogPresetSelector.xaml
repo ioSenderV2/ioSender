@@ -1,0 +1,51 @@
+<UserControl x:Class="CNC.Controls.JogPresetSelector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d" Loaded="UserControl_Loaded"
+             d:DesignHeight="28" d:DesignWidth="300">
+    <!-- Single-row jog preset spinners for the run bar: Dist [down field up]  Jog  [down field up] Feed.
+         Each field is read-only; the down arrow steps to the previous preset and the up arrow to the next,
+         both wrapping around the four presets. The presets/selection are the shared JogData singleton
+         (edited on Settings:App / the Jog tab), so this mirrors the jog pad / keyboard / controller. -->
+    <UserControl.Resources>
+        <Style x:Key="SpinButton" TargetType="{x:Type RepeatButton}">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SpinField" TargetType="{x:Type TextBox}">
+            <Setter Property="Width" Value="58"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="#FFF8F8F8"/>
+        </Style>
+        <Style x:Key="SpinLabel" TargetType="{x:Type Label}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <!-- Jog distance -->
+        <Label Style="{StaticResource SpinLabel}" Content="Dist" Margin="0,0,4,0"/>
+        <RepeatButton Style="{StaticResource SpinButton}" Content="&#x25BC;" Click="DistDown_Click" ToolTip="Previous jog distance (wraps)"/>
+        <TextBox Style="{StaticResource SpinField}" Text="{Binding Path=SelectedDistanceText, Mode=OneWay}" ToolTip="{Binding Path=DistanceHeader}"/>
+        <RepeatButton Style="{StaticResource SpinButton}" Content="&#x25B2;" Click="DistUp_Click" ToolTip="Next jog distance (wraps)"/>
+
+        <!-- Centre label -->
+        <Label Style="{StaticResource SpinLabel}" Content="Jog" Margin="14,0,14,0"/>
+
+        <!-- Jog feed -->
+        <RepeatButton Style="{StaticResource SpinButton}" Content="&#x25BC;" Click="FeedDown_Click" ToolTip="Previous jog feed (wraps)"/>
+        <TextBox Style="{StaticResource SpinField}" Text="{Binding Path=SelectedFeedrateText, Mode=OneWay}" ToolTip="{Binding Path=SpeedHeader}"/>
+        <RepeatButton Style="{StaticResource SpinButton}" Content="&#x25B2;" Click="FeedUp_Click" ToolTip="Next jog feed (wraps)"/>
+        <Label Style="{StaticResource SpinLabel}" Content="Feed" Margin="4,0,0,0"/>
+    </StackPanel>
+</UserControl>
