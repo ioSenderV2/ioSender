@@ -44,11 +44,19 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for JogUiConfigControl.xaml
     /// </summary>
-    public partial class JogUiConfigControl : UserControl
+    public partial class JogUiConfigControl : UserControl, ISettingsResettable
     {
         public JogUiConfigControl()
         {
             InitializeComponent();
+        }
+
+        // Reset the on-screen jog presets (Config.JogUiMetric) this panel owns to their factory defaults.
+        public void ResetToDefaults()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg?.JogUiMetric != null)
+                ConfigReset.CopyScalars(AppConfig.GetFactoryDefaults().JogUiMetric, cfg.JogUiMetric);
         }
     }
 }

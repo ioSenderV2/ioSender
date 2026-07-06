@@ -532,10 +532,10 @@ namespace GCode_Sender
         private void OnBooted()
         {
             isBooted = true;
-            string filename = CNC.Core.Resources.Path + "KeyMap0.xml";
 
-            if (System.IO.File.Exists(filename))
-                model.Keyboard.LoadMappings(filename);
+            // Key mappings now live in the App.config "KeyMap" section (loaded at config-load); apply them now
+            // that the handlers are registered.
+            model.Keyboard.LoadMappings();
 
             if (GrblInfo.NumAxes > 3)
                 GCode.File.AddTransformer(typeof(GCodeWrapViewModel), "Wrap to rotary (WIP)", MainWindow.UIViewModel.TransformMenuItems);

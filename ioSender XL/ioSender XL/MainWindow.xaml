@@ -42,6 +42,7 @@
                 <MenuItem x:Uid="mnu_close" x:Name="menuCloseFile" Header="_Close" IsEnabled="false" Click="fileCloseMenuItem_Click"/>
                 <MenuItem x:Uid="mnu_transform" x:Name="menuTransform" Header="_Transform" IsEnabled="false" ItemsSource="{Binding Path=UIViewModel.TransformMenuItems, RelativeSource={RelativeSource AncestorType=Window}}"/>
                 <MenuItem x:Uid="mnu_openConsole" x:Name="menuOpenConsole" Header="_Open Console" Click="openConsoleMenuItem_Click"/>
+                <MenuItem x:Uid="mnu_openConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
                 <MenuItem x:Uid="mnu_exit" Header="_Exit" Click="exitMenuItem_Click"/>
             </MenuItem>
             <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">

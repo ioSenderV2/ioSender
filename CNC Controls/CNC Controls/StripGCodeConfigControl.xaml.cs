@@ -44,11 +44,25 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for StripGCodeConfigControl.xaml
     /// </summary>
-    public partial class StripGCodeConfigControl : UserControl
+    public partial class StripGCodeConfigControl : UserControl, ISettingsResettable
     {
         public StripGCodeConfigControl()
         {
             InitializeComponent();
+        }
+
+        // Reset the command-stripping choices this panel owns to their factory defaults.
+        public void ResetToDefaults()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg == null)
+                return;
+
+            var d = AppConfig.GetFactoryDefaults();
+            cfg.IgnoreM6 = d.IgnoreM6;
+            cfg.IgnoreM7 = d.IgnoreM7;
+            cfg.IgnoreM8 = d.IgnoreM8;
+            cfg.IgnoreG61G64 = d.IgnoreG61G64;
         }
     }
 }

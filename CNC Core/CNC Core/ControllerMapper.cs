@@ -101,10 +101,21 @@ namespace CNC.Core
                 map[button] = action;
         }
 
-        // ---- persistence (ControllerMap.xml alongside the KeyMap files) -------------------------
+        // ---- persistence ------------------------------------------------------------------------
+        //
+        // The controller map is stored as the "Controller" section of App.config (folded in from the old
+        // standalone ControllerMap.xml). CNC.Core can't reference the config store in CNC.Controls, so the wiring
+        // is a small static hand-off: AppConfig sets PersistHook (to save App.config) and keeps SectionConfig in
+        // sync with the section's payload. When PersistHook is null (e.g. tools that don't load AppConfig) the
+        // code falls back to the legacy ControllerMap.xml file.
 
         private bool mapLoaded = false;
         private static string MapPath { get { return Resources.ConfigPath + "ControllerMap.xml"; } }
+
+        // App.config "Controller" section payload (get/set by the ConfigStore section) + the save hook.
+        public static ControllerMapFile SectionConfig;
+        public static System.Action PersistHook;
+        private static bool UseSection { get { return PersistHook != null; } }
 
         /// <summary>Load the saved map once (config path isn't available when the mapper is constructed).</summary>
         public void EnsureLoaded()
@@ -115,9 +126,53 @@ namespace CNC.Core
             LoadMap();
         }
 
+        // Apply a saved map onto the live state. Only called when there IS a saved map, so an absent map leaves
+        // the constructor's defaults in place.
+        private void Apply(ControllerMapFile file)
+        {
+            if (file == null)
+                return;
+
+            map.Clear();
+            if (file.Buttons != null)
+                foreach (var e in file.Buttons)
+                    if (e.Action != ControllerAction.None)
+                        map[e.Button] = e.Action;
+
+            AnalogJogEnabled = file.AnalogJogEnabled;
+            FeedScale = file.FeedScale;
+            DeadzonePercent = file.DeadzonePercent;
+            InvertX = file.InvertX;
+            InvertY = file.InvertY;
+            InvertZ = file.InvertZ;
+        }
+
+        // Snapshot the live state (for the section serializer / SaveMap).
+        public ControllerMapFile Export()
+        {
+            return new ControllerMapFile
+            {
+                Buttons = map.Select(kv => new ControllerMapEntry { Button = kv.Key, Action = kv.Value }).ToList(),
+                AnalogJogEnabled = AnalogJogEnabled,
+                FeedScale = FeedScale,
+                DeadzonePercent = DeadzonePercent,
+                InvertX = InvertX,
+                InvertY = InvertY,
+                InvertZ = InvertZ
+            };
+        }
+
         public bool LoadMap()
         {
             mapLoaded = true;
+
+            if (UseSection)
+            {
+                if (SectionConfig == null)
+                    return false;   // no saved map - keep defaults
+                Apply(SectionConfig);
+                return true;
+            }
 
             try
             {
@@ -126,21 +181,7 @@ namespace CNC.Core
 
                 var xs = new XmlSerializer(typeof(ControllerMapFile));
                 using (var reader = new StreamReader(MapPath))
-                {
-                    var file = (ControllerMapFile)xs.Deserialize(reader);
-                    map.Clear();
-                    if (file.Buttons != null)
-                        foreach (var e in file.Buttons)
-                            if (e.Action != ControllerAction.None)
-                                map[e.Button] = e.Action;
-
-                    AnalogJogEnabled = file.AnalogJogEnabled;
-                    FeedScale = file.FeedScale;
-                    DeadzonePercent = file.DeadzonePercent;
-                    InvertX = file.InvertX;
-                    InvertY = file.InvertY;
-                    InvertZ = file.InvertZ;
-                }
+                    Apply((ControllerMapFile)xs.Deserialize(reader));
                 return true;
             }
             catch
@@ -151,26 +192,40 @@ namespace CNC.Core
 
         public bool SaveMap()
         {
+            if (UseSection)
+            {
+                SectionConfig = Export();
+                PersistHook();
+                return true;
+            }
+
             try
             {
-                var file = new ControllerMapFile
-                {
-                    Buttons = map.Select(kv => new ControllerMapEntry { Button = kv.Key, Action = kv.Value }).ToList(),
-                    AnalogJogEnabled = AnalogJogEnabled,
-                    FeedScale = FeedScale,
-                    DeadzonePercent = DeadzonePercent,
-                    InvertX = InvertX,
-                    InvertY = InvertY,
-                    InvertZ = InvertZ
-                };
                 var xs = new XmlSerializer(typeof(ControllerMapFile));
                 using (var fs = new FileStream(MapPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    xs.Serialize(fs, file);
+                    xs.Serialize(fs, Export());
                 return true;
             }
             catch
             {
                 return false;
+            }
+        }
+
+        // One-time importer for the "Controller" section: read the legacy ControllerMap.xml if present.
+        public static ControllerMapFile ReadLegacyFile()
+        {
+            try
+            {
+                if (!File.Exists(MapPath))
+                    return null;
+                var xs = new XmlSerializer(typeof(ControllerMapFile));
+                using (var reader = new StreamReader(MapPath))
+                    return (ControllerMapFile)xs.Deserialize(reader);
+            }
+            catch
+            {
+                return null;
             }
         }
 

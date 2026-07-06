@@ -50,7 +50,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class GrblConfigControl : UserControl, IGrblConfigTab
+    public partial class GrblConfigControl : UserControl, IGrblConfigTab, ISettingsResettable
     {
         private bool active = false;
         private Widget curSetting = null;
@@ -86,15 +86,6 @@ namespace CNC.Controls
             }
 
             UpdateValidation();
-            UpdateGrblSaveButton();
-        }
-
-        // Hide the manual Save button when grbl-settings autosave is on (it saves on leave), mirroring how the
-        // App-settings Save button hides when app autosave is on.
-        private void UpdateGrblSaveButton()
-        {
-            bool autoSave = AppConfig.Settings.Base != null && AppConfig.Settings.Base.AutoSaveGrblSettings;
-            btnSave.Visibility = autoSave ? Visibility.Collapsed : Visibility.Visible;
         }
 
         #region Methods required by GrblConfigTab interface
@@ -105,9 +96,7 @@ namespace CNC.Controls
         {
             if (model != null)
             {
-                btnSave.IsEnabled = !model.IsCheckMode;
                 model.Message = string.Empty;
-                UpdateGrblSaveButton();
 
                 if (activate)
                 {
@@ -153,7 +142,8 @@ namespace CNC.Controls
 
         #region UIEvents
 
-        void btnSave_Click(object sender, RoutedEventArgs e)
+        // Save changed $ settings to the controller. Public: invoked by the shared Settings footer.
+        public void SaveSettings()
         {
             if (curSetting != null)
                 curSetting.Assign();
@@ -163,7 +153,8 @@ namespace CNC.Controls
             GrblSettings.Save();
         }
 
-        void btnReload_Click(object sender, RoutedEventArgs e)
+        // Reload $ settings from the controller (discards unsaved editor edits). Public: shared footer.
+        public void ReloadSettings()
         {
             using(new UIUtils.WaitCursor()) {
                 GrblSettings.ClearPendingEdits();    // Reload discards unsaved editor edits
@@ -173,18 +164,44 @@ namespace CNC.Controls
             }
         }
 
-        void btnBackup_Click(object sender, RoutedEventArgs e)
+        // Back up settings + work offsets to files in the sender folder. Public: shared footer.
+        public void BackupSettings()
         {
             if(GrblSettings.Backup(string.Format("{0}settings.txt", Core.Resources.ConfigPath)))
                 model.Message = string.Format((string)FindResource("SettingsWritten"), "settings.txt");
             GrblWorkParameters.Backup(string.Format("{0}offsets.nc", Core.Resources.ConfigPath));
         }
 
+        // Restore controller $ settings to firmware defaults ($RST=$), then reload. Public: shared footer's
+        // "Reset to Default" on the Grbl tab (ISettingsResettable). These are hardware writes, so confirm first.
+        public void ResetToDefaults()
+        {
+            if (model == null)
+                return;
+
+            if (MessageBox.Show((string)FindResource("ResetGrblDefaults"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation, MessageBoxResult.No) != MessageBoxResult.Yes)
+                return;
+
+            using (new UIUtils.WaitCursor())
+            {
+                GrblSettings.ClearPendingEdits();
+                Comms.com.WriteCommand("$RST=$");
+                Thread.Sleep(250);          // let the controller apply the restore before re-reading
+                GrblSettings.Load();
+                if (curSetting != null)
+                    ShowSetting(curSetting.Setting, false);
+            }
+        }
+
         // Mirror the current settings into the bundled simulator's "My Machine" EEPROM (same action as the
         // Machine Setup Wizard), so a later simulator connection boots with this machine's configuration.
-        // Runs off the UI thread - it briefly drives a headless simulator instance.
-        private async void CopyToSim_Click(object sender, RoutedEventArgs e)
+        // Runs off the UI thread - it briefly drives a headless simulator instance. Public: shared footer.
+        private bool _copyingToSim = false;
+        public async void CopyToSimulator()
         {
+            if (_copyingToSim)
+                return;
+
             var cmds = GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
             if (cmds.Count == 0)
             {
@@ -192,11 +209,11 @@ namespace CNC.Controls
                 return;
             }
 
-            btnCopyToSim.IsEnabled = false;
+            _copyingToSim = true;
             model.Message = "Copying settings to the simulator...";
             string err = null;
             bool ok = await Task.Run(() => SimulatorManager.BuildMyMachineEeprom(cmds, out err));
-            btnCopyToSim.IsEnabled = true;
+            _copyingToSim = false;
             model.Message = ok ? "Copied settings to the simulator (My Machine)." : ("Copy to simulator failed - " + err);
         }
 
@@ -394,7 +411,8 @@ namespace CNC.Controls
                 retval = data;
         }
 
-        private void btnRestore_Click(object sender, RoutedEventArgs e)
+        // Restore settings from a chosen restore point / backup file. Public: shared footer.
+        public void RestoreSettings()
         {
             // Pick a restore point (auto-snapshot written on each Save), newest first; the dialog's
             // Browse... button falls back to choosing an arbitrary backup file.

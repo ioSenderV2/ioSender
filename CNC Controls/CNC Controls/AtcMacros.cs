@@ -351,13 +351,16 @@ namespace CNC.Controls
                 if (body == null)
                     return;
 
+                // Seed the embedded body only when the file is ABSENT. The Start Job tab regenerates this file
+                // (its pcorner-based program) via WriteStartJobMacro, so do NOT self-heal to the embedded copy on
+                // change - that would clobber the operator's generated Start Job on the next connect.
                 string path = Path.Combine(CNC.Core.Resources.ConfigPath ?? "./", "start_job.macro");
                 try
                 {
-                    if (!File.Exists(path) || File.ReadAllText(path) != body)
+                    if (!File.Exists(path))
                         File.WriteAllText(path, body);
                 }
-                catch { /* best effort - the macro still works once the file exists / is created via View */ }
+                catch { /* best effort - the macro still works once the file exists / is created via the tab */ }
 
                 if (macros.Any(m => string.Equals(m.Name, "Start Job", StringComparison.OrdinalIgnoreCase)))
                     return;   // already seeded or user-created - leave the entry (and its F-key) alone
@@ -371,28 +374,12 @@ namespace CNC.Controls
                     Name = "Start Job",
                     Code = "@start_job.macro",
                     ConfirmOnExecute = true,
-                    FKey = FirstFreeFKey(macros)
+                    FKey = 0                 // no default F-key - Start Job is driven from its tab, not a hotkey
                 });
 
                 AppConfig.Settings.Save();
             }
             catch { /* never break the connect flow */ }
-        }
-
-        // First function key (1-12) not already bound to a macro; 0 if all are taken.
-        // Mirrors MacroManagerDialog.FirstFreeFKey.
-        static int FirstFreeFKey(System.Collections.Generic.IEnumerable<CNC.GCode.Macro> macros)
-        {
-            var used = new HashSet<int>();
-            foreach (var m in macros)
-                if (m.FKey >= 1 && m.FKey <= 12)
-                    used.Add(m.FKey);
-
-            for (int i = 1; i <= 12; i++)
-                if (!used.Contains(i))
-                    return i;
-
-            return 0;
         }
 
         // Stream <content> to the controller as <name> on the target (littlefs) filesystem via YModem. First

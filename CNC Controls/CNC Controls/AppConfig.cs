@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Xml.Linq;
 using System.Xml.Serialization;
 using System.Windows;
@@ -306,6 +307,9 @@ namespace CNC.Controls
         public bool ConsoleShowRTAll { get; set; } = false;
         public bool ConsoleWindowOpen { get; set; } = false;
         public string ConsoleShortcut { get; set; } = "Esc";
+        // Point size for the console scrollback + command prompt. Notifies so the console updates live.
+        private double _consoleFontSize = 10d;
+        public double ConsoleFontSize { get { return _consoleFontSize; } set { if (_consoleFontSize != value) { _consoleFontSize = Math.Max(6d, Math.Min(32d, value)); OnPropertyChanged(); } } }
         // Last machine picked in the Machine Setup Wizard ("Manufacturer|Product|Model"), restored next run.
         public string LastMachine { get; set; } = string.Empty;
         public double ConsoleWindowLeft { get; set; } = double.NaN;
@@ -376,6 +380,11 @@ namespace CNC.Controls
         // saved layout/tab-order won't include it and would filter it out. Injected once on load (then the
         // user can hide it like any tab). See AppConfig load.
         public bool HeightMapTabMigrated { get; set; } = false;
+
+        // One-shot: Load Stock was renamed "Start Job" and made the first tab (before Job). An existing saved
+        // layout/tab-order pins its old position, so move it to the front once on load (the user can reorder
+        // afterwards like any tab). See AppConfig load.
+        public bool StartJobTabFirstMigrated { get; set; } = false;
 
         // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)
         public List<string> PinnedFlyouts { get; set; } = new List<string>();
@@ -452,6 +461,34 @@ namespace CNC.Controls
             ConfigStore.Register(new XmlObjectSection<GCodeViewerConfig>("GCodeViewer", () => Base.GCodeViewer, v => Base.GCodeViewer = v));
             ConfigStore.Register(new XmlObjectSection<ProbeConfig>("Probing", () => Base.Probing, v => Base.Probing = v));
 
+            // Feature data formerly kept in standalone .xml files next to App.config, folded in as sections via
+            // RegisterFolded (registers the section + one-time legacy importer + tracks the file for deletion after
+            // the migrated save). See DeleteFoldedInFiles / ConfigStore for the mechanism.
+            RegisterFolded<ProbeDefinitionList>("Probes",
+                () => ProbeDefinitions.Export(), v => ProbeDefinitions.SetItems(v), "ProbeDefinitions.xml");
+
+            // Game-controller button map (was ControllerMap.xml). CNC.Core can't see the config store, so it keeps
+            // ControllerMapper.SectionConfig in sync and calls PersistHook to save; we wire that hook here.
+            RegisterFolded<ControllerMapFile>("Controller",
+                () => ControllerMapper.SectionConfig, v => ControllerMapper.SectionConfig = v, "ControllerMap.xml");
+            ControllerMapper.PersistHook = () => Save();
+
+            // Keyboard key mappings (was KeyMap0.xml) - legacy file uses a custom XML root, so a custom importer.
+            RegisterFolded<List<KeypressHandler.KeypressHandlerFn>>("KeyMap",
+                () => KeypressHandler.SectionConfig, v => KeypressHandler.SectionConfig = v, "KeyMap0.xml", () => KeypressHandler.ReadLegacyFile());
+            KeypressHandler.PersistHook = () => Save();
+
+            // Tool/wizard parameter blobs (were their own .xml files). These live in CNC.Controls so they save
+            // via AppConfig directly; each keeps a static holder the section reads.
+            RegisterFolded<SurfaceParams>("SurfaceSpoilboard",
+                () => SurfaceSpoilboardWizard.SectionConfig, v => SurfaceSpoilboardWizard.SectionConfig = v, "SurfaceSpoilboard.xml");
+            RegisterFolded<AutoSquareParams>("AutoSquare",
+                () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
+            RegisterFolded<ScratchParams>("StepperCalScratch",
+                () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
+            RegisterFolded<LoadStockSettings>("LoadStock",
+                () => LoadStockConfig.Section, v => LoadStockConfig.Section = v, "LoadStock.xml");
+
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
             layoutSection = new LayoutSection(() => LayoutMigration.FromFlat(Base?.Tabs));
@@ -461,6 +498,51 @@ namespace CNC.Controls
         // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).
         private LayoutSection layoutSection;
         public LayoutNode Layout { get { return layoutSection?.Root; } }
+
+        // Standalone config files now folded into App.config as sections (populated below via RegisterFolded).
+        // After a migrated load persists the merged config, these redundant files are deleted so only App.config
+        // remains. Kept in registration order.
+        private static readonly List<string> FoldedInFiles = new List<string>();
+
+        // Register a section backed by a serializable DTO T, folded in from a legacy standalone file: get/set
+        // expose the feature's holder for T, legacyFileName is the old file (imported once when the section is
+        // absent, then deleted). A feature with a non-default XML root passes its own importer. This is the shared
+        // "save/restore a config fragment" plumbing - each feature supplies only its DTO and how to read/write it.
+        private void RegisterFolded<T>(string key, Func<T> get, Action<T> set, string legacyFileName, Func<T> importer = null) where T : class
+        {
+            ConfigStore.Register(new XmlObjectSection<T>(key, get, set, null, importer ?? (() => ReadLegacyXml<T>(legacyFileName))));
+            if (!FoldedInFiles.Contains(legacyFileName))
+                FoldedInFiles.Add(legacyFileName);
+        }
+
+        // Generic one-time importer: deserialize a legacy standalone XML file (default serializer / root) into T.
+        private static T ReadLegacyXml<T>(string fileName) where T : class
+        {
+            try
+            {
+                string path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, fileName);
+                if (!File.Exists(path))
+                    return null;
+                var xs = new XmlSerializer(typeof(T));
+                using (var fs = File.OpenRead(path))
+                    return (T)xs.Deserialize(fs);
+            }
+            catch { return null; }
+        }
+
+        private static void DeleteFoldedInFiles()
+        {
+            foreach (var name in FoldedInFiles)
+            {
+                try
+                {
+                    string p = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, name);
+                    if (File.Exists(p))
+                        File.Delete(p);
+                }
+                catch { /* best-effort; a leftover file is harmless (the section supersedes it) */ }
+            }
+        }
 
         private AppConfig()
         {
@@ -703,6 +785,142 @@ namespace CNC.Controls
             return status == 0 ? OpenConnection(appname, model, dispatcher) : status;
         }
 
+        // Name of the read-only factory-default template shipped next to the exe (app folder).
+        public const string DefaultTemplateName = "Default-App.config";
+
+        // The factory-default Config, read once from the read-only Default-App.config template in the app folder
+        // (Resources.Path). The settings panels' "Reset to Default" reads its values from here, so the shipped
+        // template defines the defaults. Falls back to code defaults (new Config()) if it's missing/unreadable.
+        private static Config _factoryDefaults;
+        public static Config GetFactoryDefaults()
+        {
+            if (_factoryDefaults != null)
+                return _factoryDefaults;
+
+            Config tpl = null;
+            try
+            {
+                string dir = string.IsNullOrEmpty(CNC.Core.Resources.Path) ? AppDomain.CurrentDomain.BaseDirectory : CNC.Core.Resources.Path;
+                string path = Path.Combine(dir, DefaultTemplateName);
+
+                if (File.Exists(path))
+                {
+                    var doc = XDocument.Load(path);
+                    if (ConfigStore.IsLegacy(doc))
+                    {
+                        using (var r = doc.Root.CreateReader())
+                            tpl = (Config)legacySerializer.Deserialize(r);
+                    }
+                    else
+                    {
+                        // v2 sectioned: Core carries the scalar Config props; Jog / JogUiMetric are their own sections.
+                        tpl = (Config)DeserializeSection(doc, "Core", coreSerializer) ?? new Config();
+                        if (DeserializeSection(doc, "Jog", new XmlSerializer(typeof(JogConfig))) is JogConfig jog)
+                            tpl.Jog = jog;
+                        if (DeserializeSection(doc, "JogUiMetric", new XmlSerializer(typeof(JogUIConfig))) is JogUIConfig jum)
+                            tpl.JogUiMetric = jum;
+                    }
+                }
+            }
+            catch { tpl = null; }
+
+            _factoryDefaults = tpl ?? new Config();
+            return _factoryDefaults;
+        }
+
+        // Deserialize one <section key="..."> payload from a v2 config document.
+        private static object DeserializeSection(XDocument doc, string key, XmlSerializer ser)
+        {
+            try
+            {
+                var payload = doc.Root.Elements("section")
+                                      .FirstOrDefault(sec => (string)sec.Attribute("key") == key)
+                                     ?.Elements().FirstOrDefault();
+                if (payload == null)
+                    return null;
+                using (var r = payload.CreateReader())
+                    return ser.Deserialize(r);
+            }
+            catch { return null; }
+        }
+
+        // The per-user config directory (%AppData%\ioSender\). Created on first use; on the first run after this
+        // relocation (no App.config there yet) the app folder's existing user files are migrated in (moved) so
+        // nothing is lost, or seeded from the template on a fresh install. Falls back to the app folder if AppData
+        // can't be resolved/created.
+        private static string ResolveUserConfigDir()
+        {
+            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            try
+            {
+                string userDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ioSender");
+                Directory.CreateDirectory(userDir);
+                if (!userDir.EndsWith("\\"))
+                    userDir += "\\";
+
+                if (!File.Exists(Path.Combine(userDir, "App.config")))
+                    SeedUserConfigDir(appDir, userDir);
+
+                return userDir;
+            }
+            catch
+            {
+                return appDir;   // AppData unavailable - keep the legacy app-folder behaviour
+            }
+        }
+
+        // First-run migration: MOVE the user-written files that exist in the app folder into the per-user folder,
+        // so upgrading keeps the current settings/keymaps/probe defs/backups AND leaves the app folder holding
+        // only the read-only Default-App.config template (no stale App.config to later override the defaults).
+        // If there was no existing App.config to migrate (fresh install), seed it by COPYING the template.
+        // Best-effort: any move/copy failure is skipped, never fatal.
+        private static void SeedUserConfigDir(string appDir, string userDir)
+        {
+            try
+            {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "App.config", "App.config.bak", "KeyMap0.xml", "ControllerMap.xml",
+                    "settings.txt", "offsets.nc", "ProbeDefinitions.xml",
+                    "LoadStock.xml", "AutoSquare.xml", "StepperCalScratch.xml", "SurfaceSpoilboard.xml"
+                };
+                try
+                {
+                    foreach (var f in Directory.GetFiles(appDir, "*Profiles.xml")) names.Add(Path.GetFileName(f));
+                    foreach (var f in Directory.GetFiles(appDir, "*.macro")) names.Add(Path.GetFileName(f));
+                }
+                catch { /* directory listing best-effort */ }
+
+                foreach (var name in names)
+                {
+                    string src = Path.Combine(appDir, name), dst = Path.Combine(userDir, name);
+                    if (File.Exists(src) && !File.Exists(dst))
+                        try { File.Move(src, dst); } catch { }
+                }
+
+                // grbl settings restore points (a subfolder): move each file across.
+                string sbSrc = Path.Combine(appDir, "settings-backups"), sbDst = Path.Combine(userDir, "settings-backups");
+                if (Directory.Exists(sbSrc))
+                {
+                    try { Directory.CreateDirectory(sbDst); } catch { }
+                    foreach (var f in Directory.GetFiles(sbSrc))
+                    {
+                        string dst = Path.Combine(sbDst, Path.GetFileName(f));
+                        if (!File.Exists(dst))
+                            try { File.Move(f, dst); } catch { }
+                    }
+                }
+
+                // Fresh install (no existing App.config was migrated): seed the per-user App.config by copying the
+                // shipped read-only template so first-run starts from the curated defaults.
+                string userCfg = Path.Combine(userDir, "App.config");
+                string template = Path.Combine(appDir, DefaultTemplateName);
+                if (!File.Exists(userCfg) && File.Exists(template))
+                    try { File.Copy(template, userCfg); } catch { }
+            }
+            catch { /* migration is best-effort; a missing file just re-initialises to defaults */ }
+        }
+
         // Parse command-line args and load the config file (populates Base). Must run BEFORE any
         // control Loaded handlers that read AppConfig.Settings.Base (e.g. JogControl), so call it
         // synchronously at construction. Returns 1 on config error (caller should exit), else 0.
@@ -713,7 +931,12 @@ namespace CNC.Controls
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
 
-            CNC.Core.Resources.Path = CNC.Core.Resources.ConfigPath = AppDomain.CurrentDomain.BaseDirectory;
+            // Read-only shipped resources (CSVs, images, the App.config template) are read from the app folder;
+            // all user-written state lives in a per-user folder (%AppData%\ioSender), seeded from the app folder
+            // on first run so an existing install's settings/keymaps/backups carry over. A -configpath arg below
+            // still overrides ConfigPath (portable use).
+            CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
+            CNC.Core.Resources.ConfigPath = ResolveUserConfigDir();
 
             string[] args = Environment.GetCommandLineArgs();
 
@@ -837,6 +1060,39 @@ namespace CNC.Controls
                 _migratedFormat = true;   // persist the injected layout/flag via the save below
             }
 
+            // One-shot: move Load Stock (now "Start Job") to the front of the tab order for existing saved
+            // layouts that pin its old position. Mirrors the HeightMap injection above - guarded by a flag so a
+            // later manual reorder is respected.
+            if (!Base.StartJobTabFirstMigrated)
+            {
+                Base.StartJobTabFirstMigrated = true;
+
+                var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
+                if (tabsSlot != null)
+                {
+                    int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.LoadStock);
+                    if (idx > 0)
+                    {
+                        var node = tabsSlot.Items[idx];
+                        tabsSlot.Items.RemoveAt(idx);
+                        tabsSlot.Items.Insert(0, node);
+                    }
+                }
+                if (Base.Tabs.Count > 0)
+                {
+                    Base.Tabs.Remove(LayoutKeys.LoadStock);
+                    Base.Tabs.Insert(0, LayoutKeys.LoadStock);
+                }
+
+                // Also drop the F-key from an already-seeded "Start Job" macro: it used to auto-bind the first
+                // free F-key (F1); Start Job is driven from its tab now, so clear the default assignment once.
+                var startJob = Base.Macros?.FirstOrDefault(m => string.Equals(m.Name, "Start Job", StringComparison.OrdinalIgnoreCase));
+                if (startJob != null)
+                    startJob.FKey = 0;
+
+                _migratedFormat = true;   // persist the reordered layout/flag via the save below
+            }
+
             // Keep the layout tree's top-level tab order in sync with the legacy Config.Tabs (still the
             // editor's source until the layout editor edits the tree). Transitional - tree drives the build.
             if (layoutSection != null)
@@ -849,6 +1105,7 @@ namespace CNC.Controls
             {
                 Save(CNC.Core.Resources.IniFile);
                 _migratedFormat = false;
+                DeleteFoldedInFiles();   // their data is now in App.config; drop the redundant standalone files
             }
 
             _startupPort = port;

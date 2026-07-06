@@ -170,10 +170,10 @@ namespace CNC.Controls
             if (!MainPanelRegistry.LayoutEnabled)
                 tabConfig.Items.Remove(tabMainPage);
 
-            UpdateSaveButtonVisibility();
+            UpdateFooterForTab(tabConfig.SelectedItem as TabItem);
             AppConfig.Settings.Base.PropertyChanged += (s, e) => {
-                if (e.PropertyName == nameof(Config.AutoSaveSettings))
-                    UpdateSaveButtonVisibility();
+                if (e.PropertyName == nameof(Config.AutoSaveSettings) || e.PropertyName == nameof(Config.AutoSaveGrblSettings))
+                    UpdateFooterForTab(tabConfig.SelectedItem as TabItem);
             };
         }
 
@@ -334,23 +334,89 @@ namespace CNC.Controls
 
         #region Footer (Save settings / Restart) + restart hooking
 
+        // One shared footer, its buttons shown per the active tab (see the applicability table): the Grbl tools
+        // sub-row only on Grbl; Save hidden when that tab's autosave is on; Reset to Default only where a panel
+        // opts in via ISettingsResettable.
         private void UpdateFooterForTab(TabItem tab)
         {
-            // The Grbl tab has its own Reload/Save/Backup/Restore; the shared footer is for the App-settings side.
-            footer.Visibility = tab == tabGrbl ? Visibility.Collapsed : Visibility.Visible;
+            if (tab == null)
+                return;
+
+            grblTools.Visibility = tab == tabGrbl ? Visibility.Visible : Visibility.Collapsed;
+            btnSave.Visibility = SaveApplies(tab) ? Visibility.Visible : Visibility.Collapsed;
+            btnReset.Visibility = ResettablesFor(tab).Any() ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void UpdateSaveButtonVisibility()
+        // Save is offered unless the tab's autosave (which persists on leave) is on: grbl-settings autosave for the
+        // Grbl tab, app-settings autosave for everything else.
+        private bool SaveApplies(TabItem tab)
         {
-            btnSave.Visibility = AppConfig.Settings.Base != null && AppConfig.Settings.Base.AutoSaveSettings
-                ? Visibility.Collapsed : Visibility.Visible;
+            var cfg = AppConfig.Settings.Base;
+            if (cfg == null)
+                return true;
+            return tab == tabGrbl ? !cfg.AutoSaveGrblSettings : !cfg.AutoSaveSettings;
+        }
+
+        // The map from a config panel to the tab it lives on (parallels TargetPanel).
+        private TabItem TabFor(UserControl c)
+        {
+            if (c is BasicConfigControl)
+                return tabApp;
+            if (c is JogUiConfigControl || c is JogConfigControl)
+                return tabJogging;
+            if (c is StripGCodeConfigControl)
+                return tabGCode;
+
+            switch (c.GetType().FullName)
+            {
+                case "CNC.Controls.Viewer.ConfigControl":
+                    return tabGCode;
+                case "CNC.Controls.Camera.ConfigControl":
+                case "CNC.Controls.Probing.ConfigControl":
+                case "CNC.Controls.Lathe.ConfigControl":
+                    return tabApp;
+            }
+            return tabApp;
+        }
+
+        // The resettable panels/editors on a tab: the Grbl control itself ($RST=$), the visible app-config panels
+        // that opt in, or an editor tab that opts in (key bindings). Empty => the tab has no Reset button.
+        private IEnumerable<ISettingsResettable> ResettablesFor(TabItem tab)
+        {
+            if (tab == tabGrbl)
+                return new ISettingsResettable[] { basicConfig };
+
+            if (tab == tabApp || tab == tabJogging || tab == tabGCode)
+                return model == null ? Enumerable.Empty<ISettingsResettable>()
+                    : model.ConfigControls.Where(c => TabFor(c) == tab && c.Visibility == Visibility.Visible)
+                                          .OfType<ISettingsResettable>().ToList();
+
+            return tab.Content is ISettingsResettable r ? new[] { r } : Enumerable.Empty<ISettingsResettable>();
         }
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            if (AppConfig.Settings.Save())
+            var tab = tabConfig.SelectedItem as TabItem;
+            if (tab == tabGrbl)
+                basicConfig.SaveSettings();
+            else if (tab?.Content is ISettingsEditorTab editor)
+                editor.Commit();
+            else if (AppConfig.Settings.Save())
                 Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");
         }
+
+        private void btnReset_Click(object sender, RoutedEventArgs e)
+        {
+            var tab = tabConfig.SelectedItem as TabItem;
+            foreach (var r in ResettablesFor(tab).ToList())
+                r.ResetToDefaults();
+        }
+
+        // Grbl sub-footer tools -> the Grbl control's public methods.
+        private void btnReload_Click(object sender, RoutedEventArgs e) { basicConfig.ReloadSettings(); }
+        private void btnBackup_Click(object sender, RoutedEventArgs e) { basicConfig.BackupSettings(); }
+        private void btnRestore_Click(object sender, RoutedEventArgs e) { basicConfig.RestoreSettings(); }
+        private void btnCopyToSim_Click(object sender, RoutedEventArgs e) { basicConfig.CopyToSimulator(); }
 
         // Surface the Restart button (relaunch to apply) for a setting that only takes effect at startup.
         private void EnableRestart(string message)

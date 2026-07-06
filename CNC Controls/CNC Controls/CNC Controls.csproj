@@ -81,6 +81,8 @@
     <Compile Include="LayoutModel.cs" />
     <Compile Include="LayoutSection.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
+    <Compile Include="ConfigPanel.cs" />
+    <Compile Include="LoadStockConfig.cs" />
     <Compile Include="AtcMacros.cs" />
     <Compile Include="ArcsToLines.cs" />
     <Compile Include="BasicConfigControl.xaml.cs">

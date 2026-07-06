@@ -167,6 +167,13 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <!-- Read-only factory-default ioSender settings, shipped next to the exe. Source of "Reset to Default"
+         and the first-run seed for %AppData%\ioSender\App.config (see AppConfig.GetFactoryDefaults). -->
+    <Content Include="Default-App.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\CNC Controls Camera\CNC Controls Camera\CNC Controls Camera.csproj">
       <Project>{17a9ab9b-71eb-4b09-aebe-eebbd9cd2071}</Project>
       <Name>CNC Controls Camera</Name>

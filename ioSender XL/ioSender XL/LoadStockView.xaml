@@ -19,33 +19,15 @@
             </Grid.RowDefinitions>
 
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <GroupBox x:Uid="ls_grpSetup" Header="Probe and stock" Margin="0,0,8,0">
+                <GroupBox x:Uid="ls_grpSetup" Header="Start Job setup" Margin="0,0,8,0">
                     <StackPanel Margin="6">
-                        <StackPanel Orientation="Horizontal" Margin="0,2">
-                            <Label x:Uid="ls_lblProbe" Content="Probe:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxProbe" Width="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name"/>
-                        </StackPanel>
+                        <!-- Corner is always the front-left (TFL), like start_job.macro; the tip radius + feeds come
+                             straight from the configured 3D probe definition, so no probe/corner pickers. -->
+                        <cnccontrols:NumericField x:Name="fldWidth"  x:Uid="ls_width"  Label="Stock width (X):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <cnccontrols:NumericField x:Name="fldHeight" x:Uid="ls_height" Label="Stock height (Y):" ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"
+                                   Text="Actual stock size."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
-                            <Label x:Uid="ls_lblCorner" Content="Stock corner:" Width="90" HorizontalContentAlignment="Right" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <!-- laid out like the bed: back row on top, front row below -->
-                                <RadioButton x:Uid="ls_rbBL" x:Name="rbBL" Grid.Column="0" Grid.Row="0" Content="Back-left"   GroupName="corner" Margin="4,2"/>
-                                <RadioButton x:Uid="ls_rbBR" x:Name="rbBR" Grid.Column="1" Grid.Row="0" Content="Back-right"  GroupName="corner" Margin="4,2"/>
-                                <RadioButton x:Uid="ls_rbFL" x:Name="rbFL" Grid.Column="0" Grid.Row="1" Content="Front-left"  GroupName="corner" Margin="4,2" IsChecked="True"/>
-                                <RadioButton x:Uid="ls_rbFR" x:Name="rbFR" Grid.Column="1" Grid.Row="1" Content="Front-right" GroupName="corner" Margin="4,2"/>
-                            </Grid>
-                        </StackPanel>
-                        <cnccontrols:NumericField x:Name="fldWidth"  x:Uid="ls_width"  Label="Approx. width (X):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,6,0,2"/>
-                        <cnccontrols:NumericField x:Name="fldHeight" x:Uid="ls_height" Label="Approx. height (Y):" ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
                             <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxWcs" Width="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
                                 <ComboBoxItem Content="G54"/>
@@ -56,12 +38,13 @@
                                 <ComboBoxItem Content="G59"/>
                             </ComboBox>
                         </StackPanel>
-                        <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe far faces)" IsChecked="True" Margin="0,6,0,2" VerticalAlignment="Center"/>
+                        <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe all 4 corners)" IsChecked="False" Margin="0,6,0,2" VerticalAlignment="Center"
+                                  ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
                         <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
                                   IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
                                   ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
-                        <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference (Start Job)" IsChecked="False" Margin="0,2,0,2" VerticalAlignment="Center"
-                                  ToolTip="After corner 1 is probed, reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle). With Measure unchecked this makes Load Stock equivalent to start_job.macro - it sets the work origin AND the TLO reference. Requires ATC and a toolsetter at G59.3."/>
+                        <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference" IsChecked="True" Margin="0,2,0,2" VerticalAlignment="Center"
+                                  ToolTip="Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."/>
                     </StackPanel>
                 </GroupBox>
             </ScrollViewer>
@@ -69,7 +52,7 @@
             <!-- Warning + result + Generate/Run pinned at the bottom-left of the input column -->
             <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
-                           Text="No 3D probe or edge finder defined. Add one in Machine Setup Wizard &gt; Probe definitions - Load stock needs horizontal probing."/>
+                           Text="No 3D probe defined. Add one in Machine Setup Wizard &gt; Probe definitions - Start Job reads its tip radius and probing feeds."/>
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
@@ -77,6 +60,8 @@
                     <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" Width="90" MinHeight="26" Click="Generate_Click"/>
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" Width="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
+                    <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" Width="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
+                            ToolTip="After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."/>
                 </StackPanel>
             </StackPanel>
         </Grid>

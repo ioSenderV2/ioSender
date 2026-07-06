@@ -45,7 +45,7 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for BasicConfigControl.xaml
     /// </summary>
-    public partial class BasicConfigControl : UserControl, IRestartRequired
+    public partial class BasicConfigControl : UserControl, IRestartRequired, ISettingsResettable
     {
         public event EventHandler<RestartRequiredEventArgs> RestartRequired;
 
@@ -61,6 +61,39 @@ namespace CNC.Controls
                     if (e.PropertyName == nameof(Config.MaxBufferSize) || e.PropertyName == nameof(Config.ResetDelay))
                         RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply the buffer/reset-delay change."));
                 };
+        }
+
+        // Reset the Main-panel settings this control owns to their factory defaults (from a fresh Config).
+        public void ResetToDefaults()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg == null)
+                return;
+
+            var d = AppConfig.GetFactoryDefaults();
+            cfg.Theme = d.Theme;
+            cfg.ResetDelay = d.ResetDelay;
+            cfg.PollInterval = d.PollInterval;
+            cfg.MaxBufferSize = d.MaxBufferSize;
+            cfg.UseBuffering = d.UseBuffering;
+            cfg.KeepMdiFocus = d.KeepMdiFocus;
+            cfg.FilterOkResponse = d.FilterOkResponse;
+            cfg.AutoCompress = d.AutoCompress;
+            cfg.KeepWindowSize = d.KeepWindowSize;
+            cfg.SendComments = d.SendComments;
+            cfg.PreferNetwork = d.PreferNetwork;
+            cfg.AddLineNumbers = d.AddLineNumbers;
+            cfg.AutoSaveSettings = d.AutoSaveSettings;
+            cfg.PromptOnSave = d.PromptOnSave;
+            cfg.AutoSaveGrblSettings = d.AutoSaveGrblSettings;
+            cfg.PromptOnGrblSave = d.PromptOnGrblSave;
+            cfg.SafeGotoZ = d.SafeGotoZ;
+            cfg.RestoreFusionRapids = d.RestoreFusionRapids;
+
+            // Force the bound controls to re-read (covers any plain auto-properties that don't notify).
+            var dc = DataContext;
+            DataContext = null;
+            DataContext = dc;
         }
     }
 }

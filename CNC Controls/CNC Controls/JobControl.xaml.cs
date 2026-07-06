@@ -253,6 +253,7 @@ namespace CNC.Controls
                     keyboard.AddHandler(Key.H, ModifierKeys.Control, Home, parent);
                     keyboard.AddHandler(Key.U, ModifierKeys.Control, Unlock);
                     keyboard.AddHandler(Key.R, ModifierKeys.Shift | ModifierKeys.Control, Reset);
+                    keyboard.AddHandler(Key.None, ModifierKeys.None, ResetAndUnlock);   // unbound by default; assign in the Key Bindings editor
                     keyboard.AddHandler(Key.Space, ModifierKeys.None, FeedHold, parent);
                     keyboard.AddHandler(Key.F1, ModifierKeys.None, FnKeyHandler);
                     keyboard.AddHandler(Key.F2, ModifierKeys.None, FnKeyHandler);
@@ -522,6 +523,18 @@ namespace CNC.Controls
         private bool Reset(Key key)
         {
             Comms.com.WriteByte((byte)GrblConstants.CMD_RESET);
+            return true;
+        }
+
+        // Soft-reset, then clear the alarm ($X) once the controller has warm-restarted. One key for the common
+        // "get me out of alarm" recovery (the same intent as the status-bar Reset+Unlock). Bindable, unbound by
+        // default. The delay lets the controller finish its restart before $X, which it would otherwise drop.
+        private bool ResetAndUnlock(Key key)
+        {
+            Comms.com.WriteByte((byte)GrblConstants.CMD_RESET);
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
+            timer.Tick += (s, e) => { timer.Stop(); model.ExecuteCommand(GrblConstants.CMD_UNLOCK); };
+            timer.Start();
             return true;
         }
 

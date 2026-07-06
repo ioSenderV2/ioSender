@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="140" d:DesignWidth="310">
-    <GroupBox x:Uid="grp_gcodeStrip" Header="GCode command stripping" HorizontalAlignment="Left" VerticalAlignment="Top" Height="Auto" Width="310"
+    <GroupBox x:Uid="grp_gcodeStrip" Header="GCode command stripping" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310"
               ToolTip="Remove selected commands from programs as they are sent - for machines that lack the matching hardware (e.g. no tool changer or no coolant) so the controller doesn't error or stop on them.">
         <Grid Margin="50,0,0,0">
             <Grid.ColumnDefinitions>

@@ -82,12 +82,16 @@ namespace CNC.Controls
         private void btnSet_Click(object sender, RoutedEventArgs e)
         {
             var grbl = DataContext as GrblViewModel;
-            if (grbl == null)
+            if (grbl == null || Comms.com == null)
                 return;
 
+            // Write directly to the controller, like the Offsets tab (OffsetView) does. Going through
+            // ExecuteCommand -> MDI -> JobControl.SendCommand silently drops the command unless the streaming
+            // state machine happens to be in an idle-ish state (and it also runs it through ParseBlock) - which
+            // is why the flyout Set "quietly did nothing" while the Offsets tab worked.
             if (code == "G28" || code == "G30")
             {
-                grbl.ExecuteCommand(code + ".1");   // store the current machine position
+                Comms.com.WriteCommand(code + ".1");   // store the current machine position
                 return;
             }
 
@@ -101,7 +105,7 @@ namespace CNC.Controls
             for (int i = 0; i < GrblInfo.NumAxes; i++)
                 sb.Append(GrblInfo.AxisIndexToLetter(i) + grbl.MachinePosition.Values[i].ToInvariantString("F3"));
 
-            grbl.ExecuteCommand(sb.ToString());
+            Comms.com.WriteCommand(sb.ToString());
         }
 
         private void btn_Close(object sender, RoutedEventArgs e)

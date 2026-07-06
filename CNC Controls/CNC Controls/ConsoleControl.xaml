@@ -12,12 +12,37 @@
         <local:LogicalNotConverter x:Key="BooleanConverter" />
     </UserControl.Resources>
     <!--> <GroupBox Header="Console" HorizontalAlignment="Center" VerticalAlignment="Top" Width="394" Height="328"> <\!-->
-    <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+    <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" KeyDown="Console_KeyDown">
+        <!-- Find-in-log: the same Search box + n-of-m readout + up/down arrows as the Grbl settings tab,
+             here searching the console scrollback (selects/scrolls each match; Enter/F3 next, F4 previous). -->
+        <DockPanel DockPanel.Dock="Top" Margin="5,3,5,2" LastChildFill="False">
+            <TextBlock x:Uid="lbl_consoleSearch" Text="Search:" VerticalAlignment="Center" Margin="5,0,6,0"/>
+            <Border BorderBrush="#FFABADB3" BorderThickness="1" Background="White" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <TextBox x:Uid="fld_consoleSearch" x:Name="searchBox" Width="240" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
+                             TextChanged="searchBox_TextChanged" KeyDown="searchBox_KeyDown"
+                             ToolTip="Find text in the console log. Enter / F3 = next match, F4 = previous."/>
+                    <TextBlock x:Name="txtMatchCount" VerticalAlignment="Center" Margin="6,0,8,0" Foreground="#FF606060" MinWidth="56"/>
+                </StackPanel>
+            </Border>
+            <Button x:Uid="btn_consolePrev" x:Name="btnMatchPrev" Content="▲" MinWidth="26" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center" Click="btnMatchPrev_Click" IsEnabled="False" ToolTip="Previous match (F4)"/>
+            <Button x:Uid="btn_consoleNext" x:Name="btnMatchNext" Content="▼" MinWidth="26" Padding="4,1" Margin="2,0,0,0" VerticalAlignment="Center" Click="btnMatchNext_Click" IsEnabled="False" ToolTip="Next match (F3)"/>
+        </DockPanel>
         <DockPanel DockPanel.Dock="Top" HorizontalAlignment="Stretch" Margin="0,0,0,5">
-            <CheckBox x:Uid="lbl_verbose" Content="Verbose" IsChecked="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
-            <CheckBox x:Uid="lbl_filterRT" Content="Filter out realtime responses" IsChecked="{Binding Path=ResponseLogFilterRT}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
-            <CheckBox x:Uid="lbl_showAll" Content="Show all realtime responses" IsChecked="{Binding Path=ResponseLogShowRTAll}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
-            <Button x:Uid="btn_clear" Content="Clear" HorizontalAlignment="Right" Margin="0,5,5,0" VerticalAlignment="Top" Height="22" Width="75" Click="btn_Clear"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,5,5,0">
+                <!-- Console text size: adjusts (and persists) Config.ConsoleFontSize, which the scrollback binds to. -->
+                <TextBlock x:Uid="lbl_consoleFont" Text="Font" VerticalAlignment="Center" Foreground="#FF606060" Margin="0,0,4,0"/>
+                <RepeatButton x:Uid="btn_fontSmaller" Content="A−" MinWidth="26" MinHeight="23" Padding="4,1" Click="FontSmaller_Click" ToolTip="Smaller console text"/>
+                <TextBlock VerticalAlignment="Center" MinWidth="20" TextAlignment="Center" Margin="3,0"
+                           Text="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize, StringFormat={}{0:0}}"/>
+                <RepeatButton x:Uid="btn_fontLarger" Content="A+" MinWidth="26" MinHeight="23" Padding="4,1" Margin="0,0,8,0" Click="FontLarger_Click" ToolTip="Larger console text"/>
+                <Button x:Uid="btn_clear" Content="Clear" VerticalAlignment="Top" MinHeight="23" MinWidth="60" Padding="6,1" Click="btn_Clear"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <CheckBox x:Uid="lbl_verbose" Content="Verbose" IsChecked="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
+                <CheckBox x:Uid="lbl_filterRT" Content="Filter out realtime responses" IsChecked="{Binding Path=ResponseLogFilterRT}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
+                <CheckBox x:Uid="lbl_showAll" Content="Show all realtime responses" IsChecked="{Binding Path=ResponseLogShowRTAll}" IsEnabled="{Binding Path=ResponseLogVerbose}" Click="consoleOption_Click" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top"/>
+            </StackPanel>
         </DockPanel>
         <!-- Inline terminal-style command prompt. Shares the MDI plumbing: Enter routes through
              MDICommand (which echoes the command into ResponseLog above), Up/Down recall the
@@ -36,7 +61,8 @@
                      ToolTip="Enter a command (MDI). Paste multiple lines to send them all on Enter. Up/Down recalls history, Esc clears."/>
         </DockPanel>
         <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-                 local:TextBoxUtilities.AlwaysScrollToEnd="True" FontSize="10" FontFamily="Verdana"
+                 local:TextBoxUtilities.AlwaysScrollToEnd="True" IsInactiveSelectionHighlightEnabled="True"
+                 FontSize="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize}" FontFamily="Verdana"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                  ScrollViewer.HorizontalScrollBarVisibility="Visible"
                  ToolTip="Right-click for Clear all / Clear up to here / Save. The log keeps every line until cleared (in memory only - not written to disk)."

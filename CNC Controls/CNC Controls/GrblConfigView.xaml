@@ -9,20 +9,36 @@
              d:DesignHeight="515" d:DesignWidth="900"
              Loaded="UserControl_Loaded">
     <UserControl.Resources>
+        <!-- MinHeight/MinWidth (not fixed Height/MaxWidth) so the buttons grow with the text at higher DPI /
+             text scaling instead of clipping (see the footer). -->
         <Style x:Key="ConfigButtonStyle" TargetType="Button">
             <Setter Property="MinWidth" Value="90" />
-            <Setter Property="MaxWidth" Value="150" />
-            <Setter Property="Height" Value="22" />
-            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="MinHeight" Value="23" />
+            <Setter Property="Padding" Value="8,2" />
             <Setter Property="VerticalAlignment" Value="Top" />
         </Style>
     </UserControl.Resources>
     <DockPanel>
-        <!-- Shared footer for the App-settings side (hidden on the Grbl tab, which has its own Save/Reload).
-             Save settings shows only when app-config autosave is off; Restart appears when a restart-only change fires. -->
-        <StackPanel x:Name="footer" DockPanel.Dock="Bottom" Orientation="Horizontal" Visibility="Collapsed">
-            <Button x:Uid="btn_saveSettings" x:Name="btnSave" Content="Save settings" Margin="5" Padding="5,0" Click="btnSave_Click" Style="{StaticResource ConfigButtonStyle}"/>
-            <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Width="90" Margin="5" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply changes that only take effect at startup. Enabled once such a change is made."/>
+        <!-- One shared footer for the whole Settings area. Right group = Save settings (hidden when the relevant
+             autosave is on) + Restart (shown when a restart-only change fires). Left group = Reset to Default
+             (shown on tabs whose panels opt in via ISettingsResettable). The Grbl sub-footer (Reload/Backup/
+             Restore/Copy to simulator) shows only on the Grbl tab. Per-tab visibility is set in UpdateFooterForTab. -->
+        <StackPanel x:Name="footer" DockPanel.Dock="Bottom" Margin="0,2,0,0">
+            <StackPanel x:Name="grblTools" Orientation="Horizontal" Margin="5,0,5,2" Visibility="Collapsed">
+                <Button x:Uid="btn_reload" x:Name="btnReload" Content="Reload" Margin="0,0,5,0" Padding="5,0" Click="btnReload_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Reload settings from the controller (discards unsaved edits)."/>
+                <Button x:Uid="btn_backup" x:Name="btnBackup" Content="Backup" Margin="0,0,5,0" Padding="5,0" Click="btnBackup_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Write settings + work offsets to files in the sender folder."/>
+                <Button x:Uid="btn_restore" x:Name="btnRestore" Content="Restore" Margin="0,0,5,0" Padding="5,0" Click="btnRestore_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Restore settings from a backup / restore point."/>
+                <Button x:Uid="btn_copyToSim" x:Name="btnCopyToSim" Content="Copy to simulator" Margin="0,0,5,0" MinWidth="120" Click="btnCopyToSim_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile."/>
+            </StackPanel>
+            <DockPanel Margin="5,0,5,3">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Uid="btn_saveSettings" x:Name="btnSave" Content="Save settings" Margin="5,0,0,0" Padding="5,0" Click="btnSave_Click" Style="{StaticResource ConfigButtonStyle}"/>
+                    <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Margin="5,0,0,0" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply changes that only take effect at startup. Enabled once such a change is made."/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button x:Uid="btn_resetDefault" x:Name="btnReset" Content="Reset to Default" Padding="8,0" MinWidth="110" Click="btnReset_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Reset this tab's settings to their defaults."/>
+                </StackPanel>
+            </DockPanel>
         </StackPanel>
         <TabControl x:Name="tabConfig" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
             <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl">
@@ -40,7 +56,7 @@
             </TabItem>
             <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="315" Margin="5"/>
+                    <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
             <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller"/>

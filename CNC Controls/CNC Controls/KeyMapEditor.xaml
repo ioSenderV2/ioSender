@@ -88,7 +88,7 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChanged}" Value="True">
+                                            <DataTrigger Binding="{Binding IsModified}" Value="True">
                                                 <Setter Property="Foreground" Value="#FFD9730D"/>
                                                 <Setter Property="FontWeight" Value="SemiBold"/>
                                             </DataTrigger>
@@ -126,7 +126,7 @@
                                                                     <TextBlock.Style>
                                                                         <Style TargetType="TextBlock">
                                                                             <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding Modified}" Value="True">
+                                                                                <DataTrigger Binding="{Binding HasModified}" Value="True">
                                                                                     <Setter Property="Foreground" Value="#FFD9730D"/>
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
@@ -245,11 +245,8 @@
         </TabControl>
 
         <DockPanel Grid.Row="1" Margin="0,8,0,0">
-            <TextBlock x:Name="lblConflict" DockPanel.Dock="Left" VerticalAlignment="Center"
+            <TextBlock x:Name="lblConflict" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Uid="btn_reset" Content="Reset all to defaults" MinWidth="80" Margin="4,0" Padding="5,2" Click="Reset_Click"/>
-            </StackPanel>
         </DockPanel>
     </Grid>
 </UserControl>

@@ -151,16 +151,44 @@ namespace CNC.Controls
             Renumber(_items);   // names are derived from type, not stored
         }
 
+        // Now persisted as the "Probes" section of App.config (folded in from the old standalone file). Saving
+        // writes the whole sectioned config.
         public static void Save()
+        {
+            AppConfig.Settings.Save();
+        }
+
+        // Snapshot for the App.config "Probes" section serializer.
+        public static ProbeDefinitionList Export()
+        {
+            return new ProbeDefinitionList { Items = new List<ProbeDefinition>(Items) };
+        }
+
+        // Load the library from the App.config section (called by ConfigStore at startup).
+        public static void SetItems(ProbeDefinitionList list)
+        {
+            _items = new ObservableCollection<ProbeDefinition>();
+            if (list?.Items != null)
+                foreach (var d in list.Items)
+                    _items.Add(d);
+            Renumber(_items);
+        }
+
+        // One-time importer: read the legacy standalone ProbeDefinitions.xml if present, so an existing library
+        // is folded into App.config on first run. Returns null when there's nothing to import.
+        public static ProbeDefinitionList ReadLegacyFile()
         {
             try
             {
-                var list = new ProbeDefinitionList { Items = new List<ProbeDefinition>(Items) };
-                var xs = new XmlSerializer(typeof(ProbeDefinitionList));
-                using (var fs = File.Create(FilePath))
-                    xs.Serialize(fs, list);
+                if (File.Exists(FilePath))
+                {
+                    var xs = new XmlSerializer(typeof(ProbeDefinitionList));
+                    using (var fs = File.OpenRead(FilePath))
+                        return (ProbeDefinitionList)xs.Deserialize(fs);
+                }
             }
             catch { }
+            return null;
         }
 
         // Derive each probe's name from its type: "3D probe" when it's the only one of that type,

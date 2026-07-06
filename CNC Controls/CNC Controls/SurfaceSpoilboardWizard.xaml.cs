@@ -18,11 +18,10 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for SurfaceSpoilboardWizard.xaml
     /// </summary>
-    public partial class SurfaceSpoilboardWizard : UserControl, IGrblConfigTab
+    public partial class SurfaceSpoilboardWizard : ConfigPanel<SurfaceParams>, IGrblConfigTab
     {
         private GrblViewModel model = null;
         private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
-        private bool _paramsLoaded = false;
 
         public SurfaceSpoilboardWizard()
         {
@@ -523,72 +522,51 @@ namespace CNC.Controls
             ToolNumber = cbxTool.SelectedIndex == 1 ? 1d : 0d;
         }
 
-        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        // Persisted as the "SurfaceSpoilboard" section of App.config (folded in from SurfaceSpoilboard.xml).
+        // ConfigPanel<SurfaceParams> restores/saves this via the overrides below; AppConfig reads it for the section.
+        public static SurfaceParams SectionConfig;
+
+        #region ConfigPanel<SurfaceParams> overrides
+
+        protected override SurfaceParams Config { get { return SectionConfig; } set { SectionConfig = value; } }
+
+        protected override DependencyProperty[] PersistedProperties => new[] {
+            BitDiameterProperty, BitMaxRPMProperty, SpindleRPMProperty, OverlapProperty, FeedProperty,
+            PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, FinishDepthProperty, SafeZProperty, MarginProperty,
+            WidthMMProperty, HeightMMProperty, ToolNumberProperty };
+
+        protected override void ApplyConfig(SurfaceParams p)
+        {
+            BitDiameter = p.BitDiameter; BitMaxRPM = p.BitMaxRPM; SpindleRPM = p.SpindleRPM;
+            Overlap = p.Overlap; Feed = p.Feed; PlungeFeed = p.PlungeFeed; DepthOfCut = p.DepthOfCut;
+            TotalDepth = p.TotalDepth; FinishDepth = p.FinishDepth; SafeZ = p.SafeZ; Margin = p.Margin; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
+            ToolNumber = p.ToolNumber;
+        }
+
+        protected override SurfaceParams CaptureConfig()
+        {
+            return new SurfaceParams
+            {
+                BitDiameter = BitDiameter, BitMaxRPM = BitMaxRPM, SpindleRPM = SpindleRPM, Overlap = Overlap,
+                Feed = Feed, PlungeFeed = PlungeFeed, DepthOfCut = DepthOfCut, TotalDepth = TotalDepth,
+                FinishDepth = FinishDepth, SafeZ = SafeZ, Margin = Margin, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
+            };
+        }
+
+        // Runs after the base restores the saved params (first load) and each time the tab is re-shown.
+        protected override void OnConfigReady()
         {
             if (model == null)
                 model = DataContext as GrblViewModel;
 
-            if (!_paramsLoaded)   // restore the saved parameters once, then persist on every change
-            {
-                _paramsLoaded = true;
-                LoadParams();
-                cbxTool.SelectedIndex = ToolNumber > 0d ? 1 : 0;   // Loaded / Prompt
-                foreach (var dp in new[] {
-                    BitDiameterProperty, BitMaxRPMProperty, SpindleRPMProperty, OverlapProperty, FeedProperty,
-                    PlungeFeedProperty, DepthOfCutProperty, TotalDepthProperty, FinishDepthProperty, SafeZProperty, MarginProperty,
-                    WidthMMProperty, HeightMMProperty, ToolNumberProperty })
-                    System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(SurfaceSpoilboardWizard))
-                        .AddValueChanged(this, (s, ev) => SaveParams());
-            }
+            cbxTool.SelectedIndex = ToolNumber > 0d ? 1 : 0;   // Loaded / Prompt
 
-            // Default / clamp the area to the in-bounds travel envelope.
-            DefaultArea();
-
+            DefaultArea();               // default / clamp the area to the in-bounds travel envelope
             txtWarnings.Text = string.Empty;
-
             UpdateSummary();
         }
 
-        private static string ParamsFile
-        {
-            get { return System.IO.Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, "SurfaceSpoilboard.xml"); }
-        }
-
-        private void LoadParams()
-        {
-            try
-            {
-                if (!System.IO.File.Exists(ParamsFile))
-                    return;
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(SurfaceParams));
-                using (var fs = System.IO.File.OpenRead(ParamsFile))
-                {
-                    var p = (SurfaceParams)xs.Deserialize(fs);
-                    BitDiameter = p.BitDiameter; BitMaxRPM = p.BitMaxRPM; SpindleRPM = p.SpindleRPM;
-                    Overlap = p.Overlap; Feed = p.Feed; PlungeFeed = p.PlungeFeed; DepthOfCut = p.DepthOfCut;
-                    TotalDepth = p.TotalDepth; FinishDepth = p.FinishDepth; SafeZ = p.SafeZ; Margin = p.Margin; WidthMM = p.WidthMM; HeightMM = p.HeightMM;
-                    ToolNumber = p.ToolNumber;
-                }
-            }
-            catch { /* ignore - use the defaults */ }
-        }
-
-        private void SaveParams()
-        {
-            try
-            {
-                var p = new SurfaceParams
-                {
-                    BitDiameter = BitDiameter, BitMaxRPM = BitMaxRPM, SpindleRPM = SpindleRPM, Overlap = Overlap,
-                    Feed = Feed, PlungeFeed = PlungeFeed, DepthOfCut = DepthOfCut, TotalDepth = TotalDepth,
-                    FinishDepth = FinishDepth, SafeZ = SafeZ, Margin = Margin, WidthMM = WidthMM, HeightMM = HeightMM, ToolNumber = ToolNumber
-                };
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(SurfaceParams));
-                using (var fs = System.IO.File.Create(ParamsFile))
-                    xs.Serialize(fs, p);
-            }
-            catch { }
-        }
+        #endregion
     }
 
     // Persisted spoilboard-surfacing parameters. Public for XmlSerializer.

@@ -58,6 +58,49 @@ namespace CNC.Controls
         void Commit();
     }
 
+    // A settings panel or editor tab implements this to opt in to the shared footer's "Reset to Default" button.
+    // The host shows Reset only on tabs that contain at least one resettable, and calls ResetToDefaults() on each
+    // when clicked - so each panel owns what "default" means for its own settings (App/G Code Config values, jog
+    // config, key bindings, or $RST=$ for the controller settings). Panels that don't implement it are left alone.
+    public interface ISettingsResettable
+    {
+        void ResetToDefaults();
+    }
+
+    // Shared helper for ISettingsResettable panels: copy scalar property values (incl. nested config objects) from
+    // a fresh-default source into the live target in place, so the target instance is preserved (its setters
+    // notify, and anything else holding the same reference keeps working).
+    public static class ConfigReset
+    {
+        private static bool IsScalar(Type t)
+        {
+            return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(double) || t == typeof(decimal);
+        }
+
+        public static void CopyScalars(object src, object dst)
+        {
+            if (src == null || dst == null)
+                return;
+
+            foreach (var p in src.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || p.GetIndexParameters().Length > 0)
+                    continue;
+
+                if (IsScalar(p.PropertyType))
+                {
+                    if (p.CanWrite)
+                        try { p.SetValue(dst, p.GetValue(src)); } catch { }
+                }
+                else if (p.PropertyType.IsArray)
+                {
+                    if (p.CanWrite)
+                        try { p.SetValue(dst, (p.GetValue(src) as Array)?.Clone()); } catch { }
+                }
+            }
+        }
+    }
+
     // A Settings:App panel implements this to declare that one of its settings only takes effect at startup,
     // so changing it needs an app restart. The panel raises RestartRequired (with a reason) when such a setting
     // changes; AppConfigView then surfaces the Restart button. This keeps the "needs restart" knowledge with the

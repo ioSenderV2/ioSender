@@ -23,11 +23,10 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class AutoSquareWizard : UserControl, IGrblConfigTab
+    public partial class AutoSquareWizard : ConfigPanel<AutoSquareParams>, IGrblConfigTab
     {
         private GrblViewModel model = null;
         private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
-        private bool _paramsLoaded = false;
         private GrblSettingDetails _offset = null;   // the controller's squaring-offset setting (or null)
         private int _gangedAxis = 1;                 // 0=X, 1=Y, 2=Z (derived from the offset setting id)
 
@@ -596,12 +595,12 @@ namespace CNC.Controls
 
         private void cbxGangedAxis_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!_paramsLoaded)
+            if (!ConfigLoaded)
                 return;   // ignore the construction / pre-load selection
             _gangedAxis = Math.Max(0, Math.Min(2, cbxGangedAxis.SelectedIndex));
             DetectOffsetSetting();
             UpdateComputed();
-            SaveParams();
+            Persist();
         }
 
         private void Generate()
@@ -702,71 +701,52 @@ namespace CNC.Controls
         // Localized message via LibStrings, with \n expanded to real newlines.
         private static string Loc(string key) => LibStrings.FindResource(key).Replace("\\n", "\n");
 
-        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        // Persisted as the "AutoSquare" section of App.config (folded in from AutoSquare.xml). ConfigPanel restores/
+        // saves this via the overrides below; AppConfig reads it for the section.
+        public static AutoSquareParams SectionConfig;
+
+        #region ConfigPanel<AutoSquareParams> overrides
+
+        protected override AutoSquareParams Config { get { return SectionConfig; } set { SectionConfig = value; } }
+
+        protected override DependencyProperty[] PersistedProperties => new[] {
+            BladeLengthProperty, TongueLengthProperty, CornerOffsetProperty, BitDiameterProperty,
+            DrillDepthProperty, PeckDepthProperty, PlungeFeedProperty, SpindleRPMProperty,
+            SafeZProperty, XOffsetProperty, YOffsetProperty };
+
+        protected override void ApplyConfig(AutoSquareParams p)
+        {
+            BladeLength = p.BladeLength; TongueLength = p.TongueLength; CornerOffset = p.CornerOffset;
+            BitDiameter = p.BitDiameter; DrillDepth = p.DrillDepth; PeckDepth = p.PeckDepth;
+            PlungeFeed = p.PlungeFeed; SpindleRPM = p.SpindleRPM; SafeZ = p.SafeZ;
+            XOffset = p.XOffset; YOffset = p.YOffset;
+            _gangedAxis = Math.Max(0, Math.Min(2, p.GangedAxis));
+        }
+
+        protected override AutoSquareParams CaptureConfig()
+        {
+            return new AutoSquareParams
+            {
+                BladeLength = BladeLength, TongueLength = TongueLength, CornerOffset = CornerOffset,
+                BitDiameter = BitDiameter, DrillDepth = DrillDepth, PeckDepth = PeckDepth, PlungeFeed = PlungeFeed,
+                SpindleRPM = SpindleRPM, SafeZ = SafeZ, XOffset = XOffset, YOffset = YOffset, GangedAxis = _gangedAxis
+            };
+        }
+
+        // Runs after the base restores the saved params (first load) and each time the tab is re-shown.
+        protected override void OnConfigReady()
         {
             if (model == null)
                 model = DataContext as GrblViewModel;
-
-            if (!_paramsLoaded)
-            {
-                _paramsLoaded = true;
-                LoadParams();
-                foreach (var dp in new[] { BladeLengthProperty, TongueLengthProperty, CornerOffsetProperty, BitDiameterProperty,
-                                           DrillDepthProperty, PeckDepthProperty, PlungeFeedProperty, SpindleRPMProperty,
-                                           SafeZProperty, XOffsetProperty, YOffsetProperty })
-                    System.ComponentModel.DependencyPropertyDescriptor.FromProperty(dp, typeof(AutoSquareWizard))
-                        .AddValueChanged(this, (s, ev) => SaveParams());
-            }
 
             if (cbxGangedAxis != null)
                 cbxGangedAxis.SelectedIndex = Math.Max(0, Math.Min(2, _gangedAxis));
 
             DetectOffsetSetting();
-
             UpdateComputed();
         }
 
-        private static string ParamsFile
-        {
-            get { return System.IO.Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, "AutoSquare.xml"); }
-        }
-
-        private void LoadParams()
-        {
-            try
-            {
-                if (!System.IO.File.Exists(ParamsFile))
-                    return;
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(AutoSquareParams));
-                using (var fs = System.IO.File.OpenRead(ParamsFile))
-                {
-                    var p = (AutoSquareParams)xs.Deserialize(fs);
-                    BladeLength = p.BladeLength; TongueLength = p.TongueLength; CornerOffset = p.CornerOffset;
-                    BitDiameter = p.BitDiameter; DrillDepth = p.DrillDepth; PeckDepth = p.PeckDepth;
-                    PlungeFeed = p.PlungeFeed; SpindleRPM = p.SpindleRPM; SafeZ = p.SafeZ;
-                    XOffset = p.XOffset; YOffset = p.YOffset;
-                    _gangedAxis = Math.Max(0, Math.Min(2, p.GangedAxis));
-                }
-            }
-            catch { }
-        }
-
-        private void SaveParams()
-        {
-            try
-            {
-                var p = new AutoSquareParams
-                {
-                    BladeLength = BladeLength, TongueLength = TongueLength, CornerOffset = CornerOffset,
-                    BitDiameter = BitDiameter, DrillDepth = DrillDepth, PeckDepth = PeckDepth, PlungeFeed = PlungeFeed,
-                    SpindleRPM = SpindleRPM, SafeZ = SafeZ, XOffset = XOffset, YOffset = YOffset, GangedAxis = _gangedAxis
-                };
-                var xs = new System.Xml.Serialization.XmlSerializer(typeof(AutoSquareParams));
-                using (var fs = System.IO.File.Create(ParamsFile))
-                    xs.Serialize(fs, p);
-            }
-            catch { }
-        }
+        #endregion
     }
 
     // Persisted auto-square drilling parameters. Public for XmlSerializer.

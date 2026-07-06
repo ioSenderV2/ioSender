@@ -699,7 +699,7 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valNoCheckMode:System.Str
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_lfNoToolpaths:System.String.$Content,None,True,True,,No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabJob:System.String.$Content,None,True,True,,Job
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Load stock
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Start Job
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabOffsets:System.String.$Content,None,True,True,,Offsets
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSettings:System.String.$Content,None,True,True,,Settings
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabProbing:System.String.$Content,None,True,True,,Probing

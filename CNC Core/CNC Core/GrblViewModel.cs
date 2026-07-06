@@ -1591,7 +1591,7 @@ namespace CNC.Core
                 Message = GrblAlarms.GetMessage(_grblState.Substate.ToString());
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
             }
-            else if (ResponseLogVerbose || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error"))
+            else if (!Silent && (ResponseLogVerbose || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))
             {
                 if (!(data.First() == '<' && ResponseLogFilterRT))
                 {

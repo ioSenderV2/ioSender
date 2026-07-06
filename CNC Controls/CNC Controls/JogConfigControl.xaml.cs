@@ -45,7 +45,7 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for JogSetupControl.xaml
     /// </summary>
-    public partial class JogConfigControl : UserControl
+    public partial class JogConfigControl : UserControl, ISettingsResettable
     {
         public JogConfigControl()
         {
@@ -57,6 +57,15 @@ namespace CNC.Controls
         {
             get { return (bool)GetValue(IsGrblProperty); }
             set { SetValue(IsGrblProperty, value); }
+        }
+
+        // Reset the keyboard-jog config (Config.Jog) this panel owns to its factory defaults. Copies scalar
+        // values in-place (the sub-object's setters notify) so the live handler keeps the same Jog instance.
+        public void ResetToDefaults()
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg?.Jog != null)
+                ConfigReset.CopyScalars(AppConfig.GetFactoryDefaults().Jog, cfg.Jog);
         }
     }
 }

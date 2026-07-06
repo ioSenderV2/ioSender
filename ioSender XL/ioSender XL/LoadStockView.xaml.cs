@@ -50,13 +50,13 @@ namespace GCode_Sender
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
 
-        // Load Stock's OWN program view (the ProgramView refactor): created lazily, titled "Load Stock", connected
+        // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Start Job", connected
         // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
         private CNC.Controls.ProgramView programView;
         private void EnsureProgramView()
         {
             if (programView == null)
-                programView = new CNC.Controls.ProgramView { Title = "Load Stock" };
+                programView = new CNC.Controls.ProgramView { Title = "Start Job" };
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
@@ -71,16 +71,40 @@ namespace GCode_Sender
         // disabled until Generate is pressed again - the program would otherwise be stale).
         private void WireInputs()
         {
-            rbFL.Checked += (s, e) => InputChanged();
-            rbFR.Checked += (s, e) => InputChanged();
-            rbBL.Checked += (s, e) => InputChanged();
-            rbBR.Checked += (s, e) => InputChanged();
-            cbxProbe.SelectionChanged += (s, e) => InputChanged();
             cbxWcs.SelectionChanged += (s, e) => InputChanged();
-            chkMeasure.Checked += (s, e) => InputChanged();
-            chkMeasure.Unchecked += (s, e) => InputChanged();
+            chkMeasure.Checked += (s, e) => { UpdateSizeHint(); InputChanged(); };
+            chkMeasure.Unchecked += (s, e) => { UpdateSizeHint(); InputChanged(); };
+            chkRotate.Checked += (s, e) => InputChanged();
+            chkRotate.Unchecked += (s, e) => InputChanged();
+            chkSetTloRef.Checked += (s, e) => InputChanged();
+            chkSetTloRef.Unchecked += (s, e) => InputChanged();
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => InputChanged());
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => InputChanged());
+        }
+
+        // The width/height fields are the actual size when not measuring; when Measure is on they are only a
+        // conservative estimate pcorner uses to place the far-corner probes (must be a few mm oversize).
+        private void UpdateSizeHint()
+        {
+            if (txtSizeHint != null)
+                txtSizeHint.Text = chkMeasure.IsChecked == true
+                    ? "Estimate only - make it a few mm larger than actual so the far-corner probes land just outside the stock. Probing measures the true size."
+                    : "Actual stock size.";
+        }
+
+        // The configured 3D probe supplies the tip radius and the search/latch feeds the program needs; there is
+        // no probe picker (Start Job assumes a 3D probe + toolsetter). Null when none is defined.
+        private ProbeDefinition ThreeDProbe()
+        {
+            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+        }
+
+        // Enable Generate only when a 3D probe is defined; otherwise show the "define a probe" hint.
+        private void UpdateProbeWarning()
+        {
+            bool ok = ThreeDProbe() != null;
+            btnGenerate.IsEnabled = ok;
+            txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void InputChanged()
@@ -111,15 +135,10 @@ namespace GCode_Sender
             {
                 if (model == null)
                     model = DataContext as GrblViewModel;
-                RefreshProbes();
-                if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/corner/options
+                if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
+                UpdateSizeHint();
                 Subscribe(true);
-                UpdateExpressionWarning();
-                // Only offer the skew->WCS rotation when the controller supports it (reports WCSROT in $I): on
-                // firmware without ROTATION_ENABLE the G10 L2 R word errors:20, so hide the option entirely.
-                chkRotate.Visibility = GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
-                // The puck TLO reference goes through M6 (tc.macro) - only offer it when the controller has ATC.
-                chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
+                RefreshCapabilities();   // EXPR / probe / rotation / ATC gating - refreshed again on connect (see Model_PropertyChanged)
                 UpdateDrawing();
                 if (!string.IsNullOrEmpty(program))
                 {
@@ -222,6 +241,8 @@ namespace GCode_Sender
             txtResult.Text = BuildResultText(probed);
             UpdateDrawing();   // the right-panel drawing is the live result view (no separate popup)
             btnCopySize.IsEnabled = measuredX.HasValue && measuredY.HasValue;
+            // Verify skew needs all four corners (a full measure run) and a controller that applies WCS rotation.
+            btnVerify.IsEnabled = GrblInfo.RotationSupported && Has(1) && Has(2) && Has(3) && Has(4);
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
@@ -483,94 +504,87 @@ namespace GCode_Sender
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
-        private void RefreshProbes()
-        {
-            // Load Stock needs horizontal probing - only a 3D probe or an edge finder qualifies.
-            var usable = ProbeDefinitions.Items
-                .Where(p => p.ProbeType == ProbeType.ThreeDProbe || p.ProbeType == ProbeType.EdgeFinder).ToList();
-
-            var sel = cbxProbe.SelectedItem as ProbeDefinition;
-            cbxProbe.ItemsSource = usable;
-            if (sel != null && usable.Contains(sel))
-                cbxProbe.SelectedItem = sel;
-            else                                                  // prefer a 3D probe, else an edge finder
-                cbxProbe.SelectedItem = usable.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe) ?? usable.FirstOrDefault();
-
-            bool ok = usable.Count > 0;
-            btnGenerate.IsEnabled = ok;
-            txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
-        }
-
         private void UpdateExpressionWarning()
         {
             txtExprWarn.Visibility = GrblInfo.ExpressionsSupported ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private Corner SelectedCorner
+        // Capability-driven UI. Depends on the controller's $I (EXPR / WCSROT / ATC), which is only parsed after
+        // connect - so this must run both on Activate AND when the controller info arrives (GrblState change),
+        // otherwise the tab (now shown first, before connect) would be stuck showing the disconnected state.
+        // The rotation/TLO checkboxes are only shown when supported; the actual emission is gated again at
+        // Generate time, so a hidden-but-checked box can never emit an R word or M6 T8 the firmware rejects.
+        private void RefreshCapabilities()
         {
-            get
-            {
-                if (rbFR.IsChecked == true) return Corner.FrontRight;
-                if (rbBL.IsChecked == true) return Corner.BackLeft;
-                if (rbBR.IsChecked == true) return Corner.BackRight;
-                return Corner.FrontLeft;
-            }
+            UpdateProbeWarning();
+            UpdateExpressionWarning();
+            chkRotate.Visibility = GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
+            chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        // Start Job always references the front-left (TFL) corner, matching start_job.macro.
+        private Corner SelectedCorner { get { return Corner.FrontLeft; } }
 
         private void Generate_Click(object sender, RoutedEventArgs e)
         {
-            var p = cbxProbe.SelectedItem as ProbeDefinition;
+            var p = ThreeDProbe();
             if (p == null)
             {
                 MessageBox.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
-                    "Load stock", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
+            // Gate the capability-dependent options on what the controller actually supports, regardless of the
+            // checkbox state - a hidden-but-checked box must never emit a G10 L2 R (errors:20 without WCSROT) or
+            // an M6 T8 puck reference (no toolsetter without ATC).
+            bool measure = chkMeasure.IsChecked == true;
+            bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
+            bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
             program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                   cbxWcs.SelectedIndex + 1, chkMeasure.IsChecked == true, chkRotate.IsChecked == true,
-                                   chkSetTloRef.IsChecked == true);
+                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef);
             ResetResults();
             SaveInputs();
+            WriteStartJobMacro(program);   // also persist as @start_job.macro so the Start Job macro/F-key runs it
 
             // Re-arm as the active program: a previous run tears this down (handing the source back to the job),
-            // so Generate must re-establish it so Cycle Start runs Load stock again without leaving the tab.
-            MacroProcessor.ActiveProgramName = "Load stock";
+            // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
+            MacroProcessor.ActiveProgramName = "Start Job";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             EnsureProgramView();
             programView.SetProgramText(program);
-            programView.Connect();   // Load Stock owns its ProgramView; the overlay hosts it and it titles itself
+            programView.Connect();   // Start Job owns its ProgramView; the overlay hosts it and it titles itself
         }
 
-        private static string SettingsPath
+        // Materialise the generated program as ConfigPath/start_job.macro - the file the seeded "Start Job" macro
+        // entry (@start_job.macro) re-reads on every run. So generating here updates both the in-tab program and
+        // the macro/F-key one-button start. Best-effort: a write failure only means the macro keeps its old body.
+        private static void WriteStartJobMacro(string program)
         {
-            get { return Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, "LoadStock.xml"); }
+            try
+            {
+                string path = Path.Combine(CNC.Core.Resources.ConfigPath ?? "./", "start_job.macro");
+                File.WriteAllText(path, program);
+            }
+            catch { }
         }
 
+        // Persisted as the "LoadStock" section of App.config (folded in from LoadStock.xml); the DTO + holder
+        // live in CNC.Controls (LoadStockConfig) so AppConfig can register the section.
         private void LoadInputs()
         {
             try
             {
-                if (!File.Exists(SettingsPath))
+                var s = LoadStockConfig.Section;
+                if (s == null)
                     return;
-                var xs = new XmlSerializer(typeof(LoadStockSettings));
-                using (var fs = File.OpenRead(SettingsPath))
-                {
-                    var s = (LoadStockSettings)xs.Deserialize(fs);
-                    fldWidth.Value = s.Width;
-                    fldHeight.Value = s.Height;
-                    cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
-                    chkMeasure.IsChecked = s.Measure;
-                    chkRotate.IsChecked = s.ApplyRotation;
-                    chkSetTloRef.IsChecked = s.SetTloRef;
-                    rbFL.IsChecked = s.Corner == "FrontLeft";
-                    rbFR.IsChecked = s.Corner == "FrontRight";
-                    rbBL.IsChecked = s.Corner == "BackLeft";
-                    rbBR.IsChecked = s.Corner == "BackRight";
-                    if (!string.IsNullOrEmpty(s.Probe))
-                        foreach (var item in cbxProbe.Items)
-                            if ((item as ProbeDefinition)?.Name == s.Probe) { cbxProbe.SelectedItem = item; break; }
-                }
+                fldWidth.Value = s.Width;
+                fldHeight.Value = s.Height;
+                cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
+                chkMeasure.IsChecked = s.Measure;
+                chkRotate.IsChecked = s.ApplyRotation;
+                chkSetTloRef.IsChecked = s.SetTloRef;
+                // Corner is always front-left now; the probe comes from the 3D-probe definition - both dropped.
             }
             catch { /* start with defaults */ }
         }
@@ -579,7 +593,7 @@ namespace GCode_Sender
         {
             try
             {
-                var s = new LoadStockSettings
+                LoadStockConfig.Section = new LoadStockSettings
                 {
                     Width = fldWidth.Value,
                     Height = fldHeight.Value,
@@ -587,12 +601,9 @@ namespace GCode_Sender
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
                     ApplyRotation = chkRotate.IsChecked == true,
-                    SetTloRef = chkSetTloRef.IsChecked == true,
-                    Probe = (cbxProbe.SelectedItem as ProbeDefinition)?.Name ?? string.Empty
+                    SetTloRef = chkSetTloRef.IsChecked == true
                 };
-                var xs = new XmlSerializer(typeof(LoadStockSettings));
-                using (var fs = File.Create(SettingsPath))
-                    xs.Serialize(fs, s);
+                AppConfig.Settings.Save();
             }
             catch { }
         }
@@ -615,7 +626,127 @@ namespace GCode_Sender
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
             // confirmation. confirm:true gives the operator a final "run?" before any motion.
-            MacroProcessor.Run(model, "Load stock", program, true);
+            MacroProcessor.Run(model, "Start Job", program, true);
+        }
+
+        // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained
+        // probed corners and touch each corner of the ideal rectangle in the rotated work frame. If the rotation
+        // is right (and the stock square) every touch lands on the top surface right at the corner; a corner that
+        // misses or touches low reveals a bad rotation or an out-of-square (parallelogram) stock. A separate,
+        // re-runnable check that reuses the last measurement - it does not disturb the measure program/results.
+        private void VerifySkew_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+            var p = ThreeDProbe();
+            if (p == null)
+            {
+                MessageBox.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
+                    "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+            if (!(Has(1) && Has(2) && Has(3) && Has(4)))
+            {
+                MessageBox.Show("Measure the stock first - all four corners must be probed before the skew can be verified.",
+                    "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            string verify = BuildVerifyProgram(p, cbxWcs.SelectedIndex + 1);
+            EnsureProgramView();
+            programView.SetProgramText(verify);
+            programView.Connect();
+            MacroProcessor.Run(model, "Verify skew", verify, true);
+        }
+
+        private string BuildVerifyProgram(ProbeDefinition p, int wcsP)
+        {
+            double r = p.ProbeDiameter / 2d;                         // inset so the tip edge sits at the corner
+            double latch = p.LatchFeedRate > 0d ? p.LatchFeedRate : 50d;
+            const double safeZ = 10d, probeDepth = 3d;               // work Z: 10 above the top, probe 3 below it
+
+            // Corner work coords in the measure's rotated frame: transform each probed corner (machine) about the
+            // FL origin by the applied rotation. FR defines +X (front edge); BL gives the Y direction whose SIGN
+            // depends on the machine's handedness - never assume +Y (that sent the probe off the table -> Alarm:2).
+            double rot = Math.Atan2(cornerY[2].Value - cornerY[1].Value, cornerX[2].Value - cornerX[1].Value);
+            double rotDeg = rot * 180d / Math.PI;
+            double cos = Math.Cos(rot), sin = Math.Sin(rot);
+            double WX(int c) { double dx = cornerX[c].Value - cornerX[1].Value, dy = cornerY[c].Value - cornerY[1].Value; return dx * cos + dy * sin; }
+            double WY(int c) { double dx = cornerX[c].Value - cornerX[1].Value, dy = cornerY[c].Value - cornerY[1].Value; return -dx * sin + dy * cos; }
+
+            double fx = WX(2);                                       // FR work X (front-edge length, positive)
+            double ly = WY(3);                                       // BL work Y (signed)
+            var b = new StringBuilder();
+            void L(string s) { b.Append(SanitizeParens(s)).Append('\n'); }
+
+            // Inset a work-coord touch point toward the stock centre by the tip radius (so the tip edge sits at
+            // the point), rapid over it above the stock, drop to safe Z, probe down (G38.3 - a miss won't halt),
+            // and retract. Handedness-agnostic: the inset direction comes from the centre, never an assumed sign.
+            double cx = fx / 2d, cy = ly / 2d;
+            void Touch(double px, double py, string label)
+            {
+                double dx = cx - px, dy = cy - py, len = Math.Sqrt(dx * dx + dy * dy);
+                double ix = len < 1e-6 ? px : px + r * dx / len;
+                double iy = len < 1e-6 ? py : py + r * dy / len;
+                L(string.Format("(--- {0} ---)", label));
+                L(string.Format("G0 X{0} Y{1}", N(ix), N(iy)));     // work XY (rotation applied); above the stock
+                L("(WAITIDLE)");
+                L("G0 Z" + N(safeZ));                               // drop to safe Z above the stock top
+                L(string.Format("G38.3 Z{0} F{1}", N(-probeDepth), N(latch)));   // no-error probe
+                L("G0 Z" + N(safeZ));                               // retract above the stock
+            }
+
+            L("(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)");
+            L("(Front-left/right define the frame (ideal == measured).)");
+            L("(Back-left/right are touched twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
+            L("(Discipline matches Measure: no G53 move runs while the rotation is active.)");
+            L("(PREREQ, connected, homed, noalarm, EXPR, G30)");
+            L("G21 G90 G94 G17");
+            if (GrblInfo.HasToolSetter)
+                L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
+
+            // Use the WCS the measure set (origin). Clear the rotation FIRST so the G53 safe-Z lift is a clean
+            // machine move (a G53 move with an active WCS rotation needs a separate firmware exemption).
+            L(WcsCode(wcsP) + "  (activate the WCS the measure set - origin)");
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));     // clear rotation for the G53 lift
+
+            L("G53 G0 Z0");                                         // lift to machine top (rotation cleared - clean)
+            L("(WAITIDLE)");
+            L("(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)");
+            L("(WAITIDLE)");
+            L("G53 G0 Z0");                                         // re-lift after install (still R0)
+
+            // Apply the measured skew rotation (negated - grblHAL's G10 L2 R aligns with -atan2(dy,dx)). From here
+            // on ONLY work-coord moves are issued (no G53), so a machine-move/rotation interaction can't arise.
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(-rotDeg)));
+
+            // Order matches the Measure / Start-Job numbering: 1=FL, 2=FR, 3=BL, 4=BR.
+            Touch(0d, 0d, "front-left (origin)");
+            Touch(fx, 0d, "front-right");
+            Touch(0d, ly, "back-left - ideal rectangle");
+            Touch(WX(3), WY(3), "back-left - measured corner");
+            Touch(fx, ly, "back-right - ideal rectangle");
+            Touch(WX(4), WY(4), "back-right - measured corner");
+
+            // Park back at G30 (where the job started). Clear the rotation for the G53 park moves, park, then
+            // restore the skew rotation so the WCS is left as the measure produced it (no move follows - safe).
+            L("(--- park at G30 ---)");
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));
+            L("G53 G0 Z0");                                         // lift to machine top
+            L("G53 G0 X[#5181] Y[#5182]");                          // traverse to G30 X/Y
+            L("G53 G0 Z[#5183]");                                   // descend to G30 Z
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(-rotDeg)));   // restore the skew rotation
+            L("M2");
+            return b.ToString();
+        }
+
+        private static string WcsCode(int wcsP)
+        {
+            return "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
         }
 
         // Build the NGC probe program: call the tested pcorner.macro per corner (it discovers the spoilboard /
@@ -669,7 +800,7 @@ namespace GCode_Sender
                 L("O<pcorner> CALL [#<_ls_rad>]");   // single arg (tip radius) - grblHAL's CALL resolves with one arg
             }
 
-            L(string.Format("(Load stock - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
+            L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
             L(string.Format("(Probe \"{0}\": tip {1} mm. Set G28 10-30 mm OUTSIDE the {2} corner in BOTH X and Y.)", p.Name, N(p.ProbeDiameter), cornerName));
             L("(Estimated size MUST be conservative - a few mm larger than actual - so far refs land just outside.)");
             L("(Requires grblHAL NGC expressions + pcorner.macro on the controller. VALIDATE before trusting.)");
@@ -776,7 +907,11 @@ namespace GCode_Sender
             // to a controller that would reject it - Load Stock always completes, with rotation when available.
             if (measure && applyRotation && GrblInfo.RotationSupported)
             {
-                L("#<rot> = ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
+                // NOTE the leading negation: grblHAL's G10 L2 R rotates the coordinate frame in the opposite
+                // sense to the raw front-edge angle, so the rotation that ALIGNS the work frame to the stock is
+                // -atan2(dy,dx). Without the negation the far edge lands off by ~2*width*sin(angle) (the Verify
+                // skew check showed the right-hand corners a couple of mm short in Y).
+                L("#<rot> = 0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
                 L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
                 L("(PRINT, LS_ROT=#<rot>)");
             }
@@ -852,23 +987,5 @@ namespace GCode_Sender
         private static string plusMinus(string baseExpr, int dir, double mag) { return baseExpr + (dir >= 0 ? " + " : " - ") + N(mag); }
 
         private static string N(double v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
-    }
-
-    // Persisted Load Stock inputs (LoadStock.xml in the config folder) so the estimate/corner/options survive restarts.
-    public class LoadStockSettings
-    {
-        public double Width = 100d;
-        public double Height = 100d;
-        public string Corner = "FrontLeft";
-        public int Wcs = 1;            // 1 = G54
-        public bool Measure = true;
-        // Default OFF: setting a WCS rotation (G10 L2 R) arms a grblHAL rotation-transform bug on affected
-        // firmware - a garbage runtime rotation is applied to far-from-origin G54 moves, throwing the first
-        // cut rapid off the table (false Alarm:2 soft limit) on the NEXT program run, even for a ~0.1 deg
-        // skew. Load Stock itself stays clean (it scrubs R0 before probing); the rotation only bites the
-        // program that runs after. Opt in only on firmware with the rotation transform fixed.
-        public bool ApplyRotation = false;   // set the WCS rotation from the measured skew (G10 L2 R)
-        public bool SetTloRef = false;      // reference the puck TLO after corner 1 (Load Stock == start_job)
-        public string Probe = string.Empty;
     }
 }

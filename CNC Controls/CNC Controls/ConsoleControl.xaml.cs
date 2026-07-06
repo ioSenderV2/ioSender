@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -219,6 +220,135 @@ namespace CNC.Controls
                 AppConfig.Settings.Base.ConsoleShowRTAll = model.ResponseLogShowRTAll;
                 AppConfig.Settings.Save();
             }
+        }
+
+        // ---- Console text size (persisted in Config.ConsoleFontSize; the scrollback binds to it) ----
+
+        private void FontSmaller_Click(object sender, RoutedEventArgs e) { AdjustFont(-1d); }
+        private void FontLarger_Click(object sender, RoutedEventArgs e) { AdjustFont(1d); }
+
+        private void AdjustFont(double delta)
+        {
+            var b = AppConfig.Settings.Base;
+            if (b == null)
+                return;
+            b.ConsoleFontSize = b.ConsoleFontSize + delta;   // clamped 6-32 in the setter
+            AppConfig.Settings.Save();
+        }
+
+        // ---- Find in log: search the console scrollback, select/scroll each match, n-of-m + up/down / F3-F4 ----
+
+        private readonly List<int> _matches = new List<int>();   // character offsets of each match in txtOutput
+        private int _matchIndex = -1;
+        private string _matchQuery = string.Empty;
+
+        private void searchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RunSearch(searchBox.Text);
+        }
+
+        private void searchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Return) { NavMatch(1); e.Handled = true; }
+            else if (e.Key == Key.F3) { NavMatch(1); e.Handled = true; }
+            else if (e.Key == Key.F4) { NavMatch(-1); e.Handled = true; }
+        }
+
+        private void Console_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F3) { NavMatch(1); e.Handled = true; }
+            else if (e.Key == Key.F4) { NavMatch(-1); e.Handled = true; }
+        }
+
+        private void btnMatchNext_Click(object sender, RoutedEventArgs e) { NavMatch(1); }
+        private void btnMatchPrev_Click(object sender, RoutedEventArgs e) { NavMatch(-1); }
+
+        // (Re)compute all match offsets for the current query against the live scrollback text.
+        private void RunSearch(string query)
+        {
+            _matches.Clear();
+            _matchIndex = -1;
+            _matchQuery = query ?? string.Empty;
+
+            string text = txtOutput.Text ?? string.Empty;
+            if (_matchQuery.Length > 0)
+            {
+                int i = 0;
+                while ((i = text.IndexOf(_matchQuery, i, StringComparison.OrdinalIgnoreCase)) >= 0)
+                {
+                    _matches.Add(i);
+                    i += _matchQuery.Length;
+                }
+            }
+
+            if (_matches.Count > 0)
+            {
+                _matchIndex = 0;
+                SelectMatch();
+            }
+            else
+                txtOutput.Select(txtOutput.SelectionStart, 0);
+
+            UpdateMatchUi();
+        }
+
+        // Step to the next (+1) / previous (-1) match, wrapping. Re-runs the search first so matches stay in
+        // sync with a scrollback that may have grown since the last keystroke.
+        private void NavMatch(int dir)
+        {
+            if (_matchQuery.Length == 0)
+                return;
+
+            // Recompute against current text; keep the caret near where we were.
+            int prev = _matchIndex >= 0 && _matchIndex < _matches.Count ? _matches[_matchIndex] : -1;
+            RecomputeMatches();
+            if (_matches.Count == 0)
+            {
+                UpdateMatchUi();
+                return;
+            }
+
+            if (prev >= 0)
+                _matchIndex = _matches.IndexOf(prev);
+            if (_matchIndex < 0)
+                _matchIndex = 0;
+
+            _matchIndex = ((_matchIndex + dir) % _matches.Count + _matches.Count) % _matches.Count;
+            SelectMatch();
+            UpdateMatchUi();
+        }
+
+        private void RecomputeMatches()
+        {
+            _matches.Clear();
+            string text = txtOutput.Text ?? string.Empty;
+            if (_matchQuery.Length == 0)
+                return;
+            int i = 0;
+            while ((i = text.IndexOf(_matchQuery, i, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                _matches.Add(i);
+                i += _matchQuery.Length;
+            }
+        }
+
+        private void SelectMatch()
+        {
+            if (_matchIndex < 0 || _matchIndex >= _matches.Count)
+                return;
+            int start = _matches[_matchIndex];
+            txtOutput.Select(start, _matchQuery.Length);
+            int line = txtOutput.GetLineIndexFromCharacterIndex(start);
+            if (line >= 0)
+                txtOutput.ScrollToLine(line);
+        }
+
+        private void UpdateMatchUi()
+        {
+            btnMatchPrev.IsEnabled = btnMatchNext.IsEnabled = _matches.Count > 0;
+            txtMatchCount.Text = _matches.Count > 0
+                ? string.Format("{0} of {1}", _matchIndex + 1, _matches.Count)
+                : (_matchQuery.Length > 0 ? "no matches" : string.Empty);
         }
     }
 }

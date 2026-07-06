@@ -252,43 +252,79 @@ namespace CNC.Core
             }
         }
 
-        public bool SaveMappings (string filename)
+        // ---- persistence -----------------------------------------------------------------------
+        //
+        // Key mappings are stored as the "KeyMap" section of App.config (folded in from the old standalone
+        // KeyMap0.xml). CNC.Core can't reference the config store, so AppConfig keeps SectionConfig in sync with
+        // the section payload and provides PersistHook to save App.config; with no hook (e.g. helper tools) the
+        // code falls back to the legacy KeyMap0.xml file.
+        public static List<KeypressHandlerFn> SectionConfig;
+        public static System.Action PersistHook;
+        private static bool UseSection { get { return PersistHook != null; } }
+        private static string KeyMapPath { get { return Resources.ConfigPath + "KeyMap0.xml"; } }
+
+        // Serializable snapshot of the current mappings: the live handlers (minus the F-key macro handler) plus a
+        // synthetic entry for each remapped jog key.
+        public List<KeypressHandlerFn> ExportMappings()
+        {
+            var list = handlers.Where(x => x.Method != "JobControl.FnKeyHandler").ToList();
+            for (var i = 0; i < jogKeys.Length; i++)
+                if (jogKeys[i].Remapped)
+                    list.Add(new KeypressHandlerFn() { Key = jogKeys[i].Key, Modifiers = ModifierKeys.None, OnUp = false, Method = "Jogkey." + GrblInfo.AxisIndexToLetter(i >> 1) + ((i & 1) == 1 ? "minus" : "plus") });
+            return list;
+        }
+
+        public bool SaveMappings(string filename = null)
         {
             if (handlers.Count == 0)
                 return false;
 
-            bool ok = false;
-
-            XmlSerializer xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+            if (UseSection)
+            {
+                SectionConfig = ExportMappings();
+                PersistHook();
+                return true;
+            }
 
             try
             {
-                FileStream fsout = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
-                using (fsout)
-                {
-                    int remapped_at = handlers.Count, n_remapped = 0;
-                    for(var i = 0; i < jogKeys.Length; i++)
-                    {
-                        if (jogKeys[i].Remapped)
-                        {
-                            n_remapped++;
-                            handlers.Add(new KeypressHandlerFn() { Key = jogKeys[i].Key, Modifiers = ModifierKeys.None, OnUp = false, Method = "Jogkey." + GrblInfo.AxisIndexToLetter(i >> 1) + ((i & 1) == 1 ? "minus" : "plus") });
-                        }
-                    }
-
-                    xs.Serialize(fsout, handlers.Where(x => x.Method != "JobControl.FnKeyHandler").ToList());
-
-                    if (n_remapped > 0)
-                        handlers.RemoveRange(remapped_at, n_remapped);
-                    ok = true;
-                }
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                using (var fsout = new FileStream(filename ?? KeyMapPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    xs.Serialize(fsout, ExportMappings());
+                return true;
             }
             catch (Exception e)
             {
                 System.Windows.MessageBox.Show(e.Message, "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Exclamation);
+                return false;
             }
+        }
 
-            return ok;
+        // One-time importer for the "KeyMap" section: read the legacy KeyMap0.xml if present.
+        public static List<KeypressHandlerFn> ReadLegacyFile()
+        {
+            try
+            {
+                if (!File.Exists(KeyMapPath))
+                    return null;
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                using (var reader = new StreamReader(KeyMapPath))
+                    return (List<KeypressHandlerFn>)xs.Deserialize(reader);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // Load the saved mappings from the App.config "KeyMap" section (populated at config-load). Call once the
+        // handlers have been registered (JobView.OnBooted); a null section leaves the default bindings in place.
+        public bool LoadMappings()
+        {
+            if (!UseSection || SectionConfig == null || handlers.Count == 0)
+                return false;
+            ImportMappings(SectionConfig);
+            return true;
         }
 
         public bool LoadMappings(string filename)
@@ -296,57 +332,60 @@ namespace CNC.Core
             if (handlers.Count == 0)
                 return false;
 
-            bool ok = false;
-            List<KeypressHandlerFn> keymappings = new List<KeypressHandlerFn>();
-            XmlSerializer xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
-
             try
             {
-                StreamReader reader = new StreamReader(filename);
-                keymappings = (List<KeypressHandlerFn>)xs.Deserialize(reader);
-                reader.Close();
-
-                foreach (var newmap in keymappings)
-                {
-                    if (newmap.method.StartsWith("Jogkey.")) {
-                        int k = GrblInfo.AxisLetterToIndex(newmap.method.Substring(7, 1));
-                        if(k >= 0 && newmap.method.Substring(8) == "plus" || newmap.method.Substring(8) == "minus")
-                        {
-                            k = k * 2 + (newmap.method.Substring(8) == "minus" ? 1 : 0);
-                            jogKeys[k].Key = newmap.Key;
-                            jogKeys[k].Remapped = true;
-                        }
-                    } else {
-
-                        var handler = functions.Where(x => x.Method == newmap.method && x.Context == newmap.Context).FirstOrDefault();
-                        var keymap = handlers.Where(k => k.Modifiers == newmap.Modifiers && k.Key == newmap.Key && k.OnUp == newmap.OnUp && k.Context == newmap.Context).FirstOrDefault();
-
-                        if (handler != null)
-                        {
-                            if (keymap != null)
-                            {
-                                if (keymap.Method != newmap.method)
-                                {
-                                    keymap.OnUp = newmap.OnUp;
-                                    keymap.Call = handler.Call;
-                                }
-                            }
-                            else
-                                handlers.Add(new KeypressHandlerFn() { Key = newmap.Key, Modifiers = newmap.Modifiers, Call = handler.Call, context = handler.context, OnUp = newmap.OnUp });
-                        }
-                        else if (keymap != null && newmap.method == "None")
-                            handlers.Remove(keymap);
-                    }
-                }
-
-                ok = true;
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                List<KeypressHandlerFn> keymappings;
+                using (var reader = new StreamReader(filename))
+                    keymappings = (List<KeypressHandlerFn>)xs.Deserialize(reader);
+                ImportMappings(keymappings);
+                return true;
             }
             catch
             {
                 System.Windows.MessageBox.Show("keymap file is corrupt!", "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                return false;
             }
+        }
 
-            return ok;
+        // Apply a deserialized mapping list onto the live handlers / jog keys.
+        private void ImportMappings(List<KeypressHandlerFn> keymappings)
+        {
+            if (keymappings == null)
+                return;
+
+            foreach (var newmap in keymappings)
+            {
+                if (newmap.method.StartsWith("Jogkey.")) {
+                    int k = GrblInfo.AxisLetterToIndex(newmap.method.Substring(7, 1));
+                    if(k >= 0 && newmap.method.Substring(8) == "plus" || newmap.method.Substring(8) == "minus")
+                    {
+                        k = k * 2 + (newmap.method.Substring(8) == "minus" ? 1 : 0);
+                        jogKeys[k].Key = newmap.Key;
+                        jogKeys[k].Remapped = true;
+                    }
+                } else {
+
+                    var handler = functions.Where(x => x.Method == newmap.method && x.Context == newmap.Context).FirstOrDefault();
+                    var keymap = handlers.Where(k => k.Modifiers == newmap.Modifiers && k.Key == newmap.Key && k.OnUp == newmap.OnUp && k.Context == newmap.Context).FirstOrDefault();
+
+                    if (handler != null)
+                    {
+                        if (keymap != null)
+                        {
+                            if (keymap.Method != newmap.method)
+                            {
+                                keymap.OnUp = newmap.OnUp;
+                                keymap.Call = handler.Call;
+                            }
+                        }
+                        else
+                            handlers.Add(new KeypressHandlerFn() { Key = newmap.Key, Modifiers = newmap.Modifiers, Call = handler.Call, context = handler.context, OnUp = newmap.OnUp });
+                    }
+                    else if (keymap != null && newmap.method == "None")
+                        handlers.Remove(keymap);
+                }
+            }
         }
 
         // ---- Editor API (used by the Key Mappings editor) -------------------------------------

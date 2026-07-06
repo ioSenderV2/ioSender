@@ -84,9 +84,10 @@ namespace CNC.Controls
         {
             return new LayoutNode(LayoutKeys.Root,
                 new LayoutSlot(LayoutKeys.SlotTabs,
+                    // Start Job (LoadStock) is first: the flow is Start Job (set origin / TLO / measure) then Job (run).
+                    new LayoutNode(LayoutKeys.LoadStock),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
-                    new LayoutNode(LayoutKeys.LoadStock),
                     new LayoutNode(LayoutKeys.Offsets),
                     new LayoutNode(LayoutKeys.Settings),
                     new LayoutNode(LayoutKeys.Probing),

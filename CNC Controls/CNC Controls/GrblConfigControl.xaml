@@ -13,6 +13,7 @@
              KeyDown="ConfigView_KeyDown">
     <UserControl.Resources>
         <system:String x:Uid="str_saveSettings" x:Key="SaveSettings">Settings changed, save now?</system:String>
+        <system:String x:Uid="str_resetGrblDefaults" x:Key="ResetGrblDefaults">Restore ALL controller settings to firmware defaults ($RST=$)? This overwrites the current $ settings on the machine.</system:String>
         <system:String x:Uid="str_settingsWritten" x:Key="SettingsWritten">All settings written to {0} in the sender folder.</system:String>
         <system:String x:Uid="str_settingsError" x:Key="SettingsError">Setting {0} returned {1}, continue?</system:String>
         <system:String x:Uid="str_settingsTimeout" x:Key="SettingsTimeout">Timed out while setting {0}, continue?</system:String>
@@ -110,7 +111,8 @@
                 <Button x:Uid="btn_matchPrev" x:Name="btnMatchPrev" Content="▲" MinWidth="26" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchPrev_Click" IsEnabled="False" ToolTip="Previous match (F4)"/>
                 <Button x:Uid="btn_matchNext" x:Name="btnMatchNext" Content="▼" MinWidth="26" Padding="4,1" Margin="2,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchNext_Click" IsEnabled="False" ToolTip="Next match (F3)"/>
             </StackPanel>
-            <TreeView x:Name="treeView" Grid.Row="1" HorizontalAlignment="Left" Margin="10,5,0,10" VerticalAlignment="Stretch" Width="390" SelectedItemChanged="treeView_SelectedItemChanged" Grid.RowSpan="2">
+            <TreeView x:Name="treeView" Grid.Row="1" HorizontalAlignment="Left" Margin="10,5,0,10" VerticalAlignment="Stretch"
+                      Width="{Binding ActualWidth, ElementName=searchPanel}" MinWidth="390" SelectedItemChanged="treeView_SelectedItemChanged" Grid.RowSpan="2">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type cnccore:GrblSettingGroup}" ItemsSource="{Binding Settings}" >
                         <StackPanel Orientation="Horizontal">
@@ -164,30 +166,8 @@
             </DataGrid.Columns>
         </DataGrid>
         <DockPanel x:Name="dpan" DockPanel.Dock="Left">
-            <DockPanel DockPanel.Dock="Bottom" HorizontalAlignment="Stretch" Height="Auto" Margin="10,0,10,10" VerticalAlignment="Top" Width="Auto">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Height="Auto" VerticalAlignment="Top">
-                    <Button x:Uid="btn_reload" x:Name="btnReload" Content="Reload" ToolTip="Reload settings from controller." HorizontalAlignment="Left" Style="{StaticResource ConfigButtonStyle}" Click="btnReload_Click"/>
-                    <Button x:Uid="btn_save" x:Name="btnSave" Content="Save" ToolTip="Save changed settings to controller." HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnSave_Click">
-                        <!--- TODO                        <Button.IsEnabled>
-                            <Binding Converter="IsNotConverter">
-                            <MultiBinding Converter="{StaticResource StateToBooleanConverter}">
-                            <Binding Path="Grbl.GrblState"/>
-                            <Binding>
-                                <Binding.Source>
-                                    <cnccore:GrblStates>Hold</cnccore:GrblStates>
-                                </Binding.Source>
-                            </Binding>
-                            </MultiBinding>
-                            </Binding>
-                        </Button.IsEnabled> -->
-                    </Button>
-                    <Button x:Uid="btn_copyToSim" x:Name="btnCopyToSim" Content="Copy to simulator" ToolTip="Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile, so a later simulator connection matches this machine." HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Padding="8,0" MinWidth="120" Click="CopyToSim_Click"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Height="Auto" VerticalAlignment="Top" HorizontalAlignment="Right">
-                    <Button x:Uid="btn_backup" x:Name="btnBackup" Content="Backup" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnBackup_Click"/>
-                    <Button x:Uid="btn_restore" x:Name="btnRestore" Content="Restore" HorizontalAlignment="Right" Margin="5,0,0,0" VerticalAlignment="Top" Style="{StaticResource ConfigButtonStyle}" Click="btnRestore_Click"/>
-                </StackPanel>
-            </DockPanel>
+            <!-- Reload / Save / Backup / Restore / Copy-to-sim live in the shared Settings footer's Grbl sub-footer
+                 (GrblConfigView), so the whole Settings area has one consistent footer. -->
             <!-- Auto row: the selected setting's edit field(s); * row: the description box fills the rest.
                  This lets the field always take its full height (it is no longer clipped by the box below)
                  and the box fill the remaining area via layout - no code-computed height needed. -->

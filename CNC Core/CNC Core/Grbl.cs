@@ -1157,7 +1157,7 @@ namespace CNC.Core
 
         public static int AxisLetterToIndex(string letter)
         {
-            return AxisLetters.IndexOf(letter);
+            return string.IsNullOrEmpty(letter) ? -1 : AxisLetters.IndexOf(letter);
         }
 
         public static int AxisLetterToIndex(char letter)

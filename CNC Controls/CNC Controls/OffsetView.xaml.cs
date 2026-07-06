@@ -194,21 +194,38 @@ namespace CNC.Controls
             (DataContext as GrblViewModel).Message = String.Empty;
 
             // G28/G30 can only be stored from the CURRENT machine position (G28.1/G30.1). To honour an edited
-            // target value, rapid there first (G53 G0) then store. This MOVES the machine, so confirm first.
+            // target value, rapid there first (G53 G0) then store - but only when the target actually differs
+            // from where the machine already is. When it matches (the common "store where I am now" case, same as
+            // the flyout Set), store directly: no rapid, no confirmation. Only an edited target that moves the
+            // machine warrants the popup.
             if (IsPredefined && axis != "ClearAll")
             {
+                var grbl = DataContext as GrblViewModel;
                 var flags = axis == "All" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis);
-                string axes = newpos.ToString(flags);
-                if (MessageBox.Show(
-                        string.Format("This will rapid the machine to {0} (G53 G0) and store that as {1}.\n\nProceed?", axes, selectedOffset.Code),
-                        "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                    return;
-                if (mChanged)
+
+                bool needsMove = false;
+                for (int i = 0; i < GrblInfo.NumAxes; i++)
+                    if (flags.HasFlag(GrblInfo.AxisIndexToFlag(i)) &&
+                        Math.Abs(newpos.Values[i] - grbl.MachinePosition.Values[i]) > 0.001)
+                        needsMove = true;
+
+                if (needsMove)
+                {
+                    string axes = newpos.ToString(flags);
+                    if (MessageBox.Show(
+                            string.Format("This will rapid the machine to {0} (G53 G0) and store that as {1}.\n\nProceed?", axes, selectedOffset.Code),
+                            "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        return;
+                    if (mChanged)
+                        Comms.com.WriteCommand(cmd);
+                    Comms.com.WriteCommand("G53G0" + axes);
+                }
+                else if (mChanged)
                     Comms.com.WriteCommand(cmd);
-                Comms.com.WriteCommand("G53G0" + axes);
+
                 Comms.com.WriteCommand(selectedOffset.Code + ".1");
                 if (mChanged)
-                    Comms.com.WriteCommand((DataContext as GrblViewModel).IsMetric ? "G20" : "G21");
+                    Comms.com.WriteCommand(grbl.IsMetric ? "G20" : "G21");
                 return;
             }
 

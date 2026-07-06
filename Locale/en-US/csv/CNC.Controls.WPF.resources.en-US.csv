@@ -677,7 +677,7 @@ CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scma
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,lbl_sctool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,fld_scnewres:CNC.Controls.NumericField.Unit,None,False,True,,steps/mm
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabJob:System.String.$Content,None,True,True,,Job
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Load stock
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabLoadStock:System.String.$Content,None,True,True,,Start Job
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabOffsets:System.String.$Content,None,True,True,,Offsets
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSettings:System.String.$Content,None,True,True,,Settings
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabProbing:System.String.$Content,None,True,True,,Probing

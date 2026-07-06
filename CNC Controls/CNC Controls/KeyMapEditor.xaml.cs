@@ -22,7 +22,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class KeyMapEditor : UserControl, ISettingsEditorTab
+    public partial class KeyMapEditor : UserControl, ISettingsEditorTab, ISettingsResettable
     {
         private readonly KeypressHandler keyboard;
         private readonly GrblViewModel model;
@@ -88,7 +88,7 @@ namespace CNC.Controls
                 m.SaveMap();
             }
 
-            keyboard.SaveMappings(CNC.Core.Resources.ConfigPath + "KeyMap0.xml");
+            keyboard.SaveMappings();   // persists into the App.config "KeyMap" section
             AppConfig.Settings.Save();
             AppConfig.NotifyConsoleShortcutChanged();
         }
@@ -195,9 +195,19 @@ namespace CNC.Controls
             UpdateConflicts();
         }
 
-        private void Reset_Click(object sender, RoutedEventArgs e)
+        // Reset every keyboard binding (and controller button) to its factory default. Invoked by the shared
+        // Settings footer's "Reset to Default" (this tab has no in-tab reset button of its own).
+        public void ResetToDefaults()
         {
-            LoadRows();
+            foreach (var row in rows)
+                row.ResetToDefault();
+
+            if (model.ControllerMapper != null)
+                foreach (var r in controllerRows)
+                    r.Action = ControllerMapper.DefaultAction(r.Button);
+
+            UpdateJogPresetRadios();
+            UpdateConflicts();
         }
 
         private void BuildGroupStates()
@@ -612,6 +622,7 @@ namespace CNC.Controls
             { "JobControl.Home", "Run the homing cycle." },
             { "JobControl.Unlock", "Clear an alarm / unlock the controller ($X)." },
             { "JobControl.Reset", "Soft-reset the controller (Ctrl-X)." },
+            { "JobControl.ResetAndUnlock", "Soft-reset the controller, then clear the alarm ($X) once it restarts." },
             { "JobControl.FeedHold", "Pause motion (feed hold)." },
             { "JobControl.FeedRateUp", "Increase the programmed feed rate." },
             { "JobControl.FeedRateDown", "Decrease the programmed feed rate." },
@@ -695,6 +706,7 @@ namespace CNC.Controls
             { "JobControl.Home", "Home" },
             { "JobControl.Unlock", "Unlock (clear alarm)" },
             { "JobControl.Reset", "Reset (soft-reset)" },
+            { "JobControl.ResetAndUnlock", "Reset and unlock" },
             { "JobControl.FeedHold", "Feed hold" },
             { "JobControl.FeedRateUp", "Feed rate +" },
             { "JobControl.FeedRateDown", "Feed rate −" },
@@ -851,10 +863,21 @@ namespace CNC.Controls
 
             public GroupRowState Group;   // owning outline group (for header change indication)
 
-            /// <summary>True when the binding differs from its factory default.</summary>
+            // Value when the editor was first opened this session (the persisted / app-startup binding). Used
+            // for the "modified" highlight, so a saved custom binding doesn't read as modified on every launch.
+            public readonly Key StartupKey;
+            public readonly ModifierKeys StartupModifiers;
+
+            /// <summary>True when the binding differs from its factory default (drives Reset-to-default).</summary>
             public bool IsChanged
             {
                 get { return Model.Key != Model.DefaultKey || Model.Modifiers != Model.DefaultModifiers; }
+            }
+
+            /// <summary>True when the binding differs from its value at first open (drives the highlight).</summary>
+            public bool IsModified
+            {
+                get { return Model.Key != StartupKey || Model.Modifiers != StartupModifiers; }
             }
 
             /// <summary>True when a key is assigned (so Clear is meaningful).</summary>
@@ -888,12 +911,15 @@ namespace CNC.Controls
             {
                 Model = model;
                 Label = label;
+                StartupKey = model.Key;
+                StartupModifiers = model.Modifiers;
             }
 
             public void Refresh()
             {
                 Notify(nameof(DisplayText));
                 Notify(nameof(IsChanged));
+                Notify(nameof(IsModified));
                 Notify(nameof(IsBound));
                 if (Group != null)
                     Group.Recompute();
@@ -915,10 +941,19 @@ namespace CNC.Controls
             public List<BindingRow> Rows { get; } = new List<BindingRow>();
 
             private bool modified;
+            // Any row differs from its factory default (enables "Reset group to defaults").
             public bool Modified
             {
                 get { return modified; }
                 private set { if (modified != value) { modified = value; Notify(nameof(Modified)); } }
+            }
+
+            private bool hasModified;
+            // Any row differs from its value at first open (drives the group-header highlight).
+            public bool HasModified
+            {
+                get { return hasModified; }
+                private set { if (hasModified != value) { hasModified = value; Notify(nameof(HasModified)); } }
             }
 
             public GroupRowState(string name, string description)
@@ -930,6 +965,7 @@ namespace CNC.Controls
             public void Recompute()
             {
                 Modified = Rows.Any(r => r.IsChanged);
+                HasModified = Rows.Any(r => r.IsModified);
             }
 
             public event PropertyChangedEventHandler PropertyChanged;

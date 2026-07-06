@@ -190,6 +190,8 @@ namespace GCode_Sender
                 {
                     if (e.PropertyName == nameof(GrblViewModel.FileName))
                         OnJobFileChanged((DataContext as GrblViewModel)?.FileName);
+                    else if (e.PropertyName == nameof(GrblViewModel.GrblState))
+                        UpdateConnectionGatedTabs();   // enable operational tabs on connect, disable on disconnect
                 };
         }
 
@@ -490,7 +492,18 @@ namespace GCode_Sender
                 showPinned.Start();
             }
 
-            UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = 0]);
+            // Set the initial connection-gated tab state (Start Job etc. disabled until connect).
+            UpdateConnectionGatedTabs();
+
+            // Land on the Job (GRBL) tab. It is always enabled, and its Activate runs the controller handshake
+            // (Controller.Restart -> OnBooted -> InitSystem -> $I: EXPR/ENUMS/ATC/WCSROT) and manages status
+            // polling. Start Job is first in the tab strip but must NOT be the landing: its view does not boot the
+            // controller, and activating Job separately just to boot corrupts the poller/init state (dead status
+            // feedback, InitSystem re-firing mid-job). The operator clicks Start Job when they want it - by then
+            // the controller is booted and its capabilities are known.
+            var jobTab = getTab(ViewType.GRBL);
+            int landing = jobTab != null ? tabMode.Items.IndexOf(jobTab) : 0;
+            UIViewModel.CurrentView = getView((TabItem)tabMode.Items[tabMode.SelectedIndex = landing]);
             if (connected)
             {
                 System.Threading.Thread.Sleep(50);
@@ -744,6 +757,16 @@ namespace GCode_Sender
             }));
         }
 
+        // Reassert pinned flyouts as visible. The sidebar canvas is collapsed off the Job tab, so returning to
+        // Job must re-show any pinned flyout (a pin means "stay open"); without this they only appeared via the
+        // one-shot launch timer and read as "closed on tab switch".
+        private void ShowPinnedFlyouts()
+        {
+            foreach (var child in sidebarCanvas.Children)
+                if (child is IPinnableFlyout f && f.Pinned && child is UIElement el)
+                    el.Visibility = Visibility.Visible;
+        }
+
         // Persist a flyout's pin state so it reopens (pinned) on next launch.
         private void MainPanelFlyout_PinnedChanged(IPinnableFlyout flyout)
         {
@@ -840,6 +863,23 @@ namespace GCode_Sender
         private void exitMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        // Open the config folder (where App.config, KeyMap0.xml, grbl backups and restore points live) in Explorer,
+        // so the user can find/back up/edit those files without hunting for the install directory.
+        private void openConfigFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string path = CNC.Core.Resources.ConfigPath;
+                if (string.IsNullOrEmpty(path))
+                    path = AppDomain.CurrentDomain.BaseDirectory;
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + System.IO.Path.GetFullPath(path).TrimEnd('\\') + "\"");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
         }
 
         void aboutWikiItem_Click(object sender, EventArgs e)
@@ -1102,17 +1142,25 @@ namespace GCode_Sender
 
             // The sidebar flyouts only act on the Job tab, so only show them when it's selected (done
             // regardless of IsReady so it tracks tab changes before a controller is connected too).
-            sidebarCanvas.Visibility = nextView != null && nextView.ViewType == ViewType.GRBL ? Visibility.Visible : Visibility.Collapsed;
+            bool onJob = nextView != null && nextView.ViewType == ViewType.GRBL;
+            sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
 
-            if (!(DataContext as GrblViewModel).IsReady)
-                return;
-
-            if (UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
+            if ((DataContext as GrblViewModel).IsReady &&
+                UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
             {
                 ICNCView prevView = UIViewModel.CurrentView;
                 UIViewModel.CurrentView = nextView;
                 prevView.Activate(false, nextView.ViewType);
                 nextView.Activate(true, prevView.ViewType);
+            }
+
+            // Pinned flyouts persist across tab switches. Reassert them on return to Job AFTER the activation
+            // above, and again deferred: a post-activation layout pass otherwise re-hides them (the same reason
+            // the launch reopen uses a deferred timer instead of an inline Visibility set).
+            if (onJob)
+            {
+                ShowPinnedFlyouts();
+                Dispatcher.BeginInvoke(new System.Action(ShowPinnedFlyouts), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
@@ -1166,6 +1214,29 @@ namespace GCode_Sender
             return tab != null && enable;
         }
 
+        private bool _connGatedTabsOn = false;
+
+        // Enable/disable the connection-gated tabs (descriptor EnabledWhenDisconnected == false) as the controller
+        // connects/disconnects. Only acts on a change of connection so it doesn't fight the JobRunning enable rules
+        // during a job (a job never spans a connect transition). Idempotent; safe to call from the state handler.
+        private void UpdateConnectionGatedTabs()
+        {
+            bool connected = Comms.com != null && Comms.com.IsOpen;
+            if (connected == _connGatedTabsOn)
+                return;
+            _connGatedTabsOn = connected;
+
+            foreach (TabItem tab in UIUtils.FindLogicalChildren<TabItem>(tabMode))
+            {
+                var view = getView(tab);
+                if (view == null)
+                    continue;
+                var d = TabRegistry.DescriptorByName(view.ViewType.ToString());
+                if (d != null && !d.EnabledWhenDisconnected)
+                    tab.IsEnabled = connected;
+            }
+        }
+
         public static void ShowView(bool show, ViewType view)
         {
             TabItem tab = getTab(view);
@@ -1191,15 +1262,19 @@ namespace GCode_Sender
             // "greyed until connected"), and a tab that needs a capability the controller lacks is REMOVED on
             // connect (JobView.Setup) and listed, with the reason, in Edit Main Page > Unavailable
             // (ComponentAvailability). Tabs that only need a live controller stay available and act on connect.
+            // enabledWhenDisconnected: which tabs are usable before a controller connects. Job stays on for
+            // offline g-code load/preview; Settings/Tools/Machine Setup are config/setup work. The operational
+            // tabs (Start Job, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
+            // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 10, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, TabLabel("TabLoadStock", "Load stock"), () => new LoadStockView(), 20, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 30, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, TabLabel("TabLoadStock", "Start Job"), () => new LoadStockView(), 5, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 30, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 55, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: true,
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 55, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Wizards"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Wizards"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
         }

@@ -1,12 +1,11 @@
-<UserControl x:Class="CNC.Controls.AutoSquareWizard"
+<local:ConfigPanel x:TypeArguments="local:AutoSquareParams" x:Class="CNC.Controls.AutoSquareWizard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
-             d:DesignHeight="520" d:DesignWidth="980"
-             Loaded="UserControl_Loaded">
+             d:DesignHeight="520" d:DesignWidth="980">
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="450"/>
@@ -108,4 +107,4 @@
             <TextBlock x:Name="txtSummary" Grid.Row="2" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
     </Grid>
-</UserControl>
+</local:ConfigPanel>
