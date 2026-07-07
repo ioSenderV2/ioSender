@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>59 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>60 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -174,6 +174,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>High-DPI / 125&ndash;150% text-scaling layout</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr7">7</a></td></tr>
 <tr><td>Assignable <em>Jog distance +/&minus;</em> controller actions &mdash; step the jog distance preset (separate from jog speed)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr35">35</a></td></tr>
 <tr><td>Run-bar jog preset spinners &mdash; read-only <em>Dist</em> / <em>Feed</em> up/down selectors (wrap-around) on the Check line; startup splash stays on top so the full init sequence is visible</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr45">45</a></td></tr>
+<tr><td>Drag a tab header left/right to reorder tabs &mdash; main bar and every sub-tab strip; the order persists across restarts (and agrees with the Edit Main Page editor)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr60">60</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -309,7 +310,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">57</td><td><a href="#pr57">Fixes: Start Job tab strand + program-view overlay width</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">58</td><td><a href="#pr58">Numeric fields select their value on focus</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+35</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">59</td><td><a href="#pr59">Connect: Network default + LAN controller discovery</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+527</span> <span class="del">-9</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (59 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">491</span> <span class="del">2</span> <span class="add">+94</span><br><span class="k">Lines:</span> <span class="add">+31407</span> <span class="del">-3884</span></td></tr>
+<tr><td class="n">60</td><td><a href="#pr60">Drag to reorder tabs (persisted across restarts)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+306</span> <span class="del">-8</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (60 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">497</span> <span class="del">2</span> <span class="add">+95</span><br><span class="k">Lines:</span> <span class="add">+31713</span> <span class="del">-3892</span></td></tr>
 </table>
 </div>
 
@@ -1728,6 +1730,24 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Discovery by protocol, not open ports.</strong> An async subnet sweep (up to a /24 per interface, 64 concurrent) probes each host and confirms it&rsquo;s really a grbl controller by sending the real-time status request <code>?</code> and requiring a valid <code>&lt;State|&hellip;&gt;</code> report back &mdash; then reads <code>$I</code> to show &ldquo;grblHAL&nbsp;&lt;version&gt;&rdquo;. Random devices with telnet open are rejected. mDNS (<code>grblHAL.local</code>) is tried first but not relied on: consumer WiFi routers routinely drop mDNS multicast between the wireless and wired segments, so the subnet scan is the real workhorse.</li>
 <li><strong>Editable host picker.</strong> The IP field is now a combo &mdash; type a host, or pick one the scan found (the dropdown shows &ldquo;host:port&nbsp;&mdash;&nbsp;grblHAL&nbsp;x.x&rdquo;, the edit box shows just the host, and OK connects to whatever is current).</li>
 <li>The dialog also no longer hides behind the startup splash (it docks to the top of the screen while the splash is up), and its fields no longer clip at high DPI.</li>
+</ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #60 ===== -->
+<div class="pr">
+<h2 id="pr60"><span class="badge">#60</span>Drag to reorder tabs (persisted across restarts)</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/StretchTabControl.cs</td><td class="num add">178</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/TabOrderConfig.cs</td><td class="num add">48</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">56</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">13</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/ToolsView.xaml.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls Probing/ProbingView.xaml</td><td class="num add">5</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Grab any tab <strong>header</strong> and drag it left or right to change tab order &mdash; on the main bar and on every sub-tab strip (Settings, Tools, Probing). A plain click still just selects the tab; the drag only starts once the pointer passes the system drag threshold, and the cursor switches to a &harr; while dragging. The new order now <strong>survives a restart</strong>.</p><ul>
+<li><strong>Persisted to whichever store already governs a bar &mdash; never a second source of truth.</strong> The Probing and Settings strips (which had no order config before) are saved by the control itself into a new <code>TabOrder</code> section of <code>App.config</code>, keyed per strip. The main bar and the Tools sub-tabs are already backed by the layout tree, so a drag there writes into <code>Config.Tabs</code> / the layout tree &mdash; the <em>same</em> store the <strong>Edit Main Page &rarr; Tabs</strong> editor uses, so dragging and the editor always agree (and drag takes effect immediately, no restart needed).</li>
+<li><strong>Capability-hidden tabs stay put.</strong> Tabs hidden for the current controller (e.g. Lathe Wizards outside lathe mode, Trinamic / PID when unsupported) keep their stored position &mdash; only the on-screen tabs reorder among themselves, so a hidden tab can never be dropped from the saved layout.</li>
 </ul><p class="foot">In the integration build.</p></div>
 </div>
 </section>
