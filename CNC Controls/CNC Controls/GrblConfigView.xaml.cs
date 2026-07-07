@@ -98,6 +98,13 @@ namespace CNC.Controls
             {
                 LeaveTab(cur);
                 AutoSaveOnLeave();
+
+                // A restart-only change was made and not yet applied - offer to restart now on the way out of the
+                // Settings area (the flashing Restart button otherwise just persists until the next visit).
+                if (RestartPending &&
+                    MessageBox.Show("Some changes you made only take effect after a restart. Restart ioSender now?",
+                                    "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    DoRestart();
             }
         }
 
@@ -434,6 +441,14 @@ namespace CNC.Controls
         }
 
         private void btnRestart_Click(object sender, RoutedEventArgs e)
+        {
+            DoRestart();
+        }
+
+        // True while a restart-only change is pending (the Restart button is shown + enabled and pulsing).
+        private bool RestartPending { get { return btnRestart.IsEnabled && btnRestart.Visibility == Visibility.Visible; } }
+
+        private void DoRestart()
         {
             AppConfig.Settings.Save();
             try

@@ -17,6 +17,48 @@
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="VerticalAlignment" Value="Top" />
         </Style>
+        <!-- Restart button: while enabled (a restart-only change is pending) it slowly pulses red so the user
+             can't miss that a relaunch is needed. A custom template is used because the themed Button chrome
+             would otherwise paint over the Background, hiding the animation. The pulse runs off the IsEnabled
+             trigger, so it starts when the button is enabled and keeps flashing across tab switches until the
+             user restarts (the button is never re-disabled). -->
+        <Style x:Key="RestartButtonStyle" TargetType="Button" BasedOn="{StaticResource ConfigButtonStyle}">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="#FFD32F2F" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="2" BorderThickness="1" BorderBrush="#FF8B0000"
+                                Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" SnapsToDevicePixels="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard x:Name="flashStoryboard">
+                                        <Storyboard>
+                                            <ColorAnimation Storyboard.TargetName="border"
+                                                            Storyboard.TargetProperty="Background.Color"
+                                                            From="#FFE53935" To="#FF7A1515" Duration="0:0:1"
+                                                            AutoReverse="True" RepeatBehavior="Forever"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="flashStoryboard"/>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <DockPanel>
         <!-- One shared footer for the whole Settings area. Right group = Save settings (hidden when the relevant
@@ -33,7 +75,7 @@
             <DockPanel Margin="5,0,5,3">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button x:Uid="btn_saveSettings" x:Name="btnSave" Content="Save settings" Margin="5,0,0,0" Padding="5,0" Click="btnSave_Click" Style="{StaticResource ConfigButtonStyle}"/>
-                    <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Margin="5,0,0,0" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource ConfigButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply changes that only take effect at startup. Enabled once such a change is made."/>
+                    <Button x:Uid="btn_restart" x:Name="btnRestart" Content="Restart" Margin="5,0,0,0" Padding="5,0" Click="btnRestart_Click" Style="{StaticResource RestartButtonStyle}" Visibility="Collapsed" IsEnabled="False" ToolTip="Relaunch ioSender to apply changes that only take effect at startup. Enabled once such a change is made."/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <Button x:Uid="btn_resetDefault" x:Name="btnReset" Content="Reset to Default" Padding="8,0" MinWidth="110" Click="btnReset_Click" Style="{StaticResource ConfigButtonStyle}" ToolTip="Reset this tab's settings to their defaults."/>
