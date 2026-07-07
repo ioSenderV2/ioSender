@@ -40,6 +40,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -108,24 +111,86 @@ namespace GCode_Sender
             main.Show();   // shown with Opacity 0 / not in taskbar; Window_Load -> CompleteStartup runs unseen
         }
 
+        // Exit code written on a fatal unhandled exception. Distinct non-zero sentinel (0xFA11 = "FAIL") so a
+        // headless launcher/harness can tell "crashed - read the log" apart from a normal quit (0) or a build
+        // failure. The crash detail is dumped to CrashLogPath() first.
+        private const int CrashExitCode = 0xFA11;
+
         private void CurrentDomainOnUnhandledException(object sender, UnhandledExceptionEventArgs args)
-        { 
-            MessageBox.Show("Unhandled exception occured: " + (args.ExceptionObject as Exception).Message, "CurrentDomainException");
+        {
+            // Background/non-UI thread: the event is notification-only (can't be marked handled), so the process
+            // is going down regardless. Log, tell an interactive user, then exit with the crash sentinel - the
+            // previous handler showed a box but never exited, leaving a wedged process.
+            HandleFatal("AppDomain.UnhandledException", args.ExceptionObject as Exception);
         }
 
         private void DispatcherOnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
         {
-            args.Handled = true;
-
-            MessageBox.Show("Unhandled exception occured: " + (args.Exception as Exception).Message, "DispatcherException");
-            Environment.Exit(-1);
+            args.Handled = true; // stop the default WER/JIT path; we terminate deterministically below
+            HandleFatal("Dispatcher.UnhandledException", args.Exception);
         }
 
         private void TaskSchedulerOnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs args)
         {
             args.SetObserved();
+            HandleFatal("TaskScheduler.UnobservedTaskException", args.Exception?.GetBaseException());
+        }
 
-            MessageBox.Show("Unhandled exception occured: " + (args.Exception.GetBaseException() as Exception).Message, "TaskSchedulerException");
+        // Common fatal path: dump the exception to a known log file, surface it to an interactive user (unless
+        // running headless), then exit with CrashExitCode. Never throws.
+        private void HandleFatal(string source, Exception ex)
+        {
+            string logPath = WriteCrashLog(source, ex);
+
+            // Skip the modal dialog for unattended runs (build.ps1 -Headless sets IOSENDER_HEADLESS) so a crash
+            // can't hang the process on an un-clicked message box; the log + exit code carry the signal.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("IOSENDER_HEADLESS")))
+            {
+                try
+                {
+                    MessageBox.Show(
+                        (ex?.Message ?? "Unknown error") + "\n\nDetails written to:\n" + logPath,
+                        "ioSender - unhandled exception (" + source + ")",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch { /* UI may be gone on a background-thread crash - the log already has it */ }
+            }
+
+            Environment.Exit(CrashExitCode);
+        }
+
+        // Append a timestamped crash entry to %AppData%\ioSender\ioSender.crash.log (falls back to the app folder
+        // if the config dir isn't resolved yet, e.g. a crash during early startup). Returns the path written, or a
+        // best-effort path string if the write itself failed. Never throws.
+        private static string WriteCrashLog(string source, Exception ex)
+        {
+            string dir;
+            try
+            {
+                dir = CNC.Core.Resources.ConfigPath;
+                if (string.IsNullOrEmpty(dir) || dir == "./" || !Path.IsPathRooted(dir))
+                    dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ioSender");
+                Directory.CreateDirectory(dir);
+            }
+            catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
+
+            string path = Path.Combine(dir, "ioSender.crash.log");
+
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("========================================================================");
+                sb.AppendLine("Time (UTC) : " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
+                sb.AppendLine("Version    : " + (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?"));
+                sb.AppendLine("Source     : " + source);
+                sb.AppendLine("Exception  :");
+                sb.AppendLine(ex?.ToString() ?? "(no exception object)");
+                sb.AppendLine();
+                File.AppendAllText(path, sb.ToString());
+            }
+            catch { /* last resort: nothing more we can do */ }
+
+            return path;
         }
     }
 }

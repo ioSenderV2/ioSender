@@ -1,0 +1,69 @@
+{
+    // Headless build tasks for ioSender XL - run via Terminal -> Run Task (or Ctrl+Shift+B
+    // for the default). All delegate to build.ps1 so there is one source of truth for the
+    // build, and none of them open the Visual Studio GUI.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Debug + Launch",
+            "detail": "Kill ioSender, Debug build, launch the app (the 'go test it' step).",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/build.ps1",
+                "-Configuration", "Debug",
+                "-Launch"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Build Release (verify)",
+            "detail": "Kill ioSender, Release build only - the pre-commit clean check.",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/build.ps1",
+                "-Configuration", "Release"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "Build Both (Debug + Release)",
+            "detail": "Verify Debug and Release both build clean before committing.",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/build.ps1",
+                "-Configuration", "Both"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        }
+    ]
+}
