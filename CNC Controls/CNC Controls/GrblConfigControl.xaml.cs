@@ -70,6 +70,19 @@ namespace CNC.Controls
 
             model = (DataContext as WidgetViewModel).Grbl;
 
+            ConfigureView();
+
+            UpdateValidation();
+        }
+
+        // Set up the tree (grblHAL, reports setting enums) vs the classic DataGrid (legacy Grbl) and bind the
+        // matching data source. This MUST be re-run whenever the tab is entered, not just once on Loaded: the
+        // control is created eagerly at app startup - before any controller is connected, so GrblInfo.HasEnums
+        // is false and the one-time Loaded pass would leave the classic grid showing and the grblHAL settings
+        // tree collapsed and unbound. GrblSettingGroups.Groups is a plain List (no change notification), so we
+        // null-then-reassign to force the tree to rebuild after Load() has populated it.
+        private void ConfigureView()
+        {
             dgrSettings.Visibility = GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             searchPanel.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             treeView.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
@@ -77,6 +90,7 @@ namespace CNC.Controls
 
             if (GrblInfo.HasEnums)
             {
+                treeView.ItemsSource = null;
                 treeView.ItemsSource = GrblSettingGroups.Groups;
             }
             else
@@ -84,8 +98,6 @@ namespace CNC.Controls
                 dgrSettings.DataContext = GrblSettings.Settings;
                 dgrSettings.SelectedIndex = 0;
             }
-
-            UpdateValidation();
         }
 
         #region Methods required by GrblConfigTab interface
@@ -108,6 +120,10 @@ namespace CNC.Controls
                     {
                         GrblSettings.Load();
                     }
+
+                    // Re-evaluate now the controller is known: on the first entry after connecting, Loaded ran
+                    // while disconnected (HasEnums == false) so the tree was collapsed/unbound; rebind it now.
+                    ConfigureView();
 
                     if(treeView.SelectedItem != null && treeView.SelectedItem is GrblSettingDetails)
                         ShowSetting(treeView.SelectedItem as GrblSettingDetails, false);
