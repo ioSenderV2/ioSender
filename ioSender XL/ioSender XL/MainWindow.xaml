@@ -241,16 +241,18 @@
             <cnccontrols:THCMonitorControl x:Name="thcControl" Visibility="Hidden" Canvas.Right="22"/>
         </Canvas>
         <Grid DockPanel.Dock="Left">
-        <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
-            <TabControl.Resources>
+        <!-- StretchTabControl spreads the tab headers across the full strip width (proportional to each
+             label). Recomputes only on tab add/remove and a deferred, post-layout resize callback. -->
+        <cnccontrols:StretchTabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
+            <cnccontrols:StretchTabControl.Resources>
                 <Style TargetType="{x:Type TabItem}">
                     <Setter Property="MinHeight" Value="32" />
                     <Setter Property="MinWidth" Value="40" />
                 </Style>
-            </TabControl.Resources>
+            </cnccontrols:StretchTabControl.Resources>
             <!-- Tabs are built in code from TabRegistry (Phase 1: MainWindow is a container).
                  See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
-        </TabControl>
+        </cnccontrols:StretchTabControl>
         <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
         <!-- Program view always pops on the RIGHT. -->
         <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" Margin="0,60,0,0"

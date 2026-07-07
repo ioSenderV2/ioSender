@@ -56,7 +56,7 @@
         </StackPanel>
 
         <!-- Body: one tab per setup step -->
-        <TabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
+        <local:StretchTabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
 
             <!-- Overview -->
             <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview">
@@ -348,7 +348,7 @@
                     </StackPanel>
                 </Grid>
             </TabItem>
-        </TabControl>
+        </local:StretchTabControl>
 
         <!-- Footer -->
         <DockPanel Grid.Row="2" Margin="0,8,0,0">

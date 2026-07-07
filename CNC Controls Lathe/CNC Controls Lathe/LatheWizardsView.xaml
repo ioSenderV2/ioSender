@@ -4,9 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls.Lathe"
-             mc:Ignorable="d" 
+             xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900">
-    <TabControl x:Name="tab" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+    <Controls:StretchTabControl x:Name="tab" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
         <TabItem x:Uid="tab_turning" x:Name="tabTurning" Header="Turning">
             <local:TurningWizard x:Name="turningWizard"/>
         </TabItem>
@@ -19,5 +20,5 @@
         <TabItem x:Uid="tab_threading" x:Name="tabThreading" Header="Threading">
             <local:ThreadingWizard x:Name="threadingWizard"/>
         </TabItem>
-    </TabControl>
+    </Controls:StretchTabControl>
 </UserControl>

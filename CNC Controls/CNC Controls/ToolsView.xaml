@@ -9,5 +9,5 @@
              Loaded="UserControl_Loaded">
     <!-- Sub-tabs are built in code from the layout tree's Tools/"tools" slot (Phase 2b step 3).
          See RegisterTools()/BuildTools() in ToolsView.xaml.cs. -->
-    <TabControl x:Name="tabTools" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged"/>
+    <local:StretchTabControl x:Name="tabTools" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged"/>
 </UserControl>
