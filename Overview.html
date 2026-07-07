@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>60 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>63 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -190,6 +190,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Lathe mode toggle &mdash; App &rsaquo; Main checkbox enables/disables lathe mode, adding or removing the Lathe wizards tab (restart to apply)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr47">47</a></td></tr>
 <tr><td>Restart-needed cue &mdash; the Restart button pulses red while a restart-only change is pending and offers to relaunch when you leave Settings</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr48">48</a></td></tr>
 <tr><td>Connect: Network default + <strong>Scan network</strong> &mdash; finds grblHAL controllers on the LAN (confirms each by a <code>?</code>/<code>$I</code> handshake, not just an open port) and lists them in an editable host picker</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr59">59</a></td></tr>
+<tr><td>grbl:Settings tree now populates when opened after connecting &mdash; the flat-tab redesign built the settings view before a controller was connected, leaving the grblHAL settings tree collapsed and unbound; it now rebinds on entry</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr61">61</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -202,6 +203,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Start Job (was Load Stock) &mdash; first tab, connection-gated tabs, auto 3D-probe at the front-left origin, writes <code>start_job.macro</code>; new Verify skew pass (re-touch each corner in the rotated frame); flyout persistence &amp; offset-Set fixes</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr44">44</a></td></tr>
 <tr><td>Tools tab guidance &mdash; each Tools tab (tool table, spoilboard surfacing, scratch calibration, Trinamic, PID) now shows an on-screen &ldquo;About&rdquo; explainer of what it does and how to use it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr52">52</a></td></tr>
 <tr><td>Start Job tab no longer strands + program view stays a right column &mdash; a probe/hold that didn&rsquo;t cleanly clear could leave a gated tab disabled with no way back; the generated program overlay no longer grows to cover the whole tab</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr57">57</a></td></tr>
+<tr><td>Probing &amp; Tools sub-tabs share one look &mdash; instructions on the ambient grey, results in a white panel, consistent across the four Probing tabs and Stepper calibration</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr62">62</a></td></tr>
+<tr><td>Check mode (<code>$C</code>) moved off the status bar to a checkable <strong>Cycle Start</strong> right-click item &mdash; a dry-run / validate toggle now sits with the button that starts a run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr63">63</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -311,7 +314,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">58</td><td><a href="#pr58">Numeric fields select their value on focus</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+35</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">59</td><td><a href="#pr59">Connect: Network default + LAN controller discovery</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+527</span> <span class="del">-9</span></td></tr>
 <tr><td class="n">60</td><td><a href="#pr60">Drag to reorder tabs (persisted across restarts)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+306</span> <span class="del">-8</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (60 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">497</span> <span class="del">2</span> <span class="add">+95</span><br><span class="k">Lines:</span> <span class="add">+31713</span> <span class="del">-3892</span></td></tr>
+<tr><td class="n">61</td><td><a href="#pr61">grbl:Settings tree populates after connecting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">62</td><td><a href="#pr62">Probing/Tools sub-tab layout standardized</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+38</span> <span class="del">-30</span></td></tr>
+<tr><td class="n">63</td><td><a href="#pr63">Check ($C) moved to Cycle Start context menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+48</span> <span class="del">-29</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (63 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">515</span> <span class="del">2</span> <span class="add">+95</span><br><span class="k">Lines:</span> <span class="add">+31817</span> <span class="del">-3953</span></td></tr>
 </table>
 </div>
 
@@ -1748,6 +1754,50 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <div class="desc"><p>Grab any tab <strong>header</strong> and drag it left or right to change tab order &mdash; on the main bar and on every sub-tab strip (Settings, Tools, Probing). A plain click still just selects the tab; the drag only starts once the pointer passes the system drag threshold, and the cursor switches to a &harr; while dragging. The new order now <strong>survives a restart</strong>.</p><ul>
 <li><strong>Persisted to whichever store already governs a bar &mdash; never a second source of truth.</strong> The Probing and Settings strips (which had no order config before) are saved by the control itself into a new <code>TabOrder</code> section of <code>App.config</code>, keyed per strip. The main bar and the Tools sub-tabs are already backed by the layout tree, so a drag there writes into <code>Config.Tabs</code> / the layout tree &mdash; the <em>same</em> store the <strong>Edit Main Page &rarr; Tabs</strong> editor uses, so dragging and the editor always agree (and drag takes effect immediately, no restart needed).</li>
 <li><strong>Capability-hidden tabs stay put.</strong> Tabs hidden for the current controller (e.g. Lathe Wizards outside lathe mode, Trinamic / PID when unsupported) keep their stored position &mdash; only the on-screen tabs reorder among themselves, so a hidden tab can never be dropped from the saved layout.</li>
+</ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #61 ===== -->
+<div class="pr">
+<h2 id="pr61"><span class="badge">#61</span>grbl:Settings tree populates when opened after connecting</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">18</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Opening <strong>Settings &rsaquo; Grbl</strong> after connecting to a grblHAL controller could show an empty settings tree. The flat-tab Settings redesign builds the settings control eagerly at startup &mdash; before any controller is connected &mdash; and the one-time <code>Loaded</code> pass did all the &ldquo;does this controller report setting enums?&rdquo; setup then, when the answer was still <em>no</em>: it left the classic (legacy-Grbl) grid showing and the grblHAL settings tree collapsed and unbound. After connecting, the settings load, but nothing re-ran that setup (and the group list is a plain <code>List</code> with no change notification, so the tree wouldn&rsquo;t refresh on its own).</p><ul>
+<li><strong>Re-evaluate on entry.</strong> The tree/grid selection and data binding are now factored into one method that runs again each time the Grbl tab is entered (after settings load), null-then-reassigning the tree&rsquo;s source so it rebuilds from the now-populated groups.</li>
+</ul><p class="foot">In the integration build. Fixes a regression from the Settings flat-tab redesign (#42).</p></div>
+</div>
+
+<!-- ===== #62 ===== -->
+<div class="pr">
+<h2 id="pr62"><span class="badge">#62</span>Probing &amp; Tools sub-tabs share one layout</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls Probing/EdgeFinderControl.xaml</td><td class="num add">10</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls Probing/EdgeFinderIntControl.xaml</td><td class="num add">10</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls Probing/CenterFinderControl.xaml</td><td class="num add">10</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls Probing/ToolLengthControl.xaml</td><td class="num add">6</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls Probing/ProbingView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/StepperCalibrationWizard.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>A consistency pass so the descriptive/instructions area and the results area look the same across the four Probing sub-tabs (Tool length offset, Edge finder external/internal, Center finder) and the Stepper calibration tool, matching the newer Tools tabs: <strong>instructions on the ambient window grey, results in a white panel</strong>, with clear separation.</p><ul>
+<li><strong>Instructions on the ambient grey, not a near-white box.</strong> The instruction text sits directly on the window grey (as the Tools tabs do), and each tab&rsquo;s output (position / message / preview) is a bordered white panel.</li>
+<li><strong>The real culprit was the tab host.</strong> The Probing sub-tabs render inside a <code>StretchTabControl</code> that &mdash; unlike the Tools one &mdash; never set <code>Background="Transparent"</code>, so the stock TabControl template painted its content area white behind the transparent instructions. Making the Probing host transparent lets the ambient grey show through, so all four tabs finally match.</li>
+</ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #63 ===== -->
+<div class="pr">
+<h2 id="pr63"><span class="badge">#63</span>Check mode (<code>$C</code>) moved to a Cycle Start context-menu item</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/JobControl.xaml.cs</td><td class="num add">22</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml</td><td class="num add">11</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/StatusControl.xaml.cs</td><td class="num add">1</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/StatusControl.xaml</td><td class="num add">0</td><td class="num del">10</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num del">7</td></tr>
+</table>
+<div class="desc"><p>The <strong>Check</strong> checkbox next to the <em>State</em> field on the status bar was misplaced and rarely used. It&rsquo;s gone from the status bar; the grbl check-mode toggle is now a checkable <strong>&ldquo;Check mode (<code>$C</code>)&rdquo;</strong> item on the <strong>Cycle Start</strong> button&rsquo;s right-click menu &mdash; a dry-run / validate toggle now lives with the button that starts a run.</p><ul>
+<li><strong>Same semantics.</strong> The menu item mirrors the live check-mode state, is enabled only when not running a job and not asleep, sends <code>$C</code> from Idle to enter check mode, and soft-resets to leave it &mdash; exactly as the old checkbox did.</li>
+<li><strong>Localized.</strong> The new menu string (header + tooltip) is added to all 7 locale CSVs; the retired checkbox label rows are removed.</li>
 </ul><p class="foot">In the integration build.</p></div>
 </div>
 </section>
