@@ -61,6 +61,41 @@ namespace CNC.Controls
                 NumericProperties.OnFormatChanged(this, np, Format);
         }
 
+        // Select the whole value the first time the field gains focus (tab or click) so the user can
+        // just type the replacement instead of clearing the old value first. We must NOT swallow the
+        // focusing click - that would break native caret placement on later clicks. Instead:
+        //  - keyboard/tab focus: SelectAll right away in OnGotKeyboardFocus;
+        //  - click focus: let WPF place the caret natively, then SelectAll on the mouse-up (only for a
+        //    plain click, so a drag-select still keeps the user's partial selection).
+        // Once the box already has focus, every click falls through untouched -> caret lands where the
+        // user clicks, so single-digit edits work as expected.
+        private bool selectAllOnMouseUp;
+
+        protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+        {
+            base.OnGotKeyboardFocus(e);
+            if (Mouse.LeftButton != MouseButtonState.Pressed)
+                SelectAll();
+        }
+
+        protected override void OnPreviewMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            if (!IsKeyboardFocusWithin)
+                selectAllOnMouseUp = true;
+            base.OnPreviewMouseLeftButtonDown(e);
+        }
+
+        protected override void OnPreviewMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseLeftButtonUp(e);
+            if (selectAllOnMouseUp)
+            {
+                selectAllOnMouseUp = false;
+                if (SelectionLength == 0)   // plain click (not a drag-select) -> select the whole value
+                    SelectAll();
+            }
+        }
+
         public new string Text { get { return base.Text; } set { base.Text = value; } }
         public NumberStyles Styles { get { return np.Styles; } }
         public string DisplayFormat { get { return np.DisplayFormat; } }
