@@ -9,7 +9,6 @@
     <UserControl.Resources>
         <local:MacroReferenceConverter x:Key="MacroRef"/>
         <Style x:Key="SideButton" TargetType="Button">
-            <Setter Property="Height" Value="24"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="Padding" Value="5,0"/>
         </Style>
@@ -64,7 +63,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="0" Grid.Column="1" Width="92" Margin="8,0,0,0">
+        <StackPanel Grid.Row="0" Grid.Column="1" MinWidth="92" Margin="8,0,0,0">
             <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"/>
             <Button x:Name="btnView" x:Uid="btn_macroView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
                     ToolTip="Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."/>

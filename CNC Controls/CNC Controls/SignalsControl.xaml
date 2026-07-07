@@ -93,12 +93,12 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Name="grpSignals" HorizontalAlignment="Left" VerticalAlignment="Top" Height="60" Width="216">
+    <GroupBox x:Name="grpSignals" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="216">
         <GroupBox.Header>
             <!-- centered header, default font size -->
-            <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" Width="200"/>
+            <TextBlock x:Uid="txt_signalsHdr" Text="Signals" TextAlignment="Center" MinWidth="200"/>
         </GroupBox.Header>
-        <DockPanel HorizontalAlignment="Left" VerticalAlignment="Center" Height="28" Width="205">
+        <DockPanel HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="205">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="-7,0,0,0" VerticalAlignment="Center" Width="Auto" DockPanel.Dock="Left">
                 <local:SignalControl Label="X" IsSet="{Binding Path=Signals[(core:Signals)LimitX], Mode=OneWay}"/>
                 <local:SignalControl Label="Y" IsSet="{Binding Path=Signals[(core:Signals)LimitY], Mode=OneWay}" Style="{StaticResource YAxisVisibleStyle}"/>

@@ -295,7 +295,7 @@
                             <DataGridTextColumn x:Uid="pdl_clr" Header="Standoff" Binding="{Binding XYClearance, StringFormat=0.0##}" Width="65"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <StackPanel Grid.Row="1" Grid.Column="1" Width="90" Margin="8,0,0,0">
+                    <StackPanel Grid.Row="1" Grid.Column="1" MinWidth="90" Margin="8,0,0,0">
                         <Button x:Uid="pdl_add" x:Name="btnProbeAdd" Content="Add" Click="ProbeAdd_Click" Margin="0,0,0,4" MinHeight="26"/>
                         <Button x:Uid="pdl_edit" x:Name="btnProbeEdit" Content="Edit" Click="ProbeEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                         <Button x:Uid="pdl_delete" x:Name="btnProbeDelete" Content="Delete" Click="ProbeDelete_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>

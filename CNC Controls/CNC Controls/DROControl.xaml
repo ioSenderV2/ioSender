@@ -20,9 +20,9 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HorizontalAlignment="Center" VerticalAlignment="Top" Width="216">
+    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216">
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,5,0,5">
-            <Label x:Name="lblXMode" Content="{Binding Path=LatheMode, Mode=OneWay, Converter={StaticResource LatheModeConverter}}" Visibility="{Binding Path=LatheModeEnabled, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}" Height="25" HorizontalContentAlignment="Right" Margin="20,0,65,0"/>
+            <Label x:Name="lblXMode" Content="{Binding Path=LatheMode, Mode=OneWay, Converter={StaticResource LatheModeConverter}}" Visibility="{Binding Path=LatheModeEnabled, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}" HorizontalContentAlignment="Right" Margin="20,0,65,0"/>
             <local:DROBaseControl x:Name="axisX" Label="X"
                 Value="{Binding Path=Position.X, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)X], Mode=OneWay}"
@@ -59,7 +59,7 @@
                 Value="{Binding Path=Position.W, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)W], Mode=OneWay}"
             />
-            <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" Height="28" Width="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"/>
+            <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" MinWidth="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"/>
         </StackPanel>
     </GroupBox>
 </UserControl>

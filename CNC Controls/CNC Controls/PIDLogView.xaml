@@ -26,7 +26,7 @@
             <TextBlock Text="{Binding Path=GridLabel3, StringFormat=-\{0\} µm}" Width="50" Margin="0,30,0,0" Height="20" Foreground="Red"/>
             <TextBlock Text="{Binding Path=GridLabel4, StringFormat=-\{0\} µm}" Width="50" Margin="0,30,0,0" Height="20" Foreground="Red"/>
         </StackPanel>
-        <Button x:Name="btnGetPIDData" Content="Get data" HorizontalAlignment="Left"  Margin="10,4,0,-16" VerticalAlignment="Top" Height="25" Width="75" Click="btnGetPIDData_Click" Grid.Row="1"/>
+        <Button x:Name="btnGetPIDData" Content="Get data" HorizontalAlignment="Left"  Margin="10,4,0,-16" VerticalAlignment="Top" MinWidth="75" Click="btnGetPIDData_Click" Grid.Row="1"/>
         <Label x:Name="lblTarget" Content="Target" Foreground="Green" HorizontalAlignment="Left" Margin="492,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
         <Label x:Name="lblError" Content="Error" Foreground="Red" HorizontalAlignment="Left" Margin="602,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
         <Label x:Name="lblActual" Content="Actual" Foreground="Blue" HorizontalAlignment="Left" Margin="547,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>

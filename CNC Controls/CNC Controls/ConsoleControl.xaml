@@ -19,7 +19,7 @@
             <TextBlock x:Uid="lbl_consoleSearch" Text="Search:" VerticalAlignment="Center" Margin="5,0,6,0"/>
             <Border BorderBrush="#FFABADB3" BorderThickness="1" Background="White" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBox x:Uid="fld_consoleSearch" x:Name="searchBox" Width="240" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
+                    <TextBox x:Uid="fld_consoleSearch" x:Name="searchBox" MinWidth="240" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
                              TextChanged="searchBox_TextChanged" KeyDown="searchBox_KeyDown"
                              ToolTip="Find text in the console log. Enter / F3 = next match, F4 = previous."/>
                     <TextBlock x:Name="txtMatchCount" VerticalAlignment="Center" Margin="6,0,8,0" Foreground="#FF606060" MinWidth="56"/>

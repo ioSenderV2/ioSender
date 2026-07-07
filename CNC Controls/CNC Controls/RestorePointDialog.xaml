@@ -33,9 +33,9 @@
             </DataGrid.Columns>
         </DataGrid>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="btnBrowse" x:Uid="btn_rpBrowse" Content="Browse..." Width="90" Margin="0,0,8,0" Click="btnBrowse_Click"/>
-            <Button x:Name="btnRestore" x:Uid="btn_rpRestore" Content="Restore" Width="90" Margin="0,0,8,0" IsDefault="True" Click="btnRestore_Click"/>
-            <Button x:Name="btnCancel" x:Uid="btn_rpCancel" Content="Cancel" Width="90" IsCancel="True"/>
+            <Button x:Name="btnBrowse" x:Uid="btn_rpBrowse" Content="Browse..." MinWidth="90" Margin="0,0,8,0" Click="btnBrowse_Click"/>
+            <Button x:Name="btnRestore" x:Uid="btn_rpRestore" Content="Restore" MinWidth="90" Margin="0,0,8,0" IsDefault="True" Click="btnRestore_Click"/>
+            <Button x:Name="btnCancel" x:Uid="btn_rpCancel" Content="Cancel" MinWidth="90" IsCancel="True"/>
         </StackPanel>
     </Grid>
 </Window>

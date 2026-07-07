@@ -17,11 +17,11 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Border BorderBrush="DarkGray" BorderThickness="1" CornerRadius="3" Background="#FFE5E5EA">
-        <Grid Width="275" Margin="10,0,0,0">
+        <Grid MinWidth="275" Margin="10,0,0,0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="25"/>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="30"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <StackPanel Orientation="Horizontal" Grid.Row="1">
                 <local:NumericField Label="X:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.X, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Top"/>

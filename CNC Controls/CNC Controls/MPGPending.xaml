@@ -15,8 +15,8 @@
         </Grid.RowDefinitions>
         <Label x:Uid="lbl_mpgModeActive" x:Name="label" Grid.Row="0" Content="Pendant active, waiting for it to be disabled..." HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" FontSize="16"/>
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-            <Button x:Uid="btn_mpgContinue" x:Name="btnContinue" Content="Continue" Width="100" Height="26" Margin="6,0" Click="btnContinue_Click"/>
-            <Button x:Uid="btn_mpgDisconnect" x:Name="btnDisconnect" Content="Disconnect" Width="100" Height="26" Margin="6,0" IsCancel="True" Click="btnDisconnect_Click"/>
+            <Button x:Uid="btn_mpgContinue" x:Name="btnContinue" Content="Continue" MinWidth="100" Margin="6,0" Click="btnContinue_Click"/>
+            <Button x:Uid="btn_mpgDisconnect" x:Name="btnDisconnect" Content="Disconnect" MinWidth="100" Margin="6,0" IsCancel="True" Click="btnDisconnect_Click"/>
         </StackPanel>
     </Grid>
 </Window>

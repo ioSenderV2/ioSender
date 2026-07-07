@@ -59,7 +59,7 @@
                 Value="{Binding SpindleRPM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                 <Label x:Uid="lbl_sctool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Name="cbxTool" Width="90" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"
+                <ComboBox x:Name="cbxTool" MinWidth="90" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"
                           ToolTip="Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.">
                     <ComboBoxItem x:Uid="cbi_toolLoaded" Content="Loaded"/>
                     <ComboBoxItem x:Uid="cbi_toolPrompt" Content="Prompt"/>

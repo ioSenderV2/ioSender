@@ -22,7 +22,7 @@
             <TextBlock x:Name="txtAxisInfo" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,6"/>
             <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
                 <TextBlock x:Uid="txt_asgangedaxis" Text="Ganged axis:" VerticalAlignment="Center" MinWidth="160"/>
-                <ComboBox x:Name="cbxGangedAxis" Width="60" SelectedIndex="1" SelectionChanged="cbxGangedAxis_SelectionChanged"
+                <ComboBox x:Name="cbxGangedAxis" MinWidth="60" SelectedIndex="1" SelectionChanged="cbxGangedAxis_SelectionChanged"
                           ToolTip="The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write.">
                     <ComboBoxItem x:Uid="cbi_asaxisx" Content="X"/>
                     <ComboBoxItem x:Uid="cbi_asaxisy" Content="Y"/>

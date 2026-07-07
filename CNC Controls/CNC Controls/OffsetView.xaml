@@ -147,7 +147,7 @@
         <StackPanel Grid.Column="1" HorizontalAlignment="Left" Margin="20,15,0,0" VerticalAlignment="Top">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_offset" Content="Offset:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Margin="29,0,0,0" VerticalAlignment="Top"/>
-                <TextBox Text="{Binding Path=Offset.Code, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Left" Height="23" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" IsReadOnly="True"/>
+                <TextBox Text="{Binding Path=Offset.Code, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Top" MinWidth="40" IsReadOnly="True"/>
             </StackPanel>
             <local:CoordValueSetControl x:Name="cvXOffset" Label="{Binding Path=AxisLetter.X, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="X" Click="cvOffset_Click"
                 Value="{Binding Path=Offset.X, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
@@ -185,7 +185,7 @@
                 Value="{Binding Path=Offset.W, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                 IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
             />
-            <StackPanel Orientation="Horizontal" Height="28" Margin="0,5">
+            <StackPanel Orientation="Horizontal" Margin="0,5">
                 <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Padding="5,0" IsEnabled="{Binding Path=IsPredefined, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsNotPredefined}}" Margin="3,0" Click="btnCurrPos_Click"/>
                 <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Padding="5,0" IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnClearAll_Click"/>
                 <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Padding="5,0" Margin="3,0" Click="btnSetAll_Click"/>

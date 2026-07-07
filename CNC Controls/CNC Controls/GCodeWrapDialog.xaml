@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        Title="Wrap parameters" Height="150" Width="200"
+        Title="Wrap parameters"
         SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="190"
         Loaded="Window_Loaded" Icon="App.ico">
     <Grid Background="#FFE5E5E5">
@@ -21,14 +21,14 @@
                     <RowDefinition/>
                 </Grid.RowDefinitions>
                 <Label x:Uid="lbl_wrapSource" Content="Wrap:" HorizontalAlignment="Right" HorizontalContentAlignment="Right" VerticalAlignment="Center" Grid.Row="0" Grid.Column="0"/>
-                <ComboBox HorizontalAlignment="Left" VerticalAlignment="Center" Width="80" Grid.Row="0" Grid.Column="1"
+                <ComboBox HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80" Grid.Row="0" Grid.Column="1"
                     ItemsSource="{Binding Path=SourceAxes}"
                     SelectedValue="{Binding Path=SourceAxis, Mode=TwoWay}"
                     DisplayMemberPath="Name"
                     SelectedValuePath="AxisId" Margin="0,2"
                 />
                 <Label x:Uid="lbl_wrapTarget" Content="to:" HorizontalAlignment="Right" HorizontalContentAlignment="Right" VerticalAlignment="Center" Grid.Row="1" Grid.Column="0"/>
-                <ComboBox HorizontalAlignment="Left" VerticalAlignment="Center" Width="80" Grid.Row="1" Grid.Column="1"
+                <ComboBox HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80" Grid.Row="1" Grid.Column="1"
                     ItemsSource="{Binding Path=TargetAxes}"
                     SelectedValue="{Binding Path=TargetAxis, Mode=TwoWay}"
                     DisplayMemberPath="Name"
@@ -36,8 +36,8 @@
                 />
             </Grid>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="Auto" Margin="0,10,0,0">
-                <Button x:Uid="btn_ok" x:Name="btnOk" Content="Ok" HorizontalAlignment="Left" VerticalAlignment="Top" Width="75" Click="btnOk_Click"/>
-                <Button x:Uid="btn_cancel" x:Name="btnCancel" Content="Cancel" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Width="75" Click="btnCancel_Click"/>
+                <Button x:Uid="btn_ok" x:Name="btnOk" Content="Ok" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="75" Click="btnOk_Click"/>
+                <Button x:Uid="btn_cancel" x:Name="btnCancel" Content="Cancel" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" MinWidth="75" Click="btnCancel_Click"/>
             </StackPanel>
         </StackPanel>
     </Grid>

@@ -21,27 +21,27 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <DockPanel Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" Width="520" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-            <StackPanel DockPanel.Dock="Top" Width="520" VerticalAlignment="Stretch">
+        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" MinWidth="520" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+            <StackPanel DockPanel.Dock="Top" MinWidth="520" VerticalAlignment="Stretch">
                 <Border BorderThickness="1" BorderBrush="DarkGray" Height="242" Width="514" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <Canvas x:Name="SGPlot" Background="WhiteSmoke" HorizontalAlignment="Left" Height="240" VerticalAlignment="Top" Width="512"/>
                 </Border>
                 <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <StackPanel Orientation="Horizontal" Height="24">
-                        <RadioButton Content="X" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)X], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16" Margin="5,0"/>
-                        <RadioButton Content="Y" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)Y], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource YAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16"/>
-                        <RadioButton Content="Z" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)Z], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource ZAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16"/>
-                        <RadioButton Content="A" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)A], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource AAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16"/>
-                        <RadioButton Content="B" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)B], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource BAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16"/>
-                        <RadioButton Content="C" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)C], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource CAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Height="16"/>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Content="X" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)X], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0"/>
+                        <RadioButton Content="Y" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)Y], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource YAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        <RadioButton Content="Z" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)Z], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource ZAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        <RadioButton Content="A" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)A], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource AAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        <RadioButton Content="B" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)B], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource BAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        <RadioButton Content="C" IsChecked="{Binding Path=AxisEnabled[(gcode:AxisFlags)C], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource CAxisVisibleStyle}" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                     </StackPanel>
                     <Label x:Uid="lbl_sgLoad" x:Name="lblLoad" Content="Load (SG_RESULT)" Foreground="Blue" Margin="0,0,5,0" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 </Grid>
                 <GroupBox x:Uid="grp_stallGuard" Header="stallGuard">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,5">
-                            <Slider Value="{Binding SGValue, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Width="169" Minimum="{Binding Path=SGValueMin, RelativeSource={RelativeSource AncestorType=UserControl}}" Maximum="{Binding Path=SGValueMax, RelativeSource={RelativeSource AncestorType=UserControl}}" TickPlacement="BottomRight" IsSnapToTickEnabled="False" LostMouseCapture="Slider_LostMouseCapture"/>
-                            <TextBox Text="{Binding Path=SGValue, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat='##0'}" HorizontalContentAlignment="Right" IsReadOnly="True" Width="30" Margin="5,0,0,0" />
+                            <Slider Value="{Binding SGValue, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" MinWidth="169" Minimum="{Binding Path=SGValueMin, RelativeSource={RelativeSource AncestorType=UserControl}}" Maximum="{Binding Path=SGValueMax, RelativeSource={RelativeSource AncestorType=UserControl}}" TickPlacement="BottomRight" IsSnapToTickEnabled="False" LostMouseCapture="Slider_LostMouseCapture"/>
+                            <TextBox Text="{Binding Path=SGValue, RelativeSource={RelativeSource AncestorType=UserControl}, StringFormat='##0'}" HorizontalContentAlignment="Right" IsReadOnly="True" MinWidth="30" Margin="5,0,0,0" />
                             <Button x:Uid="lbl_configure" Content="Configure" MinWidth="60" VerticalAlignment="Center" Margin="5,0" Padding="6,0" Click="btnConfigureSGVal_Click"/>
                             <CheckBox x:Uid="lbl_stallGuardEnable" IsChecked="{Binding Path=SFiltEnabled, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Content="Enable filter (SFILT)" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -54,7 +54,7 @@
             </StackPanel>
             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,5,0,0">
                 <local:MDIControl x:Name="mdiControl"/>
-                <TextBlock TextWrapping="NoWrap" Height="25" Width="235" HorizontalAlignment="Left" Margin="0,5,0,0">
+                <TextBlock TextWrapping="NoWrap" MinWidth="235" HorizontalAlignment="Left" Margin="0,5,0,0">
                     <TextBlock.Text>
                         <MultiBinding Converter="{StaticResource PositionConverter}">
                             <Binding Path="Position"/>
@@ -67,12 +67,12 @@
         <Grid DockPanel.Dock="Top" Margin="0,5,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="30"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBox Grid.Row="0" Text="{Binding Path=DriverStatus, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True" HorizontalAlignment="Stretch" TextWrapping="Wrap" VerticalAlignment="Stretch" FontSize="12" FontFamily="Global Monospace"/>
             <StackPanel Grid.Row="1" Orientation="Horizontal">
-                <Button x:Uid="btn_getStatus" Content="Get status" Width="130" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetState_Click"/>
-                <Button x:Uid="btn_getStatusAll" Content="Get status, all drivers" Width="130" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetStateAll_Click"/>
+                <Button x:Uid="btn_getStatus" Content="Get status" MinWidth="130" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetState_Click"/>
+                <Button x:Uid="btn_getStatusAll" Content="Get status, all drivers" MinWidth="130" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetStateAll_Click"/>
             </StackPanel>
         </Grid>
     </DockPanel>
