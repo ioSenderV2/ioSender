@@ -61,7 +61,7 @@
             </StackPanel>
         </DockPanel>
         <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
-        <Controls:StretchTabControl x:Name="tab" PersistKey="Probing" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
+        <Controls:StretchTabControl x:Name="tab" PersistKey="Probing" Background="Transparent" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
             <TabItem x:Name="tabToolOffset" x:Uid="tab_toolOffset" Header="Tool length offset">
                 <local:ToolLengthControl/>
             </TabItem>
