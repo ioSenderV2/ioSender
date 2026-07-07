@@ -66,11 +66,17 @@
         </DockPanel>
         <Grid DockPanel.Dock="Top" Margin="0,5,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBox Grid.Row="0" Text="{Binding Path=DriverStatus, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True" HorizontalAlignment="Stretch" TextWrapping="Wrap" VerticalAlignment="Stretch" FontSize="12" FontFamily="Global Monospace"/>
-            <StackPanel Grid.Row="1" Orientation="Horizontal">
+            <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                <TextBlock x:Uid="hlp_tmcHdr" Text="About the Trinamic tuner" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <TextBlock x:Uid="hlp_tmcBody" TextWrapping="Wrap"
+                           Text="For machines fitted with Trinamic stepper drivers: tune StallGuard (used for sensorless homing and load detection) and read live driver diagnostics.&#10;&#10;Pick an axis and jog it, then watch the SG_RESULT load plot on the left. Set the stallGuard threshold with the slider so the trace stays high under normal load and drops toward zero as the axis stalls, then Configure to store it. Get status prints the selected driver's registers (temperature, current, fault flags); Get status, all drivers prints every axis."/>
+            </StackPanel>
+            <TextBox Grid.Row="1" Text="{Binding Path=DriverStatus, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True" HorizontalAlignment="Stretch" TextWrapping="Wrap" VerticalAlignment="Stretch" FontSize="12" FontFamily="Global Monospace"/>
+            <StackPanel Grid.Row="2" Orientation="Horizontal">
                 <Button x:Uid="btn_getStatus" Content="Get status" MinWidth="130" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetState_Click"/>
                 <Button x:Uid="btn_getStatusAll" Content="Get status, all drivers" MinWidth="130" Margin="5,0" HorizontalAlignment="Left" VerticalAlignment="Center" Click="btnGetStateAll_Click"/>
             </StackPanel>

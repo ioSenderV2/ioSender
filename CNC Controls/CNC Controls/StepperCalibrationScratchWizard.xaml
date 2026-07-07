@@ -82,7 +82,12 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock x:Uid="txt_scresults" Grid.Row="0" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Uid="hlp_scHdr" Text="About scratch calibration" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <TextBlock x:Uid="hlp_scBody" TextWrapping="Wrap" Margin="0,0,0,10"
+                           Text="Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Cycle Start to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."/>
+                <TextBlock x:Uid="txt_scresults" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
+            </StackPanel>
             <DataGrid x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                       ItemsSource="{Binding Results, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">

@@ -78,9 +78,14 @@
             </StackPanel>
         </StackPanel>
         </Grid>
-        <!-- Right: summary (the generated program previews in the bottom Program View, not here) -->
+        <!-- Right: guidance on top, summary below (the generated program previews in the bottom Program View, not here) -->
         <Grid Grid.Column="1" Margin="8,5,5,5">
-            <TextBlock x:Name="txtSummary" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
+            <StackPanel VerticalAlignment="Top">
+                <TextBlock x:Uid="hlp_sbHdr" Text="About surfacing the spoilboard" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <TextBlock x:Uid="hlp_sbBody" TextWrapping="Wrap" Margin="0,0,0,10"
+                           Text="Generates a raster (boustrophedon) facing program that skims the whole bed with a surfacing bit, so the spoilboard surface ends up perfectly parallel to the gantry.&#10;&#10;Set the bit diameter, overlap and depths, then Generate. The area defaults to the machine travel less the edge margin - adjust Area width/height to face a smaller region. Tick Outline only or Dry run to trace the extents at safe Z first, then Cycle Start to cut. Reuse Z0 skips the touch-off so you can re-run at the same height."/>
+                <TextBlock x:Name="txtSummary" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </local:ConfigPanel>

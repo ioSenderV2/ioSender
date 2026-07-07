@@ -58,6 +58,9 @@
                 <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Click="btnClearAll_Click"/>
                 <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Margin="3,0" Click="btnSetAll_Click"/>
             </StackPanel>
+            <TextBlock x:Uid="hlp_toolTableHdr" Text="About the tool table" FontWeight="SemiBold" Margin="5,18,0,2" MaxWidth="360" HorizontalAlignment="Left"/>
+            <TextBlock x:Uid="hlp_toolTableBody" TextWrapping="Wrap" MaxWidth="360" HorizontalAlignment="Left" Margin="5,0,0,0"
+                       Text="Per-tool work offsets (X/Y/Z, plus tip radius on a lathe) stored in the controller and applied for tool-length compensation when a program selects a tool with M6.&#10;&#10;To set a tool: pick it in the list, jog the machine to the reference point, then Get current position to capture the coordinates (or type the values directly). Set the highlighted axis to write that axis alone, Set all to write every axis, or Clear all to zero them. Changes are saved to the controller immediately."/>
         </StackPanel>
     </Grid>
 </UserControl>

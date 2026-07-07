@@ -26,6 +26,11 @@
             <TextBlock Text="{Binding Path=GridLabel3, StringFormat=-\{0\} µm}" Width="50" Margin="0,30,0,0" Height="20" Foreground="Red"/>
             <TextBlock Text="{Binding Path=GridLabel4, StringFormat=-\{0\} µm}" Width="50" Margin="0,30,0,0" Height="20" Foreground="Red"/>
         </StackPanel>
+        <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="720,12,10,0">
+            <TextBlock x:Uid="hlp_pidHdr" Text="About the PID tuner" FontWeight="SemiBold" Margin="0,0,0,2"/>
+            <TextBlock x:Uid="hlp_pidBody" TextWrapping="Wrap"
+                       Text="Plots the closed-loop position error of a PID-controlled axis (for example a servo or a spindle) over time, so you can judge how well the loop is tuned.&#10;&#10;Get data captures a log burst from the controller and draws Target (green), Actual (blue) and Error (red). A well-tuned axis tracks the target with little error and no sustained oscillation. Use the slider to scale the error trace. Adjust the PID gains through the controller's $ settings and re-capture to compare."/>
+        </StackPanel>
         <Button x:Name="btnGetPIDData" Content="Get data" HorizontalAlignment="Left"  Margin="10,4,0,-16" VerticalAlignment="Top" MinWidth="75" Click="btnGetPIDData_Click" Grid.Row="1"/>
         <Label x:Name="lblTarget" Content="Target" Foreground="Green" HorizontalAlignment="Left" Margin="492,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
         <Label x:Name="lblError" Content="Error" Foreground="Red" HorizontalAlignment="Left" Margin="602,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
