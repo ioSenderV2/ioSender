@@ -126,6 +126,9 @@ namespace CNC.Controls
         }
 
         // One-line free-space banner across all mounts, e.g. "SD: 14.8 GB free  ·  littlefs: 468 KB free".
+        // Only filesystems that actually report free space are listed - a bare "<name>: mounted" carries no
+        // information (the file list already shows the filesystem is there), so those are omitted and the whole
+        // banner simply disappears when the controller reports no sizes.
         public static string FreeSpaceSummary(IEnumerable<FsMount> mounts)
         {
             var parts = new List<string>();
@@ -133,8 +136,6 @@ namespace CNC.Controls
             {
                 if (fs.Free >= 0)
                     parts.Add(fs.Name + ": " + HumanSize(fs.Free) + " free" + (fs.Size >= 0 ? " of " + HumanSize(fs.Size) : ""));
-                else
-                    parts.Add(fs.Name + ": mounted");
             }
             return string.Join("    ·    ", parts);
         }
