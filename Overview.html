@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>54 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>55 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -240,6 +240,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a></td></tr>
 <tr><td>Headless build &mdash; <code>build.ps1</code> + VS Code tasks build/launch without opening the VS GUI (MSBuild found via vswhere); unhandled exceptions now dump to <code>%AppData%\ioSender\ioSender.crash.log</code> and exit <code>0xFA11</code> instead of blocking on a dialog</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr53">53</a></td></tr>
 <tr><td>Code renamed LoadStock &rarr; Start Job to match the UI throughout (files, classes, <code>ViewType</code>, layout keys, config section)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr54">54</a></td></tr>
+<tr><td>Localization catch-up &mdash; later V2 features (Start Job, probing-redesign dialogs, main-page editor, Tools guidance, &hellip;) were <code>x:Uid</code>&rsquo;d but had no LocBaml rows; every missing string backfilled into all 7 locale CSVs</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr55">55</a></td></tr>
 </table>
 </div>
 
@@ -299,7 +300,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">52</td><td><a href="#pr52">Per-tool guidance text on the Tools tabs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+46</span> <span class="del">-14</span></td></tr>
 <tr><td class="n">53</td><td><a href="#pr53">Headless build script + crash logging</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+255</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">54</td><td><a href="#pr54">Rename LoadStock &rarr; Start Job (code matches the UI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">30</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+177</span> <span class="del">-177</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (54 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">447</span> <span class="del">2</span> <span class="add">+92</span><br><span class="k">Lines:</span> <span class="add">+29112</span> <span class="del">-3871</span></td></tr>
+<tr><td class="n">55</td><td><a href="#pr55">Localization sweep &mdash; V2 strings into all 7 locales</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">29</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+1581</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (55 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">476</span> <span class="del">2</span> <span class="add">+92</span><br><span class="k">Lines:</span> <span class="add">+30693</span> <span class="del">-3872</span></td></tr>
 </table>
 </div>
 
@@ -1642,6 +1644,24 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Tokens</strong> &mdash; <code>ViewType.LoadStock</code> and <code>ProbingType.LoadStock</code> &rarr; <code>StartJob</code>; <code>LayoutKeys</code> value, the folded App.config section (<code>LoadStock</code>&nbsp;/&nbsp;<code>LoadStock.xml</code>), the <code>str_tabLoadStock</code> resource key and its locale-CSV baml paths, and the StreamPump temp-log name all follow.</li>
 <li><strong>Persisted config</strong> &mdash; the three tokens saved in <code>%AppData%\ioSender\App.config</code> (tab name, layout component, section key) were patched out-of-band to match.</li>
 </ul><p class="foot">In the integration build. Debug&nbsp;+&nbsp;Release build clean; headless startup smoke test passes on the renamed config.</p></div>
+</div>
+
+<!-- ===== #55 ===== -->
+<div class="pr">
+<h2 id="pr55"><span class="badge">#55</span>Localization sweep &mdash; V2 strings into all 7 locales</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">Locale/*/csv/CNC.Controls.WPF.resources.*.csv <em>(7 locales)</em></td><td class="num add">1300</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv/CNC.Controls.Probing.resources.*.csv <em>(7 locales)</em></td><td class="num add">147</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv/ioSender.resources.*.csv <em>(7 locales)</em></td><td class="num add">63</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv/CNC.Controls.Viewer.resources.*.csv <em>(7 locales)</em></td><td class="num add">35</td><td class="num">0</td></tr>
+<tr><td class="mono">tools/locadd.py</td><td class="num add">36</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Later V2 features were <code>x:Uid</code>&rsquo;d in XAML but never had LocBaml rows added, so they fell back to English in the other six languages. The self-deriving <code>tools/locadd.py</code> was pointed at the current view set and backfilled every missing row.</p><ul>
+<li><strong>+1545 rows across 7 locales</strong> &mdash; 159 new keys in en-US plus the backfills for keys that had reached en-US but not the other locales, so all seven are consistent again.</li>
+<li><strong>Covers</strong> &mdash; Start Job (renamed view + the probing control), the probing-redesign dialogs (<code>ProbeMotionParams</code>&thinsp;/&thinsp;<code>ProbeDefinition*</code>), the main-page editor, console search, the Tools tab guidance (#52), the carve view, and assorted flyouts/config controls.</li>
+<li><strong>Baseline, not machine-translation</strong> &mdash; each new row carries the English text for a translator to replace; the app already rendered English via fallback, so nothing changes on screen. Comma values RFC4180-quoted; re-running the tool adds nothing.</li>
+</ul><p class="foot">In the integration build. Lathe wizards are excluded (no <code>CNC.Controls.Lathe</code> locale CSV exists &mdash; never LocBaml-localized).</p></div>
 </div>
 </section>
 
