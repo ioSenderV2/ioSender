@@ -14,7 +14,7 @@
             <ColumnDefinition Width="37*"/>
         </Grid.ColumnDefinitions>
         <CheckBox x:Name="chkTaper" Content="Taper:" IsChecked="{Binding Path=IsTaperEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-        <cncontrols:NumericTextBox x:Name="data" Format="##0" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" IsEnabled="{Binding IsTaperEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="1" HorizontalAlignment="Left" Height="24" Margin="5,0" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" Width="64"/>
-        <Label x:Name="unit" Content="deg" Grid.Column="2" HorizontalAlignment="Left" Margin="0,1,0,0" VerticalAlignment="Center" Height="26"/>
+        <cncontrols:NumericTextBox x:Name="data" Format="##0" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" IsEnabled="{Binding IsTaperEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="1" HorizontalAlignment="Left" Margin="5,0" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" MinWidth="64"/>
+        <Label x:Name="unit" Content="deg" Grid.Column="2" HorizontalAlignment="Left" Margin="0,1,0,0" VerticalAlignment="Center"/>
     </Grid>
 </UserControl>
