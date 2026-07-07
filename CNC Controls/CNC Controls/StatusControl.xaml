@@ -69,16 +69,6 @@
                     </ContextMenu>
                 </TextBox.ContextMenu>
             </TextBox>
-            <CheckBox x:Name="chkCheckMode" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center" Click="btn_Click"
-                IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}">
-                <CheckBox.IsEnabled>
-                    <MultiBinding Converter="{StaticResource LogicalNorConverter}">
-                        <Binding Path="IsJobRunning"/>
-                        <Binding Path="IsSleepMode"/>
-                    </MultiBinding>
-                </CheckBox.IsEnabled>
-            </CheckBox>
-            <Label x:Uid="lbl_check" Content="Check" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel x:Name="buttonRow" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalAlignment="Bottom">
             <Button x:Uid="btn_home" x:Name="btnHome" Content="Home" ToolTip="Ctrl+H" Background="{Binding Path=HomedState, Converter={StaticResource HomedStateConverter}}" Style="{StaticResource StatusButtonStyle}" Click="btn_Click">

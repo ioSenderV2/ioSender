@@ -140,7 +140,6 @@ CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_autoCompressGcode
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,lbl_axis:System.Windows.Controls.ContentControl.Content,Label,True,True,,Axis:
 CNC.Controls.WPF.g.en-US.resources:offsetview.baml,lbl_axis:System.String.$Content,None,True,True,,Вісь {0}:
 CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_ccw:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Проти часу
-CNC.Controls.WPF.g.en-US.resources:statuscontrol.baml,lbl_check:System.Windows.Controls.ContentControl.Content,Label,True,True,,Тест
 CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,lbl_configure:System.Windows.Controls.ContentControl.Content,Button,True,True,,Налаштувати
 CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_cw:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,За часом
 CNC.Controls.WPF.g.en-US.resources:joguiconfigcontrol.baml,lbl_distance0:CNC.Controls.NumericField.Unit,None,False,True,,мм
@@ -1041,3 +1040,5 @@ CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,btn_rpCancel:System.W
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_scanNetwork:System.Windows.Controls.ContentControl.Content,Button,True,True,,Scan network
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,tab_simulator:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Simulator
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,lbl_simPort:System.Windows.Controls.ContentControl.Content,Label,True,True,,Port:
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_checkMode:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Check mode ($C)
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_checkMode:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Toggle grbl check mode - the controller parses the program without moving, to validate it before a real run.

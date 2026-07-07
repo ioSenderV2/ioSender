@@ -34,7 +34,17 @@
         </Style>
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal">
-        <Button x:Uid="btn_cycleStart" x:Name="btnStart" Content="Cycle Start" ToolTip="Alt+R" Style="{StaticResource CycleStartButtonStyle}" IsEnabled="{Binding Path=IsCycleStartEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click"/>
+        <Button x:Uid="btn_cycleStart" x:Name="btnStart" Content="Cycle Start" ToolTip="Alt+R" Style="{StaticResource CycleStartButtonStyle}" IsEnabled="{Binding Path=IsCycleStartEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click">
+            <Button.ContextMenu>
+                <!-- Grbl check mode ($C): the controller parses g-code without moving, to dry-run/validate a
+                     program. Moved here off the status bar; IsChecked mirrors the live GrblViewModel.IsCheckMode. -->
+                <ContextMenu Opened="cycleStartMenu_Opened">
+                    <MenuItem x:Uid="mnu_checkMode" x:Name="miCheckMode" Header="Check mode ($C)" IsCheckable="True"
+                              IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}" Click="miCheckMode_Click"
+                              ToolTip="Toggle grbl check mode - the controller parses the program without moving, to validate it before a real run."/>
+                </ContextMenu>
+            </Button.ContextMenu>
+        </Button>
         <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
         <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
         <Button x:Uid="btn_rewind" x:Name="btnRewind" Content="Rewind" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsRewindEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnRewind_Click"/>

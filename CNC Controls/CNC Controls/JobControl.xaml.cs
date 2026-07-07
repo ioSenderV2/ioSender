@@ -592,6 +592,28 @@ namespace CNC.Controls
             CycleStart(0);
         }
 
+        // Cycle Start right-click -> toggle grbl check mode ($C). Relocated here from the status-bar Check
+        // checkbox: enabled only when not running a job and not asleep. $C from Idle enters check mode; leaving
+        // it (unchecking while in the Check state) needs a soft reset. IsChecked mirrors GrblViewModel.IsCheckMode.
+        private void cycleStartMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            var m = DataContext as GrblViewModel;
+            miCheckMode.IsEnabled = m != null && !m.IsJobRunning && !m.IsSleepMode;
+        }
+
+        private void miCheckMode_Click(object sender, RoutedEventArgs e)
+        {
+            var m = DataContext as GrblViewModel;
+            if (m == null)
+                return;
+
+            GrblStates state = m.GrblState.State;
+            if (state == GrblStates.Check && !miCheckMode.IsChecked)
+                Grbl.Reset();
+            else if (state == GrblStates.Idle && miCheckMode.IsChecked)
+                m.ExecuteCommand(GrblConstants.CMD_CHECK);
+        }
+
         #endregion
 
         // honorActiveProgram: when a wizard tab is up it registers its program as the active program

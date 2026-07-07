@@ -52,8 +52,7 @@ namespace CNC.Controls
         {
             Home,
             Unlock,
-            Reset,
-            Check
+            Reset
         }
 
         public StatusControl()
@@ -65,7 +64,6 @@ namespace CNC.Controls
             btnHome.Tag = StatusButton.Home;
             btnReset.Tag = StatusButton.Reset;
             btnUnlock.Tag = StatusButton.Unlock;
-            chkCheckMode.Tag = StatusButton.Check;
         }
 
         // The control has two parts - the state/check row and the Home/Unlock/Reset button row. These can be
@@ -118,14 +116,6 @@ namespace CNC.Controls
                 case StatusButton.Home:
                     // ((Control)sender).Background = Brushes.LightSkyBlue;
                     (DataContext as GrblViewModel).ExecuteCommand(GrblConstants.CMD_HOMING);
-                    break;
-
-                case StatusButton.Check:
-                    GrblStates state = (DataContext as GrblViewModel).GrblState.State;
-                    if(state == GrblStates.Check && (sender as CheckBox).IsChecked == false)
-                        Grbl.Reset();
-                    else if (state == GrblStates.Idle && (sender as CheckBox).IsChecked == true)
-                        (DataContext as GrblViewModel).ExecuteCommand(GrblConstants.CMD_CHECK);
                     break;
             }
         }
