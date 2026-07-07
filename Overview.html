@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>46 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>48 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -186,6 +186,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
 <tr><td>Settings redesign &mdash; flat tab strip, free-text <code>$</code>-setting search (with match nav), grbl-settings autosave, dialog editors folded in as tabs</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr42">42</a></td></tr>
 <tr><td>Per-user config folder + standalone <code>.xml</code> folded into <code>App.config</code> sections (<code>ConfigPanel&lt;T&gt;</code> wizards, curated defaults); console output search + font size, shared reset footer, bindable ResetAndUnlock</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr43">43</a></td></tr>
+<tr><td>Lathe mode toggle &mdash; App &rsaquo; Main checkbox enables/disables lathe mode, adding or removing the Lathe wizards tab (restart to apply)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr47">47</a></td></tr>
+<tr><td>Restart-needed cue &mdash; the Restart button pulses red while a restart-only change is pending and offers to relaunch when you leave Settings</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr48">48</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -283,7 +285,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">44</td><td><a href="#pr44">Start Job workflow + Verify skew, flyout &amp; offset fixes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+369</span> <span class="del">-182</span></td></tr>
 <tr><td class="n">45</td><td><a href="#pr45">Run-bar jog preset spinners + startup splash on top</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+118</span> <span class="del">-3</span></td></tr>
 <tr><td class="n">46</td><td><a href="#pr46">High-DPI audit &mdash; text no longer clips at 125&ndash;150% scaling</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">63</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+196</span> <span class="del">-197</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (46 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">387</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+27899</span> <span class="del">-3260</span></td></tr>
+<tr><td class="n">47</td><td><a href="#pr47">Lathe mode enable/disable checkbox</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+56</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">48</td><td><a href="#pr48">Restart button pulse + restart-on-leave prompt</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+58</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (48 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">392</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+28013</span> <span class="del">-3261</span></td></tr>
 </table>
 </div>
 
@@ -1484,6 +1488,36 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Convert fixed-pixel grid rows to <code>Height="Auto"</code></strong> where the row holds text.</li>
 <li><strong>Deliberately kept</strong> genuine fixed geometry that must <em>not</em> scale with text: icons and images, LED/signal indicators, probe/lathe schematic diagrams, 3D render surfaces, colour swatches, icon-only glyph buttons, data-grid column widths, colon-aligned label columns, load-bearing scroll viewports and fixed dialog chrome.</li>
 </ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). High-traffic controls confirmed on hardware (&ldquo;no more clipped text&rdquo;). Known follow-ups: the five absolute-<code>Margin</code> lathe wizards (ThreadingWizard, ProfileDialog, Turning/Parting/Facing) need a real re-layout rather than an attribute scrub, and are intentionally left for a later pass.</p></div>
+</div>
+
+<!-- ===== #47 ===== -->
+<div class="pr">
+<h2 id="pr47"><span class="badge">#47</span>Lathe mode enable/disable checkbox</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">41</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A <em>Lathe mode</em> checkbox on the App &rsaquo; Main settings panel, so lathe mode can be turned on or off without hand-editing the config. Previously the only lathe-enable control lived on a settings panel that a lathe view had to load first &mdash; and that view/tab was itself gated on lathe already being enabled, a catch-22 that made it unreachable when off.</p><ul>
+<li><strong>Simple on/off facade</strong> &mdash; <code>LatheConfig.LatheEnabled</code> maps to the existing <code>XMode</code> (Radius when on, Disabled when off) and persists through the same <code>Lathe</code> config section.</li>
+<li><strong>Shows/hides the Lathe wizards tab</strong> &mdash; a new <code>AppConfig.SetTabPresent</code> adds or removes the tab in both the persisted layout tree and the legacy flat tab list, inserted after the SD-card tab.</li>
+<li><strong>Restart to apply</strong> &mdash; the tab is only built at startup from the controller&rsquo;s reported lathe mode, so toggling raises <code>RestartRequired</code> (see <a href="#pr48">#48</a>).</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Restores an implementation that had been prototyped then reverted; hardware-confirmed working.</p></div>
+</div>
+
+<!-- ===== #48 ===== -->
+<div class="pr">
+<h2 id="pr48"><span class="badge">#48</span>Restart button pulse + restart-on-leave prompt</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">43</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">15</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Makes a pending restart impossible to miss. Some settings (buffer/reset delay, 3D-view enable, main-page layout, and now lathe mode) only take effect at startup; when one changes, the shared Settings footer reveals a <em>Restart</em> button. That button now behaves like an alert:</p><ul>
+<li><strong>Slow red pulse</strong> &mdash; while enabled the Restart button animates between bright and dark red (custom template so the theme chrome doesn&rsquo;t paint over it), driven by its <code>IsEnabled</code> state so it keeps pulsing across inner-tab switches until the app is restarted.</li>
+<li><strong>Restart-on-leave prompt</strong> &mdash; leaving the Settings area with a restart still pending asks &ldquo;Restart ioSender now?&rdquo; (Yes relaunches). Switching between the inner Settings tabs does not prompt.</li>
+<li><strong>Shared restart path</strong> &mdash; the relaunch logic is factored into one <code>DoRestart()</code> used by both the button and the prompt.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Applies to every restart-only setting, since all route through the one shared Restart button. Hardware-confirmed (&ldquo;works great&rdquo;).</p></div>
 </div>
 </section>
 
