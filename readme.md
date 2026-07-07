@@ -1,24 +1,25 @@
-## ioSender - a gcode sender for grblHAL and Grbl controllers
+# ioSender V2 — an enhanced all-in-one grblHAL / Grbl g-code sender
+
+This is [`ioSenderV2/ioSender`](https://github.com/ioSenderV2/ioSender) — **ioSender V2**, the ongoing offshoot of the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork (itself a one-time fork of `terjeio/ioSender`). It carries a large set of enhancements and fixes delivered as **one all-in-one build** on `master` — not a menu of separately-selectable branches. Severed from upstream at the PR-era cutoff; the original upstream is no longer tracked or submitted to.
+
+### 📖 [Online user manual →](https://iosenderv2.github.io/ioSender/)
+A task-oriented guide with **novice / intermediate / machinist** reading paths, an A–Z subject index, search, diagrams and screenshots. Inside the app, press **`F1`** to open it at the page for whatever you're looking at.
+
+### 📋 Changelog &amp; overview
+[`Overview.pdf`](Overview.pdf) &nbsp;·&nbsp; [`Overview.html`](Overview.html) &nbsp;·&nbsp; [read it online →](https://iosenderv2.github.io/ioSender/overview.html)
+— how V2 came off the PR-era archive, how the V2 repos wire together, and the **full changelog** (every feature and fix with diff stats and a description) folded in as the [`#features-and-fixes`](Overview.html#features-and-fixes) section.
+
+`master` (default) is the whole product — clone and build it (build notes below); it is consumed whole. The upstream-submittable PR-era history lives frozen in the archive repo [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) at tag `pr-era-cutoff`.
 
 ---
+
+## ioSender — a gcode sender for grblHAL and Grbl controllers
 
 Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) for further details.
 
 8-bit Arduino controllers needs _Toggle DTR_ selected in order to reset the controller on connect. Behaviour may be erratic if not set.
 
 ![Toggle DTR](Media/Sender8.png)
-
----
-
-#### ioSender V2 — an enhanced all-in-one build
-
-This is [`ioSenderV2/ioSender`](https://github.com/ioSenderV2/ioSender) — **ioSender V2**, the ongoing offshoot of the [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) fork (itself a one-time fork of `terjeio/ioSender`). It carries a large set of enhancements and fixes delivered as **one all-in-one build** on `master` — not a menu of separately-selectable branches. Severed from upstream at the PR-era cutoff; the original upstream is no longer tracked or submitted to.
-
-**See [`Overview.pdf`](Overview.pdf)** ([`Overview.html`](Overview.html)) — the one document: how V2 came off the PR-era archive, how the V2 repos wire together, and the **full changelog** (every feature and fix with file-level diff stats and a description) folded in as the [`#features-and-fixes`](Overview.html#features-and-fixes) section.
-
-📖 **New — [online user manual](https://iosenderv2.github.io/ioSender/):** a task-oriented guide with novice / intermediate / machinist reading paths, an A–Z subject index, search, diagrams and screenshots. Inside the app, **`F1`** opens it at the page for whatever you're looking at. (Also served: the [changelog / overview](https://iosenderv2.github.io/ioSender/overview.html).)
-
-`master` (default) is the whole product — clone and build it (build notes below); it is consumed whole. The upstream-submittable PR-era history lives frozen in the archive repo [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) at tag `pr-era-cutoff`.
 
 #### Edge pre-releases
 
