@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>45 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>46 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -225,6 +225,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <h3>Polish, onboarding &amp; docs</h3>
 <table>
+<tr><td>High-DPI polish &mdash; fixed pixel sizes converted to Min/Auto so text doesn&rsquo;t clip at 125&ndash;150% scaling</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr46">46</a></td></tr>
 <tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
 <tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
 <tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
@@ -281,7 +282,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">43</td><td><a href="#pr43">Per-user config folder + standalone config folded into App.config</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">27</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+1269</span> <span class="del">-369</span></td></tr>
 <tr><td class="n">44</td><td><a href="#pr44">Start Job workflow + Verify skew, flyout &amp; offset fixes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+369</span> <span class="del">-182</span></td></tr>
 <tr><td class="n">45</td><td><a href="#pr45">Run-bar jog preset spinners + startup splash on top</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+118</span> <span class="del">-3</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (45 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">324</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+27703</span> <span class="del">-3063</span></td></tr>
+<tr><td class="n">46</td><td><a href="#pr46">High-DPI audit &mdash; text no longer clips at 125&ndash;150% scaling</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">63</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+196</span> <span class="del">-197</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (46 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">387</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+27899</span> <span class="del">-3260</span></td></tr>
 </table>
 </div>
 
@@ -1460,6 +1462,28 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Jog preset spinners:</strong> a new compact selector fills the space on the <em>State / Check</em> line &mdash; <em>Dist&nbsp;[&#9660;&nbsp;value&nbsp;&#9650;]&nbsp;Jog&nbsp;[&#9660;&nbsp;value&nbsp;&#9650;]&nbsp;Feed</em>. Each field is read-only; the down/up arrows step through the four jog distance/feed presets and <strong>wrap around</strong> at the ends. It binds the shared <code>JogData</code> singleton, so the selection stays in sync with the jog pad, keyboard and controller (the preset values are still edited on Settings:App / the Jog tab). Right-aligned to the Program button&rsquo;s edge above.</li>
 <li><strong>Startup splash stays on top:</strong> the progress splash was <code>Topmost="False"</code> and got buried by the main window&rsquo;s black frame almost immediately; it is now <code>Topmost="True"</code>, so the whole init sequence (connecting &rarr; reading settings &rarr; validating setup) is actually visible during the ~10&ndash;15&nbsp;s startup.</li>
 </ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Splash confirmed on hardware; spinner layout confirmed in the running app.</p></div>
+</div>
+
+<!-- ===== #46 ===== -->
+<div class="pr">
+<h2 id="pr46"><span class="badge">#46</span>High-DPI audit &mdash; text no longer clips at 125&ndash;150% scaling</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/*.xaml (38 files)</td><td class="num add">114</td><td class="num del">115</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/*.xaml (10 files)</td><td class="num add">35</td><td class="num del">35</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/*.xaml (4 files)</td><td class="num add">18</td><td class="num del">18</td></tr>
+<tr><td class="mono">CNC Controls Camera/CNC Controls Camera/*.xaml (2 files)</td><td class="num add">8</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/*.xaml (4 files)</td><td class="num add">7</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Converters/JobParametersDialog.xaml</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/*.xaml (3 files)</td><td class="num add">4</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls Dragknife/DragKnifeDialog.xaml</td><td class="num add">4</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>A reviewed, case-by-case scrub of hard-coded pixel <code>Width=</code>/<code>Height=</code> across the whole UI, so controls size to their content and no longer clip text when Windows text scaling is set to 125&ndash;150%. Roughly 250 attributes across 63 XAML files were classified one by one (not a blind find/replace):</p><ul>
+<li><strong>Drop fixed <code>Height</code></strong> on text-bearing controls (buttons, labels, text boxes, combos, radio buttons, group boxes, and the rows that hold them) so they auto-size to the scaled font instead of cropping glyphs.</li>
+<li><strong>Convert fixed <code>Width</code> to <code>MinWidth</code></strong> (and floor heights to <code>MinHeight</code>) where the value was only a minimum &mdash; text buttons, combos, fields and container panels can now grow.</li>
+<li><strong>Convert fixed-pixel grid rows to <code>Height="Auto"</code></strong> where the row holds text.</li>
+<li><strong>Deliberately kept</strong> genuine fixed geometry that must <em>not</em> scale with text: icons and images, LED/signal indicators, probe/lathe schematic diagrams, 3D render surfaces, colour swatches, icon-only glyph buttons, data-grid column widths, colon-aligned label columns, load-bearing scroll viewports and fixed dialog chrome.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). High-traffic controls confirmed on hardware (&ldquo;no more clipped text&rdquo;). Known follow-ups: the five absolute-<code>Margin</code> lathe wizards (ThreadingWizard, ProfileDialog, Turning/Parting/Facing) need a real re-layout rather than an attribute scrub, and are intentionally left for a later pass.</p></div>
 </div>
 </section>
 
