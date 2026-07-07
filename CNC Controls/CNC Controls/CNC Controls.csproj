@@ -180,6 +180,7 @@
     </Compile>
     <Compile Include="ICamera.cs" />
     <Compile Include="ICNCView.cs" />
+    <Compile Include="ManualHelp.cs" />
     <Compile Include="IGCodeConverter.cs" />
     <Compile Include="IGCodeTransformer.cs" />
     <Compile Include="IGrblConfigTab.cs" />

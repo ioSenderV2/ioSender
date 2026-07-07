@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ioSender Manual — Screenshot Uploader</title>
+<style>
+  :root{--bg:#f6f8fa;--card:#fff;--fg:#1b1f23;--muted:#57606a;--line:#d0d7de;--accent:#0a3069;
+    --ok:#1a7f37;--sel:#0969da;--warn:#d97706;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Segoe UI",Arial,sans-serif;color:var(--fg);background:var(--bg);padding:20px;}
+  h1{font-size:1.4rem;margin:0 0 4px;color:var(--accent);}
+  .lead{color:var(--muted);margin:0 0 14px;max-width:70ch;}
+  .bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line);
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);
+    color:var(--fg);cursor:pointer;}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  button:hover{filter:brightness(0.97);}
+  .status{color:var(--muted);font-size:.9rem;}
+  .status b{color:var(--fg);}
+  .count{margin-left:auto;font-weight:600;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+  .card{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .card.sel{border-color:var(--sel);box-shadow:0 0 0 3px rgba(9,105,218,.15);}
+  .card.done{border-color:var(--ok);}
+  .card h3{margin:0;font-size:1rem;display:flex;align-items:center;gap:8px;}
+  .star{color:var(--warn);}
+  .fname{font-family:Consolas,monospace;font-size:.82rem;color:var(--accent);background:var(--bg);
+    padding:1px 6px;border-radius:5px;}
+  .opt{font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;}
+  .desc{color:var(--muted);font-size:.85rem;margin:0;}
+  .drop{border:1.5px dashed var(--line);border-radius:8px;min-height:120px;display:flex;align-items:center;
+    justify-content:center;text-align:center;color:var(--muted);font-size:.85rem;background:var(--bg);
+    overflow:hidden;position:relative;cursor:pointer;}
+  .drop img{max-width:100%;max-height:220px;display:block;}
+  .drop.hover{border-color:var(--sel);color:var(--sel);}
+  .row{display:flex;gap:8px;align-items:center;justify-content:space-between;}
+  .saved{color:var(--ok);font-size:.82rem;font-weight:600;}
+  .saved.dl{color:var(--warn);}
+  .mini{font-size:.8rem;padding:5px 10px;}
+  input[type=file]{display:none;}
+  code{font-family:Consolas,monospace;background:var(--bg);padding:1px 5px;border-radius:4px;}
+  .help{background:#fff8e6;border:1px solid #f0d999;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:.9rem;}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0d1117;--card:#161b22;--fg:#e6edf3;--muted:#9198a1;--line:#30363d;--accent:#6ea8ff;--sel:#4493f8;}
+    .help{background:#2b2413;border-color:#5c4a1a;}
+  }
+</style>
+</head>
+<body>
+<h1>ioSender Manual — Screenshot Uploader</h1>
+<p class="lead">Paste each screenshot into its box; it's saved with the right filename for the manual.
+Take a shot with <b>Win + Shift + S</b>, click a box, press <b>Ctrl + V</b>. (You can also drag an image
+file onto a box, or click it to browse.)</p>
+
+<div class="help" id="help">
+  <b>First:</b> click <b>“Connect img folder”</b> and pick
+  <code>…\docs\manual\img</code> — then every paste writes straight into it. If your browser doesn't
+  support that, pastes will <b>download</b> with the correct filename instead (then move them into
+  <code>docs\manual\img</code>, or just tell Claude). When you're done, republish with
+  <code>docs\manual\publish-pages.ps1</code>.
+</div>
+
+<div class="bar">
+  <button type="button" class="primary" id="pick">📁 Connect img folder</button>
+  <span class="status" id="status">Save mode: <b id="mode">download</b> (pick a folder to write directly)</span>
+  <span class="count" id="count">0 / 0 saved</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ONE representative screenshot per screen. Show the stated state, with other tabs/options
+// visible in the frame so readers see they exist — variants are covered in the manual's text.
+const SHOTS = [
+  {file:'connect-dialog.png',        title:'Connect dialog',        desc:'File → Connect… with the SERIAL tab selected (the common case). Keep all three tab headers — Serial / Network / Simulator — visible along the top. One shot, not three.'},
+  {file:'job-runscreen.png',         title:'Job screen',            desc:'The whole main window on the Job tab with a program LOADED (ideally mid-run or paused) so the g-code list, 3D toolpath, run bar, DRO and jog pad are all populated. (Also doubles as the Jogging/DRO shot.)', star:true},
+  {file:'start-job-panel.png',       title:'Start Job panel',       desc:'The Start Job tab setup panel: stock-size fields, the four action checkboxes, and the Generate / Verify skew buttons.'},
+  {file:'machine-setup-overview.png',title:'Machine Setup overview',desc:'The Machine Setup OVERVIEW page (the one listing the 6 numbered steps) — not an individual step.'},
+  {file:'settings-grbl.png',         title:'Settings → Grbl',       desc:'The Settings → Grbl tab: the scrollable $-settings list with the search box at top. If a changed setting is highlighted, even better.'},
+  {file:'probing-tabs.png',          title:'Probing',               desc:'The Probing tab with ONE routine selected (Edge finder, external is a good default) so its form shows — with the routine sub-tab headers and the Probe selector visible.'},
+  {file:'tools-tab.png',             title:'Tools',                 desc:'The Tools tab with ONE sub-tab selected (Surface Spoilboard is a good one) — keep the Tools sub-tab headers visible so readers see the others.'},
+  {file:'offsets-table.png',         title:'Work offsets',          desc:'The Offsets tab showing the G54–G59.3 table with the Get current position / Set all / Clear all buttons.'},
+  {file:'gcode-viewer.png',          title:'3D viewer',             desc:'A clear view of the 3D toolpath viewer WITH its toolbar (reset / grid / axes / ViewCube) and a toolpath drawn. A crop of the Job screen viewer pane is fine.'},
+  {file:'sdcard.png',                title:'SD card',               desc:'The SD Card tab showing a list of files on the controller. (Optional.)', opt:true},
+  {file:'heightmap.png',             title:'Height map',            desc:'The Height map view with the area/grid controls and, ideally, a probed surface shown. (Optional.)', opt:true},
+  {file:'lathe-wizard.png',          title:'Lathe wizard',          desc:'ONE lathe wizard (e.g. Turning) with its input fields. Only if you run lathe. (Optional.)', opt:true},
+  {file:'errors-dialog.png',         title:'Errors dialog',         desc:'The Help → Error and alarm codes dialog (the searchable list). (Optional.)', opt:true}
+];
+
+let dirHandle = null;
+let selected = null;
+const grid = document.getElementById('grid');
+const modeEl = document.getElementById('mode');
+const countEl = document.getElementById('count');
+const done = new Set();
+
+// ---- build cards ----
+SHOTS.forEach((s, i) => {
+  const card = document.createElement('div');
+  card.className = 'card'; card.dataset.i = i;
+  card.innerHTML = `
+    <h3>${s.star?'<span class="star" title="the hero shot">★</span>':''}${s.title}
+        ${s.opt?'<span class="opt">optional</span>':''}</h3>
+    <div class="row"><span class="fname">${s.file}</span><span class="saved" id="sv${i}"></span></div>
+    <p class="desc">${s.desc}</p>
+    <div class="drop" id="drop${i}" tabindex="0">Click, then Ctrl+V &nbsp;·&nbsp; or drag an image here</div>
+    <div class="row">
+      <button type="button" class="mini" data-browse="${i}">Choose file…</button>
+      <input type="file" accept="image/*" id="file${i}">
+    </div>`;
+  grid.appendChild(card);
+});
+
+function selectCard(i){
+  selected = i;
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('sel', +c.dataset.i === i));
+}
+function firstEmpty(){ for(let i=0;i<SHOTS.length;i++) if(!done.has(i)) return i; return null; }
+function updateCount(){ countEl.textContent = `${done.size} / ${SHOTS.length} saved`; }
+
+// ---- image handling ----
+async function toPng(blob){
+  if(blob.type === 'image/png') return blob;
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp,0,0);
+  return await new Promise(r => c.toBlob(r, 'image/png'));
+}
+
+async function saveBlob(name, blob){
+  if(dirHandle){
+    const fh = await dirHandle.getFileHandle(name, {create:true});
+    const w = await fh.createWritable();
+    await w.write(blob); await w.close();
+    return 'folder';
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  return 'download';
+}
+
+async function handleImage(i, srcBlob){
+  if(i == null){ alert('Click a box first, then paste.'); return; }
+  try {
+    const png = await toPng(srcBlob);
+    // preview
+    const drop = document.getElementById('drop'+i);
+    drop.innerHTML = '';
+    const img = new Image(); img.src = URL.createObjectURL(png); drop.appendChild(img);
+    // save
+    const where = await saveBlob(SHOTS[i].file, png);
+    const sv = document.getElementById('sv'+i);
+    if(where === 'folder'){ sv.textContent = '✓ saved to img'; sv.className = 'saved'; }
+    else { sv.textContent = '⬇ downloaded'; sv.className = 'saved dl'; }
+    document.querySelector('.card[data-i="'+i+'"]').classList.add('done');
+    done.add(i); updateCount();
+  } catch(err){
+    alert('Could not save '+SHOTS[i].file+':\n'+err.message);
+  }
+}
+
+// ---- events ----
+grid.addEventListener('click', e => {
+  const b = e.target.closest('[data-browse]');
+  if(b){ document.getElementById('file'+b.dataset.browse).click(); return; }
+  const card = e.target.closest('.card');
+  if(card) selectCard(+card.dataset.i);
+});
+SHOTS.forEach((s,i) => {
+  document.getElementById('file'+i).addEventListener('change', e => {
+    if(e.target.files[0]) handleImage(i, e.target.files[0]);
+  });
+  const drop = document.getElementById('drop'+i);
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('hover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('hover'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('hover'); selectCard(i);
+    const f = [...(e.dataTransfer.files||[])].find(f => f.type.startsWith('image/'));
+    if(f) handleImage(i, f);
+  });
+  drop.addEventListener('focus', () => selectCard(i));
+});
+
+document.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items; if(!items) return;
+  for(const it of items){
+    if(it.type.indexOf('image') === 0){
+      const blob = it.getAsFile();
+      handleImage(selected != null ? selected : firstEmpty(), blob);
+      e.preventDefault(); return;
+    }
+  }
+});
+
+// ---- folder connect (File System Access API) ----
+document.getElementById('pick').addEventListener('click', async () => {
+  if(!window.showDirectoryPicker){
+    alert('This browser can\'t write to a folder directly (needs Edge or Chrome).\n'
+        + 'No problem — pastes will download with the correct filename; move them into docs\\manual\\img.');
+    return;
+  }
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode:'readwrite', id:'iosender-manual-img' });
+    const perm = await dirHandle.requestPermission({ mode:'readwrite' });
+    if(perm !== 'granted'){ dirHandle = null; alert('Write permission was not granted.'); return; }
+    modeEl.textContent = 'write to “' + dirHandle.name + '”';
+    document.getElementById('status').innerHTML =
+      'Save mode: <b>write to “' + dirHandle.name + '”</b> — pastes save straight into this folder.';
+  } catch(err){
+    if(err.name !== 'AbortError') alert('Folder not connected: ' + err.message);
+  }
+});
+
+updateCount();
+</script>
+</body>
+</html>

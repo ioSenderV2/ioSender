@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>55 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>57 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -199,6 +199,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Probe input follows the selected probe type &mdash; tool setter &rarr; <code>Q1</code>, else the main probe &rarr; <code>Q0</code> (guards a stale selection)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr36">36</a></td></tr>
 <tr><td>Start Job (was Load Stock) &mdash; first tab, connection-gated tabs, auto 3D-probe at the front-left origin, writes <code>start_job.macro</code>; new Verify skew pass (re-touch each corner in the rotated frame); flyout persistence &amp; offset-Set fixes</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr44">44</a></td></tr>
 <tr><td>Tools tab guidance &mdash; each Tools tab (tool table, spoilboard surfacing, scratch calibration, Trinamic, PID) now shows an on-screen &ldquo;About&rdquo; explainer of what it does and how to use it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr52">52</a></td></tr>
+<tr><td>Start Job tab no longer strands + program view stays a right column &mdash; a probe/hold that didn&rsquo;t cleanly clear could leave a gated tab disabled with no way back; the generated program overlay no longer grows to cover the whole tab</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr57">57</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -232,6 +233,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>High-DPI polish &mdash; fixed pixel sizes converted to Min/Auto so text doesn&rsquo;t clip at 125&ndash;150% scaling</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr46">46</a></td></tr>
 <tr><td>Lathe wizards rebuilt to the app layout idiom &mdash; the 5 upstream absolute-Margin wizards re-hosted in scaling StackPanel/Grid so they no longer clip/overlap at 125&ndash;150%</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr49">49</a></td></tr>
 <tr><td>Tab strips fill their width &mdash; a StretchTabControl spreads each tab header proportionally across the row so tabs read as distinct (main bar + Settings / Tools / Lathe / Probing / Machine Setup)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr50">50</a></td></tr>
+<tr><td>Online user manual + in-app context help &mdash; <kbd>F1</kbd> (and the Help menu) open a task-oriented manual with novice / intermediate / machinist reading tracks, A&ndash;Z index, search, diagrams and screenshots; hosted at <code>iosenderv2.github.io/ioSender</code></td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr56">56</a></td></tr>
 <tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
 <tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
 <tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
@@ -301,7 +303,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">53</td><td><a href="#pr53">Headless build script + crash logging</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+255</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">54</td><td><a href="#pr54">Rename LoadStock &rarr; Start Job (code matches the UI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">30</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+177</span> <span class="del">-177</span></td></tr>
 <tr><td class="n">55</td><td><a href="#pr55">Localization sweep &mdash; V2 strings into all 7 locales</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">29</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+1581</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (55 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">476</span> <span class="del">2</span> <span class="add">+92</span><br><span class="k">Lines:</span> <span class="add">+30693</span> <span class="del">-3872</span></td></tr>
+<tr><td class="n">56</td><td><a href="#pr56">Online user manual + in-app context help (F1)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+126</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">57</td><td><a href="#pr57">Fixes: Start Job tab strand + program-view overlay width</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (57 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">481</span> <span class="del">2</span> <span class="add">+93</span><br><span class="k">Lines:</span> <span class="add">+30845</span> <span class="del">-3875</span></td></tr>
 </table>
 </div>
 
@@ -1662,6 +1666,36 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Covers</strong> &mdash; Start Job (renamed view + the probing control), the probing-redesign dialogs (<code>ProbeMotionParams</code>&thinsp;/&thinsp;<code>ProbeDefinition*</code>), the main-page editor, console search, the Tools tab guidance (#52), the carve view, and assorted flyouts/config controls.</li>
 <li><strong>Baseline, not machine-translation</strong> &mdash; each new row carries the English text for a translator to replace; the app already rendered English via fallback, so nothing changes on screen. Comma values RFC4180-quoted; re-running the tool adds nothing.</li>
 </ul><p class="foot">In the integration build. Lathe wizards are excluded (no <code>CNC.Controls.Lathe</code> locale CSV exists &mdash; never LocBaml-localized).</p></div>
+</div>
+
+<!-- ===== #56 ===== -->
+<div class="pr">
+<h2 id="pr56"><span class="badge">#56</span>Online user manual + in-app context help (F1)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/ManualHelp.cs <em>(new)</em></td><td class="num add">112</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">13</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A new task-oriented <strong>online user manual</strong> &mdash; a single self-contained HTML page hosted on GitHub Pages at <code>iosenderv2.github.io/ioSender</code> &mdash; plus an in-app hook that opens it <em>in context</em>.</p><ul>
+<li><strong>Context help</strong> &mdash; <kbd>F1</kbd> opens the manual at the page for whatever tab is current (a <code>ViewType</code>&rarr;anchor map in <code>ManualHelp</code>, resolving a bundled copy next to the exe or the online copy). The Help menu&rsquo;s <em>Usage tips</em> and <em>A brief tour</em> are repointed from the upstream wiki to the V2 manual.</li>
+<li><strong>The manual</strong> (in <code>docs/manual/</code>, published from an isolated <code>gh-pages</code> branch) &mdash; 18 topics threaded into three reading tracks (novice / intermediate / machinist), an A&ndash;Z subject index, live search, three hand-built inline SVG diagrams (MCS-vs-WCS, machine anatomy, tool-change flow), 13 screenshots, and a lazy &ldquo;Watch on the machine&rdquo; video hook for future walkthroughs.</li>
+</ul><p class="foot">In the integration build. The manual site + its authoring tools (<code>docs/manual/*</code>) are not enumerated above (self-referential docs).</p></div>
+</div>
+
+<!-- ===== #57 ===== -->
+<div class="pr">
+<h2 id="pr57"><span class="badge">#57</span>Fixes: Start Job tab strand + program-view overlay width</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/JobView.xaml.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Two rough edges surfaced while documenting the Start Job flow.</p><ul>
+<li><strong>Stranded tab</strong> &mdash; tab enablement was driven by fragile <code>Hold</code>&thinsp;/&thinsp;<code>IsGCLock</code> event pairs (Start Job&rsquo;s auto-probe locks G-code); a mis-paired clear could leave a connection-gated tab (e.g. Start Job) disabled with no way back. New <code>RefreshTabsIdle()</code> reconciles every tab to its correct connection + capability state whenever the controller is idle and nothing is streaming &mdash; idempotent, and it never runs during a real job.</li>
+<li><strong>Program-view overlay</strong> &mdash; the generated-program overlay had no maximum width, so it grew to cover the whole tab and hid the Start Job inputs; capped with <code>MaxWidth=&quot;720&quot;</code> so it stays a right-hand column.</li>
+</ul><p class="foot">In the integration build. Both regressions trace to the run-bar / StretchTabControl era (#45, #50).</p></div>
 </div>
 </section>
 

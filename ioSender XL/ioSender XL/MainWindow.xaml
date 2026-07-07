@@ -255,7 +255,7 @@
         </cnccontrols:StretchTabControl>
         <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
         <!-- Program view always pops on the RIGHT. -->
-        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" Margin="0,60,0,0"
+        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" MaxWidth="720" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
             <DockPanel>
                 <!-- Title = program source (loaded file/folder) or, in preview mode, the generating tool's name. -->

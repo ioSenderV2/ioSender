@@ -262,6 +262,10 @@ namespace GCode_Sender
                         }
                         else if ((sender as GrblViewModel).GrblState.State != GrblStates.Hold && holdActivated)
                             MainWindow.ui.JobRunning = holdActivated = false;
+                        // Safety net: when the controller is idle and no job is streaming, un-strand any tab left
+                        // disabled by a lock/hold/probe (e.g. Start Job's auto-probe) whose clear didn't line up.
+                        else if ((sender as GrblViewModel).GrblState.State == GrblStates.Idle && !(sender as GrblViewModel).IsJobRunning)
+                            MainWindow.ui.RefreshTabsIdle();
                     }
                     break;
 

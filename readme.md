@@ -16,6 +16,8 @@ This is [`ioSenderV2/ioSender`](https://github.com/ioSenderV2/ioSender) — **io
 
 **See [`Overview.pdf`](Overview.pdf)** ([`Overview.html`](Overview.html)) — the one document: how V2 came off the PR-era archive, how the V2 repos wire together, and the **full changelog** (every feature and fix with file-level diff stats and a description) folded in as the [`#features-and-fixes`](Overview.html#features-and-fixes) section.
 
+📖 **New — [online user manual](https://iosenderv2.github.io/ioSender/):** a task-oriented guide with novice / intermediate / machinist reading paths, an A–Z subject index, search, diagrams and screenshots. Inside the app, **`F1`** opens it at the page for whatever you're looking at. (Also served: the [changelog / overview](https://iosenderv2.github.io/ioSender/overview.html).)
+
 `master` (default) is the whole product — clone and build it (build notes below); it is consumed whole. The upstream-submittable PR-era history lives frozen in the archive repo [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) at tag `pr-era-cutoff`.
 
 #### Edge pre-releases

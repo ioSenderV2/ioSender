@@ -889,12 +889,14 @@ namespace GCode_Sender
 
         void tipsWikiItem_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("https://github.com/terjeio/ioSender/wiki/Usage-tips");
+            // V2: open the user manual's "getting clean, repeatable results" page instead of the upstream wiki.
+            ManualHelp.Open("clean-results");
         }
 
         void briefTour_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("https://www.grbl.org/single-post/one-sender-to-rule-them-all");
+            // V2: open the manual's "Intro to CNC" orientation page instead of the upstream blog tour.
+            ManualHelp.Open("intro-to-cnc");
         }
 
         void videoTutorials_Click(object sender, EventArgs e)
@@ -1244,6 +1246,28 @@ namespace GCode_Sender
                 ui.tabMode.Items.Remove(tab);
         }
 
+        // Safety net for tab enablement. The JobRunning setter disables every non-selected tab while a job/
+        // probe holds the controller (driven by fragile IsGCLock/Hold event pairs); if the clearing event does
+        // not line up - e.g. Start Job's auto 3D-probe locks G-code, then the user changes tab - a gated tab can
+        // be left disabled with no path back. When the controller is genuinely idle and nothing is streaming,
+        // reconcile every tab to its correct not-running state (connection + capability). Idempotent and cheap
+        // (writes IsEnabled only when it differs), so it is safe to call on every idle status message. Never runs
+        // during a real job - the call site gates on Idle && !IsJobRunning, and a running job is never Idle.
+        public void RefreshTabsIdle()
+        {
+            bool connected = Comms.com != null && Comms.com.IsOpen;
+            foreach (TabItem tab in UIUtils.FindLogicalChildren<TabItem>(tabMode))
+            {
+                var view = getView(tab);
+                if (view == null)
+                    continue;
+                var d = TabRegistry.DescriptorByName(view.ViewType.ToString());
+                bool want = (d == null || d.EnabledWhenDisconnected || connected) && view.CanEnable;
+                if (tab.IsEnabled != want)
+                    tab.IsEnabled = want;
+            }
+        }
+
         public static bool IsViewVisible(ViewType view)
         {
             TabItem tab = getTab(view);
@@ -1423,6 +1447,14 @@ namespace GCode_Sender
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // F1 - context help: open the user manual at the page for whatever view is current.
+            if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
+            {
+                ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
+                e.Handled = true;
+                return;
+            }
+
             if (consoleKey != Key.None && e.Key == consoleKey && Keyboard.Modifiers == consoleModifiers)
             {
                 openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible

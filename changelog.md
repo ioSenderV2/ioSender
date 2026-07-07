@@ -1,5 +1,7 @@
 ## ioSender changelog
 
+> **Note:** this is the legacy **upstream** (terjeio) release changelog, kept for history. The **ioSender V2** changes live in [`Overview.html`](Overview.html) (`#features-and-fixes`) and on the [online manual site](https://iosenderv2.github.io/ioSender/overview.html).
+
 2026-04-29: [Release 2.0.47](https://github.com/terjeio/Grbl-GCode-Sender/releases/tag/2.0.47).
 
 * Fix for incremental arc issues, ref issue [#503](https://github.com/terjeio/ioSender/issues/503) - fix adopted from PR [#504](https://github.com/terjeio/ioSender/pull/504). Broken Z plotting of incremental arcs is also fixed. 
