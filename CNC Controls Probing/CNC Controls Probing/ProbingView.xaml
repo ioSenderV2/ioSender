@@ -61,20 +61,20 @@
             </StackPanel>
         </DockPanel>
         <!-- Tab area fills the rest. Each tab is a self-contained Tools-style control. -->
-        <Controls:StretchTabControl x:Name="tab" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
-            <TabItem x:Uid="tab_toolOffset" Header="Tool length offset">
+        <Controls:StretchTabControl x:Name="tab" PersistKey="Probing" Margin="5,8,5,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SelectionChanged="tab_SelectionChanged">
+            <TabItem x:Name="tabToolOffset" x:Uid="tab_toolOffset" Header="Tool length offset">
                 <local:ToolLengthControl/>
             </TabItem>
-            <TabItem x:Uid="tab_edgeInternal" Header="Edge finder, external">
+            <TabItem x:Name="tabEdgeExternal" x:Uid="tab_edgeInternal" Header="Edge finder, external">
                 <local:EdgeFinderControl/>
             </TabItem>
-            <TabItem x:Uid="tab_edgeExternal" Header="Edge finder, internal">
+            <TabItem x:Name="tabEdgeInternal" x:Uid="tab_edgeExternal" Header="Edge finder, internal">
                 <local:EdgeFinderIntControl/>
             </TabItem>
             <!-- Load stock moved out to its own top-level "Load stock" tab (generate-and-run model, ioSender XL). -->
             <!-- Rotation tab retired: stock skew is now applied as a work-coordinate-system rotation by the
                  Load stock tab (G10 L2 R), inherited by any program. RotationControl.* kept dormant. -->
-            <TabItem x:Uid="tab_Center" Header="Center finder">
+            <TabItem x:Name="tabCenter" x:Uid="tab_Center" Header="Center finder">
                 <local:CenterFinderControl/>
             </TabItem>
             <!-- Height map moved out to its own top-level "Height Map" tab (generate-and-run model, ioSender XL). -->

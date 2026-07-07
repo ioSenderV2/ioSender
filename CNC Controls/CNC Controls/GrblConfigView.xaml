@@ -82,7 +82,7 @@
                 </StackPanel>
             </DockPanel>
         </StackPanel>
-        <local:StretchTabControl x:Name="tabConfig" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
+        <local:StretchTabControl x:Name="tabConfig" PersistKey="Settings" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
             <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl">
                 <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </TabItem>

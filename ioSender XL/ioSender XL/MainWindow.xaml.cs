@@ -1336,9 +1336,21 @@ namespace GCode_Sender
                 {
                     Header = d.Label,
                     Content = ctl,
-                    IsEnabled = d.EnabledWhenDisconnected
+                    IsEnabled = d.EnabledWhenDisconnected,
+                    Tag = node.Component
                 });
             }
+
+            // Persist drag-reorder of the top-level bar into Config.Tabs + the layout tree (the same store the
+            // "Edit Main Page" Tabs editor writes), so the two ways of ordering tabs stay in agreement.
+            tabMode.TabsReordered += (s, e) =>
+            {
+                var order = new System.Collections.Generic.List<string>();
+                foreach (TabItem t in tabMode.Items)
+                    if (t.Tag is string key && !string.IsNullOrEmpty(key))
+                        order.Add(key);
+                AppConfig.Settings.ReorderTopLevelTabs(order);
+            };
         }
 
         // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main

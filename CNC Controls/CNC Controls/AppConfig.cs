@@ -502,6 +502,9 @@ namespace CNC.Controls
             // read Base.Tabs when the section is absent (first run on a build that has it).
             layoutSection = new LayoutSection(() => LayoutMigration.FromFlat(Base?.Tabs));
             ConfigStore.Register(layoutSection);
+
+            // Drag-reorder order for the sub-tab strips that have no other order authority (Probing/Settings).
+            ConfigStore.Register(new OwnedSection<TabOrderConfig>("TabOrder"));
         }
 
         // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).
@@ -538,6 +541,59 @@ namespace CNC.Controls
             }
 
             Save(CNC.Core.Resources.IniFile);
+        }
+
+        // Persist a drag-reorder of the top-level tab bar. presentOrder is the new left-to-right order of the
+        // tabs currently on screen (component keys). Updates BOTH the layout tree's "tabs" slot (the post-restart
+        // authority BuildTabs reads) AND the legacy flat Config.Tabs, matching what "Edit Main Page" writes, so
+        // the drag order and the editor never disagree. Tabs absent from screen (capability-hidden, e.g. Lathe)
+        // keep their stored slots - only the on-screen tabs are reordered among themselves.
+        public void ReorderTopLevelTabs(IEnumerable<string> presentOrder)
+        {
+            var order = presentOrder.ToList();
+            var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot != null)
+                ApplyOrder(tabsSlot.Items, n => n.Component, order);
+            if (Base?.Tabs != null && Base.Tabs.Count > 0)
+                ApplyOrder(Base.Tabs, s => s, order);
+            Save(CNC.Core.Resources.IniFile);
+        }
+
+        // Persist a drag-reorder of a nested container slot (e.g. the Tools sub-tabs, container "Tools" slot
+        // "tools"). Same present-only semantics as ReorderTopLevelTabs; there is no legacy flat mirror for
+        // nested slots, so only the tree is written.
+        public void ReorderSlot(string containerComponent, string slotName, IEnumerable<string> presentOrder)
+        {
+            if (layoutSection?.Root == null)
+                return;
+            var node = LayoutTree.Flatten(layoutSection.Root).FirstOrDefault(n => n.Component == containerComponent);
+            var slot = node?.Slot(slotName);
+            if (slot == null)
+                return;
+            ApplyOrder(slot.Items, n => n.Component, presentOrder.ToList());
+            Save(CNC.Core.Resources.IniFile);
+        }
+
+        // Reorder the present items of a list to match presentOrder, leaving every non-present item pinned to its
+        // current slot. Each slot that currently holds a present item receives the next present item from the
+        // requested order; unknown/hidden items are untouched.
+        private static void ApplyOrder<T>(List<T> list, Func<T, string> keyOf, List<string> presentOrder)
+        {
+            var present = new HashSet<string>(presentOrder);
+            var byKey = new Dictionary<string, T>();
+            foreach (var item in list)
+            {
+                var k = keyOf(item);
+                if (present.Contains(k) && !byKey.ContainsKey(k))
+                    byKey[k] = item;
+            }
+            var q = new Queue<T>();
+            foreach (var k in presentOrder)
+                if (byKey.TryGetValue(k, out var item))
+                    q.Enqueue(item);
+            for (int i = 0; i < list.Count && q.Count > 0; i++)
+                if (present.Contains(keyOf(list[i])))
+                    list[i] = q.Dequeue();
         }
 
         // Standalone config files now folded into App.config as sections (populated below via RegisterFolded).

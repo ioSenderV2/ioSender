@@ -56,8 +56,12 @@ namespace CNC.Controls
                 var d = ComponentRegistry.Get(node.Component);
                 var ctl = d?.Create?.Invoke();
                 if (ctl != null)
-                    tabTools.Items.Add(new TabItem { Header = d.Label, Content = ctl });
+                    tabTools.Items.Add(new TabItem { Header = d.Label, Content = ctl, Tag = node.Component });
             }
+
+            // Persist drag-reorder into the layout tree's Tools slot (the order authority BuildTools reads).
+            tabTools.TabsReordered += (s, e) => AppConfig.Settings.ReorderSlot(LayoutKeys.Tools, LayoutKeys.SlotTools,
+                tabTools.Items.Cast<TabItem>().Select(t => t.Tag as string).Where(k => !string.IsNullOrEmpty(k)));
         }
 
         #region ICNCView
