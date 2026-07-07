@@ -3271,7 +3271,17 @@ namespace CNC.Core
             PollGrbl.Suspend();
             model.Silent = true;
 
-            if ((load = Settings.Count == 0) && GrblInfo.HasEnums)
+            // The grblHAL setting-enum metadata (per-setting name/type/group + the group tree) is fetched only on
+            // the initial load. If the settings were first loaded before the controller's enum support was known -
+            // e.g. the Settings tab is activated during startup connect, after $$ is answered but before $I sets
+            // HasEnums - Settings gets populated group-less via the plain $$ path and the tree never builds. So also
+            // take the details path whenever HasEnums is now true but the group tree hasn't been built yet, dropping
+            // those stale group-less settings first so the details query rebuilds them with metadata (no duplicates).
+            bool needMeta = GrblInfo.HasEnums && GrblSettingGroups.Groups.Count == 0;
+            if (needMeta && Settings.Count > 0)
+                Settings.Clear();
+
+            if ((load = Settings.Count == 0 || needMeta) && GrblInfo.HasEnums)
             {
                 new Thread(() =>
                 {

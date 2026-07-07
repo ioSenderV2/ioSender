@@ -112,7 +112,14 @@ namespace CNC.Controls
 
                 if (activate)
                 {
-                    if (active) return;
+                    // Don't let the 'active' latch skip the first genuine load. This control is created and laid
+                    // out eagerly at app startup, and its host's inner TabControl fires an initial SelectionChanged
+                    // that activates this tab once while still disconnected - there's nothing to read then, but it
+                    // would latch active=true and make the real post-connect entry short-circuit here, leaving the
+                    // settings tree empty and unbound. So only skip when settings are genuinely loaded for the
+                    // current connection (and, on grblHAL, the group tree has actually been built).
+                    bool loaded = GrblSettings.IsLoaded && (!GrblInfo.HasEnums || GrblSettingGroups.Groups.Count > 0);
+                    if (active && loaded) return;
 
                     active = true;
 
