@@ -39,13 +39,13 @@ using CNC.Core;
 namespace CNC.Controls
 {
     // Lightweight file tracer for diagnosing stay-put/macro streaming (Load Stock). Writes to
-    // %TEMP%\iosender-loadstock.log. Cleared at the start of each small (<200-block) run so each
+    // %TEMP%\iosender-startjob.log. Cleared at the start of each small (<200-block) run so each
     // reproduction is self-contained; large cutting jobs are not traced (Enabled=false) to avoid bloat.
     internal static class PumpLog
     {
         private static readonly object gate = new object();
         public static bool Enabled = false;
-        public static readonly string FilePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "iosender-loadstock.log");
+        public static readonly string FilePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "iosender-startjob.log");
 
         public static void Clear() { try { System.IO.File.WriteAllText(FilePath, string.Empty); } catch { } }
 

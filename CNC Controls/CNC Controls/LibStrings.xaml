@@ -54,7 +54,7 @@
     <system:String x:Uid="str_lfNoToolpaths" x:Key="LfNoToolpathFiles">No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.</system:String>
     <!-- Top-level tab labels (built in code by ioSender XL's RegisterBuiltinTabs). -->
     <system:String x:Uid="str_tabJob" x:Key="TabJob">Job</system:String>
-    <system:String x:Uid="str_tabLoadStock" x:Key="TabLoadStock">Start Job</system:String>
+    <system:String x:Uid="str_tabStartJob" x:Key="TabStartJob">Start Job</system:String>
     <system:String x:Uid="str_tabOffsets" x:Key="TabOffsets">Offsets</system:String>
     <system:String x:Uid="str_tabSettings" x:Key="TabSettings">Settings</system:String>
     <system:String x:Uid="str_tabProbing" x:Key="TabProbing">Probing</system:String>

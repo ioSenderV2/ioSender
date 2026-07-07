@@ -48,7 +48,7 @@ namespace CNC.Controls.Probing
         CenterFinder,
         Rotation,
         HeightMap,
-        LoadStock
+        StartJob
     }
 
     public interface IProbeTab

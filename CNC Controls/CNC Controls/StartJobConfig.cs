@@ -1,17 +1,17 @@
 /*
- * LoadStockConfig.cs - part of CNC Controls library
+ * StartJobConfig.cs - part of CNC Controls library
  *
- * Persisted Load Stock inputs, folded into App.config as the "LoadStock" section (was the standalone
- * LoadStock.xml). The DTO and its static holder live here (rather than with LoadStockView in the top
+ * Persisted Load Stock inputs, folded into App.config as the "StartJob" section (was the standalone
+ * StartJob.xml). The DTO and its static holder live here (rather than with StartJobView in the top
  * assembly) so AppConfig - which registers the section and reads/writes the holder - can reference the type.
- * LoadStockView is event-driven (not dependency-property based), so it doesn't derive from ConfigPanel<T>;
- * it reads/writes LoadStockConfig.Section directly and calls AppConfig.Settings.Save().
+ * StartJobView is event-driven (not dependency-property based), so it doesn't derive from ConfigPanel<T>;
+ * it reads/writes StartJobConfig.Section directly and calls AppConfig.Settings.Save().
  */
 
 namespace CNC.Controls
 {
     // Persisted Load Stock inputs so the estimate/corner/options survive restarts.
-    public class LoadStockSettings
+    public class StartJobSettings
     {
         public double Width = 100d;
         public double Height = 100d;
@@ -28,10 +28,10 @@ namespace CNC.Controls
         public string Probe = string.Empty;
     }
 
-    // Static holder backing the "LoadStock" App.config section (read/written by AppConfig.RegisterFolded and
-    // by LoadStockView's LoadInputs/SaveInputs).
-    public static class LoadStockConfig
+    // Static holder backing the "StartJob" App.config section (read/written by AppConfig.RegisterFolded and
+    // by StartJobView's LoadInputs/SaveInputs).
+    public static class StartJobConfig
     {
-        public static LoadStockSettings Section;
+        public static StartJobSettings Section;
     }
 }

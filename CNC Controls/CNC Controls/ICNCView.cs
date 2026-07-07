@@ -56,7 +56,7 @@ namespace CNC.Controls
         SpindleLinearizer,
         Probing,
         LatheWizards,
-        LoadStock,
+        StartJob,
         HeightMap,
         MachineSetup
     }

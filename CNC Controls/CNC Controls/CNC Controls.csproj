@@ -83,7 +83,7 @@
     <Compile Include="LayoutSection.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="ConfigPanel.cs" />
-    <Compile Include="LoadStockConfig.cs" />
+    <Compile Include="StartJobConfig.cs" />
     <Compile Include="AtcMacros.cs" />
     <Compile Include="ArcsToLines.cs" />
     <Compile Include="BasicConfigControl.xaml.cs">

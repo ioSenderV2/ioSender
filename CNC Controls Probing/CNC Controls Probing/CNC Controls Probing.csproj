@@ -77,8 +77,8 @@
     <Compile Include="EdgeFinderIntControl.xaml.cs">
       <DependentUpon>EdgeFinderIntControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="LoadStockControl.xaml.cs">
-      <DependentUpon>LoadStockControl.xaml</DependentUpon>
+    <Compile Include="StartJobControl.xaml.cs">
+      <DependentUpon>StartJobControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="GCodeTransform.cs" />
     <Compile Include="HeightMap.cs" />
@@ -135,7 +135,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="LoadStockControl.xaml">
+    <Page Include="StartJobControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

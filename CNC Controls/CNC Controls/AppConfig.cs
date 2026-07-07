@@ -495,8 +495,8 @@ namespace CNC.Controls
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
             RegisterFolded<ScratchParams>("StepperCalScratch",
                 () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
-            RegisterFolded<LoadStockSettings>("LoadStock",
-                () => LoadStockConfig.Section, v => LoadStockConfig.Section = v, "LoadStock.xml");
+            RegisterFolded<StartJobSettings>("StartJob",
+                () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
 
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
@@ -923,7 +923,7 @@ namespace CNC.Controls
                 {
                     "App.config", "App.config.bak", "KeyMap0.xml", "ControllerMap.xml",
                     "settings.txt", "offsets.nc", "ProbeDefinitions.xml",
-                    "LoadStock.xml", "AutoSquare.xml", "StepperCalScratch.xml", "SurfaceSpoilboard.xml"
+                    "StartJob.xml", "AutoSquare.xml", "StepperCalScratch.xml", "SurfaceSpoilboard.xml"
                 };
                 try
                 {
@@ -1111,7 +1111,7 @@ namespace CNC.Controls
                 var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
                 if (tabsSlot != null)
                 {
-                    int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.LoadStock);
+                    int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.StartJob);
                     if (idx > 0)
                     {
                         var node = tabsSlot.Items[idx];
@@ -1121,8 +1121,8 @@ namespace CNC.Controls
                 }
                 if (Base.Tabs.Count > 0)
                 {
-                    Base.Tabs.Remove(LayoutKeys.LoadStock);
-                    Base.Tabs.Insert(0, LayoutKeys.LoadStock);
+                    Base.Tabs.Remove(LayoutKeys.StartJob);
+                    Base.Tabs.Insert(0, LayoutKeys.StartJob);
                 }
 
                 // Also drop the F-key from an already-seeded "Start Job" macro: it used to auto-bind the first

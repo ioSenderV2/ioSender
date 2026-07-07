@@ -1,5 +1,5 @@
 /*
- * LoadStockControl.xaml.cs - part of CNC Probing library
+ * StartJobControl.xaml.cs - part of CNC Probing library
  *
  * Load Stock: probe a corner-referenced workpiece to set the work origin at the front-left corner
  * and (step 2) measure its X/Y size. Built on the ProbingViewModel framework; the corner probe reuses
@@ -15,29 +15,29 @@ using CNC.GCode;
 namespace CNC.Controls.Probing
 {
     /// <summary>
-    /// Interaction logic for LoadStockControl.xaml
+    /// Interaction logic for StartJobControl.xaml
     /// </summary>
-    public partial class LoadStockControl : UserControl, IProbeTab
+    public partial class StartJobControl : UserControl, IProbeTab
     {
         private volatile bool isCancelled = false;
         private AxisFlags axisflags = AxisFlags.None;
         private double[] af = new double[3];
 
-        public LoadStockControl()
+        public StartJobControl()
         {
             InitializeComponent();
         }
 
-        public ProbingType ProbingType { get { return ProbingType.LoadStock; } }
+        public ProbingType ProbingType { get { return ProbingType.StartJob; } }
 
         // Approximate stock size - used in step 2 to traverse safely to the far X/Y faces.
-        public static readonly DependencyProperty ApproxWidthProperty = DependencyProperty.Register(nameof(ApproxWidth), typeof(double), typeof(LoadStockControl), new PropertyMetadata(0d));
+        public static readonly DependencyProperty ApproxWidthProperty = DependencyProperty.Register(nameof(ApproxWidth), typeof(double), typeof(StartJobControl), new PropertyMetadata(0d));
         public double ApproxWidth { get { return (double)GetValue(ApproxWidthProperty); } set { SetValue(ApproxWidthProperty, value); } }
 
-        public static readonly DependencyProperty ApproxHeightProperty = DependencyProperty.Register(nameof(ApproxHeight), typeof(double), typeof(LoadStockControl), new PropertyMetadata(0d));
+        public static readonly DependencyProperty ApproxHeightProperty = DependencyProperty.Register(nameof(ApproxHeight), typeof(double), typeof(StartJobControl), new PropertyMetadata(0d));
         public double ApproxHeight { get { return (double)GetValue(ApproxHeightProperty); } set { SetValue(ApproxHeightProperty, value); } }
 
-        public static readonly DependencyProperty ResultProperty = DependencyProperty.Register(nameof(Result), typeof(string), typeof(LoadStockControl), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty ResultProperty = DependencyProperty.Register(nameof(Result), typeof(string), typeof(StartJobControl), new PropertyMetadata(string.Empty));
         public string Result { get { return (string)GetValue(ResultProperty); } set { SetValue(ResultProperty, value); } }
 
         public void Activate(bool activate)

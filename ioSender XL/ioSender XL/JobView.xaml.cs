@@ -619,7 +619,7 @@ namespace GCode_Sender
             else
                 MainWindow.ShowView(false, ViewType.Probing);
 
-            MainWindow.EnableView(true, ViewType.LoadStock);   // front-door tool - always available
+            MainWindow.EnableView(true, ViewType.StartJob);   // front-door tool - always available
 
             MainWindow.EnableView(true, ViewType.Offsets);
             MainWindow.EnableView(true, ViewType.GRBLConfig);

@@ -1267,7 +1267,7 @@ namespace GCode_Sender
             // tabs (Start Job, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
             // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 10, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.LoadStock, TabLabel("TabLoadStock", "Start Job"), () => new LoadStockView(), 5, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabStartJob", "Start Job"), () => new StartJobView(), 5, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 30, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 50, enabledWhenDisconnected: false));

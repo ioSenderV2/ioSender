@@ -1,5 +1,5 @@
 /*
- * LoadStockView.xaml.cs - part of ioSender XL
+ * StartJobView.xaml.cs - part of ioSender XL
  *
  * "Load stock" top-level tab. Pick a probe definition + the stock corner the probe is parked over +
  * the approximate stock size, then Generate an inline grblHAL NGC probe program (shown locally) and
@@ -29,7 +29,7 @@ using CNC.Controls;
 
 namespace GCode_Sender
 {
-    public partial class LoadStockView : UserControl, ICNCView
+    public partial class StartJobView : UserControl, ICNCView
     {
         // The four stock corners the probe can be parked over. Sign factors below turn FL geometry into
         // any corner: probe +X for left corners / -X for right; probe +Y for front / -Y for back.
@@ -60,7 +60,7 @@ namespace GCode_Sender
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
-        public LoadStockView()
+        public StartJobView()
         {
             InitializeComponent();
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
@@ -126,7 +126,7 @@ namespace GCode_Sender
 
         #region ICNCView
 
-        public ViewType ViewType { get { return ViewType.LoadStock; } }
+        public ViewType ViewType { get { return ViewType.StartJob; } }
         public bool CanEnable { get { return true; } }
 
         public void Activate(bool activate, ViewType chgMode)
@@ -569,13 +569,13 @@ namespace GCode_Sender
             catch { }
         }
 
-        // Persisted as the "LoadStock" section of App.config (folded in from LoadStock.xml); the DTO + holder
-        // live in CNC.Controls (LoadStockConfig) so AppConfig can register the section.
+        // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder
+        // live in CNC.Controls (StartJobConfig) so AppConfig can register the section.
         private void LoadInputs()
         {
             try
             {
-                var s = LoadStockConfig.Section;
+                var s = StartJobConfig.Section;
                 if (s == null)
                     return;
                 fldWidth.Value = s.Width;
@@ -593,7 +593,7 @@ namespace GCode_Sender
         {
             try
             {
-                LoadStockConfig.Section = new LoadStockSettings
+                StartJobConfig.Section = new StartJobSettings
                 {
                     Width = fldWidth.Value,
                     Height = fldHeight.Value,
