@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>57 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>59 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -188,6 +188,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Per-user config folder + standalone <code>.xml</code> folded into <code>App.config</code> sections (<code>ConfigPanel&lt;T&gt;</code> wizards, curated defaults); console output search + font size, shared reset footer, bindable ResetAndUnlock</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr43">43</a></td></tr>
 <tr><td>Lathe mode toggle &mdash; App &rsaquo; Main checkbox enables/disables lathe mode, adding or removing the Lathe wizards tab (restart to apply)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr47">47</a></td></tr>
 <tr><td>Restart-needed cue &mdash; the Restart button pulses red while a restart-only change is pending and offers to relaunch when you leave Settings</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr48">48</a></td></tr>
+<tr><td>Connect: Network default + <strong>Scan network</strong> &mdash; finds grblHAL controllers on the LAN (confirms each by a <code>?</code>/<code>$I</code> handshake, not just an open port) and lists them in an editable host picker</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr59">59</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -230,6 +231,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <h3>Polish, onboarding &amp; docs</h3>
 <table>
+<tr><td>Numeric fields select their value on focus &mdash; tab or click into any number field and just type the replacement (no clearing first); single-digit edits still work</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr58">58</a></td></tr>
 <tr><td>High-DPI polish &mdash; fixed pixel sizes converted to Min/Auto so text doesn&rsquo;t clip at 125&ndash;150% scaling</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr46">46</a></td></tr>
 <tr><td>Lathe wizards rebuilt to the app layout idiom &mdash; the 5 upstream absolute-Margin wizards re-hosted in scaling StackPanel/Grid so they no longer clip/overlap at 125&ndash;150%</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr49">49</a></td></tr>
 <tr><td>Tab strips fill their width &mdash; a StretchTabControl spreads each tab header proportionally across the row so tabs read as distinct (main bar + Settings / Tools / Lathe / Probing / Machine Setup)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr50">50</a></td></tr>
@@ -305,7 +307,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">55</td><td><a href="#pr55">Localization sweep &mdash; V2 strings into all 7 locales</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">29</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+1581</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">56</td><td><a href="#pr56">Online user manual + in-app context help (F1)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+126</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">57</td><td><a href="#pr57">Fixes: Start Job tab strand + program-view overlay width</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (57 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">481</span> <span class="del">2</span> <span class="add">+93</span><br><span class="k">Lines:</span> <span class="add">+30845</span> <span class="del">-3875</span></td></tr>
+<tr><td class="n">58</td><td><a href="#pr58">Numeric fields select their value on focus</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+35</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">59</td><td><a href="#pr59">Connect: Network default + LAN controller discovery</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+527</span> <span class="del">-9</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (59 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">491</span> <span class="del">2</span> <span class="add">+94</span><br><span class="k">Lines:</span> <span class="add">+31407</span> <span class="del">-3884</span></td></tr>
 </table>
 </div>
 
@@ -1696,6 +1700,35 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Stranded tab</strong> &mdash; tab enablement was driven by fragile <code>Hold</code>&thinsp;/&thinsp;<code>IsGCLock</code> event pairs (Start Job&rsquo;s auto-probe locks G-code); a mis-paired clear could leave a connection-gated tab (e.g. Start Job) disabled with no way back. New <code>RefreshTabsIdle()</code> reconciles every tab to its correct connection + capability state whenever the controller is idle and nothing is streaming &mdash; idempotent, and it never runs during a real job.</li>
 <li><strong>Program-view overlay</strong> &mdash; the generated-program overlay had no maximum width, so it grew to cover the whole tab and hid the Start Job inputs; capped with <code>MaxWidth=&quot;720&quot;</code> so it stays a right-hand column.</li>
 </ul><p class="foot">In the integration build. Both regressions trace to the run-bar / StretchTabControl era (#45, #50).</p></div>
+</div>
+
+<!-- ===== #58 ===== -->
+<div class="pr">
+<h2 id="pr58"><span class="badge">#58</span>Numeric fields select their value on focus</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/NumericTextBox.cs</td><td class="num add">35</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Tabbing or clicking into any numeric field now selects the whole value, so you can just type the replacement instead of clearing the old number first.</p><ul>
+<li>Applied once in the shared <code>NumericTextBox</code>, so it covers every numeric field app-wide (DRO, Settings, Probing, Start Job, jog step, the wizards&hellip;).</li>
+<li>Keyboard&thinsp;/&thinsp;tab focus selects immediately; a focusing click lets WPF place the caret natively then selects on mouse-up (plain click only, so a click-drag still keeps your partial selection). Once the field already has focus, later clicks fall through untouched &mdash; so editing a single digit still lands the caret where you click.</li>
+</ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #59 ===== -->
+<div class="pr">
+<h2 id="pr59"><span class="badge">#59</span>Connect: Network default + LAN controller discovery</h2>
+<table class="files">
+<tr><td class="mono">CNC Core/NetworkScanner.cs</td><td class="num add">349</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/PortDialog.xaml.cs</td><td class="num add">127</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/PortDialog.xaml</td><td class="num add">32</td><td class="num del">6</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">19</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The Connect dialog now opens on the <strong>Network</strong> tab by default (most grblHAL controllers are networked), and a new <strong>Scan network</strong> button finds controllers on the LAN so you don&rsquo;t have to know the IP.</p><ul>
+<li><strong>Discovery by protocol, not open ports.</strong> An async subnet sweep (up to a /24 per interface, 64 concurrent) probes each host and confirms it&rsquo;s really a grbl controller by sending the real-time status request <code>?</code> and requiring a valid <code>&lt;State|&hellip;&gt;</code> report back &mdash; then reads <code>$I</code> to show &ldquo;grblHAL&nbsp;&lt;version&gt;&rdquo;. Random devices with telnet open are rejected. mDNS (<code>grblHAL.local</code>) is tried first but not relied on: consumer WiFi routers routinely drop mDNS multicast between the wireless and wired segments, so the subnet scan is the real workhorse.</li>
+<li><strong>Editable host picker.</strong> The IP field is now a combo &mdash; type a host, or pick one the scan found (the dropdown shows &ldquo;host:port&nbsp;&mdash;&nbsp;grblHAL&nbsp;x.x&rdquo;, the edit box shows just the host, and OK connects to whatever is current).</li>
+<li>The dialog also no longer hides behind the startup splash (it docks to the top of the screen while the splash is up), and its fields no longer clip at high DPI.</li>
+</ul><p class="foot">In the integration build.</p></div>
 </div>
 </section>
 
