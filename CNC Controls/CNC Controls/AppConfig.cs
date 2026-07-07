@@ -90,6 +90,15 @@ namespace CNC.Controls
         [XmlIgnore]
         public bool IsEnabled { get { return _isEnabled; } set { _isEnabled = value; OnPropertyChanged(); } }
 
+        // Simple on/off facade over XMode for the App > Main "Lathe mode" checkbox. Enabling defaults to
+        // Radius mode (the common case); disabling clears it. Persisted via XMode in the "Lathe" section.
+        [XmlIgnore]
+        public bool LatheEnabled
+        {
+            get { return _latheMode != LatheMode.Disabled; }
+            set { XMode = value ? LatheMode.Radius : LatheMode.Disabled; OnPropertyChanged(); }
+        }
+
         public LatheMode XMode { get { return _latheMode; } set { _latheMode = value; IsEnabled = value != LatheMode.Disabled; } }
         public Direction ZDirection { get; set; } = Direction.Negative;
         public double PassDepthLast { get; set; } = 0.02d;
@@ -498,6 +507,38 @@ namespace CNC.Controls
         // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).
         private LayoutSection layoutSection;
         public LayoutNode Layout { get { return layoutSection?.Root; } }
+
+        // Show/hide a top-level tab component in the persisted layout, so a config toggle (e.g. the App > Main
+        // "Lathe mode" checkbox) can add/remove a tab that only appears after a restart. Mirrors the HeightMap
+        // injection below: updates BOTH the layout tree (the post-restart authority BuildTabs reads) AND the
+        // legacy flat Config.Tabs list when the user has a customised order. When adding, insert after
+        // afterComponent (or append). Safe to call repeatedly (idempotent).
+        public void SetTabPresent(string component, bool present, string afterComponent = null)
+        {
+            var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
+
+            if (present)
+            {
+                if (tabsSlot != null && tabsSlot.Items.FindIndex(n => n.Component == component) < 0)
+                {
+                    int after = afterComponent == null ? -1 : tabsSlot.Items.FindIndex(n => n.Component == afterComponent);
+                    tabsSlot.Items.Insert(after >= 0 ? after + 1 : tabsSlot.Items.Count, new LayoutNode(component));
+                }
+                if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(component))
+                {
+                    int after = afterComponent == null ? -1 : Base.Tabs.FindIndex(t => t == afterComponent);
+                    Base.Tabs.Insert(after >= 0 ? after + 1 : Base.Tabs.Count, component);
+                }
+            }
+            else
+            {
+                tabsSlot?.Items.RemoveAll(n => n.Component == component);
+                if (Base != null && Base.Tabs.Count > 0)
+                    Base.Tabs.Remove(component);
+            }
+
+            Save(CNC.Core.Resources.IniFile);
+        }
 
         // Standalone config files now folded into App.config as sections (populated below via RegisterFolded).
         // After a migrated load persists the merged config, these redundant files are deleted so only App.config

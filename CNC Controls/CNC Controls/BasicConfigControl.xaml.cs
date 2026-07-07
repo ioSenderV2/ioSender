@@ -57,10 +57,24 @@ namespace CNC.Controls
             // captured into the serial stream at connect - both only take effect at startup, so a change needs a
             // restart. The other basic settings here are applied live / on next use.
             if (AppConfig.Settings.Base != null)
+            {
                 AppConfig.Settings.Base.PropertyChanged += (s, e) => {
                     if (e.PropertyName == nameof(Config.MaxBufferSize) || e.PropertyName == nameof(Config.ResetDelay))
                         RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply the buffer/reset-delay change."));
                 };
+
+                // Lathe mode gates a top-level tab (LatheWizards) that is only built at startup from
+                // GrblInfo.LatheModeEnabled, so toggling it here adds/removes the tab in the persisted layout and
+                // asks for a restart. Placed after SDCard to match the default layout order.
+                if (AppConfig.Settings.Base.Lathe != null)
+                    AppConfig.Settings.Base.Lathe.PropertyChanged += (s, e) => {
+                        if (e.PropertyName == nameof(LatheConfig.LatheEnabled))
+                        {
+                            AppConfig.Settings.SetTabPresent(LayoutKeys.LatheWizards, AppConfig.Settings.Base.Lathe.LatheEnabled, LayoutKeys.SDCard);
+                            RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply the lathe-mode change."));
+                        }
+                    };
+            }
         }
 
         // Reset the Main-panel settings this control owns to their factory defaults (from a fresh Config).
