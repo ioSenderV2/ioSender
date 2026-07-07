@@ -25,16 +25,51 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCALES = ['de-DE', 'en-US', 'hu-HU', 'pt-BR', 'ru-RU', 'uk-UA', 'zh-CN']
 
 # XAML view files to scan, paired with their built assembly's resource base name.
+# Idempotent: listing a file that's fully localized adds nothing; new x:Uids get backfilled.
 TARGETS = [
+    # ioSender (ioSender XL views: MainWindow + the top-level view tabs)
     ('ioSender XL/ioSender XL/HeightMapView.xaml', 'ioSender'),
-    ('ioSender XL/ioSender XL/LoadStockView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/StartJobView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
+
+    # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/StepperCalibrationWizard.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ToolView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/TrinamicView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/PIDLogView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MachineSetupWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/JogConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/FileActionControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/KeyMapEditor.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/MainPageEditor.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/MPGPending.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OffsetFlyout.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/PanelFlyout.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/PendingChangesDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ProbeDefinitionsDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ProbeMotionParamsDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/SignalsControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/RestorePointDialog.xaml', 'CNC.Controls.WPF'),
+
+    # CNC.Controls.Probing (the probing tab library - redesign + Start Job probing control)
+    ('CNC Controls Probing/CNC Controls Probing/StartJobControl.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/ProbingView.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/EdgeFinderControl.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/EdgeFinderIntControl.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/RotationControl.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/ToolLengthControl.xaml', 'CNC.Controls.Probing'),
+
+    # CNC.Controls.Viewer (the 3D/carve viewer)
+    ('CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml', 'CNC.Controls.Viewer'),
 ]
 
 # LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..

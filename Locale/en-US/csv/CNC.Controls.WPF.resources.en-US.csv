@@ -763,3 +763,127 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchNext:System.W
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ask before writing changed grbl ($) settings to the controller when leaving the tab, instead of writing them silently."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_autoSaveGrblSettings:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save grbl settings on leave
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
+CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About surfacing the spoilboard
+CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Generates a raster (boustrophedon) facing program that skims the whole bed with a surfacing bit, so the spoilboard surface ends up perfectly parallel to the gantry.&#10;&#10;Set the bit diameter, overlap and depths, then Generate. The area defaults to the machine travel less the edge margin - adjust Area width/height to face a smaller region. Tick Outline only or Dry run to trace the extents at safe Z first, then Cycle Start to cut. Reuse Z0 skips the touch-off so you can re-run at the same height."
+CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,txt_sbSummaryEmpty:System.Windows.Controls.TextBlock.Text,Text,True,True,,Set the parameters and click Generate - a summary of the generated program appears here.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.Controls.ContentControl.Content,Button,True,True,,Clear
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reset the squaring offset ($17x) to 0 and re-home - quicker than typing $17x=0 in MDI.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asgap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The gap you measured at the X-leg pin. Sets the New offset. (Leave 0 if you'd rather type the offset directly.)
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asnewoffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The offset that will be written. Type a target here to back-compute the gap it corresponds to, or leave it to be computed from the measured gap."
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,txt_asinstr:System.Windows.Controls.TextBlock.Text,Text,True,True,,"1. Set the framing square's blade &amp; tongue and the drill settings.  2. Generate, then Cycle Start &#8211; it drills the L (red +).  3. Pin the holes, register the square on the two Y-leg pins, and measure the gap at the X-leg pin (arrows).  4. Enter the gap (or a target offset) &#8211; the other is computed &#8211; then Apply offset and Re-home."
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,hlp_scHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About scratch calibration
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,hlp_scBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Cycle Start to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."
+CNC.Controls.WPF.g.en-US.resources:toolview.baml,hlp_toolTableHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About the tool table
+CNC.Controls.WPF.g.en-US.resources:toolview.baml,hlp_toolTableBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Per-tool work offsets (X/Y/Z, plus tip radius on a lathe) stored in the controller and applied for tool-length compensation when a program selects a tool with M6.&#10;&#10;To set a tool: pick it in the list, jog the machine to the reference point, then Get current position to capture the coordinates (or type the values directly). Set the highlighted axis to write that axis alone, Set all to write every axis, or Clear all to zero them. Changes are saved to the controller immediately."
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,hlp_tmcHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About the Trinamic tuner
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,hlp_tmcBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"For machines fitted with Trinamic stepper drivers: tune StallGuard (used for sensorless homing and load detection) and read live driver diagnostics.&#10;&#10;Pick an axis and jog it, then watch the SG_RESULT load plot on the left. Set the stallGuard threshold with the slider so the trace stays high under normal load and drops toward zero as the axis stalls, then Configure to store it. Get status prints the selected driver's registers (temperature, current, fault flags); Get status, all drivers prints every axis."
+CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,hlp_pidHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About the PID tuner
+CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,hlp_pidBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Plots the closed-loop position error of a PID-controlled axis (for example a servo or a spindle) over time, so you can judge how well the loop is tuned.&#10;&#10;Get data captures a log burst from the controller and draws Target (green), Actual (blue) and Error (red). A well-tuned axis tracks the target with little error and no sustained oscillation. Use the slider to scale the error trace. Adjust the PID gains through the controller's $ settings and re-capture to compare."
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_reload:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reload
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_reload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reload settings from the controller (discards unsaved edits).
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_backup:System.Windows.Controls.ContentControl.Content,Button,True,True,,Backup
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_backup:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write settings + work offsets to files in the sender folder.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_restore:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_restore:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore settings from a backup / restore point.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_copyToSim:System.Windows.Controls.ContentControl.Content,Button,True,True,,Copy to simulator
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_copyToSim:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_resetDefault:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset to Default
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,btn_resetDefault:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reset this tab's settings to their defaults.
+CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_latheMode:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enable lathe mode: adds the Lathe wizards tab and switches G-code handling to lathe conventions. Takes effect after a restart.
+CNC.Controls.WPF.g.en-US.resources:jogconfigcontrol.baml,lbl_enable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn keyboard jogging on or off. On by default.
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCenter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to centre at safe Z
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_consoleSearch:System.Windows.Controls.TextBlock.Text,Text,True,True,,Search:
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,fld_consoleSearch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Find text in the console log. Enter / F3 = next match, F4 = previous."
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consolePrev:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consolePrev:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Previous match (F4)
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consoleNext:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consoleNext:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Next match (F3)
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_consoleFont:System.Windows.Controls.TextBlock.Text,Text,True,True,,Font
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontSmaller:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller console text
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontLarger:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger console text
+CNC.Controls.WPF.g.en-US.resources:fileactioncontrol.baml,btn_openFile:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\open.png
+CNC.Controls.WPF.g.en-US.resources:fileactioncontrol.baml,btn_reloadFile:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\reload.png
+CNC.Controls.WPF.g.en-US.resources:fileactioncontrol.baml,btn_editFile:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\edit.png
+CNC.Controls.WPF.g.en-US.resources:fileactioncontrol.baml,btn_closeFile:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\close.png
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,chk_invertX:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,X
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,chk_invertY:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Y
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,chk_invertZ:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Z
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_toMain:System.Windows.Controls.ContentControl.Content,Button,True,True,,&gt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_fromMain:System.Windows.Controls.ContentControl.Content,Button,True,True,,&lt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_mainUp:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_mainDown:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_toLeft:System.Windows.Controls.ContentControl.Content,Button,True,True,,&gt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_fromLeft:System.Windows.Controls.ContentControl.Content,Button,True,True,,&lt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_leftUp:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_leftDown:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_toFlyout:System.Windows.Controls.ContentControl.Content,Button,True,True,,&gt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_fromFlyout:System.Windows.Controls.ContentControl.Content,Button,True,True,,&lt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_flyUp:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_flyDown:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_tabShow:System.Windows.Controls.ContentControl.Content,Button,True,True,,&gt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_tabHide:System.Windows.Controls.ContentControl.Content,Button,True,True,,&lt;
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_tabUp:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_tabDown:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,tab_unavailable:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Unavailable
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,txt_unavailNote:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Components not offered on this controller, and why (based on the connected controller's reported capabilities):"
+CNC.Controls.WPF.g.en-US.resources:mpgpending.baml,btn_mpgContinue:System.Windows.Controls.ContentControl.Content,Button,True,True,,Continue
+CNC.Controls.WPF.g.en-US.resources:mpgpending.baml,btn_mpgDisconnect:System.Windows.Controls.ContentControl.Content,Button,True,True,,Disconnect
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,✕
+CNC.Controls.WPF.g.en-US.resources:panelflyout.baml,btn_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,✕
+CNC.Controls.WPF.g.en-US.resources:pendingchangesdialog.baml,pc_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_type:System.Windows.Controls.ContentControl.Content,Label,True,True,,Type:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_motion:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit motion params…
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:CNC.Controls.NumericField.Label,None,False,True,,Tip diameter:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate).
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Label,None,False,True,,Ball diameter:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Label,None,False,True,,Plate thickness:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Plate height - work Z0 is the plate top minus this.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_lip:CNC.Controls.NumericField.Label,None,False,True,,Lip width:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_lip:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_lip:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far the plate's edge sticks out past the stock corner.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_setter:CNC.Controls.NumericField.Label,None,False,True,,Setter height:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_setter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_setter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Trigger height of the tool setter.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_spin:CNC.Controls.NumericField.Label,None,False,True,,Spin speed:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_spin:CNC.Controls.NumericField.Unit,None,False,True,,RPM
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_spin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Spinning edge-finder speed; 0 = does not spin.
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pm_intro:System.Windows.Controls.TextBlock.Text,Text,True,True,,Probing speeds and distances. The defaults suit most setups - only change these if you know you need to.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_searchFeed:CNC.Controls.NumericField.Label,None,False,True,,Approach speed:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_searchFeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_searchFeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How fast it moves to first touch the surface.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:CNC.Controls.NumericField.Label,None,False,True,,Re-touch speed:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Slow speed for the accurate second touch.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:CNC.Controls.NumericField.Label,None,False,True,,Travel speed:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Speed for positioning moves; 0 = use the controller default.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchDist:CNC.Controls.NumericField.Label,None,False,True,,Back-off distance:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchDist:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchDist:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far it backs off before the slow second touch; 0 to skip it.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_xyClear:CNC.Controls.NumericField.Label,None,False,True,,Edge standoff:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_xyClear:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_xyClear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far out from the edge it starts before approaching.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_depth:CNC.Controls.NumericField.Label,None,False,True,,Drop to side:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_depth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_depth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far it lowers to get beside the edge before probing sideways.
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetX:CNC.Controls.NumericField.Label,None,False,True,,Spindle offset X:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetX:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Probe tip distance from the spindle centre (0 for a centred 3D probe).
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetY:CNC.Controls.NumericField.Label,None,False,True,,Spindle offset Y:
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetY:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_offsetY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Probe tip distance from the spindle centre (0 for a centred 3D probe).
+CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pm_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:signalscontrol.baml,txt_signalsHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,Signals

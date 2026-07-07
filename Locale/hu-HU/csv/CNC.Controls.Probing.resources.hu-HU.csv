@@ -196,3 +196,24 @@ CNC.Controls.Probing.g.en-US.resources:probingview.baml,tab_toolOffset:System.Wi
 CNC.Controls.Probing.g.en-US.resources:macrodialog.baml,txt_postprobecommands:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Commands to after before probing completes.
 CNC.Controls.Probing.g.en-US.resources:macrodialog.baml,txt_preprobecommands:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Commands to run before probing starts.
 CNC.Controls.Probing.g.en-US.resources:probingview.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Figyelem! Használja körültekintően – a helytelen paraméterek károsíthatják a szondát!
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,grp_lsstock:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Stock (approximate)
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lswidth:CNC.Controls.NumericField.Label,None,False,True,,Width (X):
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lswidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lsheight:CNC.Controls.NumericField.Label,None,False,True,,Height (Y):
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lsheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lswpheight:CNC.Controls.NumericField.Label,None,False,True,,Stock height:
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lswpheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lsProbeZ:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probe Z (top surface)
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,lbl_lsPreview:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Preview
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,grp_lsresult:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Result
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,btn_lsstart:System.Windows.Controls.ContentControl.Content,Button,True,True,,Start
+CNC.Controls.Probing.g.en-US.resources:startjobcontrol.baml,btn_lsstop:System.Windows.Controls.ContentControl.Content,Button,True,True,,Stop
+CNC.Controls.Probing.g.en-US.resources:probingview.baml,btn_macros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Pre/post macros
+CNC.Controls.Probing.g.en-US.resources:probingview.baml,lbl_probe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,fld_offset:CNC.Controls.NumericField.Label,None,False,True,,Corner offset:
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,fld_offset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance from the corner along each edge to probe
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_offset:CNC.Controls.NumericField.Label,None,False,True,,Corner offset:
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_offset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance from the corner along each edge to probe
+CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,grp_workpieceOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"As well as the angle, probe a second edge to find the X0,Y0 corner and set the work origin."
+CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_workpieceOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After measuring, also set work Z0 from this touch-off on the job (using the touch-plate thickness)."
+CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_fixtureAction:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Fixture

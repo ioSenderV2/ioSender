@@ -39,3 +39,8 @@ CNC.Controls.Viewer.g.en-US.resources:rendercontrol.baml,showXYZMarkers:System.W
 CNC.Controls.Viewer.g.en-US.resources:renderer.baml,str_toolCone:System.String.$Content,None,True,True,,Конус
 CNC.Controls.Viewer.g.en-US.resources:renderer.baml,str_toolCrosshair:System.String.$Content,None,True,True,,Перекрестие
 CNC.Controls.Viewer.g.en-US.resources:renderer.baml,str_toolNoShow:System.String.$Content,None,True,True,,Не отображ.
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carvePlay:System.Windows.Controls.ContentControl.Content,Button,True,True,,Play
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carvePlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Simulate the loaded program in this view (does NOT move the machine).
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carvePause:System.Windows.Controls.ContentControl.Content,Button,True,True,,Pause
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveStop:System.Windows.Controls.ContentControl.Content,Button,True,True,,Stop
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveReset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset view
