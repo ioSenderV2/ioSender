@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>49 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>51 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -204,6 +204,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <table>
 <tr><td>Load Folder &mdash; assemble per-toolpath <code>.nc</code> files into one outlined program (+ Fusion add-in)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr6">6</a></td></tr>
 <tr><td>SD + LittleFS browser &amp; file manager &mdash; multi-filesystem, View/Edit/Create/Upload via Notepad</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr14">14</a></td></tr>
+<tr><td>SD Card first-line cleanup &mdash; the filesystem status no longer overlaps the checkbox, and the free-space banner is hidden when the controller reports no sizes (was a bare &ldquo;mounted&rdquo;)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr51">51</a></td></tr>
 <tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a></td></tr>
 </table>
 
@@ -229,6 +230,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <table>
 <tr><td>High-DPI polish &mdash; fixed pixel sizes converted to Min/Auto so text doesn&rsquo;t clip at 125&ndash;150% scaling</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr46">46</a></td></tr>
 <tr><td>Lathe wizards rebuilt to the app layout idiom &mdash; the 5 upstream absolute-Margin wizards re-hosted in scaling StackPanel/Grid so they no longer clip/overlap at 125&ndash;150%</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr49">49</a></td></tr>
+<tr><td>Tab strips fill their width &mdash; a StretchTabControl spreads each tab header proportionally across the row so tabs read as distinct (main bar + Settings / Tools / Lathe / Probing / Machine Setup)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr50">50</a></td></tr>
 <tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
 <tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
 <tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
@@ -289,7 +291,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">47</td><td><a href="#pr47">Lathe mode enable/disable checkbox</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+56</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">48</td><td><a href="#pr48">Restart button pulse + restart-on-leave prompt</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+58</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">49</td><td><a href="#pr49">Lathe wizards rebuilt to the app layout idiom (high-DPI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+461</span> <span class="del">-387</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (49 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">399</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+28488</span> <span class="del">-3654</span></td></tr>
+<tr><td class="n">50</td><td><a href="#pr50">Tab strips fill their width (StretchTabControl)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+137</span> <span class="del">-14</span></td></tr>
+<tr><td class="n">51</td><td><a href="#pr51">SD Card first-line cleanup (overlap + free-space banner)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+9</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (51 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">408</span> <span class="del">2</span> <span class="add">+90</span><br><span class="k">Lines:</span> <span class="add">+28634</span> <span class="del">-3672</span></td></tr>
 </table>
 </div>
 
@@ -1540,6 +1544,39 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Turning / Parting / Facing</strong> &mdash; a single scrolling input column with Calculate and the generated g-code pinned at the bottom.</li>
 <li><strong>Profile dialog</strong> &mdash; the fixed-size modal became a <code>SizeToContent</code> window; the CSS control and fixed-RPM field share one slot, and it follows the app theme instead of a hard-coded grey.</li>
 </ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Every <code>x:Name</code>, binding, converter and event handler the code-behinds rely on was preserved &mdash; no code-behind changes. The rebuilt layouts are functional and scale correctly; some aesthetic cleanup (spacing/grouping refinement) is still wanted at some point, ideally by someone who runs a lathe.</p></div>
+</div>
+
+<!-- ===== #50 ===== -->
+<div class="pr">
+<h2 id="pr50"><span class="badge">#50</span>Tab strips fill their width (StretchTabControl)</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/CNC Controls/StretchTabControl.cs</td><td class="num add">119</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">6</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/LatheWizardsView.xaml</td><td class="num add">4</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ProbingView.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ToolsView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The tab headers used to sit bunched at the left of each strip with dead space to the right, so tabs ran together and were hard to pick out. A new <code>StretchTabControl : TabControl</code> spreads them to fill the strip: each tab keeps its natural width (plus one space character each side) scaled up proportionally, so a wider label gets a wider tab and the row fills the width.</p><ul>
+<li><strong>Assigns each header a width</strong> &mdash; the default <code>TabControl</code> template hosts its headers in a fixed <code>TabPanel</code> (<code>IsItemsHost</code>), so a replacement <code>ItemsPanel</code> is ignored; setting each <code>TabItem.Width</code> is honoured instead.</li>
+<li><strong>Recomputed off-layout</strong> &mdash; widths are recalculated only on the discrete tab add/remove event and, on resize, from a deferred (<code>DispatcherPriority.Background</code>) callback that runs <em>after</em> the layout pass. Doing it synchronously from inside layout (<code>SizeChanged</code>/<code>LayoutUpdated</code>) re-enters the layout system and mis-measures content; the deferred approach sets the widths and lets one ordinary follow-up pass consume them, with no feedback loop. The trade is that during a drag-resize the tabs show old widths for a frame and snap on release.</li>
+<li><strong>Applied to</strong> the main tab bar and the Settings, Tools, Lathe, Probing and Machine Setup sub-tab strips.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Confirmed on the running app: strips fill, first tab flush, resize re-spreads cleanly, and tab content still fills/left-aligns (the label-centering was pulled back out after it leaked into content alignment on content-sized views).</p></div>
+</div>
+
+<!-- ===== #51 ===== -->
+<div class="pr">
+<h2 id="pr51"><span class="badge">#51</span>SD Card first-line cleanup (overlap + free-space banner)</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml</td><td class="num add">6</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblFilesystems.cs</td><td class="num add">3</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Two small fixes to the SD Card tab&rsquo;s top line.</p><ul>
+<li><strong>No more overlap</strong> &mdash; the &ldquo;List CNC files only&rdquo; checkbox and the filesystem-status text were absolutely positioned at fixed x offsets, so the status ran under the checkbox label at larger fonts. They now flow in a horizontal <code>StackPanel</code>.</li>
+<li><strong>Banner hides when uninformative</strong> &mdash; <code>FreeSpaceSummary</code> only lists a filesystem that actually reports free space; the bare &ldquo;<em>name</em>: mounted&rdquo; fallback carried no information (the file list already shows the filesystem is present) and just added clutter, so the whole banner disappears when the controller reports no sizes.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Confirmed on the running app.</p></div>
 </div>
 </section>
 
