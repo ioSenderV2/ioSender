@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>51 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>54 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -198,6 +198,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Probe definition diagrams &mdash; per-type schematic in the probe editor labelling the measurements to enter</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr34">34</a></td></tr>
 <tr><td>Probe input follows the selected probe type &mdash; tool setter &rarr; <code>Q1</code>, else the main probe &rarr; <code>Q0</code> (guards a stale selection)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr36">36</a></td></tr>
 <tr><td>Start Job (was Load Stock) &mdash; first tab, connection-gated tabs, auto 3D-probe at the front-left origin, writes <code>start_job.macro</code>; new Verify skew pass (re-touch each corner in the rotated frame); flyout persistence &amp; offset-Set fixes</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr44">44</a></td></tr>
+<tr><td>Tools tab guidance &mdash; each Tools tab (tool table, spoilboard surfacing, scratch calibration, Trinamic, PID) now shows an on-screen &ldquo;About&rdquo; explainer of what it does and how to use it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr52">52</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -237,6 +238,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Show Motor Fault / Warning signals in the Signals display</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr2">2</a></td></tr>
 <tr><td>Build documentation &mdash; Mega-XL upgrade notes + repeatable tool-change guide</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr13">13</a></td></tr>
 <tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a></td></tr>
+<tr><td>Headless build &mdash; <code>build.ps1</code> + VS Code tasks build/launch without opening the VS GUI (MSBuild found via vswhere); unhandled exceptions now dump to <code>%AppData%\ioSender\ioSender.crash.log</code> and exit <code>0xFA11</code> instead of blocking on a dialog</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr53">53</a></td></tr>
+<tr><td>Code renamed LoadStock &rarr; Start Job to match the UI throughout (files, classes, <code>ViewType</code>, layout keys, config section)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr54">54</a></td></tr>
 </table>
 </div>
 
@@ -293,7 +296,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">49</td><td><a href="#pr49">Lathe wizards rebuilt to the app layout idiom (high-DPI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+461</span> <span class="del">-387</span></td></tr>
 <tr><td class="n">50</td><td><a href="#pr50">Tab strips fill their width (StretchTabControl)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+137</span> <span class="del">-14</span></td></tr>
 <tr><td class="n">51</td><td><a href="#pr51">SD Card first-line cleanup (overlap + free-space banner)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+9</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (51 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">408</span> <span class="del">2</span> <span class="add">+90</span><br><span class="k">Lines:</span> <span class="add">+28634</span> <span class="del">-3672</span></td></tr>
+<tr><td class="n">52</td><td><a href="#pr52">Per-tool guidance text on the Tools tabs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+46</span> <span class="del">-14</span></td></tr>
+<tr><td class="n">53</td><td><a href="#pr53">Headless build script + crash logging</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+255</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">54</td><td><a href="#pr54">Rename LoadStock &rarr; Start Job (code matches the UI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">30</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+177</span> <span class="del">-177</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (54 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">447</span> <span class="del">2</span> <span class="add">+92</span><br><span class="k">Lines:</span> <span class="add">+29112</span> <span class="del">-3871</span></td></tr>
 </table>
 </div>
 
@@ -1577,6 +1583,65 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>No more overlap</strong> &mdash; the &ldquo;List CNC files only&rdquo; checkbox and the filesystem-status text were absolutely positioned at fixed x offsets, so the status ran under the checkbox label at larger fonts. They now flow in a horizontal <code>StackPanel</code>.</li>
 <li><strong>Banner hides when uninformative</strong> &mdash; <code>FreeSpaceSummary</code> only lists a filesystem that actually reports free space; the bare &ldquo;<em>name</em>: mounted&rdquo; fallback carried no information (the file list already shows the filesystem is present) and just added clutter, so the whole banner disappears when the controller reports no sizes.</li>
 </ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Confirmed on the running app.</p></div>
+</div>
+
+<!-- ===== #52 ===== -->
+<div class="pr">
+<h2 id="pr52"><span class="badge">#52</span>Per-tool guidance text on the Tools tabs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ToolView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml</td><td class="num add">11</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml</td><td class="num add">7</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationWizard.xaml</td><td class="num add">8</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AutoSquareWizard.xaml</td><td class="num add">4</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TrinamicView.xaml</td><td class="num add">8</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PIDLogView.xaml</td><td class="num add">5</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Most of the Tools tabs showed a form with no explanation of what the tool did or how to run it. Each now carries a short &ldquo;About&hellip;&rdquo; heading + wrapped explainer in the tab&rsquo;s right-hand pane (matching Auto&nbsp;Square and Stepper&nbsp;Calibration, which already had step text).</p><ul>
+<li><strong>Covered</strong> &mdash; Tool table, Surface spoilboard, Stepper calibration (scratch), Trinamic tuner, PID tuner.</li>
+<li><strong>Layout tidy</strong> &mdash; the Stepper-calibration collision warning is contained to the right column (instructions box fills the height); the Surface-spoilboard result sits in its own light panel distinct from the description; Squareness puts the description above the diagram.</li>
+<li><strong>Localizable</strong> &mdash; every string carries an <code>x:Uid</code> so it feeds the locale CSVs; English inline is the fallback.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Confirmed on the running app.</p></div>
+</div>
+
+<!-- ===== #53 ===== -->
+<div class="pr">
+<h2 id="pr53"><span class="badge">#53</span>Headless build script + crash logging</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">build.ps1</td><td class="num add">105</td><td class="num">0</td></tr>
+<tr><td class="mono">.vscode/tasks.json</td><td class="num add">69</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">72</td><td class="num del">7</td></tr>
+<tr><td class="mono">CLAUDE.md</td><td class="num add">9</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Build and run the WPF app entirely from the command line / VS&nbsp;Code, without opening the Visual&nbsp;Studio GUI. (PlatformIO can&rsquo;t drive a .NET&nbsp;Framework build &mdash; it only builds the C/C++ firmware/sim &mdash; so a plain MSBuild wrapper is the right tool.)</p><ul>
+<li><strong><code>build.ps1</code></strong> &mdash; kills a running <code>ioSender.exe</code>, builds via MSBuild (located with <code>vswhere</code>, Enterprise-path fallback), optionally launches. <code>-Configuration Debug|Release|Both</code>, <code>-Launch</code>, <code>-Headless</code>, <code>-NoKill</code>.</li>
+<li><strong>VS&nbsp;Code tasks</strong> &mdash; <em>Build Debug&nbsp;+&nbsp;Launch</em> (Ctrl+Shift+B), <em>Build Release</em>, <em>Build Both</em>, all delegating to the one script.</li>
+<li><strong>Crash logging</strong> &mdash; the global handlers (Dispatcher / AppDomain / TaskScheduler) now dump a timestamped, versioned, full-stack entry to <code>%AppData%\ioSender\ioSender.crash.log</code> and exit <code>0xFA11</code> (64017). Fixes a real bug where a background-thread exception showed a box but never exited, wedging the process. Interactive runs still show a dialog; <code>IOSENDER_HEADLESS=1</code> suppresses it so an unattended crash can&rsquo;t hang on an un-clicked box. VS&rsquo;s JIT debugger does not auto-attach.</li>
+</ul><p class="foot">In the integration build. Debug&nbsp;+&nbsp;Release build clean; both crash paths verified live (log written, exit&nbsp;0xFA11).</p></div>
+</div>
+
+<!-- ===== #54 ===== -->
+<div class="pr">
+<h2 id="pr54"><span class="badge">#54</span>Rename LoadStock &rarr; Start Job (code matches the UI)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml(.cs) <em>(was LoadStockView)</em></td><td class="num add">9</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls Probing/&hellip;/StartJobControl.xaml(.cs) <em>(was LoadStockControl)</em></td><td class="num add">9</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StartJobConfig.cs <em>(was LoadStockConfig)</em></td><td class="num add">10</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/{ICNCView,LibStrings,StreamPump}</td><td class="num add">4</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/&hellip;/{MainWindow,JobView}.xaml.cs + IProbeTab.cs</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales, 2 files each)</td><td class="num add">126</td><td class="num del">126</td></tr>
+<tr><td class="mono">*.csproj (3 projects)</td><td class="num add">7</td><td class="num del">7</td></tr>
+</table>
+<div class="desc"><p>The feature is &ldquo;Start Job&rdquo; everywhere in the UI, but the code was still <code>LoadStock*</code>. Full rename &mdash; there is no back-compat to preserve, so no migration code.</p><ul>
+<li><strong>Files &amp; classes</strong> &mdash; <code>LoadStockView</code>&thinsp;/&thinsp;<code>Control</code>&thinsp;/&thinsp;<code>Config</code>&thinsp;/&thinsp;<code>Settings</code> &rarr; <code>StartJob*</code>.</li>
+<li><strong>Tokens</strong> &mdash; <code>ViewType.LoadStock</code> and <code>ProbingType.LoadStock</code> &rarr; <code>StartJob</code>; <code>LayoutKeys</code> value, the folded App.config section (<code>LoadStock</code>&nbsp;/&nbsp;<code>LoadStock.xml</code>), the <code>str_tabLoadStock</code> resource key and its locale-CSV baml paths, and the StreamPump temp-log name all follow.</li>
+<li><strong>Persisted config</strong> &mdash; the three tokens saved in <code>%AppData%\ioSender\App.config</code> (tab name, layout component, section key) were patched out-of-band to match.</li>
+</ul><p class="foot">In the integration build. Debug&nbsp;+&nbsp;Release build clean; headless startup smoke test passes on the renamed config.</p></div>
 </div>
 </section>
 
