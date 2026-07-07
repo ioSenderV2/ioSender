@@ -33,6 +33,7 @@ TARGETS = [
     ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
 
     # CNC.Controls.WPF (the main controls library)
+    ('CNC Controls/CNC Controls/PortDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),

@@ -30,6 +30,17 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="HostErrorStyle" TargetType="ComboBox">
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="true">
+                    <Setter Property="ToolTip">
+                        <Setter.Value>
+                            <Binding RelativeSource="{RelativeSource Self}" Path="(Validation.Errors)[0].ErrorContent" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
     <Grid Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
         <Grid.RowDefinitions>
@@ -84,15 +95,30 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
                         <Label x:Uid="lbl_ipAddress" Content="IP address:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="80"/>
-                        <TextBox Style="{StaticResource Ip4ErrorStyle}" HorizontalAlignment="Left" VerticalAlignment="Center" VerticalContentAlignment="Bottom" Height="24" Width="200" MaxLength="15">
-                            <TextBox.Text>
+                        <!-- Editable host combo: type an IP/hostname, or pick one that Scan network discovered.
+                             The dropdown shows the rich "host:port - grblHAL x.x" label (ItemTemplate); the edit
+                             box shows just the host (ToString/TextSearch) which is what gets connected to. -->
+                        <ComboBox x:Name="cbxHost" Style="{StaticResource HostErrorStyle}" IsEditable="True" StaysOpenOnEdit="True"
+                                  IsTextSearchEnabled="True" TextSearch.TextPath="Host"
+                                  HorizontalAlignment="Left" VerticalAlignment="Center" MinHeight="24" Width="240"
+                                  ItemsSource="{Binding DiscoveredHosts}" SelectionChanged="cbxHost_SelectionChanged">
+                            <ComboBox.Text>
                                 <Binding Path="IpAddress" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                     <Binding.ValidationRules>
                                         <local:HostnameOrIPValueRule ValidatesOnTargetUpdated="True" />
                                     </Binding.ValidationRules>
                                 </Binding>
-                            </TextBox.Text>
-                        </TextBox>
+                            </ComboBox.Text>
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Display}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Top">
+                        <Button x:Uid="btn_scanNetwork" x:Name="btnScan" Content="Scan network" HorizontalAlignment="Left" Margin="80,0,0,0" MinWidth="120" MinHeight="23" Padding="8,2" Click="btnScan_Click"/>
+                        <TextBlock x:Name="scanStatus" VerticalAlignment="Center" Margin="10,0,0,0" Opacity="0.7"/>
                     </StackPanel>
                 </StackPanel>
             </TabItem>
@@ -127,8 +153,8 @@
             </TabItem>
         </TabControl>
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,10">
-            <Button x:Uid="btn_ok" x:Name="btnOk" Content="Ok" Height="23" Width="70" Click="btnOk_Click"/>
-            <Button x:Uid="btn_cancel" x:Name="btnCancel" Content="Cancel" Margin="5,0,0,0" Height="23" Width="70" Click="btnCancel_Click"/>
+            <Button x:Uid="btn_ok" x:Name="btnOk" Content="Ok" MinHeight="23" MinWidth="70" Padding="8,2" Click="btnOk_Click"/>
+            <Button x:Uid="btn_cancel" x:Name="btnCancel" Content="Cancel" Margin="5,0,0,0" MinHeight="23" MinWidth="70" Padding="8,2" Click="btnCancel_Click"/>
         </StackPanel>
     </Grid>
 </Window>

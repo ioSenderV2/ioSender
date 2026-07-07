@@ -1038,3 +1038,6 @@ CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,txt_restoreIntro:Syst
 CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,btn_rpBrowse:System.Windows.Controls.ContentControl.Content,Button,True,True,,Browse...
 CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,btn_rpRestore:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore
 CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,btn_rpCancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_scanNetwork:System.Windows.Controls.ContentControl.Content,Button,True,True,,Scan network
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,tab_simulator:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Simulator
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,lbl_simPort:System.Windows.Controls.ContentControl.Content,Label,True,True,,Port:

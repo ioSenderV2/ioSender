@@ -79,6 +79,7 @@
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="Machine.cs" />
     <Compile Include="MeasureViewModel.cs" />
+    <Compile Include="NetworkScanner.cs" />
     <Compile Include="NGCExpr.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerialStream.cs" />
