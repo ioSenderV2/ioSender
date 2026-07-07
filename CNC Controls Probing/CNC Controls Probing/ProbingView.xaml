@@ -49,7 +49,7 @@
             <Button x:Uid="btn_macros" DockPanel.Dock="Right" Content="Pre/post macros" Command="{Binding Macro.OpenDialog}" ToolTip="{Binding Macro.ActiveMacroName}"
                     IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"
                     Background="{Binding Path=Macro.CanDelete, Converter={StaticResource ProbingMacroActiveConverter}}"
-                    VerticalAlignment="Center" Height="25" Width="130" Margin="10,0,0,0"/>
+                    VerticalAlignment="Center" MinWidth="130" Margin="10,0,0,0"/>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Label x:Uid="lbl_probe" Content="Probe:" VerticalAlignment="Center"/>
                 <!-- ItemsSource is a per-tab filtered view set in code (by ProbeType). Selecting a definition

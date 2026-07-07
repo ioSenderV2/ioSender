@@ -58,7 +58,7 @@
             </MenuItem>
         </Menu>
         <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
-            <ToolBar IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Height="42" VerticalAlignment="Top" Width="{Binding Path=ActualWidth, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type DockPanel}}}" >
+            <ToolBar IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" MinHeight="42" VerticalAlignment="Top" Width="{Binding Path=ActualWidth, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type DockPanel}}}" >
                 <cnccontrols:FileActionControl IsEnabled="{Binding Path=IsToolChanging, Converter={StaticResource BooleanConverter}}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                 <Separator Margin="4,0"></Separator>
                 <cnccontrols:MacroToolbarControl x:Name="toolbarMacros"/>
@@ -181,7 +181,7 @@
                         <StackPanel x:Name="buttonRow" Orientation="Horizontal" Margin="0,7,0,0">
                             <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Top"/>
                             <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Top"/>
-                            <ToggleButton x:Name="btnProgramView" Content="Program" Width="80" Height="36" Margin="8,0,0,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                            <ToggleButton x:Name="btnProgramView" Content="Program" MinWidth="80" Margin="8,0,0,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </StackPanel>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -214,7 +214,7 @@
                     </cnccontrols:SignalsControl>
                     <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
                         <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
-                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" Width="52" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="52" Margin="4,0,0,0" VerticalAlignment="Center"/>
                         <Label Content="{Binding Path=FeedrateUnit, Mode=OneWay}" Padding="2,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
@@ -244,7 +244,7 @@
         <TabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
             <TabControl.Resources>
                 <Style TargetType="{x:Type TabItem}">
-                    <Setter Property="Height" Value="32" />
+                    <Setter Property="MinHeight" Value="32" />
                     <Setter Property="MinWidth" Value="40" />
                 </Style>
             </TabControl.Resources>
@@ -253,7 +253,7 @@
         </TabControl>
         <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
         <!-- Program view always pops on the RIGHT. -->
-        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="560" Margin="0,60,0,0"
+        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
             <DockPanel>
                 <!-- Title = program source (loaded file/folder) or, in preview mode, the generating tool's name. -->

@@ -32,9 +32,9 @@
     <DockPanel Background="Transparent" MouseDown="outside_MouseDown" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
             <!-- MDI / Signals / Status moved to the fixed main-window run-control bar (Phase 2c). -->
-            <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Height="23"/>
+            <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"/>
         </StackPanel>
-        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" Width="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" MinWidth="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
             <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels). Signals/Status now
                  live in the fixed bottom run-control bar (Phase 2c). -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

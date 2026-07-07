@@ -77,12 +77,12 @@
                     <GroupBox x:Uid="grp_dimensions" Header="Workpiece dimensions" Margin="0,4,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="30"/>
-                                <RowDefinition Height="30"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <Controls:NumericField x:Uid="fld_xSize" Grid.Row="0" Label="X size:" Format="{Binding Path=Grbl.Format}" Value="{Binding Path=WorkpieceSizeX, Mode=TwoWay}" Margin="0,5,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
                             <Controls:NumericField x:Uid="fld_ySize" Grid.Row="1" Label="Y size:" Format="{Binding Path=Grbl.Format}" Value="{Binding Path=WorkpieceSizeY, Mode=TwoWay}" Margin="0,2,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ErrorStyle}"/>
-                            <CheckBox x:Uid="lbl_lock" Content="Lock" Grid.RowSpan="2" IsChecked="{Binding Path=WorkpiecLockXY, Mode=TwoWay}" ToolTip="Unlock and set X or Y size to 0 to probe in one direction only." Margin="190,4,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" Width="90"/>
+                            <CheckBox x:Uid="lbl_lock" Content="Lock" Grid.RowSpan="2" IsChecked="{Binding Path=WorkpiecLockXY, Mode=TwoWay}" ToolTip="Unlock and set X or Y size to 0 to probe in one direction only." Margin="190,4,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="90"/>
                         </Grid>
                     </GroupBox>
                     <GroupBox x:Uid="grp_passes" Header="Passes" ToolTip="More than one pass is usually needed to get accurate dimensions." Margin="0,4,0,0">
@@ -98,8 +98,8 @@
                 </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Margin="5,4,5,6" Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Uid="btn_start" Content="Start" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" Width="75" Click="start_Click"/>
-                <Button x:Uid="btn_stop" Content="Stop" IsEnabled="{Binding Path=Grbl.IsJobRunning}" Margin="0,0,4,0" Width="75" Click="stop_Click"/>
+                <Button x:Uid="btn_start" Content="Start" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" MinWidth="75" Click="start_Click"/>
+                <Button x:Uid="btn_stop" Content="Stop" IsEnabled="{Binding Path=Grbl.IsJobRunning}" Margin="0,0,4,0" MinWidth="75" Click="stop_Click"/>
                 <Button x:Uid="btn_useCamera" Content="Use camera positions" IsEnabled="{Binding Path=CanApplyTransform}" Margin="0" Padding="4,0" Click="camera_Click"/>
             </StackPanel>
         </Grid>

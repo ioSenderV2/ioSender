@@ -31,7 +31,7 @@
                 <CheckBox x:Uid="lbl_lsPreview" Content="Preview" Margin="15,0,0,0" IsChecked="{Binding Path=PreviewEnable}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
-                <GroupBox x:Uid="grp_lsresult" Header="Result" Width="245" Height="180" VerticalAlignment="Top">
+                <GroupBox x:Uid="grp_lsresult" Header="Result" MinWidth="245" Height="180" VerticalAlignment="Top">
                     <TextBlock TextWrapping="Wrap" Margin="5"
                                Text="{Binding Path=Result, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}"/>
                 </GroupBox>
@@ -44,9 +44,9 @@
             </StackPanel>
         </StackPanel>
         <StackPanel Margin="5,0,0,5" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom">
-            <Button x:Uid="btn_lsstart" Content="Start" Margin="2,0" Width="75" Click="start_Click"
+            <Button x:Uid="btn_lsstart" Content="Start" Margin="2,0" MinWidth="75" Click="start_Click"
                     IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}"/>
-            <Button x:Uid="btn_lsstop" Content="Stop" Margin="2,0" Width="75" Click="stop_Click"
+            <Button x:Uid="btn_lsstop" Content="Stop" Margin="2,0" MinWidth="75" Click="stop_Click"
                     IsEnabled="{Binding Path=Grbl.IsJobRunning}"/>
         </StackPanel>
     </Grid>

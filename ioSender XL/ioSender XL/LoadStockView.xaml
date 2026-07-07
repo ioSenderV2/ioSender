@@ -29,7 +29,7 @@
                                    Text="Actual stock size."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
                             <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxWcs" Width="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
+                            <ComboBox x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
                                 <ComboBoxItem Content="G54"/>
                                 <ComboBoxItem Content="G55"/>
                                 <ComboBoxItem Content="G56"/>
@@ -57,10 +57,10 @@
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
-                    <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" Width="90" MinHeight="26" Click="Generate_Click"/>
-                    <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" Width="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
+                    <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" MinWidth="90" MinHeight="26" Click="Generate_Click"/>
+                    <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
-                    <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" Width="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
+                    <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
                             ToolTip="After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."/>
                 </StackPanel>
             </StackPanel>

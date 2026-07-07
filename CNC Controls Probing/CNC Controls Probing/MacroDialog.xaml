@@ -35,16 +35,16 @@
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="32"></RowDefinition>
+            <RowDefinition Height="Auto"></RowDefinition>
             <RowDefinition Height="*"></RowDefinition>
-            <RowDefinition Height="30"></RowDefinition>
+            <RowDefinition Height="Auto"></RowDefinition>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"></ColumnDefinition>
             <ColumnDefinition Width="*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
         <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal" Margin="5,5,0,0">
-            <ComboBox x:Name="cbxMacro" IsEditable="True" Width="175" VerticalAlignment="Center" HorizontalAlignment="Left" DisplayMemberPath="Name" SelectedValuePath="Id"
+            <ComboBox x:Name="cbxMacro" IsEditable="True" MinWidth="175" VerticalAlignment="Center" HorizontalAlignment="Left" DisplayMemberPath="Name" SelectedValuePath="Id"
                       SelectedItem="{Binding SelectedMacro, Mode=TwoWay}"
                       ItemsSource="{Binding Macros, UpdateSourceTrigger=PropertyChanged}"/>
             <CheckBox x:Uid="chk_runonce" Content="Run once" Margin="10,0,0,0" VerticalAlignment="Center" IsChecked="{Binding RunOnce, Mode=TwoWay, FallbackValue=true}" IsEnabled="{Binding Path=CanEdit}"/>
@@ -67,7 +67,7 @@
             <TextBox x:Uid="txt_postprobecommands" Text="{Binding PostMacroText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Path=CanEdit}" ToolTip="Commands to after before probing completes." TextWrapping="Wrap" AcceptsReturn="True" Height="125"/>
         </StackPanel>
         <StackPanel Margin="5,0,0,5" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Orientation="Horizontal">
-            <Button x:Uid="btn_close" Content="Close" Width="100" Margin="0,0,10,0" Click="Button_Click"/>
+            <Button x:Uid="btn_close" Content="Close" MinWidth="100" Margin="0,0,10,0" Click="Button_Click"/>
         </StackPanel>
     </Grid>
 </Window>

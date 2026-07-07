@@ -40,8 +40,8 @@
                         <Controls:NumericComboBox Margin="2,2" DisplayMemberPath="Code" SelectedValuePath="Code" ItemsSource="{Binding Path=Grbl.Tools}" SelectedValue="{Binding Path=Tool, Mode=TwoWay}" IsEnabled="{Binding Path=HasToolTable}" Format="##0" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="56" MinHeight="22"/>
                     </StackPanel>
                     <CheckBox x:Uid="lbl_setRefernecOffset" Content="Establish reference offset" IsChecked="{Binding Path=ReferenceToolOffset, Mode=TwoWay}" IsEnabled="{Binding Path=CanReferenceToolOffset}" Margin="0,6,0,0" VerticalAlignment="Center"/>
-                    <Border Margin="0,10,0,0" Visibility="{Binding Path=Grbl.IsToolOffsetActive, Converter={StaticResource IsVisibleConverter}}" Background="Salmon" HorizontalAlignment="Left" VerticalAlignment="Center" CornerRadius="2" Width="186" Height="28">
-                        <Button x:Uid="lbl_clearToolOffset" Content="Clear tool length offset" HorizontalAlignment="Center" VerticalAlignment="Center" Width="180" Height="22" Click="clearToolOffset_Click"/>
+                    <Border Margin="0,10,0,0" Visibility="{Binding Path=Grbl.IsToolOffsetActive, Converter={StaticResource IsVisibleConverter}}" Background="Salmon" HorizontalAlignment="Left" VerticalAlignment="Center" CornerRadius="2" MinWidth="186">
+                        <Button x:Uid="lbl_clearToolOffset" Content="Clear tool length offset" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="180" Click="clearToolOffset_Click"/>
                     </Border>
                     <GroupBox x:Uid="grp_workpieceOffset" Header="Also set work origin" ToolTip="After measuring, also set work Z0 from this touch-off on the job (using the touch-plate thickness)." Visibility="{Binding Path=ProbeFixture, Converter={StaticResource IsNotVisibleConverter}}" Margin="0,8,0,0">
                         <StackPanel>
@@ -59,8 +59,8 @@
                 </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Margin="5,4,5,6" Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Uid="btn_start" Content="Start" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" Width="75" Click="start_Click"/>
-                <Button x:Uid="btn_stop" Content="Stop" IsEnabled="{Binding Path=Grbl.IsJobRunning}" Margin="0" Width="75" Click="stop_Click"/>
+                <Button x:Uid="btn_start" Content="Start" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" MinWidth="75" Click="start_Click"/>
+                <Button x:Uid="btn_stop" Content="Stop" IsEnabled="{Binding Path=Grbl.IsJobRunning}" Margin="0" MinWidth="75" Click="stop_Click"/>
             </StackPanel>
         </Grid>
         <!-- Right: description on top, output below -->
