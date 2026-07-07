@@ -69,15 +69,19 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_toolLengthDescription" Text="Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."/>
-                <LineBreak/><LineBreak/>
-                <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
-            </TextBlock>
-            <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,10,0,0">
-                <TextBlock Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,0,0,6"/>
-                <TextBlock Text="{Binding Path=Message, Mode=OneWay}" TextWrapping="Wrap"/>
-            </StackPanel>
+            <Border Grid.Row="0" Background="#FFF8F8F8" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,2,0,0">
+                <TextBlock TextWrapping="Wrap">
+                    <Run x:Uid="str_toolLengthDescription" Text="Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."/>
+                    <LineBreak/><LineBreak/>
+                    <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
+                </TextBlock>
+            </Border>
+            <Border Grid.Row="1" Background="White" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,10,0,0">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding Path=Message, Mode=OneWay}" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

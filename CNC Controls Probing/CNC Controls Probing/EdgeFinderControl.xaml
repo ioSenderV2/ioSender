@@ -194,21 +194,25 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
-                <Run x:Uid="str_edgeExtDescription" Text="Use to re-establish X/Y zero on an already-mounted part or fixture, or to reference a specific outside edge. Click a corner for both axes, or a single face for one axis; tick Probe Z to also set Z0. Jog the probe over the green dot, then Start. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. For fresh rectangular stock, the Load Stock tab is usually faster. Probe: 3D probe or edge/touch plate."/>
-                <LineBreak/><LineBreak/>
-                <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
-                <LineBreak/><LineBreak/>
-                <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
-            </TextBlock>
-            <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,10,0,0">
-                <TextBlock Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,0,0,6"/>
-                <TextBlock Text="{Binding Path=Message, Mode=OneWay}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                <TextBox IsReadOnly="True" Text="{Binding Path=PreviewText, Mode=OneWay}" TextWrapping="NoWrap"
-                         Visibility="{Binding Path=PreviewEnable, Converter={StaticResource ToVisibleConverter}}"
-                         Height="200" FontSize="10" FontFamily="Verdana"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-            </StackPanel>
+            <Border Grid.Row="0" Background="#FFF8F8F8" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,2,0,0">
+                <TextBlock TextWrapping="Wrap">
+                    <Run x:Uid="str_edgeExtDescription" Text="Use to re-establish X/Y zero on an already-mounted part or fixture, or to reference a specific outside edge. Click a corner for both axes, or a single face for one axis; tick Probe Z to also set Z0. Jog the probe over the green dot, then Start. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. For fresh rectangular stock, the Load Stock tab is usually faster. Probe: 3D probe or edge/touch plate."/>
+                    <LineBreak/><LineBreak/>
+                    <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
+                    <LineBreak/><LineBreak/>
+                    <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
+                </TextBlock>
+            </Border>
+            <Border Grid.Row="1" Background="White" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,10,0,0">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding Path=Message, Mode=OneWay}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                    <TextBox IsReadOnly="True" Text="{Binding Path=PreviewText, Mode=OneWay}" TextWrapping="NoWrap"
+                             Visibility="{Binding Path=PreviewEnable, Converter={StaticResource ToVisibleConverter}}"
+                             Height="200" FontSize="10" FontFamily="Verdana"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>
