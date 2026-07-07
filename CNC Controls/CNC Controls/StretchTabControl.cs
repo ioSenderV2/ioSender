@@ -113,7 +113,6 @@ namespace CNC.Controls
             {
                 double margin = tabs[i].Margin.Left + tabs[i].Margin.Right;
                 tabs[i].Width = Math.Max(0d, minWidth[i] * scale - margin);
-                tabs[i].HorizontalContentAlignment = HorizontalAlignment.Center;
             }
         }
     }
