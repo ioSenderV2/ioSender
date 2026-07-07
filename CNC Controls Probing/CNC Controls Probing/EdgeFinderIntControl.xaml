@@ -177,15 +177,13 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#FFF8F8F8" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,2,0,0">
-                <TextBlock TextWrapping="Wrap">
-                    <Run x:Uid="str_edgeIntDescription" Text="Use to set X/Y zero on an INTERNAL feature - a hole, bore or pocket - when the reference is a wall or corner inside the part rather than an outside edge. Place the probe inside the feature, click the wall, corner or centre, then Start. Tick Probe Z to also set Z0. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. Probe: 3D probe."/>
-                    <LineBreak/><LineBreak/>
-                    <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
-                    <LineBreak/><LineBreak/>
-                    <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
-                </TextBlock>
-            </Border>
+            <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,2,0,0">
+                <Run x:Uid="str_edgeIntDescription" Text="Use to set X/Y zero on an INTERNAL feature - a hole, bore or pocket - when the reference is a wall or corner inside the part rather than an outside edge. Place the probe inside the feature, click the wall, corner or centre, then Start. Tick Probe Z to also set Z0. The result sets a coordinate-system origin (G10), a temporary offset (G92), or just measures. Probe: 3D probe."/>
+                <LineBreak/><LineBreak/>
+                <Run Text="{Binding Path=Instructions, Mode=OneWay}"/>
+                <LineBreak/><LineBreak/>
+                <Run x:Uid="txt_warning" Text="Warning! Use with care - incorrect parameters may damage your probe!" Foreground="Red" FontWeight="Bold"/>
+            </TextBlock>
             <Border Grid.Row="1" Background="White" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,10,0,0">
                 <StackPanel Orientation="Vertical">
                     <TextBlock Text="{Binding Path=Position, Mode=OneWay}" TextWrapping="NoWrap" Margin="0,0,0,6"/>
