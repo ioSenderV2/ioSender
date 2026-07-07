@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>48 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>49 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -228,6 +228,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <h3>Polish, onboarding &amp; docs</h3>
 <table>
 <tr><td>High-DPI polish &mdash; fixed pixel sizes converted to Min/Auto so text doesn&rsquo;t clip at 125&ndash;150% scaling</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr46">46</a></td></tr>
+<tr><td>Lathe wizards rebuilt to the app layout idiom &mdash; the 5 upstream absolute-Margin wizards re-hosted in scaling StackPanel/Grid so they no longer clip/overlap at 125&ndash;150%</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr49">49</a></td></tr>
 <tr><td>Onboarding tooltips &mdash; plain-language controller-state field + per-setting help</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr12">12</a></td></tr>
 <tr><td>UI localization &mdash; all UI strings registered for 7 locales (cross-cutting)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs">9,10,12,14&ndash;16,18,19,21,23</td></tr>
 <tr><td>Center owner-less modal dialogs (MPGPending, ProbeVerify)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr27">27</a></td></tr>
@@ -287,7 +288,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">46</td><td><a href="#pr46">High-DPI audit &mdash; text no longer clips at 125&ndash;150% scaling</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">63</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+196</span> <span class="del">-197</span></td></tr>
 <tr><td class="n">47</td><td><a href="#pr47">Lathe mode enable/disable checkbox</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+56</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">48</td><td><a href="#pr48">Restart button pulse + restart-on-leave prompt</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+58</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (48 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">392</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+28013</span> <span class="del">-3261</span></td></tr>
+<tr><td class="n">49</td><td><a href="#pr49">Lathe wizards rebuilt to the app layout idiom (high-DPI)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">0</span><br><span class="k">Lines:</span> <span class="add">+461</span> <span class="del">-387</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (49 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">397</span> <span class="del">2</span> <span class="add">+89</span><br><span class="k">Lines:</span> <span class="add">+28474</span> <span class="del">-3648</span></td></tr>
 </table>
 </div>
 
@@ -1518,6 +1520,24 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Restart-on-leave prompt</strong> &mdash; leaving the Settings area with a restart still pending asks &ldquo;Restart ioSender now?&rdquo; (Yes relaunches). Switching between the inner Settings tabs does not prompt.</li>
 <li><strong>Shared restart path</strong> &mdash; the relaunch logic is factored into one <code>DoRestart()</code> used by both the button and the prompt.</li>
 </ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Applies to every restart-only setting, since all route through the one shared Restart button. Hardware-confirmed (&ldquo;works great&rdquo;).</p></div>
+</div>
+
+<!-- ===== #49 ===== -->
+<div class="pr">
+<h2 id="pr49"><span class="badge">#49</span>Lathe wizards rebuilt to the app layout idiom (high-DPI)</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/ThreadingWizard.xaml</td><td class="num add">275</td><td class="num del">235</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/TurningWizard.xaml</td><td class="num add">50</td><td class="num del">42</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/FacingWizard.xaml</td><td class="num add">49</td><td class="num del">41</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/PartingWizard.xaml</td><td class="num add">47</td><td class="num del">39</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/ProfileDialog.xaml</td><td class="num add">40</td><td class="num del">30</td></tr>
+</table>
+<div class="desc"><p>The five lathe wizards were the last upstream code still laid out on an absolute-<code>Margin</code> canvas &mdash; fixed pixel <code>Width</code>/<code>Height</code> and hard-coded positions &mdash; so their text clipped and controls overlapped once Windows text scaling was set to 125&ndash;150% (they were deliberately skipped in the <a href="#pr46">#46</a> attribute scrub because they needed a real re-layout, not a mechanical edit). Each wizard body was rebuilt with the app&rsquo;s normal patterns so it flows and scales:</p><ul>
+<li><strong>Standard idiom</strong> &mdash; vertical <code>StackPanel</code>/<code>Grid</code> with <code>Auto</code> sizing, <code>NumericField</code> + <code>ColonAt</code> label alignment, <code>MinWidth</code>/<code>MinHeight</code> floors, a <code>ScrollViewer</code> for overflow, and grouped <code>GroupBox</code> sections.</li>
+<li><strong>Threading</strong> &mdash; a two-column responsive grid (selection / Dimensions / Tool on the left; Thread values / Options / Cut on the right), with the linuxCNC and Mach3 option boxes sharing one slot to preserve the code-behind&rsquo;s draw-over behaviour, and the Tool schematics + shape radios re-hosted without absolute margins.</li>
+<li><strong>Turning / Parting / Facing</strong> &mdash; a single scrolling input column with Calculate and the generated g-code pinned at the bottom.</li>
+<li><strong>Profile dialog</strong> &mdash; the fixed-size modal became a <code>SizeToContent</code> window; the CSS control and fixed-RPM field share one slot, and it follows the app theme instead of a hard-coded grey.</li>
+</ul><p class="foot">In the integration build. Builds clean (Release, EXIT&nbsp;0). Every <code>x:Name</code>, binding, converter and event handler the code-behinds rely on was preserved &mdash; no code-behind changes. The rebuilt layouts are functional and scale correctly; some aesthetic cleanup (spacing/grouping refinement) is still wanted at some point, ideally by someone who runs a lathe.</p></div>
 </div>
 </section>
 
