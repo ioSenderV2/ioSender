@@ -27,8 +27,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <CheckBox x:Uid="chk_viewAll" x:Name="checkBox" Content="List CNC files only" IsEnabled="{Binding Path=CanViewAll, RelativeSource={RelativeSource AncestorType=UserControl}}" IsChecked="{Binding Path=ViewAll, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NotConverter}}" HorizontalAlignment="Left" Margin="30,5,0,0" VerticalAlignment="Top" Click="ViewAll_Click"/>
-        <TextBlock x:Name="txtFreeSpace" Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="190,0,0,0" Foreground="#555555" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        <!-- Checkbox + filesystem-status text flow horizontally so the status can't be overrun by the checkbox
+             label at larger fonts (they were absolutely positioned at fixed x offsets and overlapped). -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="30,5,10,0">
+            <CheckBox x:Uid="chk_viewAll" x:Name="checkBox" Content="List CNC files only" IsEnabled="{Binding Path=CanViewAll, RelativeSource={RelativeSource AncestorType=UserControl}}" IsChecked="{Binding Path=ViewAll, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NotConverter}}" VerticalAlignment="Center" Click="ViewAll_Click"/>
+            <TextBlock x:Name="txtFreeSpace" VerticalAlignment="Center" Margin="24,0,0,0" Foreground="#555555" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </StackPanel>
         <DataGrid x:Uid="dgr_sdcard" x:Name="dgrSDCard" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Left" Margin="30,0,0,0" VerticalAlignment="Top" Height="450" MinWidth="470"
                   SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False"
                   CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" CanUserAddRows="False"
