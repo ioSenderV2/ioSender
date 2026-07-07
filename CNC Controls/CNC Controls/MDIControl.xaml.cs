@@ -76,9 +76,11 @@ namespace CNC.Controls
             c.grpMDI.Padding = new Thickness(0);
             c.grpMDI.HorizontalAlignment = HorizontalAlignment.Stretch;
             c.grpMDI.VerticalAlignment = VerticalAlignment.Center;
-            c.txtMDI.Width = double.NaN;                       // fill the DockPanel (use remaining space)
+            c.txtMDI.Width = double.NaN;                       // fill the Grid's * column (use remaining space)
             c.txtMDI.HorizontalAlignment = HorizontalAlignment.Stretch;
-            c.txtMDI.Height = c.btnSend.Height = 26;           // ~20% taller than the default 22
+            // Only the combo gets the (taller than default) height; the Send button is left to stretch to the
+            // shared Grid row so its height/position track the combo exactly instead of a separate fixed height.
+            c.txtMDI.MinHeight = 26;                            // ~20% taller than the default 22
         }
 
         public static readonly DependencyProperty CommandProperty = DependencyProperty.Register(nameof(Command), typeof(string), typeof(MDIControl), new PropertyMetadata(""));
