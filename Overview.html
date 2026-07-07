@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>63 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>64 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -247,6 +247,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Build documentation &mdash; Mega-XL upgrade notes + repeatable tool-change guide</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr13">13</a></td></tr>
 <tr><td>Assorted released-ioSender bug fixes (RP.Math build, LF endings, CSV null-ref, boolean settings, null-comms)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr1">1</a></td></tr>
 <tr><td>Headless build &mdash; <code>build.ps1</code> + VS Code tasks build/launch without opening the VS GUI (MSBuild found via vswhere); unhandled exceptions now dump to <code>%AppData%\ioSender\ioSender.crash.log</code> and exit <code>0xFA11</code> instead of blocking on a dialog</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr53">53</a></td></tr>
+<tr><td>Opt-in diagnostic trace log &mdash; launch with <code>-debuglog</code> (or <code>IOSENDER_DEBUGLOG</code>) to write a timestamped flow trace to <code>%AppData%\ioSender\ioSender.debug.log</code>; off by default, so <code>DebugLog.Write(&hellip;)</code> call sites can live permanently in the code without a rebuild toggle</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr64">64</a></td></tr>
 <tr><td>Code renamed LoadStock &rarr; Start Job to match the UI throughout (files, classes, <code>ViewType</code>, layout keys, config section)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr54">54</a></td></tr>
 <tr><td>Localization catch-up &mdash; later V2 features (Start Job, probing-redesign dialogs, main-page editor, Tools guidance, &hellip;) were <code>x:Uid</code>&rsquo;d but had no LocBaml rows; every missing string backfilled into all 7 locale CSVs</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr55">55</a></td></tr>
 </table>
@@ -317,7 +318,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">61</td><td><a href="#pr61">grbl:Settings tree populates after connecting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+37</span> <span class="del">-4</span></td></tr>
 <tr><td class="n">62</td><td><a href="#pr62">Probing/Tools sub-tab layout standardized</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+38</span> <span class="del">-30</span></td></tr>
 <tr><td class="n">63</td><td><a href="#pr63">Check ($C) moved to Cycle Start context menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+48</span> <span class="del">-29</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (63 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">515</span> <span class="del">2</span> <span class="add">+95</span><br><span class="k">Lines:</span> <span class="add">+31817</span> <span class="del">-3953</span></td></tr>
+<tr><td class="n">64</td><td><a href="#pr64">Opt-in diagnostic trace log (-debuglog)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+179</span> <span class="del">-5</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (64 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">518</span> <span class="del">2</span> <span class="add">+96</span><br><span class="k">Lines:</span> <span class="add">+31996</span> <span class="del">-3958</span></td></tr>
 </table>
 </div>
 
@@ -1801,6 +1803,22 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Same semantics.</strong> The menu item mirrors the live check-mode state, is enabled only when not running a job and not asleep, sends <code>$C</code> from Idle to enter check mode, and soft-resets to leave it &mdash; exactly as the old checkbox did.</li>
 <li><strong>Localized.</strong> The new menu string (header + tooltip) is added to all 7 locale CSVs; the retired checkbox label rows are removed.</li>
 </ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #64 ===== -->
+<div class="pr">
+<h2 id="pr64"><span class="badge">#64</span>Opt-in diagnostic trace log (<code>-debuglog</code>)</h2>
+<table class="files">
+<tr><td class="mono">CNC Core/DebugLog.cs</td><td class="num add">136</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">36</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A lightweight, always-compiled-in diagnostic logger &mdash; <code>CNC.Core.DebugLog</code>. It is <strong>off by default</strong> and costs a single boolean test per call site when disabled, so <code>DebugLog.Write(&hellip;)</code> statements can be left permanently at the tricky points in the code rather than being hand-added and torn down each time a layout / flow bug needs tracing. Diagnosing the earlier empty-settings-tree regression (<a href="#pr61">#61</a>) meant hand-rolling a throwaway logger; this makes that capability standing.</p><ul>
+<li><strong>How it&rsquo;s turned on.</strong> Launch with <code>-debuglog</code> (all categories) or <code>-debuglog=settings,comms</code> (an allow-list); an <code>IOSENDER_DEBUGLOG</code> env var does the same for unattended/headless runs (mirrors <code>IOSENDER_HEADLESS</code>).</li>
+<li><strong>Where it writes.</strong> Timestamped lines (<code>HH:mm:ss.fff&nbsp;&nbsp;[category]&nbsp;&nbsp;message</code>) to <code>%AppData%\ioSender\ioSender.debug.log</code>, next to the crash log, with a per-run banner (version + categories) and automatic roll at 8&nbsp;MB. Thread-safe append, and never throws &mdash; logging can&rsquo;t take the app down.</li>
+<li><strong>First call sites.</strong> The fragile grbl:Settings activation path (<code>Activate</code> / <code>ConfigureView</code>) now traces its <code>HasEnums</code> / <code>IsLoaded</code> / setting &amp; group counts, so a recurrence of the empty-tree symptom is visible in the log immediately.</li>
+</ul><p class="foot">In the integration build. Available in every configuration (not Debug-only), gated by the flag.</p></div>
 </div>
 </section>
 

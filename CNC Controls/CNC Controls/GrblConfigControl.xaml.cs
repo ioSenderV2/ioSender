@@ -83,6 +83,9 @@ namespace CNC.Controls
         // null-then-reassign to force the tree to rebuild after Load() has populated it.
         private void ConfigureView()
         {
+            DebugLog.Write("settings", string.Format("ConfigureView: HasEnums={0} IsLoaded={1} Settings={2} Groups={3} curSetting={4}",
+                GrblInfo.HasEnums, GrblSettings.IsLoaded, GrblSettings.Settings.Count, GrblSettingGroups.Groups.Count, curSetting != null));
+
             dgrSettings.Visibility = GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             searchPanel.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
             treeView.Visibility = !GrblInfo.HasEnums ? Visibility.Collapsed : Visibility.Visible;
@@ -109,6 +112,9 @@ namespace CNC.Controls
             if (model != null)
             {
                 model.Message = string.Empty;
+
+                DebugLog.Write("settings", string.Format("Activate({0}): active={1} IsLoaded={2} HasEnums={3} Groups={4}",
+                    activate, active, GrblSettings.IsLoaded, GrblInfo.HasEnums, GrblSettingGroups.Groups.Count));
 
                 if (activate)
                 {

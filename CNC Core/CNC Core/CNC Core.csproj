@@ -65,6 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
+    <Compile Include="DebugLog.cs" />
     <Compile Include="EltimaStream.cs" />
     <Compile Include="GCode.cs" />
     <Compile Include="GCodeEmulator.cs" />

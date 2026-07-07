@@ -77,13 +77,44 @@ namespace GCode_Sender
             string[] args = Environment.GetCommandLineArgs();
 
             int p = 0, lng = 0;
-            while (p < args.GetLength(0)) switch (args[p++])
+            bool debugLog = false;
+            string debugCategories = null;
+            while (p < args.GetLength(0))
             {
-                case "-locale":
-                    if (p < args.GetLength(0))
-                        lng = p;
-                    break;
+                string arg = args[p++];
+                switch (arg)
+                {
+                    case "-locale":
+                        if (p < args.GetLength(0))
+                            lng = p;
+                        break;
+
+                    // -debuglog                enable the diagnostic trace log (all categories)
+                    // -debuglog=settings,comms  enable, but only for the listed categories
+                    default:
+                        if (arg == "-debuglog" || arg.StartsWith("-debuglog=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            debugLog = true;
+                            int eq = arg.IndexOf('=');
+                            if (eq >= 0)
+                                debugCategories = arg.Substring(eq + 1);
+                        }
+                        break;
+                }
             }
+
+            // Also honour an env var (mirrors IOSENDER_HEADLESS) so unattended/headless launches can turn it on.
+            // Value may be "1"/"true" (all categories) or a category allow-list ("settings,comms").
+            string debugEnv = Environment.GetEnvironmentVariable("IOSENDER_DEBUGLOG");
+            if (!string.IsNullOrEmpty(debugEnv))
+            {
+                debugLog = true;
+                if (!(debugEnv == "1" || string.Equals(debugEnv, "true", StringComparison.OrdinalIgnoreCase)))
+                    debugCategories = debugEnv;
+            }
+
+            CNC.Core.DebugLog.Init(debugLog, debugCategories);
+            CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             if (lng > 0)
             {
