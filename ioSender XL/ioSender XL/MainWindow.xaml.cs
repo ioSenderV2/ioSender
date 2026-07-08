@@ -192,7 +192,83 @@ namespace GCode_Sender
                         OnJobFileChanged((DataContext as GrblViewModel)?.FileName);
                     else if (e.PropertyName == nameof(GrblViewModel.GrblState))
                         UpdateConnectionGatedTabs();   // enable operational tabs on connect, disable on disconnect
+                    else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
+                        OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                 };
+
+            // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
+            // marker facility is armed (-demomarker), hidden in normal use.
+            btnTimeLapse.Visibility = CNC.Core.DemoMarker.Enabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ---- Demo-video timelapse window marking (see docs/demo-videos/README.md) ----
+        // The operator flips btnTimeLapse at the moment they switch the camera to/from timelapse; each flip
+        // writes TIMELAPSE_ON/OFF to the demo marker file so the compositor knows the exact segment to speed
+        // up. RUN_START/RUN_END are only fallbacks: auto-ON a few minutes in if the operator never flips it,
+        // and a forced auto-OFF at job end. No feed-based runtime estimate exists in the app, so the auto-ON
+        // delay is a fixed guess matching the "hands-on for the first few minutes" workflow.
+        private const double TimeLapseAutoOnMinutes = 5.0;
+        private DispatcherTimer _timelapseAutoTimer;
+        private bool _timelapseSuppressMark;
+
+        private void SetTimeLapseChecked(bool value, bool suppressMark)
+        {
+            _timelapseSuppressMark = suppressMark;
+            btnTimeLapse.IsChecked = value;   // fires TimeLapse_Toggled unless the value is unchanged
+            _timelapseSuppressMark = false;
+        }
+
+        private void TimeLapse_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_timelapseSuppressMark)
+                return;
+            bool on = btnTimeLapse.IsChecked == true;
+            CNC.Core.DemoMarker.Mark(on ? "TIMELAPSE_ON" : "TIMELAPSE_OFF");
+            if (on)
+                StopTimeLapseAutoTimer();   // engaged (by hand or fallback) - no need to auto-fire
+        }
+
+        private void OnJobRunningChanged(bool running)
+        {
+            if (!CNC.Core.DemoMarker.Enabled)
+                return;
+
+            if (running)   // RUN_START: fresh job - clear the toggle without marking, arm the fallback
+            {
+                SetTimeLapseChecked(false, suppressMark: true);
+                StartTimeLapseAutoTimer();
+            }
+            else           // RUN_END: stop the fallback and force timelapse off (marks) if still on
+            {
+                StopTimeLapseAutoTimer();
+                if (btnTimeLapse.IsChecked == true)
+                    SetTimeLapseChecked(false, suppressMark: false);
+            }
+        }
+
+        private void StartTimeLapseAutoTimer()
+        {
+            StopTimeLapseAutoTimer();
+            _timelapseAutoTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(TimeLapseAutoOnMinutes) };
+            _timelapseAutoTimer.Tick += TimeLapseAutoTimer_Tick;
+            _timelapseAutoTimer.Start();
+        }
+
+        private void StopTimeLapseAutoTimer()
+        {
+            if (_timelapseAutoTimer != null)
+            {
+                _timelapseAutoTimer.Stop();
+                _timelapseAutoTimer.Tick -= TimeLapseAutoTimer_Tick;
+                _timelapseAutoTimer = null;
+            }
+        }
+
+        private void TimeLapseAutoTimer_Tick(object sender, EventArgs e)
+        {
+            StopTimeLapseAutoTimer();   // one-shot
+            if ((DataContext as GrblViewModel)?.IsJobRunning == true && btnTimeLapse.IsChecked != true)
+                SetTimeLapseChecked(true, suppressMark: false);   // fallback engage - marks TIMELAPSE_ON
         }
 
         private void ConsoleOverlay_Key(object sender, System.Windows.Input.KeyEventArgs e)

@@ -595,6 +595,7 @@ namespace CNC.Core
                     _isJobRunning = value;
                     if (!_isJobRunning && GrblState.State != GrblStates.Tool)
                         JobTimer.Stop();
+                    DemoMarker.Mark(_isJobRunning ? "RUN_START" : "RUN_END");
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(GcodeCommandsAllowed));
                 }

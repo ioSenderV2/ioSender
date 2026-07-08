@@ -191,7 +191,38 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <cnccontrols:StatusControl Grid.Column="0" ShowButtons="False" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Center"/>
+                                <!-- Demo-video timelapse marker toggle, right of the State field. Hidden unless
+                                     launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
+                                     TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
+                                <ToggleButton x:Name="btnTimeLapse" Content="Timelapse" MinWidth="80" Margin="12,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Cycle Start if you don't; auto-OFF at job end." Checked="TimeLapse_Toggled" Unchecked="TimeLapse_Toggled">
+                                    <!-- Traffic-light coloring (not the selection highlight): green when OFF
+                                         (press to start), red when RUNNING (press to stop). Custom template so
+                                         Background is honored in the checked state. -->
+                                    <ToggleButton.Style>
+                                        <Style TargetType="ToggleButton">
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Background" Value="#2E7D32"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ToggleButton">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="3" Padding="8,3" SnapsToDevicePixels="True">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter Property="Background" Value="#C62828"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ToggleButton.Style>
+                                </ToggleButton>
+                            </StackPanel>
                             <cnccontrols:JogPresetSelector Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Grid>
                     </StackPanel>

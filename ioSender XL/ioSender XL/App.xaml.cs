@@ -79,6 +79,7 @@ namespace GCode_Sender
             int p = 0, lng = 0;
             bool debugLog = false;
             string debugCategories = null;
+            bool demoMarker = false;
             while (p < args.GetLength(0))
             {
                 string arg = args[p++];
@@ -91,6 +92,11 @@ namespace GCode_Sender
 
                     // -debuglog                enable the diagnostic trace log (all categories)
                     // -debuglog=settings,comms  enable, but only for the listed categories
+                    // -demomarker  timestamp job-state transitions for demo-video sync (docs/demo-videos)
+                    case "-demomarker":
+                        demoMarker = true;
+                        break;
+
                     default:
                         if (arg == "-debuglog" || arg.StartsWith("-debuglog=", StringComparison.OrdinalIgnoreCase))
                         {
@@ -115,6 +121,14 @@ namespace GCode_Sender
 
             CNC.Core.DebugLog.Init(debugLog, debugCategories);
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
+
+            // Demo-video sync markers (mirrors the -debuglog flag + IOSENDER_* env pattern).
+            if (!demoMarker)
+            {
+                string demoEnv = Environment.GetEnvironmentVariable("IOSENDER_DEMOMARKER");
+                demoMarker = demoEnv == "1" || string.Equals(demoEnv, "true", StringComparison.OrdinalIgnoreCase);
+            }
+            CNC.Core.DemoMarker.Init(demoMarker);
 
             if (lng > 0)
             {
