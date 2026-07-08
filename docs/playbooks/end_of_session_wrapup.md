@@ -20,7 +20,7 @@ always `/clear`.
 ## Ready command (step 5)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-logger.ps1 -Once
+powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
 ```
 
 ## Notes
