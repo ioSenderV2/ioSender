@@ -71,6 +71,15 @@ namespace CNC.Controls
         // Camera + Probing share one vertical column on the App tab (both are short panels).
         private StackPanel _camProbeColumn;
 
+        // True only while the Settings view is the active top-level view. The inner TabControl raises an initial
+        // SelectionChanged for its default tab during eager startup layout (this view is built before the user ever
+        // opens Settings, and before the controller handshake completes). Reacting to it there fired a premature
+        // basicConfig.Activate(true) mid-connect - $$ answered but $I not yet, so HasEnums was false - which loaded
+        // the grbl settings group-less and left the tree empty (the #61/#64 regression). The top-level Activate()
+        // already EnterTab()s the current tab when the view is genuinely shown, so tab switches only need handling
+        // once we're active; ignore inner selection churn until then.
+        private bool _viewActive;
+
         public GrblConfigView()
         {
             InitializeComponent();
@@ -87,6 +96,8 @@ namespace CNC.Controls
                 grblmodel.Message = string.Empty;
 
             var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
+
+            _viewActive = activate;
 
             if (activate)
             {
@@ -266,6 +277,14 @@ namespace CNC.Controls
                 return;
 
             e.Handled = true;
+
+            // Ignore selection churn while the Settings view isn't the active top-level view - most importantly the
+            // initial SelectionChanged raised during eager startup layout, which used to fire a premature
+            // Activate mid-handshake. The top-level Activate(true) EnterTab()s the current tab when we're genuinely
+            // shown; this handler only needs to service real user tab switches thereafter. See _viewActive.
+            if (!_viewActive)
+                return;
+
             if (e.AddedItems.Count != 1)
                 return;
 

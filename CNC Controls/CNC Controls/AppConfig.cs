@@ -421,6 +421,7 @@ namespace CNC.Controls
         // by OpenConnection() (the two are split so config loads synchronously before controls load,
         // while the connection is deferred so the window paints first).
         private bool _selectPort = false;
+        private bool _forgetNetwork = false;   // -forgetnetwork: force the startup connect dialog, ignore the saved target
         private string _startupPort = string.Empty, _startupBaud = string.Empty;
 
         public string FileName { get; private set; }
@@ -1073,6 +1074,15 @@ namespace CNC.Controls
                         _selectPort = true;
                         break;
 
+                    // Testing/repro aid: ignore the saved connection target for this run and show the connection
+                    // dialog at startup (which can scan the network), instead of auto-connecting the remembered
+                    // host. Non-destructive - nothing is written to the config unless you then pick a target - so
+                    // the on-disk remembered value survives. Handy for reproducing startup-timing bugs (the modal
+                    // connect dialog delays the handshake) without hand-editing app.config.
+                    case "-forgetnetwork":
+                        _forgetNetwork = _selectPort = true;
+                        break;
+
                     case "-islegacy":
                         CNC.Core.Resources.IsLegacyController = true;
                         break;
@@ -1218,6 +1228,9 @@ namespace CNC.Controls
         {
             int status = 0;
             string port = _startupPort;
+
+            CNC.Core.DebugLog.Write("connect", string.Format("OpenConnection: savedTarget='{0}' selectPort={1} forgetNetwork={2} startupPort='{3}'",
+                Base?.PortParams, _selectPort, _forgetNetwork, port));
 
             if (!string.IsNullOrEmpty(port))
                 _selectPort = false;

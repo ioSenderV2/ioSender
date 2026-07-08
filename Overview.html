@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>64 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>66 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -163,6 +163,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Restore main-window <em>position</em> across launches (was size only)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr17">17</a></td></tr>
 <tr><td>Survive connection loss / SD-card swap &mdash; guarded writes + auto-reconnect instead of crashing</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr4">4</a></td></tr>
 <tr><td>Telnet / websocket modal-dialog UI deadlock</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr24">24</a></td></tr>
+<tr><td><code>-forgetNetwork</code> startup flag &mdash; ignore the saved connection target for one run and open the connect dialog (scan the network / pick any transport) instead of auto-connecting the remembered host; non-destructive (the saved value is untouched, and re-learned from the controller&rsquo;s <code>$I</code> on the next serial connect)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr66">66</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
@@ -191,6 +192,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Restart-needed cue &mdash; the Restart button pulses red while a restart-only change is pending and offers to relaunch when you leave Settings</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr48">48</a></td></tr>
 <tr><td>Connect: Network default + <strong>Scan network</strong> &mdash; finds grblHAL controllers on the LAN (confirms each by a <code>?</code>/<code>$I</code> handshake, not just an open port) and lists them in an editable host picker</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr59">59</a></td></tr>
 <tr><td>grbl:Settings tree now populates when opened after connecting &mdash; an early activation during the connect handshake loaded the settings group-less (before <code>$I</code> reported enum support), so the grblHAL settings tree never built; it now fetches the group metadata once enums are known and rebuilds the tree on entry</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr61">61</a></td></tr>
+<tr><td>&hellip; and the early activation itself is now suppressed at source &mdash; the Settings view ignores its inner tab-strip&rsquo;s startup selection churn until the view is actually shown, so <code>Activate</code> can no longer fire mid-handshake (belt-and-suspenders over <a href="#pr61">#61</a>)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr65">65</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -319,7 +321,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">62</td><td><a href="#pr62">Probing/Tools sub-tab layout standardized</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+38</span> <span class="del">-30</span></td></tr>
 <tr><td class="n">63</td><td><a href="#pr63">Check ($C) moved to Cycle Start context menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+48</span> <span class="del">-29</span></td></tr>
 <tr><td class="n">64</td><td><a href="#pr64">Opt-in diagnostic trace log (-debuglog)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+179</span> <span class="del">-5</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (64 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">518</span> <span class="del">2</span> <span class="add">+96</span><br><span class="k">Lines:</span> <span class="add">+31996</span> <span class="del">-3958</span></td></tr>
+<tr><td class="n">65</td><td><a href="#pr65">grbl:Settings premature activation prevented at source</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+19</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">66</td><td><a href="#pr66">Startup flag -forgetNetwork</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+13</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (66 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">520</span> <span class="del">2</span> <span class="add">+96</span><br><span class="k">Lines:</span> <span class="add">+32028</span> <span class="del">-3958</span></td></tr>
 </table>
 </div>
 
@@ -1819,6 +1823,30 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Where it writes.</strong> Timestamped lines (<code>HH:mm:ss.fff&nbsp;&nbsp;[category]&nbsp;&nbsp;message</code>) to <code>%AppData%\ioSender\ioSender.debug.log</code>, next to the crash log, with a per-run banner (version + categories) and automatic roll at 8&nbsp;MB. Thread-safe append, and never throws &mdash; logging can&rsquo;t take the app down.</li>
 <li><strong>First call sites.</strong> The fragile grbl:Settings activation path (<code>Activate</code> / <code>ConfigureView</code>) now traces its <code>HasEnums</code> / <code>IsLoaded</code> / setting &amp; group counts, so a recurrence of the empty-tree symptom is visible in the log immediately.</li>
 </ul><p class="foot">In the integration build. Available in every configuration (not Debug-only), gated by the flag.</p></div>
+</div>
+
+<!-- ===== #65 ===== -->
+<div class="pr">
+<h2 id="pr65"><span class="badge">#65</span>grbl:Settings premature activation prevented at source</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The root trigger behind the empty-settings-tree saga (<a href="#pr61">#61</a>), now closed off at the source. The Settings view&rsquo;s inner tab strip raises an initial <code>SelectionChanged</code> for its default tab during eager startup layout &mdash; before the view is ever shown and, on a network connect, mid-handshake. That fired a premature <code>Activate(true)</code> on the Grbl tab while <code>$I</code> hadn&rsquo;t yet reported enum support (<code>HasEnums == false</code>), which is exactly what loaded the settings group-less.</p><ul>
+<li><strong>The fix.</strong> A <code>_viewActive</code> flag, set only by the top-level <code>Activate(bool, ViewType)</code>. <code>tab_SelectionChanged</code> now ignores inner selection churn until the view is genuinely active &mdash; the top-level <code>Activate(true)</code> already enters the current tab itself, so real user tab switches still work, but the spurious startup fire is dropped.</li>
+<li><strong>Belt-and-suspenders</strong> over the <a href="#pr61">#61</a> <code>Load()</code> guard (which rebuilds the tree metadata whenever it&rsquo;s missing): even if an early activation slipped through, the tree would still build &mdash; but now it can&rsquo;t fire disconnected in the first place. Verified with the <a href="#pr64">#64</a> trace log: the mid-handshake <code>Activate</code> line is gone; the first and only activation lands post-<code>$I</code> with the groups already populated. Also removes wasted startup work.</li>
+</ul><p class="foot">In the integration build.</p></div>
+</div>
+
+<!-- ===== #66 ===== -->
+<div class="pr">
+<h2 id="pr66"><span class="badge">#66</span>Startup flag <code>-forgetNetwork</code></h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">13</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A small startup/testing aid: launch with <code>-forgetNetwork</code> to <strong>ignore the saved connection target for that run</strong> and open the connection dialog instead of auto-connecting the remembered host &mdash; from there you can scan the network or pick any transport (serial / network / simulator).</p><ul>
+<li><strong>Non-destructive.</strong> Nothing is written to <code>app.config</code> unless you then choose a target, so the remembered value survives; on the next serial connect it&rsquo;s re-learned from the controller&rsquo;s <code>$I</code>-reported IP anyway. It reuses the existing <code>-selectport</code> path to force the dialog.</li>
+<li><strong>Why.</strong> The modal connect dialog delays the handshake, which makes it a clean, repeatable way to reproduce startup-timing bugs (such as the <a href="#pr65">#65</a> activation race) without hand-editing the config. The connect path also gained a <code>[connect]</code> trace line (see <a href="#pr64">#64</a>) reporting the saved target and flags.</li>
+</ul><p class="foot">In the integration build.</p></div>
 </div>
 </section>
 
