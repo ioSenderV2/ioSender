@@ -88,10 +88,12 @@ ioSender.g.en-US.resources:startjobview.baml,ls_rbBL:System.Windows.Controls.Con
 ioSender.g.en-US.resources:startjobview.baml,ls_rbBR:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Back-right
 ioSender.g.en-US.resources:startjobview.baml,ls_rbFL:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Front-left
 ioSender.g.en-US.resources:startjobview.baml,ls_rbFR:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Front-right
-ioSender.g.en-US.resources:startjobview.baml,ls_width:CNC.Controls.NumericField.Label,None,False,True,,Approx. width (X):
+ioSender.g.en-US.resources:startjobview.baml,ls_width:CNC.Controls.NumericField.Label,None,False,True,,Est. width (X):
 ioSender.g.en-US.resources:startjobview.baml,ls_width:CNC.Controls.NumericField.Unit,None,False,True,,mm
-ioSender.g.en-US.resources:startjobview.baml,ls_height:CNC.Controls.NumericField.Label,None,False,True,,Approx. height (Y):
+ioSender.g.en-US.resources:startjobview.baml,ls_height:CNC.Controls.NumericField.Label,None,False,True,,Est. height (Y):
 ioSender.g.en-US.resources:startjobview.baml,ls_height:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_thickness:CNC.Controls.NumericField.Label,None,False,True,,Est. thickness (Z):
+ioSender.g.en-US.resources:startjobview.baml,ls_thickness:CNC.Controls.NumericField.Unit,None,False,True,,mm
 ioSender.g.en-US.resources:startjobview.baml,ls_lblWcs:System.Windows.Controls.ContentControl.Content,Label,True,True,,Set origin in:
 ioSender.g.en-US.resources:startjobview.baml,ls_measure:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Measure stock size (probe far faces)
 ioSender.g.en-US.resources:startjobview.baml,ls_generate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate

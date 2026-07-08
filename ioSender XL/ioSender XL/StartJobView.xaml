@@ -23,8 +23,11 @@
                     <StackPanel Margin="6">
                         <!-- Corner is always the front-left (TFL), like start_job.macro; the tip radius + feeds come
                              straight from the configured 3D probe definition, so no probe/corner pickers. -->
-                        <cnccontrols:NumericField x:Name="fldWidth"  x:Uid="ls_width"  Label="Stock width (X):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                        <cnccontrols:NumericField x:Name="fldHeight" x:Uid="ls_height" Label="Stock height (Y):" ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                        <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>
+                        <TextBlock x:Name="txtThickWarn" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                   Text="Stock over 1 in (25.4 mm) thick - the probe macros assume 1 in or less and will miss the top of taller stock."/>
                         <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"
                                    Text="Actual stock size."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">

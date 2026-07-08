@@ -15,6 +15,7 @@ namespace CNC.Controls
     {
         public double Width = 100d;
         public double Height = 100d;
+        public double Thickness = 19d;   // estimated stock thickness (Z), mm; only used for the <= 1 in probe check
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

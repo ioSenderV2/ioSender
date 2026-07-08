@@ -80,6 +80,16 @@ namespace GCode_Sender
             chkSetTloRef.Unchecked += (s, e) => InputChanged();
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => InputChanged());
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => InputChanged());
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { UpdateThicknessWarning(); InputChanged(); });
+        }
+
+        // The probe macros (probe_tfl / pcorner) now assume stock <= 1 in (25.4 mm) to start their top probe
+        // just above a 1 in top for speed - taller stock would be missed. Flag it when the Z estimate exceeds that.
+        private const double MaxStockThicknessMm = 25.4d;
+        private void UpdateThicknessWarning()
+        {
+            if (txtThickWarn != null)
+                txtThickWarn.Visibility = fldThickness.Value > MaxStockThicknessMm ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // The width/height fields are the actual size when not measuring; when Measure is on they are only a
@@ -580,11 +590,13 @@ namespace GCode_Sender
                     return;
                 fldWidth.Value = s.Width;
                 fldHeight.Value = s.Height;
+                fldThickness.Value = s.Thickness;
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkMeasure.IsChecked = s.Measure;
                 chkRotate.IsChecked = s.ApplyRotation;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 // Corner is always front-left now; the probe comes from the 3D-probe definition - both dropped.
+                UpdateThicknessWarning();
             }
             catch { /* start with defaults */ }
         }
@@ -597,6 +609,7 @@ namespace GCode_Sender
                 {
                     Width = fldWidth.Value,
                     Height = fldHeight.Value,
+                    Thickness = fldThickness.Value,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
