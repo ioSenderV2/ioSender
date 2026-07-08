@@ -115,6 +115,12 @@ namespace GCode_Sender
             }
             saveWinSize = AppConfig.Settings.Base != null && AppConfig.Settings.Base.KeepWindowSize;
 
+            // DPI diagnostics (-debuglog): dump the scale WPF actually resolves at startup + on any live change,
+            // to see whether "tiny UI" is a DPI/scale problem vs a display-resolution problem.
+            Loaded += LogDpiDiagnostics;
+            DpiChanged += (s, e) => CNC.Core.DebugLog.Write("dpi",
+                string.Format("DpiChanged: old PixelsPerDip={0} -> new={1}", e.OldDpi.PixelsPerDip, e.NewDpi.PixelsPerDip));
+
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
@@ -199,6 +205,40 @@ namespace GCode_Sender
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
             btnTimeLapse.Visibility = CNC.Core.DemoMarker.Enabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ---- DPI diagnostics ----
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetThreadDpiAwarenessContext();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr ctx);
+        private static string ProcessDpiAwareness()
+        {
+            try
+            {
+                int a = GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext());
+                string[] n = { "UNAWARE", "SYSTEM", "PER-MONITOR" };
+                return (a >= 0 && a < n.Length) ? n[a] : ("?(" + a + ")");
+            }
+            catch { return "?"; }
+        }
+
+        private void LogDpiDiagnostics(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+                var src = PresentationSource.FromVisual(this);
+                double m11 = src != null ? src.CompositionTarget.TransformToDevice.M11 : 0;
+                double m22 = src != null ? src.CompositionTarget.TransformToDevice.M22 : 0;
+                CNC.Core.DebugLog.Write("dpi", string.Format(
+                    "MainWindow Loaded: awareness={0} DpiScaleX={1} DpiScaleY={2} PixelsPerDip={3} TransformToDevice.M11={4} M22={5} | "
+                    + "PrimaryScreen(logical)={6}x{7} WorkArea={8}x{9} | Window Actual={10}x{11} Set={12}x{13} State={14} | savedWin={15}x{16}",
+                    ProcessDpiAwareness(), dpi.DpiScaleX, dpi.DpiScaleY, dpi.PixelsPerDip, m11, m22,
+                    SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight,
+                    SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height,
+                    ActualWidth, ActualHeight, Width, Height, WindowState,
+                    AppConfig.Settings.Base.WindowWidth, AppConfig.Settings.Base.WindowHeight));
+            }
+            catch (Exception ex) { CNC.Core.DebugLog.Write("dpi", "diag error: " + ex.Message); }
         }
 
         // ---- Demo-video timelapse window marking (see docs/demo-videos/README.md) ----
@@ -356,9 +396,11 @@ namespace GCode_Sender
         {
             if (string.IsNullOrEmpty(fileName))
             {
+                CNC.Core.ObsBridge.StopRecording();   // file closed: stop the demo recording (safety net)
                 jobProgramView?.Disconnect();   // file closed: drop the job view (overlay reverts to the empty state)
                 return;
             }
+            CNC.Core.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
             if (jobProgramView == null)
                 jobProgramView = new CNC.Controls.ProgramView { AutoShow = false };
             jobProgramView.Title = System.IO.Path.GetFileName(fileName.TrimEnd('\\', '/'));

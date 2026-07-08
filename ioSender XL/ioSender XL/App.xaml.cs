@@ -130,6 +130,20 @@ namespace GCode_Sender
             }
             CNC.Core.DemoMarker.Init(demoMarker);
 
+            // With demo markers on, also arm the OBS bridge so a shoot auto-records (program load ->
+            // StartRecord, program end -> StopRecord). No-op unless an OBS WebSocket server is reachable.
+            // Auth password (if OBS auth is on) comes from IOSENDER_OBSWS_PASSWORD; host/port default localhost:4455.
+            if (demoMarker)
+            {
+                string obsHost = Environment.GetEnvironmentVariable("IOSENDER_OBSWS_HOST");
+                if (string.IsNullOrWhiteSpace(obsHost))
+                    obsHost = "localhost";
+                int obsPort;
+                if (!int.TryParse(Environment.GetEnvironmentVariable("IOSENDER_OBSWS_PORT"), out obsPort))
+                    obsPort = 4455;
+                CNC.Core.ObsBridge.Init(true, obsHost, obsPort, Environment.GetEnvironmentVariable("IOSENDER_OBSWS_PASSWORD"));
+            }
+
             if (lng > 0)
             {
                 Thread.CurrentThread.CurrentUICulture =

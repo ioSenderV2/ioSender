@@ -17,14 +17,17 @@ be followed per video without re-deciding the pipeline each time.
 
 ## 1. The target format
 
-- **Base layer:** **Camera A = GoPro Black**, mounted in the **back-right corner** (out of reach of the gantry
-  and spindle), wide FOV covering the whole machine — the fixed establishing shot.
+- **Base layer:** **Camera A = Tapo C101** in the **back-right corner** (out of reach of the gantry and
+  spindle), wide FOV covering the whole machine — the fixed establishing shot.
 - **Overlays (picture-in-picture):**
   - **App screen recording** — the main overlay. **Full app** during setup; **shrinks to the bottom
     run-control strip** the instant the job goes to RUN, so the cut is mostly unobscured while cutting.
-  - **Camera B = iPhone** on a tripod at the **front-left**, angled down toward the **center of the
-    spoilboard** — the work-area/cutter detail PiP. Optionally grows when the app overlay shrinks (RUN),
-    since that's when the cut detail matters most.
+  - **Camera B = Tapo C101** in the **front-left** corner, angled toward the **center of the spoilboard** —
+    the work-area/cutter detail PiP. Optionally grows when the app overlay shrinks (RUN), since that's when
+    the cut detail matters most.
+- **Close-up inserts:** an **iPhone 14 Pro**, handheld, for short **cutaway b-roll** of specific moments that
+  the fixed corner cams can't frame tightly — e.g. a close-up of the homing sequence hitting all three axis
+  limit switches, a tool change, or a probe touching off. These are edited in as inserts (§7b), not a fixed PiP.
 
 ```
  SETUP phase                              RUN phase (Cycle Start pressed)
@@ -50,10 +53,15 @@ strip** from the same full-app recording — one screen recording yields both th
 
 | Source | Tool | Output |
 |---|---|---|
-| App screen | **OBS Studio** Display/Window Capture of ioSender (or Xbox Game Bar) | `app.mp4` |
-| Camera A (wide, base) | **GoPro Black**, back-right corner, whole machine in frame | `camA.mp4` |
-| Camera B (detail) | **iPhone** on a tripod, front-left, angled down at spoilboard center | `camB.mp4` |
-| RUN marker | **ioSender** (see §3) | `ioSender.demo-markers.csv` |
+| App screen | **OBS Studio** **Display Capture** of ioSender (Window Capture came up black under WGC/BitBlt on the Iris Xe) | `…App.mp4` |
+| Camera A (wide, base) | **Tapo C101**, back-right corner, RTSP over WiFi into OBS | `…Back Right.mp4` |
+| Camera B (detail) | **Tapo C101**, front-left corner, RTSP over WiFi into OBS | `…Front Left.mp4` |
+| Close-up inserts | **iPhone 14 Pro**, handheld cutaways of specific moments (§7b) | separate clips |
+| RUN / cut markers | **ioSender** (see §3) | `ioSender.demo-markers.csv` |
+
+All three OBS sources record to their **own file in one Record button** via the **Source Record** plugin (a
+per-source filter, Record Mode = *Recording*), and the ioSender OBS bridge auto-starts/stops that recording on
+program load/end (§3). The Tapo RTSP setup + gotchas are documented below.
 
 **Fixed capture settings** (keep constant so the ffmpeg recipe's crop rect stays valid):
 - App recording: **1920×1080, 30 fps**, ioSender **maximized** (so the run strip is always at the same Y).
@@ -68,6 +76,32 @@ in place.
 the table can quiver on deeper cuts, so a loose tripod will show visible shake exactly during the RUN footage
 you most want steady. Rubber feet / a mass-loaded base or a bolted corner bracket help; avoid resting it on the
 machine frame if the frame is what's vibrating.
+
+### Tapo C101 RTSP — working config + hard-won gotchas
+Two **Tapo C101** cams (fixed, front-left + back-right) stream H.264 over WiFi via RTSP; the laptop records the
+live feed (no SD card retrieval). URL pattern (put the real password in an env var / your notes, not in git):
+
+```
+rtsp://RTSPUser:<password>@<camera-ip>:554/stream1     # full res
+rtsp://RTSPUser:<password>@<camera-ip>:554/stream2     # low res
+```
+
+Setup (per camera): **Tapo app -> camera -> Settings -> Advanced Settings -> Camera Account** — set a username
++ password. This "Camera Account" is the RTSP credential and is **separate from your Tapo login**.
+
+Gotchas that cost real time here (2026-07-08):
+- **The URL needs `@` between password and IP** (`user:pass@ip`), not a colon. A colon makes ffmpeg read the
+  host as part of the password -> "Failed to open media."
+- **Each camera has its own account** — setting it on one does nothing for the other. (Confirm you're editing
+  the right camera / pointing at the right IP.)
+- **A password change needs a camera REBOOT to actually apply** — a "save" in the app alone does not take; the
+  camera keeps authenticating with the *previous* password until rebooted. (Diagnosed by raw RTSP DESCRIBE
+  returning 200 only for the old password after a reboot.)
+- **Reserve the camera IPs** in the router (DHCP reservation) so the URLs don't break on reboot.
+- **~15 fps** is typical on the RTSP stream — fine for a fixed base/context shot.
+
+Test without OBS: a raw RTSP `DESCRIBE` returns `200 OK` when creds/path are right, `401` when auth is wrong,
+`404` when the path is wrong. (VLC "Open Network Stream" or OBS "Media Source" also work as a picture test.)
 
 ---
 
@@ -187,13 +221,14 @@ mode-switch instants (they're visible in the footage). For the timelapsed middle
 overlay** by the **same factor** (`setpts=PTS/factor`) so the DRO fast-forwards in lockstep with the camera;
 the two real-time ends play at 1×.
 
-**Camera notes:**
-- **GoPro:** use a **fixed-rate** Time-Lapse Video / TimeWarp (e.g. 15×/30×) so the factor is known — clean sync.
-- **iPhone:** native Time-lapse uses a **variable auto factor** (2×–30× by clip length), which fights precise
-  sync. Prefer a fixed-interval capture app, or record the middle real-time and `setpts` it in ffmpeg (accepts
-  the GB), or just accept the variable rate and align by eye on the markers.
+**Timelapse with the Tapo cams is done entirely in ffmpeg** — the C101 is a fixed-rate always-on RTSP stream
+with no camera-side timelapse. OBS records the RTSP feed straight through (real-time), and ffmpeg speeds the
+segment between the `TIMELAPSE_ON`/`OFF` marks (`setpts=PTS/N`). The recorded file is a few GB per long cut, but
+it's a *temp* file you delete after compositing. (If you ever want to avoid writing the GB, run a second ffmpeg
+that pulls the RTSP at reduced fps — `-vf fps=1` — only during the timelapse window.)
 
-**Prerequisite:** install **ffmpeg** (`winget install Gyan.FFmpeg` or the gyan.dev build) and put it on `PATH`.
+**Prerequisite:** install **ffmpeg** — `winget install Gyan.FFmpeg` (installed 2026-07-08; exe at
+`%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe`, new shell needed for PATH).
 
 > **Future automation (see §10):** the camera mode-switches at +N / −M are currently a **manual** operator
 > action. ioSender already knows `RUN_START` and can estimate runtime, so it could instead **emit
@@ -226,6 +261,23 @@ the two real-time ends play at 1×.
 Extra task videos worth doing beyond the 5: **Surface Spoilboard**, **Auto Square**, a **tool change**.
 "Cuts? = no" videos have no RUN phase, so the app overlay just stays full (skip the `T_run` shrink — set
 `T_run` past the end).
+
+## 7b. iPhone close-up inserts (cutaway b-roll)
+
+The two fixed Tapo cams cover the wide + work-area angles, but some moments read far better as a **tight
+handheld close-up**. Shoot these separately on the **iPhone 14 Pro** and edit them in as short cutaways over the
+main footage (the app/DRO usually keeps narrating underneath).
+
+Good insert shots:
+- **Homing sequence** — close on each axis so you see all three **limit switches trip** in turn (the marquee
+  example: frame the axis + its switch, catch the approach-touch-back-off).
+- **Tool change** — spindle stopping, the bit being swapped, the tool-setter touch-off.
+- **Probe touch-off** — the probe tip contacting the stock/edge finder (slow-mo works well here).
+- **First plunge / a detail pass** — the cutter entering the material, chips forming.
+
+Tips: **1080p or 4K, 30/60 fps**, lock focus/exposure (tap-and-hold on iPhone), brace or use a small tripod —
+the table quivers on deeper cuts. These don't need marker sync; you place them by eye against the narration.
+For slow-mo, shoot 120/240 fps and keep it for the touch-off / plunge moments.
 
 ---
 

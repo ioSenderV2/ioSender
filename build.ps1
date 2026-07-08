@@ -35,6 +35,11 @@
 .EXAMPLE
     .\build.ps1 -Configuration Both
     Verify Debug + Release both build clean before committing.
+
+.EXAMPLE
+    .\build.ps1 -Launch -forgetnetwork -demomarker
+    Debug build, then launch with those flags forwarded to ioSender.exe (open the
+    connect dialog + arm the demo-video markers). Any trailing tokens pass through.
 #>
 [CmdletBinding()]
 param(
@@ -42,7 +47,11 @@ param(
     [string]$Configuration = 'Debug',
     [switch]$Launch,
     [switch]$NoKill,
-    [switch]$Headless
+    [switch]$Headless,
+    # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
+    #   .\build.ps1 -Launch -forgetnetwork -demomarker
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AppArgs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -93,9 +102,10 @@ if ($Launch) {
     else {
         $exe = Join-Path $root ($exeRel -f $Configuration)
         if (Test-Path $exe) {
-            Write-Host "==> Launching $Configuration ioSender ..." -ForegroundColor Cyan
+            $argMsg = if ($AppArgs) { " $($AppArgs -join ' ')" } else { '' }
+            Write-Host "==> Launching $Configuration ioSender$argMsg ..." -ForegroundColor Cyan
             if ($Headless) { $env:IOSENDER_HEADLESS = '1' } else { Remove-Item Env:\IOSENDER_HEADLESS -ErrorAction SilentlyContinue }
-            Start-Process $exe
+            if ($AppArgs) { Start-Process $exe -ArgumentList $AppArgs } else { Start-Process $exe }
         }
         else {
             Write-Host "==> Built exe not found: $exe" -ForegroundColor Red

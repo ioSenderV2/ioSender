@@ -915,6 +915,7 @@ namespace CNC.Core
 
             if (newstate != _grblState.State || substate != _grblState.Substate || force)
             {
+                GrblStates prevState = _grblState.State;   // captured before the assignment below (demo cut markers)
                 bool checkChanged = _grblState.State == GrblStates.Check || newstate == GrblStates.Check;
                 bool sleepChanged = _grblState.State == GrblStates.Sleep || newstate == GrblStates.Sleep;
                 bool alarmChanged = _grblState.State == GrblStates.Alarm || newstate == GrblStates.Alarm;
@@ -972,6 +973,18 @@ namespace CNC.Core
                 }
 
                 OnPropertyChanged(nameof(GrblState));
+
+                // Demo-video cut markers: RUN_START/RUN_END bracket the actual cutting. A tool change pauses
+                // the cut, so entering the Tool state ends the current cut segment and leaving it starts the
+                // next - i.e. ...RUN_END <M6 tool-change gcode> RUN_START... Only while a job is running; the
+                // job-level RUN_START/RUN_END come from the IsJobRunning setter. No-op unless -demomarker.
+                if (_isJobRunning && newstate != prevState)
+                {
+                    if (newstate == GrblStates.Tool)
+                        DemoMarker.Mark("RUN_END");
+                    else if (prevState == GrblStates.Tool)
+                        DemoMarker.Mark("RUN_START");
+                }
 
 //                CanReset = canReset();
 

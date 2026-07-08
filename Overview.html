@@ -165,6 +165,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Telnet / websocket modal-dialog UI deadlock</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr24">24</a></td></tr>
 <tr><td><code>-forgetNetwork</code> startup flag &mdash; ignore the saved connection target for one run and open the connect dialog (scan the network / pick any transport) instead of auto-connecting the remembered host; non-destructive (the saved value is untouched, and re-learned from the controller&rsquo;s <code>$I</code> on the next serial connect)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr66">66</a></td></tr>
 <tr><td>Demo-video capture aids (<code>-demomarker</code>) &mdash; an opt-in timestamped marker log (<code>SESSION_START</code> / <code>RUN_START</code> / <code>RUN_END</code> / <code>TIMELAPSE_ON</code>/<code>OFF</code>) plus a run-bar <em>Timelapse</em> toggle, so a video compositor can sync the app screen-recording to the machine-camera footage and time-compress the long cuts; hidden and near-free when off</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr67">67</a></td></tr>
+<tr><td>OBS auto-record bridge &amp; tool-change cut markers &mdash; with <code>-demomarker</code>, ioSender drives OBS Studio over obs-websocket (auto Start/Stop recording on program load / end, so a shoot needs no manual Record button); <code>RUN_START</code>/<code>RUN_END</code> now bracket the actual cutting, with a tool change emitting <code>RUN_END</code>&hellip;<code>RUN_START</code> around the M6. Plus <code>build.ps1</code> forwards trailing flags to the launched app</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr68">68</a></td></tr>
+<tr><td>Per-Monitor&nbsp;V2 DPI awareness &mdash; the app reads the <em>live</em> per-monitor DPI (like Edge / VS&nbsp;Code) instead of a system-DPI value cached at logon, so it renders at the correct scale regardless of resolution / scale changes and is no longer thrown off by a stale DPI cache; adds <code>-debuglog=dpi</code> diagnostics</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr69">69</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
@@ -325,7 +327,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">65</td><td><a href="#pr65">grbl:Settings premature activation prevented at source</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+19</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">66</td><td><a href="#pr66">Startup flag -forgetNetwork</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+13</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">67</td><td><a href="#pr67">Demo-video capture markers (-demomarker)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+219</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (67 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">525</span> <span class="del">2</span> <span class="add">+97</span><br><span class="k">Lines:</span> <span class="add">+32247</span> <span class="del">-3959</span></td></tr>
+<tr><td class="n">68</td><td><a href="#pr68">OBS auto-record bridge + tool-change cut markers</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+211</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">69</td><td><a href="#pr69">Per-Monitor V2 DPI awareness</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+79</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (69 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">533</span> <span class="del">2</span> <span class="add">+99</span><br><span class="k">Lines:</span> <span class="add">+32537</span> <span class="del">-3962</span></td></tr>
 </table>
 </div>
 
@@ -1867,6 +1871,40 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Timelapse toggle.</strong> A run-bar toggle (shown only under <code>-demomarker</code>, beside the State field) marks the timelapse window live &mdash; flip it as you switch the camera to / from timelapse. Traffic-light coloured: green = off (press to start), red = running (press to stop). Fallbacks if you never flip it: auto-on a few minutes after Cycle Start, forced off at job end.</li>
 <li><strong>Near-free when off:</strong> a single boolean test per call site &mdash; nothing is written and the toggle is collapsed on normal runs.</li>
 </ul><p class="foot">In the integration build. Builds clean (Debug + Release).</p></div>
+</div>
+
+<!-- ===== #68 ===== -->
+<div class="pr">
+<h2 id="pr68"><span class="badge">#68</span>OBS auto-record bridge + tool-change cut markers</h2>
+<table class="files">
+<tr><td class="mono">CNC Core/ObsBridge.cs</td><td class="num add">168</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GrblViewModel.cs</td><td class="num add">13</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">build.ps1</td><td class="num add">13</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>Extends the <a href="#pr67">#67</a> demo facility so a shoot can be hands-off. When armed with <code>-demomarker</code>, ioSender connects to <strong>OBS Studio</strong>&rsquo;s built-in <strong>obs-websocket</strong> server (v5 handshake, optional auth via <code>IOSENDER_OBSWS_PASSWORD</code>, defaults to <code>localhost:4455</code>) and drives recording from job state &mdash; no manual Record button. Reuses the websocket-sharp dependency already in the build; never throws and no-ops if OBS isn&rsquo;t reachable.</p><ul>
+<li><strong>Auto record.</strong> <strong>Program load</strong> &rarr; <code>StartRecord</code>; <strong>program end</strong> (unload) &rarr; <code>StopRecord</code>. The recording spans the whole session (setup, probing, every cut, tool changes), so it doesn&rsquo;t stop between phases.</li>
+<li><strong>Cut markers refined.</strong> <code>RUN_START</code>/<code>RUN_END</code> now mark the <em>actual cutting</em>. Entering the <code>Tool</code> state (an M6 tool change) ends the current cut and leaving it starts the next &mdash; i.e. <code>&hellip;RUN_END &lt;tool-change&gt; RUN_START&hellip;</code> &mdash; so the compositor can treat cutting spans and tool-change gaps differently.</li>
+<li><strong>Launch pass-through.</strong> <code>build.ps1</code> now forwards any trailing tokens to the launched exe, e.g. <code>.\build.ps1 -Launch -demomarker -forgetnetwork</code>.</li>
+</ul><p class="foot">In the integration build. Builds clean (Debug + Release). Camera-agnostic &mdash; drives OBS, so it works with any source (RTSP cams, screen capture). See <code>docs/demo-videos/</code>.</p></div>
+</div>
+
+<!-- ===== #69 ===== -->
+<div class="pr">
+<h2 id="pr69"><span class="badge">#69</span>Per-Monitor&nbsp;V2 DPI awareness</h2>
+<table class="files">
+<tr><td class="mono">ioSender XL/app.manifest</td><td class="num add">33</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">40</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.config</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>ioSender was <strong>System-DPI-aware</strong> (no manifest) &mdash; it used a system-DPI value cached at logon, so a resolution / scale change made in the current session (or a stale per-monitor override) could leave it rendering at the wrong scale until the next sign-out. It is now <strong>Per-Monitor&nbsp;V2</strong> aware, reading the <em>live</em> per-monitor DPI like Edge and VS&nbsp;Code.</p><ul>
+<li><strong>How.</strong> An <code>app.manifest</code> declaring <code>dpiAwareness = PerMonitorV2</code> (referenced from the csproj), plus the WPF <code>Switch.System.Windows.DoNotScaleForDpiChanges=false</code> app-config switch so the visual tree re-scales on a live DPI change.</li>
+<li><strong>Diagnostics.</strong> A <code>-debuglog=dpi</code> trace (see <a href="#pr64">#64</a>) logs the resolved <code>DpiScale</code> / device transform / screen &amp; window metrics at startup and on every <code>DpiChanged</code>, so a &ldquo;wrong size&rdquo; report can be pinned to a scale value in seconds.</li>
+<li><strong>Note.</strong> Interop surfaces (3D carve view, camera) should be spot-checked across a live DPI change; the switch can be flipped back to keep launch-time correctness without live re-scaling if needed.</li>
+</ul><p class="foot">In the integration build. Builds clean (Debug + Release). Verified at 100% / 175% / 300% &mdash; the app tracks the live monitor scale.</p></div>
 </div>
 </section>
 
