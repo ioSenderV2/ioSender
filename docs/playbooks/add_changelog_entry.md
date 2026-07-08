@@ -17,10 +17,24 @@ no dependency counts.
    totals row**, then **bump the totals row** (chg/del/add files + add/del lines + "Totals (N changes)").
 4. **Header count** (`<div class="sub">`) — bump "**N improvements in the `integration` build**".
 
+## Locate the anchors (Overview.html is ~1900 lines — jump straight to them)
+
+```bash
+# The last entry number + all 4 landmark lines at once:
+grep -nE 'id="pr[0-9]+"|improvements in the|class="tot"|<td class="n">[0-9]' Overview.html | tail -6
+# The <h3> groups of the "Features at a glance" table (pick the right one for step 2):
+grep -n '<h3>' Overview.html
+```
+- **Detail section (1):** the last `id="prN"` line is your template block; the new entry goes just
+  before the final `</section>` (right after that block's closing `</div>`).
+- **At-a-glance (2):** insert before the `</table>` that closes your chosen `<h3>` group.
+- **TOC + totals (3):** insert before the `<tr class="tot">` line; edit that same line for the totals.
+- **Header (4):** the `improvements in the` line.
+
 ## Use the last entry as a template
 
-Find the highest existing `#N` (search `id="pr`), copy its detail block + TOC row + at-a-glance row,
-then substitute. This keeps the exact markup current.
+Copy the highest existing entry's detail block + TOC row + at-a-glance row, then substitute. This keeps
+the exact markup current.
 
 ## Numstat convention (TOC row mirrors the DETAIL table, NOT raw git)
 
