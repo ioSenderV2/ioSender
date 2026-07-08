@@ -506,6 +506,9 @@ namespace CNC.Controls
 
             // Drag-reorder order for the sub-tab strips that have no other order authority (Probing/Settings).
             ConfigStore.Register(new OwnedSection<TabOrderConfig>("TabOrder"));
+
+            // App-side library of named machine-coordinate positions ("fixtures"), recalled from the G28 flyout.
+            ConfigStore.Register(new OwnedSection<NamedPositionConfig>("NamedPositions"));
         }
 
         // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).

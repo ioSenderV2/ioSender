@@ -422,6 +422,7 @@ CNC.Controls.WPF.g.pt-BR.resources:machinepositioncontrol.baml,grp_machinePos:Sy
 CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_go:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to offset
 CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_set:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
 CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_set:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store current machine position in this offset
+CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,cbo_fixtures:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Named fixture positions - type a name and Set to save the current position
 CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
 CNC.Controls.WPF.g.pt-BR.resources:offsetflyout.baml,btn_close:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close
 CNC.Controls.WPF.g.pt-BR.resources:panelflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
@@ -970,6 +971,7 @@ CNC.Controls.WPF.g.en-US.resources:mpgpending.baml,btn_mpgDisconnect:System.Wind
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_go:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to offset
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_set:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_set:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store current machine position in this offset
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,cbo_fixtures:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Named fixture positions - type a name and Set to save the current position
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_pin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pin (keep open when another flyout is opened)
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,✕
 CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,btn_close:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close

@@ -104,6 +104,30 @@ namespace CNC.Controls
                 model.ExecuteCommand("G53G0" + cs.ToString(GrblInfo.AxisFlags));
         }
 
+        // Go-to for an EXPLICIT machine target - the named-fixture presets (OffsetFlyout) supply their stored
+        // machine coordinates directly (an app-side library) rather than reading a firmware coordinate slot.
+        // Same Safe Z discipline as SafeGoto; the fallback is a plain coordinated G53 rapid (there is no
+        // firmware code to defer to).
+        public static void SafeGotoMachine(GrblViewModel model, Position target)
+        {
+            if (model == null || target == null)
+                return;
+
+            if (AppConfig.Settings.Base.SafeGotoZ && model.HomedState == HomedState.Homed
+                 && GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1
+                 && GrblInfo.AxisFlags.HasFlag(AxisFlags.Z))
+            {
+                string planar = target.ToString(GrblInfo.AxisFlags & ~AxisFlags.Z);
+                model.ExecuteCommand("G53G0Z0");
+                if (!string.IsNullOrEmpty(planar))
+                    model.ExecuteCommand("G53G0" + planar);
+                model.ExecuteCommand("G53G0" + target.ToString(AxisFlags.Z));
+                return;
+            }
+
+            model.ExecuteCommand("G53G0" + target.ToString(GrblInfo.AxisFlags));
+        }
+
         private void CoordinateSystems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             if(e.NewItems.Count == 1)
