@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>72 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>73 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -258,6 +258,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Opt-in diagnostic trace log &mdash; launch with <code>-debuglog</code> (or <code>IOSENDER_DEBUGLOG</code>) to write a timestamped flow trace to <code>%AppData%\ioSender\ioSender.debug.log</code>; off by default, so <code>DebugLog.Write(&hellip;)</code> call sites can live permanently in the code without a rebuild toggle</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr64">64</a></td></tr>
 <tr><td>Code renamed LoadStock &rarr; Start Job to match the UI throughout (files, classes, <code>ViewType</code>, layout keys, config section)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr54">54</a></td></tr>
 <tr><td>Localization catch-up &mdash; later V2 features (Start Job, probing-redesign dialogs, main-page editor, Tools guidance, &hellip;) were <code>x:Uid</code>&rsquo;d but had no LocBaml rows; every missing string backfilled into all 7 locale CSVs</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr55">55</a></td></tr>
+<tr><td>Playbooks &mdash; the repeatable dev procedures (changelog entry, PDF/manual publish, builds, localization, firmware, demo video) collected into <code>docs/playbooks/</code>, one per file with ready-to-run steps</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr73">73</a></td></tr>
 </table>
 </div>
 
@@ -335,7 +336,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">70</td><td><a href="#pr70">Named G28 fixtures</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+336</span> <span class="del">-3</span></td></tr>
 <tr><td class="n">71</td><td><a href="#pr71">Smoother, faster corner probing</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+30</span> <span class="del">-22</span></td></tr>
 <tr><td class="n">72</td><td><a href="#pr72">Start Job: estimated stock size &amp; Z check</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+47</span> <span class="del">-16</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (72 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">557</span> <span class="del">2</span> <span class="add">+100</span><br><span class="k">Lines:</span> <span class="add">+32950</span> <span class="del">-4003</span></td></tr>
+<tr><td class="n">73</td><td><a href="#pr73">Playbooks: one-stop procedure library</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">0</span> <span class="del">0</span> <span class="add">+14</span><br><span class="k">Lines:</span> <span class="add">+456</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (73 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">557</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33406</span> <span class="del">-4003</span></td></tr>
 </table>
 </div>
 
@@ -1955,6 +1957,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv/ioSender.resources (7 locales)</td><td class="num add">28</td><td class="num del">14</td></tr>
 </table>
 <div class="desc"><p>The Start Job setup fields are relabelled <strong>Est.</strong> (they are an estimate a measure run refines), and a new <strong>Est. thickness (Z)</strong> field is added. Since the probe macros now assume stock &le;&thinsp;1&Prime; (<a href="#pr71">#71</a>), a red warning appears under the field when the Z estimate exceeds 25.4&nbsp;mm &mdash; live and on load. The estimate persists with the other Start Job inputs; it is advisory only.</p></div>
+</div>
+
+<!-- ===== #73 ===== -->
+<div class="pr">
+<h2 id="pr73"><span class="badge">#73</span>Playbooks: one-stop procedure library</h2>
+<table class="files">
+<tr><td class="mono">docs/playbooks/*.md (14 files)</td><td class="num add">456</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The repeatable development procedures &mdash; previously scattered through dev notes &mdash; are collected into a single checked-in <code>docs/playbooks/</code> folder, <strong>one procedure per file</strong>, each with the ordered steps plus a ready-to-run command or copy-paste fragment (substitute the parameters and go). <code>README.md</code> indexes the set.</p><ul><li><strong>Docs &amp; release:</strong> add a changelog entry (the four places to touch + the detail/TOC HTML skeletons), regenerate <code>Overview.pdf</code>, publish the manual site, re-import a manual screenshot, wire a video into the manual.</li><li><strong>Build &amp; ship:</strong> the build/commit/test loop, the headless <code>build.ps1</code>, the Teensy firmware build, the end-of-session wrap-up sequence and conversation-log capture.</li><li><strong>Cross-cutting:</strong> the localization catch-up pass, running <code>gh</code> / the GitHub API on this box, and compositing a demo video.</li></ul><p class="foot">Documentation only &mdash; no code change. Each playbook cites the repo script it drives (<code>build.ps1</code>, <code>tools/locadd.py</code>, <code>docs/manual/publish-pages.ps1</code>, &hellip;) as the authoritative implementation.</p></div>
 </div>
 </section>
 
