@@ -59,16 +59,6 @@ namespace CNC.Controls
             DataContext = prop = new PortProperties();
         }
 
-        // Dock the dialog near the top-centre of the work area (used at startup so it doesn't cover the
-        // centred splash). ActualWidth is settled by Loaded for this SizeToContent window.
-        private void PositionAtTop(object sender, RoutedEventArgs e)
-        {
-            Loaded -= PositionAtTop;
-            var wa = SystemParameters.WorkArea;
-            Left = wa.Left + Math.Max(0, (wa.Width - ActualWidth) / 2);
-            Top = wa.Top + 40;
-        }
-
         private void CbxPorts_DropDownOpened(object sender, System.EventArgs e)
         {
             prop.Com.Refresh();
@@ -119,14 +109,12 @@ namespace CNC.Controls
             else
                 Topmost = true;            // no suitable visible owner - float on top rather than get lost
 
-            // When a Topmost splash is up (startup), don't center over it - dock the dialog to the top of the
-            // work area so the splash/progress in the middle stays visible. The normal (menu) case keeps
+            // At startup the dialog owns to the Topmost splash (above). The splash now docks itself to the top
+            // of the work area, so just center on the SCREEN - it lands in the middle of the display, clear of
+            // the splash, instead of centering over the (top-docked) splash. The normal (menu) case keeps
             // CenterOwner over the main window.
             if (Topmost)
-            {
-                WindowStartupLocation = WindowStartupLocation.Manual;
-                Loaded += PositionAtTop;
-            }
+                WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
             // Network is the default transport: open on the Network tab unless an existing serial/simulator
             // target below selects another. Most grblHAL controllers are networked, and the Scan button lives
