@@ -26,7 +26,8 @@
 ;   #<_corner_z>                THIS corner's stock-top Z (machine) - varies per corner = flatness
 ;   #<_start_z>                 published by the DISCOVER call as the REUSE flag for later corners
 ;
-; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 3 mm thick;
+; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 3 mm AND <= ~25 mm (1 in)
+;   thick - the stock-top probe now starts just above 1 in for speed, so taller stock would be missed;
 ;   Z probes seek to -140 (keep within $132). The DISCOVER reference must have clear air below it
 ;   to the spoilboard (no fence/clamp) and be >= body-radius outside the faces.
 
@@ -62,17 +63,17 @@ O<pcorner> SUB
     G90
     G53 G0 Z0
     G53 G0 X[#<rx>] Y[#<ry>]
-    G53 G1 Z[#5163] F1000           ; controlled descent (~0.25 of rapids) to the stored G28 Z - safer to watch than a rapid plunge
+    G53 G0 Z[#5163]                 ; rapid down to the stored G28 Z (same sequence as the G28 flyout button) - G28 Z sits just above the spoilboard
     ; SAFETY: bound the spoilboard probe to a SHORT reach below the G28 Z start. If the probe fails to trip
     ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
     ; straight into - through - the spoilboard before alarming. Capping the seek to ~12 mm below the start
     ; means a dead probe alarms after a few mm instead. So set the G28 Z reference within ~10 mm above the
     ; spoilboard. G54 was zeroed above, so work Z == machine Z here and #5163 (the G28 machine Z) is the datum.
     G38.2 Z[#5163 - 12] F[#<_ls_searchf>]        ; slow probe to the spoilboard, capped 12 mm below the G28 Z start
-    G91 G0 Z2
+    G91 G1 Z2 F1000
     G38.2 Z-5 F[#<_ls_latchf>]
     #<_z_spoil> = #5063
-    G91 G0 Z10
+    G91 G1 Z10 F1000
     G90
     (PRINT, PC z_spoil=#<_z_spoil>)
   o20 ENDIF
@@ -82,7 +83,7 @@ O<pcorner> SUB
   ; its own Z - the spread across the four corners is the stock/spoilboard flatness.
   G90
   o40 IF [#<sz_in> GE 9000]
-    G53 G0 Z0                       ; first corner: this corner's top not known yet, travel at machine top
+    G53 G0 Z[#<_z_spoil> + 30]      ; first corner: assume stock <= 1in (25.4mm), travel just above the tallest possible top (not machine top) - z_spoil known from the DISCOVER probe above
   o40 ELSE
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
@@ -91,11 +92,11 @@ O<pcorner> SUB
   ; spoilboard Z (#<_z_spoil>, published by the DISCOVER pass that always runs first) rather than seeking a
   ; deep machine target - a dead/mis-wired probe then alarms at the board instead of driving to -140.
   G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]
-  G91 G0 Z2
+  G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
   #<_safe_z> = [#<_z_top> + 20]     ; safe travel height now known: 20 mm above this corner's top
-  G91 G0 Z10
+  G91 G1 Z10 F1000
   G90
   (PRINT, PC z_top=#<_z_top>)
 
@@ -129,10 +130,10 @@ O<pcorner> SUB
   ; (firmware bug - target sign-flips -> false Alarm:2). Current X is #<rx>, so seek to an absolute X.
   G38.2 X[#<rx> + [35 * #<sx>]] F[#<_ls_searchf>]      ; coarse seek toward the X face
   #<x_c1> = #5061
-  G0 X[#<x_c1> - [4 * #<sx>]]                          ; back off so the deflecting ball RELEASES before the slow re-probe
+  G1 X[#<x_c1> - [4 * #<sx>]] F1000                    ; back off so the deflecting ball RELEASES before the slow re-probe (G1: gentle, no rapid-accel jerk)
   G38.2 X[#<x_c1> + [6 * #<sx>]] F[#<_ls_latchf>]      ; slow re-probe (2 mm back-off left it stuck triggered -> Alarm:4; 4 mm clears it)
   #<x_trig> = #5061
-  G0 X[#<x_trig> - [10 * #<sx>]]
+  G1 X[#<x_trig> - [10 * #<sx>]] F1000
   G90
   (PRINT, PC x_trig=#<x_trig>)
 
@@ -144,10 +145,10 @@ O<pcorner> SUB
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
   G38.2 Y[#<ry> + [35 * #<sy>]] F[#<_ls_searchf>]      ; coarse seek toward the Y face
   #<y_c1> = #5062
-  G0 Y[#<y_c1> - [4 * #<sy>]]                          ; back off before the slow re-probe
+  G1 Y[#<y_c1> - [4 * #<sy>]] F1000                    ; back off before the slow re-probe (G1: gentle, no rapid-accel jerk)
   G38.2 Y[#<y_c1> + [6 * #<sy>]] F[#<_ls_latchf>]      ; slow re-probe
   #<y_trig> = #5062
-  G0 Y[#<y_trig> - [10 * #<sy>]]
+  G1 Y[#<y_trig> - [10 * #<sy>]] F1000
   G90
   (PRINT, PC y_trig=#<y_trig>)
 

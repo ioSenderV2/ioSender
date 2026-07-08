@@ -27,6 +27,10 @@
 ;     stock face — Z probe still finds stock top, not spoilboard).
 ;   - Stock is at least 3 mm thick. Below 3 mm the probe ball would be too
 ;     close to spoilboard or to stock top for reliable side-probing.
+;   - Stock is at most ~25 mm (1 in) thick. The stock-top probe now starts
+;     just above 1 in for speed, so taller stock would be missed.
+;   - G28 Z sits within ~12 mm above the spoilboard. The spoilboard probe now
+;     rapids to G28 Z and seeks only 15 mm below it (was a slow seek to -140).
 ;   - Probe on main probe input (pin 15 / PROBE_ENABLE), $6 polarity correct.
 ;
 ; Safe-Z note:
@@ -51,11 +55,14 @@ O<probe_tfl> SUB
   ; or XY offset move.
   (PRINT, M02 at G28, probing spoilboard)
   G90
-  G38.2 Z-140 F500                  ; probe down to -140 (below the spoilboard, within $132)
-  G91 G0 Z2                         ; pull off (relative)
+  G53 G0 Z0                         ; safe Z (top of travel)
+  G53 G0 X[#5161] Y[#5162]          ; rapid to G28 XY (clear air beside the stock)
+  G53 G0 Z[#5163]                   ; rapid down to G28 Z (same sequence as the G28 flyout button)
+  G38.2 Z[#5163 - 15] F500          ; probe to the spoilboard, capped 15mm below G28 Z (G28 Z sits just above it)
+  G91 G1 Z2 F1000                        ; pull off (relative)
   G38.2 Z-5 F25                     ; slow re-touch (relative)
   #<_z_spoil> = #5063
-  G0 Z10                            ; clear (relative)
+  G1 Z10 F1000                           ; clear (relative)
   G90
   (PRINT, M03 _z_spoil=#<_z_spoil>)
 
@@ -63,17 +70,17 @@ O<probe_tfl> SUB
   ; G28 is 10-20mm outside the stock face (per preconditions), so a +30mm
   ; offset lands at least 10mm IN from the stock corner — reliably over
   ; stock, not beside it.
-  G53 G0 Z-5
+  G53 G0 Z[#<_z_spoil> + 30]        ; assume stock <= 1in (25.4mm): travel just above the tallest possible top (not machine top)
   G53 G0 X[#5161 + 30] Y[#5162 + 30]
   (PRINT, M04 over stock corner area)
 
   ; --- Probe Z down to find stock top ---
   G90
-  G38.2 Z-140 F500                  ; probe down to -140 (below the spoilboard, within $132)
-  G91 G0 Z2                         ; pull off
+  G38.2 Z[#<_z_spoil> - 2] F500     ; probe the stock top, capped just below the discovered spoilboard
+  G91 G1 Z2 F1000                        ; pull off
   G38.2 Z-5 F25                     ; slow re-touch
   #<z_trig> = #5063
-  G0 Z10
+  G1 Z10 F1000
   G90
   (PRINT, M05 stock top z_trig=#<z_trig>, thickness=[#<z_trig> - #<_z_spoil>])
 
@@ -104,10 +111,10 @@ O<probe_tfl> SUB
   ; X probe (left face) — at G28.X + 5, the seek covers x_offset − 5 mm,
   ; i.e. up to 30mm distance handles x_offset values up to 35mm.
   G91 G38.2 X30 F500
-  G0 X-2
+  G1 X-2 F1000
   G38.2 X5 F25
   #<x_trig> = #5061
-  G0 X-10
+  G1 X-10 F1000
   G90
   (PRINT, M08 x_trig=#<x_trig>)
 
@@ -123,10 +130,10 @@ O<probe_tfl> SUB
   ; Y probe (front face) — at G28.Y + 5, the seek covers y_offset − 5 mm,
   ; i.e. up to 30mm distance handles y_offset values up to 35mm.
   G91 G38.2 Y30 F500
-  G0 Y-2
+  G1 Y-2 F1000
   G38.2 Y5 F25
   #<y_trig> = #5062
-  G0 Y-10
+  G1 Y-10 F1000
   G90
   (PRINT, M09 y_trig=#<y_trig>)
 
