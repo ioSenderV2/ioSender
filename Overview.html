@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>66 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>72 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -188,6 +188,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Stepper calibration (scratch) tab &mdash; long-span V-bit steps/mm</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr5">5</a></td></tr>
 <tr><td>Safe-Z on Go To &mdash; lift / traverse / descend instead of a diagonal rapid</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr23">23</a></td></tr>
 <tr><td>Editable G28/G30 predefined offsets (Set rapids to target, then stores)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr26">26</a></td></tr>
+<tr><td>Named G28 fixtures &mdash; a saved library of named machine positions in the G28 flyout (Set stores where you are, Go rapids back with Safe-Z); for recurring jigs &amp; vices</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr70">70</a></td></tr>
 <tr><td>Machine Setup restructure &mdash; Settings split (Grbl/App), new Tools tab, guided step-tabs + startup gate</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr28">28</a></td></tr>
 <tr><td>Settings redesign &mdash; flat tab strip, free-text <code>$</code>-setting search (with match nav), grbl-settings autosave, dialog editors folded in as tabs</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr42">42</a></td></tr>
 <tr><td>Per-user config folder + standalone <code>.xml</code> folded into <code>App.config</code> sections (<code>ConfigPanel&lt;T&gt;</code> wizards, curated defaults); console output search + font size, shared reset footer, bindable ResetAndUnlock</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr43">43</a></td></tr>
@@ -210,6 +211,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Start Job tab no longer strands + program view stays a right column &mdash; a probe/hold that didn&rsquo;t cleanly clear could leave a gated tab disabled with no way back; the generated program overlay no longer grows to cover the whole tab</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr57">57</a></td></tr>
 <tr><td>Probing &amp; Tools sub-tabs share one look &mdash; instructions on the ambient grey, results in a white panel, consistent across the four Probing tabs and Stepper calibration</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr62">62</a></td></tr>
 <tr><td>Check mode (<code>$C</code>) moved off the status bar to a checkable <strong>Cycle Start</strong> right-click item &mdash; a dry-run / validate toggle now sits with the button that starts a run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr63">63</a></td></tr>
+<tr><td>Smoother, faster corner probing &mdash; post-trigger back-offs are gentle feeds (no rapid-accel table shudder) and the Z probes assume &le;&thinsp;1&Prime; stock for a much shorter seek</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr71">71</a></td></tr>
+<tr><td>Start Job estimated stock size &mdash; setup fields relabelled <em>Est.</em> plus a new <em>Est. thickness (Z)</em> field that warns when stock exceeds 1&Prime;</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr72">72</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -329,7 +332,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">67</td><td><a href="#pr67">Demo-video capture markers (-demomarker)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+219</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">68</td><td><a href="#pr68">OBS auto-record bridge + tool-change cut markers</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+211</span> <span class="del">-3</span></td></tr>
 <tr><td class="n">69</td><td><a href="#pr69">Per-Monitor V2 DPI awareness</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+79</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (69 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">533</span> <span class="del">2</span> <span class="add">+99</span><br><span class="k">Lines:</span> <span class="add">+32537</span> <span class="del">-3962</span></td></tr>
+<tr><td class="n">70</td><td><a href="#pr70">Named G28 fixtures</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+336</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">71</td><td><a href="#pr71">Smoother, faster corner probing</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+30</span> <span class="del">-22</span></td></tr>
+<tr><td class="n">72</td><td><a href="#pr72">Start Job: estimated stock size &amp; Z check</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+47</span> <span class="del">-16</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (72 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">557</span> <span class="del">2</span> <span class="add">+100</span><br><span class="k">Lines:</span> <span class="add">+32950</span> <span class="del">-4003</span></td></tr>
 </table>
 </div>
 
@@ -1905,6 +1911,50 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <li><strong>Diagnostics.</strong> A <code>-debuglog=dpi</code> trace (see <a href="#pr64">#64</a>) logs the resolved <code>DpiScale</code> / device transform / screen &amp; window metrics at startup and on every <code>DpiChanged</code>, so a &ldquo;wrong size&rdquo; report can be pinned to a scale value in seconds.</li>
 <li><strong>Note.</strong> Interop surfaces (3D carve view, camera) should be spot-checked across a live DPI change; the switch can be flipped back to keep launch-time correctness without live re-scaling if needed.</li>
 </ul><p class="foot">In the integration build. Builds clean (Debug + Release). Verified at 100% / 175% / 300% &mdash; the app tracks the live monitor scale.</p></div>
+</div>
+
+<!-- ===== #70 ===== -->
+<div class="pr">
+<h2 id="pr70"><span class="badge">#70</span>Named G28 fixtures</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/NamedPositionConfig.cs</td><td class="num add">77</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">215</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/GotoBaseControl.xaml.cs</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OffsetFlyout.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv/CNC.Controls.WPF (7 locales)</td><td class="num add">13</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A saved library of <strong>named machine-coordinate positions</strong> (&ldquo;fixtures&rdquo;) recalled from the <strong>G28</strong> sidebar flyout &mdash; for recurring jigs like a 90&deg; sheet-goods fence origin or a machinist-vice corner. grblHAL stores only a single G28 slot, so the library lives app-side (in machine coordinates) and never clobbers it.</p><ul>
+<li><strong>In the flyout.</strong> An editable, alphabetically-sorted name dropdown sits left of the <em>Go</em> button (G30 / G59.3 flyouts are unchanged &mdash; those are deliberate out-of-envelope park spots, not fixtures). <strong>Set</strong> stores the current machine position under the box&rsquo;s name; <strong>Go</strong> rapids to the selected fixture with the same Safe-Z lift as the G28 button (a new <code>GotoBaseControl.SafeGotoMachine</code>, app-side <code>G53</code>), falling back to the firmware G28 when no fixture is named.</li>
+<li><strong>Position-aware.</strong> On focus the box reconciles the name to where the machine actually is &mdash; the matching fixture, else the next <code>Fixture-N</code> default &mdash; so Set saves the right thing without hunting.</li>
+<li><strong>One name per position.</strong> Set renames / dedupes / updates in place, and duplicates left by earlier sessions self-heal on launch (keeping your custom name over an auto <code>Fixture-N</code>).</li>
+</ul><p class="foot">In the integration build. Builds clean (Debug + Release). Hardware-verified. Loc: <code>cbo_fixtures</code> tooltip in all 7 CNC.Controls.WPF CSVs.</p></div>
+</div>
+
+<!-- ===== #71 ===== -->
+<div class="pr">
+<h2 id="pr71"><span class="badge">#71</span>Smoother, faster corner probing</h2>
+<table class="files">
+<tr><td class="mono">macros/probe_tfl.macro</td><td class="num add">18</td><td class="num del">11</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">12</td><td class="num del">11</td></tr>
+</table>
+<div class="desc"><p>Two refinements to the Start Job corner-probe macros (<code>probe_tfl</code> / <code>pcorner</code>).</p><ul>
+<li><strong>No more table shudder.</strong> Every post-trigger move &mdash; the pull-off between the coarse and latch probes, and the retract after the latch &mdash; was a <code>G0</code>, so it ran at max rapid <em>acceleration</em>: a violent jerk on a 4&ndash;10&nbsp;mm move that shook the whole gantry. They are now <code>G1 F1000</code>: identical distance and accuracy (the measurement is the slow <code>G38.2</code> latch), but a bounded peak velocity so the ramp is gentle.</li>
+<li><strong>&le;&thinsp;1&Prime; stock optimization.</strong> The spoilboard probe now rapids straight down to the stored G28 Z (the same sequence as the G28 flyout button) and seeks only a short capped distance; the stock-top probe starts just above the tallest possible 1&Prime; top instead of machine-top, cutting its seek from ~100&nbsp;mm to ~32&nbsp;mm. Documented as preconditions: stock &le; ~25&nbsp;mm and G28 Z set just above the spoilboard.</li>
+</ul><p class="foot">In the integration build. Hardware-verified (&ldquo;smooth as silk&rdquo;). On-controller macros &mdash; re-uploaded to littlefs by Start Job&rsquo;s checksum provisioning.</p></div>
+</div>
+
+<!-- ===== #72 ===== -->
+<div class="pr">
+<h2 id="pr72"><span class="badge">#72</span>Start Job: estimated stock size &amp; Z-thickness check</h2>
+<table class="files">
+<tr><td class="mono">ioSender XL/StartJobView.xaml.cs</td><td class="num add">13</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/StartJobView.xaml</td><td class="num add">5</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/StartJobConfig.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv/ioSender.resources (7 locales)</td><td class="num add">28</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>The Start Job setup fields are relabelled <strong>Est.</strong> (they are an estimate a measure run refines), and a new <strong>Est. thickness (Z)</strong> field is added. Since the probe macros now assume stock &le;&thinsp;1&Prime; (<a href="#pr71">#71</a>), a red warning appears under the field when the Z estimate exceeds 25.4&nbsp;mm &mdash; live and on load. The estimate persists with the other Start Job inputs; it is advisory only.</p></div>
 </div>
 </section>
 
