@@ -78,7 +78,7 @@
             </TabItem>
 
             <!-- 1. Machine -->
-            <TabItem x:Name="tabStepMachine">
+            <TabItem x:Uid="tabstep_machine" x:Name="tabStepMachine">
                 <TabItem.Header><TextBlock x:Uid="step_machine" x:Name="hdrMachine" Text="1 · Machine"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -104,7 +104,7 @@
             </TabItem>
 
             <!-- 2. Home position -->
-            <TabItem x:Name="tabStepHome">
+            <TabItem x:Uid="tabstep_home" x:Name="tabStepHome">
                 <TabItem.Header><TextBlock x:Uid="step_homePos" x:Name="hdrHome" Text="2 · Home position"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -132,7 +132,7 @@
             </TabItem>
 
             <!-- 3. Axis information -->
-            <TabItem x:Name="tabStepAxis">
+            <TabItem x:Uid="tabstep_axis" x:Name="tabStepAxis">
                 <TabItem.Header><TextBlock x:Uid="step_axis" x:Name="hdrAxis" Text="3 · Axis information"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -196,7 +196,7 @@
             </TabItem>
 
             <!-- 4. Homing & limits -->
-            <TabItem x:Name="tabStepHoming">
+            <TabItem x:Uid="tabstep_homing" x:Name="tabStepHoming">
                 <TabItem.Header><TextBlock x:Uid="step_homing" x:Name="hdrHoming" Text="4 · Homing &amp; limits"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="10">
@@ -268,7 +268,7 @@
             </TabItem>
 
             <!-- 5. Probe definitions (probes are machine hardware) -->
-            <TabItem x:Name="tabStepProbes">
+            <TabItem x:Uid="tabstep_probes" x:Name="tabStepProbes">
                 <TabItem.Header><TextBlock x:Uid="step_probes" x:Name="hdrProbes" Text="5 · Probe definitions"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -304,7 +304,7 @@
             </TabItem>
 
             <!-- 6. Controller macros (ATC tool-change set + Load Stock corner probe) -->
-            <TabItem x:Name="tabStepMacros">
+            <TabItem x:Uid="tabstep_macros" x:Name="tabStepMacros">
                 <TabItem.Header><TextBlock x:Uid="step_ctrlMacros" x:Name="hdrMacros" Text="6 · Controller macros"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
