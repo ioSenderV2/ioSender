@@ -82,7 +82,7 @@ namespace CNC.Controls.Probing
 
             if (probing.ProbeEdge == Edge.None)
             {
-                MessageBox.Show((string)FindResource("SelectType"), "Edge finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show((string)FindResource("SelectType"), "Edge finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -188,7 +188,7 @@ namespace CNC.Controls.Probing
 
             axisflags = AxisFlags.X | AxisFlags.Y;
 
-            if (XYClearance > probing.Offset && MessageBox.Show(((string)FindResource("OffsetWarning")).Replace("\\n", "\n"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+            if (XYClearance > probing.Offset && AppDialogs.Show(((string)FindResource("OffsetWarning")).Replace("\\n", "\n"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
                 return false;
 
             XYClearance = Math.Min(XYClearance, probing.Offset);

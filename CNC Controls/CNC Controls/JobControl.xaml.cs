@@ -413,12 +413,12 @@ namespace CNC.Controls
                             if (Source.ToolChanges > 0)
                             {
                                 if (!GrblSettings.HasSetting(grblHALSetting.ToolChangeMode))
-                                    MessageBox.Show(string.Format((string)FindResource("JobToolChanges"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    AppDialogs.Show(string.Format((string)FindResource("JobToolChanges"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                                 else if (GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) > 0 && !model.IsTloReferenceSet)
-                                    MessageBox.Show(string.Format((string)FindResource("JobToolReference"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    AppDialogs.Show(string.Format((string)FindResource("JobToolReference"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                             }
                             if (Source.HasGoPredefinedPosition && (sender as GrblViewModel).IsGrblHAL && (sender as GrblViewModel).HomedState != HomedState.Homed)
-                                MessageBox.Show((string)FindResource("JobG28G30"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                AppDialogs.Show((string)FindResource("JobG28G30"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                             streamingHandler.Call(Source.IsLoaded ? StreamingState.Idle : StreamingState.NoFile, false);
                         }
                     }

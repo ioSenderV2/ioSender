@@ -43,6 +43,7 @@ using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
 
+using CNC.Core;
 namespace CNC.Controls.Probing
 {
     [Serializable]
@@ -148,7 +149,7 @@ namespace CNC.Controls.Probing
             }
             catch (Exception e)
             {
-                System.Windows.MessageBox.Show(e.Message, "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Exclamation);
+                AppDialogs.Show(e.Message, "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Exclamation);
             }
         }
 

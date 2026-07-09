@@ -83,7 +83,7 @@ namespace CNC.Controls.Probing
 
             if (probing.ProbeFixture && !probing.Grbl.AxisHomed.Value.HasFlag(AxisFlags.X | AxisFlags.Y | AxisFlags.Z))
             {
-                MessageBox.Show((string)FindResource("InitFailed"), "Probing");
+                AppDialogs.Show((string)FindResource("InitFailed"), "Probing");
                 return;
             }
 

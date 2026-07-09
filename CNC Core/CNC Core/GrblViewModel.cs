@@ -378,7 +378,7 @@ namespace CNC.Core
                             // previous prompt-to-continue behaviour.
                             if (parser.ExpressionsSupported)
                                 commands[i] = original;
-                            else if (!(ok = System.Windows.MessageBox.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, i + 1, original), "ioSender", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.Yes))
+                            else if (!(ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, i + 1, original), "ioSender", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.Yes))
                                 break;
                         }
                     }

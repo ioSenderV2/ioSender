@@ -212,9 +212,9 @@ namespace CNC.Controls
                 if (needsMove)
                 {
                     string axes = newpos.ToString(flags);
-                    if (MessageBox.Show(
+                    if (AppDialogs.Show(
                             string.Format("This will rapid the machine to {0} (G53 G0) and store that as {1}.\n\nProceed?", axes, selectedOffset.Code),
-                            "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                            "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning, id: "offset.setPredefined") != MessageBoxResult.Yes)
                         return;
                     if (mChanged)
                         Comms.com.WriteCommand(cmd);

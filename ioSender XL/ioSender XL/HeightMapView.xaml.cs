@@ -219,7 +219,7 @@ namespace GCode_Sender
             }
             catch (Exception ex)
             {
-                MessageBox.Show(Loc("HmStartError") + "\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppDialogs.Show(Loc("HmStartError") + "\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -229,14 +229,14 @@ namespace GCode_Sender
                 model = DataContext as GrblViewModel ?? CNC.Core.Grbl.GrblViewModel;
             if (model == null)
             {
-                MessageBox.Show(Loc("HmNoController"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("HmNoController"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
             {
-                MessageBox.Show(Loc("HmSelectProbe"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("HmSelectProbe"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -271,18 +271,18 @@ namespace GCode_Sender
 
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
             {
-                MessageBox.Show(string.Format(Loc("HmNotIdle"), model.GrblState.State),
+                AppDialogs.Show(string.Format(Loc("HmNotIdle"), model.GrblState.State),
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!pr.VerifyProbe())
             {
-                MessageBox.Show(Loc("HmProbeNotReady"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("HmProbeNotReady"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!pr.Program.Init())
             {
-                MessageBox.Show(string.IsNullOrEmpty(pr.Message) ? Loc("HmInitFailed") : pr.Message,
+                AppDialogs.Show(string.IsNullOrEmpty(pr.Message) ? Loc("HmInitFailed") : pr.Message,
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
@@ -295,7 +295,7 @@ namespace GCode_Sender
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             pr.HeightMap.Map = map;
@@ -349,7 +349,7 @@ namespace GCode_Sender
             // cleared by a late probe-release event after the final point. Report clearly either way.
             if (pr.Positions.Count != map.TotalPoints)
             {
-                MessageBox.Show(string.Format(Loc("HmCaptureShort"),
+                AppDialogs.Show(string.Format(Loc("HmCaptureShort"),
                     pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message),
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -382,7 +382,7 @@ namespace GCode_Sender
                 return;
             if (!model.IsFileLoaded)
             {
-                MessageBox.Show(Loc("HmApplyNeedsJob"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("HmApplyNeedsJob"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -394,7 +394,7 @@ namespace GCode_Sender
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
         }

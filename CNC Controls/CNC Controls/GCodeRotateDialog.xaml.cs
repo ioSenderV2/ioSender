@@ -153,7 +153,7 @@ namespace CNC.Controls
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show(e.Message, "GCode Rotate", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(e.Message, "GCode Rotate", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
         }

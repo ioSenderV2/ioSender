@@ -121,7 +121,7 @@ namespace CNC.Controls.Probing
 
             if (probing.ProbeEdge == Edge.None)
             {
-                MessageBox.Show((string)FindResource("SelectType"), "Rotation", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show((string)FindResource("SelectType"), "Rotation", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -427,7 +427,7 @@ namespace CNC.Controls.Probing
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "GCode Rotate", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(ex.Message, "GCode Rotate", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
         }

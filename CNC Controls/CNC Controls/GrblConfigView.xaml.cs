@@ -142,7 +142,7 @@ namespace CNC.Controls
                 // A restart-only change was made and not yet applied - offer to restart now on the way out of the
                 // Settings area (the flashing Restart button otherwise just persists until the next visit).
                 if (RestartPending &&
-                    MessageBox.Show("Some changes you made only take effect after a restart. Restart ioSender now?",
+                    AppDialogs.Show("Some changes you made only take effect after a restart. Restart ioSender now?",
                                     "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                     DoRestart();
             }
@@ -572,7 +572,7 @@ namespace CNC.Controls
                 if (changes.Count > 0)
                 {
                     var msg = "Save these setting changes?\n\n" + string.Join("\n", changes);
-                    if (MessageBox.Show(msg, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    if (AppDialogs.Show(msg, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                     {
                         AppConfig.Settings.Save();
                         settingsSnapshot = SerializeConfig(cfg);

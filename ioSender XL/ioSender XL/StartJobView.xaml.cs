@@ -541,7 +541,7 @@ namespace GCode_Sender
             var p = ThreeDProbe();
             if (p == null)
             {
-                MessageBox.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
+                AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
                     "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
@@ -657,13 +657,13 @@ namespace GCode_Sender
             var p = ThreeDProbe();
             if (p == null)
             {
-                MessageBox.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
+                AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
                     "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!(Has(1) && Has(2) && Has(3) && Has(4)))
             {
-                MessageBox.Show("Measure the stock first - all four corners must be probed before the skew can be verified.",
+                AppDialogs.Show("Measure the stock first - all four corners must be probed before the skew can be verified.",
                     "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }

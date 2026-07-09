@@ -117,7 +117,7 @@ namespace CNC.Controls.Probing
 
                 if (!ok)
                 {
-                    MessageBox.Show(LibStrings.FindResource("IllegalPosition"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(LibStrings.FindResource("IllegalPosition"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     probing.RemoveLastPosition();
                 } else
                     probing.CanApplyTransform = probing.CameraPositions == (mode == FindMode.XY ? 4 : 2);
@@ -130,7 +130,7 @@ namespace CNC.Controls.Probing
 
             if (probing.ProbeCenter == Center.None)
             {
-                MessageBox.Show((string)FindResource("SelectType"), "Center finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show((string)FindResource("SelectType"), "Center finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return false;
             }
 
@@ -447,7 +447,7 @@ namespace CNC.Controls.Probing
 
             if (probing.ProbeCenter == Center.None)
             {
-                MessageBox.Show((string)FindResource("SelectType"), "Center finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show((string)FindResource("SelectType"), "Center finder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 

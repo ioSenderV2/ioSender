@@ -99,7 +99,7 @@ namespace CNC.Converters
             }
             catch (System.Exception e)
             {
-                MessageBox.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
 
             return ok;

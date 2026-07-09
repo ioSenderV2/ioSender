@@ -85,7 +85,7 @@ namespace CNC.Controls.Lathe
         private void Model_ErrorsChanged(object sender, System.ComponentModel.DataErrorsChangedEventArgs e)
         {
             if(e.PropertyName == "")
-                MessageBox.Show(e.PropertyName, string.Join(",", (List<string>)logic.Model.GetErrors(e.PropertyName)));
+                AppDialogs.Show(e.PropertyName, string.Join(",", (List<string>)logic.Model.GetErrors(e.PropertyName)));
         }
 
         private void ThreadingWizard_Loaded(object sender, RoutedEventArgs e)

@@ -160,7 +160,7 @@ namespace CNC.Controls
 
                         if (!prompt)
                             GrblSettings.Save();
-                        else if (MessageBox.Show((string)FindResource("SaveSettings"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+                        else if (AppDialogs.Show((string)FindResource("SaveSettings"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
                             GrblSettings.Save();
                     }
                 }
@@ -208,7 +208,7 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            if (MessageBox.Show((string)FindResource("ResetGrblDefaults"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation, MessageBoxResult.No) != MessageBoxResult.Yes)
+            if (AppDialogs.Show((string)FindResource("ResetGrblDefaults"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
 
             using (new UIUtils.WaitCursor())
@@ -295,10 +295,10 @@ namespace CNC.Controls
 
                 var details = GrblSettings.Get((GrblSetting)setting.Key);
 
-                if (MessageBox.Show(string.Format((string)FindResource("SettingsError"), scmd, retval), "ioSender" + (details == null ? "" : " - " + details.Name), MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                if (AppDialogs.Show(string.Format((string)FindResource("SettingsError"), scmd, retval), "ioSender" + (details == null ? "" : " - " + details.Name), MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
                     return false;
             }
-            else if (res == false && MessageBox.Show(string.Format((string)FindResource("SettingsTimeout"), scmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+            else if (res == false && AppDialogs.Show(string.Format((string)FindResource("SettingsTimeout"), scmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
                 return false;
 
             return true;
@@ -334,7 +334,7 @@ namespace CNC.Controls
                 }
                 catch (Exception e)
                 {
-                    if (MessageBox.Show(((string)FindResource("SettingsFail")).Replace("\\n", "\r\r"), e.Message, MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                    if (AppDialogs.Show(((string)FindResource("SettingsFail")).Replace("\\n", "\r\r"), e.Message, MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                         block = sr.ReadLine();
                     else
                     {
@@ -348,7 +348,7 @@ namespace CNC.Controls
             sr.Close();
 
             if (settings.Count == 0)
-                MessageBox.Show((string)FindResource("SettingsInvalid"));
+                AppDialogs.Show((string)FindResource("SettingsInvalid"));
             else
             {
                 bool? res = null;
@@ -377,10 +377,10 @@ namespace CNC.Controls
 
                     if (retval != string.Empty)
                     {
-                        if (MessageBox.Show(string.Format((string)FindResource("SettingsError"), cmd, retval), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                        if (AppDialogs.Show(string.Format((string)FindResource("SettingsError"), cmd, retval), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
                             break;
                     }
-                    else if (res == false && MessageBox.Show(string.Format((string)FindResource("SettingsTimeout"), cmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                    else if (res == false && AppDialogs.Show(string.Format((string)FindResource("SettingsTimeout"), cmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
                         break;
                 }
 
@@ -429,7 +429,7 @@ namespace CNC.Controls
             model.Message = string.Empty;
 
             if (mismatch > 0)
-                MessageBox.Show(string.Format((string)FindResource("SettingsReloadMismatch"), mismatch), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(string.Format((string)FindResource("SettingsReloadMismatch"), mismatch), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 
             return settings.Count > 0;
         }

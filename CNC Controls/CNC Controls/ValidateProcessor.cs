@@ -89,7 +89,7 @@ namespace CNC.Controls
             string reason = NotReady(model);
             if (reason != null)
             {
-                MessageBox.Show(reason, "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show(reason, "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
 
@@ -97,14 +97,14 @@ namespace CNC.Controls
             // (G28/G30/G53) are accurate - offer to home now (the user's machine, so always ask).
             if (model.IsHomingEnabled && model.HomedState != HomedState.Homed)
             {
-                var ans = MessageBox.Show(
+                var ans = AppDialogs.Show(
                     "The machine is not homed.\r\n\r\nValidation needs it homed so position-dependent commands (G28/G30/G53) are tested accurately. Home the machine now and continue?",
                     "Validate controller", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (ans != MessageBoxResult.Yes)
                     return false;
                 if (!HomeMachine(model))
                 {
-                    MessageBox.Show(LibStrings.FindResource("ValHomingCancelled"), "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    AppDialogs.Show(LibStrings.FindResource("ValHomingCancelled"), "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
             }
@@ -130,13 +130,13 @@ namespace CNC.Controls
             try
             {
                 if (!EnterCheckMode(model))
-                    MessageBox.Show(LibStrings.FindResource("ValNoCheckMode"),
+                    AppDialogs.Show(LibStrings.FindResource("ValNoCheckMode"),
                         "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                 else
                 {
                     enteredCheck = true;
                     if (!ApplyPrefix(model))
-                        MessageBox.Show(LibStrings.FindResource("ValSetupRejected"),
+                        AppDialogs.Show(LibStrings.FindResource("ValSetupRejected"),
                             "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
                     else
                     {

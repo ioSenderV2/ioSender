@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
+using CNC.Core;
 namespace CNC.Controls
 {
     public partial class ProbeDefinitionsDialog : Window
@@ -82,7 +83,7 @@ namespace CNC.Controls
         private void btnDelete_Click(object sender, RoutedEventArgs e)
         {
             var sel = Selected;
-            if (sel != null && MessageBox.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
+            if (sel != null && AppDialogs.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
                                                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
                 items.Remove(sel);

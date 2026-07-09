@@ -872,8 +872,8 @@ namespace CNC.Controls
         private void ProbeDelete_Click(object sender, RoutedEventArgs e)
         {
             var sel = grdProbes.SelectedItem as ProbeDefinition;
-            if (sel != null && MessageBox.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
-                                               MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (sel != null && AppDialogs.Show(string.Format("Delete probe \"{0}\"?", sel.Name), "Probe definitions",
+                                               MessageBoxButton.YesNo, MessageBoxImage.Question, id: "probe.delete") == MessageBoxResult.Yes)
             {
                 ProbeDefinitions.Items.Remove(sel);
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);
@@ -920,7 +920,7 @@ namespace CNC.Controls
                 RefreshMacroStatus();
             }
             else
-                MessageBox.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
@@ -1018,7 +1018,7 @@ namespace CNC.Controls
                 string detail = failures.Count > 0
                     ? "The controller rejected these settings:\n\n" + string.Join("\n", failures)
                     : "The controller rejected the settings write (no specific error was reported).";
-                MessageBox.Show(detail, "Machine setup - settings rejected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show(detail, "Machine setup - settings rejected", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
             UpdateApplyState();   // reflect the post-write state (cleared on success, still pending on failure)

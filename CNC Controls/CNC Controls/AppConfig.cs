@@ -776,7 +776,7 @@ namespace CNC.Controls
             catch (Exception e)
             {
                 try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* leave the temp for inspection */ }
-                MessageBox.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
 
             return ok;
@@ -1102,7 +1102,7 @@ namespace CNC.Controls
                         if(Path.IsPathRooted(path) && Directory.Exists(path))
                             Resources.ConfigPath = path + (path.EndsWith("\\") ? string.Empty : "\\");
                         else
-                            MessageBox.Show("Invalid -configpath argument", "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                            AppDialogs.Show("Invalid -configpath argument", "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                         break;
 
                     case "-locale":
@@ -1161,7 +1161,7 @@ namespace CNC.Controls
 
             if (!Load(CNC.Core.Resources.IniFile))
             {
-                if (MessageBox.Show(LibStrings.FindResource("CreateConfig"), appname, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                if (AppDialogs.Show(LibStrings.FindResource("CreateConfig"), appname, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     // Never silently destroy an existing non-empty config: if Load failed but a file is
                     // present (a transient lock that outlasted the retries, or genuine corruption), copy
@@ -1176,7 +1176,7 @@ namespace CNC.Controls
 
                     if (!Save(CNC.Core.Resources.IniFile))
                     {
-                        MessageBox.Show(LibStrings.FindResource("CreateConfigFail"), appname);
+                        AppDialogs.Show(LibStrings.FindResource("CreateConfigFail"), appname);
                         status = 1;
                     }
                 }
@@ -1504,7 +1504,7 @@ namespace CNC.Controls
             }
             else if (status != 2)
             {
-                MessageBox.Show(string.Format(LibStrings.FindResource("ConnectFailed"), Base.PortParams), appname, MessageBoxButton.OK, MessageBoxImage.Error);
+                AppDialogs.Show(string.Format(LibStrings.FindResource("ConnectFailed"), Base.PortParams), appname, MessageBoxButton.OK, MessageBoxImage.Error);
                 status = 2;
             }
 
@@ -1561,12 +1561,12 @@ namespace CNC.Controls
                                     {
                                         if (model.LimitTriggered)
                                         {
-                                            MessageBox.Show(string.Format(LibStrings.FindResource("MsgNoCommAlarm"), model.GrblState.Substate.ToString()), "ioSender");
+                                            AppDialogs.Show(string.Format(LibStrings.FindResource("MsgNoCommAlarm"), model.GrblState.Substate.ToString()), "ioSender");
                                             if (AttemptReset())
                                                 model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
                                             else
                                             {
-                                                MessageBox.Show(LibStrings.FindResource("MsgResetFailed"), "ioSender");
+                                                AppDialogs.Show(LibStrings.FindResource("MsgResetFailed"), "ioSender");
                                                 return RestartResult.Close;
                                             }
                                         }
@@ -1580,12 +1580,12 @@ namespace CNC.Controls
                                 case 2: // Soft limits
                                     if (!GrblInfo.IsLoaded)
                                     {
-                                        MessageBox.Show(string.Format(LibStrings.FindResource("MsgNoCommAlarm"), model.GrblState.Substate.ToString()), "ioSender");
+                                        AppDialogs.Show(string.Format(LibStrings.FindResource("MsgNoCommAlarm"), model.GrblState.Substate.ToString()), "ioSender");
                                         if (AttemptReset())
                                             model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
                                         else
                                         {
-                                            MessageBox.Show(LibStrings.FindResource("MsgResetFailed"), "ioSender");
+                                            AppDialogs.Show(LibStrings.FindResource("MsgResetFailed"), "ioSender");
                                             return RestartResult.Close;
                                         }
                                     }
@@ -1596,10 +1596,10 @@ namespace CNC.Controls
                                 case 10: // EStop
                                     if (GrblInfo.IsGrblHAL && model.Signals.Value.HasFlag(Signals.EStop))
                                     {
-                                        MessageBox.Show(LibStrings.FindResource("MsgEStop"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                        AppDialogs.Show(LibStrings.FindResource("MsgEStop"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                                         while (!AttemptReset() && model.GrblState.State == GrblStates.Alarm)
                                         {
-                                            if (MessageBox.Show(LibStrings.FindResource("MsgEStopExit"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                                            if (AppDialogs.Show(LibStrings.FindResource("MsgEStopExit"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                                                 return RestartResult.Close;
                                         }
                                     }
@@ -1636,7 +1636,7 @@ namespace CNC.Controls
                         case GrblStates.Door:
                             if (!GrblInfo.IsLoaded)
                             {
-                                if (MessageBox.Show(LibStrings.FindResource("MsgDoorOpen"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                                if (AppDialogs.Show(LibStrings.FindResource("MsgDoorOpen"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                                     return RestartResult.Close;
                                 else
                                 {
@@ -1663,7 +1663,7 @@ namespace CNC.Controls
 
                                         if (!(exit = !model.Signals.Value.HasFlag(Signals.SafetyDoor)))
                                         {
-                                            if (MessageBox.Show(LibStrings.FindResource("MsgDoorExit"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                                            if (AppDialogs.Show(LibStrings.FindResource("MsgDoorExit"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                                             {
                                                 exit = true;
                                                 return RestartResult.Close;
@@ -1676,19 +1676,19 @@ namespace CNC.Controls
                             }
                             else
                             {
-                                MessageBox.Show(LibStrings.FindResource("MsgDoorPersist"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                                AppDialogs.Show(LibStrings.FindResource("MsgDoorPersist"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                                 response = string.Empty;
                             }
                             break;
 
                         case GrblStates.Hold:
                         case GrblStates.Sleep:
-                            if (MessageBox.Show(string.Format(LibStrings.FindResource("MsgNoComm"), model.GrblState.State.ToString()),
+                            if (AppDialogs.Show(string.Format(LibStrings.FindResource("MsgNoComm"), model.GrblState.State.ToString()),
                                                     "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                                 return RestartResult.Close;
                             else if (!AttemptReset())
                             {
-                                MessageBox.Show(LibStrings.FindResource("MsgResetExit"), "ioSender");
+                                AppDialogs.Show(LibStrings.FindResource("MsgResetExit"), "ioSender");
                                 return RestartResult.Close;
                             }
                             break;
@@ -1708,7 +1708,7 @@ namespace CNC.Controls
                 string detail = response == string.Empty
                                     ? LibStrings.FindResource("MsgNoResponseExit")
                                     : string.Format(LibStrings.FindResource("MsgBadResponseExit"), response);
-                return MessageBox.Show(detail + "\r\n\r\nExit ioSender now? Choose No to keep it open so you can inspect the console, save the log, or reconnect.",
+                return AppDialogs.Show(detail + "\r\n\r\nExit ioSender now? Choose No to keep it open so you can inspect the console, save the log, or reconnect.",
                                        "ioSender - no controller response", MessageBoxButton.YesNo, MessageBoxImage.Stop) == MessageBoxResult.Yes
                     ? RestartResult.Exit
                     : RestartResult.NoResponse;

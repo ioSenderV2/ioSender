@@ -451,7 +451,7 @@ namespace CNC.Controls
 
             if (CurrentResolution <= 0d)
             {
-                MessageBox.Show(LibStrings.FindResource("ScNoAxisResolution"), "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(LibStrings.FindResource("ScNoAxisResolution"), "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -473,7 +473,7 @@ namespace CNC.Controls
             if (GrblSettings.Save())
             {
                 CurrentResolution = NewResolution;
-                MessageBox.Show(string.Format("{0} steps/mm updated to {1}.", GrblInfo.AxisIndexToLetter(Axis), FR(NewResolution)),
+                AppDialogs.Show(string.Format("{0} steps/mm updated to {1}.", GrblInfo.AxisIndexToLetter(Axis), FR(NewResolution)),
                                 "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }

@@ -331,7 +331,7 @@ namespace CNC.Controls
                 return;
 
             // When the App setting is on, always restore rapids without asking; otherwise prompt per load.
-            bool restoreRapids = AppConfig.Settings.Base.RestoreFusionRapids || MessageBox.Show(
+            bool restoreRapids = AppConfig.Settings.Base.RestoreFusionRapids || AppDialogs.Show(
                 "Restore rapid moves that Fusion Personal Use downgraded to feed moves (G1 → G0)?",
                 "Load Folder", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
 
@@ -378,7 +378,7 @@ namespace CNC.Controls
             }
             catch (Exception e)
             {
-                MessageBox.Show("Error loading program: " + e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show("Error loading program: " + e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
             finally
             {
@@ -397,7 +397,7 @@ namespace CNC.Controls
 
             if (ops.Count == 0)
             {
-                MessageBox.Show(LibStrings.FindResource("LfNoToolpathFiles"),
+                AppDialogs.Show(LibStrings.FindResource("LfNoToolpathFiles"),
                                 "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }

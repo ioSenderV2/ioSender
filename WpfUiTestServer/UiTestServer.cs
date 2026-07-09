@@ -63,6 +63,31 @@ namespace WpfUiTestServer
 
         public const int DefaultPort = 8760;
 
+        // ---- dialog broker (see Prompt + the /dialog* routes) --------------------------------------------
+        // Lets the harness answer the app's confirmation prompts instead of a modal blocking an unattended run.
+        private static readonly object _dlgLock = new object();
+        private static readonly Queue<string> _armedAnswers = new Queue<string>();   // one-shot answers, FIFO
+        private static string _standingAnswer;                                       // reused for every prompt
+        private static bool _captureDialogs;                                         // intercept even with nothing armed
+        private static readonly List<PendingDialog> _pending = new List<PendingDialog>();
+        private static readonly List<RecentDialog> _recent = new List<RecentDialog>();   // last N shown, for readback
+        private const int RecentCap = 25;
+        private static int _dlgSeq;
+
+        private sealed class PendingDialog
+        {
+            public int Seq;
+            public string Id, Title, Message, Answer;
+            public string[] Buttons;
+            public readonly ManualResetEventSlim Done = new ManualResetEventSlim(false);
+        }
+
+        private sealed class RecentDialog
+        {
+            public int Seq;
+            public string Id, Title, Message, Answer;   // Answer "(passthrough)" = real dialog shown to a human
+        }
+
         // Start the server on the loopback interface. Safe to call once; a second call is ignored. Never throws
         // out to the caller - a bind failure is logged and the app continues normally (the flag is diagnostic).
         //   main           - the window whose visual tree (plus any other open windows) is addressed.
@@ -139,6 +164,149 @@ namespace WpfUiTestServer
             catch { /* the banner is cosmetic - never let it break server startup */ }
         }
 
+        // ---- dialog broker: host-facing API --------------------------------------------------------------
+        // The host routes its confirmation prompts through this so the harness can answer them. Returns the
+        // chosen answer, or NULL to mean "not intercepted - show your real dialog." Called on the UI thread;
+        // blocking here is fine because the harness answers on a separate connection (POST /dialog), and the
+        // /dialog* routes never touch the Dispatcher. Semantics when the server is running:
+        //   - a one-shot armed answer  -> returned immediately (no modal)
+        //   - else a standing answer   -> returned immediately
+        //   - else capture enabled     -> registered as pending and blocks until answered or timeout(->default)
+        //   - else                     -> null, so interactive use still shows the real dialog
+        public static string Prompt(string id, string title, string message, string[] buttons, string defaultAnswer, int timeoutMs = 30000)
+        {
+            if (_listener == null)
+                return null;   // server not active - host shows its real dialog
+
+            string result;
+            PendingDialog p = null;
+            lock (_dlgLock)
+            {
+                if (_armedAnswers.Count > 0) result = _armedAnswers.Dequeue();
+                else if (_standingAnswer != null) result = _standingAnswer;
+                else if (!_captureDialogs) result = null;   // active but not capturing - real dialog shows
+                else
+                {
+                    p = new PendingDialog { Seq = ++_dlgSeq, Id = id ?? "", Title = title ?? "", Message = message ?? "", Buttons = buttons ?? new string[0] };
+                    _pending.Add(p);
+                    result = null;   // resolved after the blocking wait below
+                }
+            }
+
+            if (p != null)   // capture path: block until the harness answers (or timeout -> default)
+            {
+                _log("dialog pending [" + p.Seq + "] " + p.Title);
+                bool answered = p.Done.Wait(timeoutMs < 0 ? 0 : timeoutMs);
+                lock (_dlgLock) { _pending.Remove(p); }
+                result = answered ? p.Answer : defaultAnswer;
+            }
+
+            // Record every shown prompt (text + how it resolved) so the harness can read back MBOX output - even
+            // an info box that was answered immediately. "(passthrough)" = returned null, so the host showed its
+            // real dialog to a human.
+            RecordRecent(id, title, message, result ?? "(passthrough)");
+            return result;
+        }
+
+        private static void RecordRecent(string id, string title, string message, string answer)
+        {
+            lock (_dlgLock)
+            {
+                _recent.Add(new RecentDialog { Seq = ++_dlgSeq, Id = id ?? "", Title = title ?? "", Message = message ?? "", Answer = answer });
+                while (_recent.Count > RecentCap) _recent.RemoveAt(0);
+            }
+        }
+
+        // POST /dialog/arm?answer=Yes           enqueue a one-shot answer (also enables capture)
+        //                  ?standing=Yes        answer every prompt with this until cleared
+        //                  ?capture=true|false  intercept prompts with no preset (answer them via /dialog)
+        //                  ?clear=true          clear armed queue + standing + capture
+        private static string DoDialogArm(string query)
+        {
+            string answer = QueryValue(query, "answer");
+            string standing = QueryValue(query, "standing");
+            string capture = QueryValue(query, "capture");
+            string clear = QueryValue(query, "clear");
+
+            lock (_dlgLock)
+            {
+                if (clear != null && NormBool(clear) == "true")
+                {
+                    _armedAnswers.Clear(); _standingAnswer = null; _captureDialogs = false;
+                }
+                else if (standing != null) { _standingAnswer = standing; _captureDialogs = true; }
+                else if (answer != null) { _armedAnswers.Enqueue(answer); _captureDialogs = true; }
+                else if (capture != null) { _captureDialogs = NormBool(capture) == "true"; }
+                else return Err("arm needs answer=, standing=, capture=, or clear=");
+
+                return "{\"ok\":true,\"capture\":" + (_captureDialogs ? "true" : "false") +
+                       ",\"armed\":" + _armedAnswers.Count +
+                       ",\"standing\":" + Str(_standingAnswer) +
+                       ",\"pending\":" + _pending.Count + "}";
+            }
+        }
+
+        // POST /dialog?answer=Yes[&id=someId]   answer the oldest pending prompt (or the one with that id)
+        private static string DoDialogAnswer(string query)
+        {
+            string answer = QueryValue(query, "answer");
+            if (answer == null) return Err("dialog answer requires ?answer=...");
+            string id = QueryValue(query, "id");
+
+            PendingDialog target = null;
+            lock (_dlgLock)
+            {
+                if (id != null)
+                {
+                    foreach (var d in _pending) if (d.Id == id) { target = d; break; }
+                }
+                else if (_pending.Count > 0) target = _pending[0];
+            }
+            if (target == null) return Err("no pending dialog" + (id != null ? " with id " + id : ""));
+
+            target.Answer = answer;
+            target.Done.Set();
+            return "{\"ok\":true,\"answered\":" + target.Seq + ",\"answer\":" + Str(answer) + "}";
+        }
+
+        private static string BuildDialogs()
+        {
+            var sb = new StringBuilder();
+            lock (_dlgLock)
+            {
+                sb.Append("{\"ok\":true,\"capture\":").Append(_captureDialogs ? "true" : "false")
+                  .Append(",\"armed\":").Append(_armedAnswers.Count)
+                  .Append(",\"standing\":").Append(Str(_standingAnswer))
+                  .Append(",\"pending\":[");
+                for (int i = 0; i < _pending.Count; i++)
+                {
+                    var d = _pending[i];
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"seq\":").Append(d.Seq)
+                      .Append(",\"id\":").Append(Str(d.Id))
+                      .Append(",\"title\":").Append(Str(d.Title))
+                      .Append(",\"message\":").Append(Str(d.Message))
+                      .Append(",\"buttons\":[");
+                    for (int b = 0; b < d.Buttons.Length; b++) { if (b > 0) sb.Append(','); sb.Append(Str(d.Buttons[b])); }
+                    sb.Append("]}");
+                }
+                sb.Append("],\"recent\":[");
+                // newest first, so the harness can read "what just popped up" at index 0
+                for (int i = _recent.Count - 1, k = 0; i >= 0; i--, k++)
+                {
+                    var d = _recent[i];
+                    if (k > 0) sb.Append(',');
+                    sb.Append("{\"seq\":").Append(d.Seq)
+                      .Append(",\"id\":").Append(Str(d.Id))
+                      .Append(",\"title\":").Append(Str(d.Title))
+                      .Append(",\"message\":").Append(Str(d.Message))
+                      .Append(",\"answer\":").Append(Str(d.Answer)).Append('}');
+                }
+                sb.Append("]}");
+            }
+            return sb.ToString();
+        }
+
         private static void AcceptLoop()
         {
             while (true)
@@ -147,9 +315,18 @@ namespace WpfUiTestServer
                 try { client = _listener.AcceptTcpClient(); }
                 catch { break; }   // listener stopped / app shutting down
 
-                try { HandleConnection(client); }
-                catch (Exception ex) { _log("handler error: " + ex.Message); }
-                finally { try { client.Close(); } catch { } }
+                // One thread per connection: a request that blocks (e.g. /invoke that pops a dialog, waiting on
+                // the operator/harness) must not stall the whole server - the harness has to be able to answer
+                // it on a SECOND connection (POST /dialog). Handlers marshal UI work via the Dispatcher, which
+                // serialises access, so concurrent connections are safe.
+                var c = client;
+                var t = new Thread(() =>
+                {
+                    try { HandleConnection(c); }
+                    catch (Exception ex) { _log("handler error: " + ex.Message); }
+                    finally { try { c.Close(); } catch { } }
+                }) { IsBackground = true, Name = "UiTestServer-conn" };
+                t.Start();
             }
         }
 
@@ -267,6 +444,14 @@ namespace WpfUiTestServer
 
                 case "waitfor":
                     return DoWaitFor(query);
+
+                // Dialog broker routes run on the handler thread, NOT the Dispatcher: the UI thread may be
+                // blocked inside a Prompt() waiting for exactly this answer.
+                case "dialogs":
+                    return BuildDialogs();
+
+                case "dialog":
+                    return "arm".Equals(arg, StringComparison.OrdinalIgnoreCase) ? DoDialogArm(query) : DoDialogAnswer(query);
 
                 case "tree":
                     return OnDispatcher(() => BuildTree());

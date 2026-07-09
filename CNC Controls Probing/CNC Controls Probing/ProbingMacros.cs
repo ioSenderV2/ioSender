@@ -68,7 +68,7 @@ namespace CNC.Controls.Probing
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
         }
 
@@ -264,7 +264,7 @@ namespace CNC.Controls.Probing
             {
                 if (!(_selectedMacro.RunOnce == RunOnce && _selectedMacro.PreCommands == PreMacroText && _selectedMacro.PostCommands == PostMacroText))
                 {
-                    if (MessageBox.Show(LibStrings.FindResource("MacroChangedSave"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)
+                    if (AppDialogs.Show(LibStrings.FindResource("MacroChangedSave"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)
                         AddCommandHandler();
                     else
                     {

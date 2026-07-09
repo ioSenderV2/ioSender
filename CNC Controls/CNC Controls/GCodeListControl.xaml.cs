@@ -461,7 +461,7 @@ namespace CNC.Controls
                 ? string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath.", group.Name)
                 : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
 
-            if (MessageBox.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+            if (AppDialogs.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
 
             // Bound the run to this section only, when requested.
@@ -486,7 +486,7 @@ namespace CNC.Controls
         private void StartHere_Click(object sender, RoutedEventArgs e)
         {
             if (grdGCode.SelectedItems.Count == 1 &&
-                 MessageBox.Show(string.Format(LibStrings.FindResource("VerifyStartFrom"), ((GCodeBlock)(grdGCode.SelectedItems[0])).LineNum),
+                 AppDialogs.Show(string.Format(LibStrings.FindResource("VerifyStartFrom"), ((GCodeBlock)(grdGCode.SelectedItems[0])).LineNum),
                                   "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
             {
                 (DataContext as GrblViewModel).StartFromBlock.Execute(grdGCode.SelectedIndex);
@@ -507,7 +507,7 @@ namespace CNC.Controls
         private void SendController_Click(object sender, RoutedEventArgs e)
         {
             if (grdGCode.SelectedItems.Count >= 1 &&
-                 MessageBox.Show(LibStrings.FindResource("VerifySendController"), "ioSender",
+                 AppDialogs.Show(LibStrings.FindResource("VerifySendController"), "ioSender",
                                   MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
             {
                 var model = DataContext as GrblViewModel;

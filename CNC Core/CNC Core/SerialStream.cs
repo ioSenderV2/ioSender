@@ -83,7 +83,7 @@ namespace CNC.Core
 
             if (parameter.Count() < 4)
             {
-                MessageBox.Show(string.Format(LibStrings.FindResource("SerialPortError"), PortParams), "ioSender");
+                AppDialogs.Show(string.Format(LibStrings.FindResource("SerialPortError"), PortParams), "ioSender");
                 System.Environment.Exit(2);
             }
 
@@ -200,7 +200,7 @@ namespace CNC.Core
                 }
                 catch
                 {
-                    MessageBox.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
+                    AppDialogs.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
                 return true;
             }

@@ -129,13 +129,13 @@ namespace CNC.Controls
         {
             if (Comms.com == null || !Comms.com.IsOpen)
             {
-                MessageBox.Show(owner, "Connect to a controller first.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppDialogs.Show(owner, "Connect to a controller first.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
             {
-                MessageBox.Show(owner, "This controller does not report an automatic tool changer, so the tool-change macros do not apply here.",
+                AppDialogs.Show(owner, "This controller does not report an automatic tool changer, so the tool-change macros do not apply here.",
                     "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -145,19 +145,19 @@ namespace CNC.Controls
                 string msg = reason == AtcMacros.UpdateReason.Outdated
                     ? "The tool-change macros on the controller are out of date.\n\nUpdate them now?"
                     : "Install the controller-side macros (tc, pcorner) on the controller now?";
-                return MessageBox.Show(owner, msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+                return AppDialogs.Show(owner, msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
             });
 
             if (result == AtcMacros.ProvisionResult.UpToDate)
-                MessageBox.Show(owner, "The tool-change macros are already installed and up to date.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppDialogs.Show(owner, "The tool-change macros are already installed and up to date.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Information);
             else if (result == AtcMacros.ProvisionResult.Failed)
-                MessageBox.Show(owner, "The tool-change macros could not be installed. Check the connection and try again.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show(owner, "The tool-change macros could not be installed. Check the connection and try again.", "Tool change macros", MessageBoxButton.OK, MessageBoxImage.Warning);
             else if (result == AtcMacros.ProvisionResult.Uploaded && GrblInfo.AtcMacrosRequired)
             {
                 // A reboot is only needed when ATC was off (tc.macro absent): the firmware scans for it at
                 // mount/boot, so a fresh install must reboot to come online. An in-place content update with ATC
                 // already on is picked up on the next tool change - no reboot.
-                if (MessageBox.Show(owner,
+                if (AppDialogs.Show(owner,
                         "Tool-change macros installed. The controller must reboot to enable the tool changer.\n\nReboot now?",
                         "Tool change macros", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                     Comms.com.WriteCommand("$REBOOT");
@@ -271,7 +271,7 @@ namespace CNC.Controls
             if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker || (int)currentFile["Size"] <= 0)
                 return;
 
-            if (run && MessageBox.Show(string.Format((string)FindResource("DownloandRun"), (string)currentFile["Name"]), "ioSender",
+            if (run && AppDialogs.Show(string.Format((string)FindResource("DownloandRun"), (string)currentFile["Name"]), "ioSender",
                                         MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
                 return;
 
@@ -669,7 +669,7 @@ namespace CNC.Controls
             if (currentFile == null || (string)currentFile["Dir"] == GrblSDCard.EmptyMountMarker)
                 return;
 
-            if (MessageBox.Show(string.Format((string)FindResource("DeleteFile"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+            if (AppDialogs.Show(string.Format((string)FindResource("DeleteFile"), (string)currentFile["Name"]), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes, id: "sdcard.deleteFile") == MessageBoxResult.Yes)
             {
                 if(Grbl.WaitForResponse(GrblConstants.CMD_SDCARD_UNLINK + TargetName(currentFile)))
                     ReloadFiles();
@@ -684,7 +684,7 @@ namespace CNC.Controls
 
                 if ((bool)currentFile["Invalid"])
                 {
-                    MessageBox.Show(string.Format(((string)FindResource("IllegalName")).Replace("\\n", "\r\r"), (string)currentFile["Name"]), "ioSender",
+                    AppDialogs.Show(string.Format(((string)FindResource("IllegalName")).Replace("\\n", "\r\r"), (string)currentFile["Name"]), "ioSender",
                                      MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else if((int)currentFile["Size"] == -1) {
@@ -702,7 +702,7 @@ namespace CNC.Controls
                             int macro;
                             if(int.TryParse(filename.Substring(pos + 1), out macro) && macro >= 100)
                             {
-                                if(MessageBox.Show(string.Format((string)FindResource("RunMacro"), macro), "ioSender",
+                                if(AppDialogs.Show(string.Format((string)FindResource("RunMacro"), macro), "ioSender",
                                                     MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                                 {
                                     Comms.com.WriteCommand("G65P" + macro.ToString());

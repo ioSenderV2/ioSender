@@ -487,22 +487,22 @@ namespace CNC.Controls
 
             if (StepoverMM() <= 0d)
             {
-                MessageBox.Show(Loc("SbOverlapHigh"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("SbOverlapHigh"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (MaxArea(0) <= 0d || MaxArea(1) <= 0d)
             {
-                MessageBox.Show(Loc("SbNoTravel"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("SbNoTravel"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             DefaultArea();   // fill / clamp the area to the in-bounds envelope
             if (WidthMM <= 0d || HeightMM <= 0d)
             {
-                MessageBox.Show(Loc("SbNoArea"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("SbNoArea"), "Surface spoilboard", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (!(DryRun || OutlineOnly) && SpindleRPM > BitMaxRPM && BitMaxRPM > 0d &&
-                MessageBox.Show(string.Format(Loc("SbRpmHigh"), SpindleRPM, BitMaxRPM),
+                AppDialogs.Show(string.Format(Loc("SbRpmHigh"), SpindleRPM, BitMaxRPM),
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 

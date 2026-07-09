@@ -136,7 +136,7 @@ namespace CNC.Controls
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show(e.Message, "GCode Wrap", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(e.Message, "GCode Wrap", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
         }

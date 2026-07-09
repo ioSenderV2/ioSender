@@ -381,8 +381,8 @@ namespace CNC.Controls
         private static MessageBoxResult ShowMessage(string text, string caption, MessageBoxButton buttons, MessageBoxImage icon)
         {
             var owner = OwnerWindow();
-            return owner != null ? MessageBox.Show(owner, text, caption, buttons, icon)
-                                 : MessageBox.Show(text, caption, buttons, icon);
+            return owner != null ? AppDialogs.Show(owner, text, caption, buttons, icon)
+                                 : AppDialogs.Show(text, caption, buttons, icon);
         }
 
         // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
@@ -541,7 +541,7 @@ namespace CNC.Controls
                     double v;
                     if (!double.TryParse(boxes[i].Text.Trim(), NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out v))
                     {
-                        MessageBox.Show(win, string.Format("\"{0}\" is not a valid number.", fields[i].Label), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        AppDialogs.Show(win, string.Format("\"{0}\" is not a valid number.", fields[i].Label), title, MessageBoxButton.OK, MessageBoxImage.Warning);
                         boxes[i].Focus();
                         boxes[i].SelectAll();
                         return;

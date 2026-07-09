@@ -234,7 +234,7 @@ namespace CNC.Controls.Probing
             {
                 int id = int.Parse(key.ToString().Substring(1));
                 var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.Id == id);
-                if (macro != null && MessageBox.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                if (macro != null && AppDialogs.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     model.Grbl.ExecuteMacro(macro.Code);
                     return true;

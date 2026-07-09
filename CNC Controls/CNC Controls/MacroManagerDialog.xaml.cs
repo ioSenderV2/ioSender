@@ -23,6 +23,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Globalization;
 
+using CNC.Core;
 namespace CNC.Controls
 {
     /// <summary>
@@ -141,7 +142,7 @@ namespace CNC.Controls
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Could not create the referenced macro file:\r\n\r\n" + refPath + "\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    AppDialogs.Show("Could not create the referenced macro file:\r\n\r\n" + refPath + "\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
                 LaunchEditor(refPath);
@@ -162,7 +163,7 @@ namespace CNC.Controls
             if (!LaunchEditor(path))
                 return;
 
-            var result = MessageBox.Show(
+            var result = AppDialogs.Show(
                 string.Format("Editing \"{0}\" in your text editor.\r\n\r\nSave your changes there, then click OK to apply them to the macro.\r\nClick Cancel to discard.", macro.Name),
                 "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Information);
 
@@ -174,7 +175,7 @@ namespace CNC.Controls
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Could not read the edited macro back:\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    AppDialogs.Show("Could not read the edited macro back:\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }
@@ -185,7 +186,7 @@ namespace CNC.Controls
             if (macro == null)
                 return;
 
-            if (MessageBox.Show(string.Format("Delete macro \"{0}\"?", macro.Name), "ioSender",
+            if (AppDialogs.Show(string.Format("Delete macro \"{0}\"?", macro.Name), "ioSender",
                                  MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
                 macros.Remove(macro);
         }
@@ -244,7 +245,7 @@ namespace CNC.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open the macro in a text editor:\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show("Could not open the macro in a text editor:\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
         }

@@ -79,7 +79,7 @@ namespace CNC.Controls.Probing
             var startpos = new Position(probing.HeightMap.MinX - probing.ProbeOffsetX, probing.HeightMap.MinY - probing.ProbeOffsetY, 0d);
 
             if ((Math.Abs(startpos.X - probing.Grbl.Position.X) > 0.01d || Math.Abs(startpos.Y - probing.Grbl.Position.Y) > 0.01d) &&
-                 MessageBox.Show(string.Format((string)FindResource("AreaOrigin"), startpos.X.ToInvariantString(probing.Grbl.Format), startpos.Y.ToInvariantString(probing.Grbl.Format)), "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Cancel)
+                 AppDialogs.Show(string.Format((string)FindResource("AreaOrigin"), startpos.X.ToInvariantString(probing.Grbl.Format), startpos.Y.ToInvariantString(probing.Grbl.Format)), "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Cancel)
                 return;
 
             origin = new Position(probing.Grbl.MachinePosition, probing.Grbl.UnitFactor);
@@ -306,7 +306,7 @@ namespace CNC.Controls.Probing
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Heightmap", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(ex.Message, "Heightmap", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
         }

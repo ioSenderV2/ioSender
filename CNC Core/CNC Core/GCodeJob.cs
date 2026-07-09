@@ -251,7 +251,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    if ((ok = MessageBox.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", MessageBoxButton.YesNo) == MessageBoxResult.Yes))
+                    if ((ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", MessageBoxButton.YesNo) == MessageBoxResult.Yes))
                         block = sr.ReadLine();
                     else
                         block = null;

@@ -916,7 +916,7 @@ namespace GCode_Sender
                 (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
             }
 
-            MessageBox.Show(this,
+            AppDialogs.Show(this,
                 "Let's finish setting up your machine.\n\nWork through the steps - the normal screen opens once all are complete.",
                 "Machine setup", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -1069,7 +1069,7 @@ namespace GCode_Sender
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
         }
 

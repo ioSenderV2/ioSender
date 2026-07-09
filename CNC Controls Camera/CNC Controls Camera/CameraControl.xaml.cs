@@ -311,7 +311,7 @@ namespace CNC.Controls.Camera
 
         private void btnMove_Click(object sender, RoutedEventArgs e)
         {
-            if (!AppConfig.Settings.Camera.ConfirmMove || MessageBox.Show(UIUtils.TryFindParent<Window>(this), (string)FindResource(MoveCameraToSpindlePosition ? "MoveCameraTo" : "MoveSpindleTo"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (!AppConfig.Settings.Camera.ConfirmMove || AppDialogs.Show(UIUtils.TryFindParent<Window>(this), (string)FindResource(MoveCameraToSpindlePosition ? "MoveCameraTo" : "MoveSpindleTo"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
                 if (MoveCameraToSpindlePosition)
                     MoveOffset?.Invoke(Mode, -XOffset, -YOffset);

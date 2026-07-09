@@ -617,7 +617,7 @@ namespace CNC.Controls
                 return;
             if (XLeg() <= 0d || YLeg() <= 0d)
             {
-                MessageBox.Show(Loc("AsNoTravel"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("AsNoTravel"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
@@ -646,7 +646,7 @@ namespace CNC.Controls
         {
             if (_offset == null)
             {
-                MessageBox.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (XLeg() <= 0d || Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
@@ -656,7 +656,7 @@ namespace CNC.Controls
             string caution = Math.Abs(newVal) > LargeOffsetWarn
                 ? string.Format(Loc("AsCaution"), newVal)
                 : string.Empty;
-            if (MessageBox.Show(string.Format(Loc("AsChangeConfirm"),
+            if (AppDialogs.Show(string.Format(Loc("AsChangeConfirm"),
                     _offset.Name, _offset.Id, F(CurrentOffset), F(newVal), caution),
                     "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                 return;
@@ -668,7 +668,7 @@ namespace CNC.Controls
                 ReHome();
             }
             else
-                MessageBox.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
+                AppDialogs.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
                                 "Auto square", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
@@ -677,12 +677,12 @@ namespace CNC.Controls
         {
             if (_offset == null)
             {
-                MessageBox.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             if (Math.Abs(CurrentOffset) <= 1e-6)
                 return;   // already zero
-            if (MessageBox.Show(string.Format("Reset {0} (${1}) to 0 and re-home?", _offset.Name, _offset.Id),
+            if (AppDialogs.Show(string.Format("Reset {0} (${1}) to 0 and re-home?", _offset.Name, _offset.Id),
                     "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                 return;
 
@@ -693,7 +693,7 @@ namespace CNC.Controls
                 ReHome();
             }
             else
-                MessageBox.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
+                AppDialogs.Show(string.Format(Loc("AsWriteFailed"), _offset.Id, "XYZ"[_gangedAxis]),
                                 "Auto square", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
@@ -701,7 +701,7 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
-            if (MessageBox.Show(Loc("AsHomeNow"),
+            if (AppDialogs.Show(Loc("AsHomeNow"),
                     "Auto square", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
                 model.ExecuteCommand("$H");
         }
