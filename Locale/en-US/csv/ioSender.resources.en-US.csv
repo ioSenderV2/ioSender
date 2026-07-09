@@ -109,3 +109,11 @@ ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.Contro
 ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."
 ioSender.g.en-US.resources:mainwindow.baml,btn_copyMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the full status message to the clipboard
+ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load Folder...
+ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a folder of per-operation g-code files as one combined program.
+ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load File...
+ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.
+ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#x2715;
+ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close the loaded program.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_connect:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Co_nnect...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Application _data folder

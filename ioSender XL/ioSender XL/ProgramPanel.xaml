@@ -5,13 +5,33 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="300">
-    <!-- The loaded-program list with a title bar = program source (file path / folder / tool name).
-         Registered as the "Program" center component (Phase 2b step 4); inherits the GrblViewModel
-         DataContext from its host so FileName/ProgramPath bind through. -->
+    <!-- The loaded-program list with a title bar that doubles as the file toolbar (menu-overhaul):
+         with no program loaded it offers Load File / Load Folder; once loaded it shows the program
+         source (file path / folder / tool name) and a close (X) button. Inherits the GrblViewModel
+         DataContext from its host so FileName/ProgramPath/IsFileLoaded bind through. -->
+    <UserControl.Resources>
+        <cnccontrols:BoolToVisibleConverter x:Key="BoolToVisible"/>
+        <cnccontrols:NotBoolToVisibleConverter x:Key="NotBoolToVisible"/>
+    </UserControl.Resources>
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
-            <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
-                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+        <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3" MinHeight="26">
+            <Grid>
+                <!-- No program loaded: Load File (left) / Load Folder (right). -->
+                <DockPanel Visibility="{Binding Path=IsFileLoaded, Converter={StaticResource NotBoolToVisible}}">
+                    <Button x:Uid="btn_loadFolderHdr" DockPanel.Dock="Right" Content="Load Folder..." Padding="8,1" Click="LoadFolder_Click"
+                            ToolTip="Load a folder of per-operation g-code files as one combined program."/>
+                    <Button x:Uid="btn_loadFileHdr" HorizontalAlignment="Left" Content="Load File..." Padding="8,1" Click="LoadFile_Click"
+                            ToolTip="Load a single g-code file."/>
+                </DockPanel>
+                <!-- Program loaded: source label (left) + close (right). -->
+                <DockPanel Visibility="{Binding Path=IsFileLoaded, Converter={StaticResource BoolToVisible}}">
+                    <Button x:Uid="btn_closeFileHdr" DockPanel.Dock="Right" Content="&#x2715;" Width="20" Padding="0" FontSize="12"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand" Click="CloseFile_Click"
+                            ToolTip="Close the loaded program."/>
+                    <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
+                </DockPanel>
+            </Grid>
         </Border>
         <cnccontrols:GCodeListControl/>
     </DockPanel>

@@ -30,6 +30,7 @@ TARGETS = [
     # ioSender (ioSender XL views: MainWindow + the top-level view tabs)
     ('ioSender XL/ioSender XL/HeightMapView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/StartJobView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/ProgramPanel.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
 
     # CNC.Controls.WPF (the main controls library)
@@ -49,6 +50,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/FileActionControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/GCodeListControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/KeyMapEditor.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MainPageEditor.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MPGPending.xaml', 'CNC.Controls.WPF'),
@@ -102,6 +104,8 @@ def prop_for(tag, attr):
         return ('System.Windows.FrameworkElement.ToolTip', 'ToolTip', 'True', 'True')
     if attr == 'Header' and tag in ('GroupBox', 'Expander', 'TabItem', 'HeaderedContentControl'):
         return ('System.Windows.Controls.HeaderedContentControl.Header', 'Label', 'True', 'True')
+    if attr == 'Header' and tag == 'MenuItem':
+        return ('System.Windows.Controls.HeaderedItemsControl.Header', 'Menu', 'True', 'True')
     if attr == 'Content' and tag in CONTENT_CATEGORY:
         return ('System.Windows.Controls.ContentControl.Content', CONTENT_CATEGORY[tag], 'True', 'True')
     if attr == 'Text' and tag == 'TextBlock':

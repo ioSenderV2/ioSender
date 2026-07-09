@@ -1044,3 +1044,18 @@ CNC.Controls.WPF.g.en-US.resources:portdialog.baml,tab_simulator:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,lbl_simPort:System.Windows.Controls.ContentControl.Content,Label,True,True,,Port:
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_checkMode:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Check mode ($C)
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_checkMode:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Toggle grbl check mode - the controller parses the program without moving, to validate it before a real run.
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,mnu_revertStartup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert to value at startup
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,mnu_revertGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert all in group to value at startup
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,mnu_revertStartup2:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Revert to value at startup
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear all
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearToHere:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear up to here
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_save:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save...
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgram:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Start from this toolpath
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Run just this toolpath
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_resetRow:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset to default
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_clearBinding:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear (unbind)
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_expandAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Expand all
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_collapseAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Collapse all
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_resetGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset group to defaults
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...

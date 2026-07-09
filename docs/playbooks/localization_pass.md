@@ -25,7 +25,13 @@ Re-run should report 0 new rows. Scoping helper: `scratchpad/locscope.py` report
   path + category), appends English-baseline rows to all 7 locales, idempotent (also backfills rows
   that only reached en-US). It also emits `LibStrings.xaml` `<system:String>` rows.
 - Keep the **TARGETS** list in `locadd.py` current with the file set (this is the thing that goes stale
-  — e.g. `LoadStockView.xaml` → `StartJobView.xaml`).
+  — e.g. `LoadStockView.xaml` → `StartJobView.xaml`). Adding a file is a one-liner: `('path.xaml', 'assembly')`.
+- If a control's rows **don't emit** (dry-run shows the file with `+0`, or a specific control missing),
+  the gap is `prop_for()` not the CSV — teach it the (tag, attr) → (property-path, category) mapping and
+  re-run. Derive the mapping by grepping an existing row for that control type. E.g. `MenuItem` Header →
+  `System.Windows.Controls.HeaderedItemsControl.Header` / `Menu` was added this way (2026-07-09); fixing
+  the tool retroactively backfilled every previously-missed menu header across all TARGETS. NEVER hand-add
+  CSV rows — extend the tool so it stays idempotent and reusable.
 
 ## Rules / gotchas
 

@@ -69,6 +69,7 @@ namespace CNC.Controls
         public static LogicalAndConverter LogicalAndConverter = new LogicalAndConverter();
         public static LogicalOrConverter LogicalOrConverter = new LogicalOrConverter();
         public static BoolToVisibleConverter BoolToVisibleConverter = new BoolToVisibleConverter();
+        public static NotBoolToVisibleConverter NotBoolToVisibleConverter = new NotBoolToVisibleConverter();
         public static BoolToColorConverter BoolToColorConverter = new BoolToColorConverter();
         public static IsAxisVisibleConverter HasAxisConverter = new IsAxisVisibleConverter();
         public static IsSignalVisibleConverter IsSignalVisibleConverter = new IsSignalVisibleConverter();
@@ -575,6 +576,20 @@ namespace CNC.Controls
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return value is Visibility && (Visibility)value == Visibility.Visible;
+        }
+    }
+
+    // Inverse of BoolToVisibleConverter: false -> Visible, true -> Collapsed. Handy for the two-state
+    // program-view header (Load buttons visible when NO file is loaded).
+    public class NotBoolToVisibleConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is bool && (bool)value ? Visibility.Collapsed : Visibility.Visible;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Visibility && (Visibility)value != Visibility.Visible;
         }
     }
 
