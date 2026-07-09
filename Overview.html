@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>81 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>82 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -267,6 +267,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Status-bar messages shown at double height for 10&nbsp;s when written, then shrink back &mdash; so an important message in the easily-missed status line gets noticed</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr75">75</a></td></tr>
 <tr><td>Selected tab label goes bold and slightly larger &mdash; the active tab reads at a glance, not just by its white background (every StretchTabControl bar)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr77">77</a></td></tr>
 <tr><td>Run-bar jog pad restored &mdash; it had been squeezed to nothing by the Program button; run bar rebalanced into four columns with the button row filling the slack up to the jog pad</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr78">78</a></td></tr>
+<tr><td>The deterministic dev playbooks are now one-command scripts &mdash; push to both remotes, regenerate the Overview PDF, run <code>gh</code>, and generate a changelog entry &mdash; so they are invoked, not re-derived each time</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr82">82</a></td></tr>
 </table>
 </div>
 
@@ -353,7 +354,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">79</td><td><a href="#pr79">Bind any tab to a key &mdash; right-click Bind-to-Key + header badges</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+716</span> <span class="del">-17</span></td></tr>
 <tr><td class="n">80</td><td><a href="#pr80">Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+129</span> <span class="del">-93</span></td></tr>
 <tr><td class="n">81</td><td><a href="#pr81">No more restart prompt hiding behind the relaunch splash</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (81 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">595</span> <span class="del">2</span> <span class="add">+116</span><br><span class="k">Lines:</span> <span class="add">+34598</span> <span class="del">-4173</span></td></tr>
+<tr><td class="n">82</td><td><a href="#pr82">Dev playbooks distilled to one-command scripts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+384</span> <span class="del">-11</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (82 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">713</span> <span class="del">2</span> <span class="add">+123</span><br><span class="k">Lines:</span> <span class="add">+36864</span> <span class="del">-4186</span></td></tr>
 </table>
 </div>
 
@@ -2087,6 +2089,19 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">18</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>Applying a restart-only change (e.g. toggling lathe mode) and relaunching could leave a &ldquo;Restart ioSender now?&rdquo; message box stranded <em>behind</em> the new instance&rsquo;s splash screen &mdash; it only surfaced after the freshly launched copy went away, looking like the app prompted <em>after</em> it had already restarted.</p><ul><li><strong>Cause:</strong> the relaunch launches the replacement (splash on top) and then shuts down, and the shutdown path re-enters the Settings &ldquo;on leave&rdquo; logic &mdash; which, seeing a restart still pending, popped the prompt a <em>second</em> time from the dying instance.</li><li><strong>Fix:</strong> once a relaunch is under way the shutting-down instance suppresses all further on-leave prompts (it has already saved), so no stray dialog is left behind the splash.</li></ul><p class="foot">Long-standing glitch, unrelated to <a href="#pr80">#80</a>. Release build verified.</p></div>
+</div>
+<!-- ===== #82 ===== -->
+<div class="pr">
+<h2 id="pr82"><span class="badge">#82</span>Dev playbooks distilled to one-command scripts</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">tools/add-changelog-entry.ps1</td><td class="num add">171</td><td class="num">0</td></tr>
+<tr><td class="mono">tools/push-all.ps1</td><td class="num add">79</td><td class="num">0</td></tr>
+<tr><td class="mono">tools/regen-overview-pdf.ps1</td><td class="num add">54</td><td class="num">0</td></tr>
+<tr><td class="mono">tools/gh.ps1</td><td class="num add">38</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/playbooks/*.md (5 files)</td><td class="num add">42</td><td class="num del">11</td></tr>
+</table>
+<div class="desc"><p>The mechanical <a href="#pr73">playbook</a> procedures &mdash; the ones that are a fixed command sequence rather than judgement &mdash; are now small scripts in <code>tools/</code>. The value is retrieval over re-derivation: one path plus args instead of reconstructing the command (and its failure traps) every session. The playbooks stay as the invocation note and keep the gotchas.</p><ul><li><strong>tools/push-all.ps1</strong> &mdash; pushes the work all the way out: <code>origin/integration</code> <em>and</em> <code>v2/master</code>, with an ahead/behind report, a clean-tree guard, and a verify that both refs actually landed (<code>-DryRun</code> to preview).</li><li><strong>tools/regen-overview-pdf.ps1</strong> &mdash; regenerates <code>Overview.pdf</code> via headless Edge with a fresh <code>--user-data-dir</code> each run (without it Edge silently no-ops) and a LastWriteTime check that fails loudly if it did.</li><li><strong>tools/gh.ps1</strong> &mdash; runs the portable <code>gh.exe</code> with <code>GH_TOKEN</code> injected from the registry (harness shells do not inherit it), args passed straight through.</li><li><strong>tools/add-changelog-entry.ps1</strong> &mdash; adds a <code>#N</code> entry to this changelog from a JSON spec: it derives the number, computes every count from the file rows and re-sums the grand totals, inserts the detail block, TOC row and at-a-glance row, bumps the header count, and self-checks that all four places agree. You author only the content &mdash; this very entry was generated by it.</li></ul><p class="foot">Tooling only; no application change, so nothing to build.</p></div>
 </div>
 </section>
 
