@@ -39,14 +39,23 @@ Write-Host "Printing $Html -> $Pdf ..." -ForegroundColor Cyan
 & $edge --headless=new --disable-gpu --no-pdf-header-footer `
     "--user-data-dir=$profileDir" "--print-to-pdf=$pdfPath" $htmlUri
 
-Start-Sleep -Seconds 4
+# Edge prints asynchronously and can flush the PDF several seconds after it returns, so POLL for the
+# timestamp to advance (up to ~20s) rather than a single fixed sleep - a fixed wait raced and reported a
+# false "no-op" while Edge was still writing.
+$after = $before
+for ($i = 0; $i -lt 40; $i++) {
+    Start-Sleep -Milliseconds 500
+    if (Test-Path $pdfPath) {
+        $after = (Get-Item $pdfPath).LastWriteTime
+        if ($after -gt $before) { break }
+    }
+}
 try { Remove-Item -Recurse -Force $profileDir -ErrorAction SilentlyContinue } catch {}
 
 if (-not (Test-Path $pdfPath)) { Write-Host "ERROR: $Pdf was not produced" -ForegroundColor Red; exit 1 }
-$after = (Get-Item $pdfPath).LastWriteTime
 if ($after -le $before) {
-    Write-Host "ERROR: $Pdf LastWriteTime did not advance ($after) - Edge likely no-op'd." -ForegroundColor Red
-    Write-Host "Close any running Edge and retry, or increase the wait." -ForegroundColor Yellow
+    Write-Host "ERROR: $Pdf LastWriteTime did not advance within timeout - Edge likely no-op'd." -ForegroundColor Red
+    Write-Host "Close any running Edge and retry." -ForegroundColor Yellow
     exit 1
 }
 
