@@ -81,6 +81,7 @@ namespace GCode_Sender
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => InputChanged());
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => InputChanged());
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { UpdateThicknessWarning(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldSpacer, (s, e) => InputChanged());
         }
 
         // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
@@ -552,7 +553,7 @@ namespace GCode_Sender
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
             program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef);
+                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value);
             ResetResults();
             SaveInputs();
             WriteStartJobMacro(program);   // also persist as @start_job.macro so the Start Job macro/F-key runs it
@@ -591,6 +592,7 @@ namespace GCode_Sender
                 fldWidth.Value = s.Width;
                 fldHeight.Value = s.Height;
                 fldThickness.Value = s.Thickness;
+                fldSpacer.Value = s.SpacerThickness;
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkMeasure.IsChecked = s.Measure;
                 chkRotate.IsChecked = s.ApplyRotation;
@@ -610,6 +612,7 @@ namespace GCode_Sender
                     Width = fldWidth.Value,
                     Height = fldHeight.Value,
                     Thickness = fldThickness.Value,
+                    SpacerThickness = fldSpacer.Value,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
@@ -767,7 +770,7 @@ namespace GCode_Sender
         // Start Job conventions: (PREREQ ...) verbatim, G30 park + install, safe-Z go-to. Origin = the selected
         // corner (probed FIRST from G28, which discovers start_z); the other three reuse that start_z and are
         // referenced from the probed origin + the (conservative) estimated size.
-        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef)
+        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius -> edge comp
             string cornerName = Name(corner);
@@ -835,6 +838,9 @@ namespace GCode_Sender
             if (GrblInfo.RotationSupported)
                 L(string.Format("G10 L2 {0} R0", pCode(wcsP)));
             L(string.Format("#<_ls_rad> = {0}", N(r)));   // probe tip radius (global, read by pcorner)
+            // Sacrificial spacer/backer thickness under the stock (0 = none). pcorner's effective floor becomes
+            // spoilboard + spacer, so a thin sheet on a backer is probed on the metal, not down in the backer.
+            L(string.Format("#<_ls_spacer> = {0}", N(spacer)));
             L(string.Format("#<_ls_searchf> = {0}", N(p.ProbeFeedRate)));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The

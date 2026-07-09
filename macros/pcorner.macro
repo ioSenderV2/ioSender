@@ -12,6 +12,9 @@
 ;   #<_ls_refx>   = machine X of the reference, just OUTSIDE this corner's X face (clear air).
 ;   #<_ls_refy>   = machine Y of the reference, just OUTSIDE this corner's Y face.
 ;   #<_ls_rad>    = probe tip radius (mm).
+;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
+;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
+;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
 ;   #<_ls_searchf>= fast search feed (mm/min), from the 3D probe definition (Probe/Search feed).
 ;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the 3D probe definition (Latch feed).
 ;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
@@ -76,6 +79,11 @@ O<pcorner> SUB
     G91 G1 Z10 F1000
     G90
     (PRINT, PC z_spoil=#<_z_spoil>)
+    ; Effective floor for the face-probe start height = spoilboard + sacrificial spacer/backer thickness
+    ; (#<_ls_spacer>, 0 when none). With a backer under the stock the real material is only the band ABOVE
+    ; it, so start_z must land in that band - not down in the backer/tape. Persists as a global for REUSE corners.
+    #<_floor> = [#<_z_spoil> + #<_ls_spacer>]
+    (PRINT, PC floor=#<_floor> spacer=#<_ls_spacer>)
   o20 ENDIF
 
   ; ================= stock-top Z at THIS corner (EVERY corner -> flatness) =================
@@ -83,7 +91,7 @@ O<pcorner> SUB
   ; its own Z - the spread across the four corners is the stock/spoilboard flatness.
   G90
   o40 IF [#<sz_in> GE 9000]
-    G53 G0 Z[#<_z_spoil> + 30]      ; first corner: assume stock <= 1in (25.4mm), travel just above the tallest possible top (not machine top) - z_spoil known from the DISCOVER probe above
+    G53 G0 Z[#<_floor> + 30]        ; first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), travel just above the tallest possible top - floor known from the DISCOVER probe above
   o40 ELSE
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
@@ -101,16 +109,15 @@ O<pcorner> SUB
   (PRINT, PC z_top=#<_z_top>)
 
   ; ================= start_z for the face probes (centre tip 4 mm below THIS corner's top) =================
-  o30 IF [#<sz_in> GE 9000]
-    ; DISCOVER: spoilboard known, so guard very thin stock
-    o31 IF [[#<_z_top> - #<_z_spoil>] LT 5]
-      #<_start_z> = [#<_z_spoil> + 1]
-    o31 ELSE
-      #<_start_z> = [#<_z_top> - 4]
-    o31 ENDIF
-  o30 ELSE
+  ; Never below the effective floor (spoilboard + spacer): a very thin sheet - or a thin sheet on a backer -
+  ; must be probed just above the floor, on the material, not down in the board/backer. #<_floor> is set by
+  ; the DISCOVER pass (first corner) and persists as a global, so REUSE corners use it too. (spacer 0 =>
+  ; _floor == _z_spoil, so this is identical to the previous spoilboard-only behaviour.)
+  o31 IF [[#<_z_top> - #<_floor>] LT 5]
+    #<_start_z> = [#<_floor> + 1]
+  o31 ELSE
     #<_start_z> = [#<_z_top> - 4]
-  o30 ENDIF
+  o31 ENDIF
   ; SAFETY: never position the probe below the machine's Z soft-limit floor (#<_ls_zfloor>, passed by Load Stock
   ; from $132). When the stock sits low - its top near the Z travel bottom - start_z = top-4 can fall below
   ; reachable Z, and the G53 G0 descent to it trips Alarm:2 (soft limit). Clamp up to the floor; the side face is

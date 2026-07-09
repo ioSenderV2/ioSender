@@ -26,6 +26,8 @@
                         <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
                         <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
                         <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>
+                        <cnccontrols:NumericField x:Name="fldSpacer"    x:Uid="ls_spacer"    Label="Spacer/backer (Z):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="0"   Margin="0,2"
+                                                  ToolTip="Sacrificial board thickness under the stock (same footprint), e.g. 1/4 in MDF a thin sheet is taped to. 0 = none. The metal top is probed for Z0; this keeps the side probe on the material, not the backer."/>
                         <TextBlock x:Name="txtThickWarn" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
                                    Text="Stock over 1 in (25.4 mm) thick - the probe macros assume 1 in or less and will miss the top of taller stock."/>
                         <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"

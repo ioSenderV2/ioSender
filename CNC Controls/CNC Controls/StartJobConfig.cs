@@ -16,6 +16,11 @@ namespace CNC.Controls
         public double Width = 100d;
         public double Height = 100d;
         public double Thickness = 19d;   // estimated stock thickness (Z), mm; only used for the <= 1 in probe check
+        // Sacrificial spacer/backer board thickness (mm) UNDER the stock, same footprint (e.g. 1/4" MDF that a
+        // thin aluminium sheet is taped to). The corner probe finds the real spoilboard, so the effective "floor"
+        // for the face-probe start height is spoilboard + spacer - without this a thin sheet gets probed down in
+        // the spacer/tape band instead of on the metal. 0 = no spacer (bare fence). Passed to pcorner as _ls_spacer.
+        public double SpacerThickness = 0d;
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

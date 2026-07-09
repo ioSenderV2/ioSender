@@ -94,6 +94,9 @@ ioSender.g.en-US.resources:startjobview.baml,ls_height:CNC.Controls.NumericField
 ioSender.g.en-US.resources:startjobview.baml,ls_height:CNC.Controls.NumericField.Unit,None,False,True,,mm
 ioSender.g.en-US.resources:startjobview.baml,ls_thickness:CNC.Controls.NumericField.Label,None,False,True,,Est. thickness (Z):
 ioSender.g.en-US.resources:startjobview.baml,ls_thickness:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_spacer:CNC.Controls.NumericField.Label,None,False,True,,Spacer/backer (Z):
+ioSender.g.en-US.resources:startjobview.baml,ls_spacer:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_spacer:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Sacrificial board thickness under the stock (same footprint), e.g. 1/4 in MDF a thin sheet is taped to. 0 = none. The metal top is probed for Z0; this keeps the side probe on the material, not the backer."
 ioSender.g.en-US.resources:startjobview.baml,ls_lblWcs:System.Windows.Controls.ContentControl.Content,Label,True,True,,Set origin in:
 ioSender.g.en-US.resources:startjobview.baml,ls_measure:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Measure stock size (probe far faces)
 ioSender.g.en-US.resources:startjobview.baml,ls_generate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
