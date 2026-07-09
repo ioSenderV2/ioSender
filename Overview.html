@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>77 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>78 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -263,6 +263,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Startup dialogs no longer hidden behind the splash &mdash; the progress splash docks to the top so the connect dialog, message boxes and setup prompts stay visible</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr74">74</a></td></tr>
 <tr><td>Status-bar messages shown at double height for 10&nbsp;s when written, then shrink back &mdash; so an important message in the easily-missed status line gets noticed</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr75">75</a></td></tr>
 <tr><td>Selected tab label goes bold and slightly larger &mdash; the active tab reads at a glance, not just by its white background (every StretchTabControl bar)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr77">77</a></td></tr>
+<tr><td>Run-bar jog pad restored &mdash; it had been squeezed to nothing by the Program button; run bar rebalanced into four columns with the button row filling the slack up to the jog pad</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr78">78</a></td></tr>
 </table>
 </div>
 
@@ -345,7 +346,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">75</td><td><a href="#pr75">Status-bar messages shown at double height</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+37</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">76</td><td><a href="#pr76">Program view: 3-line run view</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+170</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">77</td><td><a href="#pr77">Selected tab: bold, larger label</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (77 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">566</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33693</span> <span class="del">-4023</span></td></tr>
+<tr><td class="n">78</td><td><a href="#pr78">Run-bar jog pad restored &amp; row rebalanced</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+42</span> <span class="del">-39</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (78 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">569</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33735</span> <span class="del">-4062</span></td></tr>
 </table>
 </div>
 
@@ -2013,6 +2015,17 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/StretchTabControl.cs</td><td class="num add">62</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>The active tab was distinguished only by its white background, easy to lose track of on the wider strips. The selected tab&rsquo;s <strong>label</strong> now also goes <strong>bold and ~18% larger</strong> so the current tab reads at a glance. Applies to every bar built on <code>StretchTabControl</code> (main bar + Settings / Tools / Lathe / Probing / Machine Setup) with no per-view change &mdash; see <a href="#pr50">#50</a>.</p><ul><li><strong>Header only:</strong> the emphasis is set on the tab&rsquo;s header presenter, not the <code>TabItem</code> &mdash; a <code>TabControl</code> re-parents inheritance so font set on the selected <code>TabItem</code> would bold the whole page; confining it to the header leaves the page content untouched.</li><li><strong>No reflow:</strong> each tab keeps its already-assigned width, so enlarging the selected label doesn&rsquo;t retrigger the stretch recompute &mdash; the bolder text simply fills its fixed slot (a touch cramped when selected, by design).</li></ul></div>
+</div>
+
+<!-- ===== #78 ===== -->
+<div class="pr">
+<h2 id="pr78"><span class="badge">#78</span>Run-bar jog pad restored &amp; the button row rebalanced</h2>
+<table class="files">
+<tr><td class="mono">ioSender XL/MainWindow.xaml</td><td class="num add">34</td><td class="num del">33</td></tr>
+<tr><td class="mono">CNC Controls/StatusControl.xaml</td><td class="num add">5</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>The shrunk jog pad in the bottom run bar had disappeared: it lived on the leftover space right of the run buttons, and the <strong>Program</strong> toggle added to that row (the program-overlay work) widened it and consumed the leftover, collapsing the pad to zero width.</p><ul><li><strong>Four-column run bar:</strong> <em>button row &middot; jog pad &middot; signals+feed &middot; overrides</em>. The button row is the flexible (star) column and stretches to fill the slack up to the jog pad &mdash; its three groups spread across so the run buttons span the width instead of huddling left, with the MDI and State lines following so <em>Send</em> stays aligned with <em>Program</em>. The jog pad, signals and feed/rapids overrides are content-sized and ride at the right edge, adjacent.</li><li><strong>Reclaimed the width:</strong> run buttons are now content-sized (one space of padding each side) instead of a fixed 66&thinsp;/&thinsp;95&nbsp;px, and the Signals + override clusters were shrunk ~25%, so the jog pad has room.</li></ul></div>
 </div>
 </section>
 
