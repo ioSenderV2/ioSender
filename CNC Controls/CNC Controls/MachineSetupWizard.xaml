@@ -313,7 +313,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Controller-side macros on the controller's filesystem: the tool-change set (cal, probe_tfl, tc) and the Load Stock corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
+                               Text="Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Start Job corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
                     <DataGrid x:Name="grdMacros" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="All">
                         <DataGrid.Columns>

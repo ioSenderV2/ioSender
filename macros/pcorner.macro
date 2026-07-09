@@ -1,6 +1,6 @@
 ; pcorner.macro - generalized corner XYZ probe for grblHAL (any of the 4 stock corners).
 ;
-; Generalized from probe_tfl.macro: SAME safe philosophy - probe Z down to DISCOVER the
+; Safe probing philosophy: probe Z down to DISCOVER the
 ; spoilboard and stock-top heights, never rapid to an assumed Z; decompose every reposition
 ; into an explicit safe-Z lift -> traverse -> descend; route axis-at-a-time around the corner.
 ;
@@ -32,14 +32,14 @@
 ;   to the spoilboard (no fence/clamp) and be >= body-radius outside the faces.
 
 O<pcorner> SUB
-  #<rad>    = #1                 ; tip radius = the single CALL arg (matches probe_tfl); rest via globals
+  #<rad>    = #1                 ; tip radius = the single CALL arg; rest via globals
   #<corner> = #<_ls_corner>
   #<rx>     = #<_ls_refx>
   #<ry>     = #<_ls_refy>
   #<sz_in>  = #<_ls_startz>
 
-  ; Clear G54 so the absolute Z probes below run in machine coordinates - exactly as probe_tfl.macro
-  ; does. Without this a stale G54 Z offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
+  ; Clear G54 so the absolute Z probes below run in machine coordinates. Without this a stale G54 Z
+  ; offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
   ; Load Stock sets the real origin from the probed machine coordinates after all corners are done.
   G10 L2 P1 X0 Y0 Z0
 

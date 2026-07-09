@@ -114,7 +114,7 @@ namespace CNC.Controls
                 (DataContext as GrblViewModel).Message = string.Empty;
         }
 
-        // "Install ATC" button: install or update the embedded tool-change macro set (cal/probe_tfl/tc) on the
+        // "Install ATC" button: install or update the embedded controller-side macro set (tc/pcorner) on the
         // controller's LittleFS. Explicit and user-initiated - the only provisioning trigger (no auto-on-connect
         // or auto-on-show, which proved fragile against controller-I/O timing). Always re-verifies the filesystem
         // when clicked, so it reliably catches a macro that was deleted since.
@@ -123,7 +123,7 @@ namespace CNC.Controls
             InstallAtcMacros(Window.GetWindow(this));
         }
 
-        // Install/update the embedded ATC macro set (cal/probe_tfl/tc/probe_corner) on the controller. Public +
+        // Install/update the embedded controller-side macro set (tc/pcorner) on the controller. Public +
         // owner-parameterized so the Machine Setup Wizard (Step 6) drives the same proven path as this tab's button.
         public void InstallAtcMacros(Window owner)
         {
@@ -144,7 +144,7 @@ namespace CNC.Controls
             {
                 string msg = reason == AtcMacros.UpdateReason.Outdated
                     ? "The tool-change macros on the controller are out of date.\n\nUpdate them now?"
-                    : "Install the tool-change macros (cal, probe_tfl, tc, probe_corner) on the controller now?";
+                    : "Install the controller-side macros (tc, pcorner) on the controller now?";
                 return MessageBox.Show(owner, msg, "Tool change macros", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
             });
 

@@ -329,8 +329,8 @@ namespace CNC.Core
                         //  - the flow keyword must sit IMMEDIATELY after the O<name> label: grblHAL keeps
                         //    interior spaces (only leading whitespace is stripped) and its flow parser reads
                         //    the keyword at the byte right after '>' with no gap-skipping (ngc_flowctrl.c
-                        //    read_command), so "O<cal> CALL" lands on the space and faults as
-                        //    "error:81 - Unknown flow statement". Close that gap -> "O<cal>CALL".
+                        //    read_command), so "O<pcorner> CALL" lands on the space and faults as
+                        //    "error:81 - Unknown flow statement". Close that gap -> "O<pcorner>CALL".
                         //  - strip comments: ParseBlock would, and we bypass it; a trailing ";"/"(...)" left
                         //    on the line would be parsed as call arguments.
                         // The label case is left as-is (the controller upper-cases it) and any "[expr]" call

@@ -39,3 +39,18 @@ The menu bar, toolbar row, program view, console, and camera access all changed.
 ### Not yet built (will add MORE debt when done)
 - Help → Support **Check for updates** (deferred feature).
 - **Macro-name flyout** replacing the removed macro toolbar (deferred idea).
+
+---
+
+## Debt from the probe-macro consolidation (shipped 2026-07-09)
+
+Dropped `cal.macro` + `probe_tfl.macro`; the sole corner probe is now **pcorner.macro** (a superset). Impact:
+
+- [ ] `docs/Repeatable-Tool-Change.html` — describes `probe_tfl.macro` probing the spoilboard / stock top /
+      geometry (~lines 225, 368, 399) and lists it as an installed macro. Rewrite to reference **pcorner.macro**
+      (and note the provisioned set is now just **tc + pcorner**).
+- [ ] Any online-manual (`docs/manual/index.html`) mention of the ATC/tool-change macro set naming
+      "cal"/"probe_tfl" — update to "tc, pcorner".
+- [ ] Localized copies of the changed UI strings (SDCardView "Install ATC" tooltip/prompt, MachineSetupWizard
+      Step-6 macro-status text) still say "cal, probe_tfl" in the 7 `Locale/**/*.csv` rows — sweep on the next
+      loc pass.

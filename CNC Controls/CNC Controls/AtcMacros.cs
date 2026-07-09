@@ -1,8 +1,8 @@
 /*
  * AtcMacros.cs - part of CNC Controls library
  *
- * Provisions the ATC support macros (cal/probe_tfl/tc/start_job.macro) onto the controller's filesystem when
- * it reports them missing - $I [NEWOPT:...] "ATC=0" means an ATC is configured but tc.macro is not present.
+ * Provisions the ATC support macros (tc/pcorner) onto the controller's filesystem when it reports them
+ * missing - $I [NEWOPT:...] "ATC=0" means an ATC is configured but tc.macro is not present.
  * The canonical copies are embedded from the repo's macros/ folder; missing ones are written to the root
  * volume, where grblHAL looks for them (/tc.macro replaces the built-in M6 flow once the SD/LittleFS plugin
  * attaches at boot/$FM, after which the firmware reports ATC=1 and provisioning stops).
@@ -22,9 +22,9 @@ namespace CNC.Controls
     {
         // Embedded with LogicalName == file name (see CNC Controls.csproj), so they round-trip by bare name.
         // start_job.macro is intentionally NOT here: it runs ioSender-side through MacroProcessor
-        // (seeded via SeedStartJobMacro), not on the controller. cal/probe_tfl/tc stay on littlefs
+        // (seeded via SeedStartJobMacro), not on the controller. tc/pcorner stay on littlefs
         // because grblHAL resolves their O<...> CALL / M6 references from its own filesystem.
-        static readonly string[] Required = { "cal.macro", "probe_tfl.macro", "tc.macro", "pcorner.macro" };
+        static readonly string[] Required = { "tc.macro", "pcorner.macro" };
 
         // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
         // YModem upload), so a queued UI event can re-enter it before it returns - mutually recursing with the SD
@@ -415,8 +415,8 @@ namespace CNC.Controls
                 // Retry: a YModem write over an existing file truncates-in-place and can stall the stream, and a
                 // dropped ACK leaves a 0-byte file - so unlink any existing/partial copy first and re-upload a
                 // fresh file. Unlink raw (WriteCommand+AwaitAck), NOT via the MDI path: that runs the line through
-                // the g-code parser, which - with NGC expressions enabled - mangles an underscore filename (e.g.
-                // probe_tfl.macro) into "error:71 - Unknown operation found in expression". $FD= bypasses it.
+                // the g-code parser, which - with NGC expressions enabled - mangles an underscore filename
+                // into "error:71 - Unknown operation found in expression". $FD= bypasses it.
                 // Skip the unlink only on the first attempt to a known-absent file (avoids a cosmetic error:61).
                 for (int attempt = 0; attempt < 3; attempt++)
                 {

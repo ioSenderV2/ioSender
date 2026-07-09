@@ -83,7 +83,7 @@ namespace GCode_Sender
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { UpdateThicknessWarning(); InputChanged(); });
         }
 
-        // The probe macros (probe_tfl / pcorner) now assume stock <= 1 in (25.4 mm) to start their top probe
+        // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
         // just above a 1 in top for speed - taller stock would be missed. Flag it when the Z estimate exceeds that.
         private const double MaxStockThicknessMm = 25.4d;
         private void UpdateThicknessWarning()
