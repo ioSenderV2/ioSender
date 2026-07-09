@@ -16,6 +16,20 @@ Filename: `<yyyy-MM-dd_HHmm>_<slug>.html` (sortable start-time prefix + slug fro
 prompt), e.g. `2026-07-08_0753_so-both-cameras-working-if-do-start-recording.html`. Start/stop times,
 duration, and turn count appear in both the header and the footer.
 
+## Step 0 — verify committed + pushed (gate)
+
+Run this FIRST. Capturing is the last thing before `/clear`, so don't do it on top of uncommitted or
+unpushed work. Read-only; it never commits or pushes.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\verify-pushed.ps1
+```
+
+Mirrors `push-all.ps1`'s remote model (origin/integration + v2/master), fetches both (best-effort),
+and exits **1** listing anything dirty/unpushed, **0** when clean and in sync. If it fails: commit the
+outstanding changes, run `tools\push-all.ps1`, then re-run the gate. Only proceed to the Ready command
+once it prints `OK  clean + pushed`.
+
 ## Ready command
 
 ```powershell
