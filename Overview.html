@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>84 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>85 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -215,6 +215,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Check mode (<code>$C</code>) moved off the status bar to a checkable <strong>Cycle Start</strong> right-click item &mdash; a dry-run / validate toggle now sits with the button that starts a run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr63">63</a></td></tr>
 <tr><td>Smoother, faster corner probing &mdash; post-trigger back-offs are gentle feeds (no rapid-accel table shudder) and the Z probes assume &le;&thinsp;1&Prime; stock for a much shorter seek</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr71">71</a></td></tr>
 <tr><td>Start Job estimated stock size &mdash; setup fields relabelled <em>Est.</em> plus a new <em>Est. thickness (Z)</em> field that warns when stock exceeds 1&Prime;</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr72">72</a></td></tr>
+<tr><td>Consolidate the Start Job corner probe to a single macro (pcorner) and add optional sacrificial spacer/backer support so a thin sheet is probed on the metal, not the backer.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr85">85</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -359,7 +360,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">82</td><td><a href="#pr82">Dev playbooks distilled to one-command scripts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+384</span> <span class="del">-11</span></td></tr>
 <tr><td class="n">83</td><td><a href="#pr83">Relaunch supervisor, single-instance &amp; crash reporting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+850</span> <span class="del">-58</span></td></tr>
 <tr><td class="n">84</td><td><a href="#pr84">Main-menu overhaul</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">35</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+458</span> <span class="del">-65</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (84 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">753</span> <span class="del">2</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38172</span> <span class="del">-4309</span></td></tr>
+<tr><td class="n">85</td><td><a href="#pr85">Start Job: one probe macro + spacer support</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+80</span> <span class="del">-232</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (85 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">772</span> <span class="del">4</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38252</span> <span class="del">-4541</span></td></tr>
 </table>
 </div>
 
@@ -2144,6 +2146,25 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales x 3 assemblies)</td><td class="num add">188</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>The menu bar is slimmed to essentials and the File menu is dissolved, with each item rehomed to where it is actually used.</p><ul><li><strong>Program-view header</strong> â€” with no file loaded it offers Load File / Load Folder; once loaded it shows the program source with a close (Ã—). Save and a Transform submenu move to the program list's right-click menu â€” Save works on any program view, Transform is rebuilt per menu-open.</li><li><strong>File menu gone</strong> â€” Connect/Reconnect is a top-level item, Open Console is a double-click on the Console tab (Esc still toggles it), Open Application data folder moves to a new Help â†’ Support submenu, and Exit is dropped (the window close / Alt+F4 quit).</li><li><strong>Toolbar row removed</strong> â€” the file-action icons and quick-run macro buttons beneath the menu bar are gone; macros still run by F-key.</li><li><strong>Camera is opt-in</strong> â€” instead of always showing (and opening a laptop's built-in webcam), the Camera menu appears only when a video device is bound via a new Device picker + Connect/Disconnect button in Settings â†’ App â†’ Camera.</li></ul><p class="foot">Builds clean Debug + Release; user-verified. Localized across all 7 locales. Commits 52b51d1 / 54ebcdd / 9511d3e.</p></div>
+</div>
+<!-- ===== #85 ===== -->
+<div class="pr">
+<h2 id="pr85"><span class="badge">#85</span>Start Job corner probe: one macro + sacrificial spacer/backer support</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">21</td><td class="num del">14</td></tr>
+<tr><td class="mono">macros/probe_tfl.macro</td><td class="num add">0</td><td class="num del">147</td></tr>
+<tr><td class="mono">macros/cal.macro</td><td class="num add">0</td><td class="num del">3</td></tr>
+<tr><td class="mono">macros/start_job.macro</td><td class="num add">8</td><td class="num del">49</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">9</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StartJobConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">6</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">0</td><td class="num del">2</td></tr>
+<tr><td class="mono">SDCardView / MachineSetupWizard / JobView / GrblViewModel (string + comment cleanup)</td><td class="num add">8</td><td class="num del">8</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">21</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Start Job's corner probe is now a single macro, and it understands a sacrificial spacer/backer board under the stock.</p><ul><li><strong>One probe macro.</strong> Dropped <code>cal.macro</code> and <code>probe_tfl.macro</code>; the sole corner probe is <code>pcorner.macro</code> &mdash; a superset (all four corners, tip radius and feeds from the 3D probe definition, Z soft-limit clamp, per-corner flatness). The live Start Job program already emitted <code>pcorner</code>, so nothing changed at run time; the old pair survived only as a pre-Generate seed and is gone, leaving fewer files to install on the controller.</li><li><strong>Sacrificial spacer/backer.</strong> A new optional <em>Spacer/backer (Z)</em> field covers the thin-sheet case &mdash; e.g. a 2.5&nbsp;mm aluminium sheet taped to a 1/4&nbsp;in MDF backer of the same footprint. The probe finds the real spoilboard in the clear air beside the stock, so <code>pcorner</code> now derives an effective floor = spoilboard&nbsp;+&nbsp;spacer and starts the face probe from there: the 2&nbsp;mm tip lands on the metal instead of dropping into the backer/tape band. A spacer of&nbsp;0 reproduces the previous spoilboard-only behaviour exactly, so bare-fence jobs are unaffected.</li></ul><p class="foot">Hardware-validated on a grblHAL Teensy&nbsp;4.1 rig: the 2&nbsp;mm probe tip lands on a 2.5&nbsp;mm sheet edge sitting on a 1/4&nbsp;in backer, and a spacer of 0 leaves normal-stock probing unchanged.</p></div>
 </div>
 </section>
 
