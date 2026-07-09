@@ -8,6 +8,9 @@ Pools **every** Claude Code transcript for this project into one chronological s
 sessions on idle-time gaps, and writes the **current** session to a styled, self-contained, descriptively
 **named** HTML in `%USERPROFILE%\Downloads\ClaudeConv\sessions\`. Keeps user prompts + Claude prose only;
 strips tool calls, command output, diffs, thinking, IDE/opened-file and system-reminder/slash-command noise.
+Screenshots you paste into a prompt are embedded inline as `data:` URIs (base64 from the transcript), so a
+session HTML keeps its visual context and stays self-contained (no image folder). Images Claude viewed via the
+Read tool are not included (they are tool-result turns).
 
 Filename: `<yyyy-MM-dd_HHmm>_<slug>.html` (sortable start-time prefix + slug from the session's first real
 prompt), e.g. `2026-07-08_0753_so-both-cameras-working-if-do-start-recording.html`. Start/stop times,
