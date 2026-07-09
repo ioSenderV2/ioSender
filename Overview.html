@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>85 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>86 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -216,6 +216,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Smoother, faster corner probing &mdash; post-trigger back-offs are gentle feeds (no rapid-accel table shudder) and the Z probes assume &le;&thinsp;1&Prime; stock for a much shorter seek</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr71">71</a></td></tr>
 <tr><td>Start Job estimated stock size &mdash; setup fields relabelled <em>Est.</em> plus a new <em>Est. thickness (Z)</em> field that warns when stock exceeds 1&Prime;</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr72">72</a></td></tr>
 <tr><td>Consolidate the Start Job corner probe to a single macro (pcorner) and add optional sacrificial spacer/backer support so a thin sheet is probed on the metal, not the backer.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr85">85</a></td></tr>
+<tr><td>With Measure on and the estimated size too large, corners that fall over bare spoilboard now abort at once instead of driving a doomed side probe into air.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr86">86</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -361,7 +362,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">83</td><td><a href="#pr83">Relaunch supervisor, single-instance &amp; crash reporting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+850</span> <span class="del">-58</span></td></tr>
 <tr><td class="n">84</td><td><a href="#pr84">Main-menu overhaul</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">35</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+458</span> <span class="del">-65</span></td></tr>
 <tr><td class="n">85</td><td><a href="#pr85">Start Job: one probe macro + spacer support</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+80</span> <span class="del">-232</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (85 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">772</span> <span class="del">4</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38252</span> <span class="del">-4541</span></td></tr>
+<tr><td class="n">86</td><td><a href="#pr86">Start Job: fail fast over bare board</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+12</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (86 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">773</span> <span class="del">4</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38264</span> <span class="del">-4545</span></td></tr>
 </table>
 </div>
 
@@ -2165,6 +2167,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">21</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Start Job's corner probe is now a single macro, and it understands a sacrificial spacer/backer board under the stock.</p><ul><li><strong>One probe macro.</strong> Dropped <code>cal.macro</code> and <code>probe_tfl.macro</code>; the sole corner probe is <code>pcorner.macro</code> &mdash; a superset (all four corners, tip radius and feeds from the 3D probe definition, Z soft-limit clamp, per-corner flatness). The live Start Job program already emitted <code>pcorner</code>, so nothing changed at run time; the old pair survived only as a pre-Generate seed and is gone, leaving fewer files to install on the controller.</li><li><strong>Sacrificial spacer/backer.</strong> A new optional <em>Spacer/backer (Z)</em> field covers the thin-sheet case &mdash; e.g. a 2.5&nbsp;mm aluminium sheet taped to a 1/4&nbsp;in MDF backer of the same footprint. The probe finds the real spoilboard in the clear air beside the stock, so <code>pcorner</code> now derives an effective floor = spoilboard&nbsp;+&nbsp;spacer and starts the face probe from there: the 2&nbsp;mm tip lands on the metal instead of dropping into the backer/tape band. A spacer of&nbsp;0 reproduces the previous spoilboard-only behaviour exactly, so bare-fence jobs are unaffected.</li></ul><p class="foot">Hardware-validated on a grblHAL Teensy&nbsp;4.1 rig: the 2&nbsp;mm probe tip lands on a 2.5&nbsp;mm sheet edge sitting on a 1/4&nbsp;in backer, and a spacer of 0 leaves normal-stock probing unchanged.</p></div>
+</div>
+<!-- ===== #86 ===== -->
+<div class="pr">
+<h2 id="pr86"><span class="badge">#86</span>Start Job: fail fast when a corner is over bare board</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">12</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>With <em>Measure stock size</em> on, corners 2&ndash;4 are positioned from the estimated stock size. If that estimate is too large a corner lands over bare spoilboard &mdash; and previously the top probe there sought all the way down to the board, mistook it for the stock top, then drove a side probe into empty air that only faulted at the search limit. Worse, a Feed-Hold then Stop during that latch could leave the controller needing a reset.</p><p>Those reuse corners now cap the top probe at the effective floor (spoilboard&nbsp;+&nbsp;spacer): a genuine corner still triggers on the material above it, but a corner over bare board reaches the floor with nothing there and the probe aborts immediately &mdash; no side search into air, and nothing to wedge. The first corner, positioned by hand from G28, still discovers the board as before, so flatness/skew measurement is unaffected.</p></div>
 </div>
 </section>
 
