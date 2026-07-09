@@ -117,3 +117,4 @@ ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.Con
 ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close the loaded program.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_connect:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Co_nnect...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Application _data folder
+ioSender.g.en-US.resources:mainwindow.baml,mnu_support:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Support

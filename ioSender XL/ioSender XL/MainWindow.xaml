@@ -32,19 +32,12 @@
         <cnccore:GrblViewModel />
     </Window.DataContext>
     <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <Menu IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
-            <MenuItem x:Uid="mnu_file" x:Name="menuFile" Header="_File" SubmenuOpened="menuFile_SubmenuOpened">
-                <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
-                <Separator/>
-                <MenuItem x:Uid="mnu_load" Header="_Load" Click="fileOpenMenuItem_Click"/>
-                <MenuItem x:Uid="mnu_loadFolder" Header="Load _Folder..." Click="fileOpenFolderMenuItem_Click"/>
-                <MenuItem x:Uid="mnu_save" x:Name="menuSaveFile" Header="_Save" IsEnabled="false" Click="fileSaveMenuItem_Click"/>
-                <MenuItem x:Uid="mnu_close" x:Name="menuCloseFile" Header="_Close" IsEnabled="false" Click="fileCloseMenuItem_Click"/>
-                <MenuItem x:Uid="mnu_transform" x:Name="menuTransform" Header="_Transform" IsEnabled="false" ItemsSource="{Binding Path=UIViewModel.TransformMenuItems, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                <MenuItem x:Uid="mnu_openConsole" x:Name="menuOpenConsole" Header="_Open Console" Click="openConsoleMenuItem_Click"/>
-                <MenuItem x:Uid="mnu_openConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
-                <MenuItem x:Uid="mnu_exit" Header="_Exit" Click="exitMenuItem_Click"/>
-            </MenuItem>
+        <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load/Load
+             Folder/Save/Close live on the program view, Open Console is a double-click on the Console tab,
+             and Transform is in the program list's right-click menu. Exit is dropped - the window X / Alt+F4
+             (both routed through Window_Closing) quit the app. -->
+        <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
+            <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
             <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">
                 <MenuItem x:Uid="mnu_open" Header="_Open" Click="CameraOpen_Click"/>
             </MenuItem>
@@ -54,6 +47,10 @@
                 <MenuItem x:Uid="mnu_briefTour" Header="A _brief tour" Click="briefTour_Click"/>
                 <MenuItem x:Uid="mnu_videoTutorials" Header="_Video tutorials" Click="videoTutorials_Click"/>
                 <MenuItem x:Uid="mnu_errorsAndAlarms" Header="_Error and alarm codes" Click="errorAndAlarms_Click"/>
+                <Separator/>
+                <MenuItem x:Uid="mnu_support" x:Name="menuSupport" Header="_Support">
+                    <MenuItem x:Uid="mnu_openConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
+                </MenuItem>
                 <MenuItem x:Uid="mnu_about" Header="_About" Click="aboutMenuItem_Click"/>
             </MenuItem>
         </Menu>

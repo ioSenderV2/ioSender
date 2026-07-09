@@ -209,6 +209,8 @@ namespace GCode_Sender
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
                         EmphasizeMessage();
+                    else if (e.PropertyName == nameof(GrblViewModel.ConnectionTarget))
+                        UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current
                 };
 
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
@@ -505,16 +507,15 @@ namespace GCode_Sender
             set
             {
                 ui.Title = BaseWindowTitle + (string.IsNullOrEmpty(value) ? "" : " - " + value);
-                ui.menuCloseFile.IsEnabled = ui.menuSaveFile.IsEnabled = !(string.IsNullOrEmpty(value) || value.StartsWith("SDCard:"));
-                ui.menuTransform.IsEnabled = ui.menuCloseFile.IsEnabled && UIViewModel.TransformMenuItems.Count > 0;
+                // File open/save/close/transform state now lives on the program view + its right-click menu
+                // (menu overhaul), which self-gate on GCode.File - no menu-bar items to toggle here.
             }
         }
 
         public bool JobRunning
         {
-            get { return menuFile.IsEnabled != true; }
+            get { return menuMain.IsEnabled != true; }
             set {
-       //         menuFile.IsEnabled = xx.IsEnabled = !value;
                 foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(ui.tabMode))
                 {
                     var view = getView(tabitem);
@@ -978,7 +979,7 @@ namespace GCode_Sender
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (CNC.Core.Grbl.GrblViewModel.IsSDCardJob || !(e.Cancel = !menuFile.IsEnabled))
+            if (CNC.Core.Grbl.GrblViewModel.IsSDCardJob || !(e.Cancel = !menuMain.IsEnabled))
             {
                 // Remember window placement for next launch (size is also tracked live in Window_SizeChanged;
                 // position has no live handler, so capture it here). Use RestoreBounds when maximized so we
@@ -1033,10 +1034,7 @@ namespace GCode_Sender
             //Comms.com.Close(); // Makes fking process hang
         }
 
-        private void exitMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        // (The Exit menu item was dropped in the menu overhaul - the window X / Alt+F4 quit via Window_Closing.)
 
         // Open the config folder (where App.config, KeyMap0.xml, grbl backups and restore points live) in Explorer,
         // so the user can find/back up/edit those files without hunting for the install directory.
@@ -1089,9 +1087,10 @@ namespace GCode_Sender
             about.ShowDialog();
         }
 
-        // Single item: "Connect..." when disconnected, "Reconnect..." when connected (which disconnects
-        // the current target first, then shows the connection dialog so the user can pick another).
-        private void menuFile_SubmenuOpened(object sender, RoutedEventArgs e)
+        // Top-level Connect/Reconnect item: "Connect..." when disconnected, "Reconnect..." when connected
+        // (a reconnect disconnects the current target first, then shows the dialog to pick another). Driven
+        // by ConnectionTarget changes since, as a top-level click item, there is no submenu-open to hook.
+        private void UpdateConnectMenuHeader()
         {
             bool connected = Comms.com != null && Comms.com.IsOpen;
             menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
@@ -1298,25 +1297,8 @@ namespace GCode_Sender
             Topmost = false;
         }
 
-        private void fileSaveMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            GCode.File.Save();
-        }
-
-        private void fileOpenMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            GCode.File.Open();
-        }
-
-        private void fileOpenFolderMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            GCode.File.OpenFolder();
-        }
-
-        private void fileCloseMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            GCode.File.Close();
-        }
+        // (fileSave/Open/OpenFolder/Close menu handlers removed in the menu overhaul - Load/Load Folder/Close
+        //  are now on the program-view header and Save is in its right-click menu, all via the static GCode.File.)
 
         private void TabMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1591,16 +1573,18 @@ namespace GCode_Sender
         {
             UIViewModel.Camera.Open();
         }
-
-        private void openConsoleMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            openConsole();
-        }
 #else
         private void CameraOpen_Click(object sender, RoutedEventArgs e)
         {
         }
 #endif
+
+        // Public entry point for the "pop out the console" gesture (double-clicking the Console tab -
+        // JobWorkspace.BuildCenter wires it), replacing the removed "Open Console" menu item.
+        public void OpenConsoleWindow()
+        {
+            openConsole();
+        }
 
         private void openConsole()
         {
@@ -1654,7 +1638,8 @@ namespace GCode_Sender
                 consoleShortcutHooked = true;
             }
 
-            menuOpenConsole.InputGestureText = consoleKey == Key.None ? string.Empty : ShortcutKey.ToDisplayString(consoleKey, consoleModifiers);
+            // (The "Open Console" menu item that used to show this shortcut hint was removed in the menu
+            //  overhaul; the shortcut still toggles the console, and the Console tab tooltip mentions it.)
         }
 
         // --- tab-switch shortcuts ----------------------------------------------------------------

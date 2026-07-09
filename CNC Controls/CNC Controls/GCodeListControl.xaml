@@ -46,6 +46,7 @@
 				<MenuItem x:Uid="mnu_ToggleBreak" Header="Toggle Break" IsEnabled="{Binding Path=SingleSelected}" Click="ToggleBreak_Click" />
                 <Separator/>
                 <MenuItem x:Uid="mnu_saveProgram" x:Name="mnuSaveProgram" Header="Save program..." Click="SaveProgram_Click" />
+                <MenuItem x:Uid="mnu_transformCtx" x:Name="mnuTransform" Header="Transform" />
 			</ContextMenu>
         </DataGrid.ContextMenu>
         <DataGrid.GroupStyle>

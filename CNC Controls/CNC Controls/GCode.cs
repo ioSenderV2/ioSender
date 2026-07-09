@@ -212,6 +212,13 @@ namespace CNC.Controls
             return Transformers.Where(x => x.Type == converter).FirstOrDefault().Type == converter;
         }
 
+        // Registered transformer display names in Transform(id) index order. Lets a right-click menu build
+        // its own Transform items fresh (menu overhaul) instead of sharing the single UIViewModel MenuItem set.
+        public System.Collections.Generic.List<string> TransformerNames
+        {
+            get { return Transformers.Select(x => x.Name).ToList(); }
+        }
+
         private void TransformMenu_Click(object sender, RoutedEventArgs e)
         {
             Transform((int)(sender as MenuItem).Tag);

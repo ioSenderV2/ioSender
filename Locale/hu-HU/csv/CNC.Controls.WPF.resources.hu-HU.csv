@@ -1059,3 +1059,4 @@ CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_expandAll:System.Window
 CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_collapseAll:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Collapse all
 CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_resetGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset group to defaults
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_transformCtx:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Transform

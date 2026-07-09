@@ -529,10 +529,27 @@ namespace CNC.Controls
         }
 
         // Enable Save only when a program is actually loaded (the shared static GCode.File). Runs each time
-        // the menu opens so it tracks load/close without a per-instance binding on the loaded state.
+        // the menu opens so it tracks load/close without a per-instance binding on the loaded state. Also
+        // (re)builds the Transform submenu from the registered transformers - built fresh here rather than
+        // sharing the single UIViewModel MenuItem set, which cannot be a child of multiple context menus.
         private void ctxMenu_Opened(object sender, RoutedEventArgs e)
         {
             mnuSaveProgram.IsEnabled = GCode.File.IsLoaded;
+
+            mnuTransform.Items.Clear();
+            var names = GCode.File.TransformerNames;
+            for (int i = 0; i < names.Count; i++)
+            {
+                var item = new MenuItem { Header = names[i], Tag = i };
+                item.Click += Transform_Click;
+                mnuTransform.Items.Add(item);
+            }
+            mnuTransform.IsEnabled = GCode.File.IsLoaded && names.Count > 0;
+        }
+
+        private void Transform_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.Transform((int)((MenuItem)sender).Tag);
         }
 
         private void SaveProgram_Click(object sender, RoutedEventArgs e)
