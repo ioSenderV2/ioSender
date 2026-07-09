@@ -128,6 +128,15 @@ namespace CNC.Controls
             else
             {
                 LeaveTab(cur);
+
+                // Once a restart is under way the replacement instance is already launching and its splash is
+                // topmost, so ANY MessageBox this dying instance shows would be hidden behind that splash and only
+                // surface after the new instance clears - the classic "restart prompt appears after the app already
+                // relaunched" glitch. Skip all on-leave prompting (Application.Shutdown re-enters this Activate(false)
+                // during teardown, which is where the stray second prompt came from).
+                if (_restarting)
+                    return;
+
                 AutoSaveOnLeave();
 
                 // A restart-only change was made and not yet applied - offer to restart now on the way out of the
@@ -512,15 +521,23 @@ namespace CNC.Controls
         // True while a restart-only change is pending (the Restart button is shown + enabled and pulsing).
         private bool RestartPending { get { return btnRestart.IsEnabled && btnRestart.Visibility == Visibility.Visible; } }
 
+        // Set once a relaunch has been initiated, so the shutting-down instance suppresses any further on-leave
+        // prompts (see Activate) - they would otherwise pop up modal behind the new instance's topmost splash.
+        private static bool _restarting;
+
         private void DoRestart()
         {
+            if (_restarting)
+                return;
+            _restarting = true;
+
             AppConfig.Settings.Save();
             try
             {
                 System.Diagnostics.Process.Start(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
                 Application.Current.Shutdown();
             }
-            catch { }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
+            catch { _restarting = false; }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
         }
 
         #endregion
