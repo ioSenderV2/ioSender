@@ -222,7 +222,7 @@ same point every time you turn the machine on.</p>
 </ul>
 
 <p>ioSender ships the two controller-side macros this package needs
-(<code>tc.macro</code>, <code>probe_tfl.macro</code>) and can install them for you (see setup).</p>
+(<code>tc.macro</code>, <code>pcorner.macro</code>) and can install them for you (see setup).</p>
 
 <h2>One-time setup</h2>
 
@@ -365,7 +365,7 @@ pushes on it). It then applies a dynamic tool-length offset:</p>
 puck is fixed and the machine is homed, those differences are consistent run to
 run &mdash; that&rsquo;s the repeatability.</p>
 
-<p><strong>Work zero.</strong> <code>probe_tfl.macro</code> probes the spoilboard, the stock top, and the
+<p><strong>Work zero.</strong> <code>pcorner.macro</code> probes the spoilboard, the stock top, and the
 left and front faces near the front-left corner, then sets <code>G54</code> X/Y/Z. It adapts
 its probe heights to the measured stock thickness, and corrects X/Y by the probe
 tip radius you entered.</p>
@@ -396,7 +396,7 @@ approach. <code>G53 Z-5</code> (just below the top of travel) is used as the saf
 <p>The bundled macros are a known-good <em>starting point</em>, not a universal config.
 Before trusting them on your machine, check the assumptions:</p>
 <ul>
-  <li><strong>Probe geometry.</strong> <code>probe_tfl.macro</code> assumes a probe with an 8&nbsp;mm-tall,
+  <li><strong>Probe geometry.</strong> <code>pcorner.macro</code> assumes a probe with an 8&nbsp;mm-tall,
   2&nbsp;mm-diameter tip that flares to 4&nbsp;mm above. A different stylus may need the
   probe heights adjusted.</li>
   <li><strong>Probe wiring / inputs.</strong> It assumes the 3D probe is on the main probe input
