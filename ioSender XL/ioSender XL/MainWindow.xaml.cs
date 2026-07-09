@@ -751,6 +751,11 @@ namespace GCode_Sender
             var revealSafety = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
             revealSafety.Tick += (s, e) => { revealSafety.Stop(); RevealMainWindow(); };
             revealSafety.Start();
+
+            // Flag-gated UI test server (‑testserver / IOSENDER_TESTSERVER): the tabs/views are built and the
+            // visual tree is realized by now, so an external script can drive the UI by x:Uid. Off by default.
+            if (App.TestServerPort >= 0)
+                UiTestServer.Start(this, App.TestServerPort == 0 ? UiTestServer.DefaultPort : App.TestServerPort);
         }
 
         private bool _machineSetupForced = false;

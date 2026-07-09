@@ -75,6 +75,9 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <!-- UI test server (-testserver): AutomationPeer pattern-provider interfaces + pattern/ToggleState enums. -->
+    <Reference Include="UIAutomationProvider" />
+    <Reference Include="UIAutomationTypes" />
     <Reference Include="HelixToolkit.Wpf">
       <HintPath>..\..\helix-toolkit\HelixToolkit.Wpf.dll</HintPath>
     </Reference>
@@ -137,6 +140,7 @@
       <DependentUpon>ProgramPanel.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProgramSourceConverter.cs" />
+    <Compile Include="UiTestServer.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>
     </Compile>

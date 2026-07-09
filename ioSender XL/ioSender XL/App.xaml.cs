@@ -56,6 +56,9 @@ namespace GCode_Sender
     /// </summary>
     public partial class App : Application
     {
+        // UI test server: -1 = off. Set >= 0 by -testserver[=PORT] / IOSENDER_TESTSERVER; a value of 0 means
+        // "on, use the default port". Read by MainWindow.CompleteStartup once the UI is fully built.
+        public static int TestServerPort = -1;
 
         public App()
         {
@@ -112,6 +115,14 @@ namespace GCode_Sender
                             if (eq >= 0)
                                 debugCategories = arg.Substring(eq + 1);
                         }
+                        // -testserver              start the UI test server on the default port
+                        // -testserver=8760         ... on an explicit port
+                        else if (arg == "-testserver" || arg.StartsWith("-testserver=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            int eq = arg.IndexOf('=');
+                            int tp;
+                            TestServerPort = (eq >= 0 && int.TryParse(arg.Substring(eq + 1), out tp)) ? tp : 0;
+                        }
                         break;
                 }
             }
@@ -124,6 +135,18 @@ namespace GCode_Sender
                 debugLog = true;
                 if (!(debugEnv == "1" || string.Equals(debugEnv, "true", StringComparison.OrdinalIgnoreCase)))
                     debugCategories = debugEnv;
+            }
+
+            // UI test server env mirror (matches the IOSENDER_* pattern). "1"/"true" = default port; a numeric
+            // value = that port. A command-line -testserver flag takes precedence if already set.
+            if (TestServerPort < 0)
+            {
+                string tsEnv = Environment.GetEnvironmentVariable("IOSENDER_TESTSERVER");
+                if (!string.IsNullOrEmpty(tsEnv))
+                {
+                    int tp;
+                    TestServerPort = int.TryParse(tsEnv, out tp) ? tp : 0;
+                }
             }
 
             CNC.Core.DebugLog.Init(debugLog, debugCategories);
