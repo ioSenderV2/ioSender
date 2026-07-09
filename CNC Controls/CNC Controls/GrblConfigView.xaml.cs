@@ -532,6 +532,16 @@ namespace CNC.Controls
             _restarting = true;
 
             AppConfig.Settings.Save();
+
+            // Supervised: just exit with the relaunch sentinel and let the AppLaunch parent restart us.
+            // No in-process Process.Start, so the splash-over-teardown race (#81) is impossible here.
+            if (CNC.Core.RelaunchSupervisor.IsSupervised)
+            {
+                Application.Current.Shutdown(CNC.Core.RelaunchSupervisor.RelaunchExitCode);
+                return;
+            }
+
+            // Unsupervised fallback (headless/dev, or AppLaunch.exe absent): relaunch ourselves in-process.
             try
             {
                 System.Diagnostics.Process.Start(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);

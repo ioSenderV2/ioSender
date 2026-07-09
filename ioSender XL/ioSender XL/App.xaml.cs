@@ -80,6 +80,7 @@ namespace GCode_Sender
             bool debugLog = false;
             string debugCategories = null;
             bool demoMarker = false;
+            bool crashTest = false;
             while (p < args.GetLength(0))
             {
                 string arg = args[p++];
@@ -95,6 +96,12 @@ namespace GCode_Sender
                     // -demomarker  timestamp job-state transitions for demo-video sync (docs/demo-videos)
                     case "-demomarker":
                         demoMarker = true;
+                        break;
+
+                    // -crashtest  throw a synthetic unhandled exception shortly after startup, to exercise
+                    // the crash -> minidump -> report-on-next-launch pipeline. Diagnostic only.
+                    case "-crashtest":
+                        crashTest = true;
                         break;
 
                     default:
@@ -121,6 +128,16 @@ namespace GCode_Sender
 
             CNC.Core.DebugLog.Init(debugLog, debugCategories);
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
+
+            // Single instance: if another ioSender is already running, hand it our file arg (if any),
+            // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
+            // (Relaunch supervision is AppLaunch's job - we only read its exit-code protocol, see DoRestart.)
+            if (CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
+            {
+                CNC.Core.DebugLog.Write("app", "another instance is running - forwarded and exiting");
+                Environment.Exit(0);
+                return;
+            }
 
             // Demo-video sync markers (mirrors the -debuglog flag + IOSENDER_* env pattern).
             if (!demoMarker)
@@ -168,6 +185,33 @@ namespace GCode_Sender
             Current.MainWindow = main;
             main.AttachSplash(splash);
             main.Show();   // shown with Opacity 0 / not in taskbar; Window_Load -> CompleteStartup runs unseen
+
+            // If a previous run crashed, offer to report it - deferred to ApplicationIdle so it appears
+            // after the main window is up, not competing with the splash. Fires once (sentinel cleared).
+            if (CrashReporter.HasPendingReport())
+                Dispatcher.BeginInvoke(new Action(() => CrashReporter.PromptIfPending(main)),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            // -crashtest: fire a synthetic unhandled exception once the window is up, to validate the
+            // crash-capture + report-on-next-launch flow end to end.
+            if (crashTest)
+                Dispatcher.BeginInvoke(new Action(() => { throw new InvalidOperationException("Synthetic crash (-crashtest)"); }),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        // Find the file the user is trying to open, matching AppConfig's own arg handling: an explicit
+        // --loadfile <path>, or a bare existing (non-.exe) path. Returns null if there is none.
+        private static string FindFileArg(string[] args)
+        {
+            for (int i = 1; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (string.Equals(a, "--loadfile", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                    return args[i + 1];
+                if (!a.StartsWith("-") && !a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(a))
+                    return a;
+            }
+            return null;
         }
 
         // Exit code written on a fatal unhandled exception. Distinct non-zero sentinel (0xFA11 = "FAIL") so a
@@ -200,6 +244,10 @@ namespace GCode_Sender
         private void HandleFatal(string source, Exception ex)
         {
             string logPath = WriteCrashLog(source, ex);
+
+            // Capture a minidump + per-crash summary and flag it for report-on-next-launch. Never throws.
+            string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+            CrashReporter.Capture(source, ex, utcStamp);
 
             // Skip the modal dialog for unattended runs (build.ps1 -Headless sets IOSENDER_HEADLESS) so a crash
             // can't hang the process on an un-clicked message box; the log + exit code carry the signal.

@@ -39,23 +39,54 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // https://www.c-sharpcorner.com/article/aborting-thread-vs-cancelling-task/
 
+using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Security.Principal;
 using System.Threading.Tasks;
 
 namespace CNC.Controls
 {
     public class PipeServer
     {
+        // Well-known name of the single-instance pipe. The running instance listens on it (server);
+        // a newly launched instance probes it (client) to detect that an instance already exists.
+        public const string PipeName = "ioSender";
+
         public delegate void FileTransferHandler(string filename);
         public static event FileTransferHandler FileTransfer;
 
+        // Raised (on the UI thread) each time another launch connects, so the running instance can
+        // bring itself to the foreground - a second launch should surface the existing window.
+        public static event Action ActivateRequested;
+
         public PipeServer(System.Windows.Threading.Dispatcher dispatcher)
         {
-            Task server = null;
+            Task.Factory.StartNew(() => RunServer(dispatcher));
+        }
 
-            if(!File.Exists("ioSender"))
-                server = Task.Factory.StartNew(() => RunServer(dispatcher));
+        // Client-side single-instance probe: if an instance is already listening, hand it the file to
+        // open (if any) and return true (the caller should exit). Returns false on connect timeout -
+        // i.e. no instance is running, so the caller is the first instance.
+        public static bool TryForwardToRunningInstance(string filename)
+        {
+            try
+            {
+                using (var pipeClient = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.None, TokenImpersonationLevel.Impersonation))
+                {
+                    pipeClient.Connect(250);
+                    if (!string.IsNullOrEmpty(filename) && File.Exists(filename))
+                    {
+                        using (var pipe = new StreamWriter(pipeClient))
+                            pipe.WriteLine(filename);
+                    }
+                    return true;
+                }
+            }
+            catch
+            {
+                return false; // timeout / no server: we are the first instance
+            }
         }
 
         private static void RunServer(System.Windows.Threading.Dispatcher dispatcher)
@@ -64,34 +95,29 @@ namespace CNC.Controls
 
             try {
 
-                using (var pipeServer = new NamedPipeServerStream("ioSender", PipeDirection.InOut))
+                using (var pipeServer = new NamedPipeServerStream(PipeName, PipeDirection.InOut))
                 {
                     using (var reader = new StreamReader(pipeServer))
                     {
-                        using (var writer = new StreamWriter(pipeServer))
+                        while (true)
                         {
-                            while (true)
+                            filename = string.Empty;
+
+                            pipeServer.WaitForConnection();
+
+                            // Any connection means another launch happened - surface the running window.
+                            dispatcher.Invoke(() => ActivateRequested?.Invoke());
+
+                            while (pipeServer.IsConnected)
                             {
-                                filename = string.Empty;
-
-                                pipeServer.WaitForConnection();
-
-                                //writer.WriteLine("Hello");
-                                //writer.Flush();
-                                //pipeServer.WaitForPipeDrain();
-
-                                while (pipeServer.IsConnected)
-                                {
-                                    if ((c = reader.Read()) != -1)
-                                    {
-                                        if (c >= ' ')
-                                            filename += (char)c;
-                                        else if (c == 10 && FileTransfer != null && File.Exists(filename))
-                                            dispatcher.Invoke(FileTransfer, filename);
-                                    }
-                                }
-                                pipeServer.Disconnect();
+                                if ((c = reader.Read()) == -1)
+                                    break; // client closed (EOF): no more data on this connection
+                                if (c >= ' ')
+                                    filename += (char)c;
+                                else if (c == 10 && FileTransfer != null && File.Exists(filename))
+                                    dispatcher.Invoke(FileTransfer, filename);
                             }
+                            pipeServer.Disconnect();
                         }
                     }
                 }

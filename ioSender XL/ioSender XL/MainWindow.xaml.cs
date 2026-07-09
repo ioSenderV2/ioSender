@@ -145,6 +145,7 @@ namespace GCode_Sender
 
             new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
             PipeServer.FileTransfer += Pipe_FileTransfer;
+            PipeServer.ActivateRequested += BringToForeground;
             AttachBasePropertyChangedHandler();
             WireBarOverlays();
         }
@@ -1283,6 +1284,18 @@ namespace GCode_Sender
         {
             if(!JobRunning)
                 GCode.File.Load(filename);
+        }
+
+        // Another launch was intercepted by the single-instance gate: surface this (the running) window.
+        private void BringToForeground()
+        {
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+            if (!_revealed)         // still on the startup splash - don't yank it forward mid-init
+                return;
+            Activate();
+            Topmost = true;         // brief topmost bounce reliably raises above the foreground-lock
+            Topmost = false;
         }
 
         private void fileSaveMenuItem_Click(object sender, RoutedEventArgs e)
