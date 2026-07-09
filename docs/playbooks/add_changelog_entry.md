@@ -8,6 +8,22 @@
 Entries are a flat numbered list `1..N`, badge `#N`, anchor id `prN`. No branch column, no stars,
 no dependency counts.
 
+## Ready command — `tools\add-changelog-entry.ps1` does all four places + totals
+
+Write a small JSON spec (title, tag NEW/CHG/FIX, at-a-glance group + one-liner, curated file rows,
+description), then:
+
+```powershell
+tools\add-changelog-entry.ps1 -Spec <spec.json> -Pdf
+```
+
+The script derives `#N`, computes **every count from the file rows** (per-entry Files chg/del/add +
+Lines, and re-sums the grand totals), inserts the detail block / TOC row / at-a-glance row, bumps the
+header count, self-checks that all places agree, prints the diff, and (`-Pdf`) regenerates the PDF.
+**You only author content.** Spec shape + per-file `status`/`count`/`label` semantics are in the
+script header. The manual anatomy below is the reference for what it builds and for the numstat
+**curation** (grouping siblings / omitting tooling files) you still do when filling in `files`.
+
 ## The catch: FOUR places must change for one entry (miss one and it's wrong)
 
 1. **Detail section** — the full entry (numstat file table + description). Append **before

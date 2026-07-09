@@ -31,5 +31,8 @@ matching memory file keeps its context and just points here.
 - **Paths** are relative to the repo root `c:\github\ioSender` unless absolute.
 - Replace `<...>` placeholders before running.
 - Scripts referenced here (`build.ps1`, `tools/locadd.py`, `docs/manual/publish-pages.ps1`,
-  `tools/effort/convo-logger.ps1`, `docs/demo-videos/README.md`) live in the repo and are the
+  `tools/effort/convo-sessions.ps1`, `docs/demo-videos/README.md`) live in the repo and are the
   authoritative implementation — the playbook is the invocation guide + gotchas.
+- The mechanical procedures are now one-command scripts (playbook = invocation note):
+  `tools/push-all.ps1` (push to both remotes), `tools/regen-overview-pdf.ps1` (PDF regen),
+  `tools/gh.ps1` (gh + token), `tools/add-changelog-entry.ps1 -Spec x.json` (changelog entry).

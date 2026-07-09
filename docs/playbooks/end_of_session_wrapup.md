@@ -11,7 +11,8 @@ always `/clear`.
 1. **Everything committed** on `integration`.
 2. **Changelog updated** — new `#N` entry in `Overview.html` + `Overview.pdf` regen.
    → [add_changelog_entry.md](add_changelog_entry.md), [regenerate_overview_pdf.md](regenerate_overview_pdf.md).
-3. **Pushed all the way to remote** — `origin/integration` **and** `v2/master`.
+3. **Pushed all the way to remote** — `origin/integration` **and** `v2/master`. → `tools\push-all.ps1`
+   (checks ahead/behind, pushes both, verifies both refs land; `-DryRun` to preview).
 4. **New docs published to gh-pages** (only if the manual changed).
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
