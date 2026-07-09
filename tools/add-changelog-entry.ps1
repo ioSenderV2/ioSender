@@ -109,15 +109,29 @@ $totIdx = $content.IndexOf('<tr class="tot">')
 if ($totIdx -lt 0) { Fail "no <tr class=""tot""> totals row found" }
 $content = $content.Insert($totIdx, $tocRow)
 
-# --- 5. Totals row: re-sum every per-entry TOC row (self-healing) ----------
-$rowRe = '<td class="n">\d+</td>.*?<span class="chg">(\d+)</span> <span class="del">(\d+)</span> <span class="add">\+?(\d+)</span><br><span class="k">Lines:</span> <span class="add">\+(\d+)</span> <span class="del">-?(\d+)</span>'
-$sumC = 0; $sumD = 0; $sumA = 0; $sumLA = 0; $sumLD = 0; $nRows = 0
-foreach ($m in [regex]::Matches($content, $rowRe)) {
-    $sumC += [int]$m.Groups[1].Value; $sumD += [int]$m.Groups[2].Value; $sumA += [int]$m.Groups[3].Value
-    $sumLA += [int]$m.Groups[4].Value; $sumLD += [int]$m.Groups[5].Value; $nRows++
-}
-$totNew = "<tr class=""tot""><td class=""n""></td><td>Totals ($nRows changes)</td><td class=""sz""><span class=""k"">Files:</span> <span class=""chg"">$sumC</span> <span class=""del"">$sumD</span> <span class=""add"">+$sumA</span><br><span class=""k"">Lines:</span> <span class=""add"">+$sumLA</span> <span class=""del"">-$sumLD</span></td></tr>"
+# --- 5. Totals row: add this entry's numbers to the existing totals --------
+$totRe = 'Totals \((\d+) changes\).*?<span class="chg">(\d+)</span> <span class="del">(\d+)</span> <span class="add">\+?(\d+)</span><br><span class="k">Lines:</span> <span class="add">\+(\d+)</span> <span class="del">-?(\d+)</span>'
+$totM = [regex]::Match($content, $totRe)
+if (-not $totM.Success) { Fail "could not parse the existing totals row" }
+$changes = [int]$totM.Groups[1].Value + 1
+$sumC = [int]$totM.Groups[2].Value + $fChg
+$sumD = [int]$totM.Groups[3].Value + $fDel
+$sumA = [int]$totM.Groups[4].Value + $fNew
+$sumLA = [int]$totM.Groups[5].Value + $linesAdd
+$sumLD = [int]$totM.Groups[6].Value + $linesDel
+$totNew = "<tr class=""tot""><td class=""n""></td><td>Totals ($changes changes)</td><td class=""sz""><span class=""k"">Files:</span> <span class=""chg"">$sumC</span> <span class=""del"">$sumD</span> <span class=""add"">+$sumA</span><br><span class=""k"">Lines:</span> <span class=""add"">+$sumLA</span> <span class=""del"">-$sumLD</span></td></tr>"
 $content = [regex]::Replace($content, '<tr class="tot">.*?</tr>', { $totNew })
+
+# Non-failing drift guard: additive totals should match a fresh re-sum of the rows.
+$rowRe = '<td class="n">\d+</td>.*?<span class="chg">(\d+)</span> <span class="del">(\d+)</span> <span class="add">\+?(\d+)</span><br><span class="k">Lines:</span> <span class="add">\+(\d+)</span> <span class="del">-?(\d+)</span>'
+$rC = 0; $rD = 0; $rA = 0; $rLA = 0; $rLD = 0
+foreach ($m in [regex]::Matches($content, $rowRe)) {
+    $rC += [int]$m.Groups[1].Value; $rD += [int]$m.Groups[2].Value; $rA += [int]$m.Groups[3].Value
+    $rLA += [int]$m.Groups[4].Value; $rLD += [int]$m.Groups[5].Value
+}
+if ($rC -ne $sumC -or $rD -ne $sumD -or $rA -ne $sumA -or $rLA -ne $sumLA -or $rLD -ne $sumLD) {
+    Write-Host ("WARN: totals drift - additive says Files {0}/{1}/+{2} Lines +{3}/-{4}, row re-sum says {5}/{6}/+{7} +{8}/-{9}. The stored totals were off before this entry." -f $sumC, $sumD, $sumA, $sumLA, $sumLD, $rC, $rD, $rA, $rLA, $rLD) -ForegroundColor Yellow
+}
 
 # --- 6. Header count -------------------------------------------------------
 $content = [regex]::Replace($content, '(<strong>)\d+( improvements in the)', { param($m) $m.Groups[1].Value + $N + $m.Groups[2].Value })
@@ -158,7 +172,7 @@ Check 'detail blocks' $prDivs
 Check 'id="prN"' $prIds
 Check 'TOC rows' $tocN
 Check 'header count' $hdr
-Check 'Totals(N changes)' $nRows
+Check 'Totals(N changes)' $changes
 if (-not $ok) { Fail "self-check failed - the four places disagree; review the diff and fix before commit." }
 
 Write-Host "`n--- git diff --stat ---" -ForegroundColor Cyan

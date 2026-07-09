@@ -65,7 +65,8 @@ git push v2 $refspec
 if ($LASTEXITCODE -ne 0) { Fail "push to v2/master failed" }
 
 # Verify both remotes now point at local HEAD.
-git fetch --quiet origin v2
+git fetch --quiet origin
+git fetch --quiet v2
 $head = (git rev-parse $Branch).Trim()
 $originAt = (git rev-parse "origin/$Branch").Trim()
 $v2At = (git rev-parse "v2/master").Trim()
