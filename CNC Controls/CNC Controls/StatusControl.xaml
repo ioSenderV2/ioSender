@@ -20,20 +20,22 @@
                 <local:LogicalNotConverter />
             </local:LogicalOrConverter.FinalConverter>
         </local:LogicalOrConverter>
+        <!-- Content-sized (one space of padding each side) instead of a fixed 66px, to keep the run button row
+             compact so the jog pad has room to its right. -->
         <Style x:Key="StatusButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="66" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />
         </Style>
         <Style x:Key="ResetButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="LightBlue" />
-            <Setter Property="Width" Value="66" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderThickness="1" BorderBrush="#FF707070" >
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderThickness="1" BorderBrush="#FF707070" >
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>

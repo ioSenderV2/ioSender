@@ -15,10 +15,10 @@
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <system:String x:Uid="str_checking" x:Key="Checking">Checking...</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
+        <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
+             leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
         <Style x:Key="JobButtonStyle" TargetType="Button">
-            <Setter Property="MinWidth" Value="95" />
-            <Setter Property="MaxWidth" Value="120" />
-            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />
         </Style>

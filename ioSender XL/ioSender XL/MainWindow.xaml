@@ -157,32 +157,36 @@
              Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
         <Border DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">
             <Grid Margin="6,4">
-                <!-- Left column expands (MDI line stretches until State/Check meets the middle column); the
-                     middle (Signals/feed) and right (overrides) columns are content-sized and sit adjacent. -->
+                <!-- Four columns: [button row | jog pad | signals+feed | overrides]. The button-row column is the
+                     star, so it grows to consume the slack up to the jog pad; the other three are content-sized and
+                     ride at the right edge, adjacent to each other. -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- Left: top line = MDI (fills) + State/Check (right); bottom line = all buttons.
-                     Column is auto-sized to the button row, so the MDI line never extends past Rewind. -->
-                <!-- Left region: three evenly-spaced lines (MDI / run buttons / State) in column 0, with the
-                     jog pad in column 1 filling the space freed by trimming the MDI to the button-row width. -->
-                <Grid Grid.Column="0" VerticalAlignment="Center">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Left">
+                <!-- Button-row region (col 0, star): three lines (MDI / run buttons / State), left-aligned; the
+                     column grows to fill the slack up to the jog pad. -->
+                <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                         <!-- MDI line: width tied to the button row so its right edge (Send) aligns with Program. -->
                         <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" HorizontalAlignment="Left" Margin="0,5,0,0"
                                                 Width="{Binding ElementName=buttonRow, Path=ActualWidth}"/>
-                        <!-- Button line: every run button on one baseline (all top-aligned, equal height). -->
-                        <StackPanel x:Name="buttonRow" Orientation="Horizontal" Margin="0,7,0,0">
-                            <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Top"/>
-                            <cnccontrols:JobControl x:Name="runControl" Margin="8,0,0,0" VerticalAlignment="Top"/>
-                            <ToggleButton x:Name="btnProgramView" Content="Program" MinWidth="80" Margin="8,0,0,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
-                        </StackPanel>
+                        <!-- Button line: the row stretches to fill the star column so its right edge (Program) meets
+                             the jog pad; the three groups (status / job / program) are pushed apart by star spacers
+                             so the run buttons span the width instead of huddling at the left. -->
+                        <Grid x:Name="buttonRow" Margin="0,7,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
+                            <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
+                            <ToggleButton Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                        </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
                              edge ("Feed") aligns with the Program button's right edge above. -->
@@ -226,21 +230,18 @@
                             <cnccontrols:JogPresetSelector Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Grid>
                     </StackPanel>
-                    <!-- Shrunk-down copy of the Jog-tab jog control (arrows only - selection comes from the Jog
-                         tab via shared JogData), centred in the space between the Program button and the signals
-                         column. -->
-                    <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" ArrowsOnly="True" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <cnccontrols:JogBaseControl.LayoutTransform>
-                            <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
-                        </cnccontrols:JogBaseControl.LayoutTransform>
-                    </cnccontrols:JogBaseControl>
-                </Grid>
-                <!-- Middle: signal indicators (flush to top, enlarged to use the spare width) + current feed
-                     rate under them. -->
-                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="18,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),
+                     riding at the left of the right-hand group, just past the button-row column. -->
+                <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" ArrowsOnly="True" Margin="18,0,10,0" VerticalAlignment="Center">
+                    <cnccontrols:JogBaseControl.LayoutTransform>
+                        <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
+                    </cnccontrols:JogBaseControl.LayoutTransform>
+                </cnccontrols:JogBaseControl>
+                <!-- Signals (col 2): indicators (flush to top) + current feed rate under them; butts against the jog pad. -->
+                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Left">
                     <cnccontrols:SignalsControl VerticalAlignment="Top" Margin="0">
                         <cnccontrols:SignalsControl.LayoutTransform>
-                            <ScaleTransform ScaleX="1.15" ScaleY="1.15"/>
+                            <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
                         </cnccontrols:SignalsControl.LayoutTransform>
                     </cnccontrols:SignalsControl>
                     <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
@@ -250,9 +251,9 @@
                     </StackPanel>
                 </StackPanel>
                 <!-- Right: feed / rapids override controls, given ~25% more room. -->
-                <cnccontrols:FeedControl Grid.Column="2" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
+                <cnccontrols:FeedControl Grid.Column="3" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
                     <cnccontrols:FeedControl.LayoutTransform>
-                        <ScaleTransform ScaleX="1.1" ScaleY="1.1"/>
+                        <ScaleTransform ScaleX="0.82" ScaleY="0.82"/>
                     </cnccontrols:FeedControl.LayoutTransform>
                 </cnccontrols:FeedControl>
             </Grid>
