@@ -80,6 +80,25 @@ function Get-TurnText($entry) {
     return ($texts -join "`n")
 }
 
+# Pasted images live on genuine user turns as base64 content blocks
+# ({type:image, source:{type:base64, media_type, data}}). Return them as ready-to-embed data: URIs so the
+# HTML is self-contained (no image folder). Images Claude viewed via the Read tool are toolUseResult turns,
+# filtered out before this runs - so only what the user actually pasted is captured.
+function Get-TurnImages($entry) {
+    $msg = $entry.message
+    if ($null -eq $msg) { return @() }
+    $content = $msg.content
+    if ($null -eq $content -or $content -is [string]) { return @() }
+    $imgs = New-Object System.Collections.Generic.List[string]
+    foreach ($b in $content) {
+        if ($b.type -eq 'image' -and $b.source -and $b.source.type -eq 'base64' -and $b.source.data) {
+            $mt = if ($b.source.media_type) { [string]$b.source.media_type } else { 'image/png' }
+            $imgs.Add("data:$mt;base64," + [string]$b.source.data)
+        }
+    }
+    return $imgs.ToArray()
+}
+
 # One transcript line -> a turn object { Who; When(datetime); Ts(string); Text } or $null.
 function ConvertFrom-Line([string]$line) {
     $line = $line.TrimEnd("`r")
@@ -90,20 +109,23 @@ function ConvertFrom-Line([string]$line) {
     if ($t -eq 'user' -and ($o.isMeta -eq $true -or $null -ne $o.toolUseResult)) { return $null }
 
     $text = Get-TurnText $o
-    if ($null -eq $text) { return $null }
+    $images = if ($t -eq 'user') { Get-TurnImages $o } else { @() }
 
     if ($t -eq 'user') {
-        $text = Format-UserText $text
-        if ($null -eq $text) { return $null }
+        if ($null -ne $text) { $text = Format-UserText $text }
+        # Keep a paste that is images-only (no surviving text) as long as it carries at least one image.
+        if (($null -eq $text -or $text -eq '') -and $images.Count -eq 0) { return $null }
+        if ($null -eq $text) { $text = '' }
         $who = 'You'
     } else {
+        if ($null -eq $text) { return $null }
         $text = $text.Trim()
         if ($text -eq '') { return $null }
         $who = 'Claude'
     }
     if (-not $o.timestamp) { return $null }
     try { $when = ([datetime]$o.timestamp).ToLocalTime() } catch { return $null }
-    return [pscustomobject]@{ Who = $who; When = $when; Ts = $when.ToString('yyyy-MM-dd HH:mm:ss'); Text = $text }
+    return [pscustomobject]@{ Who = $who; When = $when; Ts = $when.ToString('yyyy-MM-dd HH:mm:ss'); Text = $text; Images = $images }
 }
 
 function Protect-Html([string]$s) { return $s.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;') }
@@ -173,6 +195,7 @@ function Build-Html([object[]]$turns, [string]$Title, [datetime]$Start, [datetim
   .claude .who { color:#6b21a8; }
   .ts { font-size:11px; color:#8a8f98; font-variant-numeric:tabular-nums; }
   .content { white-space:pre-wrap; word-wrap:break-word; }
+  .paste { display:block; max-width:100%; height:auto; margin:10px 0 2px; border-radius:8px; border:1px solid #dfe1e5; }
   code { background:#eaecef; border-radius:4px; padding:1px 5px; font:13px/1.4 Consolas,Menlo,monospace; }
   pre.code { background:#0d1117; color:#e6edf3; padding:12px 14px; border-radius:8px; overflow-x:auto;
              white-space:pre; margin:8px 0; font:13px/1.45 Consolas,Menlo,monospace; }
@@ -182,6 +205,7 @@ function Build-Html([object[]]$turns, [string]$Title, [datetime]$Start, [datetim
     footer { border-color:#2a2d33; }
     .turn { background:#191b1f; border-color:#2a2d33; }
     .turn.you { background:#16233b; border-color:#274472; }
+    .paste { border-color:#2a2d33; }
     .you .who { color:#7aa7ff; } .claude .who { color:#d0a3ff; }
     code { background:#2a2d33; }
   }
@@ -193,6 +217,9 @@ function Build-Html([object[]]$turns, [string]$Title, [datetime]$Start, [datetim
         $cls = if ($t.Who -eq 'You') { 'you' } else { 'claude' }
         [void]$sb.Append("<section class=`"turn $cls`"><div class=`"turnhead`"><span class=`"who`">$($t.Who)</span><span class=`"ts`">$($t.Ts)</span></div>")
         [void]$sb.Append((ConvertTo-TurnHtml $t.Text))
+        if ($t.Images -and $t.Images.Count -gt 0) {
+            foreach ($src in $t.Images) { [void]$sb.Append("<img class=`"paste`" src=`"$src`" alt=`"pasted image`">") }
+        }
         [void]$sb.Append("</section>`n")
     }
     [void]$sb.Append("</main>`n<footer>Session started <strong>$startStr</strong> &middot; ended <strong>$endStr</strong> &middot; duration $durStr &middot; $($turns.Count) turns</footer>`n</body></html>`n")
