@@ -31,10 +31,10 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock x:Uid="txt_available" Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstAvailable" x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
 
                     <TextBlock x:Uid="txt_rightOf3d" Grid.Column="2" Grid.Row="0" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstMain" x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToMain" x:Uid="btn_toMain" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to right of 3D view"/>
                         <Button x:Name="btnFromMain" x:Uid="btn_fromMain" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove"/>
@@ -45,7 +45,7 @@
                     </StackPanel>
 
                     <TextBlock x:Uid="txt_leftOf3d" Grid.Column="2" Grid.Row="2" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                    <ListBox x:Name="lstLeft" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstLeft" x:Name="lstLeft" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToLeft" x:Uid="btn_toLeft" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToLeft_Click" ToolTip="Add to left of 3D view"/>
                         <Button x:Name="btnFromLeft" x:Uid="btn_fromLeft" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromLeft_Click" ToolTip="Remove"/>
@@ -56,7 +56,7 @@
                     </StackPanel>
 
                     <TextBlock x:Uid="txt_flyouts" Grid.Column="2" Grid.Row="4" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                    <ListBox x:Name="lstFlyouts" Grid.Column="2" Grid.Row="5" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstFlyouts" x:Name="lstFlyouts" Grid.Column="2" Grid.Row="5" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToFlyout" x:Uid="btn_toFlyout" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
                         <Button x:Name="btnFromFlyout" x:Uid="btn_fromFlyout" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
@@ -82,10 +82,10 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock x:Uid="txt_hiddenTabs" Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstTabsAvail" x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
 
                     <TextBlock x:Uid="txt_shownTabs" Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <ListBox x:Uid="lstTabsShown" x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnTabShow" x:Uid="btn_tabShow" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
                         <Button x:Name="btnTabHide" x:Uid="btn_tabHide" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
@@ -105,7 +105,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock x:Uid="txt_unavailNote" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,4"
                                Text="Components not offered on this controller, and why (based on the connected controller's reported capabilities):"/>
-                    <ListView x:Name="lstUnavailable" Grid.Row="1">
+                    <ListView x:Uid="lstUnavailable" x:Name="lstUnavailable" Grid.Row="1">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn x:Uid="col_unavailComp" Header="Component" Width="190" DisplayMemberBinding="{Binding Label}"/>

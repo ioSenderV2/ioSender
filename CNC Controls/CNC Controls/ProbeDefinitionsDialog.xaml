@@ -17,7 +17,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <DataGrid x:Name="grd" Grid.Row="0" Grid.Column="0" Height="240" AutoGenerateColumns="False"
+        <DataGrid x:Uid="grd" x:Name="grd" Grid.Row="0" Grid.Column="0" Height="240" AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                   HeadersVisibility="Column" GridLinesVisibility="All"
                   SelectionChanged="grd_SelectionChanged" MouseDoubleClick="grd_MouseDoubleClick">

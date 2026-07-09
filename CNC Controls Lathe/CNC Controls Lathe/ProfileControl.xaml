@@ -16,8 +16,8 @@
             <ColumnDefinition Width="25*"/>
         </Grid.ColumnDefinitions>
         <Label x:Name="lblProfile" Content="Profile:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="48"/>
-        <ComboBox x:Name="cbxProfile" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedItem="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0" MinWidth="300" SelectionChanged="cbxProfile_SelectionChanged"/>
-        <Button x:Name="btnAddProfile" Background="{StaticResource OptionsImage}" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" Width="23" Height="23" Focusable="False" Click="btnAddProfile_Click">
+        <ComboBox x:Uid="cbxProfile" x:Name="cbxProfile" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedItem="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0" MinWidth="300" SelectionChanged="cbxProfile_SelectionChanged"/>
+        <Button x:Uid="btnAddProfile" x:Name="btnAddProfile" Background="{StaticResource OptionsImage}" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" Width="23" Height="23" Focusable="False" Click="btnAddProfile_Click">
             <!-- <Image Source="Resources/btnOptions.png"/> -->
         </Button>
 

@@ -23,7 +23,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DataGrid x:Name="grdMacros" Grid.Row="0" Grid.Column="0" AutoGenerateColumns="False"
+        <DataGrid x:Uid="grdMacros" x:Name="grdMacros" Grid.Row="0" Grid.Column="0" AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" SelectionMode="Single"
                   RowHeaderWidth="0" BorderBrush="#FFD0D0D0" BorderThickness="1"

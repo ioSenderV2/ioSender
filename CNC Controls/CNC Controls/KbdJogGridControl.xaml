@@ -35,10 +35,10 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" Text="{Binding SpeedHeader}" Foreground="#FF57606A" HorizontalAlignment="Center" Margin="0,0,0,2"/>
-            <Button x:Name="s0" Grid.Row="1" Tag="0" Style="{StaticResource JogCell}" Click="Speed_Click">
+            <Button x:Uid="s0" x:Name="s0" Grid.Row="1" Tag="0" Style="{StaticResource JogCell}" Click="Speed_Click">
                 <TextBlock><Run Text="Slow:  "/><Run Text="{Binding SlowText, Mode=OneWay}"/></TextBlock>
             </Button>
-            <Button x:Name="s1" Grid.Row="2" Tag="1" Style="{StaticResource JogCell}" Click="Speed_Click">
+            <Button x:Uid="s1" x:Name="s1" Grid.Row="2" Tag="1" Style="{StaticResource JogCell}" Click="Speed_Click">
                 <TextBlock><Run Text="Fast:  "/><Run Text="{Binding FastText, Mode=OneWay}"/></TextBlock>
             </Button>
         </Grid>

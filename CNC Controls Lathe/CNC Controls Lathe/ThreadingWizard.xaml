@@ -78,13 +78,13 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Label x:Name="lblThreadType" Content="Type:" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="cbxThreadType" Grid.Column="1" MinWidth="260" MinHeight="22" Margin="4,2,0,0" VerticalAlignment="Center"
+                        <ComboBox x:Uid="cbxThreadType" x:Name="cbxThreadType" Grid.Column="1" MinWidth="260" MinHeight="22" Margin="4,2,0,0" VerticalAlignment="Center"
                                 ItemsSource="{Binding Path=Thread.Types}"
                                 SelectedValue="{Binding Path=Thread.Type, Mode=TwoWay}"
                                 DisplayMemberPath="Value"
                                 SelectedValuePath="Key" />
                         <Label x:Name="lblThreadSize" Grid.Row="1" Content="Size:" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="cbxThreadSize" Grid.Row="1" Grid.Column="1" MinWidth="260" MinHeight="22" Margin="4,2,0,0" VerticalAlignment="Center"
+                        <ComboBox x:Uid="cbxThreadSize" x:Name="cbxThreadSize" Grid.Row="1" Grid.Column="1" MinWidth="260" MinHeight="22" Margin="4,2,0,0" VerticalAlignment="Center"
                                 ItemsSource="{Binding Path=Thread.ThreadSizes}"
                                 SelectedItem="{Binding Path=Thread.ThreadSize, Mode=TwoWay}"
                                 DisplayMemberPath="Name"
@@ -92,8 +92,8 @@
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="4,6,0,0">
-                        <RadioButton x:Name="btnOutside" Content="Outside" VerticalAlignment="Center" IsChecked="{Binding Path=Thread.Side, Mode=TwoWay, Converter={StaticResource OutsideConverter}}" IsEnabled="{Binding Path=Thread.Sides, Converter={StaticResource IsSideEnabledConverter}}"/>
-                        <RadioButton x:Name="btnInside" Content="Inside" VerticalAlignment="Center" Margin="16,0,0,0" IsChecked="{Binding Path=Thread.Side, Mode=TwoWay, Converter={StaticResource InsideConverter}}" IsEnabled="{Binding Path=Thread.Sides, Converter={StaticResource IsSideEnabledConverter}}"/>
+                        <RadioButton x:Uid="btnOutside" x:Name="btnOutside" Content="Outside" VerticalAlignment="Center" IsChecked="{Binding Path=Thread.Side, Mode=TwoWay, Converter={StaticResource OutsideConverter}}" IsEnabled="{Binding Path=Thread.Sides, Converter={StaticResource IsSideEnabledConverter}}"/>
+                        <RadioButton x:Uid="btnInside" x:Name="btnInside" Content="Inside" VerticalAlignment="Center" Margin="16,0,0,0" IsChecked="{Binding Path=Thread.Side, Mode=TwoWay, Converter={StaticResource InsideConverter}}" IsEnabled="{Binding Path=Thread.Sides, Converter={StaticResource IsSideEnabledConverter}}"/>
                     </StackPanel>
 
                     <GroupBox Header="Dimensions" Margin="0,6,0,0">
@@ -140,8 +140,8 @@
                                     <Image x:Name="pictureRadius" Height="60" Width="50" MouseUp="pictureTool_MouseUp" Source="Resources/ToolRadius.png"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <RadioButton x:Name="btnChamfer" Content="Chamfer a" VerticalAlignment="Center" IsChecked="{Binding Path=Tool.Shape, Mode=TwoWay, Converter={StaticResource ToolIsChamferedConverter}}"/>
-                                    <RadioButton x:Name="btnRadius" Content="Radius r" VerticalAlignment="Center" Margin="12,0,0,0" IsChecked="{Binding Path=Tool.Shape, Mode=TwoWay, Converter={StaticResource ToolIsRoundedConverter}}"/>
+                                    <RadioButton x:Uid="btnChamfer" x:Name="btnChamfer" Content="Chamfer a" VerticalAlignment="Center" IsChecked="{Binding Path=Tool.Shape, Mode=TwoWay, Converter={StaticResource ToolIsChamferedConverter}}"/>
+                                    <RadioButton x:Uid="btnRadius" x:Name="btnRadius" Content="Radius r" VerticalAlignment="Center" Margin="12,0,0,0" IsChecked="{Binding Path=Tool.Shape, Mode=TwoWay, Converter={StaticResource ToolIsRoundedConverter}}"/>
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
@@ -247,7 +247,7 @@
                                 </Grid.RowDefinitions>
                                 <Label x:Name="lblLinuxTaper" Content="Taper:" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="4,2,0,0">
-                                    <ComboBox x:Name="cbxTapertype" ItemsSource="{Binding Path=Thread.TaperTypes}" SelectedItem="{Binding Path=Thread.TaperType, Mode=TwoWay}" MinWidth="55" VerticalAlignment="Center"/>
+                                    <ComboBox x:Uid="cbxTapertype" x:Name="cbxTapertype" ItemsSource="{Binding Path=Thread.TaperTypes}" SelectedItem="{Binding Path=Thread.TaperType, Mode=TwoWay}" MinWidth="55" VerticalAlignment="Center"/>
                                     <Controls:NumericTextBox x:Name="cvTaperLength" Format="##0.0##" Value="{Binding Path=Thread.TaperLength, Mode=TwoWay}" IsEnabled="{Binding Path=Thread.TaperType, Converter={StaticResource TaperEnableConverter}}" MinWidth="55" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                     <Label x:Name="lblUnitE2Taper" Content="{Binding Path=Unit, Mode=OneWay}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
@@ -290,7 +290,7 @@
                             </Controls:NumericField>
                             <StackPanel Orientation="Horizontal">
                                 <Controls:NumericField Name="cvSpindleRPM" Label="Spindle:" ColonAt="90" Format="####0" Value="{Binding Path=RPM, Mode=TwoWay}" Unit="RPM" Style="{StaticResource ErrorStyle}"/>
-                                <ComboBox x:Name="cbxSpindleDir" IsEditable="False" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="6,2,0,0"
+                                <ComboBox x:Uid="cbxSpindleDir" x:Name="cbxSpindleDir" IsEditable="False" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="6,2,0,0"
                                         DisplayMemberPath="Name" SelectedValuePath="Dir"
                                         ItemsSource="{Binding Path=SpindleDirections}"
                                         SelectedValue="{Binding Path=SpindleDir, Mode=TwoWay}"/>
@@ -305,7 +305,7 @@
         <!-- ===== Bottom: Calculate + generated passes / g-code preview + warning ===== -->
         <StackPanel Grid.Row="1" Margin="0,6,0,0">
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="btnCalculate" Content="Calculate" MinWidth="75" MinHeight="24" Padding="8,2" VerticalAlignment="Center" Click="btnCalculate_Click"/>
+                <Button x:Uid="btnCalculate" x:Name="btnCalculate" Content="Calculate" MinWidth="75" MinHeight="24" Padding="8,2" VerticalAlignment="Center" Click="btnCalculate_Click"/>
                 <TextBlock TextWrapping="Wrap" Margin="12,0,0,0" VerticalAlignment="Center">
                     <Run x:Uid="txt_warning" Text="Warning! Use with care - only lightly tested!" Foreground="Red" FontWeight="Bold"/>
                 </TextBlock>
@@ -315,7 +315,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtPasses" Grid.Column="0" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,0,4,0">
+                <TextBox x:Uid="txtPasses" x:Name="txtPasses" Grid.Column="0" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,0,4,0">
                     <TextBox.Text>
                         <MultiBinding Converter="{StaticResource GCodeConverter}">
                             <Binding Path="PassData" Mode="OneWay"/>
@@ -323,7 +323,7 @@
                         </MultiBinding>
                     </TextBox.Text>
                 </TextBox>
-                <TextBox x:Name="txtGCode" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="4,0,0,0">
+                <TextBox x:Uid="txtGCode" x:Name="txtGCode" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" MaxHeight="140" VerticalScrollBarVisibility="Auto" Margin="4,0,0,0">
                     <TextBox.Text>
                         <MultiBinding Converter="{StaticResource GCodeConverter}">
                             <Binding Path="gCode" Mode="OneWay"/>

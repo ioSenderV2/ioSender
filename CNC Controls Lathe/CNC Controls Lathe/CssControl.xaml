@@ -13,9 +13,9 @@
             <ColumnDefinition Width="140"/>
             <ColumnDefinition Width="125*"/>
         </Grid.ColumnDefinitions>
-        <CheckBox x:Name="chkCSS" Content="CSS (Constand Surface Speed)" IsChecked="{Binding Path=IsCssEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+        <CheckBox x:Uid="chkCSS" x:Name="chkCSS" Content="CSS (Constand Surface Speed)" IsChecked="{Binding Path=IsCssEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
         <cncontrols:NumericField x:Name="data" Grid.Column="1" Format="###0" Label="Spindle:" ColonAt="55" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Unit="RPM" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        <ComboBox x:Name="cbxSpindleDir" Grid.Column="2" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" Margin="0,2"
+        <ComboBox x:Uid="cbxSpindleDir" x:Name="cbxSpindleDir" Grid.Column="2" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" Margin="0,2"
                   DisplayMemberPath="Name" SelectedValuePath="Dir"
                   ItemsSource="{Binding Path=SpindleDirections}"
                   SelectedValue="{Binding Path=SpindleDir, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"/>

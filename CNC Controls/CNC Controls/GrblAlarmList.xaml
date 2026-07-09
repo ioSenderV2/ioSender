@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="300" Loaded="UserControl_Loaded">
-    <DataGrid x:Name="dgrAlarms" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+    <DataGrid x:Uid="dgrAlarms" x:Name="dgrAlarms" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                   SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False"
                   CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" CanUserAddRows="False">
         <DataGrid.Columns>

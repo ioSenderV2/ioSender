@@ -23,7 +23,7 @@
                     ToolTip="Simulate the loaded program in this view (does NOT move the machine)."/>
             <Button x:Uid="btn_carvePause" Content="Pause" MinWidth="54" Padding="6,2" Margin="4,0,0,0" Focusable="False" Click="Pause_Click"/>
             <Button x:Uid="btn_carveStop" Content="Stop" MinWidth="54" Padding="6,2" Margin="4,0,0,0" Focusable="False" Click="Stop_Click"/>
-            <ComboBox x:Name="cbxSpeed" MinWidth="56" Margin="4,0,0,0" VerticalAlignment="Center" SelectedIndex="0"
+            <ComboBox x:Uid="cbxSpeed" x:Name="cbxSpeed" MinWidth="56" Margin="4,0,0,0" VerticalAlignment="Center" SelectedIndex="0"
                       SelectionChanged="Speed_SelectionChanged" ToolTip="Playback speed">
                 <ComboBoxItem Content="1x"/>
                 <ComboBoxItem Content="2x"/>

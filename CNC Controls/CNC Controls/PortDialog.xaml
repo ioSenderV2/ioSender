@@ -98,7 +98,7 @@
                         <!-- Editable host combo: type an IP/hostname, or pick one that Scan network discovered.
                              The dropdown shows the rich "host:port - grblHAL x.x" label (ItemTemplate); the edit
                              box shows just the host (ToString/TextSearch) which is what gets connected to. -->
-                        <ComboBox x:Name="cbxHost" Style="{StaticResource HostErrorStyle}" IsEditable="True" StaysOpenOnEdit="True"
+                        <ComboBox x:Uid="cbxHost" x:Name="cbxHost" Style="{StaticResource HostErrorStyle}" IsEditable="True" StaysOpenOnEdit="True"
                                   IsTextSearchEnabled="True" TextSearch.TextPath="Host"
                                   HorizontalAlignment="Left" VerticalAlignment="Center" MinHeight="24" Width="240"
                                   ItemsSource="{Binding DiscoveredHosts}" SelectionChanged="cbxHost_SelectionChanged">

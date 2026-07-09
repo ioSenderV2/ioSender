@@ -12,7 +12,7 @@
             <ColumnDefinition Width="125"/>
             <ColumnDefinition Width="50"/>
         </Grid.ColumnDefinitions>
-        <CheckBox x:Name="chkSpringPasses" Content="Spring passes:" IsChecked="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        <CheckBox x:Uid="chkSpringPasses" x:Name="chkSpringPasses" Content="Spring passes:" IsChecked="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
         <cncontrols:NumericTextBox x:Name="data" Format="#0" IsEnabled="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" Margin="5,0,0,0" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9"/>
     </Grid>
 </UserControl>

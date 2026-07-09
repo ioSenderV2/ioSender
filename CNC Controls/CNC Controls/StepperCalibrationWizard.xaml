@@ -35,7 +35,7 @@
         <StackPanel Orientation="Vertical" Margin="0,5,0,0" MinWidth="360" HorizontalAlignment="Left" Grid.ColumnSpan="2">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_axis" x:Name="lblTool" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="70"/>
-                <ComboBox x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index" ItemsSource="{Binding Path=Axes}" SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="0,2">
+                <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index" ItemsSource="{Binding Path=Axes}" SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="0,2">
                     <ComboBox.IsEnabled>
                         <MultiBinding Converter="{StaticResource StateToBooleanConverter}">
                             <Binding Path="GrblState"/>
@@ -114,7 +114,7 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBox x:Name="txtInstructions" Grid.Row="0" Background="Transparent" BorderThickness="0" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+            <TextBox x:Uid="txtInstructions" x:Name="txtInstructions" Grid.Row="0" Background="Transparent" BorderThickness="0" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
             <TextBlock x:Name="txtWarnings" Grid.Row="1" Foreground="Red" Margin="0,5,0,0" TextWrapping="Wrap"/>
         </Grid>
     </Grid>

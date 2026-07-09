@@ -47,7 +47,7 @@
         <StackPanel Grid.Column="1" Grid.IsSharedSizeScope="True" HorizontalAlignment="Left" Margin="20,15,0,0" VerticalAlignment="Top">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_tool" x:Name="lblTool" Content="Tool:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Margin="37,0,0,0" VerticalAlignment="Top"/>
-                <TextBox x:Name="txtTool" HorizontalAlignment="Left" MinHeight="23" TextWrapping="NoWrap" VerticalAlignment="Top" MinWidth="25" IsReadOnly="True"/>
+                <TextBox x:Uid="txtTool" x:Name="txtTool" HorizontalAlignment="Left" MinHeight="23" TextWrapping="NoWrap" VerticalAlignment="Top" MinWidth="25" IsReadOnly="True"/>
             </StackPanel>
             <local:CoordValueSetControl x:Uid="lbl_xAxis" x:Name="cvXOffset" Label="X axis:" Tag="X" Value="{Binding Path=offset.X, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Click="cvOffset_Click"/>
             <local:CoordValueSetControl x:Uid="lbl_yAxis" x:Name="cvYOffset" Label="Y axis:" Tag="Y" Value="{Binding Path=offset.Y, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Style="{StaticResource YAxisVisibleStyle}" Click="cvOffset_Click"/>

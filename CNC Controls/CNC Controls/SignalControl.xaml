@@ -26,7 +26,7 @@
         </Style>
     </UserControl.Resources>
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <Button x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
+        <Button x:Uid="btnLED" x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
         <Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
             <Ellipse x:Name="ellSignal" Width="19" Height="19" Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" FontFamily="Global User Interface"/>

@@ -67,7 +67,7 @@
             <ColumnDefinition Width="22*"/>
         </Grid.ColumnDefinitions>
         <Border Width="88" Height="22" Background="White" BorderBrush="DarkGray" BorderThickness="1 1 0 1">
-            <Button x:Name="cbut" Width="83" Height="16" Focusable="False" BorderThickness="0" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{DynamicResource ButtonStyle1}">
+            <Button x:Uid="cbut" x:Name="cbut" Width="83" Height="16" Focusable="False" BorderThickness="0" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{DynamicResource ButtonStyle1}">
 
             </Button>
         </Border>

@@ -17,7 +17,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Label x:Uid="lbl_cameraDevice" Content="Device:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Name="cbxDevice" Grid.Column="1" ItemsSource="{Binding Path=Camera.AvailableCameras}"
+                <ComboBox x:Uid="cbxDevice" x:Name="cbxDevice" Grid.Column="1" ItemsSource="{Binding Path=Camera.AvailableCameras}"
                           DisplayMemberPath="Name" SelectedValuePath="Moniker" DropDownOpened="cbxDevice_DropDownOpened"
                           HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Grid>
@@ -33,7 +33,7 @@
                     <ColumnDefinition Width="100*"/>
                 </Grid.ColumnDefinitions>
                 <Label x:Uid="lbl_offsetMotion" Content="Offset motion:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80"/>
+                <ComboBox x:Uid="comboBox" x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80"/>
             </Grid>
             <Button x:Uid="btn_getPosition" x:Name="getPosition" Content="Get current position" MinWidth="150" Margin="0,4,0,0" Click="getPosition_Click"/>
         </StackPanel>

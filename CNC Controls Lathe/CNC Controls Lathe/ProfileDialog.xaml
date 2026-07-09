@@ -18,8 +18,8 @@
     <StackPanel Margin="10">
         <StackPanel Orientation="Horizontal">
             <Label x:Name="lblProfile" Content="Profile:" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cbxProfile" IsEditable="True" ItemsSource="{Binding Path=Profiles}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedItem="{Binding Path=Profile, Mode=TwoWay}" MinWidth="280" MinHeight="22" Margin="4,0,0,0" VerticalAlignment="Center" SelectionChanged="cbxProfile_SelectionChanged" TextBoxBase.TextChanged="cbxProfile_TextChanged"/>
-            <Button x:Name="btnAddProfile" Content="Add" IsEnabled="False" MinWidth="46" MinHeight="22" Margin="15,0,0,0" VerticalAlignment="Center" Click="btnAddProfile_Click"/>
+            <ComboBox x:Uid="cbxProfile" x:Name="cbxProfile" IsEditable="True" ItemsSource="{Binding Path=Profiles}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedItem="{Binding Path=Profile, Mode=TwoWay}" MinWidth="280" MinHeight="22" Margin="4,0,0,0" VerticalAlignment="Center" SelectionChanged="cbxProfile_SelectionChanged" TextBoxBase.TextChanged="cbxProfile_TextChanged"/>
+            <Button x:Uid="btnAddProfile" x:Name="btnAddProfile" Content="Add" IsEnabled="False" MinWidth="46" MinHeight="22" Margin="15,0,0,0" VerticalAlignment="Center" Click="btnAddProfile_Click"/>
         </StackPanel>
         <GroupBox x:Name="grpCutDepths" Header="Cut depths" Margin="0,8,0,0">
             <StackPanel Margin="4,2,0,0">
@@ -57,13 +57,13 @@
         </StackPanel>
         <GroupBox x:Name="grpXMode" Header="X-axis" Margin="0,6,0,0">
             <StackPanel Orientation="Horizontal" Margin="20,4,0,0">
-                <RadioButton x:Name="btnRadius" Content="Radius mode" IsChecked="{Binding Path=xmode, Mode=TwoWay, Converter={StaticResource RadiusConverter}}" IsEnabled="{Binding Path=xmodeenabled}" VerticalAlignment="Center"/>
-                <RadioButton x:Name="btnDiameter" Content="Diameter mode" IsChecked="{Binding Path=xmode, Mode=TwoWay, Converter={StaticResource DiameterConverter}}" IsEnabled="{Binding Path=xmodeenabled}" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                <RadioButton x:Uid="btnRadius" x:Name="btnRadius" Content="Radius mode" IsChecked="{Binding Path=xmode, Mode=TwoWay, Converter={StaticResource RadiusConverter}}" IsEnabled="{Binding Path=xmodeenabled}" VerticalAlignment="Center"/>
+                <RadioButton x:Uid="btnDiameter" x:Name="btnDiameter" Content="Diameter mode" IsChecked="{Binding Path=xmode, Mode=TwoWay, Converter={StaticResource DiameterConverter}}" IsEnabled="{Binding Path=xmodeenabled}" Margin="20,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
         </GroupBox>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-            <Button x:Name="btnOk" Content="Ok" MinWidth="75" MinHeight="24" Padding="8,2" Click="btnOk_Click"/>
-            <Button x:Name="btnCancel" Content="Cancel" MinWidth="75" MinHeight="24" Padding="8,2" Margin="25,0,0,0" Click="btnCancel_Click"/>
+            <Button x:Uid="btnOk" x:Name="btnOk" Content="Ok" MinWidth="75" MinHeight="24" Padding="8,2" Click="btnOk_Click"/>
+            <Button x:Uid="btnCancel" x:Name="btnCancel" Content="Cancel" MinWidth="75" MinHeight="24" Padding="8,2" Margin="25,0,0,0" Click="btnCancel_Click"/>
         </StackPanel>
     </StackPanel>
 </Window>

@@ -25,7 +25,7 @@
         <StackPanel DockPanel.Dock="Top">
             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                 <Label x:Uid="pd_type" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Name="cbxType" MinWidth="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
+                <ComboBox x:Uid="cbxType" x:Name="cbxType" MinWidth="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxType_SelectionChanged">
                     <ComboBoxItem x:Uid="pd_type3d" Content="3D touch probe" Tag="ThreeDProbe"/>
                     <ComboBoxItem x:Uid="pd_typePlate" Content="Touch plate" Tag="TouchPlate"/>
                     <ComboBoxItem x:Uid="pd_typeSetter" Content="Tool setter" Tag="ToolSetter"/>

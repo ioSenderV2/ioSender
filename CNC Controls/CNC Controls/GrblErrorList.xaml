@@ -7,7 +7,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="310" d:DesignWidth="510"
              Loaded="UserControl_Loaded">
-    <DataGrid x:Name="dgrErrors" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+    <DataGrid x:Uid="dgrErrors" x:Name="dgrErrors" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                   SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False"
                   CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" CanUserAddRows="False">
         <DataGrid.Columns>

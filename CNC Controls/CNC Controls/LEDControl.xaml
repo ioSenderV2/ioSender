@@ -26,7 +26,7 @@
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
         <Border BorderBrush="LightGray" BorderThickness="1" Width="12" Height="12" Margin="2,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Button x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
+            <Button x:Uid="btnLED" x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
         </Border>
         <Label x:Name="labelLED" Content="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" MinWidth="100" Margin="2,0,0,0" VerticalAlignment="Center" FontSize="12" FontFamily="Global User Interface"/>
     </StackPanel>

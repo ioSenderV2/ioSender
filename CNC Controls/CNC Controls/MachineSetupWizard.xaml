@@ -89,11 +89,11 @@
                                     ToolTip="Show the controller's $I build/version information."/>
                         </DockPanel>
                         <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <ComboBox x:Name="cbxManufacturer" MinWidth="170" Margin="0,0,6,4" MinHeight="22"
+                            <ComboBox x:Uid="cbxManufacturer" x:Name="cbxManufacturer" MinWidth="170" Margin="0,0,6,4" MinHeight="22"
                                       ItemsSource="{Binding Manufacturers, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                       SelectionChanged="Manufacturer_Changed"/>
-                            <ComboBox x:Name="cbxProduct" MinWidth="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
-                            <ComboBox x:Name="cbxModel" MinWidth="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
+                            <ComboBox x:Uid="cbxProduct" x:Name="cbxProduct" MinWidth="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
+                            <ComboBox x:Uid="cbxModel" x:Name="cbxModel" MinWidth="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
                         </WrapPanel>
                         <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                    TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>
@@ -281,7 +281,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
                                Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
-                    <DataGrid x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
+                    <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"
                               SelectionChanged="Probes_SelectionChanged" MouseDoubleClick="Probes_DoubleClick">
@@ -314,7 +314,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
                                Text="Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Start Job corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
-                    <DataGrid x:Name="grdMacros" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                    <DataGrid x:Uid="grdMacros" x:Name="grdMacros" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="All">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn x:Uid="msc_name" Header="Name" Width="*" MinWidth="150">

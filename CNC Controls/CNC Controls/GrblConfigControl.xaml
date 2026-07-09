@@ -111,7 +111,7 @@
                 <Button x:Uid="btn_matchPrev" x:Name="btnMatchPrev" Content="▲" MinWidth="26" Padding="4,1" Margin="4,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchPrev_Click" IsEnabled="False" ToolTip="Previous match (F4)"/>
                 <Button x:Uid="btn_matchNext" x:Name="btnMatchNext" Content="▼" MinWidth="26" Padding="4,1" Margin="2,0,0,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Click="btnMatchNext_Click" IsEnabled="False" ToolTip="Next match (F3)"/>
             </StackPanel>
-            <TreeView x:Name="treeView" Grid.Row="1" HorizontalAlignment="Left" Margin="10,5,0,10" VerticalAlignment="Stretch"
+            <TreeView x:Uid="treeView" x:Name="treeView" Grid.Row="1" HorizontalAlignment="Left" Margin="10,5,0,10" VerticalAlignment="Stretch"
                       Width="{Binding ActualWidth, ElementName=searchPanel}" MinWidth="390" SelectedItemChanged="treeView_SelectedItemChanged" Grid.RowSpan="2">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type cnccore:GrblSettingGroup}" ItemsSource="{Binding Settings}" >
@@ -141,7 +141,7 @@
                 </TreeView.Resources>
             </TreeView>
         </Grid>
-        <DataGrid x:Name="dgrSettings" DockPanel.Dock="Left" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Left" Margin="10,10" VerticalAlignment="Stretch" Width="390"
+        <DataGrid x:Uid="dgrSettings" x:Name="dgrSettings" DockPanel.Dock="Left" ItemsSource="{Binding}" IsReadOnly="True" HorizontalAlignment="Left" Margin="10,10" VerticalAlignment="Stretch" Width="390"
                   SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False" Visibility="Collapsed"
                   CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" CanUserAddRows="False" SelectionChanged="dgrSettings_SelectionChanged">
             <DataGrid.RowStyle>
@@ -178,7 +178,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <StackPanel x:Name="canvas" Grid.Row="0" HorizontalAlignment="Left" MinHeight="30" Width="455" VerticalAlignment="Top"/>
-                <TextBox x:Name="txtDescription" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" Margin="5,10,0,0" HorizontalAlignment="Left" MinHeight="120" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Width="550"/>
+                <TextBox x:Uid="txtDescription" x:Name="txtDescription" Grid.Row="1" Background="#FFF8F8F8" IsReadOnly="True" Margin="5,10,0,0" HorizontalAlignment="Left" MinHeight="120" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Width="550"/>
                 <!-- Live config check: step pulse ($0) vs worst-case step rate (steps/mm x max feed rate). -->
                 <TextBlock x:Name="txtValidation" Grid.Row="2" Foreground="#C62828" TextWrapping="Wrap" Margin="5,6,0,0" MaxWidth="550" HorizontalAlignment="Left" Visibility="Collapsed"/>
             </Grid>

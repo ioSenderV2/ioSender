@@ -73,13 +73,13 @@
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
         <Label x:Uid="lbl_override" x:Name="lblOverride" HorizontalContentAlignment="Right" Content="Override" VerticalAlignment="Center" VerticalContentAlignment="Center" MinWidth="75"/>
-        <Slider x:Name="xxx" Width="100" Style="{StaticResource OverrideSliderStyle}" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10" LostMouseCapture="Slider_LostMouseCapture" GotMouseCapture="Slider_GotMouseCapture"
+        <Slider x:Uid="xxx" x:Name="xxx" Width="100" Style="{StaticResource OverrideSliderStyle}" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10" LostMouseCapture="Slider_LostMouseCapture" GotMouseCapture="Slider_GotMouseCapture"
                 Value="{Binding SliderValue, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 Ticks="{Binding Ticks, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 TickFrequency="{Binding TickFrequency, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 Minimum="{Binding Minimum, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                 Maximum="{Binding Maximum, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
-        <TextBox x:Name="txtOverride" TextWrapping="NoWrap" Text="200%" IsReadOnly="True" MinHeight="24" MinWidth="40" Margin="4,0,0,0" VerticalAlignment="Center" HorizontalContentAlignment="Right" VerticalContentAlignment="Center">
+        <TextBox x:Uid="txtOverride" x:Name="txtOverride" TextWrapping="NoWrap" Text="200%" IsReadOnly="True" MinHeight="24" MinWidth="40" Margin="4,0,0,0" VerticalAlignment="Center" HorizontalContentAlignment="Right" VerticalContentAlignment="Center">
             <TextBox.Background>
                 <MultiBinding Converter="{StaticResource EncoderModeConverter}">
                     <Binding Path="OverrideEncoderMode" Mode="OneWay"/>
@@ -102,6 +102,6 @@
                 </MultiBinding>
             </TextBox.Foreground>
         </TextBox>
-        <Button x:Name="btnOvReset" Content="Resources\reset.png" Focusable="False" Style="{StaticResource ResetButtonStyle}" Margin="2,0,0,0" Height="22" Width="22" Click="btnOverrideClick"/>
+        <Button x:Uid="btnOvReset" x:Name="btnOvReset" Content="Resources\reset.png" Focusable="False" Style="{StaticResource ResetButtonStyle}" Margin="2,0,0,0" Height="22" Width="22" Click="btnOverrideClick"/>
     </StackPanel>
 </UserControl>

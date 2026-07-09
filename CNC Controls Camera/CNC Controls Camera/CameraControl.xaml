@@ -22,9 +22,9 @@
             <ColumnDefinition Width="407"/>
             <ColumnDefinition Width="80"/>
         </Grid.ColumnDefinitions>
-        <ComboBox x:Name="cbxCamera" ItemsSource="{Binding Cameras}" DisplayMemberPath="Name" SelectedValuePath="Camera" MinWidth="400" SelectionChanged="cbxCamera_SelectionChanged" Margin="5,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+        <ComboBox x:Uid="cbxCamera" x:Name="cbxCamera" ItemsSource="{Binding Cameras}" DisplayMemberPath="Name" SelectedValuePath="Camera" MinWidth="400" SelectionChanged="cbxCamera_SelectionChanged" Margin="5,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
         <Image Width="400" Height="300" HorizontalAlignment="Left" Name="frameHolder" VerticalAlignment="Top" Margin="5,5,0,0" Grid.Row="1"/>
-        <Slider x:Name="sldcircle" Orientation="Vertical" HorizontalAlignment="Left" Value="{Binding Path=GuideScale, Mode=TwoWay}" Margin="28,1,0,0" VerticalAlignment="Top" Height="118" Width="30" Grid.Column="1" ValueChanged="sldcircle_ValueChanged" Maximum="100" Minimum="5" LargeChange="10" SmallChange="1" Grid.Row="1"/>
+        <Slider x:Uid="sldcircle" x:Name="sldcircle" Orientation="Vertical" HorizontalAlignment="Left" Value="{Binding Path=GuideScale, Mode=TwoWay}" Margin="28,1,0,0" VerticalAlignment="Top" Height="118" Width="30" Grid.Column="1" ValueChanged="sldcircle_ValueChanged" Maximum="100" Minimum="5" LargeChange="10" SmallChange="1" Grid.Row="1"/>
         <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="5,4,0,0" Grid.ColumnSpan="2" VerticalAlignment="Top">
             <Button x:Uid="btn_moveOffset" x:Name="btnMove" Content="Move offset" IsEnabled="{Binding Path=IsMoveEnabled}" MinWidth="75" Click="btnMove_Click"/>
             <CheckBox x:Uid="lbl_cameraToSpindlePosition" x:Name="chkCameraToSpindlePosition" Content="camera to spindle" Focusable="False" IsChecked="{Binding Path=MoveCameraToSpindlePosition, Mode=TwoWay}" IsEnabled="{Binding Path=IsMoveEnabled}" Margin="4,0,0,0" VerticalAlignment="Center"/>

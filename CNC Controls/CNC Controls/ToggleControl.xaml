@@ -13,7 +13,7 @@
             <ColumnDefinition Width="7*"/>
         </Grid.ColumnDefinitions>
         <!-- Self-contained red/green pill toggle (no third-party template dependency, renders in any theme). -->
-        <ToggleButton x:Name="tsw" Width="40" Height="20" Margin="0,2,0,2" Focusable="False"
+        <ToggleButton x:Uid="tsw" x:Name="tsw" Width="40" Height="20" Margin="0,2,0,2" Focusable="False"
                       HorizontalAlignment="Left" VerticalAlignment="Center"
                       IsChecked="{Binding Path=IsChecked, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}">
             <ToggleButton.Template>

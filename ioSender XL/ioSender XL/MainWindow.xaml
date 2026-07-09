@@ -178,7 +178,7 @@
                             </Grid.ColumnDefinitions>
                             <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
                             <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
-                            <ToggleButton Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                            <ToggleButton x:Uid="btnProgramView" Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -193,7 +193,7 @@
                                 <!-- Demo-video timelapse marker toggle, right of the State field. Hidden unless
                                      launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
                                      TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
-                                <ToggleButton x:Name="btnTimeLapse" Content="Timelapse" MinWidth="80" Margin="12,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Cycle Start if you don't; auto-OFF at job end." Checked="TimeLapse_Toggled" Unchecked="TimeLapse_Toggled">
+                                <ToggleButton x:Uid="btnTimeLapse" x:Name="btnTimeLapse" Content="Timelapse" MinWidth="80" Margin="12,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Cycle Start if you don't; auto-OFF at job end." Checked="TimeLapse_Toggled" Unchecked="TimeLapse_Toggled">
                                     <!-- Traffic-light coloring (not the selection highlight): green when OFF
                                          (press to start), red when RUNNING (press to stop). Custom template so
                                          Background is honored in the checked state. -->

@@ -34,7 +34,7 @@
                                    Text="Actual stock size."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
                             <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
+                            <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
                                 <ComboBoxItem Content="G54"/>
                                 <ComboBoxItem Content="G55"/>
                                 <ComboBoxItem Content="G56"/>

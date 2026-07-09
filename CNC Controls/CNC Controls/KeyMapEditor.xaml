@@ -71,7 +71,7 @@
                                    Text="Grouped by function. Right-click a group header for expand/collapse/reset; right-click a row to reset it. Changed bindings are highlighted."/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
+                    <DataGrid x:Uid="grid" Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                               SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
                               HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="False">
@@ -170,7 +170,7 @@
                     <TextBlock x:Uid="txt_controllerHelp" Grid.Row="1" TextWrapping="Wrap" Margin="2,2,2,6" Foreground="#FF707070"
                                Text="Press a button to identify it (it lights up), then choose its action. Machine actions are paused while this dialog is open. The left stick jogs X/Y and the triggers jog Z (analog) - see settings below."/>
 
-                    <DataGrid Grid.Row="2" x:Name="gridController" AutoGenerateColumns="False" CanUserAddRows="False"
+                    <DataGrid x:Uid="gridController" Grid.Row="2" x:Name="gridController" AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                               SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0" MinHeight="120"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" ScrollViewer.CanContentScroll="True">

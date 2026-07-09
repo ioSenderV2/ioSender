@@ -23,7 +23,7 @@
             <StackPanel Orientation="Vertical" Margin="5,5,0,0">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120"/>
-                <ComboBox x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
+                <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
                           ItemsSource="{Binding Path=CalAxes, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                           SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                           HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="2"/>
@@ -59,7 +59,7 @@
                 Value="{Binding SpindleRPM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                 <Label x:Uid="lbl_sctool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Name="cbxTool" MinWidth="90" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"
+                <ComboBox x:Uid="cbxTool" x:Name="cbxTool" MinWidth="90" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"
                           ToolTip="Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.">
                     <ComboBoxItem x:Uid="cbi_toolLoaded" Content="Loaded"/>
                     <ComboBoxItem x:Uid="cbi_toolPrompt" Content="Prompt"/>
@@ -88,7 +88,7 @@
                            Text="Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Cycle Start to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."/>
                 <TextBlock x:Uid="txt_scresults" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
             </StackPanel>
-            <DataGrid x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+            <DataGrid x:Uid="dgResults" x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                       ItemsSource="{Binding Results, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
                 <DataGrid.RowStyle>

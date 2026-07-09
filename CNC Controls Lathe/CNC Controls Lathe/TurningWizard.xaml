@@ -89,12 +89,12 @@
         </ScrollViewer>
         <StackPanel Grid.Row="1" Margin="0,6,0,0">
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="btnCalculate" Content="Calculate" MinWidth="75" MinHeight="24" Padding="8,2" VerticalAlignment="Center" Click="btnCalculate_Click"/>
+                <Button x:Uid="btnCalculate" x:Name="btnCalculate" Content="Calculate" MinWidth="75" MinHeight="24" Padding="8,2" VerticalAlignment="Center" Click="btnCalculate_Click"/>
                 <TextBlock TextWrapping="Wrap" Margin="12,0,0,0" VerticalAlignment="Center">
                     <Run x:Uid="txt_warning" Text="Warning! Use with care - only lightly tested!" Foreground="Red" FontWeight="Bold"/>
                 </TextBlock>
             </StackPanel>
-            <TextBox x:Name="txtGCode" IsReadOnly="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+            <TextBox x:Uid="txtGCode" x:Name="txtGCode" IsReadOnly="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
                 <TextBox.Text>
                     <MultiBinding Converter="{StaticResource GCodeConverter}">
                         <Binding Path="gCode" Mode="OneWay"/>

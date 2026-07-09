@@ -15,7 +15,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock x:Uid="txt_restoreIntro" Grid.Row="0" Text="Select a restore point (most recent first), or browse for a backup file:" Margin="0,0,0,6" TextWrapping="Wrap"/>
-        <DataGrid x:Name="dgrSnapshots" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+        <DataGrid x:Uid="dgrSnapshots" x:Name="dgrSnapshots" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column"
                   CanUserReorderColumns="False" CanUserResizeRows="False" CanUserAddRows="False"
                   CanUserSortColumns="True" GridLinesVisibility="Horizontal"

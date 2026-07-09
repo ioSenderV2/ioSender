@@ -27,7 +27,7 @@
                     <GroupBox x:Uid="hm_grpProbe" Header="Probe">
                         <StackPanel Orientation="Horizontal" Margin="6,4">
                             <Label x:Uid="hm_lblProbe" Content="Probe:" MinWidth="90" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxProbe" MinWidth="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="cbxProbe_SelectionChanged"/>
+                            <ComboBox x:Uid="cbxProbe" x:Name="cbxProbe" MinWidth="200" MinHeight="22" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="cbxProbe_SelectionChanged"/>
                         </StackPanel>
                     </GroupBox>
 
