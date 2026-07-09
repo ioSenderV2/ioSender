@@ -48,8 +48,13 @@ using System.Threading;
 
 namespace CNC.Controls
 {
-    public partial class ToolView : UserControl, ICNCView
+    public partial class ToolView : UserControl, ICNCView, IAvailabilityGated
     {
+        // The tool-table sub-tab is empty when the controller reports no tool table (NumTools == 0), so it is
+        // dropped from the Tools hub (the rest of the hub still applies).
+        public string UnavailableReason => GrblInfo.NumTools == 0 ? "The controller reports no tool table." : null;
+        public bool HideWhenUnavailable => true;
+
         Tool selectedTool = null;
         private GrblViewModel parameters = new GrblViewModel();
         private volatile bool awaitCoord = false;

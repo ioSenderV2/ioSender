@@ -181,6 +181,7 @@
     <Compile Include="GrblErrorList.xaml.cs">
       <DependentUpon>GrblErrorList.xaml</DependentUpon>
     </Compile>
+    <Compile Include="IAvailabilityGated.cs" />
     <Compile Include="ICamera.cs" />
     <Compile Include="ICNCView.cs" />
     <Compile Include="ManualHelp.cs" />

@@ -594,15 +594,13 @@ namespace GCode_Sender
 
             workspace.Set3DViewEnabled(AppConfig.Settings.GCodeViewer.IsEnabled);
 
-            if (GrblInfo.LatheModeEnabled)
-                MainWindow.EnableView(true, ViewType.LatheWizards);
-            else
-                MainWindow.ShowView(false, ViewType.LatheWizards);
-
-            if (GrblInfo.HasFS)   // any mounted filesystem (SD card and/or LittleFS), not just SD
-                MainWindow.EnableView(true, ViewType.SDCard);
-            else
-                MainWindow.ShowView(false, ViewType.SDCard);
+            // Remove the main-page tabs this controller can't support (Lathe Tools / SD Card / Probing) and record
+            // WHY under Edit Main Page > Unavailable. Each gated view owns its own prerequisite + reason
+            // (IAvailabilityGated) - the single source the removal and the listing now share. Survivors are
+            // (re)enabled by UpdateConnectionGatedTabs on the connect transition. Height Map stays either way (it
+            // can still load/apply a saved .map offline, gated at run time instead). Tools stays even with no tool
+            // table (NumTools == 0) - only its tool-table sub-tab is dropped, in ToolsView.
+            ComponentAvailability.Note(MainWindow.ui.tabMode.PruneUnavailable());
 
             // On an ATC controller, seed the ioSender-side "Start Job" macro so it is available to run. The
             // controller-side macros it CALLs (cal/probe_tfl/tc) are installed explicitly from the SD Card tab's
@@ -610,19 +608,7 @@ namespace GCode_Sender
             if (GrblInfo.HasFS && (GrblInfo.HasATC || GrblInfo.AtcMacrosRequired))
                 CNC.Controls.AtcMacros.SeedStartJobMacro();
 
-            // Tools is now a hub (tool table + stepper calibration / surface spoilboard / Trinamic / PID), so
-            // keep it available even when the controller has no tool table (NumTools == 0) - only the tool-table
-            // sub-tab is empty in that case. (Previously this hid the whole tab when NumTools == 0.)
             MainWindow.EnableView(true, ViewType.Tools);
-
-            // Probing needs a probe AND probe-coordinate reporting; without them it can do nothing, so REMOVE it
-            // (and it's listed, with the reason, in Edit Main Page > Unavailable) rather than leave it greyed.
-            // Height Map stays (it can still load/apply a saved .map offline), gated at run time instead.
-            if (GrblInfo.HasProbe && GrblSettings.ReportProbeCoordinates)
-                MainWindow.EnableView(true, ViewType.Probing);
-            else
-                MainWindow.ShowView(false, ViewType.Probing);
-
             MainWindow.EnableView(true, ViewType.StartJob);   // front-door tool - always available
 
             MainWindow.EnableView(true, ViewType.Offsets);

@@ -53,8 +53,15 @@ namespace CNC.Controls.Probing
     /// <summary>
     /// Interaction logic for ProbingView.xaml
     /// </summary>
-    public partial class ProbingView : UserControl, ICNCView, ITabBindingHost
+    public partial class ProbingView : UserControl, ICNCView, ITabBindingHost, IAvailabilityGated
     {
+        // Probing needs a probe AND probe-coordinate reporting ($10); without either it can do nothing, so the
+        // whole tab is removed (Height Map stays - it can still load/apply a saved .map offline).
+        public string UnavailableReason => !GrblInfo.HasProbe
+            ? "No probe is configured."
+            : !GrblSettings.ReportProbeCoordinates ? "Probe coordinate reporting is off ($10 - enable it to use probing)." : null;
+        public bool HideWhenUnavailable => true;
+
         private static bool keyboardMappingsOk = false;
 
         private bool probeTriggered = false, probeDisconnected = false, cycleStartSignal = false, wasMetric = true;

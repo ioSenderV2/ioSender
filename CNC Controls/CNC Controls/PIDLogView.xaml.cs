@@ -51,8 +51,12 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for PIDLogView.xaml
     /// </summary>
-    public partial class PIDLogView : UserControl, IGrblConfigTab
+    public partial class PIDLogView : UserControl, IGrblConfigTab, IAvailabilityGated
     {
+        // Offered only when the firmware provides a PID-tuning log to plot.
+        public string UnavailableReason => GrblInfo.HasPIDLog ? null : "The firmware has no PID-tuning log.";
+        public bool HideWhenUnavailable => true;
+
         private double errorScale = 2500d;
 
         public PIDLogView()

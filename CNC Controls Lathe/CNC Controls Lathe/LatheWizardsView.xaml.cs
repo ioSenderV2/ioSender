@@ -46,8 +46,12 @@ namespace CNC.Controls.Lathe
     /// <summary>
     /// Interaction logic for LatheWizards.xaml
     /// </summary>
-    public partial class LatheWizardsView : UserControl, ICNCView, ITabBindingHost
+    public partial class LatheWizardsView : UserControl, ICNCView, ITabBindingHost, IAvailabilityGated
     {
+        // Offered only when lathe mode is turned on (Settings > App); the lathe tools are meaningless otherwise.
+        public string UnavailableReason => GrblInfo.LatheModeEnabled ? null : "Lathe mode is not enabled (Settings > App).";
+        public bool HideWhenUnavailable => true;
+
         public LatheWizardsView()
         {
             InitializeComponent();

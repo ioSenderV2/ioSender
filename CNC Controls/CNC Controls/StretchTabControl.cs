@@ -281,6 +281,29 @@ namespace CNC.Controls
             return d as TabItem;
         }
 
+        // Remove the tabs whose content view reports itself unavailable on the currently connected controller,
+        // and return every {label, reason} found (in tab order) so the caller can list them in Edit Main Page.
+        // Each gated view owns its own prerequisite + reason (IAvailabilityGated) - the SAME condition it used
+        // to be removed on by hand - so this is the one place a capability-gated tab drops out. A view that
+        // reports a reason but asks to be kept (HideWhenUnavailable == false, e.g. the Auto Square gauge) stays
+        // in place; its reason is still returned so the listing explains the limitation.
+        public IList<UnavailableComponent> PruneUnavailable()
+        {
+            var found = new List<UnavailableComponent>();
+            foreach (var tab in Items.OfType<TabItem>().ToList())
+            {
+                if (!(tab.Content is IAvailabilityGated gated))
+                    continue;
+                string reason = gated.UnavailableReason;
+                if (reason == null)
+                    continue;
+                found.Add(new UnavailableComponent { Label = tab.Header?.ToString() ?? string.Empty, Reason = reason });
+                if (gated.HideWhenUnavailable)
+                    Items.Remove(tab);
+            }
+            return found;
+        }
+
         protected override void OnItemsChanged(NotifyCollectionChangedEventArgs e)
         {
             base.OnItemsChanged(e);

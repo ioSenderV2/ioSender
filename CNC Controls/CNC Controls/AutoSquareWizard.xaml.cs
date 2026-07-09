@@ -23,8 +23,16 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class AutoSquareWizard : ConfigPanel<AutoSquareParams>, IGrblConfigTab
+    public partial class AutoSquareWizard : ConfigPanel<AutoSquareParams>, IGrblConfigTab, IAvailabilityGated
     {
+        // Kept on every build (HideWhenUnavailable == false): with the squaring-offset setting ($170-$172)
+        // present it tunes that offset; without it the wizard still serves as a squareness GAUGE (drill the L,
+        // measure the gap) - just with the Apply-offset step disabled. The note explains the limitation.
+        public string UnavailableReason => SquaringSettingExists()
+            ? null
+            : "No auto-square offset setting ($170-$172) in this firmware - drill + measure only.";
+        public bool HideWhenUnavailable => false;
+
         private GrblViewModel model = null;
         private string program = string.Empty;   // last generated program (previewed in the bottom Program View)
         private GrblSettingDetails _offset = null;   // the controller's squaring-offset setting (or null)

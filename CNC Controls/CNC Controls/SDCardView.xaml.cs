@@ -52,8 +52,13 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for SDCardView.xaml
     /// </summary>
-    public partial class SDCardView : UserControl, ICNCView
+    public partial class SDCardView : UserControl, ICNCView, IAvailabilityGated
     {
+        // Offered when the controller has any mounted filesystem (SD card and/or LittleFS) - the same test the
+        // tab is enabled on in JobView.Setup. Nothing to browse/upload to without one.
+        public string UnavailableReason => GrblInfo.HasFS ? null : "No SD card / file system on the controller.";
+        public bool HideWhenUnavailable => true;
+
         public delegate void FileSelectedHandler(string filename, bool rewind);
         public event FileSelectedHandler FileSelected;
 

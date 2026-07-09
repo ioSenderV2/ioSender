@@ -166,41 +166,15 @@ namespace CNC.Controls
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        private TabItem getTab(GrblConfigType tabtype)
-        {
-            foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(tabTools))
-            {
-                var view = getView(tabitem);
-                if (view != null && view.GrblConfigType == tabtype)
-                    return tabitem;
-            }
-            return null;
-        }
-
-        private void RemoveTab(GrblConfigType type)
-        {
-            var ptab = getTab(type);
-            if (ptab != null)
-                tabTools.Items.Remove(ptab);
-        }
-
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            // No controller tool table -> drop the (empty) Tool table sub-tab; the rest of the hub still applies.
-            if (GrblInfo.NumTools == 0)
-                foreach (TabItem t in UIUtils.FindLogicalChildren<TabItem>(tabTools))
-                    if (t.Content is ToolView) { tabTools.Items.Remove(t); break; }
-
-            if (string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
-                RemoveTab(GrblConfigType.Trinamic);
-
-            if (!GrblInfo.HasPIDLog)
-                RemoveTab(GrblConfigType.PidTuning);
-
-            // Auto square is kept on every build: when the squaring-offset setting is present it tunes that
-            // offset; when it isn't (e.g. ganged but not auto-squared, or not ganged at all) it still serves as
-            // a squareness GAUGE - drill the L, measure the gap with a framing square to see how far out of
-            // square the X/Y axes are - just with the Apply-offset step disabled (correct mechanically instead).
+            // Drop the Tools sub-tabs the controller can't support (empty tool table / no Trinamic drivers / no
+            // PID log) and record why for Edit Main Page > Unavailable. Each tool owns its own prerequisite +
+            // reason (IAvailabilityGated) - the one source the removal and the listing share. Auto Square is kept
+            // even without the squaring-offset setting (it still serves as a squareness GAUGE - drill the L,
+            // measure the gap - with only the Apply-offset step disabled); PruneUnavailable notes that limitation
+            // without removing the tab.
+            ComponentAvailability.Note(tabTools.PruneUnavailable());
         }
     }
 }

@@ -1,14 +1,15 @@
 /*
  * ComponentAvailability.cs - part of CNC Controls library
  *
- * Lists the components that are gated by the controller's reported capability / configuration, with the
- * reason each is not offered, so the Edit Main Page editor can show the user WHY something is missing
- * (e.g. "Lathe Wizards - lathe mode not enabled", "Auto Square - no firmware support"). Evaluated from
- * the live GrblInfo, so it reflects the currently connected controller.
+ * The list of capability-gated components that are NOT offered on the currently connected controller, with the
+ * reason each is missing, so the Edit Main Page editor can show the user WHY something is absent (e.g. "Lathe
+ * Tools - lathe mode not enabled", "Probing - no probe configured"). It is no longer a hand-maintained switch:
+ * each gated view owns its own prerequisite + reason (IAvailabilityGated), and the tab bars record what they
+ * pruned here (StretchTabControl.PruneUnavailable -> Note) as the controller connects. So the removal decision
+ * and this listing come from one source and cannot drift.
  */
 
 using System.Collections.Generic;
-using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -20,35 +21,23 @@ namespace CNC.Controls
 
     public static class ComponentAvailability
     {
+        private static readonly List<UnavailableComponent> _list = new List<UnavailableComponent>();
+
+        // Record the components a tab bar found unavailable (dedup by label so a reconnect / a second bar's prune
+        // does not double-list). Fed by StretchTabControl.PruneUnavailable at connect / Tools-tab realization.
+        public static void Note(IEnumerable<UnavailableComponent> items)
+        {
+            if (items == null)
+                return;
+            foreach (var item in items)
+                if (item != null && !_list.Exists(c => c.Label == item.Label))
+                    _list.Add(item);
+        }
+
+        // The components not offered on the current controller (a copy, so callers can mutate their own list).
         public static List<UnavailableComponent> Unavailable()
         {
-            var list = new List<UnavailableComponent>();
-            void Add(string label, string reason) => list.Add(new UnavailableComponent { Label = label, Reason = reason });
-
-            if (GrblInfo.NumTools == 0)
-                Add("Tool table", "The controller reports no tool table.");
-
-            if (string.IsNullOrEmpty(GrblInfo.TrinamicDrivers))
-                Add("Trinamic tuner", "No Trinamic stepper drivers detected.");
-
-            if (!GrblInfo.HasPIDLog)
-                Add("PID tuner", "The firmware has no PID-tuning log.");
-
-            if (!AutoSquareWizard.SquaringSettingExists())
-                Add("Auto Square - apply offset", "No auto-square offset setting ($170-$172) in this firmware - drill + measure only.");
-
-            if (!GrblInfo.LatheModeEnabled)
-                Add("Lathe Tools", "Lathe mode is not enabled (Settings > App).");
-
-            if (!GrblInfo.HasSDCard)
-                Add("SD Card", "No SD card / file system on the controller.");
-
-            if (!GrblInfo.HasProbe)
-                Add("Probing", "No probe is configured.");
-            else if (!GrblSettings.ReportProbeCoordinates)
-                Add("Probing", "Probe coordinate reporting is off ($10 - enable it to use probing).");
-
-            return list;
+            return new List<UnavailableComponent>(_list);
         }
     }
 }

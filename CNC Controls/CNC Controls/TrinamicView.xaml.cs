@@ -54,8 +54,12 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for TrinamicView.xaml
     /// </summary>
-    public partial class TrinamicView : UserControl, IGrblConfigTab
+    public partial class TrinamicView : UserControl, IGrblConfigTab, IAvailabilityGated
     {
+        // Offered only when the controller reports Trinamic stepper drivers to tune.
+        public string UnavailableReason => string.IsNullOrEmpty(GrblInfo.TrinamicDrivers) ? "No Trinamic stepper drivers detected." : null;
+        public bool HideWhenUnavailable => true;
+
         private int sg_index = 0, y_scale = 4;
         private bool plot = false, read_status = false, grbl_reset = false, driver_reset = false;
         private GrblViewModel model = null;
