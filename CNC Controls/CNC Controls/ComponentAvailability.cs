@@ -38,7 +38,7 @@ namespace CNC.Controls
                 Add("Auto Square - apply offset", "No auto-square offset setting ($170-$172) in this firmware - drill + measure only.");
 
             if (!GrblInfo.LatheModeEnabled)
-                Add("Lathe Wizards", "Lathe mode is not enabled (Settings > App).");
+                Add("Lathe Tools", "Lathe mode is not enabled (Settings > App).");
 
             if (!GrblInfo.HasSDCard)
                 Add("SD Card", "No SD card / file system on the controller.");

@@ -56,7 +56,7 @@ namespace CNC.Controls
     /// converted from modal dialogs to inline tabs (save-on-leave). This view also owns the shared Save/Restart
     /// footer and the app-config auto-save-on-leave behaviour (formerly AppConfigView).
     /// </summary>
-    public partial class GrblConfigView : UserControl, ICNCView
+    public partial class GrblConfigView : UserControl, ICNCView, ITabBindingHost
     {
         private UIViewModel model;
         private GrblViewModel grblmodel;
@@ -83,6 +83,26 @@ namespace CNC.Controls
         public GrblConfigView()
         {
             InitializeComponent();
+            SetupTabBinding();
+        }
+
+        // Wrap each Settings sub-tab header with a live shortcut badge and a right-click "Bind to Key" menu, so
+        // a sub-tab can be bound straight from its header. The label is read back from the already-localized
+        // Header string set in XAML, so localization is preserved.
+        private void SetupTabBinding()
+        {
+            bindSubTab(tabGrbl, "Tab.Settings.Grbl");
+            bindSubTab(tabApp, "Tab.Settings.App");
+            bindSubTab(tabJogging, "Tab.Settings.Jogging");
+            bindSubTab(tabGCode, "Tab.Settings.GCode");
+            bindSubTab(tabKeys, "Tab.Settings.Keyboard");
+            bindSubTab(tabMacros, "Tab.Settings.Macros");
+            bindSubTab(tabMainPage, "Tab.Settings.MainPage");
+        }
+
+        private void bindSubTab(TabItem tab, string tabId)
+        {
+            TabKeyBinder.AttachTabBinding(tab, tabId);
         }
 
         #region Methods and properties required by CNCView interface
@@ -381,6 +401,31 @@ namespace CNC.Controls
             if (cfg == null)
                 return true;
             return tab == tabGrbl ? !cfg.AutoSaveGrblSettings : !cfg.AutoSaveSettings;
+        }
+
+        // Select a Settings sub-tab by its bindable tab-switch id ("Tab.Settings.Grbl" / "Tab.Settings.App").
+        // Called by the main-window tab-switch shortcuts after the Settings tab is shown; unknown/absent tabs
+        // are ignored (the Main Page sub-tab, for one, may be removed - see tabConfig.Items.Remove(tabMainPage)).
+        public bool SelectSubTab(string id)
+        {
+            TabItem target;
+            switch (id)
+            {
+                case "Tab.Settings.Grbl": target = tabGrbl; break;
+                case "Tab.Settings.App": target = tabApp; break;
+                case "Tab.Settings.Jogging": target = tabJogging; break;
+                case "Tab.Settings.GCode": target = tabGCode; break;
+                case "Tab.Settings.Keyboard": target = tabKeys; break;
+                case "Tab.Settings.Macros": target = tabMacros; break;
+                case "Tab.Settings.MainPage": target = tabMainPage; break;
+                default: target = null; break;
+            }
+
+            if (target == null || !tabConfig.Items.Contains(target))
+                return false;
+
+            tabConfig.SelectedItem = target;
+            return true;
         }
 
         // The map from a config panel to the tab it lives on (parallels TargetPanel).

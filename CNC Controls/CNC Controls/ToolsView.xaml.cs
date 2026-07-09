@@ -13,7 +13,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class ToolsView : UserControl, ICNCView
+    public partial class ToolsView : UserControl, ICNCView, ITabBindingHost
     {
         public ToolsView()
         {
@@ -56,12 +56,37 @@ namespace CNC.Controls
                 var d = ComponentRegistry.Get(node.Component);
                 var ctl = d?.Create?.Invoke();
                 if (ctl != null)
-                    tabTools.Items.Add(new TabItem { Header = d.Label, Content = ctl, Tag = node.Component });
+                {
+                    // Bindable sub-tab: id = "Tab.Tools.<componentKey>" (the Tag stays the layout key for reorder).
+                    string tabId = "Tab.Tools." + node.Component;
+                    var tab = new TabItem { Content = ctl, Tag = node.Component };
+                    tab.Header = new TabHeaderControl(d.Label, tabId);
+                    TabKeyBinder.AttachBindMenu(tab, tabId);
+                    tabTools.Items.Add(tab);
+                }
             }
 
             // Persist drag-reorder into the layout tree's Tools slot (the order authority BuildTools reads).
             tabTools.TabsReordered += (s, e) => AppConfig.Settings.ReorderSlot(LayoutKeys.Tools, LayoutKeys.SlotTools,
                 tabTools.Items.Cast<TabItem>().Select(t => t.Tag as string).Where(k => !string.IsNullOrEmpty(k)));
+        }
+
+        // Drill into a tool sub-tab from a "Tab.Tools.*" keyboard shortcut (ITabBindingHost). The suffix is the
+        // layout component key held in each tab's Tag; a tab removed at runtime (no tool table / Trinamic / PID)
+        // simply isn't found.
+        public bool SelectSubTab(string id)
+        {
+            const string prefix = "Tab.Tools.";
+            if (id == null || !id.StartsWith(prefix))
+                return false;
+
+            string key = id.Substring(prefix.Length);
+            var target = tabTools.Items.Cast<TabItem>().FirstOrDefault(t => (t.Tag as string) == key);
+            if (target == null)
+                return false;
+
+            tabTools.SelectedItem = target;
+            return true;
         }
 
         #region ICNCView

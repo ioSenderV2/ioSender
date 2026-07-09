@@ -53,7 +53,7 @@ namespace CNC.Controls.Probing
     /// <summary>
     /// Interaction logic for ProbingView.xaml
     /// </summary>
-    public partial class ProbingView : UserControl, ICNCView
+    public partial class ProbingView : UserControl, ICNCView, ITabBindingHost
     {
         private static bool keyboardMappingsOk = false;
 
@@ -66,6 +66,32 @@ namespace CNC.Controls.Probing
         public ProbingView()
         {
             InitializeComponent();
+
+            TabKeyBinder.AttachTabBinding(tabToolOffset, "Tab.Probing.ToolOffset");
+            TabKeyBinder.AttachTabBinding(tabEdgeExternal, "Tab.Probing.EdgeExternal");
+            TabKeyBinder.AttachTabBinding(tabEdgeInternal, "Tab.Probing.EdgeInternal");
+            TabKeyBinder.AttachTabBinding(tabCenter, "Tab.Probing.Center");
+        }
+
+        // Drill into a probing sub-tab from a "Tab.Probing.*" keyboard shortcut (ITabBindingHost). Returns false
+        // (no change) when the sub-tab is not present.
+        public bool SelectSubTab(string id)
+        {
+            TabItem target;
+            switch (id)
+            {
+                case "Tab.Probing.ToolOffset": target = tabToolOffset; break;
+                case "Tab.Probing.EdgeExternal": target = tabEdgeExternal; break;
+                case "Tab.Probing.EdgeInternal": target = tabEdgeInternal; break;
+                case "Tab.Probing.Center": target = tabCenter; break;
+                default: target = null; break;
+            }
+
+            if (target == null || !tab.Items.Contains(target))
+                return false;
+
+            tab.SelectedItem = target;
+            return true;
         }
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)

@@ -60,7 +60,7 @@
     <system:String x:Uid="str_tabProbing" x:Key="TabProbing">Probing</system:String>
     <system:String x:Uid="str_tabHeightMap" x:Key="TabHeightMap">Height Map</system:String>
     <system:String x:Uid="str_tabSDCard" x:Key="TabSDCard">SD Card</system:String>
-    <system:String x:Uid="str_tabLatheWizards" x:Key="TabLatheWizards">Lathe Wizards</system:String>
+    <system:String x:Uid="str_tabLatheWizards" x:Key="TabLatheWizards">Lathe Tools</system:String>
     <system:String x:Uid="str_tabTools" x:Key="TabTools">Tools</system:String>
     <system:String x:Uid="str_tabMachineSetup" x:Key="TabMachineSetup">Machine Setup</system:String>
     <!-- Tools container sub-tab labels (built in code by ToolsView.RegisterTools). -->

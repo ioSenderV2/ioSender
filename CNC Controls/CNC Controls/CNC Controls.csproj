@@ -162,6 +162,7 @@
       <DependentUpon>ConsoleControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Converters.cs" />
+    <Compile Include="TabKeyBinder.cs" />
     <Compile Include="CoolantControl.xaml.cs">
       <DependentUpon>CoolantControl.xaml</DependentUpon>
     </Compile>

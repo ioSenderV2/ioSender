@@ -46,11 +46,37 @@ namespace CNC.Controls.Lathe
     /// <summary>
     /// Interaction logic for LatheWizards.xaml
     /// </summary>
-    public partial class LatheWizardsView : UserControl, ICNCView
+    public partial class LatheWizardsView : UserControl, ICNCView, ITabBindingHost
     {
         public LatheWizardsView()
         {
             InitializeComponent();
+
+            TabKeyBinder.AttachTabBinding(tabTurning, "Tab.LatheWizard.Turning");
+            TabKeyBinder.AttachTabBinding(tabParting, "Tab.LatheWizard.Parting");
+            TabKeyBinder.AttachTabBinding(tabFacing, "Tab.LatheWizard.Facing");
+            TabKeyBinder.AttachTabBinding(tabThreading, "Tab.LatheWizard.Threading");
+        }
+
+        // Drill into a lathe wizard sub-tab from a "Tab.LatheWizard.*" keyboard shortcut (ITabBindingHost).
+        // Returns false (no change) when the sub-tab is not present.
+        public bool SelectSubTab(string id)
+        {
+            TabItem target;
+            switch (id)
+            {
+                case "Tab.LatheWizard.Turning": target = tabTurning; break;
+                case "Tab.LatheWizard.Parting": target = tabParting; break;
+                case "Tab.LatheWizard.Facing": target = tabFacing; break;
+                case "Tab.LatheWizard.Threading": target = tabThreading; break;
+                default: target = null; break;
+            }
+
+            if (target == null || !tab.Items.Contains(target))
+                return false;
+
+            tab.SelectedItem = target;
+            return true;
         }
 
         #region Methods and properties required by CNCView interface

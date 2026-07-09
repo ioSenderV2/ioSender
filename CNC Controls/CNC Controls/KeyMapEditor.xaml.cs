@@ -30,7 +30,12 @@ namespace CNC.Controls
         private readonly ObservableCollection<ControllerRow> controllerRows = new ObservableCollection<ControllerRow>();
         private readonly Dictionary<string, GroupRowState> groupStates = new Dictionary<string, GroupRowState>();
         private KeyMapGroupStateConverter groupStateConverter;
-        private BindingRow capturing = null;
+        private BindingRow _capturing = null;
+        private BindingRow capturing { get { return _capturing; } set { _capturing = value; IsCapturing = value != null; } }
+
+        // True while any row is waiting to capture a keypress. The main-window tab-switch dispatcher checks this
+        // so an already-bound tab hotkey doesn't switch tabs (stealing the key) while you are rebinding it here.
+        public static bool IsCapturing { get; private set; }
         private bool _controllerHooked = false;   // controller dispatch paused + live events hooked (while tab visible)
 
         /// <summary>Action choices for the Controller tab dropdowns (bound from XAML).</summary>
@@ -68,6 +73,12 @@ namespace CNC.Controls
                     ? string.Empty
                     : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
 
+            // Rebuild the saved tab-switch list from the bound rows only (unbound tabs are simply absent).
+            AppConfig.Settings.Base.TabShortcuts = rows
+                .Where(r => r.IsTabSwitch && r.Model.Key != Key.None)
+                .Select(r => new TabShortcut { Id = r.Model.Method, Key = ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
+                .ToList();
+
             if (model.ControllerMapper != null)
             {
                 var m = model.ControllerMapper;
@@ -91,6 +102,7 @@ namespace CNC.Controls
             keyboard.SaveMappings();   // persists into the App.config "KeyMap" section
             AppConfig.Settings.Save();
             AppConfig.NotifyConsoleShortcutChanged();
+            AppConfig.NotifyTabShortcutsChanged();
         }
 
         private void LoadRows()
@@ -113,6 +125,18 @@ namespace CNC.Controls
             ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
             Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
 
+            // Tab-switch shortcuts. Unbound by default (DefaultKey = None); persisted in Base.TabShortcuts and
+            // dispatched at the main-window level like the console toggle, so they fire regardless of focus.
+            var saved = AppConfig.Settings.Base.TabShortcuts;
+            foreach (var t in TabTargets)
+            {
+                var b = new KeypressHandler.KeyBinding { Method = t.Id, Context = "null", DefaultKey = Key.None };
+                var s = saved?.FirstOrDefault(x => x.Id == t.Id);
+                if (s != null)
+                    ShortcutKey.TryParse(s.Key, out b.Key, out b.Modifiers);
+                Add(new BindingRow(b, t.Label) { IsTabSwitch = true, Description = t.Description });
+            }
+
             BuildGroupStates();
 
             var view = new ListCollectionView(rows);
@@ -129,6 +153,29 @@ namespace CNC.Controls
         {
             Categorize(row);
             rows.Add(row);
+        }
+
+        // Pull each tab-switch row's key back from Config.TabShortcuts (the store the tab right-click menu writes)
+        // and refresh any that changed, so the editor stays in step with out-of-editor binds. Cheap; no rebuild.
+        private void SyncTabRows()
+        {
+            var saved = AppConfig.Settings.Base.TabShortcuts;
+            foreach (var row in rows.Where(r => r.IsTabSwitch))
+            {
+                Key k = Key.None;
+                ModifierKeys m = ModifierKeys.None;
+                var s = saved?.FirstOrDefault(x => x.Id == row.Model.Method);
+                if (s != null)
+                    ShortcutKey.TryParse(s.Key, out k, out m);
+
+                if (row.Model.Key != k || row.Model.Modifiers != m)
+                {
+                    row.Model.Key = k;
+                    row.Model.Modifiers = m;
+                    row.Refresh();
+                }
+            }
+            UpdateConflicts();
         }
 
         private static readonly HashSet<Key> modifierKeys = new HashSet<Key>
@@ -363,6 +410,10 @@ namespace CNC.Controls
         // live controller status/poll events. Paired with _Unloaded; guarded so re-entry doesn't double-hook.
         private void KeyMapEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            // Re-sync every time the tab is shown so bindings made via a tab's right-click "Bind to Key" (which
+            // write straight to Config.TabShortcuts) are reflected here, even though this editor is built once.
+            SyncTabRows();
+
             if (_controllerHooked || model.Controller == null || model.ControllerMapper == null)
                 return;
 
@@ -564,12 +615,90 @@ namespace CNC.Controls
             }
         }
 
+        // ---- tab-switch targets ---------------------------------------------------------------
+
+        /// <summary>A main-page tab or Settings sub-tab that can be bound to a key.</summary>
+        public class TabTarget
+        {
+            public readonly string Id;          // stable stored/dispatch identity - NEVER rename (saved bindings key on it)
+            public readonly string Label;
+            public readonly string Description;
+            public TabTarget(string id, string label, string description) { Id = id; Label = label; Description = description; }
+        }
+
+        // The bindable tabs, in display order within their group. Id is "Tab.<Name>" for a main-page tab and
+        // "Tab.Settings.<Name>" for a Settings sub-tab. This is the source of truth for the editor rows; the
+        // matching id -> tab dispatch lives in MainWindow.RegisterTabShortcuts / MainWindow_PreviewKeyDown.
+        public static readonly TabTarget[] TabTargets = new[]
+        {
+            new TabTarget("Tab.Settings",     "Settings tab",      "Switch to the Settings tab."),
+            new TabTarget("Tab.StartJob",     "Start Job tab",     "Switch to the Start Job tab."),
+            new TabTarget("Tab.Job",          "Job tab",           "Switch to the Job tab."),
+            new TabTarget("Tab.Offsets",      "Offsets tab",       "Switch to the Offsets tab."),
+            new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
+            new TabTarget("Tab.Probing",      "Probing tab",       "Switch to the Probing tab."),
+            new TabTarget("Tab.Tools",        "Tools tab",         "Switch to the Tools tab."),
+            new TabTarget("Tab.MachineSetup", "Machine Setup tab", "Switch to the Machine Setup tab."),
+            new TabTarget("Tab.HeightMap",    "Height Map tab",    "Switch to the Height Map tab."),
+            new TabTarget("Tab.LatheWizard",  "Lathe Tools tab",   "Switch to the Lathe Tools tab."),
+
+            new TabTarget("Tab.Settings.Grbl",     "Settings → Grbl",                  "Switch to Settings and show the Grbl sub-tab."),
+            new TabTarget("Tab.Settings.App",      "Settings → App",                   "Switch to Settings and show the App sub-tab."),
+            new TabTarget("Tab.Settings.Jogging",  "Settings → Jogging",               "Switch to Settings and show the Jogging sub-tab."),
+            new TabTarget("Tab.Settings.GCode",    "Settings → G Code",                "Switch to Settings and show the G Code sub-tab."),
+            new TabTarget("Tab.Settings.Keyboard", "Settings → Keyboard & Controller", "Switch to Settings and show the Keyboard & Controller sub-tab."),
+            new TabTarget("Tab.Settings.Macros",   "Settings → Macros",                "Switch to Settings and show the Macros sub-tab."),
+            new TabTarget("Tab.Settings.MainPage", "Settings → Main Page",             "Switch to Settings and show the Main Page sub-tab."),
+
+            new TabTarget("Tab.MachineSetup.Overview", "Machine Setup → Overview",           "Switch to Machine Setup and show the Overview step."),
+            new TabTarget("Tab.MachineSetup.Machine",  "Machine Setup → Machine",            "Switch to Machine Setup and show the Machine step."),
+            new TabTarget("Tab.MachineSetup.Home",     "Machine Setup → Home position",      "Switch to Machine Setup and show the Home position step."),
+            new TabTarget("Tab.MachineSetup.Axis",     "Machine Setup → Axis information",   "Switch to Machine Setup and show the Axis information step."),
+            new TabTarget("Tab.MachineSetup.Homing",   "Machine Setup → Homing & limits",    "Switch to Machine Setup and show the Homing & limits step."),
+            new TabTarget("Tab.MachineSetup.Probes",   "Machine Setup → Probe definitions",  "Switch to Machine Setup and show the Probe definitions step."),
+            new TabTarget("Tab.MachineSetup.Macros",   "Machine Setup → Controller macros",  "Switch to Machine Setup and show the Controller macros step."),
+
+            new TabTarget("Tab.Probing.ToolOffset",   "Probing → Tool length offset",    "Switch to Probing and show the Tool length offset tab."),
+            new TabTarget("Tab.Probing.EdgeExternal", "Probing → Edge finder, external", "Switch to Probing and show the external Edge finder tab."),
+            new TabTarget("Tab.Probing.EdgeInternal", "Probing → Edge finder, internal", "Switch to Probing and show the internal Edge finder tab."),
+            new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
+
+            new TabTarget("Tab.Tools.ToolTable",         "Tools → Tool table",                   "Switch to Tools and show the Tool table tab."),
+            new TabTarget("Tab.Tools.StepperCal",        "Tools → Stepper calibration",          "Switch to Tools and show the Stepper calibration tab."),
+            new TabTarget("Tab.Tools.StepperScratch",    "Tools → Stepper calibration (scratch)", "Switch to Tools and show the scratch Stepper calibration tab."),
+            new TabTarget("Tab.Tools.SurfaceSpoilboard", "Tools → Surface spoilboard",           "Switch to Tools and show the Surface spoilboard tab."),
+            new TabTarget("Tab.Tools.Squareness",        "Tools → Squareness",                   "Switch to Tools and show the Squareness tab."),
+            new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),
+            new TabTarget("Tab.Tools.PID",               "Tools → PID Tuner",                    "Switch to Tools and show the PID Tuner tab."),
+
+            new TabTarget("Tab.LatheWizard.Turning",   "Lathe Tools → Turning",   "Switch to Lathe Tools and show the Turning tab."),
+            new TabTarget("Tab.LatheWizard.Parting",   "Lathe Tools → Parting",   "Switch to Lathe Tools and show the Parting tab."),
+            new TabTarget("Tab.LatheWizard.Facing",    "Lathe Tools → Facing",    "Switch to Lathe Tools and show the Facing tab."),
+            new TabTarget("Tab.LatheWizard.Threading", "Lathe Tools → Threading", "Switch to Lathe Tools and show the Threading tab."),
+        };
+
         // ---- categories (outline groups) ------------------------------------------------------
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             if (r.IsConsole) { r.Set("Program", 9); return; }
+            if (r.IsTabSwitch)
+            {
+                // "Tab.<Name>" is a main-page tab; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
+                string[] parts = (r.Model.Method ?? string.Empty).Split('.');
+                if (parts.Length < 3) { r.Set("Main Page tabs", 13); return; }
+                switch (parts[1])
+                {
+                    case "Settings": r.Set("Settings tabs", 14); break;
+                    case "MachineSetup": r.Set("Machine Setup tabs", 15); break;
+                    case "Probing": r.Set("Probing tabs", 16); break;
+                    case "Tools": r.Set("Tools tabs", 17); break;
+                    case "LatheWizard": r.Set("Lathe Tools tabs", 18); break;
+                    default: r.Set("Settings tabs", 14); break;
+                }
+                return;
+            }
 
             string m = r.Model.Method ?? string.Empty;
 
@@ -606,6 +735,12 @@ namespace CNC.Controls
             { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
+            { "Main Page tabs", "Jump straight to a main-page tab from anywhere in the app." },
+            { "Settings tabs", "Jump to the Settings tab and show a specific sub-tab." },
+            { "Machine Setup tabs", "Jump to Machine Setup and show a specific step." },
+            { "Probing tabs", "Jump to Probing and show a specific probing tab." },
+            { "Tools tabs", "Jump to Tools and show a specific tool tab." },
+            { "Lathe Tools tabs", "Jump to Lathe Tools and show a specific wizard tab." },
             { "Other", "Additional actions." }
         };
 
@@ -855,6 +990,7 @@ namespace CNC.Controls
             public string Label { get; }
             public string Description { get; set; }
             public bool IsConsole { get; set; }
+            public bool IsTabSwitch { get; set; }
             public bool IsJog { get { return Model.IsJog; } }
 
             public string Category { get; private set; }
@@ -877,7 +1013,11 @@ namespace CNC.Controls
             /// <summary>True when the binding differs from its value at first open (drives the highlight).</summary>
             public bool IsModified
             {
-                get { return Model.Key != StartupKey || Model.Modifiers != StartupModifiers; }
+                // Tab-switch rows have no factory key (default = unbound), so any binding is a customization worth
+                // flagging - and it must highlight the same whether it was set here or via right-click on the tab
+                // (where StartupKey already captured the bound value, so the session-baseline test would miss it).
+                // Keyed actions keep the session-baseline test so a saved custom binding doesn't light up on open.
+                get { return IsTabSwitch ? IsChanged : (Model.Key != StartupKey || Model.Modifiers != StartupModifiers); }
             }
 
             /// <summary>True when a key is assigned (so Clear is meaningful).</summary>

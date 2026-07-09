@@ -44,7 +44,9 @@ using CNC.Core;
 using CNC.Controls;
 using CNC.Converters;
 using System.Windows.Threading;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Globalization;
 using System.Threading;
 using System.Windows.Input;
@@ -689,6 +691,7 @@ namespace GCode_Sender
                 openConsole();
 
             registerConsoleShortcut();
+            registerTabShortcuts();
 
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
@@ -1467,7 +1470,7 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 55, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Wizards"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
         }
@@ -1501,13 +1504,28 @@ namespace GCode_Sender
                 if (ctl == null)
                     continue;
                 d.Configure?.Invoke(ctl);
-                tabMode.Items.Add(new TabItem
+
+                var tabItem = new TabItem
                 {
-                    Header = d.Label,
                     Content = ctl,
                     IsEnabled = d.EnabledWhenDisconnected,
                     Tag = node.Component
-                });
+                };
+
+                // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"
+                // menu; other tabs (e.g. the Trinamic tuner, not an ICNCView) keep a plain text header.
+                string tabId = ctl is ICNCView icv
+                    ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
+                    : null;
+                if (tabId != null)
+                {
+                    tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId);
+                    TabKeyBinder.AttachBindMenu(tabItem, tabId);
+                }
+                else
+                    tabItem.Header = d.Label;
+
+                tabMode.Items.Add(tabItem);
             }
 
             // Persist drag-reorder of the top-level bar into Config.Tabs + the layout tree (the same store the
@@ -1626,6 +1644,100 @@ namespace GCode_Sender
             menuOpenConsole.InputGestureText = consoleKey == Key.None ? string.Empty : ShortcutKey.ToDisplayString(consoleKey, consoleModifiers);
         }
 
+        // --- tab-switch shortcuts ----------------------------------------------------------------
+
+        // A parsed tab-switch binding: key + modifiers -> the tab id it selects (see KeyMapEditor.TabTargets).
+        private class TabHotkey { public Key Key; public ModifierKeys Modifiers; public string Id; }
+        private readonly List<TabHotkey> tabHotkeys = new List<TabHotkey>();
+        private bool tabShortcutsHooked = false;
+
+        // Main-page tab id -> ViewType. Settings sub-tab ids ("Tab.Settings.*") are dispatched separately.
+        private static readonly Dictionary<string, ViewType> tabViewIds = new Dictionary<string, ViewType>
+        {
+            { "Tab.Settings",     ViewType.GRBLConfig },
+            { "Tab.StartJob",     ViewType.StartJob },
+            { "Tab.Job",          ViewType.GRBL },
+            { "Tab.Offsets",      ViewType.Offsets },
+            { "Tab.SDCard",       ViewType.SDCard },
+            { "Tab.Probing",      ViewType.Probing },
+            { "Tab.Tools",        ViewType.Tools },
+            { "Tab.MachineSetup", ViewType.MachineSetup },
+            { "Tab.HeightMap",    ViewType.HeightMap },
+            { "Tab.LatheWizard",  ViewType.LatheWizards },
+        };
+
+        // (Re)parse the saved tab-switch shortcuts. Called at startup (just after registerConsoleShortcut, which
+        // hooks the window preview handler that dispatches them) and again whenever the editor saves changes.
+        private void registerTabShortcuts()
+        {
+            tabHotkeys.Clear();
+
+            var saved = AppConfig.Settings.Base.TabShortcuts;
+            if (saved != null) foreach (var s in saved)
+            {
+                Key k;
+                ModifierKeys m;
+                if (!string.IsNullOrEmpty(s.Key) && ShortcutKey.TryParse(s.Key, out k, out m) && k != Key.None)
+                    tabHotkeys.Add(new TabHotkey { Key = k, Modifiers = m, Id = s.Id });
+            }
+
+            if (!tabShortcutsHooked)
+            {
+                AppConfig.TabShortcutsChanged += registerTabShortcuts;
+                tabShortcutsHooked = true;
+            }
+        }
+
+        // Switch to the tab bound to this key, if any. Returns true when handled (so the key is consumed). A
+        // hidden or disabled target is left unhandled (no-op); a bare, unmodified key is ignored while a text
+        // box has focus so tab shortcuts never eat typed characters in a field.
+        private bool dispatchTabShortcut(KeyEventArgs e)
+        {
+            if (tabHotkeys.Count == 0 || KeyMapEditor.IsCapturing)
+                return false;   // don't hijack the key while the user is rebinding a shortcut
+
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+            ModifierKeys mods = Keyboard.Modifiers;
+
+            // A text-producing combo (no modifier, or Shift only for a capital/symbol) must not be stolen from
+            // a focused text box - e.g. typing "J" or "Shift+J" into the MDI field. Ctrl/Alt combos are commands.
+            if ((mods == ModifierKeys.None || mods == ModifierKeys.Shift)
+                 && Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                return false;
+
+            var hit = tabHotkeys.FirstOrDefault(h => h.Key == key && h.Modifiers == mods);
+            if (hit == null)
+                return false;
+
+            // A nested "Tab.<Parent>.<Sub>" id selects the parent top-level tab, then drills into its inner
+            // sub-tab; a plain "Tab.<Name>" id just selects the top-level tab. The parent (or the tab itself)
+            // is resolved through tabViewIds; the inner selection is delegated to the view's ITabBindingHost.
+            int firstDot = hit.Id.IndexOf('.');
+            int secondDot = firstDot < 0 ? -1 : hit.Id.IndexOf('.', firstDot + 1);
+            string lookupId = secondDot > 0 ? hit.Id.Substring(0, secondDot) : hit.Id;
+
+            ViewType vt;
+            if (!tabViewIds.TryGetValue(lookupId, out vt))
+                return false;
+
+            TabItem tab = getTab(vt);
+            if (tab == null || !tab.IsEnabled)
+                return false;   // top-level tab removed (missing capability) or disabled -> do nothing
+
+            if (secondDot > 0)
+            {
+                // Nested: select the inner sub-tab first and only switch to the parent if it was actually
+                // available. A binding to a sub-tab that has since been removed (e.g. a capability tool tab, or
+                // a disabled lathe/probing view) does nothing at all rather than half-switching to the parent.
+                var host = getView(tab) as ITabBindingHost;
+                if (host == null || !host.SelectSubTab(hit.Id))
+                    return false;
+            }
+
+            tabMode.SelectedItem = tab;
+            return true;
+        }
+
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             // F1 - context help: open the user manual at the page for whatever view is current.
@@ -1639,6 +1751,12 @@ namespace GCode_Sender
             if (consoleKey != Key.None && e.Key == consoleKey && Keyboard.Modifiers == consoleModifiers)
             {
                 openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
+                e.Handled = true;
+                return;
+            }
+
+            if (dispatchTabShortcut(e))
+            {
                 e.Handled = true;
                 return;
             }

@@ -10,7 +10,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class MachineSetupView : UserControl, ICNCView
+    public partial class MachineSetupView : UserControl, ICNCView, ITabBindingHost
     {
         public MachineSetupView()
         {
@@ -37,6 +37,12 @@ namespace CNC.Controls
         public void GoToStep(int step)
         {
             machineSetupWizard?.GoToStep(step);
+        }
+
+        // Drill into a setup step from a "Tab.MachineSetup.*" keyboard shortcut (ITabBindingHost).
+        public bool SelectSubTab(string id)
+        {
+            return machineSetupWizard?.SelectSubTab(id) ?? false;
         }
     }
 }

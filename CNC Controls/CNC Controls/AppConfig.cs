@@ -247,6 +247,15 @@ namespace CNC.Controls
         public ObservableCollection<CNC.GCode.Macro> Macro { get; private set; } = new ObservableCollection<CNC.GCode.Macro>();
     }
 
+    // One saved tab-switch keyboard shortcut: a stable tab id (e.g. "Tab.Job", "Tab.Settings.Grbl") paired
+    // with the stored shortcut string (ShortcutKey.ToStorageString form). Persisted in Config.TabShortcuts.
+    [Serializable]
+    public class TabShortcut
+    {
+        public string Id { get; set; }
+        public string Key { get; set; }
+    }
+
     [Serializable]
     public class Config : ViewModelBase
     {
@@ -325,6 +334,11 @@ namespace CNC.Controls
         public double ConsoleWindowTop { get; set; } = double.NaN;
         public double ConsoleWindowWidth { get; set; } = double.NaN;
         public double ConsoleWindowHeight { get; set; } = double.NaN;
+        // Keyboard shortcuts for switching main-page tabs and Settings sub-tabs, keyed by a stable tab id
+        // (e.g. "Tab.Job", "Tab.Settings.Grbl"). Empty by default - no tab has a shortcut out of the box.
+        // Edited in the Key Mappings editor; dispatched at the main-window level like the console shortcut.
+        // Starts empty so the XmlSerializer's append-on-load (see MainPanels note above) can't duplicate.
+        public List<TabShortcut> TabShortcuts { get; set; } = new List<TabShortcut>();
 
         [XmlIgnore]
         public CommandIgnoreState[] CommandIgnoreStates { get { return (CommandIgnoreState[])Enum.GetValues(typeof(CommandIgnoreState)); } }
@@ -662,6 +676,11 @@ namespace CNC.Controls
         // main window(s) can re-register it without a restart.
         public static event System.Action ConsoleShortcutChanged;
         public static void NotifyConsoleShortcutChanged() { ConsoleShortcutChanged?.Invoke(); }
+
+        // Raised when tab-switch shortcuts are changed in the Key Mappings editor so the main window(s)
+        // can re-read and re-register them without a restart.
+        public static event System.Action TabShortcutsChanged;
+        public static void NotifyTabShortcutsChanged() { TabShortcutsChanged?.Invoke(); }
 
         public static string ColorMode { get { return Properties.Settings.Default.ColorMode; } }
 

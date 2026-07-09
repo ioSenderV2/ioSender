@@ -105,6 +105,17 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
+            // Make each step tab bindable to a key (badge + right-click menu). AttachTabBinding re-parents the
+            // existing header - for the six steps that is the named, colour-coded TextBlock (hdrMachine ...),
+            // which keeps working because RefreshStepColors holds it by field reference, not via TabItem.Header.
+            TabKeyBinder.AttachTabBinding(tabStepOverview, "Tab.MachineSetup.Overview");
+            TabKeyBinder.AttachTabBinding(tabStepMachine, "Tab.MachineSetup.Machine");
+            TabKeyBinder.AttachTabBinding(tabStepHome, "Tab.MachineSetup.Home");
+            TabKeyBinder.AttachTabBinding(tabStepAxis, "Tab.MachineSetup.Axis");
+            TabKeyBinder.AttachTabBinding(tabStepHoming, "Tab.MachineSetup.Homing");
+            TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
+            TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
+
             model = DataContext as GrblViewModel;
             DataContextChanged += (s, e) => { if (DataContext is GrblViewModel) model = (GrblViewModel)DataContext; };
 
@@ -211,6 +222,30 @@ namespace CNC.Controls
 
             if (txtStatus != null)
                 txtStatus.Text = step <= 0 ? "Machine setup complete." : ("Next: step " + step + " - " + StepName(step));
+        }
+
+        // Drill into a setup step from a "Tab.MachineSetup.*" keyboard shortcut (via the host's ITabBindingHost).
+        // Returns false (no change) when the step tab is not present.
+        public bool SelectSubTab(string id)
+        {
+            TabItem target;
+            switch (id)
+            {
+                case "Tab.MachineSetup.Overview": target = tabStepOverview; break;
+                case "Tab.MachineSetup.Machine": target = tabStepMachine; break;
+                case "Tab.MachineSetup.Home": target = tabStepHome; break;
+                case "Tab.MachineSetup.Axis": target = tabStepAxis; break;
+                case "Tab.MachineSetup.Homing": target = tabStepHoming; break;
+                case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
+                case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
+                default: target = null; break;
+            }
+
+            if (target == null || !tabSteps.Items.Contains(target))
+                return false;
+
+            tabSteps.SelectedItem = target;
+            return true;
         }
 
         // Per-step status for tab colouring: green = complete, orange = needs attention, red = not started.

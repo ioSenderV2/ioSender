@@ -5,8 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        d:DesignHeight="560" d:DesignWidth="520"
-        FocusManager.IsFocusScope="True">
+        d:DesignHeight="560" d:DesignWidth="520">
     <UserControl.Resources>
         <local:KeyMapGroupTooltipConverter x:Key="GroupTip"/>
         <local:KeyMapGroupExpandedConverter x:Key="GroupExpanded"/>
@@ -75,7 +74,7 @@
                     <DataGrid Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                               SelectionMode="Single" IsReadOnly="True" BorderThickness="1" BorderBrush="#FFD0D0D0"
-                              HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
+                              HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="False">
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Setter Property="ToolTip" Value="{Binding Description}"/>
