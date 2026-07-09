@@ -1521,7 +1521,11 @@ namespace GCode_Sender
                 {
                     Content = ctl,
                     IsEnabled = d.EnabledWhenDisconnected,
-                    Tag = node.Component
+                    Tag = node.Component,
+                    // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
+                    // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
+                    // server can address the nav tabs by Uid and select one via its SelectionItem peer.
+                    Uid = "tab_" + node.Component
                 };
 
                 // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"

@@ -374,6 +374,18 @@ namespace GCode_Sender
                 sel.Select();
                 return "{\"ok\":true,\"selected\":" + Str(uid) + "}";
             }
+            // A peer built directly off a selector item (TabItem/ListBoxItem) usually lacks the SelectionItem
+            // pattern - that comes from the parent selector's peer - so fall back to the item's own IsSelected.
+            if (el is System.Windows.Controls.TabItem ti)
+            {
+                ti.IsSelected = true;
+                return "{\"ok\":true,\"selected\":" + Str(uid) + "}";
+            }
+            if (el is System.Windows.Controls.ListBoxItem li)
+            {
+                li.IsSelected = true;
+                return "{\"ok\":true,\"selected\":" + Str(uid) + "}";
+            }
             return Err("element does not support Invoke/Toggle/Select: " + uid + " (" + el.GetType().Name + ")");
         }
 
