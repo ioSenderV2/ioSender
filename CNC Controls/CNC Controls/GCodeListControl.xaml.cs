@@ -284,6 +284,13 @@ namespace CNC.Controls
             if (sender is GrblViewModel) switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.ScrollPosition):
+                    // In the compact (3-line) run view, keep the executing line centred instead of the normal
+                    // "5 rows from the top" scroll - the executing line drives it (see BlockExecuting below).
+                    if (_compactRows > 0)
+                    {
+                        CenterExecutingLine();
+                        break;
+                    }
                     // An instance created collapsed (e.g. the program overlay) has no realized ScrollViewer
                     // yet - try to acquire it lazily, and skip until it exists rather than NRE.
                     if (scroll == null)
@@ -295,6 +302,13 @@ namespace CNC.Controls
                         scroll.ScrollToTop();
                     else
                         scroll.ScrollToVerticalOffset(sp);
+                    break;
+
+                case nameof(GrblViewModel.BlockExecuting):
+                    // Drives the compact view: re-centre on the newly executing line (also covers the first few
+                    // lines, where ScrollPosition = index-5 stays negative and never fires).
+                    if (_compactRows > 0)
+                        CenterExecutingLine();
                     break;
 
                 case nameof(GrblViewModel.IsFolderView):
@@ -309,6 +323,82 @@ namespace CNC.Controls
                     ForceCursor = loading;
                     break;
             }
+        }
+
+        // --- Compact (N-line) run view ------------------------------------------------------------------
+        // Shrink the list to a few rows kept centred on the executing line (previous / current / next), so a
+        // running program takes little space. 0 = normal, unbounded. Driven by ProgramView.Compact.
+        private int _compactRows = 0;
+
+        public void SetCompactRows(int rows)
+        {
+            _compactRows = rows > 0 ? rows : 0;
+            if (_compactRows > 0)
+            {
+                if (!ConstrainHeight())                                   // rows may not be realized yet
+                    Dispatcher.BeginInvoke(new System.Action(() => { ConstrainHeight(); CenterExecutingLine(); }),
+                                           System.Windows.Threading.DispatcherPriority.Loaded);
+                CenterExecutingLine();
+            }
+            else
+                grdGCode.ClearValue(MaxHeightProperty);                   // back to full height
+        }
+
+        // Cap the grid at the column header + N data rows. Returns false until a row is measurable.
+        private bool ConstrainHeight()
+        {
+            if (_compactRows <= 0)
+                return true;
+            double rowH = MeasuredRowHeight(), hdrH = MeasuredHeaderHeight();
+            if (rowH <= 0)
+                return false;
+            grdGCode.MaxHeight = hdrH + rowH * _compactRows + 4;          // +gridlines/border slack
+            return true;
+        }
+
+        private double MeasuredRowHeight()
+        {
+            double h = FindVisualChild<DataGridRow>(grdGCode)?.ActualHeight ?? 0;
+            return h > 0 ? h : (FontSize > 0 ? FontSize * 1.6 : 20);      // fallback before rows realize
+        }
+
+        private double MeasuredHeaderHeight()
+        {
+            double h = FindVisualChild<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(grdGCode)?.ActualHeight ?? 0;
+            return h > 0 ? h : 22;
+        }
+
+        // Scroll so the executing line sits in the middle of the compact window (previous above, next below).
+        private void CenterExecutingLine()
+        {
+            if (_compactRows <= 0)
+                return;
+            if (scroll == null)
+                scroll = UIUtils.GetScrollViewer(grdGCode);
+            if (scroll == null)
+                return;
+            int exec = (DataContext as GrblViewModel)?.BlockExecuting ?? -1;
+            if (exec < 0)
+                return;
+            int top = exec - _compactRows / 2;
+            scroll.ScrollToVerticalOffset(top < 0 ? 0 : top);
+        }
+
+        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+                return null;
+            int n = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < n; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T t)
+                    return t;
+                var deeper = FindVisualChild<T>(child);
+                if (deeper != null)
+                    return deeper;
+            }
+            return null;
         }
 
         // Group the gcode list by toolpath section when a folder is loaded (outline view),

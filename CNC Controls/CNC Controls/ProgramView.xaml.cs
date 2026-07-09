@@ -13,8 +13,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -24,6 +26,8 @@ namespace CNC.Controls
         public ProgramView()
         {
             InitializeComponent();
+            DataContextChanged += (s, e) => HookModel(e.NewValue as GrblViewModel);
+            UpdateTitleHint();
         }
 
         // The program this view owns and renders. Set by the producer (Load/Generate); the same block objects
@@ -49,6 +53,59 @@ namespace CNC.Controls
         {
             Blocks = blocks;
             gcodeList.SetProgram(blocks);
+            Compact = false;   // a freshly generated/loaded program opens in full; Cycle Start shrinks it
+        }
+
+        // --- Compact (3-line) run view --------------------------------------------------------------------
+        // Collapses the view to the executing line plus the one before and after it, so a running program takes
+        // little space. Auto-enabled when a run starts on this view; toggled by clicking the title bar. The host
+        // (MainWindow overlay) watches CompactChanged to size the popup to content while compact.
+        public static event System.Action CompactChanged;
+
+        private bool _compact;
+        public bool Compact
+        {
+            get { return _compact; }
+            set
+            {
+                if (_compact == value)
+                    return;
+                _compact = value;
+                gcodeList.SetCompactRows(value ? 3 : 0);
+                UpdateTitleHint();
+                CompactChanged?.Invoke();
+            }
+        }
+
+        private void UpdateTitleHint()
+        {
+            txtTitleHint.Text = _compact ? "click to expand ▸" : "click to shrink to run view ▾";
+        }
+
+        private void TitleBar_Click(object sender, MouseButtonEventArgs e)
+        {
+            Compact = !Compact;
+            e.Handled = true;
+        }
+
+        private GrblViewModel _model;
+        private void HookModel(GrblViewModel model)
+        {
+            if (_model == model)
+                return;
+            if (_model != null)
+                _model.PropertyChanged -= Model_PropertyChanged;
+            _model = model;
+            if (_model != null)
+                _model.PropertyChanged += Model_PropertyChanged;
+        }
+
+        private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Cycle Start on this (connected) view -> auto-shrink to the 3-line run view.
+            if (e.PropertyName == nameof(GrblViewModel.IsJobRunning)
+                 && (sender as GrblViewModel)?.IsJobRunning == true && IsConnected)
+                Compact = true;
         }
 
         // Build a program from raw NGC text (one block per line; a line starting with '(' is a comment). The

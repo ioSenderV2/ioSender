@@ -9,9 +9,16 @@
          Owns its own G-code (Blocks) and can be Connect()'d to the streamer - see ProgramView.xaml.cs.
          One instance per Load File / Load Folder / wizard Generate; the connected one (stack top) runs. -->
     <DockPanel>
+        <!-- Click anywhere on the title bar to toggle between the full program and the compact 3-line run view
+             (previous / current / next line). Cursor + hint make it discoverable. -->
         <Border x:Name="titleBar" DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC"
-                BorderThickness="0,0,0,1" Padding="6,3" Visibility="Collapsed">
-            <TextBlock x:Name="txtTitle" FontWeight="SemiBold"/>
+                BorderThickness="0,0,0,1" Padding="6,3" Visibility="Collapsed" Cursor="Hand"
+                MouseLeftButtonUp="TitleBar_Click" ToolTip="Click to collapse to a 3-line run view / expand">
+            <DockPanel>
+                <TextBlock x:Name="txtTitleHint" DockPanel.Dock="Right" Foreground="#FF888888" FontSize="11"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <TextBlock x:Name="txtTitle" FontWeight="SemiBold"/>
+            </DockPanel>
         </Border>
         <local:GCodeListControl x:Name="gcodeList"/>
     </DockPanel>

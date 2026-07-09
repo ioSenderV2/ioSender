@@ -133,6 +133,10 @@ namespace GCode_Sender
             // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
             CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
 
+            // When the active view collapses to its 3-line run view, size the overlay popup to content (top-
+            // aligned) instead of stretching full height, so the popup itself shrinks - not just the grid.
+            CNC.Controls.ProgramView.CompactChanged += ApplyOverlayCompact;
+
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
             CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
@@ -473,7 +477,17 @@ namespace GCode_Sender
                 _programOverlay = false;
                 btnProgramView.IsChecked = false;
             }
+            ApplyOverlayCompact();
             UpdateOverlay();
+        }
+
+        // Compact (3-line) run view: size the overlay to its content and drop it to the BOTTOM of the tab
+        // content area (the title bar slides down so the 3 lines sit at the bottom, flush above the run bar);
+        // stretch full height otherwise. Driven by ProgramView.CompactChanged and the active view.
+        private void ApplyOverlayCompact()
+        {
+            bool compact = CNC.Controls.ProgramView.Active?.Compact == true;
+            overlayProgram.VerticalAlignment = compact ? VerticalAlignment.Bottom : VerticalAlignment.Stretch;
         }
 
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
