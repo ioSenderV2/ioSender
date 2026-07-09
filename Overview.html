@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>78 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>79 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -240,6 +240,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Macro pre-processor directives &mdash; PREREQ / MBOX / WAITIDLE / PROMPT / <code>@path</code></td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr11">11</a></td></tr>
 <tr><td>In-app Key Mappings editor + console state persistence</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr3">3</a></td></tr>
 <tr><td>Console: inline terminal command prompt + output right-click menu (Clear / Save)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr19">19</a></td></tr>
+<tr><td>Bind any main + second-level tab to a key &mdash; right-click Bind-to-Key + header badges</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr79">79</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -347,7 +348,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">76</td><td><a href="#pr76">Program view: 3-line run view</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+170</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">77</td><td><a href="#pr77">Selected tab: bold, larger label</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">78</td><td><a href="#pr78">Run-bar jog pad restored &amp; row rebalanced</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+42</span> <span class="del">-39</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (78 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">569</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33735</span> <span class="del">-4062</span></td></tr>
+<tr><td class="n">79</td><td><a href="#pr79">Bind any tab to a key &mdash; right-click Bind-to-Key + header badges</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+716</span> <span class="del">-17</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (79 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">582</span> <span class="del">2</span> <span class="add">+115</span><br><span class="k">Lines:</span> <span class="add">+34451</span> <span class="del">-4079</span></td></tr>
 </table>
 </div>
 
@@ -2026,6 +2028,29 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/JobControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
 </table>
 <div class="desc"><p>The shrunk jog pad in the bottom run bar had disappeared: it lived on the leftover space right of the run buttons, and the <strong>Program</strong> toggle added to that row (the program-overlay work) widened it and consumed the leftover, collapsing the pad to zero width.</p><ul><li><strong>Four-column run bar:</strong> <em>button row &middot; jog pad &middot; signals+feed &middot; overrides</em>. The button row is the flexible (star) column and stretches to fill the slack up to the jog pad &mdash; its three groups spread across so the run buttons span the width instead of huddling left, with the MDI and State lines following so <em>Send</em> stays aligned with <em>Program</em>. The jog pad, signals and feed/rapids overrides are content-sized and ride at the right edge, adjacent.</li><li><strong>Reclaimed the width:</strong> run buttons are now content-sized (one space of padding each side) instead of a fixed 66&thinsp;/&thinsp;95&nbsp;px, and the Signals + override clusters were shrunk ~25%, so the jog pad has room.</li></ul></div>
+</div>
+
+<!-- ===== #79 ===== -->
+<div class="pr">
+<h2 id="pr79"><span class="badge">#79</span>Bind any tab to a key &mdash; right-click Bind-to-Key + header badges</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/TabKeyBinder.cs</td><td class="num add">259</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">122</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">142</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">46</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">35</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls Lathe/LatheWizardsView.xaml.cs</td><td class="num add">27</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls Probing/ProbingView.xaml.cs</td><td class="num add">27</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/ToolsView.xaml.cs</td><td class="num add">27</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupView.xaml.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml</td><td class="num add">2</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/ComponentAvailability.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/LibStrings.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Every main-page tab <em>and</em> its second-level sub-tabs can now be bound to a keyboard shortcut, so you jump straight to a tab from anywhere instead of hunting through the strip. Builds on the in-app Key Mappings editor (<a href="#pr3">#3</a>).</p><ul><li><strong>Right-click any tab &rarr; Bind to Key</strong> (or <em>Change Key</em> / <em>Clear Shortcut</em>): a small capture modal takes one combination &mdash; no need to open the editor and find the action. The current shortcut shows as a dim <strong>badge in the tab's upper-right corner</strong>, live-updating.</li><li><strong>Full coverage:</strong> the 10 main tabs plus the inner tabs of <em>Settings</em> (7), <em>Probing</em> (4), <em>Tools</em> (7), <em>Machine Setup</em> (Overview + 6 steps) and <em>Lathe Tools</em> (4). Nested <code>Tab.&lt;Parent&gt;.&lt;Sub&gt;</code> ids select the parent tab then the inner one through a shared <code>ITabBindingHost</code>; bindings persist in <code>Config.TabShortcuts</code> and dispatch at the window level so they fire regardless of focus.</li><li><strong>Smart no-ops:</strong> a stale binding to a tab that has since become unavailable (capability removed, disconnected, mode disabled) does nothing at all rather than half-switching to the parent. Text-producing combos (no modifier, or Shift only) are never stolen from a focused text box.</li><li><strong>Editor parity:</strong> the Key Mappings list groups every tab by parent; tab rows highlight when bound (changed from the unbound default), the same whether set via right-click or in the editor, and re-sync on show.</li><li>Also fixed a pre-existing key-capture bug in the editor (a stray <code>FocusManager.IsFocusScope</code> swallowed keypresses) and switched its list to line-by-line scrolling. Renamed the <em>Lathe Wizards</em> tab label to <strong>Lathe Tools</strong>.</li></ul></div>
 </div>
 </section>
 
