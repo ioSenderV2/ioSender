@@ -45,6 +45,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace WpfUiTestServer
@@ -340,6 +341,20 @@ namespace WpfUiTestServer
                 if (!ReadRequest(stream, out method, out path, out query, out body))
                     return;
 
+                // /screenshot returns a PNG (binary), so it bypasses the JSON Route.
+                string[] seg = path.Trim('/').Split('/');
+                if (seg.Length > 0 && seg[0].Equals("screenshot", StringComparison.OrdinalIgnoreCase))
+                {
+                    string uid = seg.Length > 1 ? Uri.UnescapeDataString(seg[1]) : null;
+                    string err;
+                    byte[] png = RenderPng(uid, ParseInt(QueryValue(query, "index"), 0), out err);
+                    if (png != null)
+                        WriteBinaryResponse(stream, "image/png", png);
+                    else
+                        WriteResponse(stream, err != null && err.StartsWith("no ") ? 404 : 500, Err(err ?? "screenshot failed"));
+                    return;
+                }
+
                 string json;
                 int status;
                 try { json = Route(method, path, query, body, out status); }
@@ -347,6 +362,46 @@ namespace WpfUiTestServer
 
                 WriteResponse(stream, status, json);
             }
+        }
+
+        // Render a window (no uid) or a single element to a PNG at device resolution. Runs on the UI thread.
+        private static byte[] RenderPng(string uid, int index, out string error)
+        {
+            string err = null;
+            byte[] result = (byte[])_main.Dispatcher.Invoke(new Func<byte[]>(() =>
+            {
+                FrameworkElement fe = string.IsNullOrEmpty(uid) ? _main as FrameworkElement
+                                                                : FindByUid(uid, index) as FrameworkElement;
+                if (fe == null) { err = uid == null ? "no window to capture" : "no element with uid: " + uid; return null; }
+
+                double w = fe.ActualWidth, h = fe.ActualHeight;
+                if (w < 1 || h < 1) { err = "element has no rendered size (not realized/visible): " + (uid ?? "window"); return null; }
+
+                var dpi = VisualTreeHelper.GetDpi(fe);
+                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                    (int)Math.Ceiling(w * dpi.DpiScaleX), (int)Math.Ceiling(h * dpi.DpiScaleY),
+                    96d * dpi.DpiScaleX, 96d * dpi.DpiScaleY, PixelFormats.Pbgra32);
+                rtb.Render(fe);
+
+                var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+                using (var ms = new MemoryStream()) { enc.Save(ms); return ms.ToArray(); }
+            }));
+            error = err;
+            return result;
+        }
+
+        private static void WriteBinaryResponse(NetworkStream stream, string contentType, byte[] payload)
+        {
+            var sb = new StringBuilder();
+            sb.Append("HTTP/1.1 200 OK\r\n");
+            sb.Append("Content-Type: ").Append(contentType).Append("\r\n");
+            sb.Append("Content-Length: ").Append(payload.Length).Append("\r\n");
+            sb.Append("Connection: close\r\n\r\n");
+            byte[] head = Encoding.ASCII.GetBytes(sb.ToString());
+            stream.Write(head, 0, head.Length);
+            stream.Write(payload, 0, payload.Length);
+            stream.Flush();
         }
 
         // Read the request line + headers (until CRLFCRLF), then Content-Length bytes of body. Loopback +

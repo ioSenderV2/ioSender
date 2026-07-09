@@ -78,6 +78,8 @@ Duplicate `x:Uid`s (a reused template) are disambiguated with `?index=N` (0-base
 | `GET /uids` | Distinct **realized** uids (sorted) with `type` and occurrence `count` — the "what can I address" list |
 | `GET /tree` | Every realized element carrying an `x:Uid`, with `index,type,name,enabled,visible,value` |
 | `GET /state/{uid}?index=N` | One element's full state |
+| `GET /screenshot` | PNG (`image/png`) of the whole window — lets the harness *see* rendered layout |
+| `GET /screenshot/{uid}?index=N` | PNG of a single element's bounds |
 
 ### Actions
 | Method & path | Purpose |
