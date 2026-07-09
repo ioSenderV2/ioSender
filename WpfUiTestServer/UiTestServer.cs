@@ -90,6 +90,16 @@ namespace WpfUiTestServer
             public string Id, Title, Message, Answer;   // Answer "(passthrough)" = real dialog shown to a human
         }
 
+        // ---- exception log (see RecordException + GET /exceptions) ---------------------------------------
+        // The host feeds unhandled exceptions here from its global handlers, and route-caught throws are logged
+        // too, so a harness can poll "did my action cause an error?" instead of only seeing a socket drop.
+        private static readonly object _exLock = new object();
+        private static readonly List<ExRecord> _exceptions = new List<ExRecord>();
+        private const int ExCap = 50;
+        private static int _exSeq;
+
+        private sealed class ExRecord { public int Seq; public string When, Source, Type, Message, Stack; }
+
         // Start the server on the loopback interface. Safe to call once; a second call is ignored. Never throws
         // out to the caller - a bind failure is logged and the app continues normally (the flag is diagnostic).
         //   main           - the window whose visual tree (plus any other open windows) is addressed.
@@ -309,6 +319,57 @@ namespace WpfUiTestServer
             return sb.ToString();
         }
 
+        // Host-facing: record an exception so the harness can read it at GET /exceptions. Thread-safe; call it
+        // from your global exception handlers (AppDomain/Dispatcher/TaskScheduler). No-op-safe if the server is
+        // not running (the buffer just fills; harmless).
+        public static void RecordException(string source, Exception ex)
+        {
+            if (ex == null) return;
+            lock (_exLock)
+            {
+                _exceptions.Add(new ExRecord
+                {
+                    Seq = ++_exSeq,
+                    When = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+                    Source = source ?? "",
+                    Type = ex.GetType().FullName,
+                    Message = ex.Message,
+                    Stack = ex.StackTrace ?? ""
+                });
+                while (_exceptions.Count > ExCap) _exceptions.RemoveAt(0);
+            }
+        }
+
+        // GET /exceptions[?since=N][?clear=true] - newest first. `since` returns only seq > N (for polling);
+        // `clear` empties the buffer after returning.
+        private static string BuildExceptions(string query)
+        {
+            int since = ParseInt(QueryValue(query, "since"), 0);
+            bool clear = NormBool(QueryValue(query, "clear")) == "true";
+            var sb = new StringBuilder();
+            lock (_exLock)
+            {
+                sb.Append("{\"ok\":true,\"count\":").Append(_exceptions.Count).Append(",\"exceptions\":[");
+                bool first = true;
+                for (int i = _exceptions.Count - 1; i >= 0; i--)
+                {
+                    var e = _exceptions[i];
+                    if (e.Seq <= since) continue;
+                    if (!first) sb.Append(',');
+                    first = false;
+                    sb.Append("{\"seq\":").Append(e.Seq)
+                      .Append(",\"when\":").Append(Str(e.When))
+                      .Append(",\"source\":").Append(Str(e.Source))
+                      .Append(",\"type\":").Append(Str(e.Type))
+                      .Append(",\"message\":").Append(Str(e.Message))
+                      .Append(",\"stack\":").Append(Str(e.Stack)).Append('}');
+                }
+                sb.Append("]}");
+                if (clear) _exceptions.Clear();
+            }
+            return sb.ToString();
+        }
+
         private static void AcceptLoop()
         {
             while (true)
@@ -359,7 +420,7 @@ namespace WpfUiTestServer
                 string json;
                 int status;
                 try { json = Route(method, path, query, body, out status); }
-                catch (Exception ex) { status = 500; json = Err("route threw: " + ex.Message); }
+                catch (Exception ex) { status = 500; json = Err("route threw: " + ex.Message); RecordException("route:" + path, ex); }
 
                 WriteResponse(stream, status, json);
             }
@@ -505,6 +566,9 @@ namespace WpfUiTestServer
                 // blocked inside a Prompt() waiting for exactly this answer.
                 case "dialogs":
                     return BuildDialogs();
+
+                case "exceptions":
+                    return BuildExceptions(query);
 
                 case "dialog":
                     return "arm".Equals(arg, StringComparison.OrdinalIgnoreCase) ? DoDialogArm(query) : DoDialogAnswer(query);

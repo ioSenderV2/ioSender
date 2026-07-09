@@ -242,23 +242,44 @@ namespace GCode_Sender
         // failure. The crash detail is dumped to CrashLogPath() first.
         private const int CrashExitCode = 0xFA11;
 
+        // When the UI test server is running, feed unhandled exceptions to it (readable at GET /exceptions) and,
+        // for the recoverable ones (Dispatcher / unobserved Task), keep the app alive so the harness can observe
+        // the error and carry on instead of the app vanishing. Off in a normal run - crash behaviour is unchanged.
+        private static void RecordToTestServer(string source, Exception ex)
+        {
+            try { WpfUiTestServer.UiTestServer.RecordException(source, ex); } catch { }
+        }
+
         private void CurrentDomainOnUnhandledException(object sender, UnhandledExceptionEventArgs args)
         {
             // Background/non-UI thread: the event is notification-only (can't be marked handled), so the process
             // is going down regardless. Log, tell an interactive user, then exit with the crash sentinel - the
             // previous handler showed a box but never exited, leaving a wedged process.
+            if (TestServerPort >= 0) RecordToTestServer("AppDomain.UnhandledException", args.ExceptionObject as Exception);
             HandleFatal("AppDomain.UnhandledException", args.ExceptionObject as Exception);
         }
 
         private void DispatcherOnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
         {
             args.Handled = true; // stop the default WER/JIT path; we terminate deterministically below
+            if (TestServerPort >= 0)
+            {
+                // Test mode: record + log, but do NOT exit - let the harness read it at /exceptions and continue.
+                RecordToTestServer("Dispatcher.UnhandledException", args.Exception);
+                WriteCrashLog("Dispatcher.UnhandledException (test-server: continued)", args.Exception);
+                return;
+            }
             HandleFatal("Dispatcher.UnhandledException", args.Exception);
         }
 
         private void TaskSchedulerOnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs args)
         {
             args.SetObserved();
+            if (TestServerPort >= 0)
+            {
+                RecordToTestServer("TaskScheduler.UnobservedTaskException", args.Exception?.GetBaseException());
+                return;   // already observed; in test mode just record and keep running
+            }
             HandleFatal("TaskScheduler.UnobservedTaskException", args.Exception?.GetBaseException());
         }
 

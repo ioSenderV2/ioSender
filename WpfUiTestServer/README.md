@@ -96,6 +96,9 @@ Duplicate `x:Uid`s (a reused template) are disambiguated with `?index=N` (0-base
 | `GET /idle` | Block until the Dispatcher drains to Background priority (layout/render done). Does **not** know about async I/O |
 | `GET /status` | Host/domain state map from the `IUiTestStatusProvider` |
 | `GET /waitfor?…` | Block until a condition holds or `timeout` (ms, default 5000) elapses; polls every `poll` ms (default 100). Returns `matched`+`elapsedMs`, or `timeout`+last observed value |
+| `GET /exceptions[?since=N][?clear=true]` | Unhandled exceptions the app fed via `RecordException`, plus any route-caught throw — newest first (`seq,when,source,type,message,stack`). `since` returns only `seq > N` (polling); `clear` empties the buffer |
+
+> **Exceptions.** A synchronous throw from a driven action is returned inline (`{"ok":false,"error":"route threw: …"}`, HTTP 500) *and* logged to `/exceptions`. For unhandled exceptions the host must call `UiTestServer.RecordException(source, ex)` from its global handlers; a host may also choose to keep the app alive in test mode (ioSender continues on a Dispatcher exception when the server is on) so the harness can read `/exceptions` and carry on rather than seeing the socket drop.
 
 `/waitfor` conditions (pick one):
 - `?uid=X&exists=true` — element appears / `false` = goes away
