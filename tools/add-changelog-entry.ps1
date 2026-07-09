@@ -127,7 +127,8 @@ $tagClass = 't-' + $tag.ToLower()
 $glanceRow = "<tr><td>$($s.glance)</td><td class=""tag""><span class=""$tagClass"">$tag</span></td><td class=""prs""><a href=""#pr$N"">$N</a></td></tr>`n"
 $featIdx = $content.IndexOf('<div class="feat">')
 if ($featIdx -lt 0) { Fail "no <div class=""feat""> at-a-glance section found" }
-$groupHtml = ([string]$s.group) -replace '&', '&amp;'
+# Accept the group either plain ('A & B') or already-encoded ('A &amp; B').
+$groupHtml = (([string]$s.group) -replace '&amp;', '&') -replace '&', '&amp;'
 $h3Re = '<h3[^>]*>' + [regex]::Escape($groupHtml) + '</h3>'
 $h3 = [regex]::Match($content.Substring($featIdx), $h3Re)
 if (-not $h3.Success) {
