@@ -43,8 +43,10 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using CNC.Core;
 
 namespace GCode_Sender
 {
@@ -207,6 +209,12 @@ namespace GCode_Sender
                     WaitForIdle();
                     return "{\"ok\":true,\"idle\":true}";
 
+                case "status":
+                    return OnDispatcher(BuildStatus);
+
+                case "waitfor":
+                    return DoWaitFor(query);
+
                 case "tree":
                     return OnDispatcher(() => BuildTree());
 
@@ -239,12 +247,150 @@ namespace GCode_Sender
             return (string)_main.Dispatcher.Invoke(action);
         }
 
+        private static GrblViewModel Model { get { return _main == null ? null : _main.DataContext as GrblViewModel; } }
+
+        // App-level state for assertions: connection, controller state, streaming/job, loaded file, DRO. These
+        // are the things a test asserts on but that no single x:Uid exposes. Read on the UI thread. An unknown
+        // field name yields null so /waitfor can report a clean error rather than silently never matching.
+        private static string StatusField(string name)
+        {
+            var m = Model;
+            bool connected = Comms.com != null && Comms.com.IsOpen;
+            switch ((name ?? "").ToLowerInvariant())
+            {
+                case "connected":   return connected ? "true" : "false";
+                case "state":       return m == null ? "" : m.GrblState.State.ToString();
+                case "error":       return m == null ? "0" : m.GrblState.Error.ToString(CultureInfo.InvariantCulture);
+                case "streaming":   return m == null ? "" : m.StreamingState.ToString();
+                case "jobrunning":  return m != null && m.IsJobRunning ? "true" : "false";
+                case "fileloaded":  return m != null && m.IsFileLoaded ? "true" : "false";
+                case "filename":    return m == null ? "" : m.FileName;
+                case "tool":        return m == null ? "" : m.Tool;
+                case "message":     return m == null ? "" : m.Message;
+                case "mposx":       return m == null ? "" : m.MachinePosition.X.ToString(CultureInfo.InvariantCulture);
+                case "mposy":       return m == null ? "" : m.MachinePosition.Y.ToString(CultureInfo.InvariantCulture);
+                case "mposz":       return m == null ? "" : m.MachinePosition.Z.ToString(CultureInfo.InvariantCulture);
+                case "wposx":       return m == null ? "" : m.WorkPosition.X.ToString(CultureInfo.InvariantCulture);
+                case "wposy":       return m == null ? "" : m.WorkPosition.Y.ToString(CultureInfo.InvariantCulture);
+                case "wposz":       return m == null ? "" : m.WorkPosition.Z.ToString(CultureInfo.InvariantCulture);
+                default:            return null;   // unknown field
+            }
+        }
+
+        private static readonly string[] StatusFields =
+            { "connected", "state", "error", "streaming", "jobRunning", "fileLoaded", "fileName", "tool",
+              "message", "mposX", "mposY", "mposZ", "wposX", "wposY", "wposZ" };
+
+        private static string BuildStatus()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"ok\":true,\"status\":{");
+            for (int i = 0; i < StatusFields.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                string v = StatusField(StatusFields[i]);
+                sb.Append(Str(StatusFields[i])).Append(':').Append(Str(v));
+            }
+            sb.Append("}}");
+            return sb.ToString();
+        }
+
         // Drain the Dispatcher queue down to Background priority - i.e. layout/render and queued app work have
         // run. This is the seed of "has the UI settled after my action"; it does NOT know about async I/O such
         // as an in-flight connection or a running job (that readback is future work).
         private static void WaitForIdle()
         {
-            _main.Dispatcher.Invoke(new Action(() => { }), DispatcherPriority.Background);
+            _main.Dispatcher.Invoke(new System.Action(() => { }), DispatcherPriority.Background);
+        }
+
+        // Block until a condition holds or a timeout elapses, POLLING from this background handler thread so the
+        // UI thread keeps running (a connect completes, a job streams, a tab realizes) while we wait. This is the
+        // real answer to "has the UI settled after my action" that /idle only gestures at. Each poll marshals a
+        // tiny read onto the UI thread; between polls we Thread.Sleep here, off the UI thread.
+        //
+        //   GET /waitfor?uid=btn_reset&enabled=true[&timeout=5000][&poll=100]
+        //   GET /waitfor?uid=dlgFoo&exists=true          (element appears)  / exists=false (goes away)
+        //   GET /waitfor?uid=lblStatus&value=Idle
+        //   GET /waitfor?status=connected&equals=true    (app-level state, see /status field names)
+        //   GET /waitfor?status=state&equals=Idle
+        private static string DoWaitFor(string query)
+        {
+            int timeout = ClampInt(ParseInt(QueryValue(query, "timeout"), 5000), 0, 120000);
+            int poll = ClampInt(ParseInt(QueryValue(query, "poll"), 100), 20, 5000);
+
+            string statusField = QueryValue(query, "status");
+            string uid = QueryValue(query, "uid");
+
+            Func<string> observe;
+            string expected, cond;
+
+            if (statusField != null)
+            {
+                // Validate the field name once (returns null if unknown) so we fail fast rather than never match.
+                string probe = (string)_main.Dispatcher.Invoke((Func<string>)(() => StatusField(statusField)));
+                if (probe == null) return Err("unknown status field: " + statusField + " (see /status)");
+                expected = QueryValue(query, "equals") ?? "";
+                cond = "status:" + statusField + "==" + expected;
+                observe = () => Dispatch(() => StatusField(statusField));
+            }
+            else if (!string.IsNullOrEmpty(uid))
+            {
+                string exists = QueryValue(query, "exists");
+                string enabled = QueryValue(query, "enabled");
+                string visible = QueryValue(query, "visible");
+                string value = QueryValue(query, "value");
+
+                if (exists != null)
+                {
+                    expected = NormBool(exists); cond = uid + ".exists==" + expected;
+                    observe = () => Dispatch(() => FindByUid(uid) != null ? "true" : "false");
+                }
+                else if (enabled != null)
+                {
+                    expected = NormBool(enabled); cond = uid + ".enabled==" + expected;
+                    observe = () => Dispatch(() => { var el = FindByUid(uid); return el == null ? "(absent)" : (el.IsEnabled ? "true" : "false"); });
+                }
+                else if (visible != null)
+                {
+                    expected = NormBool(visible); cond = uid + ".visible==" + expected;
+                    observe = () => Dispatch(() => { var el = FindByUid(uid); return el == null ? "(absent)" : (el.Visibility == Visibility.Visible ? "true" : "false"); });
+                }
+                else if (value != null)
+                {
+                    expected = value; cond = uid + ".value==" + expected;
+                    observe = () => Dispatch(() => { var el = FindByUid(uid); return el == null ? "(absent)" : (ReadValue(el) ?? "(null)"); });
+                }
+                else
+                    return Err("waitfor needs a condition: exists|enabled|visible|value (with uid=)");
+            }
+            else
+                return Err("waitfor needs uid=... (+ exists|enabled|visible|value) or status=... (+ equals=)");
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string last;
+            while (true)
+            {
+                last = observe();
+                if (string.Equals(last ?? "", expected ?? "", StringComparison.OrdinalIgnoreCase))
+                    return "{\"ok\":true,\"matched\":true,\"elapsedMs\":" + sw.ElapsedMilliseconds +
+                           ",\"condition\":" + Str(cond) + ",\"value\":" + Str(last) + "}";
+                if (sw.ElapsedMilliseconds >= timeout)
+                    return "{\"ok\":false,\"matched\":false,\"timeout\":true,\"elapsedMs\":" + sw.ElapsedMilliseconds +
+                           ",\"condition\":" + Str(cond) + ",\"last\":" + Str(last) + "}";
+                Thread.Sleep(poll);
+            }
+        }
+
+        private static string Dispatch(Func<string> f) { return (string)_main.Dispatcher.Invoke(f); }
+
+        private static int ParseInt(string s, int dflt) { int v; return int.TryParse(s, out v) ? v : dflt; }
+        private static int ClampInt(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+        private static string NormBool(string s)
+        {
+            s = (s ?? "").Trim();
+            return (s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("on", StringComparison.OrdinalIgnoreCase) || s.Equals("yes", StringComparison.OrdinalIgnoreCase))
+                   ? "true" : "false";
         }
 
         // ---- element lookup + description ----------------------------------------------------------------
@@ -344,6 +490,7 @@ namespace GCode_Sender
             catch { }
 
             if (el is System.Windows.Controls.TextBox tb) return tb.Text;
+            if (el is TextBlock tblk) return tblk.Text;                    // status/DRO/banner labels
             if (el is System.Windows.Controls.ContentControl cc && cc.Content is string s) return s;
             return null;
         }
