@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>88 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>89 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -274,6 +274,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>One live instance, a clean supervised restart, and opt-in crash reports with a minidump.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr83">83</a></td></tr>
 <tr><td>File menu dissolved onto the program view + right-click menu; toolbar row removed; Camera menu made opt-in.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr84">84</a></td></tr>
 <tr><td>Optional localhost server that drives the WPF UI by x:Uid so a change can be verified end to end without a human clicking</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr87">87</a></td></tr>
+<tr><td>The optional test server grew from a proof slice into a real automation harness, and moved into its own app-agnostic assembly</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr89">89</a></td></tr>
 </table>
 </div>
 
@@ -367,7 +368,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">86</td><td><a href="#pr86">Start Job: fail fast over bare board</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+12</span> <span class="del">-4</span></td></tr>
 <tr><td class="n">87</td><td><a href="#pr87">UI test server (-testserver)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+505</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">88</td><td><a href="#pr88">Fix false Machine Setup step 6 (ATC macros)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (88 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">777</span> <span class="del">4</span> <span class="add">+126</span><br><span class="k">Lines:</span> <span class="add">+38786</span> <span class="del">-4550</span></td></tr>
+<tr><td class="n">89</td><td><a href="#pr89">UI test server â€” full harness + independent assembly</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">96</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1832</span> <span class="del">-241</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (89 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">873</span> <span class="del">4</span> <span class="add">+133</span><br><span class="k">Lines:</span> <span class="add">+40618</span> <span class="del">-4791</span></td></tr>
 </table>
 </div>
 
@@ -2201,6 +2203,21 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/SDCardView.xaml.cs</td><td class="num add">8</td><td class="num del">3</td></tr>
 </table>
 <div class="desc"><p>On connecting to an ATC controller, the Machine&nbsp;Setup gate could jump straight to step&nbsp;6 (&ldquo;install ATC macros&rdquo;) even though the macros were already present &mdash; the step then painted green a moment later. A timing race between the setup check and the first controller-filesystem listing.</p><ul><li><strong>Cause.</strong> The macro-status check lists the controller filesystem, which pumps the dispatcher and has a re-entrancy guard. When another listing was already in flight (just after it cleared the shared file table), the status check's own listing was skipped and it read a half-cleared table, so the required macros looked absent &mdash; and an absent-looking result was reported as <em>Missing</em>, which the gate read as &ldquo;not installed.&rdquo;</li><li><strong>Fix.</strong> The filesystem loader now reports whether it actually performed a listing; when it did not (skipped, or the link was down) the status check returns <em>unknown</em> rather than fabricating <em>Missing</em> rows. The gate already treats unknown as &ldquo;no action,&rdquo; and a genuinely-empty filesystem still lists a placeholder, so a real first-run <em>missing</em> case still routes to step&nbsp;6 correctly.</li></ul></div>
+</div>
+<!-- ===== #89 ===== -->
+<div class="pr">
+<h2 id="pr89"><span class="badge">#89</span>UI test server matured into a full automation harness</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">WpfUiTestServer/ (new assembly: engine, status seam, HTTP spec)</td><td class="num add">1371</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/AppDialogs.cs</td><td class="num add">92</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/GrblStatusProvider.cs</td><td class="num add">53</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">63</td><td class="num del">3</td></tr>
+<tr><td class="mono">MessageBox.Show &rarr; AppDialogs (7 projects, ~130 sites)</td><td class="num add">135</td><td class="num del">130</td></tr>
+<tr><td class="mono">x:Uid on named controls (52 XAML files)</td><td class="num add">112</td><td class="num del">105</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">6</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>The flag-gated UI test server introduced in <a href="#pr87">#87</a> was built out into a capable automation harness and lifted into its own <strong>app-agnostic assembly</strong> (<code>WpfUiTestServer</code>, no ioSender references). It still only exists behind <code>-testserver</code> / <code>IOSENDER_TESTSERVER</code>; a normal run never opens a socket. Full HTTP reference in <code>WpfUiTestServer/README.md</code>.</p><ul><li><strong>Drive &amp; assert.</strong> Address any control by <code>x:Uid</code> (with <code>?index=</code> for duplicates); <code>invoke</code>/<code>set</code>/<code>select</code>; read <code>/state</code>, <code>/tree</code>, and a <code>/uids</code> discovery list (uid + type + count). App-level <code>/status</code> (connection, controller state, streaming/job, DRO) via a host-supplied provider seam, and <code>/waitfor</code> to block on a control or status condition rather than guessing at timing.</li><li><strong>See it.</strong> <code>GET /screenshot[/{uid}]</code> returns a PNG of the window or an element.</li><li><strong>Dialogs no longer block automation.</strong> Every message box now routes through <code>AppDialogs</code> (a <code>MessageBox.Show</code>-shaped wrapper &mdash; identical for a real user); the harness can pre-arm/answer prompts and read their text back. All ~130 <code>MessageBox.Show</code> sites across seven projects were migrated (the fatal crash box excepted).</li><li><strong>Input.</strong> Keyboard injection (<code>/key</code>) and context-menu open/invoke (<code>/menu</code>).</li><li><strong>Failure visibility.</strong> <code>GET /exceptions</code> surfaces unhandled/route exceptions the app used to swallow into a crash-and-exit, and a small <code>ioSender.exit.json</code> reports the exit code + reason after the app goes away.</li><li><strong>Addressability sweep.</strong> Added <code>x:Uid</code> to every named, addressable control that lacked one (105 across 52 files), plus the generated nav tabs and Machine-Setup step tabs, so the whole UI is reachable.</li><li><strong>Operator safety.</strong> A pulsing red banner across the top marks when the app is under test-server control.</li></ul><p class="foot">Off by default; loopback only, no auth &mdash; keep it test/dev-gated. New x:Uids on a few text-bearing controls await a localization CSV pass (English fallback works). Debug + Release verified.</p></div>
 </div>
 </section>
 
