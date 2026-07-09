@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>79 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>81 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -197,6 +197,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Connect: Network default + <strong>Scan network</strong> &mdash; finds grblHAL controllers on the LAN (confirms each by a <code>?</code>/<code>$I</code> handshake, not just an open port) and lists them in an editable host picker</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr59">59</a></td></tr>
 <tr><td>grbl:Settings tree now populates when opened after connecting &mdash; an early activation during the connect handshake loaded the settings group-less (before <code>$I</code> reported enum support), so the grblHAL settings tree never built; it now fetches the group metadata once enums are known and rebuilds the tree on entry</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr61">61</a></td></tr>
 <tr><td>&hellip; and the early activation itself is now suppressed at source &mdash; the Settings view ignores its inner tab-strip&rsquo;s startup selection churn until the view is actually shown, so <code>Activate</code> can no longer fire mid-handshake (belt-and-suspenders over <a href="#pr61">#61</a>)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr65">65</a></td></tr>
+<tr><td>Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason &mdash; each gated view declares why it&rsquo;s missing, so the removal and the <em>Edit Main Page</em> listing can&rsquo;t drift (fixes the SD Card &ldquo;needs SD&rdquo; vs. &ldquo;needs a filesystem&rdquo; mismatch)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr80">80</a></td></tr>
+<tr><td>Restart prompt no longer stranded behind the relaunch splash when applying a restart-only change</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr81">81</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -349,7 +351,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">77</td><td><a href="#pr77">Selected tab: bold, larger label</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">78</td><td><a href="#pr78">Run-bar jog pad restored &amp; row rebalanced</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+42</span> <span class="del">-39</span></td></tr>
 <tr><td class="n">79</td><td><a href="#pr79">Bind any tab to a key &mdash; right-click Bind-to-Key + header badges</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+716</span> <span class="del">-17</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (79 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">582</span> <span class="del">2</span> <span class="add">+115</span><br><span class="k">Lines:</span> <span class="add">+34451</span> <span class="del">-4079</span></td></tr>
+<tr><td class="n">80</td><td><a href="#pr80">Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+129</span> <span class="del">-93</span></td></tr>
+<tr><td class="n">81</td><td><a href="#pr81">No more restart prompt hiding behind the relaunch splash</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (81 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">595</span> <span class="del">2</span> <span class="add">+116</span><br><span class="k">Lines:</span> <span class="add">+34598</span> <span class="del">-4173</span></td></tr>
 </table>
 </div>
 
@@ -2051,6 +2055,38 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Every main-page tab <em>and</em> its second-level sub-tabs can now be bound to a keyboard shortcut, so you jump straight to a tab from anywhere instead of hunting through the strip. Builds on the in-app Key Mappings editor (<a href="#pr3">#3</a>).</p><ul><li><strong>Right-click any tab &rarr; Bind to Key</strong> (or <em>Change Key</em> / <em>Clear Shortcut</em>): a small capture modal takes one combination &mdash; no need to open the editor and find the action. The current shortcut shows as a dim <strong>badge in the tab's upper-right corner</strong>, live-updating.</li><li><strong>Full coverage:</strong> the 10 main tabs plus the inner tabs of <em>Settings</em> (7), <em>Probing</em> (4), <em>Tools</em> (7), <em>Machine Setup</em> (Overview + 6 steps) and <em>Lathe Tools</em> (4). Nested <code>Tab.&lt;Parent&gt;.&lt;Sub&gt;</code> ids select the parent tab then the inner one through a shared <code>ITabBindingHost</code>; bindings persist in <code>Config.TabShortcuts</code> and dispatch at the window level so they fire regardless of focus.</li><li><strong>Smart no-ops:</strong> a stale binding to a tab that has since become unavailable (capability removed, disconnected, mode disabled) does nothing at all rather than half-switching to the parent. Text-producing combos (no modifier, or Shift only) are never stolen from a focused text box.</li><li><strong>Editor parity:</strong> the Key Mappings list groups every tab by parent; tab rows highlight when bound (changed from the unbound default), the same whether set via right-click or in the editor, and re-sync on show.</li><li>Also fixed a pre-existing key-capture bug in the editor (a stray <code>FocusManager.IsFocusScope</code> swallowed keypresses) and switched its list to line-by-line scrolling. Renamed the <em>Lathe Wizards</em> tab label to <strong>Lathe Tools</strong>.</li></ul></div>
+</div>
+
+<!-- ===== #80 ===== -->
+<div class="pr">
+<h2 id="pr80"><span class="badge">#80</span>Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/IAvailabilityGated.cs</td><td class="num add">26</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/StretchTabControl.cs</td><td class="num add">23</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/ComponentAvailability.cs</td><td class="num add">21</td><td class="num del">32</td></tr>
+<tr><td class="mono">CNC Controls/ToolsView.xaml.cs</td><td class="num add">7</td><td class="num del">33</td></tr>
+<tr><td class="mono">ioSender XL/JobView.xaml.cs</td><td class="num add">7</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Controls/AutoSquareWizard.xaml.cs</td><td class="num add">9</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls Probing/ProbingView.xaml.cs</td><td class="num add">8</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/SDCardView.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/ToolView.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/PIDLogView.xaml.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/TrinamicView.xaml.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls Lathe/LatheWizardsView.xaml.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>When the connected controller lacks a capability, the tab that needs it is removed and listed &mdash; with the reason &mdash; under <em>Edit Main Page &rsaquo; Unavailable</em>. That reason used to be a hand-maintained switch kept <em>separately</em> from the code that actually removes the tab, so the two drifted: the list claimed SD Card needs an SD card while the real test was &ldquo;any filesystem&rdquo; (SD <em>or</em> LittleFS).</p><ul><li><strong>One source of truth:</strong> each gated view now owns its own prerequisite + message through a new <code>IAvailabilityGated</code> interface (Probing, Lathe Tools, SD Card, Tool table, Trinamic, PID, Auto Square). The removal and the listing read the same property, so they can&rsquo;t disagree.</li><li><strong>No central list:</strong> <code>StretchTabControl.PruneUnavailable()</code> &mdash; used by both the main tab bar and the Tools sub-bar &mdash; drops the unavailable tabs and records their reasons; the old string switch is gone.</li><li>Fixes the SD Card mismatch (both now agree on &ldquo;has a filesystem&rdquo;), and Auto Square stays as a squareness gauge when the offset setting is absent, with the limitation noted rather than the tab removed.</li></ul><p class="foot">Internal refactor; no visible behaviour change beyond the corrected SD Card reason. Release build verified.</p></div>
+</div>
+
+<!-- ===== #81 ===== -->
+<div class="pr">
+<h2 id="pr81"><span class="badge">#81</span>No more restart prompt hiding behind the relaunch splash</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">18</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Applying a restart-only change (e.g. toggling lathe mode) and relaunching could leave a &ldquo;Restart ioSender now?&rdquo; message box stranded <em>behind</em> the new instance&rsquo;s splash screen &mdash; it only surfaced after the freshly launched copy went away, looking like the app prompted <em>after</em> it had already restarted.</p><ul><li><strong>Cause:</strong> the relaunch launches the replacement (splash on top) and then shuts down, and the shutdown path re-enters the Settings &ldquo;on leave&rdquo; logic &mdash; which, seeing a restart still pending, popped the prompt a <em>second</em> time from the dying instance.</li><li><strong>Fix:</strong> once a relaunch is under way the shutting-down instance suppresses all further on-leave prompts (it has already saved), so no stray dialog is left behind the splash.</li></ul><p class="foot">Long-standing glitch, unrelated to <a href="#pr80">#80</a>. Release build verified.</p></div>
 </div>
 </section>
 
