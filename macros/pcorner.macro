@@ -96,10 +96,18 @@ O<pcorner> SUB
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
   G53 G0 X[#<rx> + [30 * #<sx>]] Y[#<ry> + [30 * #<sy>]]
-  ; SAFETY: the stock top always sits ABOVE the spoilboard, so cap this probe just below the discovered
-  ; spoilboard Z (#<_z_spoil>, published by the DISCOVER pass that always runs first) rather than seeking a
-  ; deep machine target - a dead/mis-wired probe then alarms at the board instead of driving to -140.
-  G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]
+  ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
+  ; this seek instead of driving to a deep machine target - a dead/mis-wired probe then alarms near the board
+  ; instead of ploughing to -140. DISCOVER (corner 1, reliably over stock) seeks to just below the spoilboard.
+  ; REUSE corners are placed from the ESTIMATED size, so cap them at the floor: a real corner triggers on the
+  ; material above it, but a corner left over BARE board (estimate too big) reaches the floor with nothing
+  ; there and G38.2 aborts right away - no doomed side search into air. The spacer band guarantees the cap
+  ; clears the board (floor > spoilboard); with spacer 0 the +1 keeps it a hair above the board.
+  o45 IF [#<sz_in> GE 9000]
+    G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]      ; DISCOVER: seek to just below the spoilboard
+  o45 ELSE
+    G38.2 Z[#<_floor> + 1] F[#<_ls_searchf>]        ; REUSE: refuse to seek below the material floor
+  o45 ENDIF
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
