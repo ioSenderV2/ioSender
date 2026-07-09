@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>73 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>76 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -231,6 +231,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Explain G-code on hover &mdash; plain-language per line/selection (decodes parameters, O-word CALLs, expressions); click the balloon to copy</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr33">33</a></td></tr>
 <tr><td>One in-place streaming path &mdash; every wizard/macro runs in its own view; a run never overwrites the loaded job</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr37">37</a></td></tr>
 <tr><td>Live 3D carve view &mdash; watch the stock get machined away (program-sized stock, real cutter profile flat/ball/V-bit, Play / Cycle&nbsp;Start playback) instead of just toolpath lines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr41">41</a></td></tr>
+<tr><td>3-line run view &mdash; on Cycle Start a generated program collapses to previous / current / next line at the bottom of the tab; click the title bar to expand</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr76">76</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -259,6 +260,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Code renamed LoadStock &rarr; Start Job to match the UI throughout (files, classes, <code>ViewType</code>, layout keys, config section)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr54">54</a></td></tr>
 <tr><td>Localization catch-up &mdash; later V2 features (Start Job, probing-redesign dialogs, main-page editor, Tools guidance, &hellip;) were <code>x:Uid</code>&rsquo;d but had no LocBaml rows; every missing string backfilled into all 7 locale CSVs</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr55">55</a></td></tr>
 <tr><td>Playbooks &mdash; the repeatable dev procedures (changelog entry, PDF/manual publish, builds, localization, firmware, demo video) collected into <code>docs/playbooks/</code>, one per file with ready-to-run steps</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr73">73</a></td></tr>
+<tr><td>Startup dialogs no longer hidden behind the splash &mdash; the progress splash docks to the top so the connect dialog, message boxes and setup prompts stay visible</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr74">74</a></td></tr>
+<tr><td>Status-bar messages shown at double height for 10&nbsp;s when written, then shrink back &mdash; so an important message in the easily-missed status line gets noticed</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr75">75</a></td></tr>
 </table>
 </div>
 
@@ -337,7 +340,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">71</td><td><a href="#pr71">Smoother, faster corner probing</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+30</span> <span class="del">-22</span></td></tr>
 <tr><td class="n">72</td><td><a href="#pr72">Start Job: estimated stock size &amp; Z check</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+47</span> <span class="del">-16</span></td></tr>
 <tr><td class="n">73</td><td><a href="#pr73">Playbooks: one-stop procedure library</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">0</span> <span class="del">0</span> <span class="add">+14</span><br><span class="k">Lines:</span> <span class="add">+456</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (73 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">557</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33406</span> <span class="del">-4003</span></td></tr>
+<tr><td class="n">74</td><td><a href="#pr74">Startup dialogs no longer hidden behind the splash</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-17</span></td></tr>
+<tr><td class="n">75</td><td><a href="#pr75">Status-bar messages shown at double height</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+37</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">76</td><td><a href="#pr76">Program view: 3-line run view</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+170</span> <span class="del">-2</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (76 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">565</span> <span class="del">2</span> <span class="add">+114</span><br><span class="k">Lines:</span> <span class="add">+33631</span> <span class="del">-4022</span></td></tr>
 </table>
 </div>
 
@@ -1966,6 +1972,36 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">docs/playbooks/*.md (14 files)</td><td class="num add">456</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>The repeatable development procedures &mdash; previously scattered through dev notes &mdash; are collected into a single checked-in <code>docs/playbooks/</code> folder, <strong>one procedure per file</strong>, each with the ordered steps plus a ready-to-run command or copy-paste fragment (substitute the parameters and go). <code>README.md</code> indexes the set.</p><ul><li><strong>Docs &amp; release:</strong> add a changelog entry (the four places to touch + the detail/TOC HTML skeletons), regenerate <code>Overview.pdf</code>, publish the manual site, re-import a manual screenshot, wire a video into the manual.</li><li><strong>Build &amp; ship:</strong> the build/commit/test loop, the headless <code>build.ps1</code>, the Teensy firmware build, the end-of-session wrap-up sequence and conversation-log capture.</li><li><strong>Cross-cutting:</strong> the localization catch-up pass, running <code>gh</code> / the GitHub API on this box, and compositing a demo video.</li></ul><p class="foot">Documentation only &mdash; no code change. Each playbook cites the repo script it drives (<code>build.ps1</code>, <code>tools/locadd.py</code>, <code>docs/manual/publish-pages.ps1</code>, &hellip;) as the authoritative implementation.</p></div>
+</div>
+
+<!-- ===== #74 ===== -->
+<div class="pr">
+<h2 id="pr74"><span class="badge">#74</span>Startup dialogs no longer hidden behind the splash</h2>
+<table class="files">
+<tr><td class="mono">ioSender XL/SplashWindow.xaml(.cs)</td><td class="num add">14</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/PortDialog.xaml.cs</td><td class="num add">4</td><td class="num del">16</td></tr>
+</table>
+<div class="desc"><p>The startup progress splash was <code>Topmost</code> and centred, so any dialog that opened during startup was mostly hidden behind it. That was previously worked around for the connect dialog alone by docking it to the top of the screen &mdash; but other startup popups (message boxes, machine-setup prompts, the &ldquo;controller never reported&rdquo; safety net) still landed behind the splash.</p><ul><li><strong>Fixed at the source:</strong> the splash now docks itself near the top of the work area, leaving the centre clear for <em>every</em> dialog. The connect-dialog special-case is removed &mdash; it simply centres on screen again (still owns to the splash so it wins z-order).</li></ul></div>
+</div>
+
+<!-- ===== #75 ===== -->
+<div class="pr">
+<h2 id="pr75"><span class="badge">#75</span>Status-bar messages briefly shown at double height</h2>
+<table class="files">
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">37</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The status line at the bottom of the window is short and easy to miss. When a new message is written to it, it is now shown at <strong>twice its normal height for 10&nbsp;seconds</strong> (or until the next message re-triggers the enlarge), then shrinks back &mdash; so an important message stands a chance of being noticed. An empty/cleared message reverts immediately, and the base size tracks the theme/DPI font scaling.</p></div>
+</div>
+
+<!-- ===== #76 ===== -->
+<div class="pr">
+<h2 id="pr76"><span class="badge">#76</span>Program view: 3-line run view on Cycle Start</h2>
+<table class="files">
+<tr><td class="mono">CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">90</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/ProgramView.xaml(.cs)</td><td class="num add">66</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>When a wizard <em>Generate</em> pops its program view open and you press <strong>Cycle Start</strong>, the view now collapses to a compact <strong>3-line run view</strong> &mdash; previous line, current executing line (green), next line &mdash; kept centred on the executing line as the run advances, and dropped to the <strong>bottom</strong> of the tab content area (flush above the run bar) so a running program takes little space and stays in the line of sight.</p><ul><li><strong>Toggle:</strong> click anywhere on the title bar to switch between the compact run view and the full program (hand cursor + hint text make it discoverable).</li></ul></div>
 </div>
 </section>
 
