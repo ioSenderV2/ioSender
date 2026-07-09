@@ -126,6 +126,14 @@ supplied default after its timeout.
 
 ---
 
+## App exit
+The server is in-process, so it can't announce its own death over HTTP — a request just fails once the app is
+gone. Two out-of-band channels cover exit:
+- **Exit code** — the harness owns the process, so it reads `Process.ExitCode` (`0` = clean; ioSender uses
+  `0xFA11`/`64017` as its crash sentinel).
+- **Exit reason** — the host may drop a small `ioSender.exit.json` (`{code, crash, reason, when}`) in its config
+  dir on shutdown/crash, which the harness reads after the socket drops. (Crashes also leave the full crash log.)
+
 ## Known limitations
 - **Realized elements only.** Content on a not-yet-selected tab is created lazily and won't appear until that
   tab has been shown once (`POST /invoke/{tabUid}` to realize it). The full *static* catalog of every declared

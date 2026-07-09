@@ -149,6 +149,10 @@ namespace GCode_Sender
                 }
             }
 
+            // Clear any stale test-server exit-status file so it reflects only this run's exit.
+            if (TestServerPort >= 0)
+                try { File.Delete(ExitStatusPath()); } catch { }
+
             CNC.Core.DebugLog.Init(debugLog, debugCategories);
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
@@ -307,7 +311,45 @@ namespace GCode_Sender
                 catch { /* UI may be gone on a background-thread crash - the log already has it */ }
             }
 
+            if (TestServerPort >= 0) WriteExitStatus(CrashExitCode, source + ": " + (ex?.Message ?? "unknown"));
             Environment.Exit(CrashExitCode);
+        }
+
+        // Test-server exit channel: since the in-process server dies with the app, the harness can't be told over
+        // HTTP that the app is exiting. Instead we drop a tiny JSON exit-status file the harness reads AFTER the
+        // socket goes away, pairing it with the OS process exit code. Written only when the test server is enabled;
+        // cleared at startup so it reflects only the current run.
+        private static string ExitStatusPath()
+        {
+            string dir;
+            try
+            {
+                dir = CNC.Core.Resources.ConfigPath;
+                if (string.IsNullOrEmpty(dir) || dir == "./" || !Path.IsPathRooted(dir))
+                    dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ioSender");
+                Directory.CreateDirectory(dir);
+            }
+            catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
+            return Path.Combine(dir, "ioSender.exit.json");
+        }
+
+        private static void WriteExitStatus(int code, string reason)
+        {
+            try
+            {
+                string when = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+                string json = "{\"code\":" + code + ",\"crash\":" + (code == CrashExitCode ? "true" : "false") +
+                              ",\"reason\":\"" + (reason ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", " ") +
+                              "\",\"when\":\"" + when + "\"}";
+                File.WriteAllText(ExitStatusPath(), json);
+            }
+            catch { /* best-effort */ }
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            if (TestServerPort >= 0) WriteExitStatus(e.ApplicationExitCode, "normal exit");
+            base.OnExit(e);
         }
 
         // Append a timestamped crash entry to %AppData%\ioSender\ioSender.crash.log (falls back to the app folder
