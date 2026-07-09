@@ -33,6 +33,14 @@ overnight break splits into two. This is the official capture step now.
 - `-Analyze` — print the inter-entry gap distribution + session counts at several thresholds; write nothing.
 - `-SessionGapMinutes N` — idle gap (minutes) that starts a new session (**default 60**).
 
+## Ordering: write the summary FIRST, then call `-Once` last in the same message
+
+Claude Code flushes an assistant message's text to the transcript **before** running a tool call in that
+same message, so text written earlier in the message than the `-Once` call is already on disk and gets
+captured. So write the end-of-session summary as prose, then make the `-Once` call the final action of the
+same message — the summary lands in *this* session's log (verified 2026-07-08). Don't run the capture and
+then write the summary as trailing text; that pushes the summary to the next run.
+
 ## Notes
 
 - Source transcripts: `%USERPROFILE%\.claude\projects\c--github-ioSender\*.jsonl`.
