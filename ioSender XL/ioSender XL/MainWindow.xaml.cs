@@ -200,11 +200,48 @@ namespace GCode_Sender
                         UpdateConnectionGatedTabs();   // enable operational tabs on connect, disable on disconnect
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
+                    else if (e.PropertyName == nameof(GrblViewModel.Message))
+                        EmphasizeMessage();
                 };
 
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
             btnTimeLapse.Visibility = CNC.Core.DemoMarker.Enabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ---- status-bar message emphasis ----
+        // The status line at the bottom is short and easy to miss. When a new message is written, briefly show
+        // it at twice its normal height so it stands a chance of being noticed, then shrink it back after 10 s
+        // (or when the next message arrives and re-triggers this).
+        private double _baseMessageFontSize = 0;
+        private DispatcherTimer _messageEmphasisTimer;
+
+        private void EmphasizeMessage()
+        {
+            if (_baseMessageFontSize <= 0)                 // capture the inherited size once, before we override it
+                _baseMessageFontSize = lblMessage.FontSize;
+
+            if (_messageEmphasisTimer == null)
+            {
+                _messageEmphasisTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+                _messageEmphasisTimer.Tick += (s, e) =>
+                {
+                    _messageEmphasisTimer.Stop();
+                    lblMessage.FontSize = _baseMessageFontSize;
+                };
+            }
+
+            // An empty/cleared message shouldn't leave the bar enlarged - revert immediately.
+            if (string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
+            {
+                _messageEmphasisTimer.Stop();
+                lblMessage.FontSize = _baseMessageFontSize;
+                return;
+            }
+
+            lblMessage.FontSize = _baseMessageFontSize * 2.0;
+            _messageEmphasisTimer.Stop();                  // restart the 10 s window on every new message
+            _messageEmphasisTimer.Start();
         }
 
         // ---- DPI diagnostics ----
