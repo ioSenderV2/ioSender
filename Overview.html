@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>86 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>88 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -225,6 +225,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>SD + LittleFS browser &amp; file manager &mdash; multi-filesystem, View/Edit/Create/Upload via Notepad</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr14">14</a></td></tr>
 <tr><td>SD Card first-line cleanup &mdash; the filesystem status no longer overlaps the checkbox, and the free-space banner is hidden when the controller reports no sizes (was a bare &ldquo;mounted&rdquo;)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr51">51</a></td></tr>
 <tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a></td></tr>
+<tr><td>On an ATC controller the setup gate could dump you at step 6 even though the macros were installed and turned green a moment later</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr88">88</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -272,6 +273,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The deterministic dev playbooks are now one-command scripts &mdash; push to both remotes, regenerate the Overview PDF, run <code>gh</code>, and generate a changelog entry &mdash; so they are invoked, not re-derived each time</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr82">82</a></td></tr>
 <tr><td>One live instance, a clean supervised restart, and opt-in crash reports with a minidump.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr83">83</a></td></tr>
 <tr><td>File menu dissolved onto the program view + right-click menu; toolbar row removed; Camera menu made opt-in.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr84">84</a></td></tr>
+<tr><td>Optional localhost server that drives the WPF UI by x:Uid so a change can be verified end to end without a human clicking</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr87">87</a></td></tr>
 </table>
 </div>
 
@@ -363,7 +365,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">84</td><td><a href="#pr84">Main-menu overhaul</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">35</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+458</span> <span class="del">-65</span></td></tr>
 <tr><td class="n">85</td><td><a href="#pr85">Start Job: one probe macro + spacer support</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+80</span> <span class="del">-232</span></td></tr>
 <tr><td class="n">86</td><td><a href="#pr86">Start Job: fail fast over bare board</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+12</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (86 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">773</span> <span class="del">4</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38264</span> <span class="del">-4545</span></td></tr>
+<tr><td class="n">87</td><td><a href="#pr87">UI test server (-testserver)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+505</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">88</td><td><a href="#pr88">Fix false Machine Setup step 6 (ATC macros)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (88 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">777</span> <span class="del">4</span> <span class="add">+126</span><br><span class="k">Lines:</span> <span class="add">+38786</span> <span class="del">-4550</span></td></tr>
 </table>
 </div>
 
@@ -2176,6 +2180,27 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">macros/pcorner.macro</td><td class="num add">12</td><td class="num del">4</td></tr>
 </table>
 <div class="desc"><p>With <em>Measure stock size</em> on, corners 2&ndash;4 are positioned from the estimated stock size. If that estimate is too large a corner lands over bare spoilboard &mdash; and previously the top probe there sought all the way down to the board, mistook it for the stock top, then drove a side probe into empty air that only faulted at the search limit. Worse, a Feed-Hold then Stop during that latch could leave the controller needing a reset.</p><p>Those reuse corners now cap the top probe at the effective floor (spoilboard&nbsp;+&nbsp;spacer): a genuine corner still triggers on the material above it, but a corner over bare board reaches the floor with nothing there and the probe aborts immediately &mdash; no side search into air, and nothing to wedge. The first corner, positioned by hand from G28, still discovers the board as before, so flatness/skew measurement is unaffected.</p></div>
+</div>
+<!-- ===== #87 ===== -->
+<div class="pr">
+<h2 id="pr87"><span class="badge">#87</span>In-app UI test server (flag-gated developer / QA harness)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/UiTestServer.cs</td><td class="num add">472</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">23</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>A small in-process HTTP server, <strong>off by default</strong> and started only with <code>-testserver[=PORT]</code> or <code>IOSENDER_TESTSERVER=1|PORT</code> (default port 8760), that lets an external script drive the running UI and read state back &mdash; so a change can be exercised in the real app instead of always being handed off for someone to click. A normal user run never opens a socket.</p><ul><li><strong>Addressing by x:Uid.</strong> Localization already put a unique <code>x:Uid</code> on nearly every interactive control; the server surfaces those at runtime (<code>UIElement.Uid</code>), walks the visual tree of the open windows, and acts through each element's <em>AutomationPeer</em> &mdash; the same machinery real UI-automation uses, so it respects enabled/disabled state and fires the real handlers.</li><li><strong>Routes (JSON):</strong> <code>GET /ping</code>, <code>/idle</code>, <code>/tree</code>, <code>/state/{uid}</code>; <code>POST /invoke/{uid}</code>, <code>/set/{uid}?value=</code>.</li><li><strong>Nav tabs are addressable too.</strong> The top-level tabs are built in code, so they carried no <code>x:Uid</code>; they now get one from the tab registry, and selecting a tab realizes its (lazily-created) content.</li><li><strong>No new dependencies, no admin.</strong> A raw loopback <code>TcpListener</code> (not <code>HttpListener</code>, which would need a <code>netsh</code> URL reservation) keeps it zero-config for unattended runs.</li></ul><p class="foot">Debug and Release verified; the server is inert unless explicitly enabled.</p></div>
+</div>
+<!-- ===== #88 ===== -->
+<div class="pr">
+<h2 id="pr88"><span class="badge">#88</span>Machine Setup no longer false-flags &ldquo;install ATC macros&rdquo; on connect</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/AtcMacros.cs</td><td class="num add">9</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/SDCardView.xaml.cs</td><td class="num add">8</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>On connecting to an ATC controller, the Machine&nbsp;Setup gate could jump straight to step&nbsp;6 (&ldquo;install ATC macros&rdquo;) even though the macros were already present &mdash; the step then painted green a moment later. A timing race between the setup check and the first controller-filesystem listing.</p><ul><li><strong>Cause.</strong> The macro-status check lists the controller filesystem, which pumps the dispatcher and has a re-entrancy guard. When another listing was already in flight (just after it cleared the shared file table), the status check's own listing was skipped and it read a half-cleared table, so the required macros looked absent &mdash; and an absent-looking result was reported as <em>Missing</em>, which the gate read as &ldquo;not installed.&rdquo;</li><li><strong>Fix.</strong> The filesystem loader now reports whether it actually performed a listing; when it did not (skipped, or the link was down) the status check returns <em>unknown</em> rather than fabricating <em>Missing</em> rows. The gate already treats unknown as &ldquo;no action,&rdquo; and a genuinely-empty filesystem still lists a placeholder, so a real first-run <em>missing</em> case still routes to step&nbsp;6 correctly.</li></ul></div>
 </div>
 </section>
 
