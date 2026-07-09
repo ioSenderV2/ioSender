@@ -10,3 +10,5 @@ CNC.Controls.Camera.g.en-US.resources:cameracontrol.baml,lbl_cameraToSpindlePosi
 CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_offsetMotion:System.Windows.Controls.ContentControl.Content,Label,True,True,,Offset Bewegung:
 CNC.Controls.Camera.g.en-US.resources:cameracontrol.baml,str_moveCameraTo:System.String.$Content,None,True,True,,Move camera to spindle position?
 CNC.Controls.Camera.g.en-US.resources:cameracontrol.baml,str_moveSpindleTo:System.String.$Content,None,True,True,,Move spindle to camera position?
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_cameraDevice:System.Windows.Controls.ContentControl.Content,Label,True,True,,Device:
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_cameraConnect:System.Windows.Controls.ContentControl.Content,Button,True,True,,Connect

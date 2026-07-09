@@ -116,6 +116,16 @@ namespace CNC.Controls
     }
 
     [Serializable]
+    // A selectable video-input device for the Connect dialog's camera picker. Name is shown; Moniker is the
+    // DirectShow device id stored in CameraConfig.SelectedCamera. The list is supplied by the app (which owns
+    // the AForge enumeration) via CameraConfig.DeviceEnumerator, so CNC.Controls needs no camera-assembly ref.
+    public class CameraDevice
+    {
+        public string Name { get; set; }
+        public string Moniker { get; set; }
+        public override string ToString() { return Name; }
+    }
+
     public class CameraConfig : ViewModelBase
     {
         private string _camera = string.Empty;
@@ -130,7 +140,23 @@ namespace CNC.Controls
         [XmlIgnore]
         public CameraMoveMode[] MoveModes { get { return (CameraMoveMode[])Enum.GetValues(typeof(CameraMoveMode)); } }
 
-        public string SelectedCamera { get { return _camera; } set { _camera = value; IsDirty = true; OnPropertyChanged(); } }
+        public string SelectedCamera { get { return _camera; } set { _camera = value; IsDirty = true; OnPropertyChanged(); OnPropertyChanged(nameof(IsCameraBound)); } }
+
+        // Set once by the app at startup to the AForge video-device enumeration (null when no camera support).
+        // Lets the App-settings Camera panel list devices without CNC.Controls referencing the camera assembly.
+        [XmlIgnore]
+        public static Func<System.Collections.Generic.List<CameraDevice>> DeviceEnumerator { get; set; }
+
+        // Live list of local video-input devices for the Camera panel's picker (empty when none/no support).
+        [XmlIgnore]
+        public System.Collections.Generic.List<CameraDevice> AvailableCameras
+        {
+            get { return DeviceEnumerator != null ? DeviceEnumerator() : new System.Collections.Generic.List<CameraDevice>(); }
+        }
+
+        // True when a camera device is bound (Connected in the Camera panel) - gates the Camera menu.
+        [XmlIgnore]
+        public bool IsCameraBound { get { return !string.IsNullOrEmpty(_camera); } }
         public double XOffset { get { return _xoffset; } set { _xoffset = value; OnPropertyChanged(); } }
         public double YOffset { get { return _yoffset; } set { _yoffset = value; OnPropertyChanged(); } }
         public double CrosshairPosX { get { return _crossHairX; } set { _crossHairX = value; IsDirty = true; OnPropertyChanged(); } }

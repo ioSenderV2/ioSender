@@ -87,6 +87,18 @@ namespace GCode_Sender
                 return;
             }
 
+#if ADD_CAMERA
+            // Camera-device bind (menu overhaul): let the App-settings Camera picker enumerate local webcams
+            // (CNC.Controls owns the picker but can't reference this assembly's AForge), and drive the Camera
+            // menu's visibility off the bound device - re-checked whenever the binding changes in Settings.
+            CameraConfig.DeviceEnumerator = Camera.EnumerateDevices;
+            if (AppConfig.Settings.Camera != null)
+                AppConfig.Settings.Camera.PropertyChanged += (s, e) => {
+                    if (e.PropertyName == nameof(CameraConfig.SelectedCamera))
+                        UpdateCameraMenu();
+                };
+#endif
+
             // Restore the saved window size/position now (before the window is shown) so it opens at the
             // right size instead of painting at the default size and being resized later in CompleteStartup -
             // that post-paint resize was the visible "default layout then redraw" on launch.
@@ -1563,10 +1575,23 @@ namespace GCode_Sender
                 UIViewModel.Camera = new Camera();
                 UIViewModel.Camera.Setup(UIViewModel);
                 //        Camera.Owner = owner;
-                owner.menuCamera.IsEnabled = UIViewModel.Camera.HasCamera;
             }
 
+            owner.UpdateCameraMenu();
+
             return UIViewModel.Camera != null;
+        }
+
+        // The in-app camera only sees local webcams (a laptop just shows its built-in, useless for CNC), so the
+        // Camera menu is shown/enabled only when a specific device has been bound in the Connect dialog AND that
+        // device is currently present. Re-run after the Connect dialog closes so a fresh bind takes effect.
+        public void UpdateCameraMenu()
+        {
+            var cfg = AppConfig.Settings.Camera;
+            bool bound = cfg != null && cfg.IsCameraBound &&
+                         Camera.EnumerateDevices().Any(d => d.Moniker == cfg.SelectedCamera);
+            menuCamera.Visibility = bound ? Visibility.Visible : Visibility.Collapsed;
+            menuCamera.IsEnabled = bound;
         }
 
         private void CameraOpen_Click(object sender, RoutedEventArgs e)

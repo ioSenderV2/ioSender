@@ -64,6 +64,17 @@ namespace CNC.Controls.Camera
         }
 
         public bool HasCamera { get { return CNCCamera.HasCamera; } }
+        public int CameraCount { get { return CNCCamera.Cameras.Count; } }
+
+        // Enumerate the local video-input devices for the Connect-dialog picker. Registered by the app into
+        // CameraConfig.DeviceEnumerator so CNC.Controls can list cameras without referencing this assembly.
+        public static System.Collections.Generic.List<CNC.Controls.CameraDevice> EnumerateDevices()
+        {
+            var list = new System.Collections.Generic.List<CNC.Controls.CameraDevice>();
+            foreach (AForge.Video.DirectShow.FilterInfo fi in new AForge.Video.DirectShow.FilterInfoCollection(AForge.Video.DirectShow.FilterCategory.VideoInputDevice))
+                list.Add(new CNC.Controls.CameraDevice { Name = fi.Name, Moniker = fi.MonikerString });
+            return list;
+        }
         public CameraControl CameraControl { get { return CNCCamera; } }
         public new bool IsVisible { get { return CNCCamera.IsVisible; } }
         public bool IsMoveEnabled { get { return CNCCamera.IsMoveEnabled; } set { CNCCamera.IsMoveEnabled = value && (CNCCamera.XOffset != 0d || CNCCamera.YOffset != 0d); } }

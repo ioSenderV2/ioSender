@@ -49,6 +49,7 @@ namespace CNC.Controls
         event CameraMoveOffsetHandler MoveOffset;
 
         bool HasCamera { get; }
+        int CameraCount { get; }
         bool IsVisible { get; }
         bool IsMoveEnabled { get; set; }
 

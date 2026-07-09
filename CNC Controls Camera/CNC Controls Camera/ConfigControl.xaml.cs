@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
@@ -51,6 +52,48 @@ namespace CNC.Controls.Camera
         public ConfigControl()
         {
             InitializeComponent();
+
+            Loaded += (s, e) => RefreshBindUi();
+        }
+
+        private CameraConfig Cfg { get { return (DataContext as Config)?.Camera; } }
+
+        // Reflect the current bind state: select the bound device (or the first one), toggle the button between
+        // Connect/Disconnect, and lock the picker while connected. Menu visibility follows via the SelectedCamera
+        // PropertyChanged the app subscribes to (menu overhaul).
+        private void RefreshBindUi()
+        {
+            var cfg = Cfg;
+            if (cfg == null)
+                return;
+
+            if (cfg.IsCameraBound)
+                cbxDevice.SelectedValue = cfg.SelectedCamera;
+            else if (cbxDevice.SelectedItem == null && cbxDevice.Items.Count > 0)
+                cbxDevice.SelectedIndex = 0;
+
+            btnCameraConnect.Content = cfg.IsCameraBound ? "Disconnect" : "Connect";
+            cbxDevice.IsEnabled = !cfg.IsCameraBound;
+        }
+
+        // Re-enumerate on drop-down open so a just-plugged-in camera appears without reopening Settings.
+        private void cbxDevice_DropDownOpened(object sender, EventArgs e)
+        {
+            cbxDevice.GetBindingExpression(ComboBox.ItemsSourceProperty)?.UpdateTarget();
+        }
+
+        private void btnCameraConnect_Click(object sender, RoutedEventArgs e)
+        {
+            var cfg = Cfg;
+            if (cfg == null)
+                return;
+
+            if (cfg.IsCameraBound)
+                cfg.SelectedCamera = string.Empty;                                 // Disconnect
+            else
+                cfg.SelectedCamera = (cbxDevice.SelectedValue as string) ?? string.Empty;   // Connect
+
+            RefreshBindUi();
         }
 
         private void getPosition_Click(object sender, RoutedEventArgs e)

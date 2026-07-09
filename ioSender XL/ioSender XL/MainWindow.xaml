@@ -54,13 +54,9 @@
                 <MenuItem x:Uid="mnu_about" Header="_About" Click="aboutMenuItem_Click"/>
             </MenuItem>
         </Menu>
-        <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
-            <ToolBar IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" MinHeight="42" VerticalAlignment="Top" Width="{Binding Path=ActualWidth, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type DockPanel}}}" >
-                <cnccontrols:FileActionControl IsEnabled="{Binding Path=IsToolChanging, Converter={StaticResource BooleanConverter}}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                <Separator Margin="4,0"></Separator>
-                <cnccontrols:MacroToolbarControl x:Name="toolbarMacros"/>
-            </ToolBar>
-        </ToolBarTray>
+        <!-- Menu-overhaul: the toolbar row (file-action icons + quick-run macro buttons) was removed. The
+             file icons duplicated the program-view header (Load/Close) or were dropped (Reload/Edit); macros
+             still run by F-key (KeypressHandler) - a macro-name flyout is a possible future replacement. -->
         <StatusBar DockPanel.Dock="Bottom">
             <StatusBar.ItemsPanel>
                 <ItemsPanelTemplate>
