@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>83 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>84 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -269,6 +269,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Run-bar jog pad restored &mdash; it had been squeezed to nothing by the Program button; run bar rebalanced into four columns with the button row filling the slack up to the jog pad</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr78">78</a></td></tr>
 <tr><td>The deterministic dev playbooks are now one-command scripts &mdash; push to both remotes, regenerate the Overview PDF, run <code>gh</code>, and generate a changelog entry &mdash; so they are invoked, not re-derived each time</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr82">82</a></td></tr>
 <tr><td>One live instance, a clean supervised restart, and opt-in crash reports with a minidump.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr83">83</a></td></tr>
+<tr><td>File menu dissolved onto the program view + right-click menu; toolbar row removed; Camera menu made opt-in.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr84">84</a></td></tr>
 </table>
 </div>
 
@@ -357,7 +358,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">81</td><td><a href="#pr81">No more restart prompt hiding behind the relaunch splash</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">82</td><td><a href="#pr82">Dev playbooks distilled to one-command scripts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+384</span> <span class="del">-11</span></td></tr>
 <tr><td class="n">83</td><td><a href="#pr83">Relaunch supervisor, single-instance &amp; crash reporting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+850</span> <span class="del">-58</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (83 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">718</span> <span class="del">2</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+37714</span> <span class="del">-4244</span></td></tr>
+<tr><td class="n">84</td><td><a href="#pr84">Main-menu overhaul</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">35</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+458</span> <span class="del">-65</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (84 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">753</span> <span class="del">2</span> <span class="add">+125</span><br><span class="k">Lines:</span> <span class="add">+38172</span> <span class="del">-4309</span></td></tr>
 </table>
 </div>
 
@@ -2119,6 +2121,29 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Three linked robustness features around the app's launch, restart and crash lifecycle. <code>AppLaunch.exe</code> &mdash; historically the single-instance file-open forwarder &mdash; is repurposed as a small, application-agnostic <strong>relaunch supervisor</strong>: <code>AppLaunch.exe -ExitCodeToRelaunch 240 -- &lt;exe&gt; [args]</code> starts the child with an <code>EXITCODE_TO_RELAUNCH</code> environment variable set and relaunches it whenever it exits with exactly that code (any other code propagates and ends the loop). The env var is the whole handshake; ioSender knows nothing about AppLaunch beyond it.</p><ul><li><strong>True single instance.</strong> On startup ioSender probes its named pipe: if another instance is already running it forwards the file argument (if any), raises that window, and exits &mdash; a second launch never opens a second window. This moved out of AppLaunch and into ioSender, where the server already lived.</li><li><strong>Clean supervised restart.</strong> When supervised, the in-app &ldquo;restart to apply&rdquo; simply exits with code 240 and lets the supervisor relaunch it &mdash; no in-process re-spawn, so the restart prompt can no longer strand itself behind the relaunch splash. Unsupervised runs (development, headless) keep the in-process relaunch as a fallback.</li><li><strong>Opt-in crash reporting, no backend.</strong> A fatal unhandled exception now writes a real minidump plus a text summary to <code>%AppData%\ioSender\crashes</code>. The next launch shows a consent dialog with the summary; &ldquo;Send report&rdquo; bundles the dump into a <code>.zip</code> (GitHub rejects raw <code>.dmp</code>), opens a pre-filled GitHub issue, and docks the file-manager window to a strip across the top of the screen with the zip selected, ready to drag onto the issue &mdash; sized in physical pixels and raised past the foreground lock so it works correctly on high-DPI displays. A topmost instruction banner spells out the one step to take.</li></ul><p class="foot">Builds clean (Debug + Release). Wiring the desktop shortcut / file association to AppLaunch is a packaging step (no installer in this repo). Hidden <code>-crashtest</code> flag exercises the crash&nbsp;&rarr;&nbsp;report path.</p></div>
+</div>
+<!-- ===== #84 ===== -->
+<div class="pr">
+<h2 id="pr84"><span class="badge">#84</span>Main-menu overhaul: dissolve the File menu, slim the menu bar</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">47</td><td class="num del">37</td></tr>
+<tr><td class="mono">CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml.cs</td><td class="num add">43</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">29</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">27</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ProgramPanel.xaml</td><td class="num add">26</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ProgramPanel.xaml.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">15</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">13</td><td class="num del">20</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobWorkspace.xaml.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls Camera/CNC Controls Camera/Camera.xaml.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ICamera.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales x 3 assemblies)</td><td class="num add">188</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The menu bar is slimmed to essentials and the File menu is dissolved, with each item rehomed to where it is actually used.</p><ul><li><strong>Program-view header</strong> â€” with no file loaded it offers Load File / Load Folder; once loaded it shows the program source with a close (Ã—). Save and a Transform submenu move to the program list's right-click menu â€” Save works on any program view, Transform is rebuilt per menu-open.</li><li><strong>File menu gone</strong> â€” Connect/Reconnect is a top-level item, Open Console is a double-click on the Console tab (Esc still toggles it), Open Application data folder moves to a new Help â†’ Support submenu, and Exit is dropped (the window close / Alt+F4 quit).</li><li><strong>Toolbar row removed</strong> â€” the file-action icons and quick-run macro buttons beneath the menu bar are gone; macros still run by F-key.</li><li><strong>Camera is opt-in</strong> â€” instead of always showing (and opening a laptop's built-in webcam), the Camera menu appears only when a video device is bound via a new Device picker + Connect/Disconnect button in Settings â†’ App â†’ Camera.</li></ul><p class="foot">Builds clean Debug + Release; user-verified. Localized across all 7 locales. Commits 52b51d1 / 54ebcdd / 9511d3e.</p></div>
 </div>
 </section>
 
