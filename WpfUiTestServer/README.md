@@ -86,6 +86,9 @@ Duplicate `x:Uid`s (a reused template) are disambiguated with `?index=N` (0-base
 |---|---|
 | `POST /invoke/{uid}?index=N` | Invoke (button), else Toggle, else Select (tab/list item) via the automation peer |
 | `POST /set/{uid}?value=V&index=N` | Set value: `ValuePattern` text, a checkbox/toggle bool, or a range number |
+| `POST /key/{keyName}?uid=T` | Raise a key (real routed events) on target `T` (default = the window). **Plain keys only** — synthesized events can't set `Keyboard.Modifiers`, so Ctrl/Shift/Alt combos won't fire handlers. Use e.g. `F1`, `Escape`, `Up` |
+| `POST /menu/{uid}` | Open the element's context menu (fires its `Opened`, so dynamic submenus populate); returns the items (`uid,header,enabled,hasItems`) |
+| `POST /menu/{uid}?item=X` | …and invoke the menu item with uid `X` |
 
 ### Synchronization
 | Method & path | Purpose |

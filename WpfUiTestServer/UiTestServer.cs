@@ -44,6 +44,7 @@ using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -527,6 +528,18 @@ namespace WpfUiTestServer
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("invoke requires /invoke/{uid}"); }
                     return OnDispatcher(() => DoInvoke(arg, index));
 
+                // POST /key/{keyName}?uid=<target>   raise the key on the target (default = the window, so
+                // window-level PreviewKeyDown handlers fire). Plain keys only - see DoKey.
+                case "key":
+                    if (string.IsNullOrEmpty(arg)) { status = 400; return Err("key requires /key/{keyName}"); }
+                    return OnDispatcher(() => DoKey(arg, QueryValue(query, "uid")));
+
+                // POST /menu/{uid}                open the element's context menu, return its items
+                // POST /menu/{uid}?item=<itemUid> ... and invoke that item
+                case "menu":
+                    if (string.IsNullOrEmpty(arg)) { status = 400; return Err("menu requires /menu/{uid}"); }
+                    return OnDispatcher(() => DoMenu(arg, QueryValue(query, "item")));
+
                 case "set":
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("set requires /set/{uid}?value=..."); }
                     return OnDispatcher(() => DoSet(arg, QueryValue(query, "value"), index));
@@ -906,6 +919,95 @@ namespace WpfUiTestServer
                 return "{\"ok\":true,\"set\":" + Str(uid) + ",\"value\":" + rp.Value.ToString(CultureInfo.InvariantCulture) + "}";
             }
             return Err("element does not support Value/Toggle/Range: " + uid + " (" + el.GetType().Name + ")");
+        }
+
+        // Raise a key on the target as real routed events (Preview + bubble, down then up). Default target is the
+        // window, so window-level PreviewKeyDown handlers (jog, F-keys, console toggle, shortcuts) fire.
+        // PLAIN KEYS ONLY: synthesized events can't set Keyboard.Modifiers, and handlers read the *physical*
+        // modifier state, so Ctrl/Shift/Alt combos won't trigger those handlers (use a plain key, e.g. F1, Escape).
+        private static string DoKey(string keyName, string targetUid)
+        {
+            Key key;
+            if (!Enum.TryParse(keyName, true, out key)) return Err("unknown key: " + keyName + " (use a System.Windows.Input.Key name, e.g. F1, Escape, Enter, Up)");
+
+            UIElement target = string.IsNullOrEmpty(targetUid) ? _main : FindByUid(targetUid);
+            if (target == null) return NotFound(targetUid);
+
+            var src = PresentationSource.FromVisual(target);
+            if (src == null) return Err("no presentation source for target (window not shown?)");
+
+            RaiseKey(target, src, key, Keyboard.PreviewKeyDownEvent);
+            RaiseKey(target, src, key, Keyboard.KeyDownEvent);
+            RaiseKey(target, src, key, Keyboard.PreviewKeyUpEvent);
+            RaiseKey(target, src, key, Keyboard.KeyUpEvent);
+            return "{\"ok\":true,\"key\":" + Str(key.ToString()) + ",\"target\":" + Str(targetUid ?? "window") + "}";
+        }
+
+        private static void RaiseKey(UIElement target, PresentationSource src, Key key, RoutedEvent ev)
+        {
+            target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, src, 0, key) { RoutedEvent = ev });
+        }
+
+        // Open an element's ContextMenu (firing its Opened handler, so dynamically-built submenus populate),
+        // then either list its items or invoke the item with the given uid. The menu is closed again before
+        // returning. MenuItems are found in the ContextMenu's logical item tree, so this works without the popup
+        // being in a walked window.
+        private static string DoMenu(string elementUid, string itemUid)
+        {
+            var el = FindByUid(elementUid) as FrameworkElement;
+            if (el == null) return Err("no element with uid: " + elementUid);
+            var cm = el.ContextMenu;
+            if (cm == null) return Err("no context menu on: " + elementUid + " (" + el.GetType().Name + ")");
+
+            cm.PlacementTarget = el;
+            cm.IsOpen = true;   // fires Opened synchronously - dynamic items are in cm.Items after this
+            try
+            {
+                if (string.IsNullOrEmpty(itemUid))
+                {
+                    var sb = new StringBuilder();
+                    sb.Append("{\"ok\":true,\"element\":").Append(Str(elementUid)).Append(",\"items\":[");
+                    bool first = true;
+                    AppendMenuItems(cm.Items, sb, ref first);
+                    sb.Append("]}");
+                    return sb.ToString();
+                }
+
+                var mi = FindMenuItem(cm.Items, itemUid);
+                if (mi == null) return Err("no menu item with uid: " + itemUid + " in the context menu of " + elementUid);
+                if (!mi.IsEnabled) return Err("menu item is disabled: " + itemUid);
+                mi.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, mi));
+                return "{\"ok\":true,\"invoked\":" + Str(itemUid) + "}";
+            }
+            finally { cm.IsOpen = false; }
+        }
+
+        private static void AppendMenuItems(System.Windows.Controls.ItemCollection items, StringBuilder sb, ref bool first)
+        {
+            foreach (var o in items)
+            {
+                var mi = o as MenuItem;
+                if (mi == null) continue;
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append("{\"uid\":").Append(Str(mi.Uid))
+                  .Append(",\"header\":").Append(Str(mi.Header == null ? "" : mi.Header.ToString()))
+                  .Append(",\"enabled\":").Append(mi.IsEnabled ? "true" : "false")
+                  .Append(",\"hasItems\":").Append(mi.Items.Count > 0 ? "true" : "false").Append('}');
+            }
+        }
+
+        private static MenuItem FindMenuItem(System.Windows.Controls.ItemCollection items, string uid)
+        {
+            foreach (var o in items)
+            {
+                var mi = o as MenuItem;
+                if (mi == null) continue;
+                if (mi.Uid == uid) return mi;
+                var sub = FindMenuItem(mi.Items, uid);
+                if (sub != null) return sub;
+            }
+            return null;
         }
 
         // ---- helpers -------------------------------------------------------------------------------------

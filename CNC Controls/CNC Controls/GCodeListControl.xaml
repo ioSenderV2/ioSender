@@ -11,7 +11,7 @@
          the program Cycle Start will run. Applied in code (RefreshSourceHighlight) only to that view, so when
          a wizard is the active source its program view is mint and the loaded-job view is not (and vice versa). -->
     <Grid>
-    <DataGrid x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
+    <DataGrid x:Uid="grid_gcode" x:Name="grdGCode" Grid.Row="0" ItemsSource="{Binding}" AllowDrop="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AutoGenerateColumns="False"
               CanUserSortColumns="false" CanUserResizeRows="False" IsReadOnly="true" SelectionChanged="grdGCode_SelectionChanged"
               EnableRowVirtualization="True" ScrollViewer.CanContentScroll="True"
               VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Item"
