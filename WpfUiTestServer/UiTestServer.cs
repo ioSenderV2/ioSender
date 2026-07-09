@@ -46,28 +46,38 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using CNC.Core;
 
-namespace GCode_Sender
+namespace WpfUiTestServer
 {
-    internal static class UiTestServer
+    // App-agnostic, flag-gated in-process HTTP server that drives a WPF UI by x:Uid via AutomationPeers so an
+    // external script can exercise it end to end and read state back. It knows nothing about any particular app;
+    // the host supplies domain state through IUiTestStatusProvider (see Start) and, optionally, a log sink.
+    public static class UiTestServer
     {
         private static TcpListener _listener;
         private static Thread _thread;
         private static Window _main;
         private static int _port;
+        private static IUiTestStatusProvider _status;
+        private static Action<string> _log = _ => { };
 
         public const int DefaultPort = 8760;
 
         // Start the server on the loopback interface. Safe to call once; a second call is ignored. Never throws
         // out to the caller - a bind failure is logged and the app continues normally (the flag is diagnostic).
-        public static void Start(Window main, int port)
+        //   main           - the window whose visual tree (plus any other open windows) is addressed.
+        //   port           - <=0 uses DefaultPort.
+        //   statusProvider - optional host/domain state for /status and /waitfor?status= (null => those are empty).
+        //   log            - optional diagnostic sink (null => no-op); the host can route it to its own logging.
+        public static void Start(Window main, int port, IUiTestStatusProvider statusProvider = null, Action<string> log = null)
         {
             if (_listener != null)
                 return;
 
             _main = main;
             _port = port <= 0 ? DefaultPort : port;
+            _status = statusProvider;
+            if (log != null) _log = log;
 
             try
             {
@@ -77,7 +87,7 @@ namespace GCode_Sender
             catch (Exception ex)
             {
                 _listener = null;
-                CNC.Core.DebugLog.Write("testserver", "failed to bind 127.0.0.1:" + _port + " - " + ex.Message);
+                _log("failed to bind 127.0.0.1:" + _port + " - " + ex.Message);
                 return;
             }
 
@@ -86,7 +96,7 @@ namespace GCode_Sender
 
             InstallBanner(main);   // visible "hands off" bar so a watching operator knows automation is live
 
-            CNC.Core.DebugLog.Write("testserver", "listening on http://127.0.0.1:" + _port + "/");
+            _log("listening on http://127.0.0.1:" + _port + "/");
         }
 
         // A persistent, gently-pulsing red bar docked across the very top of the window (above the menu) while
@@ -138,7 +148,7 @@ namespace GCode_Sender
                 catch { break; }   // listener stopped / app shutting down
 
                 try { HandleConnection(client); }
-                catch (Exception ex) { CNC.Core.DebugLog.Write("testserver", "handler error: " + ex.Message); }
+                catch (Exception ex) { _log("handler error: " + ex.Message); }
                 finally { try { client.Close(); } catch { } }
             }
         }
@@ -261,6 +271,9 @@ namespace GCode_Sender
                 case "tree":
                     return OnDispatcher(() => BuildTree());
 
+                case "uids":
+                    return OnDispatcher(BuildUids);
+
                 case "state":
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("state requires /state/{uid}"); }
                     return OnDispatcher(() =>
@@ -290,49 +303,41 @@ namespace GCode_Sender
             return (string)_main.Dispatcher.Invoke(action);
         }
 
-        private static GrblViewModel Model { get { return _main == null ? null : _main.DataContext as GrblViewModel; } }
-
-        // App-level state for assertions: connection, controller state, streaming/job, loaded file, DRO. These
-        // are the things a test asserts on but that no single x:Uid exposes. Read on the UI thread. An unknown
-        // field name yields null so /waitfor can report a clean error rather than silently never matching.
-        private static string StatusField(string name)
+        // Host/domain state for assertions - connection, controller state, streaming/job, loaded file, DRO -
+        // supplied by the host's IUiTestStatusProvider. These are the things a test asserts on but that no
+        // single x:Uid exposes. Read on the UI thread (the provider may touch view-models). Empty if the host
+        // registered no provider.
+        private static List<KeyValuePair<string, string>> StatusMap()
         {
-            var m = Model;
-            bool connected = Comms.com != null && Comms.com.IsOpen;
-            switch ((name ?? "").ToLowerInvariant())
-            {
-                case "connected":   return connected ? "true" : "false";
-                case "state":       return m == null ? "" : m.GrblState.State.ToString();
-                case "error":       return m == null ? "0" : m.GrblState.Error.ToString(CultureInfo.InvariantCulture);
-                case "streaming":   return m == null ? "" : m.StreamingState.ToString();
-                case "jobrunning":  return m != null && m.IsJobRunning ? "true" : "false";
-                case "fileloaded":  return m != null && m.IsFileLoaded ? "true" : "false";
-                case "filename":    return m == null ? "" : m.FileName;
-                case "tool":        return m == null ? "" : m.Tool;
-                case "message":     return m == null ? "" : m.Message;
-                case "mposx":       return m == null ? "" : m.MachinePosition.X.ToString(CultureInfo.InvariantCulture);
-                case "mposy":       return m == null ? "" : m.MachinePosition.Y.ToString(CultureInfo.InvariantCulture);
-                case "mposz":       return m == null ? "" : m.MachinePosition.Z.ToString(CultureInfo.InvariantCulture);
-                case "wposx":       return m == null ? "" : m.WorkPosition.X.ToString(CultureInfo.InvariantCulture);
-                case "wposy":       return m == null ? "" : m.WorkPosition.Y.ToString(CultureInfo.InvariantCulture);
-                case "wposz":       return m == null ? "" : m.WorkPosition.Z.ToString(CultureInfo.InvariantCulture);
-                default:            return null;   // unknown field
-            }
+            var list = new List<KeyValuePair<string, string>>();
+            if (_status == null) return list;
+            var pairs = _status.GetStatus();
+            if (pairs != null)
+                foreach (var kv in pairs)
+                    list.Add(kv);
+            return list;
         }
 
-        private static readonly string[] StatusFields =
-            { "connected", "state", "error", "streaming", "jobRunning", "fileLoaded", "fileName", "tool",
-              "message", "mposX", "mposY", "mposZ", "wposX", "wposY", "wposZ" };
+        // A single field by name (case-insensitive), or null if the host doesn't expose it - so /waitfor can
+        // report a clean error rather than silently never matching.
+        private static string StatusField(string name)
+        {
+            foreach (var kv in StatusMap())
+                if (string.Equals(kv.Key, name, StringComparison.OrdinalIgnoreCase))
+                    return kv.Value;
+            return null;
+        }
 
         private static string BuildStatus()
         {
             var sb = new StringBuilder();
             sb.Append("{\"ok\":true,\"status\":{");
-            for (int i = 0; i < StatusFields.Length; i++)
+            bool first = true;
+            foreach (var kv in StatusMap())
             {
-                if (i > 0) sb.Append(',');
-                string v = StatusField(StatusFields[i]);
-                sb.Append(Str(StatusFields[i])).Append(':').Append(Str(v));
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append(Str(kv.Key)).Append(':').Append(Str(kv.Value));
             }
             sb.Append("}}");
             return sb.ToString();
@@ -485,6 +490,46 @@ namespace GCode_Sender
                 CollectUids(w, sb, ref first, counter);
             sb.Append("]}");
             return sb.ToString();
+        }
+
+        // Lightweight catalog of the DISTINCT x:Uids addressable right now (sorted), each with its occurrence
+        // count so a caller knows which need a ?index=N. This is the "what can I address" list; /tree adds the
+        // per-element detail. NOTE: only REALIZED elements appear - content on a not-yet-selected tab is created
+        // lazily, so select its tab (POST /invoke/tab_...) to realize it first. The full static catalog of every
+        // declared x:Uid lives in the app's localization CSVs / the XAML source, not at runtime.
+        private static string BuildUids()
+        {
+            var counts = new Dictionary<string, int>();
+            var types = new Dictionary<string, string>();   // control type of the first occurrence (for discovery)
+            foreach (Window w in EnumerateWindows())
+                CountUids(w, counts, types);
+
+            var keys = new List<string>(counts.Keys);
+            keys.Sort(StringComparer.OrdinalIgnoreCase);
+
+            var sb = new StringBuilder();
+            sb.Append("{\"ok\":true,\"count\":").Append(keys.Count).Append(",\"uids\":[");
+            for (int i = 0; i < keys.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"uid\":").Append(Str(keys[i]))
+                  .Append(",\"type\":").Append(Str(types[keys[i]]))
+                  .Append(",\"count\":").Append(counts[keys[i]]).Append('}');
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private static void CountUids(DependencyObject root, Dictionary<string, int> counts, Dictionary<string, string> types)
+        {
+            if (root is UIElement ue && !string.IsNullOrEmpty(ue.Uid))
+            {
+                int c; counts.TryGetValue(ue.Uid, out c); counts[ue.Uid] = c + 1;
+                if (!types.ContainsKey(ue.Uid)) types[ue.Uid] = ue.GetType().Name;
+            }
+            int n = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < n; i++)
+                CountUids(VisualTreeHelper.GetChild(root, i), counts, types);
         }
 
         // counter tracks the running per-uid occurrence so each element carries the same 0-based "index" a

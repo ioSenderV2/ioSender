@@ -755,7 +755,10 @@ namespace GCode_Sender
             // Flag-gated UI test server (‑testserver / IOSENDER_TESTSERVER): the tabs/views are built and the
             // visual tree is realized by now, so an external script can drive the UI by x:Uid. Off by default.
             if (App.TestServerPort >= 0)
-                UiTestServer.Start(this, App.TestServerPort == 0 ? UiTestServer.DefaultPort : App.TestServerPort);
+                WpfUiTestServer.UiTestServer.Start(this,
+                    App.TestServerPort == 0 ? WpfUiTestServer.UiTestServer.DefaultPort : App.TestServerPort,
+                    new GrblStatusProvider(this),
+                    msg => CNC.Core.DebugLog.Write("testserver", msg));
         }
 
         private bool _machineSetupForced = false;

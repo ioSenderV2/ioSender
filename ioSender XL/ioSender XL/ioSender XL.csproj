@@ -75,9 +75,6 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
-    <!-- UI test server (-testserver): AutomationPeer pattern-provider interfaces + pattern/ToggleState enums. -->
-    <Reference Include="UIAutomationProvider" />
-    <Reference Include="UIAutomationTypes" />
     <Reference Include="HelixToolkit.Wpf">
       <HintPath>..\..\helix-toolkit\HelixToolkit.Wpf.dll</HintPath>
     </Reference>
@@ -140,7 +137,7 @@
       <DependentUpon>ProgramPanel.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProgramSourceConverter.cs" />
-    <Compile Include="UiTestServer.cs" />
+    <Compile Include="GrblStatusProvider.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>
     </Compile>
@@ -213,6 +210,10 @@
     <ProjectReference Include="..\..\CNC GCodeViewer\CNC GCodeViewer\CNC GCodeViewer.csproj">
       <Project>{f1f1e439-a3ee-462c-b8bf-bfd08c0b3d9e}</Project>
       <Name>CNC GCodeViewer</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\WpfUiTestServer\WpfUiTestServer.csproj">
+      <Project>{b3956354-ca21-45eb-9d06-1278fb81a92d}</Project>
+      <Name>WpfUiTestServer</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
