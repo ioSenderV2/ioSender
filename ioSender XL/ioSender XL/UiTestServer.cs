@@ -84,7 +84,49 @@ namespace GCode_Sender
             _thread = new Thread(AcceptLoop) { IsBackground = true, Name = "UiTestServer" };
             _thread.Start();
 
+            InstallBanner(main);   // visible "hands off" bar so a watching operator knows automation is live
+
             CNC.Core.DebugLog.Write("testserver", "listening on http://127.0.0.1:" + _port + "/");
+        }
+
+        // A persistent, gently-pulsing red bar docked across the very top of the window (above the menu) while
+        // the test server is running, so an operator watching the machine knows automated input is live and
+        // won't fight the harness for the mouse/keyboard. Docked (not overlaid) so it reflows cleanly and
+        // follows move/resize/minimize; best-effort - a layout we don't recognise just skips the bar.
+        private static void InstallBanner(Window main)
+        {
+            try
+            {
+                var dock = main.Content as DockPanel;
+                if (dock == null)
+                    return;
+
+                var banner = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28)),
+                    Padding = new Thickness(8, 3, 8, 3),
+                    Child = new TextBlock
+                    {
+                        Text = "●  UNDER TEST-SERVER CONTROL — automated input is live on 127.0.0.1:" + _port +
+                               ".  Please don't use the mouse or keyboard.",
+                        Foreground = Brushes.White,
+                        FontWeight = FontWeights.Bold,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextAlignment = TextAlignment.Center
+                    }
+                };
+                DockPanel.SetDock(banner, Dock.Top);
+                dock.Children.Insert(0, banner);
+
+                var pulse = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.6,
+                    new Duration(TimeSpan.FromSeconds(0.9)))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                };
+                banner.BeginAnimation(UIElement.OpacityProperty, pulse);
+            }
+            catch { /* the banner is cosmetic - never let it break server startup */ }
         }
 
         private static void AcceptLoop()
@@ -198,6 +240,7 @@ namespace GCode_Sender
             string[] seg = path.Trim('/').Split('/');
             string head = seg.Length > 0 ? seg[0].ToLowerInvariant() : "";
             string arg = seg.Length > 1 ? Uri.UnescapeDataString(seg[1]) : null;
+            int index = ParseInt(QueryValue(query, "index"), 0);   // disambiguate duplicate uids (0 = first)
 
             switch (head)
             {
@@ -222,18 +265,18 @@ namespace GCode_Sender
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("state requires /state/{uid}"); }
                     return OnDispatcher(() =>
                     {
-                        var el = FindByUid(arg);
+                        var el = FindByUid(arg, index);
                         if (el == null) return NotFound(arg);
-                        return "{\"ok\":true,\"element\":" + DescribeElement(el, arg) + "}";
+                        return "{\"ok\":true,\"element\":" + DescribeElement(el, arg, index) + "}";
                     });
 
                 case "invoke":
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("invoke requires /invoke/{uid}"); }
-                    return OnDispatcher(() => DoInvoke(arg));
+                    return OnDispatcher(() => DoInvoke(arg, index));
 
                 case "set":
                     if (string.IsNullOrEmpty(arg)) { status = 400; return Err("set requires /set/{uid}?value=..."); }
-                    return OnDispatcher(() => DoSet(arg, QueryValue(query, "value")));
+                    return OnDispatcher(() => DoSet(arg, QueryValue(query, "value"), index));
 
                 default:
                     status = 404;
@@ -395,28 +438,32 @@ namespace GCode_Sender
 
         // ---- element lookup + description ----------------------------------------------------------------
 
-        // Walk the visual tree of every open window and return the first UIElement whose Uid matches.
-        private static UIElement FindByUid(string uid)
+        // All UIElements whose Uid matches, in visual-tree (document) order across every open window. x:Uid is
+        // unique per XAML file but repeats across reused templates (e.g. the pinned offset flyouts give three
+        // btn_pin), so callers disambiguate by 0-based index - the same index /tree reports for each element.
+        private static List<UIElement> FindAllByUid(string uid)
         {
+            var list = new List<UIElement>();
             foreach (Window w in EnumerateWindows())
-            {
-                var hit = FindByUid(w, uid);
-                if (hit != null) return hit;
-            }
-            return null;
+                CollectMatches(w, uid, list);
+            return list;
         }
 
-        private static UIElement FindByUid(DependencyObject root, string uid)
+        private static void CollectMatches(DependencyObject root, string uid, List<UIElement> acc)
         {
             if (root is UIElement ue && ue.Uid == uid)
-                return ue;
+                acc.Add(ue);
             int n = VisualTreeHelper.GetChildrenCount(root);
             for (int i = 0; i < n; i++)
-            {
-                var hit = FindByUid(VisualTreeHelper.GetChild(root, i), uid);
-                if (hit != null) return hit;
-            }
-            return null;
+                CollectMatches(VisualTreeHelper.GetChild(root, i), uid, acc);
+        }
+
+        private static UIElement FindByUid(string uid) { return FindByUid(uid, 0); }
+
+        private static UIElement FindByUid(string uid, int index)
+        {
+            var all = FindAllByUid(uid);
+            return (index >= 0 && index < all.Count) ? all[index] : null;
         }
 
         private static IEnumerable<Window> EnumerateWindows()
@@ -433,26 +480,31 @@ namespace GCode_Sender
             var sb = new StringBuilder();
             sb.Append("{\"ok\":true,\"elements\":[");
             bool first = true;
+            var counter = new Dictionary<string, int>();
             foreach (Window w in EnumerateWindows())
-                CollectUids(w, sb, ref first);
+                CollectUids(w, sb, ref first, counter);
             sb.Append("]}");
             return sb.ToString();
         }
 
-        private static void CollectUids(DependencyObject root, StringBuilder sb, ref bool first)
+        // counter tracks the running per-uid occurrence so each element carries the same 0-based "index" a
+        // caller passes back as ?index=N to disambiguate duplicates. The pre-order walk here matches
+        // FindAllByUid exactly, so the indices line up.
+        private static void CollectUids(DependencyObject root, StringBuilder sb, ref bool first, Dictionary<string, int> counter)
         {
             if (root is UIElement ue && !string.IsNullOrEmpty(ue.Uid))
             {
+                int idx; counter.TryGetValue(ue.Uid, out idx); counter[ue.Uid] = idx + 1;
                 if (!first) sb.Append(',');
                 first = false;
-                sb.Append(DescribeElement(ue, ue.Uid));
+                sb.Append(DescribeElement(ue, ue.Uid, idx));
             }
             int n = VisualTreeHelper.GetChildrenCount(root);
             for (int i = 0; i < n; i++)
-                CollectUids(VisualTreeHelper.GetChild(root, i), sb, ref first);
+                CollectUids(VisualTreeHelper.GetChild(root, i), sb, ref first, counter);
         }
 
-        private static string DescribeElement(UIElement el, string uid)
+        private static string DescribeElement(UIElement el, string uid, int index = -1)
         {
             string name = "", value = null;
             bool enabled = el.IsEnabled, visible = el.Visibility == Visibility.Visible;
@@ -462,6 +514,7 @@ namespace GCode_Sender
             var sb = new StringBuilder();
             sb.Append('{');
             sb.Append("\"uid\":").Append(Str(uid));
+            if (index >= 0) sb.Append(",\"index\":").Append(index);
             sb.Append(",\"name\":").Append(Str(name));
             sb.Append(",\"type\":").Append(Str(el.GetType().Name));
             sb.Append(",\"enabled\":").Append(enabled ? "true" : "false");
@@ -497,9 +550,9 @@ namespace GCode_Sender
 
         // ---- actions -------------------------------------------------------------------------------------
 
-        private static string DoInvoke(string uid)
+        private static string DoInvoke(string uid, int index)
         {
-            var el = FindByUid(uid);
+            var el = FindByUid(uid, index);
             if (el == null) return NotFound(uid);
             if (!el.IsEnabled) return Err("element is disabled: " + uid);
 
@@ -536,10 +589,10 @@ namespace GCode_Sender
             return Err("element does not support Invoke/Toggle/Select: " + uid + " (" + el.GetType().Name + ")");
         }
 
-        private static string DoSet(string uid, string value)
+        private static string DoSet(string uid, string value, int index)
         {
             if (value == null) return Err("set requires ?value=...");
-            var el = FindByUid(uid);
+            var el = FindByUid(uid, index);
             if (el == null) return NotFound(uid);
             if (!el.IsEnabled) return Err("element is disabled: " + uid);
 
