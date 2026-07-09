@@ -82,7 +82,15 @@ namespace CNC.Controls
             {
                 try
                 {
-                    GrblSDCard.Load(model, false);
+                    // If the listing was skipped (a concurrent Load held the re-entrancy guard) or the link
+                    // dropped mid-call, the shared file table is NOT a trustworthy snapshot - it may be empty
+                    // or half-cleared. Return UNKNOWN (empty list) rather than reading it: fabricating Missing
+                    // rows here makes the Machine Setup gate mistake a raced read for "macros not installed" and
+                    // jump to step 6 even though they are present (and turn green a moment later). The caller
+                    // treats an empty list as "unknown" - no gate, no false status; the SD/setup tab re-queries
+                    // on show, when no concurrent load is running, and gets the real state.
+                    if (!GrblSDCard.Load(model, false))
+                        return new List<MacroStatusRow>();
 
                     // Snapshot the values NOW into plain rows - never hold DataRow references past here. The
                     // table can be rebuilt by a poll / another load, which detaches cached rows and throws on

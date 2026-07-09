@@ -768,14 +768,18 @@ namespace CNC.Controls
 
         private static bool _loading;
 
-        public static void Load(GrblViewModel model, bool ViewAll)
+        // Returns true if a filesystem listing was actually performed (the table is a fresh snapshot), false
+        // if the call was skipped by the re-entrancy guard or the link was down - in which case the table's
+        // contents are NOT a trustworthy result of this call. Callers that judge presence/absence (e.g.
+        // AtcMacros.GetStatus feeding the Machine Setup gate) must treat false as "unknown", not "empty".
+        public static bool Load(GrblViewModel model, bool ViewAll)
         {
             // Load pumps the dispatcher (EventUtils.DoEvents) while waiting on the controller, so a refresh
             // queued meanwhile - tab activation, ATC provisioning - can re-enter and clear/rebuild the shared
             // DataTable mid-listing. That corrupted the parse state and cascaded into unhandled exceptions
             // (and a stack overflow via the modal error handler). Ignore re-entrant calls.
             if (_loading)
-                return;
+                return false;
             _loading = true;
 
             try
@@ -790,7 +794,7 @@ namespace CNC.Controls
                 // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
                 // The user-facing message is set by the caller (SDCardView.Activate).
                 if (Comms.com == null || !Comms.com.IsOpen)
-                    return;
+                    return false;
 
                 // Prefer $FI: it enumerates every mounted filesystem (SD and/or LittleFS) so they can
                 // be shown together with a Location column and per-FS free space. Builds that do not
@@ -824,6 +828,7 @@ namespace CNC.Controls
                     LegacyLoad(model, ViewAll);
 
                 data.AcceptChanges();
+                return true;
             }
             finally
             {
