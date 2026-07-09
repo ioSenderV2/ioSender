@@ -23,6 +23,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -34,6 +35,16 @@ namespace CNC.Controls
         // Slack left under the control width so the assigned widths sum just below the header area and the
         // row never wraps to a second line (a wrapped TabPanel justifies each row - scattered-looking tabs).
         private const double HeaderInset = 8d;
+
+        // Selection emphasis: the selected tab's LABEL goes bold and a touch larger so the active tab reads at a
+        // glance, not just by its white background. The font change is applied to the tab's header content
+        // presenter only - NOT the TabItem - because a TabControl re-parents inheritance so the selected tab's
+        // *content* inherits font DPs set on the TabItem (setting them there bolds the whole page). The header
+        // presenter is a separate subtree, so confining the change there leaves the page untouched. No
+        // ControlTemplate override is needed and every bar gets it for free. Because each tab has an explicit
+        // Width assigned, enlarging the selected label does NOT retrigger the stretch recompute - the bolder
+        // text simply fills its fixed width (a little cramped when selected, by design).
+        private const double SelectedFontScale = 1.18d;
 
         private bool updateQueued;
 
@@ -90,6 +101,56 @@ namespace CNC.Controls
             PreviewMouseMove += OnReorderMouseMove;
             PreviewMouseLeftButtonUp += (s, e) => EndReorder();
             LostMouseCapture += (s, e) => EndReorder();
+
+            // Bold/enlarge the selected tab's label. Only our own tab selection matters - a SelectionChanged
+            // bubbling up from content (a ComboBox, a nested StretchTabControl) carries a different
+            // OriginalSource and is ignored.
+            SelectionChanged += (s, e) => { if (ReferenceEquals(e.OriginalSource, this)) ApplySelectionEmphasis(); };
+        }
+
+        // Set the selected tab's header bold + slightly larger; restore the rest to the inherited font. The font
+        // DPs are set on each tab's header content presenter (via the inheritable TextElement attached props),
+        // never on the TabItem itself, so the change stays in the header and the selected tab's page content is
+        // left alone. Runs on selection change, and (via QueueUpdate) on load and tab add/remove so the initial
+        // selection is emphasised too. A tab whose header presenter isn't realised yet is skipped; the next
+        // QueueUpdate re-applies. Setting FontSize causes an ordinary layout pass but never a width recompute.
+        private void ApplySelectionEmphasis()
+        {
+            double baseSize = FontSize;
+            foreach (var item in Items)
+            {
+                var ti = item as TabItem ?? ItemContainerGenerator.ContainerFromItem(item) as TabItem;
+                var header = ti == null ? null : FindHeaderPresenter(ti);
+                if (header == null)
+                    continue;
+                if (ti.IsSelected)
+                {
+                    header.SetValue(TextElement.FontWeightProperty, FontWeights.Bold);
+                    header.SetValue(TextElement.FontSizeProperty, baseSize * SelectedFontScale);
+                }
+                else
+                {
+                    header.ClearValue(TextElement.FontWeightProperty);
+                    header.ClearValue(TextElement.FontSizeProperty);
+                }
+            }
+        }
+
+        // The TabItem's header host - the single ContentPresenter in the default TabItem template (ContentSource
+        // = Header). Returns null until the container is templated.
+        private static ContentPresenter FindHeaderPresenter(DependencyObject root)
+        {
+            int n = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < n; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is ContentPresenter cp)
+                    return cp;
+                var found = FindHeaderPresenter(child);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
 
         // A tab's stable identity for persistence: x:Name, else Tag string, else header text. Hosts that persist
@@ -234,7 +295,7 @@ namespace CNC.Controls
             // Background priority = after the current measure/arrange/render. Setting the widths then causes
             // one more ordinary layout pass; nothing here is subscribed to it, so it does not loop. Coalesces
             // the flurry of SizeChanged events during a drag into a single recompute.
-            Dispatcher.BeginInvoke(new Action(() => { updateQueued = false; UpdateTabWidths(); }), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() => { updateQueued = false; UpdateTabWidths(); ApplySelectionEmphasis(); }), DispatcherPriority.Background);
         }
 
         // Width of a single space character in this control's font - the per-side minimum padding.
