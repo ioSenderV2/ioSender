@@ -37,7 +37,7 @@
             <CheckBox x:Uid="lbl_restoreWindowSize" Content='Restore last window size on startup' Margin="5,0,0,0" IsChecked="{Binding Path=KeepWindowSize, Mode=TwoWay}" ToolTip="Restore window size on next startup."/>
             <StackPanel Orientation="Horizontal" Margin="5,6,0,0">
                 <TextBlock x:Uid="lbl_uiScale" Text="UI scale" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."/>
-                <Slider x:Name="sliderUiScale" Width="160" Minimum="0.75" Maximum="2.0" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Path=UiScale, Mode=TwoWay}" VerticalAlignment="Center"/>
+                <Slider x:Uid="sld_uiScale" x:Name="sliderUiScale" Width="160" Minimum="0.75" Maximum="2.0" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Path=UiScale, Mode=TwoWay}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Path=UiScale, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
             </StackPanel>
             <CheckBox x:Uid="lbl_sendComments" Content='Send comments' Margin="5,0,0,0" IsChecked="{Binding Path=SendComments, Mode=TwoWay}" ToolTip="Stream G-code comments (in parentheses) to the controller instead of stripping them - useful if the controller displays (MSG,...) comments; leave off to save a little bandwidth."/>
