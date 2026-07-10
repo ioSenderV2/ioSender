@@ -99,11 +99,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
-         answer/read them. WpfUiTestServer has no dependencies, so this adds no cycle. -->
-    <ProjectReference Include="..\..\WpfUiTestServer\WpfUiTestServer.csproj">
-      <Project>{b3956354-ca21-45eb-9d06-1278fb81a92d}</Project>
-      <Name>WpfUiTestServer</Name>
-    </ProjectReference>
+         answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. -->
+    <PackageReference Include="WpfUiTestServer" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="LibStrings.xaml">

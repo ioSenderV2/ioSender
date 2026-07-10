@@ -75,7 +75,8 @@ function Find-MSBuild {
 function Invoke-Build {
     param([string]$Config)
     Write-Host "==> Building $Config ..." -ForegroundColor Cyan
-    & $msbuild $solution -t:Build "-p:Configuration=$Config" -m -nologo -v:minimal -clp:ErrorsOnly
+    # -restore so PackageReference deps (e.g. WpfUiTestServer from NuGet) resolve before Build.
+    & $msbuild $solution -restore -t:Build "-p:Configuration=$Config" -m -nologo -v:minimal -clp:ErrorsOnly
     if ($LASTEXITCODE -ne 0) {
         Write-Host "==> $Config build FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
         exit $LASTEXITCODE
