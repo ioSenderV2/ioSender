@@ -21,9 +21,9 @@ namespace CNC.Controls
     public static class AtcMacros
     {
         // Embedded with LogicalName == file name (see CNC Controls.csproj), so they round-trip by bare name.
-        // start_job.macro is intentionally NOT here: it runs ioSender-side through MacroProcessor
-        // (seeded via SeedStartJobMacro), not on the controller. tc/pcorner stay on littlefs
-        // because grblHAL resolves their O<...> CALL / M6 references from its own filesystem.
+        // tc/pcorner stay on littlefs because grblHAL resolves their O<...> CALL / M6 references from its
+        // own filesystem. Start Job itself runs ioSender-side through MacroProcessor's in-memory ActiveRun,
+        // not from a controller-side or disk-based macro file.
         static readonly string[] Required = { "tc.macro", "pcorner.macro" };
 
         // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
@@ -340,54 +340,6 @@ namespace CNC.Controls
                 using (var r = new StreamReader(s))
                     return r.ReadToEnd();
             }
-        }
-
-        // Seed the ioSender-side "Start Job" macro once. Unlike the littlefs ATC macros, start_job.macro
-        // runs through MacroProcessor (line-by-line via MDI), so it is materialised into the config folder
-        // and referenced by an "@start_job.macro" macro entry. Idempotent and cheap, so safe to call on
-        // every connect: the file is (re)written only when missing/changed (self-healing without clobbering
-        // a live edit) and the macro entry is added only if no "Start Job" macro already exists.
-        public static void SeedStartJobMacro()
-        {
-            try
-            {
-                var macros = AppConfig.Settings?.Macros;
-                if (macros == null)
-                    return;
-
-                string body = ReadEmbedded("start_job.macro");
-                if (body == null)
-                    return;
-
-                // Seed the embedded body only when the file is ABSENT. The Start Job tab regenerates this file
-                // (its pcorner-based program) via WriteStartJobMacro, so do NOT self-heal to the embedded copy on
-                // change - that would clobber the operator's generated Start Job on the next connect.
-                string path = Path.Combine(CNC.Core.Resources.ConfigPath ?? "./", "start_job.macro");
-                try
-                {
-                    if (!File.Exists(path))
-                        File.WriteAllText(path, body);
-                }
-                catch { /* best effort - the macro still works once the file exists / is created via the tab */ }
-
-                if (macros.Any(m => string.Equals(m.Name, "Start Job", StringComparison.OrdinalIgnoreCase)))
-                    return;   // already seeded or user-created - leave the entry (and its F-key) alone
-
-                int id = 0;
-                foreach (var m in macros)
-                    id = Math.Max(id, m.Id);
-
-                macros.Add(new CNC.GCode.Macro {
-                    Id = id + 1,
-                    Name = "Start Job",
-                    Code = "@start_job.macro",
-                    ConfirmOnExecute = true,
-                    FKey = 0                 // no default F-key - Start Job is driven from its tab, not a hotkey
-                });
-
-                AppConfig.Settings.Save();
-            }
-            catch { /* never break the connect flow */ }
         }
 
         // Stream <content> to the controller as <name> on the target (littlefs) filesystem via YModem. First

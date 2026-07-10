@@ -16,7 +16,6 @@
 using System;
 using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -533,7 +532,7 @@ namespace GCode_Sender
             chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // Start Job always references the front-left (TFL) corner, matching start_job.macro.
+        // Start Job always references the front-left (TFL) corner.
         private Corner SelectedCorner { get { return Corner.FrontLeft; } }
 
         private void Generate_Click(object sender, RoutedEventArgs e)
@@ -556,7 +555,6 @@ namespace GCode_Sender
                                    cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value);
             ResetResults();
             SaveInputs();
-            WriteStartJobMacro(program);   // also persist as @start_job.macro so the Start Job macro/F-key runs it
 
             // Re-arm as the active program: a previous run tears this down (handing the source back to the job),
             // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
@@ -565,19 +563,6 @@ namespace GCode_Sender
             EnsureProgramView();
             programView.SetProgramText(program);
             programView.Connect();   // Start Job owns its ProgramView; the overlay hosts it and it titles itself
-        }
-
-        // Materialise the generated program as ConfigPath/start_job.macro - the file the seeded "Start Job" macro
-        // entry (@start_job.macro) re-reads on every run. So generating here updates both the in-tab program and
-        // the macro/F-key one-button start. Best-effort: a write failure only means the macro keeps its old body.
-        private static void WriteStartJobMacro(string program)
-        {
-            try
-            {
-                string path = Path.Combine(CNC.Core.Resources.ConfigPath ?? "./", "start_job.macro");
-                File.WriteAllText(path, program);
-            }
-            catch { }
         }
 
         // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder
@@ -862,7 +847,7 @@ namespace GCode_Sender
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
 
-            // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == start_job.macro
+            // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == a plain Start Job
             // (origin + TLO ref). The 3D probe is already in the spindle (installed at the top), so this is the
             // M6 T8 "reference" path in tc.macro: reset the ref, probe the puck at G59.3, store the probe machine-Z
             // as #<_tlo_ref>, park at G30. Emitted right after corner 1 while WCO is still 0, so the remaining
