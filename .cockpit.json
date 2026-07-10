@@ -1,4 +1,4 @@
 {
-  "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build.ps1 -Configuration Debug",
-  "run": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build.ps1 -Configuration Debug -Launch"
+  "Test (Debug)": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build.ps1 -Configuration Debug -Launch",
+  "Test (Release)": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build.ps1 -Configuration Release -Launch"
 }
