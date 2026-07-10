@@ -123,3 +123,7 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFolder:System.Windows.Control
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Application _data folder
 ioSender.g.en-US.resources:mainwindow.baml,mnu_validate:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Validate controller...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_support:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Support
+ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Check for updates...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check if a newer version of ioSender is available on GitHub.
+ioSender.g.en-US.resources:mainwindow.baml,btnProgramView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show/hide the program view over the work area.
+ioSender.g.en-US.resources:mainwindow.baml,btnTimeLapse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Cycle Start if you don't; auto-OFF at job end."

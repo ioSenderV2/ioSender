@@ -893,3 +893,8 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_checkMode:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgram:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_transformCtx:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Transform
+CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the surfacing bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before surfacing.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,cbxGangedAxis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write."
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.
+CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.Controls.ContentControl.Content,Button,True,True,,Get data
+CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_macrosTitle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Macros

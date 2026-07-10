@@ -217,3 +217,5 @@ CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_offset:Syst
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,grp_workpieceOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"As well as the angle, probe a second edge to find the X0,Y0 corner and set the work origin."
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_workpieceOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After measuring, also set work Z0 from this touch-off on the job (using the touch-plate thickness)."
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_fixtureAction:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Fixture
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,probez:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Resources/edgeZ.png
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,probez:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Resources/edgeZ.png
