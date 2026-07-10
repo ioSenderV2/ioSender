@@ -48,8 +48,14 @@ namespace CNC.Controls.Lathe
     /// </summary>
     public partial class LatheWizardsView : UserControl, ICNCView, ITabBindingHost, IAvailabilityGated
     {
+        // Shared with the startup-time ComponentAvailability.Note call (MainWindow) below - this view is
+        // never even constructed while the top-level tab is absent, so IAvailabilityGated alone can't report
+        // it to the "Edit Main Page" Unavailable list; the one shared string keeps both reports in sync.
+        public const string TabDisplayLabel = "Lathe Tools";
+        public const string NotEnabledReason = "Lathe mode is not enabled (Settings > App).";
+
         // Offered only when lathe mode is turned on (Settings > App); the lathe tools are meaningless otherwise.
-        public string UnavailableReason => GrblInfo.LatheModeEnabled ? null : "Lathe mode is not enabled (Settings > App).";
+        public string UnavailableReason => GrblInfo.LatheModeEnabled ? null : NotEnabledReason;
         public bool HideWhenUnavailable => true;
 
         public LatheWizardsView()

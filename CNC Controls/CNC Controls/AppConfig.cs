@@ -91,8 +91,9 @@ namespace CNC.Controls
         public bool IsEnabled { get { return _isEnabled; } set { _isEnabled = value; OnPropertyChanged(); } }
 
         // Simple on/off facade over XMode for the App > Main "Lathe mode" checkbox. Enabling defaults to
-        // Radius mode (the common case); disabling clears it. Persisted via XMode in the "Lathe" section.
-        [XmlIgnore]
+        // Radius mode (the common case); disabling clears it. XMode remains the actual mutable state (this
+        // is fully derived from it) - serialized anyway (not XmlIgnore) so App.config always shows an
+        // explicit true/false rather than requiring XMode to be read as a proxy for it.
         public bool LatheEnabled
         {
             get { return _latheMode != LatheMode.Disabled; }

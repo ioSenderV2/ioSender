@@ -563,6 +563,16 @@ namespace GCode_Sender
             RegisterBuiltinTabs();
             BuildTabs();
 
+            // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
+            // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -
+            // so StretchTabControl.PruneUnavailable never sees it to report it. Note it explicitly here so
+            // "Edit Main Page" still lists it as unavailable, with the same reason LatheWizardsView itself
+            // would give if it were ever constructed to ask.
+            if (!AppConfig.Settings.Base.Lathe.LatheEnabled)
+                ComponentAvailability.Note(new[] { new UnavailableComponent {
+                    Label = CNC.Controls.Lathe.LatheWizardsView.TabDisplayLabel,
+                    Reason = CNC.Controls.Lathe.LatheWizardsView.NotEnabledReason } });
+
             // Config already loaded in the constructor; here we only open the connection (deferred so
             // the main window paints first). res == 2: user cancelled / no connection - stay open
             // (disconnected) so the user can connect later via the Connect menu item.
