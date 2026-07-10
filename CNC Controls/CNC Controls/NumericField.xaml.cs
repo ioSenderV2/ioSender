@@ -43,6 +43,7 @@ using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Data;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -219,8 +220,17 @@ namespace CNC.Controls
         public void SetValue(string value)
         {
             double d;
-            if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
-                Field.Value = d;
+            if (!double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
+                return;
+            Field.Value = d;
+
+            // Most of these fields bind Value with UpdateSourceTrigger=LostFocus (commit-on-tab-away, not
+            // every keystroke) - correct for real typing, but automation never causes a real focus/blur
+            // cycle, so the change would otherwise sit on the DependencyProperty without ever reaching the
+            // bound Config property. Push it through explicitly so a scripted SetValue behaves like a real
+            // edit-then-tab-away, regardless of the binding's trigger mode.
+            BindingExpression be = Field.GetBindingExpression(NumericField.ValueProperty);
+            be?.UpdateSource();
         }
     }
 }
