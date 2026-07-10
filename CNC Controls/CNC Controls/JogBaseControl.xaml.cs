@@ -947,6 +947,23 @@ namespace CNC.Controls
         public KeyboardJogViewModel(KeypressHandler keyboard)
         {
             this.keyboard = keyboard;
+
+            // FastText/SlowText/SelectedFeedrateText below are computed straight from Jog.*Feedrate on
+            // every read, but plain computed getters never tell WPF's binding engine to re-query them -
+            // that only happens on a PropertyChanged for THIS view model, not the Config object it reads
+            // from. Without this, an edit on Settings:Jogging leaves the Job-tab Slow/Fast badges showing
+            // their value from whenever this view model was first constructed, until the app restarts.
+            AppConfig.Settings.Jog.PropertyChanged += Jog_PropertyChanged;
+        }
+
+        private void Jog_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(JogConfig.FastFeedrate) || e.PropertyName == nameof(JogConfig.SlowFeedrate))
+            {
+                OnPropertyChanged(nameof(FastText));
+                OnPropertyChanged(nameof(SlowText));
+                OnPropertyChanged(nameof(SelectedFeedrateText));
+            }
         }
 
         public int SpeedIndex
