@@ -79,6 +79,10 @@ namespace GCode_Sender
             Title = string.Format(Title, version);
             BaseWindowTitle = Title;
 
+            // Register the Lathe wizard profile sections before the document is read (AppConfig itself
+            // can't reference CNC.Controls.Lathe types - see LatheProfileSections' own comment).
+            CNC.Controls.Lathe.LatheProfileSections.RegisterSections();
+
             // Load config synchronously now - before any control Loaded handler (e.g. JogControl)
             // reads AppConfig.Settings.Base. Only the connection is deferred (see CompleteStartup).
             int cfg = AppConfig.Settings.LoadConfig(Title);

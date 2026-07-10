@@ -660,6 +660,15 @@ namespace CNC.Controls
         // remains. Kept in registration order.
         private static readonly List<string> FoldedInFiles = new List<string>();
 
+        // Lets a downstream project (one AppConfig can't reference, e.g. CNC Controls Lathe) register its own
+        // ConfigStore section directly and still get the same "delete the legacy file after a migrated save"
+        // cleanup as a RegisterFolded call made here. Call once, before LoadConfig() reads the document.
+        public static void TrackFoldedInFile(string legacyFileName)
+        {
+            if (!FoldedInFiles.Contains(legacyFileName))
+                FoldedInFiles.Add(legacyFileName);
+        }
+
         // Register a section backed by a serializable DTO T, folded in from a legacy standalone file: get/set
         // expose the feature's holder for T, legacyFileName is the old file (imported once when the section is
         // absent, then deleted). A feature with a non-default XML root passes its own importer. This is the shared

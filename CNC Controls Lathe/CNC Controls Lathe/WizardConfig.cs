@@ -42,6 +42,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
+using CNC.Controls;
 using CNC.Core;
 using CNC.GCode;
 
@@ -224,7 +225,7 @@ namespace CNC.Controls.Lathe
         public ObservableCollection<ProfileData> profiles = new ObservableCollection<ProfileData>();
 
         private int id = 0;
-        private string filename;
+        private string sectionKey;
 
         public ProfileData Add()
         {
@@ -238,35 +239,26 @@ namespace CNC.Controls.Lathe
             return data;
         }
 
+        // Persists into the "<name>Profiles" App.config section (see LatheProfileSections) rather than
+        // a standalone file - Save() just needs to update the section's held value and ask AppConfig to
+        // write the document, matching the ControllerMapper/KeypressHandler "static holder + PersistHook"
+        // pattern used for other CNC.Controls Lathe-adjacent config that AppConfig itself can't reference.
         public void Save()
         {
-            XmlSerializer xs = new XmlSerializer(typeof(ObservableCollection<ProfileData>));
-            try
-            {
-                FileStream fsout = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
-                using (fsout)
-                {
-                    xs.Serialize(fsout, profiles);
-                }
-            }
-            catch (Exception e)
-            {
-                AppDialogs.Show(e.Message, "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Exclamation);
-            }
+            LatheProfileSections.Set(sectionKey, profiles);
+            AppConfig.Settings.Save();
         }
 
-        public void Load(string filename)
+        // sectionKey is the profile set's name (e.g. "Facing"), matching what WizardConfig was
+        // constructed with - the "<name>Profiles" ConfigStore section, not a filename.
+        public void Load(string sectionKey)
         {
-            this.filename = filename;
+            this.sectionKey = sectionKey;
 
-            XmlSerializer xs = new XmlSerializer(typeof(ObservableCollection<ProfileData>));
-
-            try
+            var loaded = LatheProfileSections.Get(sectionKey);
+            if (loaded != null)
             {
-                StreamReader reader = new StreamReader(filename);
-                profiles = (ObservableCollection<ProfileData>)xs.Deserialize(reader);
-                reader.Close();
-
+                profiles = loaded;
                 foreach (ProfileData profile in profiles)
                 {
                     profile.Id = id++;
@@ -274,8 +266,64 @@ namespace CNC.Controls.Lathe
                         profile.SpindleDir = SpindleState.CW;
                 }
             }
+        }
+    }
+
+    // Registers the four lathe wizard profile sets ("Facing"/"Parting"/"Threading"/"Turning") as
+    // App.config sections, folded in from their old standalone <name>Profiles.xml files. AppConfig
+    // (CNC.Controls) can't reference ProfileData (CNC.Controls.Lathe is downstream of it), so - like
+    // ControllerMapper/KeypressHandler in CNC.Core - this project registers its own ConfigStore section
+    // directly. Call RegisterSections() once before AppConfig.Settings.LoadConfig() reads the document.
+    public static class LatheProfileSections
+    {
+        private static readonly System.Collections.Generic.Dictionary<string, ObservableCollection<ProfileData>> holders
+            = new System.Collections.Generic.Dictionary<string, ObservableCollection<ProfileData>>();
+
+        private static readonly string[] Names = { "Facing", "Parting", "Threading", "Turning" };
+
+        public static ObservableCollection<ProfileData> Get(string name)
+        {
+            return holders.TryGetValue(name, out var v) ? v : null;
+        }
+
+        public static void Set(string name, ObservableCollection<ProfileData> value)
+        {
+            holders[name] = value;
+        }
+
+        public static void RegisterSections()
+        {
+            foreach (var name in Names)
+            {
+                string key = name + "Profiles";
+                string legacyFile = key + ".xml";
+                string boundName = name;   // capture per-iteration for the closures below
+                ConfigStore.Register(new XmlObjectSection<ObservableCollection<ProfileData>>(
+                    key,
+                    () => Get(boundName),
+                    v => Set(boundName, v),
+                    null,
+                    () => ReadLegacyFile(legacyFile)));
+                AppConfig.TrackFoldedInFile(legacyFile);
+            }
+        }
+
+        // One-time import of the old standalone <name>Profiles.xml (same XmlSerializer root the
+        // pre-folding LatheProfile.Load/Save used), for a config that predates this change.
+        private static ObservableCollection<ProfileData> ReadLegacyFile(string fileName)
+        {
+            try
+            {
+                string path = Path.Combine(Resources.ConfigPath ?? string.Empty, fileName);
+                if (!File.Exists(path))
+                    return null;
+                var xs = new XmlSerializer(typeof(ObservableCollection<ProfileData>));
+                using (var reader = new StreamReader(path))
+                    return (ObservableCollection<ProfileData>)xs.Deserialize(reader);
+            }
             catch
             {
+                return null;
             }
         }
     }
@@ -324,7 +372,7 @@ namespace CNC.Controls.Lathe
 
             using (new UIUtils.WaitCursor())
             {
-                profile.Load(Core.Resources.ConfigPath + ProfileName + "Profiles.xml");
+                profile.Load(ProfileName);
 
                 if (profile.profiles.Count() == 0)
                 {
