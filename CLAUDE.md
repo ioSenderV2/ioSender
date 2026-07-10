@@ -11,6 +11,40 @@ Upstream is no longer tracked or submitted to; the product is the `master` branc
   `#features-and-fixes` section (every feature/fix with diff stats and a description). Superset of the old
   `Overview.html` + `FeaturesAndFixes.html`.
 
+## Working directives (agents: read before you touch code)
+Short rules that apply to every task here, so they don't have to be repeated per prompt.
+
+**Build & verify**
+- Build with **`.\build.ps1`** (`-Configuration Debug|Release|Both`), **not raw `msbuild`**. It passes
+  `-restore`, so the **`WpfUiTestServer` NuGet package** resolves. A bare `msbuild`/`dotnet build` fails to
+  find that package — that means you forgot `-restore`, **not** that the repo is broken. Never "fix" it by
+  editing a `.csproj` or vendoring a DLL.
+- **Windows-only** (WPF). Don't attempt macOS/Linux builds.
+- **A clean build is not "done."** Verify behavior: launch the app — optionally with `-testserver[=PORT]`
+  (or `IOSENDER_TESTSERVER=1`) to drive the UI by `x:Uid` over localhost — and exercise the changed flow.
+  If you couldn't drive it, say so ("unverified"); don't claim success from a compile.
+- **Don't revert your own working changes** because a build looks broken — diagnose the build *command*
+  first (almost always a missing `-restore`).
+
+**Scope & design (solo user)**
+- No back-compat, no migration shims, no feature flags — **default new behavior ON**.
+- **Confirm an ambiguous design in one sentence before building it.**
+- **Reuse existing engines before reinventing:** `MacroProcessor.Run` (run macros), **`AppDialogs.Show`**
+  (message boxes — use this, *not* `MessageBox.Show`; it's UI-test-server aware), `GCode.File.AddBlock`
+  (build g-code in memory), the existing probe macros. See the settings/architecture notes before adding tabs.
+
+**Code conventions**
+- **LF** line endings (`.gitattributes eol=lf`).
+- **Outbound HTTPS** (e.g. GitHub) needs TLS 1.2 enabled explicitly on net462:
+  `ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;` (idiom in `SimulatorManager.cs`).
+- **New UI strings:** give the control an `x:Uid`, then add a row in **all 7** `Locale/<loc>/csv/*.csv`
+  (English baseline) via `tools/locadd.py` — add the XAML file to its `TARGETS` if missing. Comma-containing
+  values must be CSV-quoted. English fallback works, so this is low-urgency but grows silently.
+
+**Git**
+- Develop on **`integration`** (fixes) or a **`pr/*`** branch (new features). `master` = the product.
+- **Don't commit or push unless asked**; if you're on the default branch, branch first.
+
 ## Build (Windows only — WPF, .NET Framework 4.6.2)
 - **Headless (no VS GUI):** `.\build.ps1` — kills a running ioSender.exe, builds (MSBuild found via
   `vswhere`), optionally launches. `-Configuration Debug|Release|Both`, `-Launch`, `-Headless`, `-NoKill`.
