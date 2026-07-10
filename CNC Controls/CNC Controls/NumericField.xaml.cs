@@ -38,7 +38,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using CNC.Core;
 
@@ -58,6 +61,14 @@ namespace CNC.Controls
             InitializeComponent();
 
             data.DataContext = this;
+        }
+
+        // Without a custom peer, UI Automation (and so the WPF test server) sees only the base
+        // UserControl - no Value pattern - even though Value is a perfectly normal DependencyProperty.
+        // This is what makes every Settings NumericField scriptable via /set/{uid}?value=.
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new NumericFieldAutomationPeer(this);
         }
 
         public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(nameof(Value), typeof(double), typeof(NumericField), new PropertyMetadata(double.NaN, new PropertyChangedCallback(OnValueChanged)), new ValidateValueCallback(IsValidReading));
@@ -177,6 +188,39 @@ namespace CNC.Controls
             var def = GetDefaultValue();
             if (def != null)
                 Value = Convert.ToDouble(def);
+        }
+    }
+
+    // Exposes NumericField.Value to UI Automation as a standard Value pattern, so it can be read/set
+    // like any built-in editable control - by a screen reader, or by the WPF test server's /set/{uid}.
+    public class NumericFieldAutomationPeer : FrameworkElementAutomationPeer, IValueProvider
+    {
+        public NumericFieldAutomationPeer(NumericField owner) : base(owner) { }
+
+        private NumericField Field { get { return (NumericField)Owner; } }
+
+        protected override string GetClassNameCore() { return "NumericField"; }
+        protected override AutomationControlType GetAutomationControlTypeCore() { return AutomationControlType.Edit; }
+
+        // Implementing IValueProvider on the class is not enough - GetPattern is WPF's separate dispatch
+        // for "which interfaces do you actually support"; without this override it's never consulted and
+        // callers (screen readers, the test server) see a peer with no patterns at all.
+        public override object GetPattern(PatternInterface patternInterface)
+        {
+            if (patternInterface == PatternInterface.Value)
+                return this;
+            return base.GetPattern(patternInterface);
+        }
+
+        public bool IsReadOnly { get { return Field.IsReadOnly; } }
+
+        public string Value { get { return Field.Value.ToString(CultureInfo.InvariantCulture); } }
+
+        public void SetValue(string value)
+        {
+            double d;
+            if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out d))
+                Field.Value = d;
         }
     }
 }
