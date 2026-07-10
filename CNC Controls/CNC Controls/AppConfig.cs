@@ -784,15 +784,12 @@ namespace CNC.Controls
 
                 if (File.Exists(filename))
                 {
-                    // Swap in the new file and keep the previous good copy as <name>.bak. That rolling
-                    // backup is what Load() recovers from if the live file is ever found empty or unreadable.
-                    string bak = filename + ".bak";
-                    try { File.Replace(tmp, filename, bak); }   // atomic: live -> .bak, tmp -> live
+                    // Swap in the new file. Recovery from a bad save is handled by the startup-time
+                    // Backups\<datetime>_App.config snapshot (see BackupStartupSnapshot), not a rolling .bak.
+                    try { File.Replace(tmp, filename, null); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                     {
-                        // Fallback where Replace is unsupported (some sync placeholders): preserve the
-                        // current file as the backup, then overwrite from the fully-written temp file.
-                        try { File.Copy(filename, bak, true); } catch { /* best effort */ }
+                        // Fallback where Replace is unsupported (some sync placeholders).
                         File.Copy(tmp, filename, true);
                         File.Delete(tmp);
                     }
@@ -832,23 +829,51 @@ namespace CNC.Controls
         public bool Load(string filename)
         {
             // Try the live config first. If it is missing, 0 bytes, or otherwise unreadable - an
-            // interrupted save or a sync truncation can leave it empty - fall back to the rolling backup
-            // Save() keeps. Recovering the last good copy avoids losing the user's settings AND the
-            // destructive "create new?" prompt that a false "invalid" used to trigger.
+            // interrupted save or a sync truncation can leave it empty - fall back to the newest
+            // Backups\<datetime>_App.config startup snapshot. Recovering the last good copy avoids
+            // losing the user's settings AND the destructive "create new?" prompt that a false
+            // "invalid" used to trigger.
             _migratedFormat = false;
 
             if (TryLoad(filename))
                 return true;
 
-            string bak = filename + ".bak";
-            if (TryLoad(bak))
+            string newest = null;
+            try
+            {
+                newest = Directory.Exists(Resources.BackupsFolder)
+                    ? Directory.GetFiles(Resources.BackupsFolder, "*_App.config").OrderByDescending(f => f).FirstOrDefault()
+                    : null;
+            }
+            catch { }
+
+            if (newest != null && TryLoad(newest))
             {
                 configfile = filename;                                  // keep writing to the real path
-                try { File.Copy(bak, filename, true); } catch { /* leave .bak as the source of truth */ }
+                try { File.Copy(newest, filename, true); } catch { /* leave the backup as the source of truth */ }
                 return true;
             }
 
             return false;
+        }
+
+        // Snapshot the current live config to Backups\<datetime>_App.config, once per session (before
+        // any in-session edits), so Load() has a known-good fallback and the user has a manual restore
+        // point. Best-effort; failure must not block startup.
+        public static void BackupStartupSnapshot(string filename)
+        {
+            try
+            {
+                if (!File.Exists(filename))
+                    return;
+
+                Directory.CreateDirectory(Resources.BackupsFolder);
+                string name = string.Format("{0}_App.config", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                File.Copy(filename, System.IO.Path.Combine(Resources.BackupsFolder, name), true);
+
+                Resources.PruneBackups();
+            }
+            catch { }
         }
 
         // Deserialize one config file into Base, tolerating a transient unreadable / 0-length state by
@@ -1189,20 +1214,20 @@ namespace CNC.Controls
                         break;
                 }
 
-            if (!Load(CNC.Core.Resources.IniFile))
+            if (Load(CNC.Core.Resources.IniFile))
+            {
+                // Snapshot the pre-session config once at startup, before any in-session edits, so
+                // Load()'s crash recovery and the user's own Backups folder both have a known-good copy.
+                BackupStartupSnapshot(CNC.Core.Resources.IniFile);
+            }
+            else
             {
                 if (AppDialogs.Show(LibStrings.FindResource("CreateConfig"), appname, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     // Never silently destroy an existing non-empty config: if Load failed but a file is
                     // present (a transient lock that outlasted the retries, or genuine corruption), copy
                     // it aside before overwriting so the user's settings are recoverable.
-                    try
-                    {
-                        string ini = CNC.Core.Resources.IniFile;
-                        if (File.Exists(ini) && new FileInfo(ini).Length > 0)
-                            File.Copy(ini, ini + ".bak", true);
-                    }
-                    catch { /* best effort - do not block startup on a backup failure */ }
+                    BackupStartupSnapshot(CNC.Core.Resources.IniFile);
 
                     if (!Save(CNC.Core.Resources.IniFile))
                     {

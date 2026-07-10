@@ -394,6 +394,29 @@ namespace CNC.Core
         public static string ConfigPath { get; set; }
         public static bool IsLegacyController { get; set; } = false; // Set true if controller is legacy v1.1
 
+        public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
+
+        // Best-effort day-based retention shared by the App.config and Grbl settings backups.
+        public static void PruneBackups(int days = 10)
+        {
+            try
+            {
+                if (!System.IO.Directory.Exists(BackupsFolder))
+                    return;
+                DateTime cutoff = DateTime.Now.AddDays(-days);
+                foreach (string file in System.IO.Directory.GetFiles(BackupsFolder))
+                {
+                    try
+                    {
+                        if (System.IO.File.GetLastWriteTime(file) < cutoff)
+                            System.IO.File.Delete(file);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
         static Resources()
         {
             ConfigPath = Path = @"./";
@@ -3107,17 +3130,8 @@ namespace CNC.Core
     {
         public string FilePath { get; set; }
         public DateTime Saved { get; set; }
-        public int Changes { get; set; }
-        public string Machine { get; set; }
-
-        // Multi-line "$id name: old -> new" list parsed from the snapshot's comment header; null if absent.
-        public string ChangesDetail { get; set; }
 
         public string SavedText { get { return Saved.ToString("yyyy-MM-dd HH:mm:ss"); } }
-        public string ChangesText { get { return Changes >= 0 ? Changes.ToString() : string.Empty; } }
-
-        // Tooltip text for the restore picker: the change list, or a fallback when none was recorded.
-        public string Tooltip { get { return string.IsNullOrEmpty(ChangesDetail) ? "No change details recorded." : ("Changed settings:\n" + ChangesDetail); } }
     }
 
     public static class GrblSettings
@@ -3431,11 +3445,8 @@ namespace CNC.Core
 
             if (changed.Count > 0)
             {
-                var changeLog = new List<string>();   // "$id name: old -> new" per successfully-written setting
-
                 foreach (var setting in changed)
                 {
-                    string oldValue = setting.LoadedValue;  // controller value before this write
 #if USE_ASYNC
                     var task = Task.Run(() => Comms.com.AwaitAck(string.Format("${0}={1}", Setting.Id, Setting.Value)));
                     await await Task.WhenAny(task, Task.Delay(2500));
@@ -3452,12 +3463,7 @@ namespace CNC.Core
 
                     setting.IsDirty = setting.HasErrors;
                     if (!setting.HasErrors)
-                    {
-                        changeLog.Add(string.Format("${0}{1}: {2} -> {3}", setting.Id,
-                            string.IsNullOrEmpty(setting.Name) ? string.Empty : " " + setting.Name,
-                            string.IsNullOrEmpty(oldValue) ? "(unset)" : oldValue, setting.Value));
                         setting.SetLoadedBaseline();    // controller now holds this value
-                    }
                 }
 
                 // Re-derive GrblInfo from the now-current settings (max travel, homing direction, step
@@ -3466,8 +3472,6 @@ namespace CNC.Core
                 // Wizard) instead of the values read at connect.
                 if (Grbl.GrblViewModel != null)
                     GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
-
-                WriteSnapshot(changeLog);       // timestamped restore point of the now-saved settings
             }
 
             return ok;
@@ -3556,72 +3560,31 @@ namespace CNC.Core
             return ok;
         }
 
-        // Rolling, timestamped restore points written on each Save. Per controller-identity so multiple
-        // machines do not intermix; full settings dumps in the Backup format so Restore reuses LoadFile().
-        private const int MaxSnapshots = 20;
+        // Timestamped restore point of the settings as read at connect - one per successful connect,
+        // shared Backups folder with the App.config startup backups; full settings dump in the Backup
+        // format so Restore reuses LoadFile(). Retention is day-based (Resources.PruneBackups).
+        public static string SnapshotFolder { get { return Resources.BackupsFolder; } }
 
-        public static string SnapshotFolder { get { return System.IO.Path.Combine(Resources.ConfigPath, "settings-backups"); } }
-
-        private static string SnapshotTag()
-        {
-            string tag = new string((GrblInfo.Identity ?? string.Empty).Trim().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-            return tag.Length == 0 ? "controller" : tag;
-        }
-
-        // Write a restore point of the current (saved) settings; best-effort, never blocks a Save.
-        // The file leads with a "; changes (N):" comment block listing what this save changed
-        // (old -> new), followed by a full settings dump in the Backup format.
-        public static void WriteSnapshot(IList<string> changes)
+        // Write a restore point of the settings just read from the controller; best-effort, never blocks connect.
+        public static void WriteSnapshot()
         {
             if (Settings.Count == 0)
                 return;
 
-            int n = changes == null ? 0 : changes.Count;
-
             try
             {
                 Directory.CreateDirectory(SnapshotFolder);
-                string tag = SnapshotTag();
-                string name = string.Format("snapshot_{0}_{1}_{2}.txt", DateTime.Now.ToString("yyyyMMddHHmmss"), n, tag);
+                string name = string.Format("{0}_Grbl.txt", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
 
                 using (var sw = new StreamWriter(System.IO.Path.Combine(SnapshotFolder, name)))
                 {
-                    sw.WriteLine(string.Format("; changes ({0}):", n));
-                    if (changes != null)
-                        foreach (var c in changes)
-                            sw.WriteLine(";   " + c);
                     foreach (string s in Export())
                         sw.WriteLine(s);
                 }
 
-                // Prune oldest beyond MaxSnapshots for this controller (lexicographic order == chronological).
-                var files = Directory.GetFiles(SnapshotFolder, "snapshot_*_" + tag + ".txt").OrderByDescending(f => f).ToList();
-                for (int i = MaxSnapshots; i < files.Count; i++)
-                    try { File.Delete(files[i]); } catch { }
+                Resources.PruneBackups();
             }
-            catch { }   // snapshots are a convenience; failure must not affect the save
-        }
-
-        // Read back the "; changes (N):" comment block written by WriteSnapshot (the change lines only).
-        private static string ReadSnapshotChanges(string path)
-        {
-            try
-            {
-                using (var sr = new StreamReader(path))
-                {
-                    string first = sr.ReadLine();
-                    if (first == null || !first.StartsWith("; changes ("))
-                        return null;
-
-                    var lines = new List<string>();
-                    string ln;
-                    while ((ln = sr.ReadLine()) != null && ln.StartsWith(";   "))
-                        lines.Add(ln.Substring(4));
-
-                    return lines.Count > 0 ? string.Join("\n", lines) : null;
-                }
-            }
-            catch { return null; }
+            catch { }   // snapshots are a convenience; failure must not affect connect
         }
 
         // Restore points (newest first) for the Restore picker.
@@ -3634,25 +3597,18 @@ namespace CNC.Core
                 if (!Directory.Exists(SnapshotFolder))
                     return list;
 
-                foreach (var path in Directory.GetFiles(SnapshotFolder, "snapshot_*.txt"))
+                foreach (var path in Directory.GetFiles(SnapshotFolder, "*_Grbl.txt"))
                 {
-                    var parts = System.IO.Path.GetFileNameWithoutExtension(path).Split('_');
-                    if (parts.Length < 4)
-                        continue;
+                    string stamp = System.IO.Path.GetFileNameWithoutExtension(path);
+                    stamp = stamp.Substring(0, stamp.Length - "_Grbl".Length);
 
-                    if (!DateTime.TryParseExact(parts[1], "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
+                    if (!DateTime.TryParseExact(stamp, "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
                         saved = File.GetLastWriteTime(path);
-
-                    if (!int.TryParse(parts[2], out int changes))
-                        changes = -1;
 
                     list.Add(new SettingsSnapshot
                     {
                         FilePath = path,
-                        Saved = saved,
-                        Changes = changes,
-                        Machine = string.Join("_", parts.Skip(3)),
-                        ChangesDetail = ReadSnapshotChanges(path)
+                        Saved = saved
                     });
                 }
             }

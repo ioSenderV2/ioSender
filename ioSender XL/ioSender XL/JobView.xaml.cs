@@ -568,6 +568,7 @@ namespace GCode_Sender
                 GrblAlarms.Get();
                 GrblErrors.Get();
                 GrblSettings.Load();
+                GrblSettings.WriteSnapshot();   // restore-point snapshot of the settings just read from the controller
                 if (GrblInfo.IsGrblHAL)
                 {
                     GrblParserState.Get();

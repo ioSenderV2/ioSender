@@ -20,16 +20,8 @@
                   CanUserReorderColumns="False" CanUserResizeRows="False" CanUserAddRows="False"
                   CanUserSortColumns="True" GridLinesVisibility="Horizontal"
                   MouseDoubleClick="dgrSnapshots_MouseDoubleClick">
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <Setter Property="ToolTip" Value="{Binding Tooltip}"/>
-                    <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
-                </Style>
-            </DataGrid.RowStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="150"/>
-                <DataGridTextColumn x:Uid="col_rpChanges" Header="Changes" Binding="{Binding ChangesText}" Width="70"/>
-                <DataGridTextColumn x:Uid="col_rpMachine" Header="Machine" Binding="{Binding Machine}" Width="*"/>
+                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">

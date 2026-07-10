@@ -1,7 +1,7 @@
 /*
  * RestorePointDialog.xaml.cs - part of CNC Controls library for Grbl
  *
- * Picker for settings restore points (auto-snapshots written on each Save),
+ * Picker for settings restore points (auto-snapshots written on each successful connect),
  * newest first, with a Browse... escape hatch for arbitrary backup files.
  *
  */
