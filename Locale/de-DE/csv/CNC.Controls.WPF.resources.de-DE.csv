@@ -1067,4 +1067,3 @@ CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_macrosTitle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Macros
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.Controls.TextBlock.Text,Text,True,True,,UI scale
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."
-CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,grb_actionShortcuts:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Assignable shortcuts

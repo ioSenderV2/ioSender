@@ -708,8 +708,10 @@ namespace GCode_Sender
             registerConsoleShortcut();
             registerTabShortcuts();
 
-            // Assignable action shortcuts (UI zoom, job feed-rate override) - seed real-world defaults
-            // once, then register this window's own actions (feed-rate override is owned by JobControl).
+            // UI-zoom shortcuts (assignable in Keyboard & Controller, "UI zoom" group) - seed real defaults
+            // once, then register the actual in/out behaviour; dispatched globally like console/tab shortcuts
+            // since ProcessKeypress is only ever called from specific views (Job/Probing/Jog flyout), never at
+            // the window level, and zoom needs to work regardless of which tab is showing.
             ActionKeyBinder.SeedDefaults();
             ActionKeyBinder.Register("UiScaleUp", k => { AppConfig.Settings.Base.UiScale += 0.05; return true; });
             ActionKeyBinder.Register("UiScaleDown", k => { AppConfig.Settings.Base.UiScale -= 0.05; return true; });

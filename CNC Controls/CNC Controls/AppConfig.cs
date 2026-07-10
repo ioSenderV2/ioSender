@@ -371,10 +371,11 @@ namespace CNC.Controls
         // Starts empty so the XmlSerializer's append-on-load (see MainPanels note above) can't duplicate.
         public List<TabShortcut> TabShortcuts { get; set; } = new List<TabShortcut>();
 
-        // Reuses TabShortcut's {Id, Key} shape for non-tab, assignable action shortcuts (UI zoom, job feed
-        // rate override, ...) - see ActionKeyBinder. Unlike TabShortcuts these DO ship with defaults, seeded
-        // once by ActionKeyBinder.SeedDefaults() if a given Id is entirely absent (an explicit Clear leaves an
-        // empty-Key row in place so the default isn't silently reapplied on the next run).
+        // Reuses TabShortcut's {Id, Key} shape for UI-zoom keyboard shortcuts (Settings:App's UI scale) -
+        // see ActionKeyBinder. Edited in Keyboard & Controller's "UI zoom" group like tab-switch shortcuts;
+        // unlike those, these DO ship with defaults, seeded once by ActionKeyBinder.SeedDefaults() if a
+        // given Id is entirely absent (an explicit Clear leaves an empty-Key row so the default isn't
+        // silently reapplied on the next run).
         public List<TabShortcut> ActionShortcuts { get; set; } = new List<TabShortcut>();
 
         [XmlIgnore]

@@ -38,22 +38,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
 using System.Windows.Controls;
 
 namespace CNC.Controls
 {
-    // One row in the "Assignable shortcuts" list (UI zoom, job feed-rate override). Rebuilt wholesale
-    // on each refresh rather than made individually observable - simpler, and this list changes rarely.
-    public class ActionShortcutRow
-    {
-        public string Id { get; set; }
-        public string Label { get; set; }
-        public string CurrentDisplay { get; set; }
-    }
-
     /// <summary>
     /// Interaction logic for BasicConfigControl.xaml
     /// </summary>
@@ -64,10 +52,6 @@ namespace CNC.Controls
         public BasicConfigControl()
         {
             InitializeComponent();
-
-            RefreshActionShortcuts();
-            ActionKeyBinder.ActionShortcutsChanged += RefreshActionShortcuts;
-            Unloaded += (s, e) => ActionKeyBinder.ActionShortcutsChanged -= RefreshActionShortcuts;
 
             // Max buffer size (streamer flow-control window) is latched once at job-view init, and reset delay is
             // captured into the serial stream at connect - both only take effect at startup, so a change needs a
@@ -124,28 +108,6 @@ namespace CNC.Controls
             var dc = DataContext;
             DataContext = null;
             DataContext = dc;
-        }
-
-        private void RefreshActionShortcuts()
-        {
-            lstActionShortcuts.ItemsSource = ActionKeyBinder.Catalog.Select(a => new ActionShortcutRow
-            {
-                Id = a.Id,
-                Label = a.Label,
-                CurrentDisplay = ActionKeyBinder.CurrentDisplay(a.Id) ?? "(unbound)"
-            }).ToList();
-        }
-
-        private void ChangeShortcut_Click(object sender, RoutedEventArgs e)
-        {
-            string id = (string)((Button)sender).Tag;
-            ActionKeyBinder.PromptAndBind(Window.GetWindow(this), id);
-        }
-
-        private void ClearShortcut_Click(object sender, RoutedEventArgs e)
-        {
-            string id = (string)((Button)sender).Tag;
-            ActionKeyBinder.Clear(id);
         }
     }
 }

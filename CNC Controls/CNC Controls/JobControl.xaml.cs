@@ -268,12 +268,10 @@ namespace CNC.Controls
                     keyboard.AddHandler(Key.F11, ModifierKeys.None, FnKeyHandler);
                     keyboard.AddHandler(Key.F12, ModifierKeys.None, FnKeyHandler);
 
-                    // Assignable via Settings:App - Config.ActionShortcuts, not a fixed key (ActionKeyBinder
-                    // dispatches these from MainWindow's PreviewKeyDown chain; defaults match the old fixed keys).
-                    ActionKeyBinder.Register("JobFeedRateDown", FeedRateDown);
-                    ActionKeyBinder.Register("JobFeedRateUp", FeedRateUp);
-                    ActionKeyBinder.Register("JobFeedRateDownFine", FeedRateDownFine);
-                    ActionKeyBinder.Register("JobFeedRateUpFine", FeedRateUpFine);
+                    keyboard.AddHandler(Key.OemMinus, ModifierKeys.Control, FeedRateDown);
+                    keyboard.AddHandler(Key.OemPlus, ModifierKeys.Control, FeedRateUp);
+                    keyboard.AddHandler(Key.OemMinus, ModifierKeys.Shift | ModifierKeys.Control, FeedRateDownFine);
+                    keyboard.AddHandler(Key.OemPlus, ModifierKeys.Shift | ModifierKeys.Control, FeedRateUpFine);
                 }
 
                 GCodeParser.IgnoreM6 = AppConfig.Settings.Base.IgnoreM6;

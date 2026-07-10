@@ -40,26 +40,6 @@
                 <Slider x:Uid="sld_uiScale" x:Name="sliderUiScale" Width="160" Minimum="0.75" Maximum="2.0" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Path=UiScale, Mode=TwoWay}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Path=UiScale, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
             </StackPanel>
-            <GroupBox x:Uid="grb_actionShortcuts" Header="Assignable shortcuts" Margin="0,6,0,0">
-                <ItemsControl x:Name="lstActionShortcuts">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Label}" Grid.Column="0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding CurrentDisplay}" Grid.Column="1" VerticalAlignment="Center" FontStyle="Italic" Foreground="Gray"/>
-                                <Button Content="Change…" Grid.Column="2" Margin="0,0,4,0" Padding="6,1" Tag="{Binding Id}" Click="ChangeShortcut_Click" ToolTip="Press a new key combination for this action."/>
-                                <Button Content="Clear" Grid.Column="3" Padding="6,1" Tag="{Binding Id}" Click="ClearShortcut_Click" ToolTip="Unbind this action's shortcut."/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </GroupBox>
             <CheckBox x:Uid="lbl_sendComments" Content='Send comments' Margin="5,0,0,0" IsChecked="{Binding Path=SendComments, Mode=TwoWay}" ToolTip="Stream G-code comments (in parentheses) to the controller instead of stripping them - useful if the controller displays (MSG,...) comments; leave off to save a little bandwidth."/>
             <CheckBox x:Uid="lbl_preferNetwork" Content='Prefer network connection if available' Margin="5,0,0,0" IsChecked="{Binding Path=PreferNetwork, Mode=TwoWay}" ToolTip="After connecting over USB/serial, if the controller reports an IP address (via $I) and its telnet port (23) responds, automatically switch the connection to the network."/>
             <CheckBox x:Uid="lbl_addLineNumbers" Content='Add line numbers' Margin="5,0,0,0" IsChecked="{Binding Path=AddLineNumbers, Mode=TwoWay}" ToolTip="Add linenumbers if the controller is configured to report them."/>

@@ -79,6 +79,14 @@ namespace CNC.Controls
                 .Select(r => new TabShortcut { Id = r.Model.Method, Key = ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
                 .ToList();
 
+            // UI-zoom shortcuts: unlike tab shortcuts these ship with defaults, so a row cleared to Key.None
+            // is kept (with an empty Key) rather than dropped - ActionKeyBinder.SeedDefaults must see the Id
+            // is present to know not to silently reinstate the default on the next run.
+            AppConfig.Settings.Base.ActionShortcuts = rows
+                .Where(r => r.IsZoomAction)
+                .Select(r => new TabShortcut { Id = r.Model.Method, Key = r.Model.Key == Key.None ? string.Empty : ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
+                .ToList();
+
             if (model.ControllerMapper != null)
             {
                 var m = model.ControllerMapper;
@@ -135,6 +143,20 @@ namespace CNC.Controls
                 if (s != null)
                     ShortcutKey.TryParse(s.Key, out b.Key, out b.Modifiers);
                 Add(new BindingRow(b, t.Label) { IsTabSwitch = true, Description = t.Description });
+            }
+
+            // UI-zoom shortcuts (Settings:App's UI scale). Dispatched at the main-window level like the
+            // console toggle and tab switches (ActionKeyBinder), not through ProcessKeypress - these ship
+            // with real defaults, unlike tab shortcuts, so an entirely-absent row falls back to the catalog
+            // default rather than showing unbound.
+            var savedActions = AppConfig.Settings.Base.ActionShortcuts;
+            foreach (var z in ActionKeyBinder.Catalog)
+            {
+                var b = new KeypressHandler.KeyBinding { Method = z.Id, Context = "null", DefaultKey = z.DefaultKey, DefaultModifiers = z.DefaultModifiers, Key = z.DefaultKey, Modifiers = z.DefaultModifiers };
+                var s = savedActions?.FirstOrDefault(x => x.Id == z.Id);
+                if (s != null)
+                    ShortcutKey.TryParse(s.Key, out b.Key, out b.Modifiers);   // TryParse leaves Key.None on an explicit empty (cleared) row
+                Add(new BindingRow(b, z.Label) { IsZoomAction = true, Description = z.Label });
             }
 
             BuildGroupStates();
@@ -683,6 +705,7 @@ namespace CNC.Controls
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             if (r.IsConsole) { r.Set("Program", 9); return; }
+            if (r.IsZoomAction) { r.Set("UI zoom", 9); return; }
             if (r.IsTabSwitch)
             {
                 // "Tab.<Name>" is a main-page tab; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
@@ -991,6 +1014,7 @@ namespace CNC.Controls
             public string Description { get; set; }
             public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
+            public bool IsZoomAction { get; set; }
             public bool IsJog { get { return Model.IsJog; } }
 
             public string Category { get; private set; }
