@@ -371,6 +371,12 @@ namespace CNC.Controls
         // Starts empty so the XmlSerializer's append-on-load (see MainPanels note above) can't duplicate.
         public List<TabShortcut> TabShortcuts { get; set; } = new List<TabShortcut>();
 
+        // Reuses TabShortcut's {Id, Key} shape for non-tab, assignable action shortcuts (UI zoom, job feed
+        // rate override, ...) - see ActionKeyBinder. Unlike TabShortcuts these DO ship with defaults, seeded
+        // once by ActionKeyBinder.SeedDefaults() if a given Id is entirely absent (an explicit Clear leaves an
+        // empty-Key row in place so the default isn't silently reapplied on the next run).
+        public List<TabShortcut> ActionShortcuts { get; set; } = new List<TabShortcut>();
+
         [XmlIgnore]
         public CommandIgnoreState[] CommandIgnoreStates { get { return (CommandIgnoreState[])Enum.GetValues(typeof(CommandIgnoreState)); } }
         public CommandIgnoreState IgnoreM6 { get { return _ignoreM6; } set { _ignoreM6 = value; OnPropertyChanged(); } }

@@ -708,6 +708,12 @@ namespace GCode_Sender
             registerConsoleShortcut();
             registerTabShortcuts();
 
+            // Assignable action shortcuts (UI zoom, job feed-rate override) - seed real-world defaults
+            // once, then register this window's own actions (feed-rate override is owned by JobControl).
+            ActionKeyBinder.SeedDefaults();
+            ActionKeyBinder.Register("UiScaleUp", k => { AppConfig.Settings.Base.UiScale += 0.05; return true; });
+            ActionKeyBinder.Register("UiScaleDown", k => { AppConfig.Settings.Base.UiScale -= 0.05; return true; });
+
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
                 // Delay loading until app is ready
@@ -1904,6 +1910,12 @@ namespace GCode_Sender
             }
 
             if (dispatchTabShortcut(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (ActionKeyBinder.Dispatch(e))
             {
                 e.Handled = true;
                 return;
