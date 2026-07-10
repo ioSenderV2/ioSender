@@ -391,13 +391,14 @@ namespace CNC.Controls
         public JogUIConfig JogUiImperial { get; set; } = new JogUIConfig(new int[4] { 5, 10, 50, 100 }, new double[4] { .001d, .01d, .1d, 1d });
 
         // Configurable main page (ioSender XL), edited via the "Edit Main Page" dialog.
-        // MainPanels: ordered panel names filling the six main-page slots (col-major, [0,1,2]=left, [3,4,5]=right).
-        // FlyoutItems: ordered names (panels / offset codes / specials) shown as sidebar flyouts.
+        // MainPanels: ordered component keys (MainPanelRegistry) filling the six main-page slots
+        // (col-major, [0,1,2]=left, [3,4,5]=right).
+        // FlyoutItems: ordered component keys (panels / offset codes / specials) shown as sidebar flyouts.
         // Anything in neither list is unassigned (shown nowhere). Applied on restart.
-        // NOTE: serialized as CSV strings (MainPanelsCsv / FlyoutItemsCsv), NOT as List<string>.
-        // XmlSerializer APPENDS to a pre-initialized List<T> on load (defaults + saved), which silently
-        // discarded the user's edits; a string property is replaced cleanly, and a missing element still
-        // falls back to the initializer defaults for configs that predate the feature.
+        // NOTE: persisted as a comma-joined list of component keys (the *Keys properties below), NOT as
+        // List<string> directly. XmlSerializer APPENDS to a pre-initialized List<T> on load (defaults +
+        // saved), which silently discarded the user's edits; a string property is replaced cleanly, and a
+        // missing element still falls back to the initializer defaults for configs that predate the feature.
         private List<string> _mainPanels = new List<string> { "Outline", "Spindle", "Coolant", "WorkParameters", "Feed", "Goto" };
         private List<string> _flyoutItems = new List<string> { "Macros", "MachinePosition" };
         // LeftPanels: ordered panel names filling the area left of the 3D view (default = the original DRO +
@@ -416,22 +417,24 @@ namespace CNC.Controls
         [XmlIgnore]
         public List<string> LeftPanels { get { return _leftPanels; } set { _leftPanels = value ?? new List<string>(); } }
 
-        public string MainPanelsCsv
+        // A persisted, comma-joined list of component keys - see the NOTE above for why this is a string
+        // property rather than List<string>.
+        public string MainPanelsKeys
         {
             get { return string.Join(",", _mainPanels); }
             set { _mainPanels = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
-        public string FlyoutItemsCsv
+        public string FlyoutItemsKeys
         {
             get { return string.Join(",", _flyoutItems); }
             set { _flyoutItems = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
-        public string LeftPanelsCsv
+        public string LeftPanelsKeys
         {
             get { return string.Join(",", _leftPanels); }
             set { _leftPanels = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
-        public string TabsCsv
+        public string TabsKeys
         {
             get { return string.Join(",", _tabs); }
             set { _tabs = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
