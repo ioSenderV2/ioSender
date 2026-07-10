@@ -32,6 +32,13 @@
         <cnccore:GrblViewModel />
     </Window.DataContext>
     <DockPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <DockPanel.LayoutTransform>
+            <!-- Whole-app UI scale (Settings:App) - live, no restart. Bound to the static config
+                 singleton (not Window.DataContext, which is GrblViewModel) so it scales the entire
+                 window - menu, panels, everything - together. -->
+            <ScaleTransform ScaleX="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"
+                            ScaleY="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"/>
+        </DockPanel.LayoutTransform>
         <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load/Load
              Folder/Save/Close live on the program view, Open Console is a double-click on the Console tab,
              and Transform is in the program list's right-click menu. Exit is dropped - the window X / Alt+F4

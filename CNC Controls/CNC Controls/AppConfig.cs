@@ -288,6 +288,7 @@ namespace CNC.Controls
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _preferNetwork = false;
+        private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true, _restoreFusionRapids = false;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
@@ -322,6 +323,10 @@ namespace CNC.Controls
         // When set, after a serial/USB connection whose $I reports an IP, ioSender probes <ip>:23 and, if it
         // answers, automatically switches the connection to the network (status line: "Connection migrated...").
         public bool PreferNetwork { get { return _preferNetwork; } set { if (_preferNetwork != value) { _preferNetwork = value; OnPropertyChanged(); } } }
+        // Whole-app UI scale (fonts, controls, spacing - not just the 3D viewer). Applied live via a
+        // LayoutTransform on MainWindow's root; clamped so a corrupt/hand-edited settings file can't
+        // leave the window unusably tiny or oversized.
+        public double UiScale { get { return _uiScale; } set { var v = value < 0.5 ? 0.5 : (value > 2.5 ? 2.5 : value); if (_uiScale != v) { _uiScale = v; OnPropertyChanged(); } } }
         public int ResetDelay { get { return _resetDelay; } set { _resetDelay = value; OnPropertyChanged(); } }
         // Remember when the saved target is the bundled simulator so startup auto-reconnect can launch
         // it first (a 127.0.0.1:port target is otherwise indistinguishable from a real network controller).
@@ -715,7 +720,12 @@ namespace CNC.Controls
             get { return _base; }
             private set
             {
+                // LoadConfig() replaces this with a freshly-deserialized Config AFTER
+                // MainWindow's InitializeComponent() has already established any XAML
+                // bindings on Path=Base.<prop> (e.g. the UI-scale LayoutTransform) - those
+                // bindings only re-evaluate if "Base" itself raises PropertyChanged.
                 _base = value;
+                OnPropertyChanged();
             }
         }
 
