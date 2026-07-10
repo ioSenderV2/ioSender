@@ -38,7 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.ComponentModel;
@@ -47,7 +46,10 @@ using CNC.Core;
 namespace CNC.Controls
 {
     /// <summary>
-    /// Interaction logic for MacroExecuteControl.xaml
+    /// Flyout panel showing configured macros as clickable buttons for easy one-click execution.
+    /// Replaces the old macro toolbar (MacroToolbarControl) - macros are now accessible via this
+    /// flyout or by F-key (KeypressHandler). Each button shows the macro name and optional F-key
+    /// shortcut hint.
     /// </summary>
     public partial class MacroExecuteControl : UserControl, ISidebarControl
     {
@@ -62,19 +64,6 @@ namespace CNC.Controls
         private void macroExecuteControl_Loaded(object sender, RoutedEventArgs e)
         {
             Macros = AppConfig.Settings.Macros;
-            Dispatcher.BeginInvoke(new System.Action(SelectInitialMacro), System.Windows.Threading.DispatcherPriority.Loaded);
-        }
-
-        // Pre-select the most recently run macro (persisted, any entry point) if it still exists,
-        // otherwise the first macro.
-        private void SelectInitialMacro()
-        {
-            if (cbMacros == null || Macros == null || Macros.Count == 0)
-                return;
-
-            int lastId = AppConfig.Settings.LastMacroId;
-            CNC.GCode.Macro macro = lastId >= 0 ? Macros.FirstOrDefault(o => o.Id == lastId) : null;
-            cbMacros.SelectedItem = macro ?? Macros[0];
         }
 
         private void View_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -115,8 +104,6 @@ namespace CNC.Controls
         private void Macros_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             IsMessageVisible = (sender as ObservableCollection<CNC.GCode.Macro>).Count == 0 ? Visibility.Visible : Visibility.Hidden;
-            if (cbMacros != null && cbMacros.SelectedItem == null)
-                SelectInitialMacro();
         }
 
         public static readonly DependencyProperty IsMessageVisibleProperty = DependencyProperty.Register(nameof(IsMessageVisible), typeof(Visibility), typeof(MacroExecuteControl), new PropertyMetadata(Visibility.Visible));
@@ -126,11 +113,14 @@ namespace CNC.Controls
             set { SetValue(IsMessageVisibleProperty, value); }
         }
 
-        private void button_Click(object sender, RoutedEventArgs e)
+        // Handle click on a macro button - runs the macro from the button's Tag binding.
+        private void macroButton_Click(object sender, RoutedEventArgs e)
         {
-            CNC.GCode.Macro macro = cbMacros.SelectedItem as CNC.GCode.Macro;
-            if (macro != null && MacroProcessor.Run(DataContext as GrblViewModel, macro.Name, macro.Code, macro.ConfirmOnExecute))
-                AppConfig.Settings.RecordMacroRun(macro.Id);
+            if (sender is Button btn && btn.Tag is CNC.GCode.Macro macro)
+            {
+                if (MacroProcessor.Run(DataContext as GrblViewModel, macro.Name, macro.Code, macro.ConfirmOnExecute))
+                    AppConfig.Settings.RecordMacroRun(macro.Id);
+            }
         }
 
         private void btn_Close(object sender, RoutedEventArgs e)

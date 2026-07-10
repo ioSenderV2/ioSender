@@ -49,6 +49,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Globalization;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Input;
 #if ADD_CAMERA
 using CNC.Controls.Camera;
@@ -1105,6 +1106,118 @@ namespace GCode_Sender
             About about = new About(BaseWindowTitle) { Owner = Application.Current.MainWindow };
             about.DataContext = DataContext;
             about.ShowDialog();
+        }
+
+        // Check for updates: query the GitHub releases API for the latest release of ioSenderV2/ioSender,
+        // compare to the running app version, and inform the user. Handles offline/failure gracefully.
+        private async void checkForUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            const string releasesUrl = "https://api.github.com/repos/ioSenderV2/ioSender/releases/latest";
+            const string releasesPageUrl = "https://github.com/ioSenderV2/ioSender/releases/latest";
+
+            try
+            {
+                // GitHub requires TLS 1.2; .NET Framework 4.6.2 does not enable it by default
+                // (same idiom as SimulatorManager's GitHub calls).
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    // GitHub API requires a User-Agent header
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("ioSender/" + version);
+                    client.Timeout = TimeSpan.FromSeconds(15);
+
+                    var httpResponse = await client.GetAsync(releasesUrl);
+                    // A 404 means the repository has no published release to compare against
+                    // (distinct from a connectivity problem, which would throw below).
+                    if (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        AppDialogs.Show(string.Format("No published releases were found for ioSender, so there is nothing to compare against.\n\nYou are running version {0}.", version),
+                            "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                    httpResponse.EnsureSuccessStatusCode();
+                    var response = await httpResponse.Content.ReadAsStringAsync();
+                    // Parse the JSON to extract the tag_name (e.g. "v2.0.2")
+                    string latestTag = ParseGitHubReleaseTag(response);
+                    if (string.IsNullOrEmpty(latestTag))
+                    {
+                        AppDialogs.Show("Could not determine the latest release version.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    // Normalize: strip leading 'v' or 'V' if present
+                    string latestVersion = latestTag.TrimStart('v', 'V');
+                    string currentVersion = version;
+
+                    int cmp = CompareVersions(currentVersion, latestVersion);
+                    if (cmp >= 0)
+                    {
+                        AppDialogs.Show(string.Format("You are running ioSender {0}, which is up to date.", currentVersion),
+                            "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        var result = AppDialogs.Show(
+                            string.Format("A newer version of ioSender is available.\n\nYour version: {0}\nLatest release: {1}\n\nWould you like to open the releases page?", currentVersion, latestVersion),
+                            "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
+                        if (result == MessageBoxResult.Yes)
+                            System.Diagnostics.Process.Start(releasesPageUrl);
+                    }
+                }
+            }
+            catch (System.Net.Http.HttpRequestException)
+            {
+                AppDialogs.Show("Could not connect to GitHub. Please check your internet connection and try again.",
+                    "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (TaskCanceledException)
+            {
+                AppDialogs.Show("The request timed out. Please check your internet connection and try again.",
+                    "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("An error occurred while checking for updates:\n" + ex.Message,
+                    "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // Parse the "tag_name" field from a GitHub releases API JSON response.
+        // Minimal JSON parsing to avoid adding a JSON library dependency.
+        private static string ParseGitHubReleaseTag(string json)
+        {
+            const string key = "\"tag_name\"";
+            int idx = json.IndexOf(key);
+            if (idx < 0)
+                return null;
+            idx = json.IndexOf(':', idx + key.Length);
+            if (idx < 0)
+                return null;
+            int start = json.IndexOf('"', idx + 1);
+            if (start < 0)
+                return null;
+            int end = json.IndexOf('"', start + 1);
+            if (end < 0)
+                return null;
+            return json.Substring(start + 1, end - start - 1);
+        }
+
+        // Compare two version strings (e.g. "2.0.1" vs "2.0.2"). Returns <0 if v1 < v2, 0 if equal, >0 if v1 > v2.
+        // Handles versions with different segment counts (e.g. "2.0" vs "2.0.1").
+        private static int CompareVersions(string v1, string v2)
+        {
+            var parts1 = v1.Split('.');
+            var parts2 = v2.Split('.');
+            int maxLen = Math.Max(parts1.Length, parts2.Length);
+            for (int i = 0; i < maxLen; i++)
+            {
+                int n1 = i < parts1.Length && int.TryParse(parts1[i], out int p1) ? p1 : 0;
+                int n2 = i < parts2.Length && int.TryParse(parts2[i], out int p2) ? p2 : 0;
+                if (n1 != n2)
+                    return n1 - n2;
+            }
+            return 0;
         }
 
         // Top-level Connect/Reconnect item: "Connect..." when disconnected, "Reconnect..." when connected
