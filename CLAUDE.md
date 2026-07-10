@@ -17,7 +17,13 @@ Upstream is no longer tracked or submitted to; the product is the `master` branc
   In VS Code: **Terminal → Run Task** (Ctrl+Shift+B = *Build Debug + Launch*). This is the one build
   entrypoint — the `.vscode/tasks.json` tasks all delegate to it.
 - Or open **`ioSender XL/ioSender XL.sln`** in Visual Studio 2022, build **Release** — or raw:
-  `msbuild "ioSender XL/ioSender XL.sln" -t:Build -p:Configuration=Release`
+  `msbuild "ioSender XL/ioSender XL.sln" -restore -t:Build -p:Configuration=Release`
+- **NuGet dependency (don't be surprised):** `CNC Core` and `ioSender XL` consume **`WpfUiTestServer`**
+  as a **`<PackageReference>` (v1.0.0 from nuget.org)** — the flag-gated in-process UI-automation server
+  (published standalone at github.com/stevenrwood/WpfUiTestServer). There is **no in-repo `WpfUiTestServer/`
+  project** anymore. These are legacy `net462` csproj with otherwise zero NuGet deps, so a plain
+  `msbuild ... -t:Build` **fails to resolve the package** — you must pass **`-restore`** (or run a
+  `nuget/dotnet restore` first). `build.ps1` already does this; prefer it.
 - Needs the .NET Framework 4.6.2 targeting pack. A couple of external DLLs (RP.Math, websocket-sharp)
   are referenced by relative `..\..\` paths; if a clean build can't resolve `RP.Math` or is missing
   `App.config`, see entry #1 in `Overview.html`.
