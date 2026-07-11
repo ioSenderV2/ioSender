@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>90 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>93 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -199,6 +199,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>&hellip; and the early activation itself is now suppressed at source &mdash; the Settings view ignores its inner tab-strip&rsquo;s startup selection churn until the view is actually shown, so <code>Activate</code> can no longer fire mid-handshake (belt-and-suspenders over <a href="#pr61">#61</a>)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr65">65</a></td></tr>
 <tr><td>Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason &mdash; each gated view declares why it&rsquo;s missing, so the removal and the <em>Edit Main Page</em> listing can&rsquo;t drift (fixes the SD Card &ldquo;needs SD&rdquo; vs. &ldquo;needs a filesystem&rdquo; mismatch)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr80">80</a></td></tr>
 <tr><td>Restart prompt no longer stranded behind the relaunch splash when applying a restart-only change</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr81">81</a></td></tr>
+<tr><td>App.config and Grbl settings snapshots now share one day-retained Backups folder instead of a single .bak and a count-retained settings-backups folder.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr91">91</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -237,6 +238,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>One in-place streaming path &mdash; every wizard/macro runs in its own view; a run never overwrites the loaded job</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr37">37</a></td></tr>
 <tr><td>Live 3D carve view &mdash; watch the stock get machined away (program-sized stock, real cutter profile flat/ball/V-bit, Play / Cycle&nbsp;Start playback) instead of just toolpath lines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr41">41</a></td></tr>
 <tr><td>3-line run view &mdash; on Cycle Start a generated program collapses to previous / current / next line at the bottom of the tab; click the title bar to expand</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr76">76</a></td></tr>
+<tr><td>Save program... now works for a wizard's generated preview, and the floating Program popup no longer shows a redundant second copy of the loaded job already docked in the Job tab.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr93">93</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -246,6 +248,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>In-app Key Mappings editor + console state persistence</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr3">3</a></td></tr>
 <tr><td>Console: inline terminal command prompt + output right-click menu (Clear / Save)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr19">19</a></td></tr>
 <tr><td>Bind any main + second-level tab to a key &mdash; right-click Bind-to-Key + header badges</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr79">79</a></td></tr>
+<tr><td>Start Job no longer writes a start_job.macro file or seeds a catalog entry - it already ran entirely in-memory like the other Generate/Cycle Start wizards.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr92">92</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -371,7 +374,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">88</td><td><a href="#pr88">Fix false Machine Setup step 6 (ATC macros)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-4</span></td></tr>
 <tr><td class="n">89</td><td><a href="#pr89">UI test server â€” full harness + independent assembly</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">96</span> <span class="del">0</span> <span class="add">+7</span><br><span class="k">Lines:</span> <span class="add">+1832</span> <span class="del">-241</span></td></tr>
 <tr><td class="n">90</td><td><a href="#pr90">UI test server &mdash; standalone repo + NuGet package</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">5</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+5</span> <span class="del">-1391</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (90 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">877</span> <span class="del">9</span> <span class="add">+133</span><br><span class="k">Lines:</span> <span class="add">+40623</span> <span class="del">-6182</span></td></tr>
+<tr><td class="n">91</td><td><a href="#pr91">AppData: shared Backups folder replaces .bak + settings-backups</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+86</span> <span class="del">-112</span></td></tr>
+<tr><td class="n">92</td><td><a href="#pr92">Remove start_job.macro file + its seeded macro catalog entry</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">1</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-87</span></td></tr>
+<tr><td class="n">93</td><td><a href="#pr93">Program view: fix Save for wizard previews + popup duplication</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+53</span> <span class="del">-65</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (93 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">890</span> <span class="del">10</span> <span class="add">+133</span><br><span class="k">Lines:</span> <span class="add">+40768</span> <span class="del">-6446</span></td></tr>
 </table>
 </div>
 
@@ -2233,6 +2239,44 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">build.ps1</td><td class="num add">2</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>The app-agnostic UI test server assembly introduced in <a href="#pr89">#89</a> now lives in its own public repository (<code>github.com/stevenrwood/WpfUiTestServer</code>) and ships as a NuGet package. ioSender references it like any third-party dependency; the in-repo copy is gone. No user-facing behaviour change &mdash; it remains off by default, behind <code>-testserver</code> / <code>IOSENDER_TESTSERVER</code>.</p><ul><li><strong>Package, not project.</strong> Both consumers (<code>ioSender XL</code> and <code>CNC Core</code>) swapped their <code>ProjectReference</code> for <code>&lt;PackageReference Include="WpfUiTestServer" Version="1.0.0"&gt;</code>; the project was dropped from the solution and the folder removed.</li><li><strong>Published via Trusted Publishing.</strong> The standalone repo packs and publishes to NuGet from GitHub Actions using OIDC (no stored API key), converted to an SDK-style <code>net462</code> project with package metadata.</li><li><strong>Build now restores.</strong> These projects had no prior NuGet dependencies, so <code>build.ps1</code> gained <code>-restore</code> on the MSBuild call. Building in Visual Studio restores automatically; a raw <code>msbuild</code> of the solution now needs a restore step too.</li></ul><p class="foot">Dev/QA infrastructure only. Debug + Release both build-verified against the published package.</p></div>
+</div>
+<!-- ===== #91 ===== -->
+<div class="pr">
+<h2 id="pr91"><span class="badge">#91</span>AppData cleanup: a shared Backups folder replaces App.config.bak + settings-backups</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/Grbl.cs</td><td class="num add">37</td><td class="num del">81</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">46</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Controls/RestorePointDialog.xaml</td><td class="num add">1</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/RestorePointDialog.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/JobView.xaml.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><code>%AppData%\ioSender</code> collected two separate backup mechanisms over time: a single rolling <code>App.config.bak</code> rewritten on every save, and a <code>settings-backups</code> folder taking a Grbl settings snapshot on every <code>$</code>-setting save (count-retained, 20 deep). Both are replaced by one shared <code>Backups</code> folder with day-based retention (10 days).</p><ul><li><strong>App.config</strong> is snapshotted once at startup, before any in-session edits, to <code>Backups\&lt;datetime&gt;_App.config</code>; <code>Load()</code>'s crash-recovery fallback now reads the newest such file instead of a single <code>.bak</code>.</li><li><strong>Grbl settings</strong> are snapshotted once per successful <em>connect</em> (not on every settings save) to <code>Backups\&lt;datetime&gt;_Grbl.txt</code>, since a fresh connect-time snapshot is the restore point that matters - a per-edit changelog header is no longer written.</li><li>The Restore-settings picker (<code>RestorePointDialog</code>) is updated to the simplified filename format and shared folder.</li></ul><p class="foot">Verified live: startup and connect-time snapshots both confirmed written correctly; the old .bak/settings-backups artifacts removed from a real AppData folder without disturbing the live App.config.</p></div>
+</div>
+<!-- ===== #92 ===== -->
+<div class="pr">
+<h2 id="pr92"><span class="badge">#92</span>Remove start_job.macro file + its seeded macro catalog entry</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/AtcMacros.cs</td><td class="num add">3</td><td class="num del">51</td></tr>
+<tr><td class="mono">ioSender XL/StartJobView.xaml.cs</td><td class="num add">2</td><td class="num del">17</td></tr>
+<tr><td class="mono">ioSender XL/JobView.xaml.cs</td><td class="num add">0</td><td class="num del">6</td></tr>
+<tr><td class="mono">macros/start_job.macro</td><td class="num add">0</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls.csproj</td><td class="num add">0</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/StartJobView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Clicking <em>Generate</em> on the Start Job tab also wrote the generated program to <code>%AppData%\ioSender\start_job.macro</code> and, on the next ATC connect, seeded a &ldquo;Start Job&rdquo; entry in the macro catalog referencing it - so it could be re-run from the Macro list or an F-key outside the tab. But Start Job already runs entirely in-memory via <code>MacroProcessor.ActiveRun</code>, the same paradigm as the Auto Square, Stepper Calibration, and Surface Spoilboard wizards (none of which write a file); the disk copy and catalog entry were redundant with that and just left an extra file behind. Removed <code>WriteStartJobMacro</code>, <code>AtcMacros.SeedStartJobMacro</code>, and the embedded <code>macros/start_job.macro</code> template.</p></div>
+</div>
+<!-- ===== #93 ===== -->
+<div class="pr">
+<h2 id="pr93"><span class="badge">#93</span>Program view: fix Save for wizard previews, stop the popup duplicating the Job tab</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">36</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">11</td><td class="num del">41</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml</td><td class="num add">6</td><td class="num del">18</td></tr>
+</table>
+<div class="desc"><p>Two gaps left over from the ProgramView refactor (each Generate&#8209;&gt;Cycle&nbsp;Start wizard - Start Job, Auto Square, Stepper Calibration, Surface Spoilboard - now owns its own transient <code>ProgramView</code> instead of sharing one overlay):</p><ul><li><strong>Save program... was permanently disabled</strong> for a wizard's own preview - its enablement still checked only the loaded-job singleton (<code>GCode.File.IsLoaded</code>), which is never true for a wizard's separate, transient program. It now also enables for a view showing its own generated program, and writes that program's lines to a file the operator picks.</li><li><strong>The floating &ldquo;Program&rdquo; popup duplicated the Job tab.</strong> With no wizard connected it fell back to showing the loaded job a second time - identical content to the always-docked Job-tab program list (<code>ProgramPanel</code>). The popup now hosts a view only when it is genuinely transient (<code>ProgramView.AutoShow</code> - a wizard preview or a plain macro run); the &ldquo;Program&rdquo; button disables itself whenever there is nothing to show there, since the loaded job already has a persistent home.</li></ul><p class="foot">Verified live via the UI test server: Program button starts/stays disabled with nothing loaded, enables and shows the generated program on Start Job's Generate, and disables again on leaving the tab.</p></div>
 </div>
 </section>
 
