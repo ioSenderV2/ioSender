@@ -15,8 +15,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -35,23 +33,19 @@ namespace CNC.Controls.Viewer
         // cutter shapes (from the program's TOOL TYPE=): flat end-mill, ball-nose, V-bit (Angle = included deg)
         private const int ShapeFlat = 0, ShapeBall = 1, ShapeVbit = 2;
 
-        // Tool info parsed from the program's (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) comments (the Fusion
-        // ioSenderBatchPost emits these). Maps tool number -> cutter geometry; drives the carve radius + cone.
-        private struct ToolInfo { public double Dia; public string Shape; public double Angle; }
-        private readonly Dictionary<int, ToolInfo> tools = new Dictionary<int, ToolInfo>();
+        // Cutter geometry per tool number and declared stock size now come from the shared
+        // CNC.Controls.GCodeProgramComments parser (rebuilt once per completed Load File/Load Folder) instead
+        // of a private copy of the same (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) / (STOCK X=.. Y=.. Z=..)
+        // regexes - drives the carve radius + cone and the stock block size.
         private double defaultToolRadius = 3d;
         private int defaultToolShape = ShapeFlat;
         private double defaultToolAngle;
-        private double stockX, stockY, stockZ;   // stock size from the program's (STOCK X=.. Y=.. Z=..) comment; 0 = unknown
+        private double stockX, stockY, stockZ;   // stock size from GCodeProgramComments.Stock; 0 = unknown
 
         // current cutter geometry the carve uses (set per segment in playback, or the default for live motion)
         private double curR = 3d;
         private int curShape = ShapeFlat;
         private double curAngle;
-        private static readonly Regex rxTool =
-            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?", RegexOptions.IgnoreCase);
-        private static readonly Regex rxStock =
-            new Regex(@"\(\s*STOCK\s+X=([0-9.]+)\s+Y=([0-9.]+)\s+Z=([0-9.]+)", RegexOptions.IgnoreCase);
 
         private GrblViewModel model;
         private Position wpos;           // live WORK position (drives the cone when not playing)
@@ -346,11 +340,15 @@ namespace CNC.Controls.Viewer
                         {
                             case Commands.ToolSelect:
                             case Commands.M61:
-                                if (a.Token is GCToolSelect ts && tools.TryGetValue(ts.Tool, out var ti))
+                                if (a.Token is GCToolSelect ts)
                                 {
-                                    curRad = Math.Max(ti.Dia / 2d, 0.1d);
-                                    curShp = ShapeId(ti.Shape);
-                                    curAng = ti.Angle;
+                                    var ti = CNC.Controls.GCodeProgramComments.For(ts.Tool);
+                                    if (ti.HasValue)
+                                    {
+                                        curRad = Math.Max(ti.Value.Diameter / 2d, 0.1d);
+                                        curShp = ShapeId(ti.Value.Shape);
+                                        curAng = ti.Value.Angle;
+                                    }
                                 }
                                 break;
                             case Commands.G0:
@@ -410,51 +408,28 @@ namespace CNC.Controls.Viewer
             Grow(b);
         }
 
-        // Parse the program's (TOOL T=n D=d TYPE=t [A=a]) comment lines into the tool table; defaultToolRadius is
-        // the lowest-numbered tool's radius (used before the first tool change and for the live cone).
+        // Both tool geometry and declared stock size now come from the shared CNC.Controls.GCodeProgramComments
+        // parser (already rebuilt by the time this runs - it's refreshed synchronously on the same Load
+        // File/Load Folder completion this view's poll-on-render eventually notices), no local re-scan needed.
+        // defaultToolRadius is the lowest-numbered tool's radius (used before the first tool change and for
+        // the live cone).
         private void ParseTools()
         {
-            tools.Clear();
             defaultToolRadius = 3d;
             defaultToolShape = ShapeFlat;
             defaultToolAngle = 0d;
-            stockX = stockY = stockZ = 0d;
 
-            var data = GCode.File.Data;
-            if (data == null)
-                return;
-
-            foreach (var b in data)
-            {
-                string line = b.Data ?? string.Empty;
-
-                var ms = rxStock.Match(line);
-                if (ms.Success)
-                {
-                    double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockX);
-                    double.TryParse(ms.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockY);
-                    double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out stockZ);
-                }
-
-                var m = rxTool.Match(line);
-                if (!m.Success)
-                    continue;
-                if (int.TryParse(m.Groups[1].Value, out int t) &&
-                    double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
-                {
-                    double ang = 0d;
-                    if (m.Groups[4].Success)
-                        double.TryParse(m.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out ang);
-                    tools[t] = new ToolInfo { Dia = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang };
-                }
-            }
+            var stock = CNC.Controls.GCodeProgramComments.Stock;
+            stockX = stock?.X ?? 0d;
+            stockY = stock?.Y ?? 0d;
+            stockZ = stock?.Z ?? 0d;
 
             int lowest = int.MaxValue;
-            foreach (var kv in tools)
+            foreach (var kv in CNC.Controls.GCodeProgramComments.All)
                 if (kv.Key < lowest)
                 {
                     lowest = kv.Key;
-                    defaultToolRadius = Math.Max(kv.Value.Dia / 2d, 0.1d);
+                    defaultToolRadius = Math.Max(kv.Value.Diameter / 2d, 0.1d);
                     defaultToolShape = ShapeId(kv.Value.Shape);
                     defaultToolAngle = kv.Value.Angle;
                 }

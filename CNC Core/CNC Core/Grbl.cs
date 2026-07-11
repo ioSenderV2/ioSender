@@ -980,7 +980,7 @@ namespace CNC.Core
 
         double _r;
 
-        public double R { get { return R; } set { _r = value; OnPropertyChanged(); } }
+        public double R { get { return _r; } set { _r = value; OnPropertyChanged(); } }
 
         public new string ToString(AxisFlags axisflags, int precision = 3)
         {

@@ -55,7 +55,8 @@
                  label are set per type in code-behind. -->
             <StackPanel Grid.Column="0" VerticalAlignment="Top">
                 <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
-                <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Ball diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Body diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldLength" x:Uid="pd_length" Label="Probe length:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe stylus length below the body (excludes the body itself) - body-bottom to the end of the tip." Margin="0,2,0,0" Value="{Binding Path=ProbeLength, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
@@ -70,7 +71,7 @@
 
                         <!-- 3D touch probe: wide body, thin stylus, ruby tip ball. -->
                         <Canvas x:Name="drwThreeD">
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="63" Canvas.Top="2" Text="Ball diameter"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="63" Canvas.Top="2" Text="Body diameter"/>
                             <Line Style="{StaticResource DimLine}" X1="74" Y1="20" X2="146" Y2="20"/>
                             <Line Style="{StaticResource DimLine}" X1="74" Y1="16" X2="74" Y2="34"/>
                             <Line Style="{StaticResource DimLine}" X1="146" Y1="16" X2="146" Y2="34"/>
@@ -81,6 +82,14 @@
                             <Line Style="{StaticResource DimLine}" X1="100" Y1="204" X2="100" Y2="226"/>
                             <Line Style="{StaticResource DimLine}" X1="120" Y1="204" X2="120" Y2="226"/>
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="82" Canvas.Top="228" Text="Tip diameter"/>
+
+                            <!-- probe length: body BOTTOM to the END of the tip (excludes the body itself), alongside the right of the shape -->
+                            <Line Style="{StaticResource DimLine}" X1="160" Y1="122" X2="160" Y2="202"/>
+                            <Line Style="{StaticResource DimLine}" X1="156" Y1="122" X2="164" Y2="122"/>
+                            <Line Style="{StaticResource DimLine}" X1="156" Y1="202" X2="164" Y2="202"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="168" Canvas.Top="128" Text="Probe length">
+                                <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
+                            </TextBlock>
                         </Canvas>
 
                         <!-- Touch plate (aluminium): flat plate on the stock top; a lip protrudes DOWN from the

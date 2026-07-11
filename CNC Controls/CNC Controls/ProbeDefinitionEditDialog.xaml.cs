@@ -62,13 +62,16 @@ namespace CNC.Controls
         // Show only the essentials relevant to the selected type (speeds/distances live behind 'Edit motion params').
         private void UpdateFieldVisibility(ProbeType type)
         {
-            // The touch plate has no stylus - it uses the bit in the collet, so its diameter field is the bit's.
+            // The touch plate has no stylus - whatever bit is in the collet varies job to job, so it's not a
+            // fixed property of the PLATE. The loaded program's own (TOOL T=n D=d ...) comment for the current
+            // tool is preferred at runtime (ProbingViewModel.SelectedProbe); this field is only the fallback
+            // used when that's unavailable (no program loaded, or its comments don't mention this tool).
             bool hasDiameter = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
             Show(fldDiameter, hasDiameter);
             if (type == ProbeType.TouchPlate)
             {
-                fldDiameter.Label = "Bit diameter:";
-                fldDiameter.ToolTip = "Diameter of the bit in the collet (used for edge radius compensation).";
+                fldDiameter.Label = "Fallback diameter:";
+                fldDiameter.ToolTip = "Used only when the loaded program's own (TOOL T=n D=...) comment doesn't cover the current tool - edge radius compensation prefers that live value when available.";
             }
             else
             {
@@ -76,9 +79,11 @@ namespace CNC.Controls
                 fldDiameter.ToolTip = "Stylus tip / bit diameter that contacts the work (used for edge radius compensation).";
             }
 
-            // The 3D probe also has a large ball/body; its radius is the minimum standoff for rapid/G28 moves
-            // and drives the Load Stock approach clearance.
+            // The 3D probe also has a large body; its radius is the minimum standoff for rapid/G28 moves
+            // and drives the Load Stock approach clearance. Probe length (stylus below the body, excluding
+            // the body itself) is informational.
             Show(fldBody, type == ProbeType.ThreeDProbe);
+            Show(fldLength, type == ProbeType.ThreeDProbe);
 
             Show(fldPlate, type == ProbeType.TouchPlate);
             Show(fldLip, type == ProbeType.TouchPlate);
@@ -111,7 +116,7 @@ namespace CNC.Controls
             switch (type)
             {
                 case ProbeType.ThreeDProbe:
-                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.ProbeLength = 50d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d;
                     d.ProbeOffsetX = 0d; d.ProbeOffsetY = 0d;
                     break;

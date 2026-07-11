@@ -34,7 +34,7 @@ namespace CNC.Controls
     {
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
-        private double _diameter = 2d, _bodyDiameter = 42d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
+        private double _diameter = 2d, _bodyDiameter = 42d, _probeLength = 50d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
                        _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d;
 
@@ -61,9 +61,13 @@ namespace CNC.Controls
         // radius compensation applied to face touches.
         public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); } }
 
-        // 3D-probe ball/body diameter - the large part that must clear the work; its radius is the
+        // 3D-probe body diameter - the large part that must clear the work; its radius is the
         // minimum standoff held during G28 / rapid clearance moves so the body never strikes the stock.
         public double BodyDiameter { get { return _bodyDiameter; } set { _bodyDiameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }
+
+        // 3D-probe stylus/shaft length BELOW the body (excludes the body itself) - the reach from body-bottom
+        // to the end of the tip. Informational/clearance reference, not consumed by any macro today.
+        public double ProbeLength { get { return _probeLength; } set { _probeLength = value; OnChanged(); } }
 
         // Minimum XY standoff (body radius) to keep clear of the work on G28/rapid clearance moves.
         [System.Xml.Serialization.XmlIgnore]
@@ -91,7 +95,7 @@ namespace CNC.Controls
 
         public void CopyFrom(ProbeDefinition o)
         {
-            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; ProbeFeedRate = o.ProbeFeedRate;
+            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; ProbeLength = o.ProbeLength; ProbeFeedRate = o.ProbeFeedRate;
             LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
