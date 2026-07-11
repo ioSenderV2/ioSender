@@ -411,24 +411,6 @@ namespace GCode_Sender
             overlayConsole.Visibility = _consoleOverlay ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // Return the program view to the loaded job and drop any active wizard program, so Cycle Start streams the
-        // job. Called when a wizard tab is left (active follows tab) or a job file is loaded (FileName change).
-        private void ClearProgramPreview()
-        {
-            overlayProgramView.SetProgram(null);   // null = the loaded job
-            CNC.Controls.MacroProcessor.ActiveProgramName = null;
-            CNC.Controls.MacroProcessor.ActiveRun = null;
-            overlayPreviewTitle.Visibility = Visibility.Collapsed;
-            overlayJobTitle.Visibility = Visibility.Visible;
-
-            // Close the preview overlay rather than leave it showing the loaded job: a generated preview pops
-            // OPEN (ShowProgramPreview) as Generate feedback, so when that program is cleared (run finished, or
-            // the wizard tab left) it should pop CLOSED again - not be replaced by the loaded file/folder program.
-            _programOverlay = false;
-            if (btnProgramView != null)
-                btnProgramView.IsChecked = false;
-            UpdateOverlay();
-        }
 
         // The loaded job's own program view (ProgramView refactor): Load File / Load Folder create+connect it so
         // the overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
@@ -473,32 +455,20 @@ namespace GCode_Sender
 
         // A program is just a list of G-code blocks; build one from generated text so a wizard program renders
         // in the same program view as a file/folder (no raw-text special case).
-        // Host the connected ProgramView (a tool that owns its own view) in the overlay, or revert to the shared/
-        // job view when none is connected. The connected view brings its own title bar, so overlayTitleBar hides.
+        // Host the connected ProgramView in the popup ONLY when it's genuinely transient (AutoShow - a wizard's
+        // Generate output, or a plain macro run). The loaded job's own view (jobProgramView, AutoShow=false)
+        // already has a persistent home in the docked Job-tab panel (ProgramPanel), so this popup must never
+        // show it a second time - the "Program" button is disabled whenever there's nothing showable here.
         private void OnOverlayActiveChanged()
         {
             var active = CNC.Controls.ProgramView.Active;
-            if (active != null)
-            {
-                overlayActiveHost.Content = active;
-                overlayActiveHost.Visibility = Visibility.Visible;
-                overlayProgramView.Visibility = Visibility.Collapsed;
-                overlayTitleBar.Visibility = Visibility.Collapsed;   // the connected view carries its own title
-                // A wizard's view (AutoShow) pops the overlay OPEN as Generate feedback; the loaded job (AutoShow
-                // false) is hosted but the overlay stays/returns closed - loading a file, or a wizard run ending,
-                // shouldn't fling it open over the work area (the persistent Job-tab list already shows the job).
-                _programOverlay = active.AutoShow;
-                btnProgramView.IsChecked = active.AutoShow;
-            }
-            else
-            {
-                overlayActiveHost.Content = null;
-                overlayActiveHost.Visibility = Visibility.Collapsed;
-                overlayProgramView.Visibility = Visibility.Visible;
-                overlayTitleBar.Visibility = Visibility.Visible;
-                _programOverlay = false;
-                btnProgramView.IsChecked = false;
-            }
+            bool showable = active != null && active.AutoShow;
+
+            overlayActiveHost.Content = showable ? active : null;
+            btnProgramView.IsEnabled = showable;
+            btnProgramView.IsChecked = showable;   // AutoShow pops the popup open as Generate feedback
+            _programOverlay = showable;
+
             ApplyOverlayCompact();
             UpdateOverlay();
         }

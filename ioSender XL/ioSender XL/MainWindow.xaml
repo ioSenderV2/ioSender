@@ -186,7 +186,7 @@
                             </Grid.ColumnDefinitions>
                             <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
                             <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
-                            <ToggleButton x:Uid="btnProgramView" Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
+                            <ToggleButton x:Uid="btnProgramView" Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" IsEnabled="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -290,23 +290,11 @@
         <!-- Program view always pops on the RIGHT. -->
         <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" MaxWidth="720" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
-            <DockPanel>
-                <!-- Title = program source (loaded file/folder) or, in preview mode, the generating tool's name. -->
-                <Border x:Name="overlayTitleBar" DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3">
-                    <Grid>
-                        <TextBlock x:Name="overlayJobTitle" Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
-                        <TextBlock x:Name="overlayPreviewTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
-                    </Grid>
-                </Border>
-                <!-- Fallback ProgramView (title bar collapses - overlayTitleBar above supplies the title) shows the
-                     loaded job / an un-converted wizard. overlayActiveHost hosts a tool that owns its OWN
-                     ProgramView (e.g. Load Stock, titled by the view itself) - overlayTitleBar hides while it shows. -->
-                <Grid>
-                    <cnccontrols:ProgramView x:Name="overlayProgramView"/>
-                    <ContentControl x:Name="overlayActiveHost" Visibility="Collapsed"/>
-                </Grid>
-            </DockPanel>
+            <!-- Hosts whichever tool's own ProgramView is connected (Load File/Folder, or a wizard's Generate
+                 output) - each carries its own title bar. Nothing shows here (and the "Program" button is
+                 disabled) when nothing is connected; the loaded job's own docked list (ProgramPanel, in the
+                 Job tab) is the persistent view of that content, so this popup never duplicates it. -->
+            <ContentControl x:Name="overlayActiveHost"/>
         </Border>
         <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->
         <Border x:Name="overlayConsole" HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="300" Margin="6,0,0,0"
