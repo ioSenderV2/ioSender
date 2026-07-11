@@ -114,6 +114,7 @@ namespace CNC.Controls
             TabKeyBinder.AttachTabBinding(tabStepAxis, "Tab.MachineSetup.Axis");
             TabKeyBinder.AttachTabBinding(tabStepHoming, "Tab.MachineSetup.Homing");
             TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
+            TabKeyBinder.AttachTabBinding(tabStepFixtures, "Tab.MachineSetup.Fixtures");
             TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
 
             model = DataContext as GrblViewModel;
@@ -124,6 +125,9 @@ namespace CNC.Controls
 
             // Step 5 hosts the probe library inline (live ObservableCollection - add/edit/delete in place).
             grdProbes.ItemsSource = ProbeDefinitions.Items;
+
+            // Step 6 hosts the fixture library inline, same pattern as Probes. Starts empty (no prepopulation).
+            grdFixtures.ItemsSource = Fixtures.Items;
 
             // Colour the step tabs from the start - incomplete steps show red immediately, before any load.
             RefreshStepColors();
@@ -184,14 +188,16 @@ namespace CNC.Controls
             if (ProbeDefinitions.Items.Count == 0)
                 return 5;
 
-            // 6 - Controller macros: on an ATC-capable controller every required macro must be present and
+            // Step 6 (Fixture definitions) is NOT gating - fixtures aren't required for basic machine operation.
+
+            // 7 - Controller macros: on an ATC-capable controller every required macro must be present and
             // current. Query the filesystem (GetStatus) rather than trusting the ATC flag - the flag won't
             // notice a macro the user deleted or edited by hand.
             if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
             {
                 var macros = AtcMacros.GetStatus(Grbl.GrblViewModel);
                 if (macros.Any(r => r.State != AtcMacros.MacroState.Installed))
-                    return 6;
+                    return 7;
             }
 
             return 0;
@@ -208,16 +214,17 @@ namespace CNC.Controls
                 case 3: return "Axis information - steps/mm and travel";
                 case 4: return "Homing & limits - enable limit protection";
                 case 5: return "Probe definitions - define a probe";
-                case 6: return "Controller macros - install ATC macros";
+                case 7: return "Controller macros - install ATC macros";
                 default: return string.Empty;
             }
         }
 
-        // Select the given step's tab (1-6) and note it in the status line. Used by the startup gate.
-        // Tab order is Overview(0), Machine(1), Home(2), Axis(3), Homing(4), Probes(5), Macros(6).
+        // Select the given step's tab (1-5, 7 - step 6/Fixtures is not gated, so never targeted by the setup
+        // gate) and note it in the status line. Used by the startup gate.
+        // Tab order is Overview(0), Machine(1), Home(2), Axis(3), Homing(4), Probes(5), Fixtures(6), Macros(7).
         public void GoToStep(int step)
         {
-            if (tabSteps != null && step >= 1 && step <= 6)
+            if (tabSteps != null && step >= 1 && step <= 7)
                 tabSteps.SelectedIndex = step;
 
             if (txtStatus != null)
@@ -237,6 +244,7 @@ namespace CNC.Controls
                 case "Tab.MachineSetup.Axis": target = tabStepAxis; break;
                 case "Tab.MachineSetup.Homing": target = tabStepHoming; break;
                 case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
+                case "Tab.MachineSetup.Fixtures": target = tabStepFixtures; break;
                 case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
                 default: target = null; break;
             }
@@ -258,7 +266,8 @@ namespace CNC.Controls
         // Last macro-status query (cached so tab colouring doesn't re-hit the controller filesystem).
         private System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
 
-        // Colour the six step tabs from their current state. Cheap (no filesystem query) - step 6 uses the
+        // Colour the six graded step tabs from their current state (step 6/Fixtures is optional, not graded,
+        // so its header stays uncoloured like Overview). Cheap (no filesystem query) - step 7 uses the
         // cached macro status, so it can be called freely (e.g. on every Setup edit).
         private void RefreshStepColors()
         {
@@ -267,7 +276,7 @@ namespace CNC.Controls
             SetStepColor(hdrAxis, StepStatusOf(3));
             SetStepColor(hdrHoming, StepStatusOf(4));
             SetStepColor(hdrProbes, StepStatusOf(5));
-            SetStepColor(hdrMacros, StepStatusOf(6));
+            SetStepColor(hdrMacros, StepStatusOf(7));
         }
 
         // Colour only the tab's header text (not the tab body, which would make the descriptive text
@@ -310,7 +319,7 @@ namespace CNC.Controls
                     case 5: // Probes: at least one defined
                         return (ProbeDefinitions.Items?.Count ?? 0) > 0 ? StepState.Complete : StepState.NotStarted;
 
-                    case 6: // Controller macros: all installed = green, some outdated = orange, any missing = red
+                    case 7: // Controller macros: all installed = green, some outdated = orange, any missing = red
                         if (_macroStatus != null && _macroStatus.Count > 0)
                         {
                             if (_macroStatus.All(r => r.State == AtcMacros.MacroState.Installed))
@@ -357,7 +366,7 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
                 UpdateApplyState();
-                RefreshMacroStatus();   // queries the filesystem once so step 6's colour is right on open
+                RefreshMacroStatus();   // queries the filesystem once so step 7's colour is right on open
             }
             else
             {
@@ -882,7 +891,90 @@ namespace CNC.Controls
             }
         }
 
-        // ---- Step 6: controller macros status ----
+        // The user's own named fixtures (Kind is a fixed, code-defined choice - see FixtureKind - not itself
+        // user-addable). Not gated (optional) - no RefreshStepColors calls.
+        // ---- Step 6: fixture definitions (hosted inline) ----
+
+        private void Fixtures_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            bool sel = grdFixtures.SelectedItem is Fixture;
+            btnFixtureEdit.IsEnabled = btnFixtureDelete.IsEnabled = btnFixtureSetPosition.IsEnabled = sel;
+        }
+
+        private void Fixtures_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (grdFixtures.SelectedItem is Fixture)
+                EditSelectedFixture();
+        }
+
+        private void FixtureAdd_Click(object sender, RoutedEventArgs e)
+        {
+            var def = new Fixture();
+            var dlg = new FixtureEditDialog(def, model, isNew: true) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                Fixtures.Items.Add(def);
+                Fixtures.Save();
+                grdFixtures.SelectedItem = def;
+            }
+        }
+
+        private void FixtureEdit_Click(object sender, RoutedEventArgs e)
+        {
+            EditSelectedFixture();
+        }
+
+        // Edit a clone and copy back on OK so Cancel reverts.
+        private void EditSelectedFixture()
+        {
+            var sel = grdFixtures.SelectedItem as Fixture;
+            if (sel == null)
+                return;
+
+            var edit = sel.Clone();
+            var dlg = new FixtureEditDialog(edit, model) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                sel.CopyFrom(edit);
+                Fixtures.Save();
+                grdFixtures.Items.Refresh();
+            }
+        }
+
+        private void FixtureDelete_Click(object sender, RoutedEventArgs e)
+        {
+            var sel = grdFixtures.SelectedItem as Fixture;
+            if (sel != null && AppDialogs.Show(string.Format("Delete fixture \"{0}\"?", sel.Name), "Fixture definitions",
+                                               MessageBoxButton.YesNo, MessageBoxImage.Question, id: "fixture.delete") == MessageBoxResult.Yes)
+            {
+                Fixtures.Items.Remove(sel);
+                Fixtures.Save();
+            }
+        }
+
+        // Captures the CURRENT machine position as the selected fixture's reference start point (the point
+        // the corner probe reads from - NOT a firmware G28 write, kept only in this fixture's own Coords).
+        // Also available inside the Add/Edit dialog itself, and from Start Job.
+        private void FixtureSetPosition_Click(object sender, RoutedEventArgs e)
+        {
+            var sel = grdFixtures.SelectedItem as Fixture;
+            if (sel == null)
+                return;
+
+            string coords = Fixtures.CurrentCoordsCsv(model);
+            if (coords == null)
+            {
+                if (model != null)
+                    model.Message = "Machine position unknown - home first to save a fixture position.";
+                return;
+            }
+
+            sel.Coords = coords;
+            Fixtures.Save();
+            grdFixtures.Items.Refresh();
+        }
+
+        // ---- Step 7: controller macros status ----
 
         private void Steps_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

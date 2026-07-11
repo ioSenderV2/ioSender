@@ -303,9 +303,44 @@
                 </Grid>
             </TabItem>
 
-            <!-- 6. Controller macros (ATC tool-change set + Load Stock corner probe) -->
+            <!-- 6. Fixture definitions (the user's own named workholding fixtures - Start Job selects from these) -->
+            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures">
+                <TabItem.Header><TextBlock x:Uid="step_fixtures" x:Name="hdrFixtures" Text="6 · Fixture definitions"/></TabItem.Header>
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_fixturesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Text="Define the fixtures on this machine (a specific vise, fence, etc.). Add picks the TYPE first - Corner fence, Machinist vise, Dog-hole/grid corner, Vacuum table zero-corner, fixed choices ioSender knows the probe pattern for - which determines which offset fields apply. After OK, jog to the reference and click &quot;Set position&quot; to capture its machine-coordinate start point. Only Corner fence currently generates working g-code."/>
+                    <DataGrid x:Uid="grdFixtures" x:Name="grdFixtures" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
+                              HeadersVisibility="Column" GridLinesVisibility="All"
+                              SelectionChanged="Fixtures_SelectionChanged" MouseDoubleClick="Fixtures_DoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn x:Uid="fxl_name" Header="Name" Binding="{Binding Name}" Width="*" MinWidth="120"/>
+                            <DataGridTextColumn x:Uid="fxl_kind" Header="Type" Binding="{Binding KindName}" MinWidth="150"/>
+                            <DataGridTextColumn x:Uid="fxl_coords" Header="Position" Binding="{Binding Coords}" MinWidth="200"/>
+                            <DataGridCheckBoxColumn x:Uid="fxl_impl" Header="Implemented" Binding="{Binding Implemented}" Width="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Grid.Row="1" Grid.Column="1" MinWidth="90" Margin="8,0,0,0">
+                        <Button x:Uid="fxl_add" x:Name="btnFixtureAdd" Content="Add" Click="FixtureAdd_Click" Margin="0,0,0,4" MinHeight="26"/>
+                        <Button x:Uid="fxl_edit" x:Name="btnFixtureEdit" Content="Edit" Click="FixtureEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
+                        <Button x:Uid="fxl_delete" x:Name="btnFixtureDelete" Content="Delete" Click="FixtureDelete_Click" Margin="0,0,0,10" MinHeight="26" IsEnabled="False"/>
+                        <Button x:Uid="fxl_setpos" x:Name="btnFixtureSetPosition" Content="Set position" Click="FixtureSetPosition_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"
+                                ToolTip="Store the current machine position as the selected fixture's reference start point."/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- 7. Controller macros (ATC tool-change set + Load Stock corner probe) -->
             <TabItem x:Uid="tabstep_macros" x:Name="tabStepMacros">
-                <TabItem.Header><TextBlock x:Uid="step_ctrlMacros" x:Name="hdrMacros" Text="6 · Controller macros"/></TabItem.Header>
+                <TabItem.Header><TextBlock x:Uid="step_ctrlMacros" x:Name="hdrMacros" Text="7 · Controller macros"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

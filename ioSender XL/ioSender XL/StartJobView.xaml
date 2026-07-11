@@ -22,7 +22,26 @@
                 <GroupBox x:Uid="ls_grpSetup" Header="Start Job setup" Margin="0,0,8,0">
                     <StackPanel Margin="6">
                         <!-- Corner is always the front-left (TFL); the tip radius + feeds come
-                             straight from the configured 3D probe definition, so no probe/corner pickers. -->
+                             straight from the configured 3D probe definition, so no probe picker. Fixtures
+                             themselves are defined in Machine Setup > Fixture definitions - here you only
+                             pick one and (re)capture its position if needed. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <Label x:Uid="ls_lblFixture" Content="Fixture:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="160" MinHeight="22" VerticalAlignment="Center"
+                                      DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label Width="120"/>
+                            <Button x:Uid="btnFxSetPos" x:Name="btnSetFixturePosition" Content="Set position" MinHeight="22" Padding="8,0" Click="SetFixturePosition_Click"
+                                    ToolTip="Store the current machine position as this fixture's reference start point." IsEnabled="False"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                   Text="No fixture defined. Add one in Machine Setup Wizard &gt; Fixture definitions."/>
+                        <TextBlock x:Name="txtFixtureWarning" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                   Text="This fixture type isn't supported yet."/>
+                        <TextBlock x:Name="txtFixtureNoPosition" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                   Text="This fixture has no saved position yet. Jog to its reference and click &quot;Set position&quot;."/>
+                        <Separator Margin="0,4"/>
                         <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
                         <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
                         <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>

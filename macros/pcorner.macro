@@ -15,12 +15,21 @@
 ;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
 ;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
 ;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
+;   #<_ls_spoilx>, #<_ls_spoily> = fixture-type offset (mm) from the reference, along this corner's
+;                   stock-interior direction, to the spoilboard-probe XY (Corner Fence default: 0,0 - AT
+;                   the reference, matching the original hardcoded behaviour).
+;   #<_ls_topx>, #<_ls_topy>     = fixture-type offset (mm) from the reference, into the stock, to the
+;                   stock-top probe XY (Corner Fence default: 30,30).
+;   #<_ls_edgex>, #<_ls_edgey>   = fixture-type offset (mm) from the reference, into the stock, to START
+;                   the X-face / Y-face edge probes (Corner Fence default: 30,30).
+;   #<_ls_spoilz> = machine Z of the fixture instance's saved position - the spoilboard probe starts its
+;                   descent from here (replaces the old dependency on the firmware's single-slot G28 Z).
 ;   #<_ls_searchf>= fast search feed (mm/min), from the 3D probe definition (Probe/Search feed).
 ;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the 3D probe definition (Latch feed).
 ;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
 ;                            (clear air below), publishing #<_start_z> as the DISCOVER/REUSE flag.
 ;                            (Use for the FIRST corner only - its reference must clear the probe
-;                             body, i.e. G28 set 10-30 mm outside the corner.)
+;                             body, i.e. the fixture instance set 10-30 mm outside the corner.)
 ;                 < 9000  -> REUSE: skip the spoilboard probe. EVERY corner (DISCOVER or REUSE)
 ;                            still probes its OWN stock top, so each reports its own Z (flatness).
 ;
@@ -65,14 +74,14 @@ O<pcorner> SUB
   o20 IF [#<sz_in> GE 9000]
     G90
     G53 G0 Z0
-    G53 G0 X[#<rx>] Y[#<ry>]
-    G53 G0 Z[#5163]                 ; rapid down to the stored G28 Z (same sequence as the G28 flyout button) - G28 Z sits just above the spoilboard
-    ; SAFETY: bound the spoilboard probe to a SHORT reach below the G28 Z start. If the probe fails to trip
+    G53 G0 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]
+    G53 G0 Z[#<_ls_spoilz>]          ; rapid down to the fixture instance's saved Z - sits just above the spoilboard
+    ; SAFETY: bound the spoilboard probe to a SHORT reach below the start Z. If the probe fails to trip
     ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
     ; straight into - through - the spoilboard before alarming. Capping the seek to ~12 mm below the start
-    ; means a dead probe alarms after a few mm instead. So set the G28 Z reference within ~10 mm above the
-    ; spoilboard. G54 was zeroed above, so work Z == machine Z here and #5163 (the G28 machine Z) is the datum.
-    G38.2 Z[#5163 - 12] F[#<_ls_searchf>]        ; slow probe to the spoilboard, capped 12 mm below the G28 Z start
+    ; means a dead probe alarms after a few mm instead. So the fixture instance must be captured within ~10 mm
+    ; above the spoilboard. G54 was zeroed above, so work Z == machine Z here and #<_ls_spoilz> is the datum.
+    G38.2 Z[#<_ls_spoilz> - 12] F[#<_ls_searchf>] ; slow probe to the spoilboard, capped 12 mm below the start Z
     G91 G1 Z2 F1000
     G38.2 Z-5 F[#<_ls_latchf>]
     #<_z_spoil> = #5063
@@ -87,15 +96,16 @@ O<pcorner> SUB
   o20 ENDIF
 
   ; ================= stock-top Z at THIS corner (EVERY corner -> flatness) =================
-  ; Move 30 mm into the stock interior (sign per corner) and probe the top, so each corner reports
-  ; its own Z - the spread across the four corners is the stock/spoilboard flatness.
+  ; Move the fixture type's top-probe offset (#<_ls_topx>/#<_ls_topy>) into the stock interior (sign per
+  ; corner) and probe the top, so each corner reports its own Z - the spread across the four corners is
+  ; the stock/spoilboard flatness.
   G90
   o40 IF [#<sz_in> GE 9000]
     G53 G0 Z[#<_floor> + 30]        ; first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), travel just above the tallest possible top - floor known from the DISCOVER probe above
   o40 ELSE
     G53 G0 Z[#<_safe_z>]            ; later corners: travel just above the known stock top (top + 5)
   o40 ENDIF
-  G53 G0 X[#<rx> + [30 * #<sx>]] Y[#<ry> + [30 * #<sy>]]
+  G53 G0 X[#<rx> + [#<_ls_topx> * #<sx>]] Y[#<ry> + [#<_ls_topy> * #<sy>]]
   ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
   ; this seek instead of driving to a deep machine target - a dead/mis-wired probe then alarms near the board
   ; instead of ploughing to -140. DISCOVER (corner 1, reliably over stock) seeks to just below the spoilboard.
@@ -136,10 +146,10 @@ O<pcorner> SUB
   (PRINT, PC start_z=#<_start_z>)
 
   ; ================= X face probe =================
-  ; Beside the X face (at ref_x, clear air) but 30 mm into the stock's Y range, so probing
-  ; toward the face contacts stock. Descend to start_z, then seek toward the face.
+  ; Beside the X face (at ref_x, clear air) but the fixture type's edge-probe offset into the stock's Y
+  ; range, so probing toward the face contacts stock. Descend to start_z, then seek toward the face.
   G53 G0 Z[#<_safe_z>]              ; retract only to just above the stock top (top + 5), not machine top
-  G53 G0 X[#<rx>] Y[#<ry> + [30 * #<sy>]]
+  G53 G0 X[#<rx>] Y[#<ry> + [#<_ls_edgey> * #<sy>]]
   G53 G0 Z[#<_start_z>]
   ; ABSOLUTE seeks (not G91): a G91 move right after a G53 mis-computes on a $23-inverted axis
   ; (firmware bug - target sign-flips -> false Alarm:2). Current X is #<rx>, so seek to an absolute X.
@@ -154,9 +164,10 @@ O<pcorner> SUB
 
   ; ================= Y face probe (route axis-at-a-time around the corner) =================
   ; First move in Y to just outside the Y face (still beside the stock in X), then move in X
-  ; into the stock's X range, then seek toward the Y face. Never a diagonal at probing depth.
+  ; the fixture type's edge-probe offset into the stock's X range, then seek toward the Y face.
+  ; Never a diagonal at probing depth.
   G53 G0 Y[#<ry>]
-  G53 G0 X[#<rx> + [30 * #<sx>]]
+  G53 G0 X[#<rx> + [#<_ls_edgex> * #<sx>]]
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
   G38.2 Y[#<ry> + [35 * #<sy>]] F[#<_ls_searchf>]      ; coarse seek toward the Y face
   #<y_c1> = #5062

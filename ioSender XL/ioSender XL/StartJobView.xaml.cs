@@ -25,6 +25,7 @@ using System.Windows.Media;
 using System.Xml.Serialization;
 using CNC.Core;
 using CNC.Controls;
+using CNC.GCode;
 
 namespace GCode_Sender
 {
@@ -117,6 +118,66 @@ namespace GCode_Sender
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        // (Re)load the fixture library into the dropdown, preserving the current selection by name. Fixtures
+        // are DEFINED in Machine Setup > Fixture definitions - Start Job only selects one and can (re)capture
+        // its position.
+        private void RefreshFixtures()
+        {
+            string current = SelectedFixture?.Name;
+            cbxFixture.ItemsSource = Fixtures.Items;
+            if (current != null)
+                cbxFixture.SelectedItem = Fixtures.Items.FirstOrDefault(f => f.Name == current);
+        }
+
+        private Fixture SelectedFixture { get { return cbxFixture.SelectedItem as Fixture; } }
+
+        // Gate Generate on a fixture being selected, its kind having a working macro, AND a position having
+        // been captured; show the matching hint/warning. Also hides Measure/Rotate for a kind that doesn't
+        // probe edges (nothing to measure - see the Machinist Vise design note in BuildProgram).
+        private void UpdateFixtureWarning()
+        {
+            var fx = SelectedFixture;
+            bool noFixtures = Fixtures.Items.Count == 0;
+            bool implemented = fx != null && fx.Implemented;
+            bool hasPosition = fx != null && fx.HasPosition;
+            bool ok = implemented && hasPosition;
+
+            txtNoFixture.Visibility = noFixtures ? Visibility.Visible : Visibility.Collapsed;
+            txtFixtureWarning.Visibility = (fx != null && !implemented) ? Visibility.Visible : Visibility.Collapsed;
+            txtFixtureNoPosition.Visibility = (fx != null && implemented && !hasPosition) ? Visibility.Visible : Visibility.Collapsed;
+            btnSetFixturePosition.IsEnabled = fx != null;
+            btnGenerate.IsEnabled = ok && ThreeDProbe() != null;
+
+            bool showMeasure = fx == null || FixtureKinds.ProbesEdges(fx.Kind);
+            chkMeasure.Visibility = showMeasure ? Visibility.Visible : Visibility.Collapsed;
+            chkRotate.Visibility = showMeasure && GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void cbxFixture_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateFixtureWarning();
+            InputChanged();
+        }
+
+        private void SetFixturePosition_Click(object sender, RoutedEventArgs e)
+        {
+            var fx = SelectedFixture;
+            if (fx == null)
+                return;
+
+            string coords = Fixtures.CurrentCoordsCsv(model);
+            if (coords == null)
+            {
+                if (model != null)
+                    model.Message = "Machine position unknown - home first to save a fixture position.";
+                return;
+            }
+
+            fx.Coords = coords;
+            Fixtures.Save();
+            UpdateFixtureWarning();
+        }
+
         private void InputChanged()
         {
             InvalidateProgram();
@@ -146,6 +207,7 @@ namespace GCode_Sender
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
+                RefreshFixtures();
                 UpdateSizeHint();
                 Subscribe(true);
                 RefreshCapabilities();   // EXPR / probe / rotation / ATC gating - refreshed again on connect (see Model_PropertyChanged)
@@ -527,8 +589,8 @@ namespace GCode_Sender
         private void RefreshCapabilities()
         {
             UpdateProbeWarning();
+            UpdateFixtureWarning();   // also drives chkRotate visibility (gated on RotationSupported AND the fixture type probing edges)
             UpdateExpressionWarning();
-            chkRotate.Visibility = GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
             chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -545,13 +607,22 @@ namespace GCode_Sender
                 return;
             }
 
+            var fx = SelectedFixture;
+            if (fx == null || !fx.Implemented || !fx.HasPosition)
+            {
+                AppDialogs.Show("Select a fixture with a supported type and a captured position first (Machine Setup > Fixture definitions).",
+                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
             // Gate the capability-dependent options on what the controller actually supports, regardless of the
             // checkbox state - a hidden-but-checked box must never emit a G10 L2 R (errors:20 without WCSROT) or
-            // an M6 T8 puck reference (no toolsetter without ATC).
-            bool measure = chkMeasure.IsChecked == true;
+            // an M6 T8 puck reference (no toolsetter without ATC). A kind that doesn't probe edges has nothing
+            // to measure (see the Machinist Vise design note in BuildProgram), so measure is forced off for it.
+            bool measure = FixtureKinds.ProbesEdges(fx.Kind) && chkMeasure.IsChecked == true;
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
-            program = BuildProgram(p, SelectedCorner, fldWidth.Value, fldHeight.Value,
+            program = BuildProgram(p, fx, SelectedCorner, fldWidth.Value, fldHeight.Value,
                                    cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value);
             ResetResults();
             SaveInputs();
@@ -753,12 +824,21 @@ namespace GCode_Sender
         // Build the NGC probe program: call the tested pcorner.macro per corner (it discovers the spoilboard /
         // stock-top Z and never rapids blind), then set the origin + compute size from the probed corners.
         // Start Job conventions: (PREREQ ...) verbatim, G30 park + install, safe-Z go-to. Origin = the selected
-        // corner (probed FIRST from G28, which discovers start_z); the other three reuse that start_z and are
-        // referenced from the probed origin + the (conservative) estimated size.
-        private static string BuildProgram(ProbeDefinition p, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer)
+        // corner (probed FIRST from the fixture's saved machine position, decoupled from the firmware's
+        // single-slot G28); the other three reuse that start_z and are referenced from the probed origin + the
+        // (conservative) estimated size.
+        //
+        // NOTE on Machinist Vise (FixtureKinds.ProbesEdges == false): its origin is a KNOWN position (the
+        // fixture's saved Coords ARE the precise origin, captured via a probe cycle at Set-time - not this
+        // per-job flow), so it needs zero edge-probing and no Measure/skew support at all. That macro/flow
+        // isn't built yet - only a ProbesEdges == true kind (Corner Fence) is wired to real NGC generation
+        // this round; Implemented == false kinds are blocked before BuildProgram is ever called (Generate_Click).
+        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius -> edge comp
             string cornerName = Name(corner);
+            var fxPos = new Position(fx.Coords);
+            string refX = N(fxPos.X), refY = N(fxPos.Y);        // the fixture's saved machine XY - replaces firmware G28 (#5161/#5162)
 
             int id1 = CornerId(corner);
             Corner xn = XNeighbor(corner), yn = YNeighbor(corner), dg = Diagonal(corner);
@@ -802,7 +882,7 @@ namespace GCode_Sender
             }
 
             L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
-            L(string.Format("(Probe \"{0}\": tip {1} mm. Set G28 10-30 mm OUTSIDE the {2} corner in BOTH X and Y.)", p.Name, N(p.ProbeDiameter), cornerName));
+            L(string.Format("(Probe \"{0}\": tip {1} mm. Fixture \"{2}\" must be 10-30 mm OUTSIDE the {3} corner in BOTH X and Y.)", p.Name, N(p.ProbeDiameter), fx.Name, cornerName));
             L("(Estimated size MUST be conservative - a few mm larger than actual - so far refs land just outside.)");
             L("(Requires grblHAL NGC expressions + pcorner.macro on the controller. VALIDATE before trusting.)");
             L("(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)");
@@ -826,6 +906,18 @@ namespace GCode_Sender
             // Sacrificial spacer/backer thickness under the stock (0 = none). pcorner's effective floor becomes
             // spoilboard + spacer, so a thin sheet on a backer is probed on the metal, not down in the backer.
             L(string.Format("#<_ls_spacer> = {0}", N(spacer)));
+            // Fixture-type probe geometry (replaces pcorner's old hardcoded 30mm constants). Corner Fence's
+            // defaults reproduce today's exact values; a future type can offset (or, with ProbesEdges/
+            // ProbesSpoilboard false, skip) any of these stages.
+            L(string.Format("#<_ls_spoilx> = {0}", N(fx.SpoilProbeOffsetX)));
+            L(string.Format("#<_ls_spoily> = {0}", N(fx.SpoilProbeOffsetY)));
+            L(string.Format("#<_ls_topx> = {0}", N(fx.TopProbeOffsetX)));
+            L(string.Format("#<_ls_topy> = {0}", N(fx.TopProbeOffsetY)));
+            L(string.Format("#<_ls_edgex> = {0}", N(fx.EdgeProbeOffsetX)));
+            L(string.Format("#<_ls_edgey> = {0}", N(fx.EdgeProbeOffsetY)));
+            // Z of the fixture instance's saved position - the spoilboard-probe Z-start now comes from THIS
+            // (decoupled from the firmware's G28 Z, #5163) so it matches whichever instance is selected.
+            L(string.Format("#<_ls_spoilz> = {0}", N(fxPos.Z)));
             L(string.Format("#<_ls_searchf> = {0}", N(p.ProbeFeedRate)));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
@@ -840,9 +932,10 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
 
-            // Corner 1 = the selected origin corner: reference = G28, start_z = 9999 -> DISCOVER (publishes #<_start_z>).
-            L(string.Format("(--- corner 1 = {0} (origin): reference G28, discover Z ---)", cornerName));
-            EmitCall(id1, "#5161", "#5162", "9999");
+            // Corner 1 = the selected origin corner: reference = the fixture instance's saved position,
+            // start_z = 9999 -> DISCOVER (publishes #<_start_z>).
+            L(string.Format("(--- corner 1 = {0} (origin): reference {1}, discover Z ---)", cornerName, fx.Name));
+            EmitCall(id1, refX, refY, "9999");
             L("#<c1x> = #<_corner_x>");
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
@@ -864,14 +957,15 @@ namespace GCode_Sender
             if (measure)
             {
                 // The other three reuse start_z; references come from the probed origin + estimate on the spanning
-                // axis and G28 on the shared axis. corner 2 = X-neighbour, 3 = Y-neighbour, 4 = diagonal.
+                // axis and the fixture instance's saved position on the shared axis. corner 2 = X-neighbour,
+                // 3 = Y-neighbour, 4 = diagonal.
                 L(string.Format("(--- corner 2 = {0} (X-neighbour) ---)", Name(xn)));
-                EmitCall(CornerId(xn), plusMinus("#<c1x>", sox, estW), "#5162", "#<_start_z>");
+                EmitCall(CornerId(xn), plusMinus("#<c1x>", sox, estW), refY, "#<_start_z>");
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
                 L(string.Format("(--- corner 3 = {0} (Y-neighbour) ---)", Name(yn)));
-                EmitCall(CornerId(yn), "#5161", plusMinus("#<c1y>", soy, estH), "#<_start_z>");
+                EmitCall(CornerId(yn), refX, plusMinus("#<c1y>", soy, estH), "#<_start_z>");
                 L("#<c3x> = #<_corner_x>");
                 L("#<c3y> = #<_corner_y>");
 

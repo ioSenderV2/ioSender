@@ -563,8 +563,12 @@ namespace CNC.Controls
             // Drag-reorder order for the sub-tab strips that have no other order authority (Probing/Settings).
             ConfigStore.Register(new OwnedSection<TabOrderConfig>("TabOrder"));
 
-            // App-side library of named machine-coordinate positions ("fixtures"), recalled from the G28 flyout.
-            ConfigStore.Register(new OwnedSection<NamedPositionConfig>("NamedPositions"));
+            // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
+            // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback
+            // (for the wizard's DataGrid), so it registers via XmlObjectSection directly rather than
+            // OwnedSection. Starts empty - no prepopulation (a fixture is inherently per-machine/physical).
+            ConfigStore.Register(new XmlObjectSection<FixtureList>("Fixtures",
+                () => Fixtures.Export(), v => Fixtures.SetItems(v)));
         }
 
         // The current main-window layout tree (Phase 2b). Always EnsureEssentials-repaired (safe to consume).

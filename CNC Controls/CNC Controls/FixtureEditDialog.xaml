@@ -1,0 +1,176 @@
+<Window x:Class="CNC.Controls.FixtureEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        d:DesignHeight="360" d:DesignWidth="600"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="600"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Fixture" Icon="App.ico">
+    <Window.Resources>
+        <!-- Dimension-annotation styling shared by the per-kind schematics (matches ProbeDefinitionEditDialog). -->
+        <SolidColorBrush x:Key="DimBrush" Color="#FF1565C0"/>
+        <Style x:Key="DimLine" TargetType="Line">
+            <Setter Property="Stroke" Value="{StaticResource DimBrush}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+        </Style>
+        <Style x:Key="DimText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
+        </Style>
+    </Window.Resources>
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top">
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label x:Uid="fxd_name" Content="Name:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBox x:Uid="txtFxName" x:Name="txtName" MinWidth="200" MinHeight="22" VerticalContentAlignment="Center"
+                         Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <Label x:Uid="fxd_kind" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <ComboBox x:Uid="cbxKind" x:Name="cbxKind" MinWidth="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxKind_SelectionChanged">
+                    <ComboBoxItem x:Uid="fxd_kindCorner" Content="Corner fence" Tag="CornerFence"/>
+                    <ComboBoxItem x:Uid="fxd_kindVise" Content="Machinist vise" Tag="MachinistVise"/>
+                    <ComboBoxItem x:Uid="fxd_kindDoghole" Content="Dog-hole/grid corner" Tag="DogHoleGridCorner"/>
+                    <ComboBoxItem x:Uid="fxd_kindVacuum" Content="Vacuum table zero-corner" Tag="VacuumTableZeroCorner"/>
+                </ComboBox>
+            </StackPanel>
+            <TextBlock x:Name="txtNotImplemented" Foreground="#C0392B" TextWrapping="Wrap" Margin="120,4,0,0" FontSize="11" Visibility="Collapsed"
+                       Text="This fixture type isn't wired to a working probe macro yet - it can be defined, but Start Job will block Generate for it."/>
+            <Separator Margin="0,7"/>
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Uid="fxd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" MinWidth="75" MinHeight="24" IsDefault="True"/>
+                <Button x:Uid="fxd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" MinWidth="75" MinHeight="24" Margin="6,0,0,0"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Fields on the left, a per-kind schematic on the right (which offset is which is not obvious from
+             a number alone - same reasoning as ProbeDefinitionEditDialog's schematic panel). -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                <local:NumericField x:Name="fldSpoilX" x:Uid="fxd_spoilx" Label="Spoil probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="Offset from the reference, along the corner's stock-interior X direction, to probe the spoilboard." Margin="0,2,0,0"
+                                     Value="{Binding Path=SpoilProbeOffsetX, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldSpoilY" x:Uid="fxd_spoily" Label="Spoil probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="Offset from the reference, along the corner's stock-interior Y direction, to probe the spoilboard." Margin="0,2,0,0"
+                                     Value="{Binding Path=SpoilProbeOffsetY, Mode=TwoWay}"/>
+
+                <local:NumericField x:Name="fldTopX" x:Uid="fxd_topx" Label="Top probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)." Margin="0,8,0,0"
+                                     Value="{Binding Path=TopProbeOffsetX, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldTopY" x:Uid="fxd_topy" Label="Top probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)." Margin="0,2,0,0"
+                                     Value="{Binding Path=TopProbeOffsetY, Mode=TwoWay}"/>
+
+                <local:NumericField x:Name="fldEdgeX" x:Uid="fxd_edgex" Label="Edge probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="How far along Y (into the stock) to position before seeking X, toward the Y face." Margin="0,8,0,0"
+                                     Value="{Binding Path=EdgeProbeOffsetX, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldEdgeY" x:Uid="fxd_edgey" Label="Edge probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
+                                     ToolTip="How far along X (into the stock) to position before seeking Y, toward the X face." Margin="0,2,0,0"
+                                     Value="{Binding Path=EdgeProbeOffsetY, Mode=TwoWay}"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Label x:Uid="fxd_picture" Content="Picture:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                    <TextBox x:Uid="txtFxPicture" x:Name="txtPictureFile" MinWidth="150" MinHeight="22" VerticalContentAlignment="Center"
+                             Text="{Binding Path=PictureFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button x:Uid="btnFxBrowse" x:Name="btnBrowsePicture" Content="Browse…" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnBrowsePicture_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Label x:Uid="fxd_position" Content="Position:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                    <TextBlock x:Uid="txtFxPosition" x:Name="txtPosition" VerticalAlignment="Center" MinWidth="150" Text="Not set" Foreground="#7F8C8D"/>
+                    <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnSetPosition_Click"
+                            ToolTip="Store the current machine position as this fixture's reference start point. Not written to firmware G28 - kept only in this fixture's own definition."/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Per-kind schematic: shows where each offset is measured from/to. One Canvas per shape (the
+                 three edge-probing kinds share a schematic - only the numbers differ), toggled in code-behind
+                 (UpdateFieldVisibility) like the fields; Viewbox scales it. -->
+            <Border Grid.Column="1" Margin="16,0,0,0" Width="230" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="#FFFAFAFA">
+                <Viewbox Stretch="Uniform" Margin="8">
+                    <Grid Width="220" Height="250">
+
+                        <!-- Corner-probing kinds (Corner fence / Dog-hole / Vacuum): reference point outside the
+                             corner, with three dimension pairs to the spoilboard probe, the top probe, and the
+                             two edge-probe start points (each of which then seeks toward its face). -->
+                        <Canvas x:Name="drwCornerStyle">
+                            <!-- Front-left convention (pcorner.macro: FL has sx=+1 "stock is +X of a left
+                                 corner", sy=+1 "stock is +Y of a front corner"). In a standard top-down plan
+                                 view (+X right, +Y up/away-from-operator) that puts the front-left reference
+                                 at the BOTTOM-LEFT, with the stock extending up and to the right from it. -->
+
+                            <!-- stock -->
+                            <Rectangle Canvas.Left="70" Canvas.Top="50" Width="130" Height="140" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+
+                            <!-- reference point (the fixture's saved "Set position") -->
+                            <Ellipse Canvas.Left="36" Canvas.Top="216" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="0" Canvas.Top="224" Text="Reference"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="0" Canvas.Top="236" Text="(Set position)"/>
+
+                            <!-- spoilboard probe: at reference + Spoil X,Y (default 0,0 = at the reference itself) -->
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="140"
+                                       Text="Spoilboard probe = reference + Spoil X,Y (0,0 = at reference)"/>
+
+                            <!-- top probe: diagonal into the stock (up + right from the front-left reference) -->
+                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="90" Y2="220"/>
+                            <Line Style="{StaticResource DimLine}" X1="90" Y1="220" X2="90" Y2="170"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="46" Canvas.Top="224" Text="Top X"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="94" Canvas.Top="195" Text="Top Y"/>
+                            <Ellipse Canvas.Left="86" Canvas.Top="166" Width="8" Height="8" Stroke="{StaticResource DimBrush}" StrokeThickness="1.5"/>
+                            <Line Style="{StaticResource DimLine}" X1="86" Y1="170" X2="94" Y2="170"/>
+                            <Line Style="{StaticResource DimLine}" X1="90" Y1="166" X2="90" Y2="174"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="162" Text="Top probe (Z)"/>
+
+                            <!-- X-face edge probe: up by Edge Y, then seeks +X toward the X face -->
+                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="40" Y2="180"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="196" Text="Edge Y"/>
+                            <Line Style="{StaticResource DimLine}" X1="40" Y1="180" X2="118" Y2="180"/>
+                            <Polygon Points="118,176 126,180 118,184" Fill="{StaticResource DimBrush}"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="40" Canvas.Top="184" Text="seeks -&gt; X face"/>
+
+                            <!-- Y-face edge probe: right by Edge X, then seeks +Y (up) toward the Y face -->
+                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="130" Y2="220"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="224" Text="Edge X"/>
+                            <Line Style="{StaticResource DimLine}" X1="130" Y1="220" X2="130" Y2="145"/>
+                            <Polygon Points="126,149 130,141 134,149" Fill="{StaticResource DimBrush}"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="128" Text="seeks ^ Y face"/>
+                        </Canvas>
+
+                        <!-- Machinist vise: origin is a KNOWN position (captured via a probe cycle at Set-time,
+                             not per-job) - no edge probing at all, only the stock top is probed. -->
+                        <Canvas x:Name="drwKnownPosition" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
+                                       Text="Origin is a KNOWN position - no edge probing. Only the stock top (Z) is probed."/>
+                            <!-- fixed jaw -->
+                            <Rectangle Canvas.Left="40" Canvas.Top="100" Width="20" Height="100" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <!-- stock -->
+                            <Rectangle Canvas.Left="60" Canvas.Top="110" Width="90" Height="80" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <!-- moving jaw -->
+                            <Rectangle Canvas.Left="150" Canvas.Top="100" Width="20" Height="100" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <!-- known position dot, at the fixed-jaw/stock corner -->
+                            <Ellipse Canvas.Left="56" Canvas.Top="106" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="192" Text="Known position"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="206" Text="(captured via probe"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="220" Text="cycle, not jog+Set)"/>
+                            <!-- top probe crosshair -->
+                            <Ellipse Canvas.Left="86" Canvas.Top="136" Width="8" Height="8" Stroke="{StaticResource DimBrush}" StrokeThickness="1.5"/>
+                            <Line Style="{StaticResource DimLine}" X1="86" Y1="140" X2="94" Y2="140"/>
+                            <Line Style="{StaticResource DimLine}" X1="90" Y1="136" X2="90" Y2="144"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="132" Text="Top probe (Z)"/>
+                        </Canvas>
+                    </Grid>
+                </Viewbox>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

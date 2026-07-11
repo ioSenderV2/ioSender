@@ -82,7 +82,7 @@
     <Compile Include="StreamPump.cs" />
     <Compile Include="LayoutModel.cs" />
     <Compile Include="LayoutSection.cs" />
-    <Compile Include="NamedPositionConfig.cs" />
+    <Compile Include="Fixture.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="ConfigPanel.cs" />
@@ -133,6 +133,9 @@
     <Compile Include="ProbeDefinition.cs" />
     <Compile Include="ProbeDefinitionEditDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="FixtureEditDialog.xaml.cs">
+      <DependentUpon>FixtureEditDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProbeMotionParamsDialog.xaml.cs">
       <DependentUpon>ProbeMotionParamsDialog.xaml</DependentUpon>
@@ -438,6 +441,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="RestorePointDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="FixtureEditDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
