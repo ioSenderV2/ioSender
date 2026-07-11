@@ -84,7 +84,7 @@ namespace CNC.Controls
             if (list is System.Collections.IEnumerable en)
                 AssignBlockNumbers(en);
             grdGCode.DataContext = list;
-            ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.IsFolderView ?? false));
+            ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.HasOutline ?? false));
             RefreshSourceHighlight();
         }
 
@@ -276,7 +276,7 @@ namespace CNC.Controls
             if (DataContext is GrblViewModel)
             {
                 (DataContext as GrblViewModel).PropertyChanged += GCodeListControl_PropertyChanged;
-                ApplyGrouping(_program == null && (DataContext as GrblViewModel).IsFolderView);
+                ApplyGrouping(_program == null && (DataContext as GrblViewModel).HasOutline);
             }
             RefreshSourceHighlight();
         }
@@ -313,8 +313,8 @@ namespace CNC.Controls
                         CenterExecutingLine();
                     break;
 
-                case nameof(GrblViewModel.IsFolderView):
-                    ApplyGrouping(_program == null && ((GrblViewModel)sender).IsFolderView);
+                case nameof(GrblViewModel.HasOutline):
+                    ApplyGrouping(_program == null && ((GrblViewModel)sender).HasOutline);
                     break;
 
                 case nameof(GrblViewModel.IsLoading):
@@ -473,7 +473,7 @@ namespace CNC.Controls
             // Re-establish modal state (distance/feed mode, plane, units) for a mid-program start.
             // Queued ahead of the toolpath via the streamed command queue, which is drained first
             // by SendNextLine and survives CycleStart's serial PurgeQueue.
-            foreach (var line in FusionFolderLoader.Prolog)
+            foreach (var line in GCodeJob.DefaultProlog)
                 GCode.File.Commands.Enqueue(line);
 
             model.StartFromBlock.Execute(startIndex);

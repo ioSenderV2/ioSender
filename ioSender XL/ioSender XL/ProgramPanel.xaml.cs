@@ -19,15 +19,12 @@ namespace GCode_Sender
         }
 
         // The title bar doubles as the file toolbar (menu overhaul): these mirror the old File-menu
-        // Load / Load Folder / Close items, which all route through the shared static GCode.File.
+        // Load / Close items, which route through the shared static GCode.File. Load Folder retired -
+        // the Fusion ioSenderBatchPost add-in now posts one already-combined file (with the same section
+        // markers/outline) instead of a folder of per-op files, so plain Load File covers it.
         private void LoadFile_Click(object sender, RoutedEventArgs e)
         {
             GCode.File.Open();
-        }
-
-        private void LoadFolder_Click(object sender, RoutedEventArgs e)
-        {
-            GCode.File.OpenFolder();
         }
 
         private void CloseFile_Click(object sender, RoutedEventArgs e)

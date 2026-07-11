@@ -102,7 +102,6 @@ namespace CNC.Controls
             cfg.AutoSaveGrblSettings = d.AutoSaveGrblSettings;
             cfg.PromptOnGrblSave = d.PromptOnGrblSave;
             cfg.SafeGotoZ = d.SafeGotoZ;
-            cfg.RestoreFusionRapids = d.RestoreFusionRapids;
 
             // Force the bound controls to re-read (covers any plain auto-properties that don't notify).
             var dc = DataContext;

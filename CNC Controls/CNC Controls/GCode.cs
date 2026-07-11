@@ -104,6 +104,12 @@ namespace CNC.Controls
             if (_transient)
                 return;   // a transient (tool-run) program never touches the shared Model or the simulator
 
+            // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File/Load
+            // Folder - this is the single point both funnel through (GCodeJob.FileChanged), so callers (e.g.
+            // touch-plate probing's edge-radius compensation, CarveView's 3D carve simulation) never need to
+            // re-scan the program themselves.
+            GCodeProgramComments.Refresh();
+
             if (Model != null)
             {
                 if (filename == "")
@@ -115,8 +121,7 @@ namespace CNC.Controls
                 }
 
                 Model.FileName = filename;
-                // Default the source path to the name; LoadFolder overrides it with the full folder path,
-                // and a single file's FileName already IS its full path. Generated programs have no path.
+                // A single file's FileName already IS its full path; generated programs have no path.
                 Model.ProgramPath = filename;
             }
 
@@ -291,7 +296,7 @@ namespace CNC.Controls
         {
             Program.CloseFile();
             if (Model != null)
-                Model.IsFolderView = false;
+                Model.HasOutline = false;
             Model.Blocks = Blocks;
         }
 
@@ -316,26 +321,6 @@ namespace CNC.Controls
                 Load(filename);
 
             Model.Blocks = Blocks;
-        }
-
-        // Load a folder of per-toolpath .nc files (named <seq>_<name>_T<tool>.nc, as produced
-        // by the SRWCommands Fusion add-in) and combine them, in memory, into one program shown
-        // as an expandable per-toolpath outline. See FusionFolderLoader for the combine rules.
-        public void OpenFolder()
-        {
-            // Modern folder picker (IFileOpenDialog with FOS_PICKFOLDERS) - same dialog family as
-            // File > Load, in folder-select mode, and it remembers the last-used location.
-            string folder = FolderPicker.Select("Select the folder of per-toolpath files (<seq>_<name>_T<tool>.nc)");
-
-            if (string.IsNullOrEmpty(folder))
-                return;
-
-            // When the App setting is on, always restore rapids without asking; otherwise prompt per load.
-            bool restoreRapids = AppConfig.Settings.Base.RestoreFusionRapids || AppDialogs.Show(
-                "Restore rapid moves that Fusion Personal Use downgraded to feed moves (G1 → G0)?",
-                "Load Folder", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
-
-            LoadFolder(folder, restoreRapids);
         }
 
         // Read + parse a (potentially huge) program on a background thread so the rest of the UI stays responsive,
@@ -388,115 +373,13 @@ namespace CNC.Controls
             }
         }
 
-        public void LoadFolder(string folder, bool restoreRapids)
-        {
-            if (Model != null && Model.IsLoading)
-                return;   // a background load is already in progress - ignore a re-entrant request
-
-            var ops = FusionFolderLoader.MatchFolder(folder);
-
-            if (ops.Count == 0)
-            {
-                AppDialogs.Show(LibStrings.FindResource("LfNoToolpathFiles"),
-                                "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
-
-            // Combine can be a big (multi-MB / 100k+ line) program - so read + parse on a background thread with
-            // incremental UI flush (see BackgroundLoad). Clear + reset on the UI thread first; use the folder's
-            // leaf name as the "filename" (not a real path, so the sender won't treat it as a reloadable file).
-            if (Model != null)
-                Model.IsFolderView = false;
-
-            Program.AddBlock(new DirectoryInfo(folder.TrimEnd('\\', '/')).Name, Core.Action.New);
-
-            // Match a normal file load: only prepend N<line> numbers when the user has enabled both controller
-            // line numbers and the "add line numbers" option.
-            Program.AddLineNumbers = GrblInfo.UseLinenumbers && AppConfig.Settings.Base.AddLineNumbers;
-
-            var toolTablePath = FusionFolderLoader.MatchToolTable(folder);
-
-            BackgroundLoad(() =>
-            {
-                // File prolog (also re-sent before a toolpath when starting a run partway through).
-                Program.BeginSection("Program start");
-                foreach (var line in FusionFolderLoader.Prolog)
-                    Program.AddBlock(line);
-
-                // Tool table (e.g. 0_tooltable.nc): loaded first, verbatim, so its (TOOL ...) comments reach
-                // the controller / simulator before the first tool change. Comments are preserved here (the
-                // per-op files below still get their headers stripped).
-                if (toolTablePath != null)
-                {
-                    try
-                    {
-                        var ttLines = FusionFolderLoader.ReadPreservingComments(System.IO.File.ReadAllText(toolTablePath));
-                        if (ttLines.Count > 0)
-                        {
-                            Program.BeginSection("Tool table");
-                            foreach (var line in ttLines)
-                                Program.AddBlock(line);
-                        }
-                    }
-                    catch { }
-                }
-
-                foreach (var op in ops)
-                {
-                    string content;
-                    try
-                    {
-                        content = System.IO.File.ReadAllText(op.FilePath);
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-
-                    if (restoreRapids)
-                    {
-                        int n;
-                        content = FusionFolderLoader.RestoreRapids(content, out n);
-                        op.RapidsRestored = n;
-                    }
-
-                    op.Body = FusionFolderLoader.StripWrappers(content);
-
-                    Program.BeginSection(op.Section);
-                    Program.AddBlock("G53 G0 Z0");          // machine-coord safe-Z retract before the tool change
-                    // Only insert a tool change if the posted file doesn't already have one
-                    // (e.g. grbl.cps omits M6, but an M6-emitting post includes it - avoid doubling).
-                    if (!FusionFolderLoader.ContainsToolChange(op.Body))
-                        Program.AddBlock("M6 T" + op.Tool); // M0 swap-pause is handled by the controller's tc.macro
-                    foreach (var line in op.Body)
-                        Program.AddBlock(line);
-                }
-
-                Program.BeginSection("Program end");
-                Program.AddBlock("M5");
-                Program.AddBlock("M30");
-
-                Program.ComputeLimits();                    // bounding box on the worker thread
-            },
-            () =>
-            {
-                Program.RaiseFileChanged();                 // FileName + limits (sets ProgramPath = leaf name)
-                if (Model != null)
-                {
-                    Model.IsFolderView = true;
-                    Model.Blocks = Blocks;
-                    Model.ProgramPath = folder;             // override with the full folder path for the tooltip
-                }
-            });
-        }
-
         public void Load(string filename)
         {
             if (Model != null && Model.IsLoading)
                 return;   // a background load is already in progress - ignore a re-entrant request
 
             if (Model != null)
-                Model.IsFolderView = false;
+                Model.HasOutline = false;
 
             foreach (var converter in Converters)
             {
@@ -529,6 +412,10 @@ namespace CNC.Controls
                 if (ok[0])
                 {
                     Program.RaiseFileChanged();
+                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers the same way
+                    // Load Folder's stitching does (GCodeJob.ParseFileLines calls BeginSection on a match) -
+                    // an ordinary file with no such markers leaves this false, same as before.
+                    Model.HasOutline = Program.HasSections;
                     Model.Blocks = Blocks;
                 }
                 else

@@ -51,7 +51,6 @@
     <system:String x:Uid="str_valHomingCancel" x:Key="ValHomingCancelled">Homing did not complete - validation cancelled.</system:String>
     <system:String x:Uid="str_valNoCheckMode" x:Key="ValNoCheckMode">The controller did not enter check mode ($C) - validation aborted.</system:String>
     <system:String x:Uid="str_valSetupRejected" x:Key="ValSetupRejected">The controller rejected a basic set-up command - validation aborted.</system:String>
-    <system:String x:Uid="str_lfNoToolpaths" x:Key="LfNoToolpathFiles">No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.</system:String>
     <!-- Top-level tab labels (built in code by ioSender XL's RegisterBuiltinTabs). -->
     <system:String x:Uid="str_tabJob" x:Key="TabJob">Job</system:String>
     <system:String x:Uid="str_tabStartJob" x:Key="TabStartJob">Start Job</system:String>

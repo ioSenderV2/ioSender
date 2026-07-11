@@ -44,6 +44,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media.Media3D;
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CNC.GCode;
 
 namespace CNC.Core
@@ -134,6 +135,31 @@ namespace CNC.Core
     {
         uint LineNumber = 1;
 
+        // Section-marker comment the Fusion ioSenderBatchPost add-in emits between operations in its combined
+        // output - "(--- 2: FinishBottom (T2) ---)" - captures the inner text verbatim as the section name
+        // (matches FolderToolpath.Section's "{seq}: {name} (T{tool})" format exactly, since that's what the
+        // add-in wraps). Recognized during a plain Load File parse, not just Load Folder's stitching.
+        private static readonly Regex rxSectionMarker = new Regex(@"^\(---\s*(.+?)\s*---\)$");
+
+        // Neutralise interior parens in a comment line so it survives as ONE well-formed comment regardless of
+        // what's inside it (grblHAL-style parsers end a comment at the first ')'). Keeps the outer ( and last )
+        // intact; only content strictly between them is affected. Same idiom as StartJobView's SanitizeParens,
+        // applied here on the READ side (incoming files) rather than when generating NGC.
+        private static string SanitizeCommentParens(string s)
+        {
+            int open = s.IndexOf('(');
+            int close = s.LastIndexOf(')');
+            if (open < 0 || close <= open + 1)
+                return s;
+
+            var sb = new System.Text.StringBuilder(s.Length);
+            sb.Append(s, 0, open + 1);
+            for (int i = open + 1; i < close; i++)
+                sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
+            sb.Append(s, close, s.Length - close);
+            return sb.ToString();
+        }
+
         private string filename = string.Empty;
         public ObservableCollection<GCodeBlock> blocks = new ObservableCollection<GCodeBlock>();
 
@@ -166,10 +192,20 @@ namespace CNC.Core
         public string CurrentSection { get; set; }
         private bool sectionStartPending = false;
 
+        // True once BeginSection() has been called at least once since the last Reset() - i.e. this program
+        // has an outline to show (GrblViewModel.HasOutline), regardless of whether it came from Load Folder's
+        // stitching or Load File recognizing the Fusion add-in's (--- seq: name (Tn) ---) section markers.
+        public bool HasSections { get; private set; }
+
+        // Modal state (distance/feed mode, plane, units) to replay when starting mid-program from an
+        // outline section, since a "Start from this toolpath" run skips whatever set that state earlier.
+        public static readonly string[] DefaultProlog = { "G90 G94", "G17", "G21" };
+
         public void BeginSection(string name)
         {
             CurrentSection = name;
             sectionStartPending = true;
+            HasSections = true;
         }
 
         // Whether AddBlock prepends N<line> numbers (when GrblInfo.UseLinenumbers is also set).
@@ -223,6 +259,15 @@ namespace CNC.Core
                 try
                 {
                     block = block.Trim();
+
+                    // A comment may itself contain parens (e.g. the Fusion add-in's malformed, pre-fix
+                    // (--- seq: name (Tn) ---) section markers) - grblHAL-style parsers end a comment at the
+                    // FIRST ')', so a nested one leaves garbage behind that fails as G-code. Neutralise interior
+                    // parens ( -> [, ) -> ] ) so a single well-formed comment survives regardless of what's
+                    // inside it; a no-op for ordinary comments (STOCK/TOOL lines have no interior parens).
+                    if (block.Length > 1 && block[0] == '(')
+                        block = SanitizeCommentParens(block);
+
                     if (Parser.ParseBlock(ref block, false, out ln, out isComment))
                     {
                         if (ln > 0)
@@ -237,14 +282,24 @@ namespace CNC.Core
                         } else
                             LineNumber++;
 
-                        Emit(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
+                        // Recognize the Fusion add-in's (--- seq: name (Tn) ---) section-marker comments so a
+                        // plain Load File builds the same outline Load Folder's stitching produces - AddStamped
+                        // (not Emit) is what actually attaches Section/IsSectionStart to the block.
+                        if (isComment)
+                        {
+                            var sm = rxSectionMarker.Match(block);
+                            if (sm.Success)
+                                BeginSection(sm.Groups[1].Value);
+                        }
+
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
                             LineNumber++;
                             if (addLineNumber)
                                 block = "N" + (LineNumber).ToString() + block;
-                            Emit(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
+                            AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                         }
                     }
                     block = sr.ReadLine();
@@ -428,6 +483,7 @@ namespace CNC.Core
             HeightMapApplied = false;
             CurrentSection = null;
             sectionStartPending = false;
+            HasSections = false;
             AddLineNumbers = true;
             Parser.Reset();
         }

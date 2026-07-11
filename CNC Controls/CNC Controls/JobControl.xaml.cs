@@ -410,13 +410,9 @@ namespace CNC.Controls
                         job.PgmEndLine = Source.Blocks - 1;
                         if ((sender as GrblViewModel).IsPhysicalFileLoaded)
                         {
-                            if (Source.ToolChanges > 0)
-                            {
-                                if (!GrblSettings.HasSetting(grblHALSetting.ToolChangeMode))
-                                    AppDialogs.Show(string.Format((string)FindResource("JobToolChanges"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                                else if (GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) > 0 && !model.IsTloReferenceSet)
-                                    AppDialogs.Show(string.Format((string)FindResource("JobToolReference"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            }
+                            if (Source.ToolChanges > 0 && GrblSettings.HasSetting(grblHALSetting.ToolChangeMode)
+                                && GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) > 0 && !model.IsTloReferenceSet)
+                                AppDialogs.Show(string.Format((string)FindResource("JobToolReference"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                             if (Source.HasGoPredefinedPosition && (sender as GrblViewModel).IsGrblHAL && (sender as GrblViewModel).HomedState != HomedState.Homed)
                                 AppDialogs.Show((string)FindResource("JobG28G30"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                             streamingHandler.Call(Source.IsLoaded ? StreamingState.Idle : StreamingState.NoFile, false);

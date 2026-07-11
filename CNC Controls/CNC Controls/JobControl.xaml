@@ -8,7 +8,6 @@
              mc:Ignorable="d" 
              d:DesignHeight="36" d:DesignWidth="400">
     <UserControl.Resources>
-        <system:String x:Uid="str_toolchanges" x:Key="JobToolChanges">Job has {0} tool change(s) using M6, only a few Grbl ports supports that.</system:String>
         <system:String x:Uid="str_toolchangeTLO" x:Key="JobToolReference">Job has {0} tool change(s), tool length reference should be established before start.</system:String>
         <system:String x:Uid="str_g28g30" x:Key="JobG28G30">Job has G28/G30 moves and machine is not homed.</system:String>
         <system:String x:Uid="str_stop" x:Key="JobStop">Stop</system:String>
