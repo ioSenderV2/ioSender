@@ -48,6 +48,7 @@ namespace CNC.Controls.DragKnife
         public DragKnifeDialog(DragKnifeViewModel model)
         {
             InitializeComponent();
+            CNC.Controls.DialogScaling.Apply(this);
 
             DataContext = model;
         }

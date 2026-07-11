@@ -22,6 +22,7 @@ namespace CNC.Controls
         public ProbeDefinitionsDialog(ObservableCollection<ProbeDefinition> definitions)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
             items = definitions;
             grd.ItemsSource = items;
             if (items.Count > 0)

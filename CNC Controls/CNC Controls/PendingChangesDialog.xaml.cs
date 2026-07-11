@@ -16,6 +16,7 @@ namespace CNC.Controls
         public PendingChangesDialog(IEnumerable changes)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
             grd.ItemsSource = changes;
         }
 

@@ -54,6 +54,7 @@ namespace CNC.Controls
         public GCodeWrapDialog(GCodeWrapViewModel model)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
 
             DataContext = model;
         }

@@ -55,6 +55,7 @@ namespace CNC.Controls
         public PortDialog()
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
 
             DataContext = prop = new PortProperties();
         }

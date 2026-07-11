@@ -53,6 +53,7 @@ namespace CNC.Converters
         public JobParametersDialog(JobParametersViewModel model)
         {
             InitializeComponent();
+            CNC.Controls.DialogScaling.Apply(this);
 
             DataContext = model;
 

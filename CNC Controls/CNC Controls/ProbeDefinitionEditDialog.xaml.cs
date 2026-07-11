@@ -19,6 +19,7 @@ namespace CNC.Controls
         public ProbeDefinitionEditDialog(ProbeDefinition definition)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
             DataContext = definition;
 
             loading = true;

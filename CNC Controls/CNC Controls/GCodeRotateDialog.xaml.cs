@@ -53,6 +53,7 @@ namespace CNC.Controls
         public GCodeRotateDialog(GCodeRotateViewModel model)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
 
             DataContext = model;
         }

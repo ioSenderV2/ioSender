@@ -15,6 +15,7 @@ namespace CNC.Controls
         public ProbeMotionParamsDialog(ProbeDefinition definition)
         {
             InitializeComponent();
+            DialogScaling.Apply(this);
             DataContext = definition;
 
             var type = definition.ProbeType;
