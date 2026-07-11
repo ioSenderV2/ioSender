@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -45,6 +46,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Microsoft.Win32;
 using CNC.Core;
 using CNC.GCode;
 
@@ -528,13 +530,15 @@ namespace CNC.Controls
             }
         }
 
-        // Enable Save only when a program is actually loaded (the shared static GCode.File). Runs each time
-        // the menu opens so it tracks load/close without a per-instance binding on the loaded state. Also
-        // (re)builds the Transform submenu from the registered transformers - built fresh here rather than
-        // sharing the single UIViewModel MenuItem set, which cannot be a child of multiple context menus.
+        // Enable Save when either the loaded job (the shared static GCode.File) or this view's OWN program
+        // (_program - a wizard's Generate output, e.g. Start Job) has content. Runs each time the menu opens
+        // so it tracks load/close without a per-instance binding on the loaded state. Also (re)builds the
+        // Transform submenu from the registered transformers - built fresh here rather than sharing the single
+        // UIViewModel MenuItem set, which cannot be a child of multiple context menus. Transform only applies
+        // to the loaded job - a wizard's generated program has no transformer pipeline.
         private void ctxMenu_Opened(object sender, RoutedEventArgs e)
         {
-            mnuSaveProgram.IsEnabled = GCode.File.IsLoaded;
+            mnuSaveProgram.IsEnabled = _program != null ? _program.Count > 0 : GCode.File.IsLoaded;
 
             mnuTransform.Items.Clear();
             var names = GCode.File.TransformerNames;
@@ -554,7 +558,33 @@ namespace CNC.Controls
 
         private void SaveProgram_Click(object sender, RoutedEventArgs e)
         {
-            GCode.File.Save();
+            if (_program != null)
+                SaveOwnProgram();
+            else
+                GCode.File.Save();
+        }
+
+        // Save this view's OWN program (a wizard's Generate output) to a file the operator picks - mirrors
+        // GCode.File.Save() but writes _program instead of the loaded job, since a wizard-generated program
+        // (e.g. Start Job) is never itself the loaded job.
+        private void SaveOwnProgram()
+        {
+            var saveDialog = new SaveFileDialog { Filter = "GCode file (*.nc)|*.nc", AddExtension = true, DefaultExt = ".nc" };
+
+            if (saveDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    using (var stream = new StreamWriter(saveDialog.FileName))
+                    {
+                        foreach (var line in _program)
+                            stream.WriteLine(line.Data);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+            }
         }
     }
 
