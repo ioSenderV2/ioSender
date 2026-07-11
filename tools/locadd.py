@@ -59,6 +59,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/PanelFlyout.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PendingChangesDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/FixtureEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ProbeDefinitionsDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ProbeMotionParamsDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/SignalsControl.xaml', 'CNC.Controls.WPF'),

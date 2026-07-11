@@ -303,7 +303,6 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_themeDark:System.String.$
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_themeDefault:System.String.$Content,None,True,True,,Default
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_themeLight:System.String.$Content,None,True,True,,Light
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_themeWhite:System.String.$Content,None,True,True,,White
-CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_toolchanges:System.String.$Content,None,True,True,,"Job has {0} tool change(s) using M6, only a few Grbl ports supports that."
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_toolchangeTLO:System.String.$Content,None,True,True,,"Job has {0} tool change(s), tool length reference should be established before start."
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,str_transferAborted:System.String.$Content,None,True,True,,Transfer aborted.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_transferComplete:System.String.$Content,None,True,True,,Transfer complete
@@ -585,7 +584,6 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_scNoAxisRes:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_lfNoToolpaths:System.String.$Content,None,True,True,,No per-toolpath files matching &lt;seq&gt;_&lt;name&gt;_T&lt;tool&gt;.nc were found in the selected folder.
 CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
 CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
@@ -755,7 +753,6 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,fld_searchSetting:Syst
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_copyToSim:System.Windows.Controls.ContentControl.Content,Button,True,True,,Copy to simulator
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_copyToSim:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile, so a later simulator connection matches this machine."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_autoSaveGrblSettings:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"When leaving the Grbl settings tab with unsaved changes, write them to the controller automatically instead of prompting. Off by default - these are controller ($) settings that change machine behaviour."
-CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_restoreFusionRapids:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Fusion 360 Personal Edition downgrades rapid (G0) retracts/repositions to feed moves (G1). When enabled, Load Folder always converts them back to rapids without asking each time (also applies to a --LoadFolder startup load)."
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchPrev:System.Windows.Controls.ContentControl.Content,Button,True,True,,▲
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchPrev:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Previous match (F4)
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchNext:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
@@ -900,3 +897,65 @@ CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_macrosTitle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Macros
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.Controls.TextBlock.Text,Text,True,True,,UI scale
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_fixtures:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Fixture definitions
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fixturesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,Define the fixture types used to reference stock on this machine - origin corner and the probe offsets pcorner.macro uses. Prepopulated with common fixture shapes; only types marked Implemented currently generate working g-code.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fxPosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Fixture positions: saved machine-coordinate reference points (the G28-style start point the corner probe reads from). Jog to the position, pick a type and a name, then Set. Also settable from the Start Job tab."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txtFxInstName:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Name for the fixture position captured at the current machine position.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btnFxInstSet:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btnFxInstSet:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store the current machine position as this fixture position.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btnFxInstDelete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_name:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_origin:System.Windows.Controls.ContentControl.Content,Label,True,True,,Origin corner:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,chkProbesSpoil:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probes spoilboard (establishes a floor reference)
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoilx:CNC.Controls.NumericField.Label,None,False,True,,Spoil probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoilx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoilx:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, along the corner's stock-interior X direction, to probe the spoilboard."
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoily:CNC.Controls.NumericField.Label,None,False,True,,Spoil probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoily:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_spoily:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, along the corner's stock-interior Y direction, to probe the spoilboard."
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topx:CNC.Controls.NumericField.Label,None,False,True,,Top probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topx:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, into the stock, to probe the stock top (every fixture type probes Z)."
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topy:CNC.Controls.NumericField.Label,None,False,True,,Top probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topy:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_topy:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, into the stock, to probe the stock top (every fixture type probes Z)."
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,chkProbesEdge:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probes X/Y edges (unchecked = origin is a known position)
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgex:CNC.Controls.NumericField.Label,None,False,True,,Edge probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgex:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgex:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Offset from the reference to start the X-face edge probe.
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgey:CNC.Controls.NumericField.Label,None,False,True,,Edge probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgey:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_edgey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Offset from the reference to start the Y-face edge probe.
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,fxd_picture:System.Windows.Controls.ContentControl.Content,Label,True,True,,Picture:
+CNC.Controls.WPF.g.en-US.resources:fixturetypeeditdialog.baml,btnFxBrowse:System.Windows.Controls.ContentControl.Content,Button,True,True,,Browse…
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_setpos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set position
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_setpos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store the current machine position as the selected fixture's reference start point.
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_name:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_kind:System.Windows.Controls.ContentControl.Content,Label,True,True,,Type:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoilx:CNC.Controls.NumericField.Label,None,False,True,,Spoil probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoilx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoilx:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, along the corner's stock-interior X direction, to probe the spoilboard."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoily:CNC.Controls.NumericField.Label,None,False,True,,Spoil probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoily:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_spoily:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, along the corner's stock-interior Y direction, to probe the spoilboard."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topx:CNC.Controls.NumericField.Label,None,False,True,,Top probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topx:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topy:CNC.Controls.NumericField.Label,None,False,True,,Top probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topy:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_topy:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgex:CNC.Controls.NumericField.Label,None,False,True,,Edge probe offset X:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgex:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgex:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Offset from the reference to start the X-face edge probe.
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgey:CNC.Controls.NumericField.Label,None,False,True,,Edge probe offset Y:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgey:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_edgey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Offset from the reference to start the Y-face edge probe.
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_picture:System.Windows.Controls.ContentControl.Content,Label,True,True,,Picture:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxBrowse:System.Windows.Controls.ContentControl.Content,Button,True,True,,Browse…
