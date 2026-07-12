@@ -529,10 +529,11 @@ namespace GCode_Sender
 
             Point ctr = new Point((P(1).X + P(2).X + P(3).X + P(4).X) / 4d, (P(1).Y + P(2).Y + P(3).Y + P(4).Y) / 4d);
 
-            // Vise: draw the fixed jaw (at the probed corner, BL = local (0, eh)) and the moving jaw (MaxOpening
-            // mm away, toward the front) using the fixture's real JawWidth/MaxOpening - both bars start EXACTLY
-            // at local X=0 (no overhang), so the fixed jaw's own corner lands precisely on the origin dot below
-            // instead of being inset from it.
+            // Vise: fixed jaw at the probed corner (BL = local (0, eh)); moving jaw drawn adjacent to the
+            // stock's front edge - where it actually clamps THIS stock, not the theoretical max-open position.
+            // Both bars start EXACTLY at local X=0 (no overhang), so the fixed jaw's own corner lands precisely
+            // on the origin dot below instead of being inset from it. A separate dashed line marks where the
+            // moving jaw would sit fully open (MaxOpening) - red if the entered stock height won't fit inside it.
             if (isVise)
             {
                 const double jawBar = 14d;   // fixed visual depth (px) - not a tracked dimension
@@ -546,11 +547,36 @@ namespace GCode_Sender
                 Canvas.SetTop(fixedJaw, fixedFace0.Y - jawBar);
                 canvas.Children.Add(fixedJaw);
 
-                Point movFace0 = P2(0d, eh - openingMm), movFace1 = P2(jawWidthMm, eh - openingMm);
+                Point movFace0 = P2(0d, 0d), movFace1 = P2(jawWidthMm, 0d);
                 var movingJaw = new System.Windows.Shapes.Rectangle { Width = Math.Abs(movFace1.X - movFace0.X), Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
                 Canvas.SetLeft(movingJaw, Math.Min(movFace0.X, movFace1.X));
                 Canvas.SetTop(movingJaw, movFace0.Y);
                 canvas.Children.Add(movingJaw);
+
+                if (SelectedFixture.MaxOpening > 0d)
+                {
+                    bool tooTall = eh > openingMm;
+                    var openBrush = tooTall ? Brushes.Red : Brushes.DimGray;
+                    Point openL = P2(0d, eh - openingMm), openR = P2(jawWidthMm, eh - openingMm);
+                    var openLine = new System.Windows.Shapes.Line
+                    {
+                        X1 = openL.X, Y1 = openL.Y, X2 = openR.X, Y2 = openR.Y,
+                        Stroke = openBrush,
+                        StrokeThickness = tooTall ? 2d : 1.5d,
+                        StrokeDashArray = new DoubleCollection(new[] { 4d, 3d })
+                    };
+                    canvas.Children.Add(openLine);
+
+                    var openLbl = new TextBlock
+                    {
+                        Text = string.Format(CultureInfo.InvariantCulture, "max opening {0:0.#} mm", openingMm),
+                        FontSize = 11d, Foreground = openBrush, Background = Brushes.White, Padding = new Thickness(2d, 0d, 2d, 0d)
+                    };
+                    openLbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    Canvas.SetLeft(openLbl, Math.Min(openL.X, openR.X));
+                    Canvas.SetTop(openLbl, openL.Y - openLbl.DesiredSize.Height - 2d);
+                    canvas.Children.Add(openLbl);
+                }
             }
 
             // origin corner marker: red dot only. Every edge-probing kind (Corner Fence etc.) always
