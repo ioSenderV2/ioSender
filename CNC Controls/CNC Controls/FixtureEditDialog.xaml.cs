@@ -34,8 +34,12 @@ namespace CNC.Controls
             DataContext = fixture;
             this.model = model;
 
+            rbFxProbe3d.Checked += (s, e) => UpdateProbeCircleLabel();
+            rbFxProbeTouch.Checked += (s, e) => UpdateProbeCircleLabel();
+
             SelectKind(fixture.Kind);
             UpdateFieldVisibility(fixture.Kind);
+            UpdateFxProbeWarning();
             UpdateProbeCircleLabel();
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
@@ -50,6 +54,27 @@ namespace CNC.Controls
             btnTestPosition.IsEnabled = !_probing && fx != null && fx.HasPosition && FixtureKinds.ProbesSpoilboard(fx.Kind);
         }
 
+        // Vise-only probe picker (jaw metal is always conductive - Touch Plate needs no thickness offset here,
+        // unlike Start Job's stock, which may or may not be conductive). Touch Plate is only selectable when a
+        // touch-plate probe is actually defined - falls back to 3D Probe if the definition disappears while it
+        // was selected, same rule StartJobView.UpdateProbeWarning follows.
+        private void UpdateFxProbeWarning()
+        {
+            bool touchAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.TouchPlate);
+            rbFxProbeTouch.IsEnabled = touchAvailable;
+            if (!touchAvailable && rbFxProbeTouch.IsChecked == true)
+                rbFxProbe3d.IsChecked = true;
+        }
+
+        // The probe definition Set/Test position should actually use, per the Probe: radio selection (vise
+        // only - other kinds don't run a probe at Set time and always use the 3D probe for Test position).
+        private ProbeDefinition FixtureActiveProbe()
+        {
+            return rbFxProbeTouch.IsChecked == true
+                ? ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate)
+                : ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+        }
+
         // Disable both position buttons while a vise corner probe is running (it moves the machine
         // asynchronously - see RunViseCornerProbe) so a second click can't overlap it.
         private void SetBusy(bool busy)
@@ -59,12 +84,13 @@ namespace CNC.Controls
             UpdateTestPositionEnabled();
         }
 
-        // The clearance circle in the corner-style schematic is sized to the current 3D probe's body diameter
-        // (the physical constraint - see FixtureEditDialog.xaml.cs class comment). Labelled once at dialog-open
-        // since the probe library rarely changes mid-edit; "no 3D probe defined yet" falls back to a generic hint.
+        // The clearance circle in the schematic is sized to the ACTIVE probe's body diameter (the physical
+        // constraint - see FixtureEditDialog.xaml.cs class comment). Re-labelled whenever the vise-only Probe:
+        // selection changes (see the Checked handlers wired in the constructor); "no probe defined yet" falls
+        // back to a generic hint.
         private void UpdateProbeCircleLabel()
         {
-            var probe = ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+            var probe = FixtureActiveProbe();
             txtProbeCircle.Text = probe != null
                 ? string.Format("~{0:0.#} mm", probe.BodyDiameter)
                 : "probe diameter";
@@ -95,6 +121,14 @@ namespace CNC.Controls
 
             if (fx.Kind == FixtureKind.MachinistVise)
             {
+                // Set position probes the FIXED JAW's own corner (a one-time fixture calibration, independent
+                // of any job's stock) - if stock is still clamped in the vise it sits right where the jog
+                // reference/probe search expects bare jaw, so the probe finds the stock's own top instead and
+                // silently saves a wrong reference (every later Start Job run then measures from the wrong
+                // point). Confirmed by the user hitting exactly this on real hardware - the vise must be EMPTY.
+                if (AppDialogs.Show("Set position probes the vise's own fixed-jaw corner - not the stock. The vise must be EMPTY (no stock clamped), or the probe may find the stock instead of the jaw and save a wrong reference. Is the vise empty?",
+                        "Set position", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
                 RunViseCornerProbe(fx, coords);
                 return;
             }
@@ -137,10 +171,12 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            var probe = ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+            var probe = FixtureActiveProbe();
             if (probe == null)
             {
-                model.Message = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                model.Message = rbFxProbeTouch.IsChecked == true
+                    ? "Define a touch plate probe first (Machine Setup > Probe definitions)."
+                    : "Define a 3D probe first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -153,7 +189,7 @@ namespace CNC.Controls
             // rapid straight to the exact probed surface (what Test position, and any future Start Job use,
             // does first) would plunge onto solid jaw metal. Matches the "~10 mm above" convention every other
             // kind's Coords already uses.
-            const double zMargin = 8d;
+            const double zMargin = FixtureKinds.VisePositionMarginMm;
 
             var b = new StringBuilder();
             b.AppendLine("(Set position - vise: probe the fixed jaw's front-left corner via pvisecorner.macro)");
@@ -260,10 +296,12 @@ namespace CNC.Controls
             if (fx == null || !fx.HasPosition || model == null)
                 return;
 
-            var probe = ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+            var probe = FixtureActiveProbe();
             if (probe == null)
             {
-                model.Message = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                model.Message = rbFxProbeTouch.IsChecked == true
+                    ? "Define a touch plate probe first (Machine Setup > Probe definitions)."
+                    : "Define a 3D probe first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -356,10 +394,12 @@ namespace CNC.Controls
             Show(drwCornerStyle, edges);
             Show(drwKnownPosition, !edges);
 
-            // Jaw width/Max opening are vise-only - drawing dimensions, meaningless for an edge-probing kind.
+            // Jaw width/Max opening/probe picker are vise-only - drawing dimensions and probe choice,
+            // meaningless for an edge-probing kind (its Set position is a raw jog-capture, no probe run).
             bool isVise = kind == FixtureKind.MachinistVise;
             Show(fldJawWidth, isVise);
             Show(fldMaxOpening, isVise);
+            Show(pnlFxProbeType, isVise);
 
             txtNotImplemented.Visibility = FixtureKinds.Implemented(kind) ? Visibility.Collapsed : Visibility.Visible;
         }

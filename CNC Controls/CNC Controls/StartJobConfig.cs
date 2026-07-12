@@ -31,7 +31,10 @@ namespace CNC.Controls
         // program that runs after. Opt in only on firmware with the rotation transform fixed.
         public bool ApplyRotation = false;   // set the WCS rotation from the measured skew (G10 L2 R)
         public bool SetTloRef = false;        // reference the puck TLO after corner 1 (Load Stock == start_job)
-        public string Probe = string.Empty;
+        // A touch plate probes by electrical continuity with the stock, so it only works on conductive
+        // material (metal). Gates the Probe selection below - unchecked forces "ThreeDProbe".
+        public bool StockConductive = false;
+        public string Probe = "ThreeDProbe";   // "ThreeDProbe" or "TouchPlate" (UI selection only - not yet wired into BuildProgram)
         public string Fixture = string.Empty;   // selected fixture's Name (Machine Setup > Fixture definitions)
         // Display-only preference: Width/Height/Thickness/SpacerThickness above are ALWAYS persisted in mm
         // (everything downstream - BuildProgram, the drawing, warnings - assumes mm) regardless of this flag;

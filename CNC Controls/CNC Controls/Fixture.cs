@@ -63,6 +63,13 @@ namespace CNC.Controls
         // kind), so the same search works unchanged - re-probing the jaw's own top, not the stock's.
         public static bool ProbesSpoilboard(FixtureKind k) { return true; }
 
+        // Whether Start Job's Measure checkbox has ANYTHING to offer for this kind. Edge-probing kinds get the
+        // full 4-corner measure (ProbesEdges). MachinistVise gets a PARTIAL measure (StartJobView.
+        // BuildViseProgram's own measure block) - corners 2/4 face-probed, 1/3 Z-only, no skew - since its
+        // origin corner is already known exactly, not itself probed. Distinct from ProbesEdges: a vise never
+        // probes its OWN origin corner, but it CAN still offer Measure.
+        public static bool CanMeasure(FixtureKind k) { return ProbesEdges(k) || k == FixtureKind.MachinistVise; }
+
         public static FixtureOriginCorner OriginCorner(FixtureKind k)
         {
             return k == FixtureKind.MachinistVise ? FixtureOriginCorner.Inside : FixtureOriginCorner.Outside;
@@ -72,6 +79,13 @@ namespace CNC.Controls
         // (BuildProgram) and Machinist Vise (BuildViseProgram, StartJobView.xaml.cs) are wired; Dog-hole/grid
         // corner and Vacuum table zero-corner are still defined but not wired to a working macro.
         public static bool Implemented(FixtureKind k) { return k == FixtureKind.CornerFence || k == FixtureKind.MachinistVise; }
+
+        // A vise fixture's saved Coords.Z sits this many mm ABOVE the actual probed jaw top (FixtureEditDialog.
+        // RunViseCornerProbe stores the resolved corner + this margin, not the literal touched height - a bare
+        // rapid straight to the exact probed surface would plunge onto solid jaw metal). Anything computing a
+        // safe height FROM the jaw's true top (not the saved reference) must back this out first - see
+        // StartJobView.BuildViseProgram.
+        public const double VisePositionMarginMm = 8d;
     }
 
     public class Fixture : INotifyPropertyChanged

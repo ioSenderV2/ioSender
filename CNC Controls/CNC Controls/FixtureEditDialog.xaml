@@ -66,6 +66,15 @@
                             ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
                 </StackPanel>
 
+                <!-- Vise-only: the jaw is bare metal, always conductive - Touch Plate probes it directly (no
+                     separate plate object, no thickness offset needed - see FixtureActiveProbe). -->
+                <StackPanel x:Name="pnlFxProbeType" Orientation="Horizontal" Margin="0,8,0,2" Visibility="Collapsed">
+                    <Label x:Uid="fxd_lblProbe" Content="Probe:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                    <RadioButton x:Uid="fxd_rbProbe3d" x:Name="rbFxProbe3d" Content="3D Probe" GroupName="FxProbeType" IsChecked="True" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    <RadioButton x:Uid="fxd_rbProbeTouch" x:Name="rbFxProbeTouch" Content="Touch Plate" GroupName="FxProbeType" VerticalAlignment="Center" Margin="14,0,0,0"
+                                 ToolTip="The jaw is bare metal (always conductive) - probes by electrical continuity, same physical probe input as the 3D probe."/>
+                </StackPanel>
+
                 <!-- Vise-only: drawing-only dimensions (Start Job's stock drawing + this dialog's own schematic
                      could use them too) - pvisecorner.macro doesn't read either, it finds the jaw corner by
                      probing, not by knowing the jaw's extent. -->
@@ -123,7 +132,7 @@
                              at the front. -->
                         <Canvas x:Name="drwKnownPosition" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
-                                       Text="Jog the probe tip inside the circle (over the fixed jaw, near its front-left corner) AND within ~10 mm above the jaw top, then click Set position."/>
+                                       Text="VISE MUST BE EMPTY (no stock clamped). Jog the probe tip inside the circle (over the fixed jaw, near its front-left corner) AND within ~10 mm above the jaw top, then click Set position."/>
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="40" Canvas.Top="64" Text="~10 mm dia."/>
                             <!-- fixed jaw (back, along X) -->
                             <Rectangle Canvas.Left="45" Canvas.Top="95" Width="130" Height="22" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>

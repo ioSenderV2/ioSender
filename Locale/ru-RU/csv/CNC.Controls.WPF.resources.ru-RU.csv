@@ -1101,3 +1101,7 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:System.Wi
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:CNC.Controls.NumericField.Label,None,False,True,,Max opening:
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum distance the moving jaw can travel from the fixed jaw - used only to draw the vise's true throat in Start Job. 0 = not set.
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_lblProbe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbe3d:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,3D Probe
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbeTouch:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Touch Plate
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbeTouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The jaw is bare metal (always conductive) - probes by electrical continuity, same physical probe input as the 3D probe."

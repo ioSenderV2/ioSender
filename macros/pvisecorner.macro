@@ -39,9 +39,9 @@ O<pvisecorner> SUB
   (PRINT, PV ENTER rx=#<rx> ry=#<ry> rz=#<rz> rad=#<rad> clear=#<_lv_clear>)
 
   ; ================= jaw top Z, probed directly at the reference (already over the jaw) =================
-  G53 G1 F1000 Z0
-  G53 G1 F1000 X[#<rx>] Y[#<ry>]
-  G53 G1 F1000 Z[#<rz>]
+  G53 G0 Z0                    ; rapid - Z0 is the machine top, always clear
+  G53 G0 X[#<rx>] Y[#<ry>]     ; rapid - travelling AT Z0
+  G53 G1 F1000 Z[#<rz>]        ; controlled - descending toward the (unverified) jogged reference, near the jaw
   ; SAFETY: cap the search 12 mm below the reference, same reasoning as pcorner.macro's spoilboard/top probes -
   ; a dead/mis-wired probe alarms near the jaw instead of ploughing on.
   G38.2 Z[#<rz> - 12] F[#<_lv_searchf>]
@@ -61,9 +61,10 @@ O<pvisecorner> SUB
   ; ================= X face (jaw's left end) =================
   ; Back off OUTWARD (left, -X) from the reference by #<_lv_clear> - clear of the jaw - then descend and seek
   ; back INWARD (+X) to find the face. Mirror image of pcorner's X-face section.
-  G53 G1 F1000 Z[#<_safe_z>]
-  G53 G1 F1000 X[#<rx> - #<_lv_clear>] Y[#<ry>]
-  G53 G1 F1000 Z[#<_start_z>]
+  G53 G0 Z[#<_safe_z>]                            ; rapid - VERIFIED height, just probed
+  G53 G0 X[#<rx> - #<_lv_clear>] Y[#<ry>]         ; rapid - travelling AT that height
+  G53 G0 Z[#<_top_z> + 12]                        ; rapid down to within 12mm of the KNOWN top (just probed) - controlled feed only takes over for the final approach
+  G53 G1 F1000 Z[#<_start_z>]                     ; controlled - final descent to the face-probe depth
   G38.2 X[#<rx> + 20] F[#<_lv_searchf>]           ; coarse seek back toward/past the reference
   #<x_c1> = #5061
   G1 X[#<x_c1> - 4] F1000                         ; back off so the deflecting ball releases before the slow re-probe
@@ -76,9 +77,10 @@ O<pvisecorner> SUB
   ; ================= Y face (jaw's clamping face, front) =================
   ; Retract to safe Z before crossing back over the jaw (same reasoning as pcorner: never traverse at probing
   ; depth over solid material). Back off OUTWARD (front, -Y) by #<_lv_clear>, descend, seek back INWARD (+Y).
-  G53 G1 F1000 Z[#<_safe_z>]
-  G53 G1 F1000 X[#<rx>] Y[#<ry> - #<_lv_clear>]
-  G53 G1 F1000 Z[#<_start_z>]
+  G53 G0 Z[#<_safe_z>]                            ; rapid - VERIFIED height (see X face above)
+  G53 G0 X[#<rx>] Y[#<ry> - #<_lv_clear>]         ; rapid - travelling AT that height
+  G53 G0 Z[#<_top_z> + 12]                        ; rapid down to within 12mm of the KNOWN top (see X face above)
+  G53 G1 F1000 Z[#<_start_z>]                     ; controlled - final descent to the face-probe depth
   G38.2 Y[#<ry> + 20] F[#<_lv_searchf>]
   #<y_c1> = #5062
   G1 Y[#<y_c1> - 4] F1000
@@ -94,7 +96,8 @@ O<pvisecorner> SUB
   #<_corner_z> = #<_top_z>
   (PRINT, PV OUT x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
 
-  ; retract to just above the jaw top
-  G53 G1 F1000 Z[#<_safe_z>]
+  ; retract to just above the jaw top - rapid: _safe_z is VERIFIED (20mm above the just-probed top), so this
+  ; only ever moves AWAY from the jaw, never toward it.
+  G53 G0 Z[#<_safe_z>]
   (PRINT, PV EXIT)
 O<pvisecorner> ENDSUB

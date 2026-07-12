@@ -15,6 +15,10 @@
 ;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
 ;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
 ;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
+;   #<_ls_thickness> = estimated stock thickness (mm). The X/Y face probes search at the material's
+;                   MIDPOINT (top - thickness/2) - safely inside the material for any thickness, rather
+;                   than a fixed offset below the top (which could miss thin stock or catch a top chamfer
+;                   on thick stock).
 ;   #<_ls_spoilx>, #<_ls_spoily> = offset (mm) from the reference, along this corner's stock-interior
 ;                   direction, to the spoilboard-probe XY (always 0,0 - AT the reference).
 ;   #<_ls_topx>, #<_ls_topy>     = offset (mm) from the reference, into the stock, to the stock-top probe
@@ -23,8 +27,8 @@
 ;                   edge offset is needed since the top-probe XY is already verified to be over solid stock.
 ;   #<_ls_spoilz> = machine Z of the fixture instance's saved position - the spoilboard probe starts its
 ;                   descent from here (replaces the old dependency on the firmware's single-slot G28 Z).
-;   #<_ls_searchf>= fast search feed (mm/min), from the 3D probe definition (Probe/Search feed).
-;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the 3D probe definition (Latch feed).
+;   #<_ls_searchf>= fast search feed (mm/min), from the probe definition (Probe/Search feed).
+;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the probe definition (Latch feed).
 ;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
 ;                            (clear air below), publishing #<_start_z> as the DISCOVER/REUSE flag.
 ;                            (Use for the FIRST corner only - its reference must clear the probe
@@ -32,10 +36,22 @@
 ;                             full body diameter outside the corner - see FixtureEditDialog's schematic.)
 ;                 < 9000  -> REUSE: skip the spoilboard probe. EVERY corner (DISCOVER or REUSE)
 ;                            still probes its OWN stock top, so each reports its own Z (flatness).
+;   #<_ls_mode>   = 0 = 3D probe (default) - the spoilboard-anchored DISCOVER/REUSE behavior above,
+;                       unchanged.
+;                   1 = touch plate - probes by electrical continuity, so it never falsely triggers on
+;                       non-conductive spoilboard: the separate spoilboard probe is skipped entirely and
+;                       the DISCOVER corner instead anchors its safety floor to its OWN measured stock-top
+;                       Z (see the block right after that probe, below). REUSE corners are unaffected -
+;                       they already just read the shared #<_bottom> global, whichever mode set it.
+;   #<_ls_plateoffset> = Z (mm) subtracted from the probed top before it is reported as this corner's Z.
+;                       0 for the 3D probe, and for a touch plate run directly against conductive stock
+;                       (no plate, no offset). A separate metal touch plate against non-conductive stock
+;                       sets this to the plate's own known thickness (ProbeDefinition.PlateThickness).
 ;
 ; Outputs (GLOBAL named params, survive the SUB):
 ;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
-;   #<_corner_z>                THIS corner's stock-top Z (machine) - varies per corner = flatness
+;   #<_corner_z>                THIS corner's stock-top Z (machine), less #<_ls_plateoffset> - varies
+;                                per corner = flatness
 ;   #<_start_z>                 published by the DISCOVER call as the REUSE flag for later corners
 ;
 ; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 3 mm AND <= ~25 mm (1 in)
@@ -49,6 +65,7 @@ O<pcorner> SUB
   #<rx>     = #<_ls_refx>
   #<ry>     = #<_ls_refy>
   #<sz_in>  = #<_ls_startz>
+  #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
 
   ; Clear G54 so the absolute Z probes below run in machine coordinates. Without this a stale G54 Z
   ; offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
@@ -68,14 +85,14 @@ O<pcorner> SUB
   o11 ENDIF
   (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in>)
 
-  ; ================= spoilboard reference Z (first corner / DISCOVER only) =================
+  ; ================= spoilboard reference Z (first corner / DISCOVER only, 3D probe only) =================
   ; Probed once at the origin reference (clear air below per preconditions) to anchor thickness;
   ; later corners skip it. Only used to guard very thin stock when picking start_z.
-  o20 IF [#<sz_in> GE 9000]
+  o20 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 0]]
     G90
-    G53 G1 F1000 Z0
-    G53 G1 F1000 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]
-    G53 G1 F1000 Z[#<_ls_spoilz>]          ; move down to the fixture instance's saved Z - sits just above the spoilboard
+    G53 G0 Z0                                     ; rapid - Z0 is the machine top, always clear
+    G53 G0 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]   ; rapid - travelling AT Z0
+    G53 G1 F1000 Z[#<_ls_spoilz>]          ; controlled - descending toward the (unverified) spoilboard
     ; SAFETY: bound the spoilboard probe to a SHORT reach below the start Z. If the probe fails to trip
     ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
     ; straight into - through - the spoilboard before alarming. Capping the seek to ~12 mm below the start
@@ -91,9 +108,19 @@ O<pcorner> SUB
     ; Effective floor for the face-probe start height = spoilboard + sacrificial spacer/backer thickness
     ; (#<_ls_spacer>, 0 when none). With a backer under the stock the real material is only the band ABOVE
     ; it, so start_z must land in that band - not down in the backer/tape. Persists as a global for REUSE corners.
-    #<_floor> = [#<_z_spoil> + #<_ls_spacer>]
-    (PRINT, PC floor=#<_floor> spacer=#<_ls_spacer>)
+    #<_bottom> = [#<_z_spoil> + #<_ls_spacer>]
+    (PRINT, PC bottom=#<_bottom> spacer=#<_ls_spacer>)
   o20 ENDIF
+
+  ; ================= placeholder floor (first corner / DISCOVER only, touch plate only) =================
+  ; A continuity probe never falsely triggers on non-conductive spoilboard, so there is nothing to discover
+  ; there - skip the probe entirely. #<_bottom> just needs SOME value before the approach-height/seek-cap
+  ; math below runs; it is overwritten with a REAL value, anchored to this corner's own measured stock top,
+  ; right after that probe completes (see the block below it).
+  o21 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 1]]
+    #<_bottom> = [#<_ls_spoilz> - 20]
+    (PRINT, PC bottom=#<_bottom> [touch plate placeholder])
+  o21 ENDIF
 
   ; ================= stock-top Z at THIS corner (EVERY corner -> flatness) =================
   ; Move the fixture type's top-probe offset (#<_ls_topx>/#<_ls_topy>) into the stock interior (sign per
@@ -101,20 +128,21 @@ O<pcorner> SUB
   ; the stock/spoilboard flatness. #<_topx>/#<_topy> persist as the edge probes' anchor below.
   G90
   o40 IF [#<sz_in> GE 9000]
-    G53 G1 F1000 Z[#<_floor> + 30]        ; first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), travel just above the tallest possible top - floor known from the DISCOVER probe above
+    G53 G0 Z[#<_bottom> + 30]        ; rapid - first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), a COMPUTED safe clearance (floor known from the DISCOVER probe above), travel just above the tallest possible top
   o40 ELSE
-    G53 G1 F1000 Z0                       ; later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
+    G53 G0 Z0                       ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
   o40 ENDIF
   #<_topx> = [#<rx> + [#<_ls_topx> * #<sx>]]
   #<_topy> = [#<ry> + [#<_ls_topy> * #<sy>]]
-  G53 G1 F1000 X[#<_topx>] Y[#<_topy>]
+  G53 G0 X[#<_topx>] Y[#<_topy>]    ; rapid - travelling AT the safe height set above
   o41 IF [#<sz_in> LT 9000]
     ; Descend to the SAME conservative floor+30 estimate the DISCOVER corner uses above - NOT #<_safe_z>,
     ; which still holds the PREVIOUS corner's height (top+20) at this point in the code (this corner's own
     ; top probe, which recomputes it, hasn't run yet). Flatness/spacer variance between corners means the
     ; previous corner's safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale
-    ; height would drive straight into solid stock with nothing to catch it.
-    G53 G1 F1000 Z[#<_floor> + 30]
+    ; height would drive straight into solid stock with nothing to catch it. floor+30 IS a computed safe
+    ; clearance though (same reasoning as o40 above), so this stays a rapid too.
+    G53 G0 Z[#<_bottom> + 30]
   o41 ENDIF
   ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
   ; this seek instead of driving to a deep machine target - a dead/mis-wired probe then alarms near the board
@@ -124,9 +152,13 @@ O<pcorner> SUB
   ; there and G38.2 aborts right away - no doomed side search into air. The spacer band guarantees the cap
   ; clears the board (floor > spoilboard); with spacer 0 the +1 keeps it a hair above the board.
   o45 IF [#<sz_in> GE 9000]
-    G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]      ; DISCOVER: seek to just below the spoilboard
+    o46 IF [#<mode> EQ 0]
+      G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]      ; DISCOVER, 3D probe: seek to just below the spoilboard
+    o46 ELSE
+      G38.2 Z[#<_ls_spoilz> - 12] F[#<_ls_searchf>]   ; DISCOVER, touch plate: seek to just below the fixture's saved reference (no spoilboard probe was run)
+    o46 ENDIF
   o45 ELSE
-    G38.2 Z[#<_floor> + 1] F[#<_ls_searchf>]        ; REUSE: refuse to seek below the material floor
+    G38.2 Z[#<_bottom> + 1] F[#<_ls_searchf>]        ; REUSE: refuse to seek below the material floor
   o45 ENDIF
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
@@ -135,19 +167,21 @@ O<pcorner> SUB
   G91 G1 Z10 F1000
   G90
   (PRINT, PC z_top=#<_z_top>)
+  ; Touch plate DISCOVER: replace the placeholder floor with a REAL one, anchored to this corner's own
+  ; just-measured top (30 mm margin for stock-flatness variance) - REUSE corners below read this same
+  ; global, same as the 3D-probe path's spoilboard-anchored #<_bottom>.
+  o22 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 1]]
+    #<_bottom> = [#<_z_top> - 30]
+    (PRINT, PC bottom=#<_bottom> [touch plate, from measured top])
+  o22 ENDIF
 
-  ; ================= start_z for the face probes (centre tip 4 mm below THIS corner's top) =================
-  ; Never below the effective floor (spoilboard + spacer): a very thin sheet - or a thin sheet on a backer -
-  ; must be probed just above the floor, on the material, not down in the board/backer. #<_floor> is set by
-  ; the DISCOVER pass (first corner) and persists as a global, so REUSE corners use it too. (spacer 0 =>
-  ; _floor == _z_spoil, so this is identical to the previous spoilboard-only behaviour.)
-  o31 IF [[#<_z_top> - #<_floor>] LT 5]
-    #<_start_z> = [#<_floor> + 1]
-  o31 ELSE
-    #<_start_z> = [#<_z_top> - 4]
-  o31 ENDIF
+  ; ================= start_z for the face probes (centre tip at the material's MIDPOINT) =================
+  ; top - thickness/2 always lands inside the material regardless of thickness (unlike a fixed offset below
+  ; the top, which could miss thin stock or catch a top chamfer/rounded edge on thick stock) - self-safe by
+  ; construction, so no #<_bottom>-based thin-stock fallback is needed here anymore.
+  #<_start_z> = [#<_z_top> - [#<_ls_thickness> / 2]]
   ; SAFETY: never position the probe below the machine's Z soft-limit floor (#<_ls_zfloor>, passed by Load Stock
-  ; from $132). When the stock sits low - its top near the Z travel bottom - start_z = top-4 can fall below
+  ; from $132). When the stock sits low - its top near the Z travel bottom - start_z can fall below
   ; reachable Z, and the G53 G1 descent to it trips Alarm:2 (soft limit). Clamp up to the floor; the side face is
   ; still contacted since the face seek is horizontal from start_z.
   o32 IF [#<_start_z> LT #<_ls_zfloor>]
@@ -159,9 +193,10 @@ O<pcorner> SUB
   ; From the top-probe position (over solid stock, verified above) move ONLY X back out to the reference
   ; (the face) - Y unchanged, so the pre-seek position is anchored to a point already known to be over
   ; material rather than a separately estimated offset. Descend to start_z, then seek toward the face.
-  G53 G1 F1000 Z[#<_safe_z>]              ; retract only to just above the stock top (top + 20), not machine top
-  G53 G1 F1000 X[#<rx>] Y[#<_topy>]
-  G53 G1 F1000 Z[#<_start_z>]
+  G53 G0 Z[#<_safe_z>]              ; rapid - retract only to just above the stock top (top + 20, VERIFIED by the probe just run), not machine top
+  G53 G0 X[#<rx>] Y[#<_topy>]       ; rapid - travelling AT the verified safe height
+  G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (just probed) - controlled feed only takes over for the final approach
+  G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (not G91): a G91 move right after a G53 mis-computes on a $23-inverted axis
   ; (firmware bug - target sign-flips -> false Alarm:2). Current X is #<rx>, so seek to an absolute X.
   G38.2 X[#<rx> + [35 * #<sx>]] F[#<_ls_searchf>]      ; coarse seek toward the X face
@@ -179,10 +214,11 @@ O<pcorner> SUB
   ; Back to the top-probe XY, STILL AT SAFE HEIGHT move ONLY Y out to the reference (clear air outside the
   ; Y face) - X unchanged. Only THEN descend to start_z: (topx, ry) is clear of stock (Y outside the face),
   ; whereas (topx, topy) is the exact point the top probe just touched - descending there would hit stock.
-  G53 G1 F1000 Z[#<_safe_z>]
-  G53 G1 F1000 X[#<_topx>] Y[#<_topy>]
-  G53 G1 F1000 Y[#<ry>]
-  G53 G1 F1000 Z[#<_start_z>]
+  G53 G0 Z[#<_safe_z>]              ; rapid - verified-safe height (see X face above)
+  G53 G0 X[#<_topx>] Y[#<_topy>]    ; rapid - travelling AT that height
+  G53 G0 Y[#<ry>]                   ; rapid - still AT that height
+  G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (see X face above)
+  G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
   G38.2 Y[#<ry> + [35 * #<sy>]] F[#<_ls_searchf>]      ; coarse seek toward the Y face
   #<y_c1> = #5062
@@ -196,10 +232,12 @@ O<pcorner> SUB
   ; ================= outputs (radius compensated) =================
   #<_corner_x> = [#<x_trig> + [#<rad> * #<sx>]]
   #<_corner_y> = [#<y_trig> + [#<rad> * #<sy>]]
-  #<_corner_z> = #<_z_top>
+  #<_corner_z> = [#<_z_top> - #<_ls_plateoffset>]   ; 0 for the 3D probe and touch-plate-on-conductive-stock (no-op)
   (PRINT, PC OUT c=#<corner> x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
 
-  ; retract to just above the stock top - the next corner travels at this height
-  G53 G1 F1000 Z[#<_safe_z>]
+  ; retract to just above the stock top - the next corner travels at this height. Rapid: _safe_z is a
+  ; VERIFIED height (20mm above this corner's just-probed top), so this retract only ever moves AWAY from
+  ; material, never toward it.
+  G53 G0 Z[#<_safe_z>]
   (PRINT, PC EXIT)
 O<pcorner> ENDSUB
