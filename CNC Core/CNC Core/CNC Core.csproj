@@ -100,7 +100,7 @@
   <ItemGroup>
     <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
          answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. -->
-    <PackageReference Include="WpfUiTestServer" Version="1.0.0" />
+    <PackageReference Include="WpfUiTestServer" Version="1.1.0" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="LibStrings.xaml">
