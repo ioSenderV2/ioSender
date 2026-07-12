@@ -35,17 +35,47 @@ namespace CNC.Controls
         // are what the streamer runs when this view is connected, so per-line markers are live (never a copy).
         public ObservableCollection<GCodeBlock> Blocks { get; private set; }
 
+        // The ProgramView representing the loaded job (set by MainWindow when it creates jobProgramView) - the
+        // ONLY instance Stock/DeclaredStock are valid on. Every other ProgramView (wizard/Start Job output, a
+        // macro run's transient view) is generated content, not "the loaded job" - there is no such thing as
+        // "the stock" for a probe/wizard program, so those throw rather than silently returning a value nobody
+        // asked for. Not a cached singleton itself - just an instance pointer; the values below are still
+        // computed fresh on every access, from this instance's own Blocks (or GCode.File.Data when Blocks is
+        // null - the loaded-job convention, SetProgram(null)), never cached.
+        public static ProgramView LoadedJob { get; set; }
+        public bool IsLoadedJob { get; set; }
+
+        private IEnumerable<string> ProgramLines()
+        {
+            return Blocks != null
+                ? Blocks.Select(b => b.Data)
+                : (GCode.File?.Data?.Select(b => b.Data) ?? Enumerable.Empty<string>());
+        }
+
         // This program's declared stock size, from its own (STOCK X=.. Y=.. Z=..) comment (the Fusion
-        // ioSenderBatchPost add-in's format - see GCodeProgramComments) - null if it has none. Blocks == null
-        // means this view defers to the loaded job (MainWindow.jobProgramView's SetProgram(null) convention),
-        // so that case reads the already-maintained global GCodeProgramComments.Stock instead of re-scanning.
-        public GCodeStockInfo? Stock
+        // ioSenderBatchPost add-in's format - see GCodeProgramComments) - null if it has none.
+        public GCodeStockInfo? DeclaredStock
         {
             get
             {
-                return Blocks != null
-                    ? GCodeProgramComments.ParseStock(Blocks.Select(b => b.Data))
-                    : GCodeProgramComments.Stock;
+                if (!IsLoadedJob)
+                    throw new InvalidOperationException("DeclaredStock is only defined for the loaded job's ProgramView.");
+                return GCodeProgramComments.ParseStock(ProgramLines());
+            }
+        }
+
+        // This program's EFFECTIVE stock size: DeclaredStock if the program declares one, else the machine's
+        // full work envelope (GrblInfo.MaxTravel) as a conservative default/sanity bound - always defined
+        // (never null) on the loaded-job instance.
+        public GCodeStockInfo Stock
+        {
+            get
+            {
+                var declared = DeclaredStock;   // throws here if !IsLoadedJob
+                if (declared.HasValue)
+                    return declared.Value;
+                var travel = GrblInfo.MaxTravel;
+                return new GCodeStockInfo { X = travel.X, Y = travel.Y, Z = travel.Z };
             }
         }
 

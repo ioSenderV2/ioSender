@@ -99,14 +99,16 @@ namespace GCode_Sender
         }
 
         // Auto-fill Width/Height/Thickness from the loaded job's own (STOCK X=.. Y=.. Z=..) comment (the
-        // Fusion ioSenderBatchPost add-in's format - GCodeProgramComments, refreshed on every completed Load
-        // File/Load Folder), when it declares one - that counts as "explicitly set for this job", same as a
-        // hand-edit, so it also clears the stale-value warning gate (see Generate_Click). Silent no-op when the
-        // loaded program has no STOCK comment (most hand-written/non-Fusion files) - manual entry still works
-        // exactly as before, and Generate's stale-value/envelope checks still catch an unset or oversized guess.
+        // Fusion ioSenderBatchPost add-in's format), via ProgramView.LoadedJob.DeclaredStock - computed fresh
+        // from GCode.File.Data each time, not a cached global. Only a genuine DECLARED comment counts as
+        // "explicitly set for this job" (clears the stale-value warning gate, Generate_Click) - deliberately
+        // NOT ProgramView.Stock's envelope-defaulted fallback, which would otherwise silently overwrite the
+        // fields with the full machine travel on every tab activate when no program has a STOCK comment.
+        // Silent no-op in that case - manual entry still works exactly as before, and Generate's stale-value/
+        // envelope checks still catch an unset or oversized guess.
         private void TryAutoFillStockFromProgram()
         {
-            var stock = GCodeProgramComments.Stock;
+            var stock = CNC.Controls.ProgramView.LoadedJob?.DeclaredStock;
             if (stock == null)
                 return;
 
@@ -662,14 +664,18 @@ namespace GCode_Sender
                 sizeFieldsTouched = true;   // confirmed once - don't nag again this session unless the fields change
             }
 
-            // No (STOCK) comment to trust (or none loaded) - sanity-cap against the machine's own travel: typed
-            // dimensions bigger than the work envelope are certainly wrong, regardless of who set them.
-            var travel = GrblInfo.MaxTravel;
-            if (GCodeProgramComments.Stock == null && travel.X > 0d && travel.Y > 0d &&
-                (fldWidth.Value > travel.X || fldHeight.Value > travel.Y || (travel.Z > 0d && fldThickness.Value > travel.Z)))
+            // Sanity-cap against this program's effective stock size: its own declared (STOCK) size if it has
+            // one, else the machine's full work envelope (ProgramView.Stock - computed fresh, never a stale
+            // cached value). Typed dimensions bigger than that bound are certainly wrong, regardless of who set them.
+            var bound = CNC.Controls.ProgramView.LoadedJob?.Stock;
+            if (bound != null && bound.Value.X > 0d && bound.Value.Y > 0d &&
+                (fldWidth.Value > bound.Value.X || fldHeight.Value > bound.Value.Y || (bound.Value.Z > 0d && fldThickness.Value > bound.Value.Z)))
             {
-                if (AppDialogs.Show(string.Format("Est. width/height/thickness ({0} x {1} x {2} mm) exceeds this machine's travel ({3} x {4} x {5} mm) - that can't be right. Generate anyway?",
-                        N(fldWidth.Value), N(fldHeight.Value), N(fldThickness.Value), N(travel.X), N(travel.Y), N(travel.Z)),
+                bool declared = CNC.Controls.ProgramView.LoadedJob.DeclaredStock != null;
+                if (AppDialogs.Show(string.Format("Est. width/height/thickness ({0} x {1} x {2} mm) exceeds {3} ({4} x {5} x {6} mm) - that can't be right. Generate anyway?",
+                        N(fldWidth.Value), N(fldHeight.Value), N(fldThickness.Value),
+                        declared ? "the loaded program's declared stock size" : "this machine's travel",
+                        N(bound.Value.X), N(bound.Value.Y), N(bound.Value.Z)),
                         "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }

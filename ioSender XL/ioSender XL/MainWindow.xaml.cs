@@ -447,7 +447,10 @@ namespace GCode_Sender
             }
             CNC.Core.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
             if (jobProgramView == null)
-                jobProgramView = new CNC.Controls.ProgramView { AutoShow = false };
+            {
+                jobProgramView = new CNC.Controls.ProgramView { AutoShow = false, IsLoadedJob = true };
+                CNC.Controls.ProgramView.LoadedJob = jobProgramView;   // the only ProgramView Stock/DeclaredStock are valid on
+            }
             jobProgramView.Title = System.IO.Path.GetFileName(fileName.TrimEnd('\\', '/'));
             jobProgramView.SetProgram(null);   // null == the loaded job (GCode.File.Data) - the streamed collection
             jobProgramView.Connect();
