@@ -209,18 +209,22 @@ namespace GCode_Sender
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        // (Re)load the fixture library into the dropdown, preserving the current selection by name. Fixtures
-        // are DEFINED (including their position) in Machine Setup > Fixture definitions - Start Job only
-        // selects one, and only lists ones with a VALIDATED position: "Test position" (FixtureEditDialog) has
-        // actually run the real spoilboard probe search and the controller didn't alarm. A merely-captured-
-        // but-untested position is exactly what caused an Alarm:5 probe fail mid-Start-Job (the 12 mm search
-        // cap missed because the saved Z was too far above the spoilboard) - offering it here just invites
-        // repeating that instead of validating it in Machine Setup first.
+        // (Re)load the fixture library into the dropdown, preserving the current selection by name - falling
+        // back to the persisted selection (StartJobConfig, see LoadInputs/SaveInputs) when nothing is
+        // currently selected, i.e. on the very first activation each session. Fixtures are DEFINED (including
+        // their position) in Machine Setup > Fixture definitions - Start Job only selects one, and only lists
+        // ones with a VALIDATED position: "Test position" (FixtureEditDialog) has actually run the real
+        // spoilboard probe search and the controller didn't alarm. A merely-captured-but-untested position is
+        // exactly what caused an Alarm:5 probe fail mid-Start-Job (the 12 mm search cap missed because the
+        // saved Z was too far above the spoilboard) - offering it here just invites repeating that instead of
+        // validating it in Machine Setup first.
         private void RefreshFixtures()
         {
             string current = SelectedFixture?.Name;
+            if (string.IsNullOrEmpty(current))
+                current = StartJobConfig.Section?.Fixture;
             cbxFixture.ItemsSource = Fixtures.Items.Where(f => f.PositionValidated).ToList();
-            if (current != null)
+            if (!string.IsNullOrEmpty(current))
                 cbxFixture.SelectedItem = (cbxFixture.ItemsSource as List<Fixture>).FirstOrDefault(f => f.Name == current);
         }
 
@@ -460,6 +464,10 @@ namespace GCode_Sender
             bool measured = Has(1) && Has(2) && Has(3) && Has(4);
 
             double[] mx = new double[5], my = new double[5];   // 1..4 = FL,FR,BL,BR
+            // Vise jaw geometry, in the SAME local mm space as mx/my - the fixed jaw's own front-left corner
+            // (the probed reference, where the origin dot goes) is exactly BL = (0, eh), so the jaw rectangle
+            // below starts there with NO overhang; JawWidth/MaxOpening (0 = not set) come from the fixture.
+            double jawWidthMm = 0d, openingMm = 0d;
             if (measured)
             {
                 for (int c = 1; c <= 4; c++) { mx[c] = cornerX[c].Value; my[c] = cornerY[c].Value; }
@@ -471,12 +479,26 @@ namespace GCode_Sender
                 mx[2] = ew;  my[2] = 0d;     // FR
                 mx[3] = 0d;  my[3] = eh;     // BL
                 mx[4] = ew;  my[4] = eh;     // BR
+
+                if (isVise)
+                {
+                    jawWidthMm = SelectedFixture.JawWidth > 0d ? SelectedFixture.JawWidth : ew + 20d;
+                    openingMm = SelectedFixture.MaxOpening > 0d ? SelectedFixture.MaxOpening : eh;
+                }
             }
 
             double minX = Math.Min(Math.Min(mx[1], mx[2]), Math.Min(mx[3], mx[4]));
             double maxX = Math.Max(Math.Max(mx[1], mx[2]), Math.Max(mx[3], mx[4]));
             double minY = Math.Min(Math.Min(my[1], my[2]), Math.Min(my[3], my[4]));
             double maxY = Math.Max(Math.Max(my[1], my[2]), Math.Max(my[3], my[4]));
+            if (isVise)
+            {
+                // Widen the bounding box to the jaw's own footprint too - it can extend past the stock in X
+                // (jawWidthMm > ew) or in Y (the moving jaw at MaxOpening can sit past the stock's front edge),
+                // and everything must still fit the canvas.
+                maxX = Math.Max(maxX, jawWidthMm);
+                minY = Math.Min(minY, maxY - openingMm);
+            }
             double spanX = Math.Max(maxX - minX, 1e-6), spanY = Math.Max(maxY - minY, 1e-6);
             double scale = Math.Min((W - 2d * margin) / spanX, (H - 2d * margin) / spanY);
             if (scale <= 0d || double.IsInfinity(scale) || double.IsNaN(scale))
@@ -484,9 +506,10 @@ namespace GCode_Sender
             double offX = (W - spanX * scale) / 2d, offY = (H - spanY * scale) / 2d;
 
             // machine X right / Y up (back) -> screen X right / Y down (flip Y)
-            System.Func<int, Point> P = c => new Point(
-                offX + (mx[c] - minX) * scale,
-                H - offY - (my[c] - minY) * scale);
+            System.Func<double, double, Point> P2 = (x, y) => new Point(
+                offX + (x - minX) * scale,
+                H - offY - (y - minY) * scale);
+            System.Func<int, Point> P = c => P2(mx[c], my[c]);
 
             var poly = new System.Windows.Shapes.Polygon
             {
@@ -506,29 +529,33 @@ namespace GCode_Sender
 
             Point ctr = new Point((P(1).X + P(2).X + P(3).X + P(4).X) / 4d, (P(1).Y + P(2).Y + P(3).Y + P(4).Y) / 4d);
 
-            // Vise: draw the fixed jaw (back, BL-BR edge) and moving jaw (front, FL-FR edge) as bars just
-            // outside the stock - screen Y already has back=smaller/front=larger from the machine-Y-up flip
-            // above (P(3)/P(4) are BL/BR, P(1)/P(2) are FL/FR), matching FixtureEditDialog's schematic.
+            // Vise: draw the fixed jaw (at the probed corner, BL = local (0, eh)) and the moving jaw (MaxOpening
+            // mm away, toward the front) using the fixture's real JawWidth/MaxOpening - both bars start EXACTLY
+            // at local X=0 (no overhang), so the fixed jaw's own corner lands precisely on the origin dot below
+            // instead of being inset from it.
             if (isVise)
             {
-                const double jawBar = 14d, jawOverhang = 12d;
+                const double jawBar = 14d;   // fixed visual depth (px) - not a tracked dimension
                 var jawFill = new SolidColorBrush(Color.FromRgb(0x9A, 0xA7, 0xB4));
                 var jawStroke = new SolidColorBrush(Color.FromRgb(0x4A, 0x60, 0x70));
-                double jawX0 = Math.Min(P(3).X, P(4).X) - jawOverhang, jawX1 = Math.Max(P(3).X, P(4).X) + jawOverhang;
+                double eh = my[3];   // BL.y - the fixed jaw's clamping face, in local mm
 
-                var fixedJaw = new System.Windows.Shapes.Rectangle { Width = jawX1 - jawX0, Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
-                Canvas.SetLeft(fixedJaw, jawX0);
-                Canvas.SetTop(fixedJaw, Math.Min(P(3).Y, P(4).Y) - jawBar);
+                Point fixedFace0 = P2(0d, eh), fixedFace1 = P2(jawWidthMm, eh);
+                var fixedJaw = new System.Windows.Shapes.Rectangle { Width = Math.Abs(fixedFace1.X - fixedFace0.X), Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
+                Canvas.SetLeft(fixedJaw, Math.Min(fixedFace0.X, fixedFace1.X));
+                Canvas.SetTop(fixedJaw, fixedFace0.Y - jawBar);
                 canvas.Children.Add(fixedJaw);
 
-                var movingJaw = new System.Windows.Shapes.Rectangle { Width = jawX1 - jawX0, Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
-                Canvas.SetLeft(movingJaw, jawX0);
-                Canvas.SetTop(movingJaw, Math.Max(P(1).Y, P(2).Y));
+                Point movFace0 = P2(0d, eh - openingMm), movFace1 = P2(jawWidthMm, eh - openingMm);
+                var movingJaw = new System.Windows.Shapes.Rectangle { Width = Math.Abs(movFace1.X - movFace0.X), Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
+                Canvas.SetLeft(movingJaw, Math.Min(movFace0.X, movFace1.X));
+                Canvas.SetTop(movingJaw, movFace0.Y);
                 canvas.Children.Add(movingJaw);
             }
 
             // origin corner marker: red dot only. Every edge-probing kind (Corner Fence etc.) always
-            // references front-left; a vise's origin is the jaw's own back-left corner instead (see isVise above).
+            // references front-left; a vise's origin is the jaw's own front-left corner instead - which in
+            // this drawing's overall stock-relative frame is back-left (see isVise above).
             int oc = isVise ? CornerId(Corner.BackLeft) : CornerId(SelectedCorner);
             Point op = P(oc);
             var dot = new System.Windows.Shapes.Ellipse { Width = 11d, Height = 11d, Fill = Brushes.OrangeRed };
@@ -837,7 +864,8 @@ namespace GCode_Sender
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
                     ApplyRotation = chkRotate.IsChecked == true,
-                    SetTloRef = chkSetTloRef.IsChecked == true
+                    SetTloRef = chkSetTloRef.IsChecked == true,
+                    Fixture = SelectedFixture?.Name ?? string.Empty
                 };
                 AppConfig.Settings.Save();
             }

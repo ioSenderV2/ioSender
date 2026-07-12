@@ -1095,3 +1095,9 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,txtFxProbeCircle:Syste
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Label,None,False,True,,Probe length:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe stylus length below the body (excludes the body itself) - body-bottom to the end of the tip.
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Label,None,False,True,,Jaw width:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Start Job). 0 = not set."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:CNC.Controls.NumericField.Label,None,False,True,,Max opening:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_maxOpening:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum distance the moving jaw can travel from the fixed jaw - used only to draw the vise's true throat in Start Job. 0 = not set.

@@ -65,6 +65,16 @@
                     <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnTestPosition_Click"
                             ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
                 </StackPanel>
+
+                <!-- Vise-only: drawing-only dimensions (Start Job's stock drawing + this dialog's own schematic
+                     could use them too) - pvisecorner.macro doesn't read either, it finds the jaw corner by
+                     probing, not by knowing the jaw's extent. -->
+                <local:NumericField x:Name="fldJawWidth" x:Uid="fxd_jawWidth" Label="Jaw width:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding JawWidth, Mode=TwoWay}" Margin="0,8,0,2"
+                                     Visibility="Collapsed"
+                                     ToolTip="Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Start Job). 0 = not set."/>
+                <local:NumericField x:Name="fldMaxOpening" x:Uid="fxd_maxOpening" Label="Max opening:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding MaxOpening, Mode=TwoWay}" Margin="0,2"
+                                     Visibility="Collapsed"
+                                     ToolTip="Maximum distance the moving jaw can travel from the fixed jaw - used only to draw the vise's true throat in Start Job. 0 = not set."/>
             </StackPanel>
 
             <!-- Per-kind schematic: shows where each offset is measured from/to. One Canvas per shape (the

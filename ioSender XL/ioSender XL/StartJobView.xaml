@@ -37,7 +37,7 @@
                         <Separator Margin="0,4"/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                             <Label x:Uid="ls_lblUnits" Content="Stock size units:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <RadioButton x:Uid="rbUnitsMm" x:Name="rbUnitsMm" Content="mm" GroupName="StockSizeUnits" IsChecked="True" VerticalAlignment="Center" Margin="4,0,0,0" Checked="Units_Checked"/>
+                            <RadioButton x:Uid="rbUnitsMm" x:Name="rbUnitsMm" Content="mm" GroupName="StockSizeUnits" VerticalAlignment="Center" Margin="4,0,0,0" Checked="Units_Checked"/>
                             <RadioButton x:Uid="rbUnitsIn" x:Name="rbUnitsIn" Content="in" GroupName="StockSizeUnits" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Units_Checked"/>
                         </StackPanel>
                         <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>

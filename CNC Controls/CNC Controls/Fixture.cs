@@ -80,9 +80,19 @@ namespace CNC.Controls
         private FixtureKind _kind = FixtureKind.CornerFence;
         private string _coords = string.Empty;
         private bool _positionValidated = false;
+        private double _jawWidth = 0d;
+        private double _maxOpening = 0d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public FixtureKind Kind { get { return _kind; } set { _kind = value; OnChanged(); OnChanged(nameof(KindName)); OnChanged(nameof(Implemented)); } }
+
+        // Vise-only, both DRAWING-only (Start Job's stock drawing + this fixture's own schematic) - neither
+        // is read by pvisecorner.macro, which finds the jaw corner by probing, not by knowing its extent.
+        // 0 = not set: the Start Job drawing falls back to sizing the jaw bar from the entered stock instead.
+        public double JawWidth { get { return _jawWidth; } set { _jawWidth = value; OnChanged(); } }
+        // Maximum jaw opening (mm) - how far the moving jaw can travel from the fixed jaw. 0 = not set: the
+        // drawing places the moving jaw right at the stock's edge instead of at the vise's true throat depth.
+        public double MaxOpening { get { return _maxOpening; } set { _maxOpening = value; OnChanged(); } }
 
         // Friendly kind name for the list grid (derived, not persisted).
         [XmlIgnore]
@@ -126,6 +136,7 @@ namespace CNC.Controls
         {
             Name = o.Name; Kind = o.Kind;
             Coords = o.Coords; PositionValidated = o.PositionValidated;
+            JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

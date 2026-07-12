@@ -337,6 +337,11 @@ namespace CNC.Controls
             Show(drwCornerStyle, edges);
             Show(drwKnownPosition, !edges);
 
+            // Jaw width/Max opening are vise-only - drawing dimensions, meaningless for an edge-probing kind.
+            bool isVise = kind == FixtureKind.MachinistVise;
+            Show(fldJawWidth, isVise);
+            Show(fldMaxOpening, isVise);
+
             txtNotImplemented.Visibility = FixtureKinds.Implemented(kind) ? Visibility.Collapsed : Visibility.Visible;
         }
 
