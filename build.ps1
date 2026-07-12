@@ -40,8 +40,15 @@
     .\build.ps1 -Launch -forgetnetwork -demomarker
     Debug build, then launch with those flags forwarded to ioSender.exe (open the
     connect dialog + arm the demo-video markers). Any trailing tokens pass through.
+
+.EXAMPLE
+    .\build.ps1 -Launch '-debuglog=comms-tx,comms-rx'
+    A pass-through arg containing "=value,value" MUST be quoted - that's PowerShell's own
+    command-line parser (it tries to build an array at the comma), not this script; the
+    error surfaces before build.ps1 even starts running. Once quoted, PositionalBinding is
+    off (see CmdletBinding below) so it can't be mis-bound to -Configuration either.
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [ValidateSet('Debug', 'Release', 'Both')]
     [string]$Configuration = 'Debug',
