@@ -52,33 +52,34 @@ namespace CNC.Controls
             }
         }
 
-        // A known-position kind (vise) has no edge probing at all - its saved Coords ARE the precise origin
-        // (captured via a probe cycle, not this jog+Set flow - not yet built, see Implemented). Every other
-        // kind re-probes precisely each job, so ProbesEdges == true there.
+        // A known-position kind (vise) has no PER-JOB edge probing - its saved Coords ARE the precise origin,
+        // captured ONCE via a real pcorner.macro corner probe against the fixed jaw when Set position is
+        // clicked (FixtureEditDialog.RunViseCornerProbe), not re-probed by Start Job every run. Every other
+        // kind re-probes the STOCK's own corner precisely each job, so ProbesEdges == true there.
         public static bool ProbesEdges(FixtureKind k) { return k != FixtureKind.MachinistVise; }
 
-        // Whether this kind's macro probes the spoilboard to establish a floor reference (pcorner.macro's
-        // DISCOVER phase). A known-position kind has no such reference.
-        public static bool ProbesSpoilboard(FixtureKind k) { return k != FixtureKind.MachinistVise; }
+        // Whether Test position's capped Z-search makes sense for this kind's saved Coords. Vise's Coords is
+        // the resolved jaw corner (+ a small Z safety margin, same "~10 mm above" convention as every other
+        // kind), so the same search works unchanged - re-probing the jaw's own top, not the stock's.
+        public static bool ProbesSpoilboard(FixtureKind k) { return true; }
 
         public static FixtureOriginCorner OriginCorner(FixtureKind k)
         {
             return k == FixtureKind.MachinistVise ? FixtureOriginCorner.Inside : FixtureOriginCorner.Outside;
         }
 
-        // Only Corner Fence generates real NGC today; the rest are defined but not wired to a working macro.
-        public static bool Implemented(FixtureKind k) { return k == FixtureKind.CornerFence; }
+        // Whether Start Job's BuildProgram can generate a real per-job program for this kind. Corner Fence
+        // (BuildProgram) and Machinist Vise (BuildViseProgram, StartJobView.xaml.cs) are wired; Dog-hole/grid
+        // corner and Vacuum table zero-corner are still defined but not wired to a working macro.
+        public static bool Implemented(FixtureKind k) { return k == FixtureKind.CornerFence || k == FixtureKind.MachinistVise; }
     }
 
     public class Fixture : INotifyPropertyChanged
     {
         private string _name = "Fixture";
         private FixtureKind _kind = FixtureKind.CornerFence;
-        private double _spoilOffsetX = 0d, _spoilOffsetY = 0d;
-        private double _topOffsetX = 30d, _topOffsetY = 30d;
-        private double _edgeOffsetX = 30d, _edgeOffsetY = 30d;
         private string _coords = string.Empty;
-        private string _pictureFile = string.Empty;
+        private bool _positionValidated = false;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public FixtureKind Kind { get { return _kind; } set { _kind = value; OnChanged(); OnChanged(nameof(KindName)); OnChanged(nameof(Implemented)); } }
@@ -90,24 +91,29 @@ namespace CNC.Controls
         [XmlIgnore]
         public bool Implemented { get { return FixtureKinds.Implemented(_kind); } }
 
-        public double SpoilProbeOffsetX { get { return _spoilOffsetX; } set { _spoilOffsetX = value; OnChanged(); } }
-        public double SpoilProbeOffsetY { get { return _spoilOffsetY; } set { _spoilOffsetY = value; OnChanged(); } }
-        public double TopProbeOffsetX { get { return _topOffsetX; } set { _topOffsetX = value; OnChanged(); } }
-        public double TopProbeOffsetY { get { return _topOffsetY; } set { _topOffsetY = value; OnChanged(); } }
-        public double EdgeProbeOffsetX { get { return _edgeOffsetX; } set { _edgeOffsetX = value; OnChanged(); } }
-        public double EdgeProbeOffsetY { get { return _edgeOffsetY; } set { _edgeOffsetY = value; OnChanged(); } }
-
-        // Captured machine position (jog there, click "Set position"). Empty = not yet set. Invariant CSV of
-        // the enabled axes' machine coords (round-trips through CNC.Core.Position), includes Z so pcorner's
-        // spoilboard-probe Z-start comes from this instead of the firmware's single-slot G28 Z.
-        public string Coords { get { return _coords; } set { _coords = value; OnChanged(); OnChanged(nameof(HasPosition)); } }
+        // Captured machine position (jog there, click "Set position") - the single reference pcorner.macro
+        // probes everything from: it must clear the corner in BOTH X and Y by the current 3D probe's body
+        // diameter (a probe-sized clearance circle drawn in the edit dialog is the jog target) AND sit within
+        // ~10 mm above the spoilboard in Z (the spoilboard probe's search is capped to 12 mm below this point
+        // - see pcorner.macro), same idiom as the old firmware G28 slot but per-fixture-instance and not
+        // written to firmware. Empty = not yet set. Invariant CSV of the enabled axes' machine coords
+        // (round-trips through CNC.Core.Position). Changing it invalidates any prior "Test position" result -
+        // a re-jogged position hasn't actually been probed yet.
+        public string Coords
+        {
+            get { return _coords; }
+            set { _coords = value; PositionValidated = false; OnChanged(); OnChanged(nameof(HasPosition)); }
+        }
 
         [XmlIgnore]
         public bool HasPosition { get { return !string.IsNullOrEmpty(_coords); } }
 
-        // Optional reference picture (path, blank = none).
-        [XmlIgnore]
-        public string PictureFile { get { return _pictureFile; } set { _pictureFile = value; OnChanged(); } }
+        // Set true only when "Test position" (FixtureEditDialog) has actually run the real spoilboard probe
+        // search from this Coords and the controller did NOT alarm - i.e. the saved position is proven to
+        // work, not just captured. Start Job's fixture dropdown only offers validated fixtures (see
+        // StartJobView.RefreshFixtures) - a merely-captured-but-untested position is exactly what caused the
+        // Alarm:5 probe fail this was added to prevent.
+        public bool PositionValidated { get { return _positionValidated; } set { _positionValidated = value; OnChanged(); } }
 
         public Fixture Clone()
         {
@@ -119,10 +125,7 @@ namespace CNC.Controls
         public void CopyFrom(Fixture o)
         {
             Name = o.Name; Kind = o.Kind;
-            SpoilProbeOffsetX = o.SpoilProbeOffsetX; SpoilProbeOffsetY = o.SpoilProbeOffsetY;
-            TopProbeOffsetX = o.TopProbeOffsetX; TopProbeOffsetY = o.TopProbeOffsetY;
-            EdgeProbeOffsetX = o.EdgeProbeOffsetX; EdgeProbeOffsetY = o.EdgeProbeOffsetY;
-            Coords = o.Coords; PictureFile = o.PictureFile;
+            Coords = o.Coords; PositionValidated = o.PositionValidated;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

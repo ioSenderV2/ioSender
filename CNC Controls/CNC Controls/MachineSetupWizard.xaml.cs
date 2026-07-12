@@ -910,7 +910,7 @@ namespace CNC.Controls
         private void FixtureAdd_Click(object sender, RoutedEventArgs e)
         {
             var def = new Fixture();
-            var dlg = new FixtureEditDialog(def, model, isNew: true) { Owner = Window.GetWindow(this) };
+            var dlg = new FixtureEditDialog(def, model) { Owner = Window.GetWindow(this) };
             if (dlg.ShowDialog() == true)
             {
                 Fixtures.Items.Add(def);

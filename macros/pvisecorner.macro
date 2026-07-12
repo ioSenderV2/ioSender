@@ -1,0 +1,100 @@
+; pvisecorner.macro - probes a machinist vise's FIXED JAW front-left corner for grblHAL.
+;
+; Unlike pcorner.macro (which needs its reference OUTSIDE both faces, over open spoilboard), this macro's
+; reference sits OVER the jaw interior, near the corner - the FixtureEditDialog schematic's clearance circle
+; is centered there, with the corner on its boundary. That's the opposite geometry, so this is its own macro
+; rather than a variant of pcorner: probe the jaw top DIRECTLY at the reference (no separate spoilboard probe -
+; the jaw is rigid and bolted down, so its own top is the only surface that matters), then for each face back
+; OFF outward (away from the jaw interior) to clear air, descend, and seek back INWARD to find it - the mirror
+; image of pcorner's outside-in approach.
+;
+; Args via GLOBALS set before a NO-ARG call (grblHAL's O-word CALL does not reliably accept multiple bracketed
+; args), then invoke:
+;   #<_lv_refx>, #<_lv_refy>, #<_lv_refz> = machine position jogged over the jaw, near its front-left corner,
+;                   within the schematic's clearance circle AND within ~10 mm above the jaw top.
+;   #<_lv_rad>    = probe tip radius (mm).
+;   #<_lv_clear>  = distance (mm) to back off OUTWARD (away from the jaw) from the reference before each face
+;                   seek - must clear the probe body off the corner, same idea as pcorner's topx/topy offset.
+;   #<_lv_searchf>= fast search feed (mm/min), from the 3D probe definition (Probe/Search feed).
+;   #<_lv_latchf> = slow latch / re-probe feed (mm/min), from the 3D probe definition (Latch feed).
+;   #<_lv_zfloor> = machine Z soft-limit floor (machine coords) - never position the probe below this.
+;
+; Outputs (GLOBAL named params, survive the SUB):
+;   #<_corner_x> #<_corner_y>   radius-compensated jaw corner XY (machine coords)
+;   #<_corner_z>                the jaw's top Z (machine) at the reference
+;
+; Preconditions: homed; probe on the main probe input ($6 polarity correct); the reference must be within
+; ~10 mm above the jaw top (the top-probe search is capped 12 mm below it) and clear of both faces by less
+; than #<_lv_clear> (so backing off #<_lv_clear> outward truly reaches open air beside the jaw).
+
+O<pvisecorner> SUB
+  #<rad> = #1                    ; tip radius = the single CALL arg; rest via globals
+  #<rx>  = #<_lv_refx>
+  #<ry>  = #<_lv_refy>
+  #<rz>  = #<_lv_refz>
+
+  ; Clear G54 so the absolute Z probes below run in machine coordinates (same reasoning as pcorner.macro).
+  G10 L2 P1 X0 Y0 Z0
+  G90
+  (PRINT, PV ENTER rx=#<rx> ry=#<ry> rz=#<rz> rad=#<rad> clear=#<_lv_clear>)
+
+  ; ================= jaw top Z, probed directly at the reference (already over the jaw) =================
+  G53 G1 F1000 Z0
+  G53 G1 F1000 X[#<rx>] Y[#<ry>]
+  G53 G1 F1000 Z[#<rz>]
+  ; SAFETY: cap the search 12 mm below the reference, same reasoning as pcorner.macro's spoilboard/top probes -
+  ; a dead/mis-wired probe alarms near the jaw instead of ploughing on.
+  G38.2 Z[#<rz> - 12] F[#<_lv_searchf>]
+  G91 G1 Z2 F1000
+  G38.2 Z-5 F[#<_lv_latchf>]
+  #<_top_z> = #5063
+  G91 G1 Z10 F1000
+  G90
+  (PRINT, PV top_z=#<_top_z>)
+  #<_safe_z>  = [#<_top_z> + 20]   ; safe travel height: 20 mm above the jaw top
+  #<_start_z> = [#<_top_z> - 4]    ; face-seek height: centre tip 4 mm below the jaw top
+  o10 IF [#<_start_z> LT #<_lv_zfloor>]
+    #<_start_z> = #<_lv_zfloor>
+  o10 ENDIF
+  (PRINT, PV start_z=#<_start_z>)
+
+  ; ================= X face (jaw's left end) =================
+  ; Back off OUTWARD (left, -X) from the reference by #<_lv_clear> - clear of the jaw - then descend and seek
+  ; back INWARD (+X) to find the face. Mirror image of pcorner's X-face section.
+  G53 G1 F1000 Z[#<_safe_z>]
+  G53 G1 F1000 X[#<rx> - #<_lv_clear>] Y[#<ry>]
+  G53 G1 F1000 Z[#<_start_z>]
+  G38.2 X[#<rx> + 20] F[#<_lv_searchf>]           ; coarse seek back toward/past the reference
+  #<x_c1> = #5061
+  G1 X[#<x_c1> - 4] F1000                         ; back off so the deflecting ball releases before the slow re-probe
+  G38.2 X[#<x_c1> + 6] F[#<_lv_latchf>]           ; slow re-probe
+  #<x_trig> = #5061
+  G1 X[#<x_trig> - 10] F1000
+  G90
+  (PRINT, PV x_trig=#<x_trig>)
+
+  ; ================= Y face (jaw's clamping face, front) =================
+  ; Retract to safe Z before crossing back over the jaw (same reasoning as pcorner: never traverse at probing
+  ; depth over solid material). Back off OUTWARD (front, -Y) by #<_lv_clear>, descend, seek back INWARD (+Y).
+  G53 G1 F1000 Z[#<_safe_z>]
+  G53 G1 F1000 X[#<rx>] Y[#<ry> - #<_lv_clear>]
+  G53 G1 F1000 Z[#<_start_z>]
+  G38.2 Y[#<ry> + 20] F[#<_lv_searchf>]
+  #<y_c1> = #5062
+  G1 Y[#<y_c1> - 4] F1000
+  G38.2 Y[#<y_c1> + 6] F[#<_lv_latchf>]
+  #<y_trig> = #5062
+  G1 Y[#<y_trig> - 10] F1000
+  G90
+  (PRINT, PV y_trig=#<y_trig>)
+
+  ; ================= outputs (radius compensated) =================
+  #<_corner_x> = [#<x_trig> + #<rad>]
+  #<_corner_y> = [#<y_trig> + #<rad>]
+  #<_corner_z> = #<_top_z>
+  (PRINT, PV OUT x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
+
+  ; retract to just above the jaw top
+  G53 G1 F1000 Z[#<_safe_z>]
+  (PRINT, PV EXIT)
+O<pvisecorner> ENDSUB

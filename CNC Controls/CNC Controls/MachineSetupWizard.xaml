@@ -325,7 +325,7 @@
                             <DataGridTextColumn x:Uid="fxl_name" Header="Name" Binding="{Binding Name}" Width="*" MinWidth="120"/>
                             <DataGridTextColumn x:Uid="fxl_kind" Header="Type" Binding="{Binding KindName}" MinWidth="150"/>
                             <DataGridTextColumn x:Uid="fxl_coords" Header="Position" Binding="{Binding Coords}" MinWidth="200"/>
-                            <DataGridCheckBoxColumn x:Uid="fxl_impl" Header="Implemented" Binding="{Binding Implemented}" Width="80"/>
+                            <DataGridCheckBoxColumn x:Uid="fxl_posval" Header="Validated" Binding="{Binding PositionValidated, Mode=OneWay}" Width="80"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="1" Grid.Column="1" MinWidth="90" Margin="8,0,0,0">

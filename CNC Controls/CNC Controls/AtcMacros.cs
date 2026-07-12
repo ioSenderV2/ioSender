@@ -1,8 +1,8 @@
 /*
  * AtcMacros.cs - part of CNC Controls library
  *
- * Provisions the ATC support macros (tc/pcorner) onto the controller's filesystem when it reports them
- * missing - $I [NEWOPT:...] "ATC=0" means an ATC is configured but tc.macro is not present.
+ * Provisions the ATC support macros (tc/pcorner/pvisecorner) onto the controller's filesystem when it
+ * reports them missing - $I [NEWOPT:...] "ATC=0" means an ATC is configured but tc.macro is not present.
  * The canonical copies are embedded from the repo's macros/ folder; missing ones are written to the root
  * volume, where grblHAL looks for them (/tc.macro replaces the built-in M6 flow once the SD/LittleFS plugin
  * attaches at boot/$FM, after which the firmware reports ATC=1 and provisioning stops).
@@ -21,10 +21,12 @@ namespace CNC.Controls
     public static class AtcMacros
     {
         // Embedded with LogicalName == file name (see CNC Controls.csproj), so they round-trip by bare name.
-        // tc/pcorner stay on littlefs because grblHAL resolves their O<...> CALL / M6 references from its
-        // own filesystem. Start Job itself runs ioSender-side through MacroProcessor's in-memory ActiveRun,
-        // not from a controller-side or disk-based macro file.
-        static readonly string[] Required = { "tc.macro", "pcorner.macro" };
+        // tc/pcorner/pvisecorner stay on littlefs because grblHAL resolves their O<...> CALL / M6 references
+        // from its own filesystem. Start Job itself runs ioSender-side through MacroProcessor's in-memory
+        // ActiveRun, not from a controller-side or disk-based macro file. pvisecorner.macro is only ever
+        // CALLed from FixtureEditDialog's vise Set position, not from a Start Job program, but it needs the
+        // same on-controller presence as pcorner.macro for that O-word CALL to resolve.
+        static readonly string[] Required = { "tc.macro", "pcorner.macro", "pvisecorner.macro" };
 
         // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
         // YModem upload), so a queued UI event can re-enter it before it returns - mutually recursing with the SD
@@ -201,7 +203,19 @@ namespace CNC.Controls
                 // it returns error:9 "not allowed until homed". Unlock so the macros can be written without first
                 // homing - the upload moves nothing, and the user homes when ready afterwards.
                 if (model.GrblState.State == GrblStates.Alarm)
+                {
                     Grbl.WaitForResponse(GrblConstants.CMD_UNLOCK);
+                    // $X can fail to clear some alarms (e.g. certain homing-required configs still refuse file
+                    // ops after unlock). Bail out here rather than fall through to the raw unlink/YModem calls
+                    // below: those use Comms.AwaitAck(), which has NO timeout anywhere in this codebase - a
+                    // rejected ("error:9") response to an unlink issued while still alarmed hangs the UI thread
+                    // forever instead of failing. Surfacing a clear message beats a silent freeze.
+                    if (model.GrblState.State == GrblStates.Alarm)
+                    {
+                        model.Message = "ATC macro update skipped: controller is still in alarm - clear it (e.g. Home) and try again.";
+                        return ProvisionResult.Failed;
+                    }
+                }
 
                 // Remove any stray copies of these files that live OUTSIDE the littlefs target - e.g. on an SD
                 // card mounted at "/" from an earlier mis-targeted upload. They are ours by name, and a stray

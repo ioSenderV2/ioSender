@@ -57,39 +57,13 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Top">
-                <local:NumericField x:Name="fldSpoilX" x:Uid="fxd_spoilx" Label="Spoil probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="Offset from the reference, along the corner's stock-interior X direction, to probe the spoilboard." Margin="0,2,0,0"
-                                     Value="{Binding Path=SpoilProbeOffsetX, Mode=TwoWay}"/>
-                <local:NumericField x:Name="fldSpoilY" x:Uid="fxd_spoily" Label="Spoil probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="Offset from the reference, along the corner's stock-interior Y direction, to probe the spoilboard." Margin="0,2,0,0"
-                                     Value="{Binding Path=SpoilProbeOffsetY, Mode=TwoWay}"/>
-
-                <local:NumericField x:Name="fldTopX" x:Uid="fxd_topx" Label="Top probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)." Margin="0,8,0,0"
-                                     Value="{Binding Path=TopProbeOffsetX, Mode=TwoWay}"/>
-                <local:NumericField x:Name="fldTopY" x:Uid="fxd_topy" Label="Top probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="Offset from the reference, into the stock, to probe the stock top (every fixture probes Z)." Margin="0,2,0,0"
-                                     Value="{Binding Path=TopProbeOffsetY, Mode=TwoWay}"/>
-
-                <local:NumericField x:Name="fldEdgeX" x:Uid="fxd_edgex" Label="Edge probe offset X:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="How far along Y (into the stock) to position before seeking X, toward the Y face." Margin="0,8,0,0"
-                                     Value="{Binding Path=EdgeProbeOffsetX, Mode=TwoWay}"/>
-                <local:NumericField x:Name="fldEdgeY" x:Uid="fxd_edgey" Label="Edge probe offset Y:" ColonAt="140" Unit="mm" Format="-###0.0##"
-                                     ToolTip="How far along X (into the stock) to position before seeking Y, toward the X face." Margin="0,2,0,0"
-                                     Value="{Binding Path=EdgeProbeOffsetY, Mode=TwoWay}"/>
-
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Label x:Uid="fxd_picture" Content="Picture:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                    <TextBox x:Uid="txtFxPicture" x:Name="txtPictureFile" MinWidth="150" MinHeight="22" VerticalContentAlignment="Center"
-                             Text="{Binding Path=PictureFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    <Button x:Uid="btnFxBrowse" x:Name="btnBrowsePicture" Content="Browse…" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnBrowsePicture_Click"/>
-                </StackPanel>
-
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Label x:Uid="fxd_position" Content="Position:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                     <TextBlock x:Uid="txtFxPosition" x:Name="txtPosition" VerticalAlignment="Center" MinWidth="150" Text="Not set" Foreground="#7F8C8D"/>
                     <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnSetPosition_Click"
-                            ToolTip="Store the current machine position as this fixture's reference start point. Not written to firmware G28 - kept only in this fixture's own definition."/>
+                            ToolTip="Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: clear of both faces (within the schematic's circle) AND within ~10 mm above the spoilboard - the spoilboard probe searches only 12 mm down from here. Not written to firmware G28 - kept only in this fixture's own definition."/>
+                    <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnTestPosition_Click"
+                            ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
                 </StackPanel>
             </StackPanel>
 
@@ -100,73 +74,65 @@
                 <Viewbox Stretch="Uniform" Margin="8">
                     <Grid Width="220" Height="250">
 
-                        <!-- Corner-probing kinds (Corner fence / Dog-hole / Vacuum): reference point outside the
-                             corner, with three dimension pairs to the spoilboard probe, the top probe, and the
-                             two edge-probe start points (each of which then seeks toward its face). -->
+                        <!-- Corner-probing kinds (Corner fence / Dog-hole / Vacuum): jog the probe tip anywhere
+                             inside the clearance circle - clear of both corner faces - and click Set position.
+                             pcorner.macro probes the spoilboard, stock top, and both edges from that one point,
+                             using the live probe definition (no per-fixture offsets to fill in). -->
                         <Canvas x:Name="drwCornerStyle">
                             <!-- Front-left convention (pcorner.macro: FL has sx=+1 "stock is +X of a left
                                  corner", sy=+1 "stock is +Y of a front corner"). In a standard top-down plan
-                                 view (+X right, +Y up/away-from-operator) that puts the front-left reference
+                                 view (+X right, +Y up/away-from-operator) that puts the front-left corner
                                  at the BOTTOM-LEFT, with the stock extending up and to the right from it. -->
+
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
+                                       Text="Jog the probe tip inside the circle (clear of both faces) AND within ~10 mm above the spoilboard (clear air below), then click Set position."/>
 
                             <!-- stock -->
                             <Rectangle Canvas.Left="70" Canvas.Top="50" Width="130" Height="140" Fill="#FFDDDDDD" Stroke="#FF888888"/>
 
-                            <!-- reference point (the fixture's saved "Set position") -->
-                            <Ellipse Canvas.Left="36" Canvas.Top="216" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="0" Canvas.Top="224" Text="Reference"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="0" Canvas.Top="236" Text="(Set position)"/>
-
-                            <!-- spoilboard probe: at reference + Spoil X,Y (default 0,0 = at the reference itself) -->
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="140"
-                                       Text="Spoilboard probe = reference + Spoil X,Y (0,0 = at reference)"/>
-
-                            <!-- top probe: diagonal into the stock (up + right from the front-left reference) -->
-                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="90" Y2="220"/>
-                            <Line Style="{StaticResource DimLine}" X1="90" Y1="220" X2="90" Y2="170"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="46" Canvas.Top="224" Text="Top X"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="94" Canvas.Top="195" Text="Top Y"/>
-                            <Ellipse Canvas.Left="86" Canvas.Top="166" Width="8" Height="8" Stroke="{StaticResource DimBrush}" StrokeThickness="1.5"/>
-                            <Line Style="{StaticResource DimLine}" X1="86" Y1="170" X2="94" Y2="170"/>
-                            <Line Style="{StaticResource DimLine}" X1="90" Y1="166" X2="90" Y2="174"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="162" Text="Top probe (Z)"/>
-
-                            <!-- X-face edge probe: up by Edge Y, then seeks +X toward the X face -->
-                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="40" Y2="180"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="196" Text="Edge Y"/>
-                            <Line Style="{StaticResource DimLine}" X1="40" Y1="180" X2="118" Y2="180"/>
-                            <Polygon Points="118,176 126,180 118,184" Fill="{StaticResource DimBrush}"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="40" Canvas.Top="184" Text="seeks -&gt; X face"/>
-
-                            <!-- Y-face edge probe: right by Edge X, then seeks +Y (up) toward the Y face -->
-                            <Line Style="{StaticResource DimLine}" X1="40" Y1="220" X2="130" Y2="220"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="224" Text="Edge X"/>
-                            <Line Style="{StaticResource DimLine}" X1="130" Y1="220" X2="130" Y2="145"/>
-                            <Polygon Points="126,149 130,141 134,149" Fill="{StaticResource DimBrush}"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="128" Text="seeks ^ Y face"/>
+                            <!-- clearance circle CENTERED ON the reference dot (50,210) - the stock corner
+                                 (70,190) sits on its boundary, so the circle illustrates the reference's
+                                 distance from the corner, sized to the current 3D probe's body diameter
+                                 (label set in code-behind, UpdateProbeCircleLabel). -->
+                            <Ellipse Canvas.Left="22" Canvas.Top="182" Width="56" Height="56" Stroke="{StaticResource DimBrush}"
+                                     StrokeThickness="1.5" StrokeDashArray="3,2"/>
+                            <Ellipse Canvas.Left="46" Canvas.Top="206" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
+                            <TextBlock x:Uid="txtFxProbeCircle" x:Name="txtProbeCircle" Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="150" Text="probe diameter"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="228" Text="Reference (Set position)"/>
                         </Canvas>
 
-                        <!-- Machinist vise: origin is a KNOWN position (captured via a probe cycle at Set-time,
-                             not per-job) - no edge probing at all, only the stock top is probed. -->
+                        <!-- Machinist vise: Set position runs pvisecorner.macro (a dedicated macro - the reference
+                             sits OVER the jaw interior here, the opposite convention from pcorner.macro's corner
+                             probe, which needs the reference OUTSIDE both faces; trying to force pcorner to work
+                             from an inside reference is what sent the probe the wrong direction on hardware, so
+                             this uses its own small macro instead). No spoilboard-style probe is done - the jaw's
+                             own top IS the only surface that matters here - so the jog height just needs to be
+                             close to the jaw top. Drawn in the same top-down plan view as the corner schematic
+                             (+X right, +Y up/away-from-operator): the fixed jaw runs along X at the BACK (top of
+                             the drawing), the vise opens/closes along Y toward the operator (bottom), moving jaw
+                             at the front. -->
                         <Canvas x:Name="drwKnownPosition" Visibility="Collapsed">
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
-                                       Text="Origin is a KNOWN position - no edge probing. Only the stock top (Z) is probed."/>
-                            <!-- fixed jaw -->
-                            <Rectangle Canvas.Left="40" Canvas.Top="100" Width="20" Height="100" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
-                            <!-- stock -->
-                            <Rectangle Canvas.Left="60" Canvas.Top="110" Width="90" Height="80" Fill="#FFDDDDDD" Stroke="#FF888888"/>
-                            <!-- moving jaw -->
-                            <Rectangle Canvas.Left="150" Canvas.Top="100" Width="20" Height="100" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
-                            <!-- known position dot, at the fixed-jaw/stock corner -->
-                            <Ellipse Canvas.Left="56" Canvas.Top="106" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="192" Text="Known position"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="206" Text="(captured via probe"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="30" Canvas.Top="220" Text="cycle, not jog+Set)"/>
-                            <!-- top probe crosshair -->
-                            <Ellipse Canvas.Left="86" Canvas.Top="136" Width="8" Height="8" Stroke="{StaticResource DimBrush}" StrokeThickness="1.5"/>
-                            <Line Style="{StaticResource DimLine}" X1="86" Y1="140" X2="94" Y2="140"/>
-                            <Line Style="{StaticResource DimLine}" X1="90" Y1="136" X2="90" Y2="144"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="98" Canvas.Top="132" Text="Top probe (Z)"/>
+                                       Text="Jog the probe tip inside the circle (over the fixed jaw, near its front-left corner) AND within ~10 mm above the jaw top, then click Set position."/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="40" Canvas.Top="64" Text="~10 mm dia."/>
+                            <!-- fixed jaw (back, along X) -->
+                            <Rectangle Canvas.Left="45" Canvas.Top="95" Width="130" Height="22" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <TextBlock Canvas.Left="45" Canvas.Top="99" Width="130" TextAlignment="Center" FontWeight="Bold" Foreground="Black" FontSize="12" Text="Fixed jaw"/>
+                            <!-- stock (between the jaws, running along Y) -->
+                            <Rectangle Canvas.Left="65" Canvas.Top="117" Width="90" Height="60" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <!-- moving jaw (front, along X) -->
+                            <Rectangle Canvas.Left="45" Canvas.Top="177" Width="130" Height="22" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>
+                            <TextBlock Canvas.Left="45" Canvas.Top="181" Width="130" TextAlignment="Center" FontWeight="Bold" Foreground="Black" FontSize="12" Text="Moving jaw"/>
+                            <!-- 10 mm dia clearance circle, centered OVER the fixed jaw interior - the jaw's
+                                 front-left corner (the red dot) sits on its boundary. pvisecorner.macro backs OFF
+                                 outward from here to find each face, the mirror image of pcorner.macro's approach. -->
+                            <Ellipse Canvas.Left="39" Canvas.Top="83" Width="40" Height="40" Stroke="{StaticResource DimBrush}"
+                                     StrokeThickness="1.5" StrokeDashArray="3,2"/>
+                            <!-- red dot: the jaw's front-left corner (the feature Set position probes for) -->
+                            <Ellipse Canvas.Left="41" Canvas.Top="113" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="20" Canvas.Top="205" Text="Jaw corner (probed"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="20" Canvas.Top="219" Text="via pvisecorner.macro"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="20" Canvas.Top="233" Text="on Set position)"/>
                         </Canvas>
                     </Grid>
                 </Viewbox>
