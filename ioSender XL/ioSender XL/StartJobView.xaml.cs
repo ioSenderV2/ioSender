@@ -80,6 +80,10 @@ namespace GCode_Sender
         public StartJobView()
         {
             InitializeComponent();
+            // rbUnitsMm's initial checked state is set HERE, not via IsChecked="True" in XAML - setting it in
+            // XAML fires Units_Checked mid-BAML-parse, before rbUnitsIn (declared later in the tree) has been
+            // assigned to its field, null-refing on rbUnitsIn.IsChecked and crashing the app on every launch.
+            rbUnitsMm.IsChecked = true;
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             WireInputs();
         }
@@ -243,6 +247,18 @@ namespace GCode_Sender
             bool showMeasure = fx == null || FixtureKinds.ProbesEdges(fx.Kind);
             chkMeasure.Visibility = showMeasure ? Visibility.Visible : Visibility.Collapsed;
             chkRotate.Visibility = showMeasure && GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
+
+            // Size fields describe THIS fixture's stock - meaningless (and easy to fill in against the wrong
+            // assumptions) before a fixture is even chosen. Spacer/backer is a Corner-Fence-style concept (the
+            // spoilboard+spacer floor pcorner.macro computes from it) - a vise has no spoilboard probe at all
+            // (BuildViseProgram never reads it), so it's hidden rather than just disabled for that kind.
+            bool fixtureChosen = fx != null;
+            fldWidth.IsEnabled = fldHeight.IsEnabled = fldThickness.IsEnabled = fixtureChosen;
+            rbUnitsMm.IsEnabled = rbUnitsIn.IsEnabled = fixtureChosen;
+            fldSpacer.Visibility = (fixtureChosen && FixtureKinds.ProbesEdges(fx.Kind)) ? Visibility.Visible : Visibility.Collapsed;
+            fldSpacer.IsEnabled = fixtureChosen;
+
+            UpdateDrawing();   // origin-corner marker (+ jaws for a vise) tracks the selected fixture's kind
         }
 
         private void cbxFixture_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -436,6 +452,11 @@ namespace GCode_Sender
             var canvas = new Canvas { Width = W, Height = H, Background = Brushes.White };
             const double margin = 60d;
 
+            // Only a vise has a fixed physical origin corner independent of where the stock happens to sit -
+            // its jaw is at the BACK of the setup (see FixtureEditDialog's schematic), so the reference/origin
+            // is back-left, not the front-left every edge-probing kind (Corner Fence etc.) always uses.
+            bool isVise = SelectedFixture != null && SelectedFixture.Kind == FixtureKind.MachinistVise;
+
             bool measured = Has(1) && Has(2) && Has(3) && Has(4);
 
             double[] mx = new double[5], my = new double[5];   // 1..4 = FL,FR,BL,BR
@@ -485,8 +506,30 @@ namespace GCode_Sender
 
             Point ctr = new Point((P(1).X + P(2).X + P(3).X + P(4).X) / 4d, (P(1).Y + P(2).Y + P(3).Y + P(4).Y) / 4d);
 
-            // origin corner marker (the selected probe corner): red dot only.
-            int oc = CornerId(SelectedCorner);
+            // Vise: draw the fixed jaw (back, BL-BR edge) and moving jaw (front, FL-FR edge) as bars just
+            // outside the stock - screen Y already has back=smaller/front=larger from the machine-Y-up flip
+            // above (P(3)/P(4) are BL/BR, P(1)/P(2) are FL/FR), matching FixtureEditDialog's schematic.
+            if (isVise)
+            {
+                const double jawBar = 14d, jawOverhang = 12d;
+                var jawFill = new SolidColorBrush(Color.FromRgb(0x9A, 0xA7, 0xB4));
+                var jawStroke = new SolidColorBrush(Color.FromRgb(0x4A, 0x60, 0x70));
+                double jawX0 = Math.Min(P(3).X, P(4).X) - jawOverhang, jawX1 = Math.Max(P(3).X, P(4).X) + jawOverhang;
+
+                var fixedJaw = new System.Windows.Shapes.Rectangle { Width = jawX1 - jawX0, Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
+                Canvas.SetLeft(fixedJaw, jawX0);
+                Canvas.SetTop(fixedJaw, Math.Min(P(3).Y, P(4).Y) - jawBar);
+                canvas.Children.Add(fixedJaw);
+
+                var movingJaw = new System.Windows.Shapes.Rectangle { Width = jawX1 - jawX0, Height = jawBar, Fill = jawFill, Stroke = jawStroke, StrokeThickness = 1.5 };
+                Canvas.SetLeft(movingJaw, jawX0);
+                Canvas.SetTop(movingJaw, Math.Max(P(1).Y, P(2).Y));
+                canvas.Children.Add(movingJaw);
+            }
+
+            // origin corner marker: red dot only. Every edge-probing kind (Corner Fence etc.) always
+            // references front-left; a vise's origin is the jaw's own back-left corner instead (see isVise above).
+            int oc = isVise ? CornerId(Corner.BackLeft) : CornerId(SelectedCorner);
             Point op = P(oc);
             var dot = new System.Windows.Shapes.Ellipse { Width = 11d, Height = 11d, Fill = Brushes.OrangeRed };
             Canvas.SetLeft(dot, op.X - 5.5);
