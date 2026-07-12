@@ -54,12 +54,9 @@ namespace CNC.Controls
             {
                 string line = b.Data ?? string.Empty;
 
-                var ms = rxStock.Match(line);
-                if (ms.Success &&
-                    double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sx) &&
-                    double.TryParse(ms.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sy) &&
-                    double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sz))
-                    Stock = new GCodeStockInfo { X = sx, Y = sy, Z = sz };
+                var stock = TryParseStockLine(line);
+                if (stock.HasValue)
+                    Stock = stock;
 
                 var m = rxTool.Match(line);
                 if (!m.Success)
@@ -73,6 +70,32 @@ namespace CNC.Controls
                     tools[t] = new GCodeToolInfo { Diameter = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang };
                 }
             }
+        }
+
+        // Scan an arbitrary set of program lines for a (STOCK X=.. Y=.. Z=..) comment - the last one wins, same
+        // as Refresh()'s loop. Used both by Refresh() (the global loaded-job scan) and by ProgramView.Stock
+        // (per-instance, for a program that carries its own Blocks rather than deferring to GCode.File.Data).
+        public static GCodeStockInfo? ParseStock(IEnumerable<string> lines)
+        {
+            GCodeStockInfo? found = null;
+            foreach (var line in lines)
+            {
+                var stock = TryParseStockLine(line);
+                if (stock.HasValue)
+                    found = stock;
+            }
+            return found;
+        }
+
+        private static GCodeStockInfo? TryParseStockLine(string line)
+        {
+            var ms = rxStock.Match(line ?? string.Empty);
+            if (ms.Success &&
+                double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sx) &&
+                double.TryParse(ms.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sy) &&
+                double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sz))
+                return new GCodeStockInfo { X = sx, Y = sy, Z = sz };
+            return null;
         }
 
         // Null when the loaded program's (TOOL ...) comments never mention this tool number (or no program is

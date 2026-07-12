@@ -14,6 +14,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
@@ -50,6 +51,13 @@ namespace GCode_Sender
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
 
+        // Whether Width/Height/Thickness have been explicitly set THIS session - either hand-edited, or (once
+        // that exists) auto-filled from a loaded program's stock size. LoadInputs restores last session's
+        // saved numbers silently on tab activation; those are leftovers, not necessarily right for THIS stock -
+        // Generate warns if none of the three were touched (see Generate_Click).
+        private bool sizeFieldsTouched = false;
+        private bool loadingInputs = false;   // true only while LoadInputs is assigning - suppresses the touched flag
+
         // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Start Job", connected
         // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
         private CNC.Controls.ProgramView programView;
@@ -78,10 +86,45 @@ namespace GCode_Sender
             chkRotate.Unchecked += (s, e) => InputChanged();
             chkSetTloRef.Checked += (s, e) => InputChanged();
             chkSetTloRef.Unchecked += (s, e) => InputChanged();
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => InputChanged());
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => InputChanged());
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { UpdateThicknessWarning(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => { MarkSizeFieldsTouched(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => { MarkSizeFieldsTouched(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { MarkSizeFieldsTouched(); UpdateThicknessWarning(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldSpacer, (s, e) => InputChanged());
+        }
+
+        private void MarkSizeFieldsTouched()
+        {
+            if (!loadingInputs)
+                sizeFieldsTouched = true;
+        }
+
+        // Auto-fill Width/Height/Thickness from the loaded job's own (STOCK X=.. Y=.. Z=..) comment (the
+        // Fusion ioSenderBatchPost add-in's format - GCodeProgramComments, refreshed on every completed Load
+        // File/Load Folder), when it declares one - that counts as "explicitly set for this job", same as a
+        // hand-edit, so it also clears the stale-value warning gate (see Generate_Click). Silent no-op when the
+        // loaded program has no STOCK comment (most hand-written/non-Fusion files) - manual entry still works
+        // exactly as before, and Generate's stale-value/envelope checks still catch an unset or oversized guess.
+        private void TryAutoFillStockFromProgram()
+        {
+            var stock = GCodeProgramComments.Stock;
+            if (stock == null)
+                return;
+
+            loadingInputs = true;   // these three ARE explicit values (from the program), not a silent restore -
+            try                     // suppress MarkSizeFieldsTouched's per-field firing so we can set it once below
+            {
+                fldWidth.Value = stock.Value.X;
+                fldHeight.Value = stock.Value.Y;
+                fldThickness.Value = stock.Value.Z;
+                UpdateThicknessWarning();
+            }
+            finally
+            {
+                loadingInputs = false;
+            }
+            sizeFieldsTouched = true;
+            if (model != null)
+                model.Message = "Stock size loaded from the program's (STOCK) comment.";
         }
 
         // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
@@ -119,33 +162,38 @@ namespace GCode_Sender
         }
 
         // (Re)load the fixture library into the dropdown, preserving the current selection by name. Fixtures
-        // are DEFINED in Machine Setup > Fixture definitions - Start Job only selects one and can (re)capture
-        // its position.
+        // are DEFINED (including their position) in Machine Setup > Fixture definitions - Start Job only
+        // selects one, and only lists ones with a VALIDATED position: "Test position" (FixtureEditDialog) has
+        // actually run the real spoilboard probe search and the controller didn't alarm. A merely-captured-
+        // but-untested position is exactly what caused an Alarm:5 probe fail mid-Start-Job (the 12 mm search
+        // cap missed because the saved Z was too far above the spoilboard) - offering it here just invites
+        // repeating that instead of validating it in Machine Setup first.
         private void RefreshFixtures()
         {
             string current = SelectedFixture?.Name;
-            cbxFixture.ItemsSource = Fixtures.Items;
+            cbxFixture.ItemsSource = Fixtures.Items.Where(f => f.PositionValidated).ToList();
             if (current != null)
-                cbxFixture.SelectedItem = Fixtures.Items.FirstOrDefault(f => f.Name == current);
+                cbxFixture.SelectedItem = (cbxFixture.ItemsSource as List<Fixture>).FirstOrDefault(f => f.Name == current);
         }
 
         private Fixture SelectedFixture { get { return cbxFixture.SelectedItem as Fixture; } }
 
-        // Gate Generate on a fixture being selected, its kind having a working macro, AND a position having
-        // been captured; show the matching hint/warning. Also hides Measure/Rotate for a kind that doesn't
-        // probe edges (nothing to measure - see the Machinist Vise design note in BuildProgram).
+        // Gate Generate on a fixture being selected, its kind having a working macro, AND the controller not
+        // being in Alarm (a leftover alarm from a prior failed probe silently swallows the G30 park move -
+        // MBOX prompts show regardless of controller state, so that looked like "prompts but doesn't move").
+        // Also hides Measure/Rotate for a kind that doesn't probe edges (nothing to measure - see the
+        // Machinist Vise design note in BuildProgram). The dropdown only lists validated fixtures
+        // (RefreshFixtures), so there is no separate "no position" case to gate on here.
         private void UpdateFixtureWarning()
         {
             var fx = SelectedFixture;
-            bool noFixtures = Fixtures.Items.Count == 0;
+            bool noFixtures = (cbxFixture.ItemsSource as List<Fixture>)?.Count == 0;
             bool implemented = fx != null && fx.Implemented;
-            bool hasPosition = fx != null && fx.HasPosition;
-            bool ok = implemented && hasPosition;
+            bool notAlarmed = model != null && model.GrblState.State != GrblStates.Alarm;
+            bool ok = fx != null && implemented && notAlarmed;
 
             txtNoFixture.Visibility = noFixtures ? Visibility.Visible : Visibility.Collapsed;
             txtFixtureWarning.Visibility = (fx != null && !implemented) ? Visibility.Visible : Visibility.Collapsed;
-            txtFixtureNoPosition.Visibility = (fx != null && implemented && !hasPosition) ? Visibility.Visible : Visibility.Collapsed;
-            btnSetFixturePosition.IsEnabled = fx != null;
             btnGenerate.IsEnabled = ok && ThreeDProbe() != null;
 
             bool showMeasure = fx == null || FixtureKinds.ProbesEdges(fx.Kind);
@@ -157,25 +205,6 @@ namespace GCode_Sender
         {
             UpdateFixtureWarning();
             InputChanged();
-        }
-
-        private void SetFixturePosition_Click(object sender, RoutedEventArgs e)
-        {
-            var fx = SelectedFixture;
-            if (fx == null)
-                return;
-
-            string coords = Fixtures.CurrentCoordsCsv(model);
-            if (coords == null)
-            {
-                if (model != null)
-                    model.Message = "Machine position unknown - home first to save a fixture position.";
-                return;
-            }
-
-            fx.Coords = coords;
-            Fixtures.Save();
-            UpdateFixtureWarning();
         }
 
         private void InputChanged()
@@ -207,6 +236,7 @@ namespace GCode_Sender
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
+                TryAutoFillStockFromProgram();
                 RefreshFixtures();
                 UpdateSizeHint();
                 Subscribe(true);
@@ -252,6 +282,11 @@ namespace GCode_Sender
         // surface the measured size in the tab. Controller print/debug comments arrive as Message updates.
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // Re-gate Generate live: entering/leaving Alarm should enable/disable it without waiting for the
+            // fixture selection to change (see UpdateFixtureWarning).
+            if (e.PropertyName == nameof(GrblViewModel.GrblState))
+                UpdateFixtureWarning();
+
             if (e.PropertyName != nameof(GrblViewModel.Message))
                 return;
 
@@ -608,11 +643,35 @@ namespace GCode_Sender
             }
 
             var fx = SelectedFixture;
-            if (fx == null || !fx.Implemented || !fx.HasPosition)
+            if (fx == null || !fx.Implemented || !fx.PositionValidated)
             {
-                AppDialogs.Show("Select a fixture with a supported type and a captured position first (Machine Setup > Fixture definitions).",
+                AppDialogs.Show("Select a fixture with a supported type and a validated position first (Machine Setup > Fixture definitions > Test position).",
                     "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
+            }
+
+            // Width/Height/Thickness are silently restored from LAST session's saved values on tab activation
+            // (LoadInputs) - fine as a starting point, but not necessarily right for THIS stock. Confirm before
+            // generating from numbers nobody has actually looked at for this job (TryAutoFillStockFromProgram
+            // already marks this touched when the loaded program declares its own STOCK size).
+            if (!sizeFieldsTouched)
+            {
+                if (AppDialogs.Show("Est. width/height/thickness haven't been set for this job - they're carried over from last time. Generate anyway?",
+                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
+                sizeFieldsTouched = true;   // confirmed once - don't nag again this session unless the fields change
+            }
+
+            // No (STOCK) comment to trust (or none loaded) - sanity-cap against the machine's own travel: typed
+            // dimensions bigger than the work envelope are certainly wrong, regardless of who set them.
+            var travel = GrblInfo.MaxTravel;
+            if (GCodeProgramComments.Stock == null && travel.X > 0d && travel.Y > 0d &&
+                (fldWidth.Value > travel.X || fldHeight.Value > travel.Y || (travel.Z > 0d && fldThickness.Value > travel.Z)))
+            {
+                if (AppDialogs.Show(string.Format("Est. width/height/thickness ({0} x {1} x {2} mm) exceeds this machine's travel ({3} x {4} x {5} mm) - that can't be right. Generate anyway?",
+                        N(fldWidth.Value), N(fldHeight.Value), N(fldThickness.Value), N(travel.X), N(travel.Y), N(travel.Z)),
+                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
             }
 
             // Gate the capability-dependent options on what the controller actually supports, regardless of the
@@ -622,8 +681,10 @@ namespace GCode_Sender
             bool measure = FixtureKinds.ProbesEdges(fx.Kind) && chkMeasure.IsChecked == true;
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
-            program = BuildProgram(p, fx, SelectedCorner, fldWidth.Value, fldHeight.Value,
-                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value);
+            program = FixtureKinds.ProbesEdges(fx.Kind)
+                ? BuildProgram(p, fx, SelectedCorner, fldWidth.Value, fldHeight.Value,
+                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value)
+                : BuildViseProgram(p, fx, fldWidth.Value, fldHeight.Value, fldThickness.Value, cbxWcs.SelectedIndex + 1, setTloRef);
             ResetResults();
             SaveInputs();
 
@@ -640,6 +701,7 @@ namespace GCode_Sender
         // live in CNC.Controls (StartJobConfig) so AppConfig can register the section.
         private void LoadInputs()
         {
+            loadingInputs = true;
             try
             {
                 var s = StartJobConfig.Section;
@@ -657,6 +719,11 @@ namespace GCode_Sender
                 UpdateThicknessWarning();
             }
             catch { /* start with defaults */ }
+            finally
+            {
+                loadingInputs = false;
+                sizeFieldsTouched = false;   // these are last session's leftovers, not yet confirmed for THIS job
+            }
         }
 
         private void SaveInputs()
@@ -829,10 +896,10 @@ namespace GCode_Sender
         // (conservative) estimated size.
         //
         // NOTE on Machinist Vise (FixtureKinds.ProbesEdges == false): its origin is a KNOWN position (the
-        // fixture's saved Coords ARE the precise origin, captured via a probe cycle at Set-time - not this
-        // per-job flow), so it needs zero edge-probing and no Measure/skew support at all. That macro/flow
-        // isn't built yet - only a ProbesEdges == true kind (Corner Fence) is wired to real NGC generation
-        // this round; Implemented == false kinds are blocked before BuildProgram is ever called (Generate_Click).
+        // fixture's saved Coords ARE the precise jaw-corner origin, captured via a real probe cycle at
+        // Set-time - see FixtureEditDialog.RunViseCornerProbe - not this per-job flow), so it needs zero
+        // edge-probing and no Measure/skew support at all. That gets its own generator, BuildViseProgram
+        // (below), not this one - Generate_Click branches on ProbesEdges to pick between them.
         private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius -> edge comp
@@ -882,7 +949,11 @@ namespace GCode_Sender
             }
 
             L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
-            L(string.Format("(Probe \"{0}\": tip {1} mm. Fixture \"{2}\" must be 10-30 mm OUTSIDE the {3} corner in BOTH X and Y.)", p.Name, N(p.ProbeDiameter), fx.Name, cornerName));
+            // Split across short lines - grblHAL rejects a line over its receive-buffer size ("Max characters
+            // per line exceeded") outright, and one long sentence with real names substituted in can exceed it.
+            L(string.Format("(Probe \"{0}\": tip {1}mm body {2}mm.)", p.Name, N(p.ProbeDiameter), N(p.BodyDiameter)));
+            L(string.Format("(Fixture \"{0}\" ({1}): saved position must clear both faces by ~D and be)", fx.Name, cornerName));
+            L("(within 10mm above the spoilboard in Z - see Test position in Fixture definitions.)");
             L("(Estimated size MUST be conservative - a few mm larger than actual - so far refs land just outside.)");
             L("(Requires grblHAL NGC expressions + pcorner.macro on the controller. VALIDATE before trusting.)");
             L("(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)");
@@ -906,15 +977,18 @@ namespace GCode_Sender
             // Sacrificial spacer/backer thickness under the stock (0 = none). pcorner's effective floor becomes
             // spoilboard + spacer, so a thin sheet on a backer is probed on the metal, not down in the backer.
             L(string.Format("#<_ls_spacer> = {0}", N(spacer)));
-            // Fixture-type probe geometry (replaces pcorner's old hardcoded 30mm constants). Corner Fence's
-            // defaults reproduce today's exact values; a future type can offset (or, with ProbesEdges/
-            // ProbesSpoilboard false, skip) any of these stages.
-            L(string.Format("#<_ls_spoilx> = {0}", N(fx.SpoilProbeOffsetX)));
-            L(string.Format("#<_ls_spoily> = {0}", N(fx.SpoilProbeOffsetY)));
-            L(string.Format("#<_ls_topx> = {0}", N(fx.TopProbeOffsetX)));
-            L(string.Format("#<_ls_topy> = {0}", N(fx.TopProbeOffsetY)));
-            L(string.Format("#<_ls_edgex> = {0}", N(fx.EdgeProbeOffsetX)));
-            L(string.Format("#<_ls_edgey> = {0}", N(fx.EdgeProbeOffsetY)));
+            // Probe-geometry offset (into the stock, from the fixture's reference) - derived from the SAME
+            // probe definition doing the probing, not stored per-fixture: the fixture only captures the
+            // single reference point (fx.Coords, "Set position"), which the Fixture edit dialog's schematic
+            // shows as a clearance circle sized to the probe's body diameter. Spoilboard probe stays AT the
+            // reference (clear air below it, per the DISCOVER precondition); top-probe clearance keeps the
+            // probe BODY off the corner while it seeks down. The edge (X/Y face) probes no longer need a
+            // separate offset - pcorner.macro anchors them off the top-probe's own verified XY instead.
+            double topClearance = p.MinStandoff + 9d;
+            L(string.Format("#<_ls_spoilx> = {0}", N(0d)));
+            L(string.Format("#<_ls_spoily> = {0}", N(0d)));
+            L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
+            L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             // Z of the fixture instance's saved position - the spoilboard-probe Z-start now comes from THIS
             // (decoupled from the firmware's G28 Z, #5163) so it matches whichever instance is selected.
             L(string.Format("#<_ls_spoilz> = {0}", N(fxPos.Z)));
@@ -1013,6 +1087,103 @@ namespace GCode_Sender
                 L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
                 L("(PRINT, LS_ROT=#<rot>)");
             }
+            L("M2");
+
+            return b.ToString();
+        }
+
+        // Machinist vise: the fixture's Coords ARE the precise origin X/Y (probed once via pvisecorner.macro at
+        // Set position time, FixtureEditDialog.RunViseCornerProbe) - no per-job edge probing (ProbesEdges ==
+        // false), so unlike BuildProgram this never calls pcorner.macro at all. Only Z needs finding here, from
+        // the ACTUAL stock - fx.Coords.Z is the JAW's top (+ a small safety margin), not the material's, since
+        // stock usually sits at an unpredictable height above the jaws (parallels, clamped height, etc.). Probes
+        // straight down at the CENTRE of the entered stock footprint, per the user's confirmed design. No
+        // measure/skew support - the jaw is rigid and machine-aligned (assumed square to the machine axes),
+        // there is nothing to measure. UNVERIFIED on hardware - this is a first cut (see the file header note).
+        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double estThickness, int wcsP, bool setTloRef)
+        {
+            var fxPos = new Position(fx.Coords);
+            string wcs = "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
+
+            // Stock sits BETWEEN the jaws: from the jaw's probed front-left corner, it extends +X (rightward -
+            // the SAME direction pvisecorner.macro's own top-probe offset uses, assuming stock butts against the
+            // jaw's probed left end) and -Y (toward the operator/moving jaw - the OPPOSITE of the jaw's own bulk,
+            // which is +Y from its corner; the stock is clamped IN FRONT of the jaw's face, not behind it).
+            double centerX = fxPos.X + estW / 2d;
+            double centerY = fxPos.Y - estH / 2d;
+
+            var b = new StringBuilder();
+            int lineNo = 0;
+            void L(string s)
+            {
+                s = SanitizeParens(s);
+                string t = s.TrimStart();
+                bool oword = t.Length > 1 && (t[0] == 'O' || t[0] == 'o') && t[1] == '<';
+                if (s.Length > 0 && s[0] != '(' && !oword)
+                    b.Append('N').Append((lineNo += 10).ToString(CultureInfo.InvariantCulture)).Append(' ');
+                b.Append(s).Append('\n');
+            }
+
+            L("(Start Job - vise: origin from the probed jaw corner, Z from a stock-top probe)");
+            L(string.Format("(Probe \"{0}\": tip {1}mm body {2}mm.)", p.Name, N(p.ProbeDiameter), N(p.BodyDiameter)));
+            L(string.Format("(Fixture \"{0}\": jaw corner from Set position - see Fixture definitions.)", fx.Name));
+            L("(Z is probed at the CENTRE of the entered stock footprint - keep width/height/thickness honest,");
+            L("not oversized: thickness sets how far above the jaw this descends before it starts probing.)");
+            L("(Requires grblHAL NGC expressions. First run for this fixture kind - VALIDATE before trusting.)");
+
+            string prereq = "connected, homed, EXPR, G28, G30";
+            if (setTloRef)
+                prereq += ", ATC=1, G59.3";
+            L(string.Format("(PREREQ, {0})", prereq));
+
+            L("G21 G90 G94 G17");
+            L("G49");
+            if (GrblInfo.HasToolSetter)
+                L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
+            if (GrblInfo.RotationSupported)
+                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));   // clear any stale rotation - vise never measures skew
+
+            L("(park at G30 - install / confirm the probe)");
+            EmitGotoG30(L);
+            L("(WAITIDLE)");
+            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+
+            // Clear G54 so the Z probe below runs in machine coordinates (same reasoning as pcorner.macro).
+            L("G10 L2 P1 X0 Y0 Z0");
+            L("G90");
+
+            L("(--- stock top Z, probed at the footprint centre ---)");
+            L("G53 G1 F1000 Z0");   // retract fully to machine top before crossing - no guessing an intermediate height
+            L(string.Format("G53 G1 F1000 X{0} Y{1}", N(centerX), N(centerY)));
+            // Safe descent height: above the ESTIMATED stock top (jaw top + typed thickness + margin), not the
+            // jaw's own height - the whole point is the stock is a different height than the jaw. If thickness
+            // is UNDERESTIMATED this bare (controlled-feed) descent could contact the stock before reaching the
+            // computed height - same reasoning as Corner Fence wanting the width/height estimate a bit oversize.
+            L(string.Format("G53 G1 F1000 Z[{0} + {1} + 10]", N(fxPos.Z), N(estThickness)));
+            L(string.Format("G38.2 Z[{0} - 15] F{1}", N(fxPos.Z), N(p.ProbeFeedRate)));
+            L("G91 G1 Z2 F1000");
+            L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
+            L("#<_stock_z> = #5063");
+            L("G91 G1 Z10 F1000");
+            L("G90");
+            L("(PRINT, LS_VISE_Z=#<_stock_z>)");
+
+            // Tool-length reference (opt-in), right after the Z probe while WCO is still 0 - same placement/
+            // reasoning as BuildProgram's.
+            if (setTloRef)
+            {
+                L("(--- set tool-length reference at the puck (probe already in spindle) ---)");
+                L("#<_tlo_ref> = 0");
+                L("M6 T8");
+                L("(WAITIDLE)");
+            }
+
+            L("(--- park at G30 (before the origin - keeps all G53 moves at WCO=0) ---)");
+            EmitGotoG30(L);
+
+            L("(--- set work origin: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
+            L(string.Format("G10 L2 {0} X{1} Y{2} Z[#<_stock_z>]", pCode(wcsP), N(fxPos.X), N(fxPos.Y)));
+            L(wcs + "  (activate the coordinate system)");
             L("M2");
 
             return b.ToString();

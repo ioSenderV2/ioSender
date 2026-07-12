@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -33,6 +34,20 @@ namespace CNC.Controls
         // The program this view owns and renders. Set by the producer (Load/Generate); the same block objects
         // are what the streamer runs when this view is connected, so per-line markers are live (never a copy).
         public ObservableCollection<GCodeBlock> Blocks { get; private set; }
+
+        // This program's declared stock size, from its own (STOCK X=.. Y=.. Z=..) comment (the Fusion
+        // ioSenderBatchPost add-in's format - see GCodeProgramComments) - null if it has none. Blocks == null
+        // means this view defers to the loaded job (MainWindow.jobProgramView's SetProgram(null) convention),
+        // so that case reads the already-maintained global GCodeProgramComments.Stock instead of re-scanning.
+        public GCodeStockInfo? Stock
+        {
+            get
+            {
+                return Blocks != null
+                    ? GCodeProgramComments.ParseStock(Blocks.Select(b => b.Data))
+                    : GCodeProgramComments.Stock;
+            }
+        }
 
         public string Title
         {
