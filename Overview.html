@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>93 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>101 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -200,6 +200,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Capability-gated tabs own their own &ldquo;unavailable&rdquo; reason &mdash; each gated view declares why it&rsquo;s missing, so the removal and the <em>Edit Main Page</em> listing can&rsquo;t drift (fixes the SD Card &ldquo;needs SD&rdquo; vs. &ldquo;needs a filesystem&rdquo; mismatch)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr80">80</a></td></tr>
 <tr><td>Restart prompt no longer stranded behind the relaunch splash when applying a restart-only change</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr81">81</a></td></tr>
 <tr><td>App.config and Grbl settings snapshots now share one day-retained Backups folder instead of a single .bak and a count-retained settings-backups folder.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr91">91</a></td></tr>
+<tr><td>New Fixture definitions library (named, typed workholding positions) in Machine Setup, consumed by Start Job's fixture picker - retires the old single-slot G28 named-position combo.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr94">94</a></td></tr>
+<tr><td>GCodeProgramComments extracted as a shared parser for a loaded program's (TOOL)/(STOCK) comments, reused by touch-plate edge-radius compensation and CarveView's 3D carve simulation; touch-plate diameter fix.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr96">96</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -218,6 +220,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Start Job estimated stock size &mdash; setup fields relabelled <em>Est.</em> plus a new <em>Est. thickness (Z)</em> field that warns when stock exceeds 1&Prime;</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr72">72</a></td></tr>
 <tr><td>Consolidate the Start Job corner probe to a single macro (pcorner) and add optional sacrificial spacer/backer support so a thin sheet is probed on the metal, not the backer.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr85">85</a></td></tr>
 <tr><td>With Measure on and the estimated size too large, corners that fall over bare spoilboard now abort at once instead of driving a doomed side probe into air.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr86">86</a></td></tr>
+<tr><td>Machinist Vise is now a working fixture kind: a dedicated corner-probe macro drives Set/Test position, Start Job generates a real program for it, and its schematic tracks the fixture's own Jaw width/Max opening.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr98">98</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -239,6 +242,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Live 3D carve view &mdash; watch the stock get machined away (program-sized stock, real cutter profile flat/ball/V-bit, Play / Cycle&nbsp;Start playback) instead of just toolpath lines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr41">41</a></td></tr>
 <tr><td>3-line run view &mdash; on Cycle Start a generated program collapses to previous / current / next line at the bottom of the tab; click the title bar to expand</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr76">76</a></td></tr>
 <tr><td>Save program... now works for a wizard's generated preview, and the floating Program popup no longer shows a redundant second copy of the loaded job already docked in the Job tab.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr93">93</a></td></tr>
+<tr><td>The Fusion ioSenderBatchPost add-in always combines every operation into one .nc; Load File now recognizes its section markers and shows the same collapsible outline Load Folder used to, so Load Folder is retired.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr97">97</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -249,6 +253,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Console: inline terminal command prompt + output right-click menu (Clear / Save)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr19">19</a></td></tr>
 <tr><td>Bind any main + second-level tab to a key &mdash; right-click Bind-to-Key + header badges</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr79">79</a></td></tr>
 <tr><td>Start Job no longer writes a start_job.macro file or seeds a catalog entry - it already ran entirely in-memory like the other Generate/Cycle Start wizards.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr92">92</a></td></tr>
+<tr><td>Two probe-tip-losing collision bugs fixed in pcorner.macro (found probing a Corner Fence fixture on hardware); MacroProcessor now truncates an oversized auto-generated comment instead of having the controller silently reject the whole line.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr99">99</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -279,6 +284,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Optional localhost server that drives the WPF UI by x:Uid so a change can be verified end to end without a human clicking</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr87">87</a></td></tr>
 <tr><td>The optional test server grew from a proof slice into a real automation harness, and moved into its own app-agnostic assembly</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr89">89</a></td></tr>
 <tr><td>The app-agnostic UI test server moved out to its own public repo and NuGet package; ioSender now consumes it as a package.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr90">90</a></td></tr>
+<tr><td>UiScale (the DPI/zoom setting) now applies to every modal dialog window, not just MainWindow.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr95">95</a></td></tr>
+<tr><td>WpfUiTestServer (v1.2.0) gains POST /handoff (shows a popup, drops the banner, and stops the server) so an agent can hand a UI it drove back to the operator with instructions; /idle now waits for an actual composed frame, not just a drained dispatcher queue.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr100">100</a></td></tr>
+<tr><td>Locale rows added/removed for every new or retired x:Uid this round (Fixture definitions, Fusion outline parity, Machinist Vise, Start Job's unit toggle and Jaw width/Max opening) across all 7 locales.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr101">101</a></td></tr>
 </table>
 </div>
 
@@ -377,7 +385,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">91</td><td><a href="#pr91">AppData: shared Backups folder replaces .bak + settings-backups</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+86</span> <span class="del">-112</span></td></tr>
 <tr><td class="n">92</td><td><a href="#pr92">Remove start_job.macro file + its seeded macro catalog entry</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">1</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-87</span></td></tr>
 <tr><td class="n">93</td><td><a href="#pr93">Program view: fix Save for wizard previews + popup duplication</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+53</span> <span class="del">-65</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (93 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">890</span> <span class="del">10</span> <span class="add">+133</span><br><span class="k">Lines:</span> <span class="add">+40768</span> <span class="del">-6446</span></td></tr>
+<tr><td class="n">94</td><td><a href="#pr94">Fixture definitions: named workholding positions replace the single-slot G28 combo</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">1</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+859</span> <span class="del">-337</span></td></tr>
+<tr><td class="n">95</td><td><a href="#pr95">Apply UiScale zoom to dialogs, not just MainWindow</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+42</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">96</td><td><a href="#pr96">Shared program-comment parser; probe dialog tweaks; touch-plate diameter fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+165</span> <span class="del">-62</span></td></tr>
+<tr><td class="n">97</td><td><a href="#pr97">Fusion add-in: combine to one .nc; Load File gets outline parity; retire Load Folder</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">16</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+200</span> <span class="del">-848</span></td></tr>
+<tr><td class="n">98</td><td><a href="#pr98">Machinist Vise fixture: probe, Start Job generation, unit toggle, accurate drawing</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+1021</span> <span class="del">-342</span></td></tr>
+<tr><td class="n">99</td><td><a href="#pr99">pcorner.macro collision fixes; MacroProcessor truncates oversized comments</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+59</span> <span class="del">-29</span></td></tr>
+<tr><td class="n">100</td><td><a href="#pr100">WpfUiTestServer: /handoff releases control to the operator; /idle waits for a real paint</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-4</span></td></tr>
+<tr><td class="n">101</td><td><a href="#pr101">Localization: locale rows for this round's new/removed UI strings</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+548</span> <span class="del">-321</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (101 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">964</span> <span class="del">13</span> <span class="add">+139</span><br><span class="k">Lines:</span> <span class="add">+43666</span> <span class="del">-8389</span></td></tr>
 </table>
 </div>
 
@@ -2277,6 +2293,124 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/MainWindow.xaml</td><td class="num add">6</td><td class="num del">18</td></tr>
 </table>
 <div class="desc"><p>Two gaps left over from the ProgramView refactor (each Generate&#8209;&gt;Cycle&nbsp;Start wizard - Start Job, Auto Square, Stepper Calibration, Surface Spoilboard - now owns its own transient <code>ProgramView</code> instead of sharing one overlay):</p><ul><li><strong>Save program... was permanently disabled</strong> for a wizard's own preview - its enablement still checked only the loaded-job singleton (<code>GCode.File.IsLoaded</code>), which is never true for a wizard's separate, transient program. It now also enables for a view showing its own generated program, and writes that program's lines to a file the operator picks.</li><li><strong>The floating &ldquo;Program&rdquo; popup duplicated the Job tab.</strong> With no wizard connected it fell back to showing the loaded job a second time - identical content to the always-docked Job-tab program list (<code>ProgramPanel</code>). The popup now hosts a view only when it is genuinely transient (<code>ProgramView.AutoShow</code> - a wizard preview or a plain macro run); the &ldquo;Program&rdquo; button disables itself whenever there is nothing to show there, since the loaded job already has a persistent home.</li></ul><p class="foot">Verified live via the UI test server: Program button starts/stays disabled with nothing loaded, enables and shows the generated program on Start Job's Generate, and disables again on leaving the tab.</p></div>
+</div>
+<!-- ===== #94 ===== -->
+<div class="pr">
+<h2 id="pr94"><span class="badge">#94</span>Fixture definitions: named workholding positions replace the single-slot G28 combo</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">192</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml</td><td class="num add">176</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">181</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">103</td><td class="num del">11</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">108</td><td class="num del">14</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">26</td><td class="num del">15</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">2</td><td class="num del">211</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NamedPositionConfig.cs</td><td class="num add">0</td><td class="num del">77</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">37</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">20</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">6</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">8</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml</td><td class="num add">0</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>A new <strong>Fixture definitions</strong> library: named, typed workholding fixtures (Corner fence to start) each with their own saved machine position, edited from a new Machine Setup wizard step and consumed by Start Job's fixture picker - replacing the old single-slot firmware G28 named-position combo (retired here, folded into fixture instances).</p><ul><li><strong>pcorner.macro generalized</strong> to read a fixture instance's saved position instead of the firmware's single G28 slot, so multiple named fixtures can each have their own reference.</li><li><strong>Corner-probing schematic.</strong> The fixture editor draws a clearance circle sized to the live 3D probe's body diameter as the jog target, instead of manually-entered offset fields.</li></ul><p class="foot">Only Corner fence is wired to a working macro this round.</p></div>
+</div>
+<!-- ===== #95 ===== -->
+<div class="pr">
+<h2 id="pr95"><span class="badge">#95</span>Apply UiScale zoom to dialogs, not just MainWindow</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/DialogScaling.cs</td><td class="num add">32</td><td class="num">0</td></tr>
+<tr><td class="mono">9 dialog .xaml.cs files (+1 line each, apply DialogScaling)</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Dialog windows (probe/tool editors, job-parameter prompts, port picker, pending-changes, etc.) rendered at 100% regardless of the configured UiScale zoom. A shared <code>DialogScaling.Apply(this)</code> call, added to each dialog's constructor, fixes that.</p></div>
+</div>
+<!-- ===== #96 ===== -->
+<div class="pr">
+<h2 id="pr96"><span class="badge">#96</span>Shared program-comment parser; probe dialog tweaks; touch-plate diameter fix</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeProgramComments.cs</td><td class="num add">100</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml.cs</td><td class="num add">24</td><td class="num del">49</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml.cs</td><td class="num add">11</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ProbingViewModel.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml</td><td class="num add">11</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinition.cs</td><td class="num add">7</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><code>GCodeProgramComments</code> parses a loaded program's <code>(TOOL T=n D=d TYPE=...)</code>/<code>(STOCK X=.. Y=.. Z=..)</code> comment lines (the Fusion ioSenderBatchPost add-in's format) once, shared by every consumer instead of duplicated regex logic - touch-plate probing's edge-radius compensation and CarveView's 3D carve simulation both switched to it. Probe definition dialog tweaks and a touch-plate diameter fix alongside.</p></div>
+</div>
+<!-- ===== #97 ===== -->
+<div class="pr">
+<h2 id="pr97"><span class="badge">#97</span>Fusion add-in: combine to one .nc; Load File gets outline parity; retire Load Folder</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">13</td><td class="num del">126</td></tr>
+<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.py</td><td class="num add">78</td><td class="num del">88</td></tr>
+<tr><td class="mono">Fusion Addin/README.md</td><td class="num add">29</td><td class="num del">62</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">58</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FusionFolderLoader.cs</td><td class="num add">0</td><td class="num del">353</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FolderPicker.cs</td><td class="num add">0</td><td class="num del">159</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">2</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">3</td><td class="num del">7</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ProgramPanel.xaml.cs</td><td class="num add">3</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/ProgramPanel.xaml</td><td class="num add">4</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">5</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">5</td><td class="num del">5</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">0</td><td class="num del">9</td></tr>
+<tr><td class="mono">5 small config/xaml cleanup files</td><td class="num add">0</td><td class="num del">5</td></tr>
+</table>
+<div class="desc"><p>The Fusion <code>ioSenderBatchPost</code> add-in now <strong>always</strong> combines every posted operation into a single <code>&lt;folder&gt;.nc</code> (STOCK/TOOL header, per-op <code>(--- seq: name (Tn) ---)</code> section markers, tool changes/rapids restored inline) instead of leaving per-op files for Load Folder to stitch afterward.</p><ul><li><strong>Load File gets outline parity.</strong> <code>GCodeJob.ParseFileLines</code> now recognizes those section markers and tags sections the same way Load Folder did, so a plain File &gt; Load of the combined output shows the same collapsible, groupable outline.</li><li><strong>Load Folder retired.</strong> <code>FusionFolderLoader.cs</code> and <code>FolderPicker.cs</code> are gone; <code>GrblViewModel.IsFolderView</code> renamed to <code>HasOutline</code> (now set by either load path).</li></ul><p class="foot">Phase 1 (the Python add-in) is code-review-verified only - no Fusion 360 available to run a real post in this environment.</p></div>
+</div>
+<!-- ===== #98 ===== -->
+<div class="pr">
+<h2 id="pr98"><span class="badge">#98</span>Machinist Vise fixture: probe, Start Job generation, unit toggle, accurate drawing</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">438</td><td class="num del">116</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">256</td><td class="num del">78</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml</td><td class="num add">60</td><td class="num del">84</td></tr>
+<tr><td class="mono">macros/pvisecorner.macro</td><td class="num add">100</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">44</td><td class="num del">30</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProgramView.xaml.cs</td><td class="num add">52</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeProgramComments.cs</td><td class="num add">29</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">20</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">10</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StartJobConfig.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">MachineSetupWizard.xaml(.cs), CNC Controls.csproj</td><td class="num add">3</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Machinist Vise moves from a defined-but-unwired fixture kind to a fully working one, end to end:</p><ul><li><strong>pvisecorner.macro</strong> - a dedicated macro, not a variant of pcorner.macro: the reference sits <em>over</em> the jaw interior (pcorner needs its reference <em>outside</em> the corner), so the face-probe logic is a mirror image - back off outward, then seek inward.</li><li><strong>Set/Test position</strong> in the Fixture dialog now actually probes the jaw's front-left corner and stores the resolved position, with async-completion tracking that fixed two real staleness bugs found on hardware: a jogged position captured before a blocking confirm dialog let a hardware MPG pendant move the machine before the probe ran, and Test position was reading controller state before its own async probe had finished.</li><li><strong>Start Job's BuildViseProgram</strong> sets origin X/Y from the probed jaw corner directly and finds Z by probing the centre of the entered stock footprint.</li><li><strong>Stock size fields</strong> gained an mm/in unit toggle (display-only - everything downstream still works in mm), are disabled until a fixture is chosen, and Spacer/backer (a Corner-Fence-only concept) is hidden for vise.</li><li><strong>The selected fixture now persists</strong> across restarts, not just the entered sizes.</li><li><strong>The schematic drawing tracks the selected fixture's kind</strong>: a vise's origin dot sits on the jaw's own corner (not always front-left), and the fixed/moving jaw bars are sized/spaced from the fixture's own Jaw width and Max opening - a dashed line marks the max-opening limit, turning red if the entered stock won't fit.</li><li><strong>ProgramView.Stock</strong> (declared-or-envelope stock size, scoped only to the loaded job) lets Start Job auto-fill from a loaded program's own (STOCK) comment and sanity-check an oversized/stale entry against it.</li></ul><p class="foot">Corner Fence remains hardware-validated; vise Set/Test/Start-Job-generation self-verified on hardware this round, drawing changes UI-test-server-verified.</p></div>
+</div>
+<!-- ===== #99 ===== -->
+<div class="pr">
+<h2 id="pr99"><span class="badge">#99</span>pcorner.macro collision fixes; MacroProcessor truncates oversized comments</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">43</td><td class="num del">28</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">16</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Two distinct collision bugs, both found probing a fence fixture on real hardware: a stale prior-corner safe-Z used for the pre-top-probe descent on REUSE corners, and the Y-face section descending onto the exact point the top probe had just touched instead of backing outside the face first. Every traverse/retract in the macro also switched from a bare rapid to a controlled feed, so a still-undiscovered logic bug produces a gentle push instead of a full-speed crash.</p><p>Separately: grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded") and the stream never recovers - an auto-generated comment with interpolated names (a probe/fixture name) had grown past that unnoticed and derailed an entire Start Job run. <code>MacroProcessor.SanitizeComment</code> now shortens an oversized pure-comment line's interior instead of sending it whole.</p></div>
+</div>
+<!-- ===== #100 ===== -->
+<div class="pr">
+<h2 id="pr100"><span class="badge">#100</span>WpfUiTestServer: /handoff releases control to the operator; /idle waits for a real paint</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core.csproj, ioSender XL.csproj (PackageReference bump 1.0.0 to 1.2.0)</td><td class="num add">4</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>Both new capabilities live in the standalone <code>WpfUiTestServer</code> package (<code>github.com/stevenrwood/WpfUiTestServer</code>), bumped here from 1.0.0 to 1.2.0:</p><ul><li><strong>POST /handoff</strong> (v1.1.0) - for an agent that has been driving the UI unattended up to a point where a human needs to take over. Shows a non-modal popup with caller-supplied instructions (so the operator has full control while reading it, never blocked), removes the "under test-server control" banner, and stops the server - a real stop, not a pause; a fresh <code>Start()</code> works again if needed later in the same run.</li><li><strong>GET /idle waits for a real paint</strong> (v1.2.0) - draining the Dispatcher to Background priority only proves layout/arrange ran; WPF's actual pixel composition happens on a separate compositor thread not synchronized with that queue at all. <code>/idle</code> now also waits (bounded) for a <code>CompositionTarget.Rendering</code> tick - the real "has this painted" signal.</li></ul><p class="foot">Dev/QA infrastructure only, off by default behind -testserver. No ioSender-side behaviour change beyond the version bump.</p></div>
+</div>
+<!-- ===== #101 ===== -->
+<div class="pr">
+<h2 id="pr101"><span class="badge">#101</span>Localization: locale rows for this round's new/removed UI strings</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">Locale/*/csv (7 locales x 2 files) + tools/locadd.py</td><td class="num add">548</td><td class="num del">321</td></tr>
+</table>
+<div class="desc"><p>English-baseline locale rows for every new or retired <code>x:Uid</code> introduced this round, across all 7 locales via <code>tools/locadd.py</code> - Fixture definitions, the retired G28 named-position combo, Fusion add-in outline parity, Machinist Vise fixture (Set/Test, schematic, Jaw width/Max opening), and Start Job's mm/in unit toggle.</p></div>
 </div>
 </section>
 
