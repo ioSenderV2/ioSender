@@ -32,6 +32,10 @@ namespace CNC.Controls
         public bool ApplyRotation = false;   // set the WCS rotation from the measured skew (G10 L2 R)
         public bool SetTloRef = false;        // reference the puck TLO after corner 1 (Load Stock == start_job)
         public string Probe = string.Empty;
+        // Display-only preference: Width/Height/Thickness/SpacerThickness above are ALWAYS persisted in mm
+        // (everything downstream - BuildProgram, the drawing, warnings - assumes mm) regardless of this flag;
+        // it only controls which unit the Stock size fields show/accept on screen (StartJobView's mm/in toggle).
+        public bool IsImperial = false;
     }
 
     // Static holder backing the "StartJob" App.config section (read/written by AppConfig.RegisterFolded and
