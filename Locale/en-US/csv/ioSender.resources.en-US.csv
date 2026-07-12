@@ -129,5 +129,3 @@ ioSender.g.en-US.resources:startjobview.baml,ls_lblFixture:System.Windows.Contro
 ioSender.g.en-US.resources:startjobview.baml,txtFxInstanceName:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Type a name and Set to save the current machine position as a fixture instance.
 ioSender.g.en-US.resources:startjobview.baml,btnFxSet:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
 ioSender.g.en-US.resources:startjobview.baml,btnFxSet:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store the current machine position as a fixture instance.
-ioSender.g.en-US.resources:startjobview.baml,btnFxSetPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set position
-ioSender.g.en-US.resources:startjobview.baml,btnFxSetPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store the current machine position as this fixture's reference start point.
