@@ -44,7 +44,7 @@
         <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="fxd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" MinWidth="75" MinHeight="24" IsDefault="True"/>
-                <Button x:Uid="fxd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" MinWidth="75" MinHeight="24" Margin="6,0,0,0"/>
+                <Button x:Uid="fxd_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" Click="btnCancel_Click" MinWidth="75" MinHeight="24" Margin="6,0,0,0"/>
             </StackPanel>
         </DockPanel>
 

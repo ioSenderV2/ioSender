@@ -104,6 +104,19 @@ namespace CNC.Controls
             UpdateTestPositionEnabled();
         }
 
+        // Cancel closes the dialog regardless (IsCancel="True") - the vise corner probe (RunViseCornerProbe)
+        // streams asynchronously and isn't owned by this window, so closing mid-probe would otherwise leave it
+        // running unsupervised while WatchAsyncCompletion's callback waits to touch a disposed window. Feed
+        // Hold only (never Stop/Reset here) - see the streamer-thread wedge notes: Stop/Reset during an
+        // in-flight move can leave grblHAL unrecoverable without a controller power-cycle, but Hold is safe.
+        // This pauses the motion; it does NOT abort the stream or resume it - the operator does that themselves
+        // from the main window's run controls once this dialog is gone.
+        private void btnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_probing)
+                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_FEED_HOLD));
+        }
+
         // Vise Set position: the jogged position (within the schematic's circle, OVER the jaw, near its
         // front-left corner) is only the RAW REFERENCE - same jog-then-Set idiom as every other kind - but
         // unlike them, Set here actually RUNS pvisecorner.macro against the fixed jaw right now and stores the
@@ -144,6 +157,12 @@ namespace CNC.Controls
 
             var b = new StringBuilder();
             b.AppendLine("(Set position - vise: probe the fixed jaw's front-left corner via pvisecorner.macro)");
+            // Diagnostic: 2026-07 hardware run saw the macro print rx=0.000 ry=0.000 rz=0.000 instead of the
+            // jogged position - pvisecorner.macro only echoes whatever #<_lv_ref*> it's handed below, so that
+            // was wrong before the CALL even ran. Print the RAW captured CSV (joggedCoords, pre-Position-parse)
+            // so a repeat shows whether CurrentCoordsCsv/the click-time capture was already wrong, or something
+            // between here and the #<_lv_ref*> lines below corrupted it.
+            b.AppendLine(string.Format("(PRINT, SV joggedCoords={0})", joggedCoords));
             b.AppendLine("(PREREQ, connected, homed, noalarm)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");

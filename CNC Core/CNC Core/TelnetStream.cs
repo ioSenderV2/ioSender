@@ -216,7 +216,14 @@ namespace CNC.Core
             try
             {
                 if (ipstream != null && IsOpen)
+                {
+                    // TEMPORARY DIAGNOSTIC (2026-07-12) - tracing an error:71 that reproduces only when
+                    // streamed as part of a job/macro run, never via identical text sent through MDI.
+                    // Remove once that's root-caused. See [[iosender-named-g28-presets]]/[[iosender-streamer-thread]].
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("comms-tx", string.Format("BYTE 0x{0:X2} '{1}'", data, data >= 0x20 && data < 0x7F ? ((char)data).ToString() : "."));
                     ipstream.Write(new byte[1] { data }, 0, 1);
+                }
             }
             catch (Exception ex)
             {
@@ -229,7 +236,12 @@ namespace CNC.Core
             try
             {
                 if (ipstream != null && IsOpen)
+                {
+                    // TEMPORARY DIAGNOSTIC (2026-07-12) - see WriteByte above.
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("comms-tx", string.Format("BYTES len={0} \"{1}\"", len, Encoding.Default.GetString(bytes, 0, len).Replace("\r", "\\r").Replace("\n", "\\n")));
                     ipstream.Write(bytes, 0, len);
+                }
             }
             catch (Exception ex)
             {
@@ -337,7 +349,11 @@ namespace CNC.Core
 
             lock (input)
             {
-                input.Append(Encoding.ASCII.GetString(buffer, 0, bytesAvailable));
+                string chunk = Encoding.ASCII.GetString(buffer, 0, bytesAvailable);
+                // TEMPORARY DIAGNOSTIC (2026-07-12) - see WriteByte/WriteBytes above; same investigation.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("comms-rx", string.Format("RECV len={0} \"{1}\"", bytesAvailable, chunk.Replace("\r", "\\r").Replace("\n", "\\n")));
+                input.Append(chunk);
 
                 if (EventMode)
                 {
