@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>101 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>102 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -221,6 +221,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Consolidate the Start Job corner probe to a single macro (pcorner) and add optional sacrificial spacer/backer support so a thin sheet is probed on the metal, not the backer.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr85">85</a></td></tr>
 <tr><td>With Measure on and the estimated size too large, corners that fall over bare spoilboard now abort at once instead of driving a doomed side probe into air.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr86">86</a></td></tr>
 <tr><td>Machinist Vise is now a working fixture kind: a dedicated corner-probe macro drives Set/Test position, Start Job generates a real program for it, and its schematic tracks the fixture's own Jaw width/Max opening.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr98">98</a></td></tr>
+<tr><td>Root-caused the vise Start Job error:71 storm (a dangling-paren comment corrupting the grblHAL parser) and a real MDI-queue pacing bug it exposed; added a jaw keep-out toolpath check, spacer-aware Z math, and Cancel-issues-Feed-Hold during a corner probe.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr102">102</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -393,7 +394,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">99</td><td><a href="#pr99">pcorner.macro collision fixes; MacroProcessor truncates oversized comments</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+59</span> <span class="del">-29</span></td></tr>
 <tr><td class="n">100</td><td><a href="#pr100">WpfUiTestServer: /handoff releases control to the operator; /idle waits for a real paint</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+4</span> <span class="del">-4</span></td></tr>
 <tr><td class="n">101</td><td><a href="#pr101">Localization: locale rows for this round's new/removed UI strings</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+548</span> <span class="del">-321</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (101 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">964</span> <span class="del">13</span> <span class="add">+139</span><br><span class="k">Lines:</span> <span class="add">+43666</span> <span class="del">-8389</span></td></tr>
+<tr><td class="n">102</td><td><a href="#pr102">Vise Start Job: error:71 root-caused, keep-out check</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+173</span> <span class="del">-21</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (102 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">970</span> <span class="del">13</span> <span class="add">+139</span><br><span class="k">Lines:</span> <span class="add">+43839</span> <span class="del">-8410</span></td></tr>
 </table>
 </div>
 
@@ -2411,6 +2413,20 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales x 2 files) + tools/locadd.py</td><td class="num add">548</td><td class="num del">321</td></tr>
 </table>
 <div class="desc"><p>English-baseline locale rows for every new or retired <code>x:Uid</code> introduced this round, across all 7 locales via <code>tools/locadd.py</code> - Fixture definitions, the retired G28 named-position combo, Fusion add-in outline parity, Machinist Vise fixture (Set/Test, schematic, Jaw width/Max opening), and Start Job's mm/in unit toggle.</p></div>
+</div>
+<!-- ===== #102 ===== -->
+<div class="pr">
+<h2 id="pr102"><span class="badge">#102</span>Machinist Vise Start Job: fixed a parser-corrupting comment + an MDI queue pacing bug, added a jaw keep-out check</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">115</td><td class="num del">17</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">13</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">17</td><td class="num del">1</td></tr>
+<tr><td class="mono">build.ps1</td><td class="num add">8</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The Machinist Vise's Start Job program (jaw-corner origin + stock-top Z probe) has been failing with a storm of <code>error:71 - Unknown operation found in expression</code> since it shipped - first hardware run to actually reach the probe traced it down through a genuinely long chase: a suspected firmware issue, a suspected TCP/streaming issue, and finally two real, distinct bugs.</p><ul><li><strong>Root cause:</strong> <code>BuildViseProgram</code> split one comment across two generated G-code lines without closing the parenthesis on the first - grblHAL has no multi-line comment continuation, so the dangling <code>(</code> corrupted the parser's state for every line that followed, until a lone blank line happened to reset it. Fixed by closing/reopening the comment per line.</li><li><strong>Found along the way:</strong> the shared MDI/macro command queue (<code>JobControl.SendCommand</code>/<code>ResponseReceived</code>) flipped back to Idle the instant its local queue emptied, right after writing a line, instead of waiting for that line's real controller ack - so a macro sending several non-motion setup lines in a tight loop fired all of them within milliseconds, zero flow-control pacing. Confirmed via a new opt-in raw comms trace (<code>-debuglog=comms-tx,comms-rx</code>). Affects any macro streaming multiple lines, not just the vise.</li><li><strong>New:</strong> a keep-out check warns (never blocks) if the loaded job's toolpath enters the vise jaws' footprint, tool-radius aware via the grblHAL tool table; the Spacer/backer field is no longer hidden for the vise kind and now feeds the stock-top probe's safe descent height.</li><li><strong>Also:</strong> the Fixture definition dialog's Cancel button now issues a Feed Hold (never Stop/Reset) if closed mid-probe, instead of leaving the corner probe running unsupervised behind a closed window.</li></ul><p class="foot">First real end-to-end hardware validation of the vise Start Job program: jaw-corner Set, stock-top Z probe, TLO-reference tool change, and final work-origin set all confirmed on real hardware.</p></div>
 </div>
 </section>
 
