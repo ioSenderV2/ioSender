@@ -244,6 +244,14 @@ namespace CNC.Controls
             return true;
         }
 
+        // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
+        // Received command line was not executed") and the stream never recovers from the lost line - so an
+        // auto-generated comment with interpolated names (a probe/fixture name, say) can silently break an
+        // entire run. Unlike G-code content, a comment's exact wording doesn't matter to the controller, so a
+        // too-long PURE comment line ("(...)" with nothing before/after) gets its interior shortened rather
+        // than sent whole and rejected. 200 is a conservative margin under grblHAL's common 256-byte line buffer.
+        private const int MaxCommentLineLength = 200;
+
         // grblHAL ends a g-code comment at the FIRST ')', so any '(' or ')' INSIDE a (comment) corrupts the
         // block - the text after the inner ')' is parsed as g-code (e.g. "1 depth pass(es)" -> stray ", DOC...").
         // Replace parens between the outer '(' .. ')' with '[' .. ']' so generated comments are always well-formed.
@@ -260,7 +268,14 @@ namespace CNC.Controls
             for (int i = open + 1; i < close; i++)
                 sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
             sb.Append(s, close, s.Length - close);
-            return sb.ToString();
+
+            string result = sb.ToString();
+            if (result.Length > MaxCommentLineLength && open == 0 && close == result.Length - 1)
+            {
+                int keep = MaxCommentLineLength - (open + 1) - 4;   // total = "(" + keep + "...)"
+                result = result.Substring(0, open + 1) + result.Substring(open + 1, keep) + "...)";
+            }
+            return result;
         }
 
         // Send the accumulated g-code. A SMALL burst goes via the MDI path (as before) - fine between
