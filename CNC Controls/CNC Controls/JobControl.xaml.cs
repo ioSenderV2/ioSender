@@ -805,6 +805,7 @@ namespace CNC.Controls
                        streamingState == StreamingState.JobFinished ||
                         streamingState == StreamingState.ToolChange ||
                          streamingState == StreamingState.Stop ||
+                          streamingState == StreamingState.SendMDI ||
                           (command == GrblConstants.CMD_UNLOCK && streamingState != StreamingState.Send))
             {
                 //                command = command.ToUpper();
@@ -1476,9 +1477,20 @@ namespace CNC.Controls
                     break;
 
                 case StreamingState.SendMDI:
+                    // A command was just dequeued and written -> we are now awaiting ITS real ack, so stay
+                    // busy (SendMDI) regardless of whether more are queued behind it. Only go Idle when this
+                    // call found nothing to send at all - i.e. a real ack just arrived for the last
+                    // outstanding write and nothing new was enqueued in the meantime. Getting this backwards
+                    // (flipping to Idle the moment the LOCAL queue empties, right after writing) let a tight
+                    // caller loop (e.g. MacroProcessor.ExecuteMacro sending several lines in one C# loop with
+                    // no real per-line delay) see "Idle" between each SendCommand call and re-kick a fresh
+                    // synthetic "go" send for every line - the whole burst went out with zero ack pacing,
+                    // confirmed via a comms-tx trace: 14 lines / ~670 bytes in 6ms, before a single real ok
+                    // came back. The controller then couldn't keep its NGC expression parser in sync with the
+                    // flood and threw a string of "error:71 - Unknown operation" it should never have seen.
                     if (Source.Commands.Count > 0)
                         Comms.com.WriteCommand(Source.Commands.Dequeue());
-                    if (Source.Commands.Count == 0)
+                    else
                         streamingState = StreamingState.Idle;
                     break;
 

@@ -253,13 +253,14 @@ namespace GCode_Sender
             chkRotate.Visibility = showMeasure && GrblInfo.RotationSupported ? Visibility.Visible : Visibility.Collapsed;
 
             // Size fields describe THIS fixture's stock - meaningless (and easy to fill in against the wrong
-            // assumptions) before a fixture is even chosen. Spacer/backer is a Corner-Fence-style concept (the
-            // spoilboard+spacer floor pcorner.macro computes from it) - a vise has no spoilboard probe at all
-            // (BuildViseProgram never reads it), so it's hidden rather than just disabled for that kind.
+            // assumptions) before a fixture is even chosen. Spacer/backer (sacrificial sheet/spoilboard under
+            // the stock, e.g. plywood resting on the jaw top under a thin aluminium part) is the same concept
+            // for every kind: pcorner.macro's effective floor is spoilboard + spacer for Corner Fence, and
+            // BuildViseProgram now reads it too - the jaw top alone isn't where the stock actually sits.
             bool fixtureChosen = fx != null;
             fldWidth.IsEnabled = fldHeight.IsEnabled = fldThickness.IsEnabled = fixtureChosen;
             rbUnitsMm.IsEnabled = rbUnitsIn.IsEnabled = fixtureChosen;
-            fldSpacer.Visibility = (fixtureChosen && FixtureKinds.ProbesEdges(fx.Kind)) ? Visibility.Visible : Visibility.Collapsed;
+            fldSpacer.Visibility = fixtureChosen ? Visibility.Visible : Visibility.Collapsed;
             fldSpacer.IsEnabled = fixtureChosen;
 
             UpdateDrawing();   // origin-corner marker (+ jaws for a vise) tracks the selected fixture's kind
@@ -819,6 +820,9 @@ namespace GCode_Sender
                     return;
             }
 
+            if (fx.Kind == FixtureKind.MachinistVise)
+                CheckViseKeepOut();
+
             // Gate the capability-dependent options on what the controller actually supports, regardless of the
             // checkbox state - a hidden-but-checked box must never emit a G10 L2 R (errors:20 without WCSROT) or
             // an M6 T8 puck reference (no toolsetter without ATC). A kind that doesn't probe edges has nothing
@@ -829,7 +833,7 @@ namespace GCode_Sender
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
                                cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value))
-                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef);
+                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, ToMm(fldSpacer.Value), cbxWcs.SelectedIndex + 1, setTloRef);
             ResetResults();
             SaveInputs();
 
@@ -1243,15 +1247,105 @@ namespace GCode_Sender
             return b.ToString();
         }
 
+        // First-pass vise keep-out check: walks the LOADED JOB's toolpath (not the Start Job NGC above) and
+        // warns if any move's swept bounding box crosses into either jaw's footprint. Works entirely in WORK
+        // coordinates - BuildViseProgram sets the work origin AT fx.Coords with no rotation ("vise never
+        // measures skew"), so in that frame the fixed jaw's clamping face is Y=0 (its bulk is +Y from there,
+        // per BuildViseProgram's own comment) and the moving jaw's face - as clamped for THIS stock - is
+        // Y=-stockH, bulk further -Y. Both jaws span X in [0, JawWidth]. Assumes the job runs unshifted in
+        // that same WCS (no G92/additional offset) - reasonable for a first pass, not guaranteed.
+        // Inflates the keep-out boundary by the active tool's radius, read live off Grbl's tool table
+        // (GrblWorkParameters.Tools, R field) as the emulator processes T/M6 - a tool with no table entry
+        // (R=0, the common case for mill setups that never populate it) is treated as zero-diameter/centerline
+        // only, per design: never over-warn on an untabled tool.
+        // Also exempts moves that never reach jaw height: work Z=0 is the probed stock TOP. We do NOT know
+        // how far below that the jaw top actually sits - spacer+thickness only holds if the spacer rests ON
+        // the jaw's probed top surface, but it may instead sit lower, on the vise's base (jaw face height
+        // isn't a tracked dimension), in which case stock top can be flush with - or even below - the jaw
+        // top. So the safe default is jaw top = stock top (Z=0): only moves that stay entirely ABOVE the
+        // material (work Z > 0, e.g. rapid/retract clearance) are exempt from the XY check. Flags and warns;
+        // never blocks Generate.
+        private void CheckViseKeepOut()
+        {
+            var fx = SelectedFixture;
+            if (fx == null || fx.Kind != FixtureKind.MachinistVise || !fx.PositionValidated || fx.JawWidth <= 0d)
+                return;
+
+            var tokens = CNC.Controls.GCode.File?.Tokens;
+            if (tokens == null || tokens.Count == 0)
+                return;
+
+            double stockH = ToMm(fldHeight.Value);
+            if (stockH <= 0d)
+                return;
+
+            double jawX0 = 0d, jawX1 = fx.JawWidth;
+            double fixedFaceY = 0d;
+            double movingFaceY = -stockH;
+            const double jawTopZ = 0d;   // conservative default: jaw top assumed flush with the probed stock top
+
+            int hitCount = 0;
+            uint firstHitLine = 0;
+
+            try
+            {
+                var emu = new GCodeEmulator();
+                foreach (var cmd in emu.Execute(tokens))
+                {
+                    GcodeBoundingBox box = null;
+                    if (cmd.Token is GCArc)
+                        box = (cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental);
+                    else if (cmd.Token is GCCubicSpline)
+                        box = (cmd.Token as GCCubicSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental);
+                    else if (cmd.Token is GCQuadraticSpline)
+                        box = (cmd.Token as GCQuadraticSpline).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental);
+                    else if (cmd.Token is GCAxisCommand9)
+                    {
+                        box = new GcodeBoundingBox();
+                        box.AddPoint(cmd.Start);
+                        box.AddPoint(cmd.End);
+                        box.Conclude();
+                    }
+
+                    if (box == null || box.Min[2] > jawTopZ)   // whole move stays above the jaw - can't hit it
+                        continue;
+
+                    double r = emu.SelectedTool?.R ?? 0d;
+                    bool xOverlap = box.Max[0] >= jawX0 - r && box.Min[0] <= jawX1 + r;
+                    if (!xOverlap)
+                        continue;
+
+                    if (box.Max[1] >= fixedFaceY - r || box.Min[1] <= movingFaceY + r)
+                    {
+                        hitCount++;
+                        if (firstHitLine == 0)
+                            firstHitLine = cmd.LineNumber;
+                    }
+                }
+            }
+            catch { return; }   // exotic/unparseable program (heavy NGC expressions etc.) - skip rather than fault Generate
+
+            if (hitCount > 0)
+            {
+                AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "Heads up: {0} loaded-program move(s) appear to enter the vise jaws' footprint (first at line {1}). " +
+                    "This is an XY-only estimate (tool radius from the grblHAL tool table where set, otherwise centerline) " +
+                    "- verify clearance before running.", hitCount, firstHitLine),
+                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         // Machinist vise: the fixture's Coords ARE the precise origin X/Y (probed once via pvisecorner.macro at
         // Set position time, FixtureEditDialog.RunViseCornerProbe) - no per-job edge probing (ProbesEdges ==
         // false), so unlike BuildProgram this never calls pcorner.macro at all. Only Z needs finding here, from
-        // the ACTUAL stock - fx.Coords.Z is the JAW's top (+ a small safety margin), not the material's, since
-        // stock usually sits at an unpredictable height above the jaws (parallels, clamped height, etc.). Probes
-        // straight down at the CENTRE of the entered stock footprint, per the user's confirmed design. No
-        // measure/skew support - the jaw is rigid and machine-aligned (assumed square to the machine axes),
+        // the ACTUAL stock - fx.Coords.Z is the JAW's top (+ a small safety margin), not the material's: stock
+        // usually sits above the jaws on a sacrificial spacer/spoilboard (parallels, plywood backer, etc.), so
+        // the safe descent height is jaw top + spacer + thickness, the same "spoilboard + spacer" floor
+        // Corner Fence's pcorner.macro computes - see the Spacer field (0 = stock rests directly on the jaw).
+        // Probes straight down at the CENTRE of the entered stock footprint, per the user's confirmed design.
+        // No measure/skew support - the jaw is rigid and machine-aligned (assumed square to the machine axes),
         // there is nothing to measure. UNVERIFIED on hardware - this is a first cut (see the file header note).
-        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double estThickness, int wcsP, bool setTloRef)
+        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double estThickness, double spacer, int wcsP, bool setTloRef)
         {
             var fxPos = new Position(fx.Coords);
             string wcs = "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
@@ -1278,8 +1372,12 @@ namespace GCode_Sender
             L("(Start Job - vise: origin from the probed jaw corner, Z from a stock-top probe)");
             L(string.Format("(Probe \"{0}\": tip {1}mm body {2}mm.)", p.Name, N(p.ProbeDiameter), N(p.BodyDiameter)));
             L(string.Format("(Fixture \"{0}\": jaw corner from Set position - see Fixture definitions.)", fx.Name));
-            L("(Z is probed at the CENTRE of the entered stock footprint - keep width/height/thickness honest,");
-            L("not oversized: thickness sets how far above the jaw this descends before it starts probing.)");
+            // Each L() call becomes its OWN G-code line - a comment must open and close ')' on the same
+            // line (grblHAL has no multi-line comment continuation); splitting one across two calls without
+            // closing the first left a dangling '(' that corrupted the parser for every line that followed
+            // until a lone blank line happened to reset it (root cause of a long-chased "error:71" streak).
+            L("(Z is probed at the CENTRE of the entered stock footprint - keep width/height/thickness honest)");
+            L("(not oversized: thickness sets how far above the jaw this descends before it starts probing.)");
             L("(Requires grblHAL NGC expressions. First run for this fixture kind - VALIDATE before trusting.)");
 
             string prereq = "connected, homed, EXPR, G28, G30";
@@ -1306,11 +1404,11 @@ namespace GCode_Sender
             L("(--- stock top Z, probed at the footprint centre ---)");
             L("G53 G1 F1000 Z0");   // retract fully to machine top before crossing - no guessing an intermediate height
             L(string.Format("G53 G1 F1000 X{0} Y{1}", N(centerX), N(centerY)));
-            // Safe descent height: above the ESTIMATED stock top (jaw top + typed thickness + margin), not the
-            // jaw's own height - the whole point is the stock is a different height than the jaw. If thickness
-            // is UNDERESTIMATED this bare (controlled-feed) descent could contact the stock before reaching the
-            // computed height - same reasoning as Corner Fence wanting the width/height estimate a bit oversize.
-            L(string.Format("G53 G1 F1000 Z[{0} + {1} + 10]", N(fxPos.Z), N(estThickness)));
+            // Safe descent height: above the ESTIMATED stock top (jaw top + spacer + typed thickness + margin),
+            // not the jaw's own height - the whole point is the stock is a different height than the jaw. If
+            // spacer+thickness is UNDERESTIMATED this bare (controlled-feed) descent could contact the stock
+            // before reaching the computed height - same reasoning as Corner Fence wanting the estimate oversize.
+            L(string.Format("G53 G1 F1000 Z[{0} + {1} + {2} + 10]", N(fxPos.Z), N(spacer), N(estThickness)));
             L(string.Format("G38.2 Z[{0} - 15] F{1}", N(fxPos.Z), N(p.ProbeFeedRate)));
             L("G91 G1 Z2 F1000");
             L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
