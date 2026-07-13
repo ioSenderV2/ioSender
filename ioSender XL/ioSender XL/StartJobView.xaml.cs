@@ -217,6 +217,23 @@ namespace GCode_Sender
             return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
         }
 
+        // Touch plate diameter: prefer the loaded program's own (TOOL T=n D=...) comment for the CURRENTLY
+        // loaded tool (GCodeProgramComments.DiameterFor, same source ProbingViewModel.SelectedProbe already
+        // uses for the general Probing tab) over the probe definition's fallback field. There's no firmware
+        // tool table here (N_TOOLS=0), so the program's own comments are the only live source of "what's
+        // actually in the collet"; falls back when no program is loaded yet or its comments don't mention
+        // this tool number.
+        private double ActiveOrFallbackProbeDiameter(ProbeDefinition p)
+        {
+            if (model != null && model.Tool != GrblConstants.NO_TOOL && int.TryParse(model.Tool, out int currentTool))
+            {
+                double? live = GCodeProgramComments.DiameterFor(currentTool);
+                if (live.HasValue)
+                    return live.Value;
+            }
+            return p.ProbeDiameter;
+        }
+
         // The probe definition Generate should actually use, per the Probe: radio selection.
         private ProbeDefinition ActiveProbe()
         {
@@ -871,7 +888,7 @@ namespace GCode_Sender
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
                                cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value), thicknessMm, touchPlate, stockConductive)
-                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise);
+                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p));
             ResetResults();
             SaveInputs();
 
@@ -1151,7 +1168,7 @@ namespace GCode_Sender
             L("(within 10mm above the spoilboard in Z - see Test position in Fixture definitions.)");
             L("(Estimated size MUST be conservative - a few mm larger than actual - so far refs land just outside.)");
             L("(Requires grblHAL NGC expressions + pcorner.macro on the controller. VALIDATE before trusting.)");
-            L("(PREREQ, connected, homed, EXPR, ATC=1, G28, G30, G59.3)");
+            L("(PREREQ, connected, homed, EXPR, ATC=1, G30, G59.3)");
             L("G21 G90 G94 G17");
             L("G49");
             // Select the probe input for the chosen probe (tool setter -> 1, else the main probe -> 0), the same
@@ -1393,7 +1410,7 @@ namespace GCode_Sender
         // Optional partial Measure (corners 2+4 only, see the `measure` block below) - the jaw is assumed
         // machine-aligned (square to the axes), so skew is never computed here, only width/height/flatness.
         // UNVERIFIED on hardware - this is a first cut (see the file header note).
-        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure)
+        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm)
         {
             var fxPos = new Position(fx.Coords);
             // Same touch-plate/conductive-stock rule as BuildProgram - see its comment. The vise's XY origin
@@ -1432,7 +1449,7 @@ namespace GCode_Sender
             L("(not oversized: thickness sets how far above the jaw this descends before it starts probing.)");
             L("(Requires grblHAL NGC expressions. First run for this fixture kind - VALIDATE before trusting.)");
 
-            string prereq = "connected, homed, EXPR, G28, G30";
+            string prereq = "connected, homed, EXPR, G30";
             if (setTloRef)
                 prereq += ", ATC=1, G59.3";
             L(string.Format("(PREREQ, {0})", prereq));
@@ -1456,18 +1473,29 @@ namespace GCode_Sender
             L("(--- stock top Z, probed at the footprint centre ---)");
             L("G53 G0 Z0");   // rapid - Z0 is the machine top, always clear
             L(string.Format("G53 G0 X{0} Y{1}", N(centerX), N(centerY)));   // rapid - travelling AT Z0
-            // Safe descent height: a FIXED 10mm above the fixture's saved reference (fxPos.Z) - NOT derived
-            // from spacer/typed thickness. Three prior attempts computing this from spacer+thickness math all
-            // missed on real hardware, and a live measurement (2026-07-12) showed the stock top can sit BELOW
-            // the vise origin just as easily as above it (depends entirely on how tall the clamped stock is
-            // relative to the jaw - spacer/thickness typed for a DIFFERENT purpose don't reliably predict it).
-            // fxPos.Z itself is only trustworthy immediately after a fresh Set position (see FixtureEditDialog)
-            // - a stale capture is a likely root cause of the earlier misses. The search below gets a GENEROUS
-            // 30mm of travel (rather than a tight cap) so it actually finds the real surface either way.
-            L(string.Format("#<_lv_descent> = [{0} + 10]", N(fxPos.Z)));
+            // Expected stock-top Z, from the vise's FIXED physical geometry (2026-07-13, user-specified;
+            // supersedes the earlier flat "+10mm above the origin" guess, which drove the probe at F1000
+            // straight into a thin 1/4" plate - that fudge assumed the stock top was always ~10mm above the
+            // jaw origin, which isn't true for stock thinner than the frame's recess). fxPos.Z is NOT the
+            // true jaw top - FixtureEditDialog.RunViseCornerProbe stores the resolved corner PLUS
+            // FixtureKinds.VisePositionMarginMm (8mm) above the actual probed surface, so that has to be
+            // backed out first (missed this on the previous attempt - fxPos.Z used directly landed the
+            // whole estimate 8mm high). The vise then has a FIXED 1in (25.4mm) recess below the TRUE jaw
+            // top: stock >= 1in thick always bottoms out ON that recess, so its top sits above the jaw top
+            // by however much it's over 1in; stock < 1in thick sits on a spacer filling the rest of that
+            // same recess, so its top is (approximately) flush WITH the true jaw top regardless of its
+            // exact thickness. Same frameRecessMm idiom as the measure block's #<_bottom> below, solving for
+            // the opposite end (the top) instead of the floor - that calculation has the same fxPos.Z vs.
+            // true-jaw-top gap, harmless there since #<_bottom> is a conservative floor, not a contact point.
+            const double frameRecessMm = 25.4d;   // 1 inch
+            double jawTopZ = fxPos.Z - FixtureKinds.VisePositionMarginMm;
+            double expectedTopZ = thickness < frameRecessMm ? jawTopZ : jawTopZ + (thickness - frameRecessMm);
+            // Safe Z = expected top + 5mm (user-specified) - the controlled-feed approach stops there, THEN
+            // the G38.2 search takes over for the actual contact.
+            L(string.Format("#<_lv_descent> = [{0} + 5]", N(expectedTopZ)));
             L("(PRINT, LS_VISE_APPROACH descent=#<_lv_descent>)");
             L("G53 G1 F1000 Z[#<_lv_descent>]");
-            L(string.Format("G38.2 Z[#<_lv_descent> - 30] F{0}", N(SearchFeed(p))));
+            L(string.Format("G38.2 Z[#<_lv_descent> - 15] F{0}", N(SearchFeed(p))));
             L("G91 G1 Z2 F1000");
             L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
             // Touch plate + non-conductive stock: subtract the plate's known thickness (0 for the 3D probe and
@@ -1488,22 +1516,40 @@ namespace GCode_Sender
             // Partial Measure (opt-in): corners 1 (FL) and 3 (BL) sit right where the fixed jaw covers that
             // edge - a face-probe there would drive into the jaw, and corner 3's XY is the jaw origin itself
             // anyway (nothing to probe). Only corners 2 (FR, diagonal) and 4 (BR, X-neighbour) are clear of
-            // the jaw on both faces, so those get a REAL pcorner.macro face+Z probe; corners 1 and 3 only get
-            // a straight-down Z probe (jaw doesn't block approaching from directly above) for flatness data.
+            // the jaw on both faces, so only those get probed (pcorner.macro face+Z); corners 1/3 are skipped
+            // entirely - they'd only ever be Z-only readout, not used for size/origin, and not worth the
+            // extra probe moves/risk (see git history for the dropped Z-only variant if revisiting).
             // Width/height come from corner 2+4 against the KNOWN jaw origin (no corner-1 fallback needed -
             // unlike Corner Fence, the origin here is exact, not itself probed). Skew is NOT computed: corner
             // 1's Y is only an ESTIMATE (never independently face-probed, blocked by the jaw), so there is no
             // real 4th point to check the stock is actually square against - any skew number here would be
-            // fabricated, not measured. UNVERIFIED on hardware - first cut, same as the rest of this function.
+            // fabricated, not measured. HARDWARE-VERIFIED end-to-end (2026-07-13/14: full Start Job run,
+            // corners 2/4 through park/set-origin/M2, succeeded after the margin tuning above).
             if (measure)
             {
-                L("(--- measure (partial): corners 2+4 face-probed via pcorner.macro, 1+3 Z-only ---)");
+                L("(--- measure (partial): corners 2+4 face-probed via pcorner.macro ---)");
                 L(string.Format("#<_ls_rad> = {0}", N(p.ProbeDiameter / 2d)));
                 L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
                 L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
                 L(string.Format("#<_ls_spacer> = {0}", N(0d)));
                 L(string.Format("#<_ls_thickness> = {0}", N(thickness)));   // face probe depth = top - thickness/2 (see pcorner.macro)
-                double topClearance = p.MinStandoff + 9d;
+                // Entered stock sizes are EXACT for the vise (precision machinist stock, not an estimate to
+                // buffer against) - refMarginMm/topClearance below exist purely so the vertical descent
+                // points don't catch the physical corner/edge, sized off the ACTUAL tip radius of whatever's
+                // in the collet (activeProbeDiameterMm - live from the loaded program's (TOOL T=n D=...)
+                // comment when available, else the touch-plate probe definition's fallback field) rather than
+                // a flat guess. refMarginMm (rx/ry, pushed OUTSIDE the exact edge) just needs to clear the tip
+                // radius so the descent there doesn't overlap the corner; topClearance (topx/topy, pulled
+                // INSIDE) must net out past refMarginMm PLUS its own clearance, since it's computed as an
+                // offset FROM rx/ry inside pcorner.macro (see #<_ls_topx> there) - not two independent points.
+                // +5d (not +2d): hardware run 2026-07-14 landed <3mm actual clearance off the +2d version -
+                // the configured touch-plate fallback diameter is 1/4in (6.35mm, radius ~3.2mm), so +5d gives
+                // real working room rather than a bare-minimum theoretical clearance.
+                double touchTipRadius = activeProbeDiameterMm / 2d;
+                double refMarginMm = touchTipRadius + 5d;
+                // Touch plate has no probe body, so MinStandoff (body radius) is meaningless here. A real 3D
+                // probe keeps its body-standoff-derived formula.
+                double topClearance = touchPlate ? refMarginMm + 10d : p.MinStandoff + 9d;
                 L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));
@@ -1511,17 +1557,17 @@ namespace GCode_Sender
                 L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d)));
                 // Seed the REUSE fail-fast #<_bottom> from the KNOWN stock bottom, not an arbitrary buffer -
                 // this also drives the rapid approach height (_bottom+30) for corner 2/4's own top-probe, so
-                // getting it too deep isn't just "slower fail-fast", it risks that rapid driving into the stock.
-                // The vise's frame has a fixed recess exactly 1in (25.4mm) below the jaw origin: stock >= 1in
-                // thick always bottoms out ON that recess, regardless of how much thicker it is (more
-                // thickness just makes it protrude higher above the jaw) - bottom = jaw_origin - 1in. Stock
-                // < 1in thick sits on a spacer that fills the REST of that same 1in gap down to the frame, so
-                // the stock's OWN bottom (what matters here, not the spacer under it) is simply
-                // jaw_origin - thickness. Both are real physical references, not a guess - same reasoning as
-                // the 3D-probe path's spoilboard+spacer bottom.
-                const double frameRecessMm = 25.4d;   // 1 inch
+                // getting it too HIGH isn't just "slower fail-fast", it risks that rapid driving into the
+                // stock (2026-07-13: this had the same fxPos.Z-vs-true-jaw-top gap as expectedTopZ above -
+                // corner probes were starting too high and timing out for the same reason the centre probe
+                // did, now fixed by reusing jawTopZ here too). The vise's frame has a fixed recess exactly
+                // 1in (frameRecessMm) below the TRUE jaw top: stock >= 1in thick always bottoms out ON that
+                // recess, regardless of how much thicker it is (more thickness just makes it protrude higher)
+                // - bottom = jaw_top - 1in. Stock < 1in thick sits on a spacer that fills the REST of that
+                // same 1in gap down to the frame, so the stock's OWN bottom (what matters here, not the
+                // spacer under it) is simply jaw_top - thickness.
                 double bottomDepth = Math.Min(thickness, frameRecessMm);
-                L(string.Format("#<_bottom> = [{0} - {1} - 5]", N(fxPos.Z), N(bottomDepth)));
+                L(string.Format("#<_bottom> = [{0} - {1} - 5]", N(jawTopZ), N(bottomDepth)));
 
                 // Rapid to the APPROXIMATE corner position first (same estimate-from-origin idea as the
                 // centre probe's centerX/centerY) before handing off to pcorner.macro - otherwise pcorner's
@@ -1534,43 +1580,33 @@ namespace GCode_Sender
                     L(string.Format("G53 G0 X{0} Y{1}", N(x), N(y)));
                 }
 
+                // pcorner.macro's rx/ry (passed below) are its own reference for "just outside this corner's
+                // face - clear air", and its face probes retract-and-rapid straight back out TO that point
+                // before descending (no probe-verified clearance check there, just trust). Zero margin
+                // (2026-07-13's earlier "trust the entered size" attempt) caught the stock edge on the way
+                // down (Alarm:4, probe already triggered before the search even started) - the descent point
+                // sat exactly ON the exact edge with no clearance for the tip's own physical footprint.
+                // refMarginMm (computed above from the tip radius) fixes that without over- or under-shooting.
+                double refXOut = fxPos.X + estW + refMarginMm;
+
                 L("(--- corner 4 = back-right (X-neighbour of the jaw origin) ---)");
-                EmitApproach(fxPos.X + estW, fxPos.Y);
-                EmitPcornerCall(L, 4, N(fxPos.X + estW), N(fxPos.Y), "0");
+                EmitApproach(refXOut, fxPos.Y + refMarginMm);
+                EmitPcornerCall(L, 4, N(refXOut), N(fxPos.Y + refMarginMm), "0");
                 L("#<c4x> = #<_corner_x>");
                 L("#<c4y> = #<_corner_y>");
 
+                double refYOut2 = fxPos.Y - estH - refMarginMm;
+
                 L("(--- corner 2 = front-right (diagonal from the jaw origin) ---)");
-                EmitApproach(fxPos.X + estW, fxPos.Y - estH);
-                EmitPcornerCall(L, 2, N(fxPos.X + estW), N(fxPos.Y - estH), "0");
+                EmitApproach(refXOut, refYOut2);
+                EmitPcornerCall(L, 2, N(refXOut), N(refYOut2), "0");
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
-                // Z-only (no face-seek) at corners 1 and 3 - straight down, same safe-approach/search pattern
-                // as the centre probe above, anchored to the same real #<_stock_z>. Formatted to match
-                // pcorner.macro's own "(PRINT, PC OUT c=N x=.. y=.. z=..)" line so the existing corner-tracking
-                // regex (StartJobView.Model_PropertyChanged) picks these up for free - flatness/drawing/result
-                // text all already handle a partial corner set gracefully (skew silently omits itself when
-                // corners 1/2/3 aren't all present).
-                void EmitZOnly(int cornerId, string label, double x, double y)
-                {
-                    L(string.Format("(--- corner {0} = {1} (Z only - jaw covers this edge's face) ---)", cornerId, label));
-                    // #<_lv_safe_z> (stock top + 5mm) is a TRUSTED height (real measurement, not an estimate),
-                    // so travel AT it and the descent TO it are both rapids - only the G38.2 search itself
-                    // (already feed-controlled via its own F word) gets close to the material.
-                    L("G53 G0 Z[#<_lv_safe_z>]");
-                    L(string.Format("G53 G0 X{0} Y{1}", N(x), N(y)));
-                    L(string.Format("G38.2 Z[#<_stock_z> - 15] F{0}", N(SearchFeed(p))));
-                    L("G91 G1 Z2 F1000");
-                    L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
-                    L("#<_zonly> = #5063");
-                    L("G91 G1 Z10 F1000");
-                    L("G90");
-                    L(string.Format("(PRINT, PC OUT c={0} x={1} y={2} z=#<_zonly>)", cornerId, N(x), N(y)));
-                }
-                EmitZOnly(1, "front-left, Y estimated", fxPos.X, fxPos.Y - estH);
-                EmitZOnly(3, "back-left, exact jaw origin", fxPos.X, fxPos.Y);
-
+                // Corners 1/3 (jaw-covered edge, Z-only) were dropped: they contributed nothing to size/origin
+                // (that's corners 2/4 vs the known jaw origin only) or skew (deliberately not computed - see
+                // above), just an extra flatness readout, and shared the same corner-catch risk corners 2/4
+                // just got fixed for - not worth two more probe moves per run for readout-only data.
                 L("(--- size: corner 2/4 X and Y against the known jaw origin, averaged ---)");
                 L(string.Format("#<size_x> = [[[#<c2x> - {0}] + [#<c4x> - {0}]] / 2]", N(fxPos.X)));
                 L(string.Format("#<size_y> = [[[{0} - #<c2y>] + [{0} - #<c4y>]] / 2]", N(fxPos.Y)));
