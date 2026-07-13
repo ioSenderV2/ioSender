@@ -83,13 +83,28 @@ namespace CNC.Controls
         public int HomingDebounce { get { return _homingDebounce; } set { _homingDebounce = value; OnPropertyChanged(); } }
     }
 
-    // One pending change shown on the review page.
-    public class SettingChange
+    // Row status for a live-apply confirmation grid (PendingChangesDialog's optional apply mode) - a plain
+    // Preview list (MachineSetupWizard's own use) leaves every row at Pending and never changes it.
+    public enum SettingApplyStatus
+    {
+        Pending,
+        NotSupported,
+        Applied,
+        Failed,
+        RolledBack
+    }
+
+    // One pending change shown on the review page (or, in PendingChangesDialog's confirm+apply mode, one
+    // row of a live restore - Status drives that row's colour as it's written).
+    public class SettingChange : ViewModelBase
     {
         public string Setting { get; set; }
         public string Name { get; set; }
         public string OldValue { get; set; }
         public string NewValue { get; set; }
+
+        private SettingApplyStatus _status = SettingApplyStatus.Pending;
+        public SettingApplyStatus Status { get { return _status; } set { _status = value; OnPropertyChanged(); } }
     }
 
     #endregion
@@ -140,6 +155,11 @@ namespace CNC.Controls
         // Raised when the user presses Apply with a machine specified (settings written + remembered). The
         // shell uses this to leave the first-run "set up your machine" gate and return to the normal UI.
         public static event System.Action SetupApplied;
+
+        // Lets code outside this class (e.g. a Restore from a backup file) prompt the same re-check the
+        // wizard's own Apply button does, so an already-open Machine Setup reflects settings changed
+        // behind its back instead of showing stale missing-parameter state.
+        public static void NotifySettingsChangedExternally() => SetupApplied?.Invoke();
 
         public MachineSetupModel Setup { get; } = new MachineSetupModel();
         public List<MachineManufacturer> Manufacturers { get; } = MachineCatalog.Manufacturers;
@@ -754,8 +774,9 @@ namespace CNC.Controls
         }
 
         // True when the target value would actually change the setting. INTEGER/FLOAT are compared numerically
-        // so formatting-only differences (e.g. "1" vs "1.000") are not reported as changes.
-        private static bool TargetDiffers(GrblSettingDetails detail, string target)
+        // so formatting-only differences (e.g. "1" vs "1.000") are not reported as changes. Internal: also used
+        // by GrblConfigControl's Restore-from-file preview (same "what would actually change" comparison).
+        internal static bool TargetDiffers(GrblSettingDetails detail, string target)
         {
             if (detail.DataType == GrblSettingDetails.DataTypes.FLOAT || detail.DataType == GrblSettingDetails.DataTypes.INTEGER)
             {

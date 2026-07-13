@@ -481,8 +481,14 @@ namespace CNC.Controls
 
         void grdGCode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            SingleSelected = grdGCode.SelectedItems.Count == 1 && (DataContext as GrblViewModel).StartFromBlock.CanExecute(grdGCode.SelectedIndex);
-            MultipleSelected = grdGCode.SelectedItems.Count >= 0 && (DataContext as GrblViewModel).StartFromBlock.CanExecute(grdGCode.SelectedIndex);
+            // DataContext can be transiently null/not-yet-a-GrblViewModel here: SetProgram's own DataContext
+            // reassignment (switching the active program) fires this SelectionChanged mid-transition.
+            var grbl = DataContext as GrblViewModel;
+            if (grbl == null)
+                return;
+
+            SingleSelected = grdGCode.SelectedItems.Count == 1 && grbl.StartFromBlock.CanExecute(grdGCode.SelectedIndex);
+            MultipleSelected = grdGCode.SelectedItems.Count >= 0 && grbl.StartFromBlock.CanExecute(grdGCode.SelectedIndex);
         }
 
         private void StartHere_Click(object sender, RoutedEventArgs e)

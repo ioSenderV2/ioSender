@@ -263,13 +263,17 @@ namespace CNC.Controls
             UpdateValidation();
         }
 
-        private bool SetSetting (KeyValuePair<int, string> setting)
+        // Writes one $id=value. true = clean "ok". false = error/timeout, with the raw failure text (error
+        // message resolved where possible) in `error` - the bulk-apply caller decides what to do (stop +
+        // offer rollback), so this no longer asks anything interactively per-setting itself.
+        private bool SetSetting (KeyValuePair<int, string> setting, out string error)
         {
             bool? res = null;
             CancellationToken cancellationToken = new CancellationToken();
             var scmd = string.Format("${0}={1}", setting.Key, setting.Value);
 
             retval = string.Empty;
+            error = null;
 
             new Thread(() =>
             {
@@ -292,14 +296,15 @@ namespace CNC.Controls
                     if(msg != retval)
                         retval += " - \"" + msg + "\"";
                 }
-
-                var details = GrblSettings.Get((GrblSetting)setting.Key);
-
-                if (AppDialogs.Show(string.Format((string)FindResource("SettingsError"), scmd, retval), "ioSender" + (details == null ? "" : " - " + details.Name), MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
-                    return false;
-            }
-            else if (res == false && AppDialogs.Show(string.Format((string)FindResource("SettingsTimeout"), scmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                error = retval;
                 return false;
+            }
+
+            if (res == false)
+            {
+                error = (string)FindResource("SettingsTimedOut");
+                return false;
+            }
 
             return true;
         }
@@ -309,6 +314,7 @@ namespace CNC.Controls
             int pos, id, mismatch = 0;
             List<string> lines = new List<string>();
             List<int> dep = new List<int>();
+            List<SettingChange> summary = new List<SettingChange>();
             Dictionary<int, string> settings = new Dictionary<int, string>();
             FileInfo file = new FileInfo(filename);
             StreamReader sr = file.OpenText();
@@ -348,90 +354,110 @@ namespace CNC.Controls
             sr.Close();
 
             if (settings.Count == 0)
-                AppDialogs.Show((string)FindResource("SettingsInvalid"));
-            else
             {
-                bool? res = null;
-                CancellationToken cancellationToken = new CancellationToken();
+                AppDialogs.Show((string)FindResource("SettingsInvalid"));
+                return false;
+            }
 
-                // List of settings that have other dependent settings and have to be set before them
-                dep.Add((int)GrblSetting.HomingEnable);
+            // List of settings that have other dependent settings and have to be set before them
+            dep.Add((int)GrblSetting.HomingEnable);
 
-                foreach (var cmd in lines)
+            // Preview pass - NO writes yet. Only settings whose value would actually change make the list
+            // (TargetDiffers, same numeric-aware comparison Machine Setup's own Preview uses), plus every
+            // setting this firmware doesn't support at all (shown greyed, Status = NotSupported, never
+            // written), so both are visible before anything is touched.
+            foreach (var d in dep)
+                if (settings.ContainsKey(d))
+                    BuildPreviewEntry(d, settings[d], summary, ref mismatch);
+            foreach (var setting in settings)
+                if (!dep.Contains(setting.Key))
+                    BuildPreviewEntry(setting.Key, setting.Value, summary, ref mismatch);
+
+            if (summary.Count == 0)
+            {
+                AppDialogs.Show((string)FindResource("SettingsRestoreNoChanges"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Information);
+                return false;
+            }
+
+            // OK writes each row live, right there in the grid, colouring it green as it applies (Applied),
+            // red if it fails (Failed, and the loop stops there), or amber if a failure triggers a rollback
+            // of everything already applied (RolledBack). Cancel/closing the window writes nothing at all.
+            var dlg = new PendingChangesDialog(summary, confirm: true)
+            {
+                Owner = Window.GetWindow(this),
+                ApplyOne = row => SetSetting(new KeyValuePair<int, string>(int.Parse(row.Setting.Substring(1)), row.NewValue), out string error) ? null : error,
+                RollbackOne = row => SetSetting(new KeyValuePair<int, string>(int.Parse(row.Setting.Substring(1)), row.OldValue), out string error) ? null : error
+            };
+
+            if (dlg.ShowDialog() != true)
+                return false; // Cancel - nothing written
+
+            if (!summary.Any(s => s.Status == SettingApplyStatus.Applied))
+                return false; // OK was clicked but every row was either NotSupported or rolled back
+
+            bool? res = null;
+            CancellationToken cancellationToken = new CancellationToken();
+
+            foreach (var cmd in lines)
+            {
+                res = null;
+                retval = string.Empty;
+
+                new Thread(() =>
                 {
-                    res = null;
-                    retval = string.Empty;
+                    res = WaitFor.AckResponse<string>(
+                        cancellationToken,
+                        response => Process(response),
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        400, () => Comms.com.WriteCommand(cmd));
+                }).Start();
 
-                    new Thread(() =>
-                    {
-                        res = WaitFor.AckResponse<string>(
-                            cancellationToken,
-                            response => Process(response),
-                            a => model.OnResponseReceived += a,
-                            a => model.OnResponseReceived -= a,
-                            400, () => Comms.com.WriteCommand(cmd));
-                    }).Start();
+                while (res == null)
+                    EventUtils.DoEvents();
 
-                    while (res == null)
-                        EventUtils.DoEvents();
-
-                    if (retval != string.Empty)
-                    {
-                        if (AppDialogs.Show(string.Format((string)FindResource("SettingsError"), cmd, retval), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
-                            break;
-                    }
-                    else if (res == false && AppDialogs.Show(string.Format((string)FindResource("SettingsTimeout"), cmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                if (retval != string.Empty)
+                {
+                    if (AppDialogs.Show(string.Format((string)FindResource("SettingsError"), cmd, retval), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
                         break;
                 }
+                else if (res == false && AppDialogs.Show(string.Format((string)FindResource("SettingsTimeout"), cmd), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.No)
+                    break;
+            }
 
-                foreach (var d in dep)
-                {
-                    if (settings.ContainsKey(d))
-                    {
-                        var setting = new KeyValuePair<int, string>(d, settings[d]);
-                        if (GrblSettings.HasSetting((GrblSetting)setting.Key))
-                        {
-                            if (!SetSetting(setting))
-                            {
-                                settings.Clear();
-                                break;
-                            }
-                        }
-                        else
-                            mismatch++;
-                    }
-                }
+            if (lines.Count > 0 && lines[0] == "%")
+                Comms.com.WriteCommand("%");
 
-                foreach (var setting in settings)
-                {
-                    if (GrblSettings.HasSetting((GrblSetting)setting.Key))
-                    {
-                        if (!dep.Contains(setting.Key))
-                        {
-                            if (!SetSetting(setting))
-                                break;
-                        }
-                    }
-                    else
-                        mismatch++;
-                }
-
-                if (lines.Count > 0 && lines[0] == "%")
-                    Comms.com.WriteCommand("%");
-
-                using (new UIUtils.WaitCursor())
-                {
-                    GrblSettings.ClearPendingEdits();    // restored-from-file values supersede unsaved edits
-                    GrblSettings.Load();
-                }
+            using (new UIUtils.WaitCursor())
+            {
+                GrblSettings.ClearPendingEdits();    // restored-from-file values supersede unsaved edits
+                GrblSettings.Load();
             }
 
             model.Message = string.Empty;
 
-            if (mismatch > 0)
-                AppDialogs.Show(string.Format((string)FindResource("SettingsReloadMismatch"), mismatch), "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            // Settings just changed outside the Machine Setup wizard's own Apply flow (which fires this event
+            // itself) - re-check the setup gate so an already-open wizard reflects the restored values instead
+            // of showing stale missing-parameter state. No-op if the wizard was never opened this session.
+            MachineSetupWizard.NotifySettingsChangedExternally();
 
-            return settings.Count > 0;
+            return true;
+        }
+
+        // Preview-pass helper: classifies one file setting as either a real change (Status = Pending, ready
+        // for the dialog's live apply) or unsupported by this firmware (Status = NotSupported, never
+        // written). Settings whose file value already matches the controller are silently skipped entirely -
+        // no row, no write.
+        private void BuildPreviewEntry(int id, string value, List<SettingChange> summary, ref int mismatch)
+        {
+            var detail = GrblSettings.Get((GrblSetting)id);
+            if (detail == null)
+            {
+                mismatch++;
+                summary.Add(new SettingChange { Setting = "$" + id, Name = "", OldValue = "-", NewValue = value, Status = SettingApplyStatus.NotSupported });
+            }
+            else if (MachineSetupWizard.TargetDiffers(detail, value))
+                summary.Add(new SettingChange { Setting = "$" + id, Name = detail.Name ?? string.Empty, OldValue = detail.Value, NewValue = value });
         }
 
         private void Process(string data)

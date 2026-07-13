@@ -120,6 +120,8 @@ namespace CNC.Controls
             if (!ResolveFileReference(ref code, name))
                 return false;
 
+            SaveGeneratedCopy(name, code);
+
             // Fast path: no directives -> identical to the previous behaviour (confirm if asked).
             if (code.IndexOf("(PREREQ", StringComparison.OrdinalIgnoreCase) < 0 &&
                  code.IndexOf("(MBOX", StringComparison.OrdinalIgnoreCase) < 0 &&
@@ -242,6 +244,21 @@ namespace CNC.Controls
             Flush(model, buffer);
 
             return true;
+        }
+
+        // Persist a copy of every macro/generated program to %AppData%\ioSender\Generated\<name>.macro,
+        // overwriting each run - a debugging aid so "what did Generate actually build" is always inspectable
+        // on disk, since the streamed program itself (StreamProgram/RunStreamedJobInPlace) never touches the
+        // filesystem. Best-effort: a write failure must never block the run itself.
+        private static void SaveGeneratedCopy(string name, string code)
+        {
+            try
+            {
+                var fileName = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()) + ".macro";
+                System.IO.Directory.CreateDirectory(Resources.GeneratedFolder);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(Resources.GeneratedFolder, fileName), code);
+            }
+            catch { /* best-effort - never let a diagnostic write block the actual run */ }
         }
 
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -

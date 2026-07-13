@@ -396,6 +396,12 @@ namespace CNC.Core
 
         public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
 
+        // Every MacroProcessor.Run() call writes its g-code here first (see MacroProcessor.cs) - a
+        // persistent, inspectable copy of the LAST thing each Generate button actually built, named after
+        // the run (e.g. "Start Job" -> "start_job.macro"). Overwritten each run - this is a debugging aid,
+        // not a history; the streamed program itself is never saved to disk otherwise.
+        public static string GeneratedFolder { get { return System.IO.Path.Combine(ConfigPath, "Generated"); } }
+
         // Best-effort day-based retention shared by the App.config and Grbl settings backups.
         public static void PruneBackups(int days = 10)
         {

@@ -1,4 +1,4 @@
-﻿CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Добавить
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Добавить
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_backup:System.Windows.Controls.ContentControl.Content,Button,True,True,,Архив.
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Отмена
 CNC.Controls.WPF.g.en-US.resources:gcoderotatedialog.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Отмена
@@ -1105,3 +1105,8 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_lblProbe:System.Wi
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbe3d:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,3D Probe
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbeTouch:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Touch Plate
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_rbProbeTouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The jaw is bare metal (always conductive) - probes by electrical continuity, same physical probe input as the 3D probe."
+CNC.Controls.WPF.g.en-US.resources:offsetflyout.baml,cbx_g28Fixture:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Fixture to go to (Go navigates to its origin instead of the firmware G28 slot). Edit fixtures in Machine Setup.
+CNC.Controls.WPF.g.en-US.resources:pendingchangesdialog.baml,pc_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore settings
+CNC.Controls.WPF.g.en-US.resources:pendingchangesdialog.baml,pc_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_settingsRestoreNoChanges:System.String.$Content,None,True,True,,Nothing to restore - every setting in this file already matches the controller.
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_settingsTimedOut:System.String.$Content,None,True,True,,timed out

@@ -30,6 +30,16 @@ namespace CNC.Controls
             // "Set" stores the current machine position: G28/G30 via their .1 form, G54-G59.3 via G10 L2.
             btnSet.Visibility = (code == "G28" || code == "G30" || code.StartsWith("G5")) ? Visibility.Visible : Visibility.Collapsed;
 
+            // G28 only: a read-only picker over the Fixture library (Machine Setup owns Set/edit - this
+            // flyout only navigates). Only offers VALIDATED fixtures, same guard Start Job's own fixture
+            // dropdown uses (an unproven Coords is exactly what caused a real Alarm:5 probe fail before).
+            if (code == "G28")
+            {
+                cbxFixture.Visibility = Visibility.Visible;
+                cbxFixture.ItemsSource = Fixtures.Items;
+                cbxFixture.Items.Filter = o => (o as Fixture)?.PositionValidated == true;
+            }
+
             IsVisibleChanged += OffsetFlyout_IsVisibleChanged;
         }
 
@@ -79,7 +89,14 @@ namespace CNC.Controls
             if (grbl == null)
                 return;
 
-            GotoBaseControl.SafeGoto(grbl, code);   // the one shared Go-To routine - applies Safe Z uniformly
+            // A selected fixture overrides the firmware G28 slot entirely - go straight to its own saved
+            // machine-coord origin. No selection (the common case, and every other offset) falls through
+            // to the normal firmware-slot behavior unchanged.
+            var fixture = cbxFixture.Visibility == Visibility.Visible ? cbxFixture.SelectedItem as Fixture : null;
+            if (fixture != null)
+                GotoBaseControl.SafeGotoMachine(grbl, new Position(fixture.Coords));
+            else
+                GotoBaseControl.SafeGoto(grbl, code);   // the one shared Go-To routine - applies Safe Z uniformly
         }
 
         private void btnSet_Click(object sender, RoutedEventArgs e)

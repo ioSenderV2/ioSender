@@ -111,14 +111,15 @@ if (-not (Test-Path $exe)) {
 
 $launchArgs = @()
 if ($TestServer -or $Port -gt 0) {
-    $launchArgs += (if ($Port -gt 0) { "-testserver=$Port" } else { '-testserver' })
+    if ($Port -gt 0) { $launchArgs += "-testserver=$Port" } else { $launchArgs += '-testserver' }
 }
 if ($AppArgs) { $launchArgs += $AppArgs }
 
 if ($Headless) { $env:IOSENDER_HEADLESS = '1' }
 else { Remove-Item Env:\IOSENDER_HEADLESS -ErrorAction SilentlyContinue }
 
-$argMsg = if ($launchArgs) { " $($launchArgs -join ' ')" } else { '' }
+$argMsg = ''
+if ($launchArgs) { $argMsg = " $($launchArgs -join ' ')" }
 Write-Host "==> launching $Configuration ioSender$argMsg ..." -ForegroundColor Cyan
 if ($launchArgs) { Start-Process $exe -ArgumentList $launchArgs } else { Start-Process $exe }
 

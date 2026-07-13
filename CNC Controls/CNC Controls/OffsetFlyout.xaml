@@ -31,6 +31,9 @@
     </UserControl.Resources>
     <Border BorderBrush="DarkGray" BorderThickness="1" Background="#FFE5E5EA" Padding="4,10">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <ComboBox x:Name="cbxFixture" x:Uid="cbx_g28Fixture" MinWidth="90" MinHeight="22" Margin="0,0,3,0" IsReadOnly="True" IsEditable="False"
+                      DisplayMemberPath="Name" Visibility="Collapsed"
+                      ToolTip="Fixture to go to (Go navigates to its origin instead of the firmware G28 slot). Edit fixtures in Machine Setup."/>
             <Button x:Name="btnGo" x:Uid="btn_go" MinWidth="46" MinHeight="22" Padding="6,0" Click="btnGo_Click" ToolTip="Go to offset"/>
             <Button x:Name="btnSet" x:Uid="btn_set" Content="Set" MinHeight="22" Padding="6,0" Margin="3,0,0,0" Click="btnSet_Click" Visibility="Collapsed" ToolTip="Store current machine position in this offset"/>
             <ToggleButton x:Name="btnPin" x:Uid="btn_pin" Content="📌" FontSize="11" Width="17" Height="17" Margin="4,0,0,0" Style="{StaticResource FlyoutGlyphButton}"
