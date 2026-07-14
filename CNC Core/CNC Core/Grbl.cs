@@ -396,6 +396,33 @@ namespace CNC.Core
 
         public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
 
+        // Shared by the crash log, debug log and console log: resolve (and create) the "logs"
+        // subfolder under the config dir, falling back to %AppData%\ioSender\logs (ConfigPath may
+        // still be unresolved this early in startup, e.g. during a crash before settings load), and
+        // as a last resort the app's own base directory. Never throws.
+        public static string ResolveLogsDirectory()
+        {
+            string dir;
+            try
+            {
+                dir = ConfigPath;
+                if (string.IsNullOrEmpty(dir) || dir == "./" || !System.IO.Path.IsPathRooted(dir))
+                    dir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "ioSender");
+                dir = System.IO.Path.Combine(dir, "logs");
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            catch
+            {
+                try
+                {
+                    dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+                    System.IO.Directory.CreateDirectory(dir);
+                }
+                catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
+            }
+            return dir;
+        }
+
         // Every MacroProcessor.Run() call writes its g-code here first (see MacroProcessor.cs) - a
         // persistent, inspectable copy of the LAST thing each Generate button actually built, named after
         // the run (e.g. "Start Job" -> "start_job.macro"). Overwritten each run - this is a debugging aid,

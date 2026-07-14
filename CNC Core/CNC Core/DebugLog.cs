@@ -65,11 +65,7 @@ namespace CNC.Core
 
                 try
                 {
-                    string dir = Resources.ConfigPath;
-                    if (string.IsNullOrEmpty(dir) || dir == "./" || !Path.IsPathRooted(dir))
-                        dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ioSender");
-                    Directory.CreateDirectory(dir);
-                    _path = Path.Combine(dir, "ioSender.debug.log");
+                    _path = Path.Combine(Resources.ResolveLogsDirectory(), "ioSender.debug.log");
                 }
                 catch
                 {

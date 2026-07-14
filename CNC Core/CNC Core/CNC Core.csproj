@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
     <Compile Include="AppDialogs.cs" />
+    <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="ObsBridge.cs" />

@@ -123,6 +123,17 @@ namespace CNC.Core
             ProbePosition.PropertyChanged += ProbePosition_PropertyChanged;
             ToolOffset.PropertyChanged += ToolOffset_PropertyChanged;
             GrblSpindles.Spindles.CollectionChanged += Spindles_CollectionChanged;
+            ResponseLog.CollectionChanged += ResponseLog_CollectionChanged;
+        }
+
+        // Mirror every line the on-screen Console tab shows to the durable console.log file - see
+        // ConsoleLog.cs. ResponseLog is trimmed to the last 2000 lines in memory; the file isn't.
+        private void ResponseLog_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || e.NewItems == null)
+                return;
+            foreach (var item in e.NewItems)
+                ConsoleLog.Write(item as string);
         }
 
         private void Spindles_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

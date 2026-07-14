@@ -12,8 +12,13 @@
 ```powershell
 $pio = "C:\Users\steve\.platformio\penv\Scripts\pio.exe"
 & $pio run -d "C:\github\iMXRT1062\grblHAL_Teensy4" -e teensy41           # build
-& $pio run -d "C:\github\iMXRT1062\grblHAL_Teensy4" -e teensy41 -t upload # build + flash (Teensy connected)
 ```
+
+**Flashing: GUI only, not `-t upload`.** `upload_protocol = teensy-cli` is configured but this box's
+`tool-teensy` package only ships the GUI loader (`teensy.exe`) — no `teensy_loader_cli.exe` anywhere on
+the system, so `-t upload` fails with "not recognized". Flash manually: open the Teensy Loader GUI app,
+point it at `firmware.hex` (path below), press the button on the Teensy. Don't re-attempt `-t upload`
+expecting it to suddenly work — it's a missing-tool gap, not a fluke.
 
 ## Notes
 

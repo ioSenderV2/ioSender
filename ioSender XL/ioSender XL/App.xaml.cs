@@ -156,6 +156,8 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Init(debugLog, debugCategories);
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
+            CNC.Core.ConsoleLog.Init();
+
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
             // (Relaunch supervision is AppLaunch's job - we only read its exit-code protocol, see DoRestart.)
@@ -352,19 +354,13 @@ namespace GCode_Sender
             base.OnExit(e);
         }
 
-        // Append a timestamped crash entry to %AppData%\ioSender\ioSender.crash.log (falls back to the app folder
-        // if the config dir isn't resolved yet, e.g. a crash during early startup). Returns the path written, or a
-        // best-effort path string if the write itself failed. Never throws.
+        // Append a timestamped crash entry to %AppData%\ioSender\logs\ioSender.crash.log (falls back to the
+        // app folder if the config dir isn't resolved yet, e.g. a crash during early startup). Returns the
+        // path written, or a best-effort path string if the write itself failed. Never throws.
         private static string WriteCrashLog(string source, Exception ex)
         {
             string dir;
-            try
-            {
-                dir = CNC.Core.Resources.ConfigPath;
-                if (string.IsNullOrEmpty(dir) || dir == "./" || !Path.IsPathRooted(dir))
-                    dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ioSender");
-                Directory.CreateDirectory(dir);
-            }
+            try { dir = CNC.Core.Resources.ResolveLogsDirectory(); }
             catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
 
             string path = Path.Combine(dir, "ioSender.crash.log");
