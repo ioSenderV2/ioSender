@@ -98,6 +98,7 @@ namespace CNC.Controls
             bindSubTab(tabKeys, "Tab.Settings.Keyboard");
             bindSubTab(tabMacros, "Tab.Settings.Macros");
             bindSubTab(tabMainPage, "Tab.Settings.MainPage");
+            bindSubTab(tabSimulator, "Tab.Settings.Simulator");
         }
 
         private void bindSubTab(TabItem tab, string tabId)
@@ -339,6 +340,8 @@ namespace CNC.Controls
 
             if (tab == tabGrbl)
                 basicConfig.Activate(true);
+            else if (tab == tabSimulator)
+                simConfig.Activate(true);
         }
 
         private void LeaveTab(TabItem tab)
@@ -348,6 +351,8 @@ namespace CNC.Controls
 
             if (tab == tabGrbl)
                 basicConfig.Activate(false);
+            else if (tab == tabSimulator)
+                simConfig.Activate(false);
             else if (tab.Content is ISettingsEditorTab editor)
                 editor.Commit();   // Keyboard & Controller / Macros / Main Page: save-on-leave
         }
@@ -427,6 +432,7 @@ namespace CNC.Controls
                 case "Tab.Settings.Keyboard": target = tabKeys; break;
                 case "Tab.Settings.Macros": target = tabMacros; break;
                 case "Tab.Settings.MainPage": target = tabMainPage; break;
+                case "Tab.Settings.Simulator": target = tabSimulator; break;
                 default: target = null; break;
             }
 

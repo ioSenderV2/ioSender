@@ -211,7 +211,7 @@
       <Project>{f1f1e439-a3ee-462c-b8bf-bfd08c0b3d9e}</Project>
       <Name>CNC GCodeViewer</Name>
     </ProjectReference>
-    <PackageReference Include="WpfUiTestServer" Version="1.2.0" />
+    <PackageReference Include="WpfUiTestServer" Version="1.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="App.ico" />

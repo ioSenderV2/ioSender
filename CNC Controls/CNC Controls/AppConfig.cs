@@ -1379,11 +1379,22 @@ namespace CNC.Controls
             model.ConnectionTarget = (Comms.com != null && Comms.com.IsOpen) ? Base.PortParams : null;
         }
 
-        // Launch is decoupled: the simulator is now run standalone by the user (it opens its own 3D view +
-        // config dialog and listens on its port), and ioSender simply connects to 127.0.0.1:<port> as a
-        // network target. ioSender no longer launches or manages the simulator process, so this is a no-op.
+        // Auto-launch the simulator on a startup auto-reconnect to a previously-chosen simulator target - the
+        // same start-if-not-running behaviour as the Connect dialog's OK button (PortDialog.xaml.cs), but for
+        // the path that skips the dialog entirely (a saved Base.PortParams). No-op if the exe this target was
+        // saved with is missing (e.g. it was since deleted) - the connect attempt then just fails to reach
+        // 127.0.0.1:<port>, same as before this existed.
         private void EnsureSimulatorRunning()
         {
+            if (!Base.StartSimulator)
+                return;
+
+            string exe = !string.IsNullOrWhiteSpace(Base.SimulatorExe) ? Base.SimulatorExe : SimulatorManager.AppDataSimulatorExePath();
+            if (!System.IO.File.Exists(exe))
+                return;
+
+            if (!SimulatorManager.IsProcessRunningByExe(exe))
+                SimulatorManager.StartSimulator(exe, Base.SimulatorArgs ?? string.Empty, true);
         }
 
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a

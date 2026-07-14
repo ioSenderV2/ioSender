@@ -1,0 +1,48 @@
+<UserControl x:Class="CNC.Controls.SimulatorConfigView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="300" d:DesignWidth="500">
+    <StackPanel Margin="12" MaxWidth="440" HorizontalAlignment="Left">
+        <TextBlock x:Uid="lbl_simIntro" TextWrapping="Wrap" Margin="0,0,0,10" Opacity="0.8"
+                   Text="Build a grblHAL simulator the Connect dialog's Simulator tab can launch. Pick the options below and click Build - this dispatches a build on GitHub Actions (a few minutes) and installs the result here."/>
+
+        <Grid Grid.IsSharedSizeScope="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="simcfglbl"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Label x:Uid="lbl_simAxes" Grid.Row="0" Grid.Column="0" Content="Axes:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,4"/>
+            <ComboBox x:Uid="cbx_simAxes" x:Name="cbxAxes" Grid.Row="0" Grid.Column="1" Width="70" HorizontalAlignment="Left" Margin="0,0,0,4" SelectedIndex="0">
+                <ComboBoxItem Content="3"/>
+                <ComboBoxItem Content="4"/>
+                <ComboBoxItem Content="5"/>
+                <ComboBoxItem Content="6"/>
+                <ComboBoxItem Content="7"/>
+            </ComboBox>
+
+            <Label x:Uid="lbl_simProbe" Grid.Row="1" Grid.Column="0" Content="" Margin="0,0,8,4"/>
+            <CheckBox x:Uid="chk_simProbe" x:Name="chkProbe" Grid.Row="1" Grid.Column="1" Content="Probe input" IsChecked="True" VerticalAlignment="Center" Margin="0,0,0,4"/>
+
+            <Label x:Uid="lbl_simRotation" Grid.Row="2" Grid.Column="0" Content="" Margin="0,0,8,0"/>
+            <CheckBox x:Uid="chk_simRotation" x:Name="chkRotation" Grid.Row="2" Grid.Column="1" Content="Coordinate-system rotation (WCSROT)" VerticalAlignment="Center" Margin="0,0,0,0"/>
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"/>
+            <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click"/>
+        </StackPanel>
+
+        <TextBlock x:Uid="txt_simStatus" x:Name="txtStatus" TextWrapping="Wrap" Margin="0,10,0,0" Opacity="0.85"/>
+        <TextBlock x:Uid="txt_simPath" x:Name="txtPath" TextWrapping="Wrap" Margin="0,4,0,0" Opacity="0.6" FontSize="11"/>
+    </StackPanel>
+</UserControl>

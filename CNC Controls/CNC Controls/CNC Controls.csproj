@@ -270,6 +270,9 @@
     <Compile Include="PIDLogView.xaml.cs">
       <DependentUpon>PIDLogView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SimulatorConfigView.xaml.cs">
+      <DependentUpon>SimulatorConfigView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GrblFilesystems.cs" />
     <Compile Include="PipeServer.cs" />
     <Compile Include="PortDialog.xaml.cs">
@@ -626,6 +629,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="PIDLogView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SimulatorConfigView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

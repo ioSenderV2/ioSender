@@ -164,6 +164,7 @@ namespace CNC.Controls
                 }
             }
 
+            UpdateSimulatorAvailability();
             HighlightActiveConnection(orgport);
 
             // Seed the host combo with the current default (grblHAL.local or the last-connected IP) so the
@@ -195,6 +196,19 @@ namespace CNC.Controls
             active.FontWeight = FontWeights.Bold;
         }
 
+        // Only offer the Simulator tab once something has actually been built to %AppData%\Simulator (see
+        // SimulatorConfigView, Settings > Simulator). Re-checked every time the dialog opens, since a build
+        // may have completed since it was last shown. Points the disabled tab's own content at where to build
+        // one rather than leaving it a dead end.
+        private void UpdateSimulatorAvailability()
+        {
+            bool present = SimulatorManager.AppDataSimulatorPresent();
+            tabSimulator.IsEnabled = present;
+            txtSimHint.Text = present
+                ? "Connects to 127.0.0.1 at this port. Launches " + SimulatorManager.AppDataSimulatorExePath() + " first if it isn't already running."
+                : "No simulator has been built yet. Build one in Settings > Simulator, then reopen this dialog.";
+        }
+
         // Exposed so the caller can persist whether this connection is the bundled simulator (and how to
         // launch it) - used to auto-start the simulator on a later startup auto-reconnect to the same target.
         public bool IsSimulatorConnection { get; private set; }
@@ -212,6 +226,12 @@ namespace CNC.Controls
             else if (tab.SelectedIndex == 2)
             {
                 port = string.Format("127.0.0.1:{0}", prop.NetPort.ToString());
+
+                string exe = SimulatorManager.AppDataSimulatorExePath();
+                prop.SimulatorExe = exe;
+                prop.SimulatorArgs = "-p " + prop.NetPort.ToString();
+                if (!SimulatorManager.IsProcessRunningByExe(exe))
+                    SimulatorManager.StartSimulator(exe, prop.SimulatorArgs, prop.AutoKillSimulator);
             }
             else if(prop.Com.Ports.Count > 0)
             {

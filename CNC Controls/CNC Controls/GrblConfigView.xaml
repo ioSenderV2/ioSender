@@ -104,6 +104,9 @@
             <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller"/>
             <TabItem x:Uid="tab_macrosConfig" x:Name="tabMacros" Header="Macros"/>
             <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page"/>
+            <TabItem x:Uid="tab_simulatorConfig" x:Name="tabSimulator" Header="Simulator">
+                <local:SimulatorConfigView x:Name="simConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </TabItem>
         </local:StretchTabControl>
     </DockPanel>
 </UserControl>

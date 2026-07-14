@@ -1123,3 +1123,10 @@ CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_feed:CN
 CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_calls:CNC.Controls.NumericField.Label,None,False,True,,Number of calls:
 CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,btn_reset_repro_generate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate...
 CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,btn_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,lbl_simIntro:System.Windows.Controls.TextBlock.Text,Text,True,True,,Build a grblHAL simulator the Connect dialog's Simulator tab can launch. Pick the options below and click Build - this dispatches a build on GitHub Actions (a few minutes) and installs the result here.
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,lbl_simAxes:System.Windows.Controls.ContentControl.Content,Label,True,True,,Axes:
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simProbe:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probe input
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simRotation:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Coordinate-system rotation (WCSROT)
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simBuild:System.Windows.Controls.ContentControl.Content,Button,True,True,,Build
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simOpenFolder:System.Windows.Controls.ContentControl.Content,Button,True,True,,Open folder
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Simulator

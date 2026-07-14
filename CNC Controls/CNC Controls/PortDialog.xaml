@@ -123,9 +123,10 @@
                 </StackPanel>
             </TabItem>
             <TabItem x:Uid="tab_simulator" x:Name="tabSimulator" Header="Simulator">
-                <!-- The simulator runs standalone now: the user launches grblHAL_sim.exe directly (it opens its
-                     own 3D view + config and listens on its port). ioSender just connects to 127.0.0.1 on that
-                     port, so this tab only needs the port. -->
+                <!-- Enabled only once a simulator has been built to %AppData%\Simulator\grblHAL_sim.exe (see
+                     PortDialog.xaml.cs UpdateSimulatorAvailability, and Settings > Simulator / SimulatorConfigView
+                     which builds it). When present, Ok launches it (if not already running) and connects to
+                     127.0.0.1 on the port below. -->
                 <Grid Margin="5,8,5,8" Grid.IsSharedSizeScope="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" SharedSizeGroup="simlbl"/>
@@ -147,8 +148,7 @@
                         </local:NumericTextBox.Value>
                     </local:NumericTextBox>
 
-                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" TextWrapping="Wrap" MaxWidth="340" Opacity="0.75"
-                               Text="Launch grblHAL_sim.exe first, then connect. The simulator listens on 127.0.0.1 at this port (default 23) and is configured in its own window."/>
+                    <TextBlock x:Uid="txt_simHint" x:Name="txtSimHint" Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" TextWrapping="Wrap" MaxWidth="340" Opacity="0.75"/>
                 </Grid>
             </TabItem>
         </TabControl>

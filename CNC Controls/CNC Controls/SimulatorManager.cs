@@ -50,6 +50,35 @@ namespace CNC.Controls
             return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "simulator");
         }
 
+        // The manually-built simulator's home (Settings > Simulator, see BuildManualOptionSymbols /
+        // EnsureAppDataSimulator below) - independent of the auto-matched one above, which lives in the app
+        // folder and is keyed to the connected controller's options rather than a user's explicit picks.
+        // %AppData%\Simulator (not under \ioSender\) so it survives an app reinstall/relocate.
+        public static string AppDataSimulatorDir()
+        {
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Simulator");
+        }
+
+        public static string AppDataSimulatorExePath()
+        {
+            return System.IO.Path.Combine(AppDataSimulatorDir(), SimulatorExeName);
+        }
+
+        // The Connect dialog's gate for the Simulator tab: only offer it once something has actually been built.
+        public static bool AppDataSimulatorPresent()
+        {
+            return System.IO.File.Exists(AppDataSimulatorExePath());
+        }
+
+        // True if a process matching the exe's name is running, regardless of who started it (a prior ioSender
+        // session, or the user by hand) - unlike IsSimulatorRunning below, which only tracks an instance THIS
+        // manager launched. Used to decide whether a fresh launch is needed at all.
+        public static bool IsProcessRunningByExe(string exePath)
+        {
+            try { return Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(exePath)).Length > 0; }
+            catch { return false; }
+        }
+
         private static string ReadBuildTemplate()
         {
             try
@@ -580,9 +609,10 @@ namespace CNC.Controls
             catch (Exception ex) { error = ex.Message; return false; }
         }
 
-        // GET the sim-<sig> release asset (public, no token) into the local cache, then activate it.
-        // Returns false (e.g. a 404 "not built yet") so the caller can fall back to dispatching a build.
-        private static bool DownloadMatchedRelease(string sig, out string error)
+        // GET the sim-<sig> release asset bytes (public, no token). Null (with a reason) on any failure,
+        // including "not built yet" (a 404) - callers use that to fall back to dispatching a build / keep
+        // polling. Shared by the auto-matched (app-relative) and manual (AppData) install paths below.
+        private static byte[] DownloadReleaseBytes(string sig, out string error)
         {
             error = null;
             string url = "https://github.com/" + SimulatorRepo + "/releases/download/sim-" + sig + "/" + SimulatorExeName;
@@ -600,7 +630,7 @@ namespace CNC.Controls
                     if (resp.StatusCode != System.Net.HttpStatusCode.OK)
                     {
                         error = "the release server returned " + (int)resp.StatusCode + ".";
-                        return false;
+                        return null;
                     }
                     byte[] bytes;
                     using (var src = resp.GetResponseStream())
@@ -612,19 +642,29 @@ namespace CNC.Controls
                     if (bytes.Length < 2 || bytes[0] != (byte)'M' || bytes[1] != (byte)'Z')
                     {
                         error = "the release asset was not an executable.";
-                        return false;
+                        return null;
                     }
-                    System.IO.Directory.CreateDirectory(SimulatorDir());
-                    System.IO.File.WriteAllBytes(CachedSimPath(sig), bytes);
+                    return bytes;
                 }
-                return Activate(CachedSimPath(sig), sig, out error);
             }
             catch (System.Net.WebException wex)
             {
                 error = "no sim-" + sig + " release yet (" + wex.Message + ").";
-                return false;
+                return null;
             }
-            catch (Exception ex) { error = ex.Message; return false; }
+            catch (Exception ex) { error = ex.Message; return null; }
+        }
+
+        // GET the sim-<sig> release asset into the local cache, then activate it. Returns false (e.g. a 404
+        // "not built yet") so the caller can fall back to dispatching a build.
+        private static bool DownloadMatchedRelease(string sig, out string error)
+        {
+            byte[] bytes = DownloadReleaseBytes(sig, out error);
+            if (bytes == null)
+                return false;
+            System.IO.Directory.CreateDirectory(SimulatorDir());
+            System.IO.File.WriteAllBytes(CachedSimPath(sig), bytes);
+            return Activate(CachedSimPath(sig), sig, out error);
         }
 
         // Token used ONLY to dispatch the build workflow (downloads are public). Read from the GH_TOKEN /
@@ -775,6 +815,116 @@ namespace CNC.Controls
                 System.Threading.Thread.Sleep(20 * 1000);   // builds take minutes; poll gently
                 string err;
                 if (DownloadMatchedRelease(sig, out err))
+                    return true;
+            }
+            return false;
+        }
+
+        // ---- Manual/Settings-tab build -> %AppData%\Simulator -----------------------------------------------
+        //
+        // Settings > Simulator lets the user pick options directly instead of relying on the auto-matched flow
+        // above (which derives them from the connected controller and targets the app-relative simulator\
+        // folder). Reuses the same build-matched-sim CI workflow + sim-<sig> release cache (so a signature
+        // already built for the auto-matched flow, or by another user, is picked up for free) but always
+        // installs as a plain grblHAL_sim.exe (no -<sig> suffix) into AppDataSimulatorDir() - that fixed path
+        // is the Connect dialog's Simulator-tab gate (AppDataSimulatorPresent), so it doesn't need to know
+        // about signatures at all.
+
+        private const string AppDataSigMarkerName = "grblHAL_sim.sig";
+
+        // Signature the currently-installed %AppData%\Simulator\grblHAL_sim.exe was built for (null if unknown
+        // /none) - lets the tab report "up to date" without re-downloading when the picked options haven't
+        // changed since the last successful build.
+        public static string AppDataActiveSignature()
+        {
+            try
+            {
+                string p = System.IO.Path.Combine(AppDataSimulatorDir(), AppDataSigMarkerName);
+                if (System.IO.File.Exists(p))
+                    return System.IO.File.ReadAllText(p).Trim();
+            }
+            catch { }
+            return null;
+        }
+
+        // Map the user's picked options (Settings > Simulator) to compile symbols + a stable signature, same
+        // scheme as BuildOptionSymbols above but from explicit picks instead of GrblInfo.
+        public static string BuildManualOptionSymbols(int axes, bool probe, bool rotation, out string signature)
+        {
+            var symbols = new System.Collections.Generic.List<string> { "N_AXIS=" + axes };
+            if (probe) symbols.Add("PROBE_ENABLE=1");
+            if (rotation) symbols.Add("ROTATION_ENABLE=1");
+            symbols.Sort(StringComparer.Ordinal);
+            string flags = string.Join(" ", symbols);
+            signature = ShortHash(flags);
+            return flags;
+        }
+
+        // GET the sim-<sig> release and install it as the plain, unsuffixed %AppData%\Simulator\grblHAL_sim.exe.
+        private static bool DownloadAppDataRelease(string sig, out string error)
+        {
+            byte[] bytes = DownloadReleaseBytes(sig, out error);
+            if (bytes == null)
+                return false;
+            try
+            {
+                string dir = AppDataSimulatorDir();
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllBytes(AppDataSimulatorExePath(), bytes);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, AppDataSigMarkerName), sig);
+                return true;
+            }
+            catch (System.IO.IOException ioex)
+            {
+                error = "could not install the simulator (is it running?): " + ioex.Message;
+                return false;
+            }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // Ensure %AppData%\Simulator\grblHAL_sim.exe matches the given options, same fallback chain as
+        // EnsureMatchedSimulator (already current -> shared release cache -> dispatch a CI build). Blocking on
+        // network I/O - call from a background thread.
+        public static MatchResult EnsureAppDataSimulator(int axes, bool probe, bool rotation, out string signature, out string detail)
+        {
+            detail = null;
+            string flags = BuildManualOptionSymbols(axes, probe, rotation, out signature);
+
+            if (signature == AppDataActiveSignature() && AppDataSimulatorPresent())
+                return MatchResult.AlreadyCurrent;
+
+            string relErr;
+            if (DownloadAppDataRelease(signature, out relErr))
+                return MatchResult.InstalledFromRelease;
+
+            if (_dispatched.Contains(signature))
+            {
+                detail = "a matching simulator (signature " + signature + ") is still building.";
+                return MatchResult.BuildTriggered;
+            }
+
+            string dispErr;
+            if (DispatchBuild(signature, flags, out dispErr))
+            {
+                _dispatched.Add(signature);
+                detail = "building a matching simulator (signature " + signature + "); this can take a few minutes.";
+                return MatchResult.BuildTriggered;
+            }
+
+            detail = dispErr;
+            return MatchResult.Failed;
+        }
+
+        // Poll for a just-dispatched sim-<sig> release and install it to %AppData%\Simulator once it appears.
+        // Intended to run on a background thread after EnsureAppDataSimulator returns BuildTriggered.
+        public static bool PollAndInstallAppData(string sig, int timeoutSeconds = 600)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                System.Threading.Thread.Sleep(20 * 1000);
+                string err;
+                if (DownloadAppDataRelease(sig, out err))
                     return true;
             }
             return false;
