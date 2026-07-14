@@ -55,14 +55,15 @@ namespace CNC.Controls
         private void RefreshStatus()
         {
             bool present = SimulatorManager.AppDataSimulatorPresent();
-            string path = SimulatorManager.AppDataSimulatorExePath();
-            txtPath.Text = path;
 
             if (!present)
             {
                 txtStatus.Text = "No simulator built yet.";
+                txtPath.Text = string.Empty;
                 return;
             }
+
+            txtPath.Text = SimulatorManager.AppDataSimulatorExePath();
 
             string sig;
             SimulatorManager.BuildManualOptionSymbols(SelectedAxes, chkProbe.IsChecked == true, chkRotation.IsChecked == true, out sig);
