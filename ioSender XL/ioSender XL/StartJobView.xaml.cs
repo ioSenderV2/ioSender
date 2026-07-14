@@ -99,8 +99,8 @@ namespace GCode_Sender
             chkRotate.Unchecked += (s, e) => InputChanged();
             chkSetTloRef.Checked += (s, e) => InputChanged();
             chkSetTloRef.Unchecked += (s, e) => InputChanged();
-            chkStockConductive.Checked += (s, e) => InputChanged();
-            chkStockConductive.Unchecked += (s, e) => InputChanged();
+            chkStockConductive.Checked += (s, e) => { UpdateMeasureAvailability(); InputChanged(); };
+            chkStockConductive.Unchecked += (s, e) => { UpdateMeasureAvailability(); InputChanged(); };
             // Switching probe type changes which ProbeDefinition Generate needs (and whether it's defined) -
             // re-gate immediately rather than waiting for the next Activate/capability refresh.
             rbProbe3d.Checked += (s, e) => { UpdateProbeWarning(); InputChanged(); };
@@ -267,6 +267,24 @@ namespace GCode_Sender
             bool ok = ActiveProbe() != null;
             btnGenerate.IsEnabled = ok;
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
+
+            UpdateMeasureAvailability();
+        }
+
+        // A separate touch plate against non-conductive stock only closes the circuit at the plate itself -
+        // the stock's own edges never trigger it, so the edge probing Measure depends on can't work. Disable
+        // (and force off, so a stale checked-but-disabled state can't sneak into Generate) rather than just
+        // hide, since the reason ("switch to 3D Probe, or check Stock conductive") is worth surfacing via the
+        // tooltip rather than silently vanishing.
+        private void UpdateMeasureAvailability()
+        {
+            bool touchNonConductive = rbProbeTouch.IsChecked == true && chkStockConductive.IsChecked != true;
+            chkMeasure.IsEnabled = !touchNonConductive;
+            if (touchNonConductive && chkMeasure.IsChecked == true)
+                chkMeasure.IsChecked = false;
+            chkMeasure.ToolTip = touchNonConductive
+                ? "Not available with Touch Plate probing on non-conductive stock: the plate closes the circuit itself, so the stock's edges never trigger it and can't be measured. Switch to 3D Probe, or check 'Stock conductive' if the stock is touched directly."
+                : "Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set.";
         }
 
         // (Re)load the fixture library into the dropdown, preserving the current selection by name - falling
@@ -689,12 +707,13 @@ namespace GCode_Sender
             return canvas;
         }
 
-        // A dimension label (mm) centred on the edge a->b, on a white pad so it reads over the outline.
+        // A dimension label (mm in, display units out) centred on the edge a->b, on a white pad so it reads
+        // over the outline.
         private void AddDimLabel(Canvas canvas, Point a, Point b, double mm)
         {
             var lbl = new TextBlock
             {
-                Text = mm.ToString("0.#", CultureInfo.InvariantCulture) + " mm",
+                Text = FromMm(mm).ToString("0.#", CultureInfo.InvariantCulture) + (isImperial ? " in" : " mm"),
                 FontSize = 12d,
                 Foreground = Brushes.DimGray,
                 Background = Brushes.White,
@@ -726,23 +745,30 @@ namespace GCode_Sender
             return Math.Acos(cos) * 180.0 / Math.PI;
         }
 
+        // All internal state (measuredX/Y, corner*, spoilZ) is mm - format through this so the readout follows
+        // whichever unit is currently selected (rbUnitsMm/rbUnitsIn), same as the input fields.
+        private string FormatLen(double mm)
+        {
+            return FromMm(mm).ToString("0.###", CultureInfo.InvariantCulture) + (isImperial ? " in" : " mm");
+        }
+
         // Live readout: size, plus flatness and squareness once enough corners are probed.
         private string BuildResultText(int probed)
         {
             var sb = new StringBuilder();
             sb.AppendFormat("Measured stock:  X = {0}   Y = {1}",
-                measuredX.HasValue ? measuredX.Value.ToString("0.###", CultureInfo.InvariantCulture) + " mm" : "-",
-                measuredY.HasValue ? measuredY.Value.ToString("0.###", CultureInfo.InvariantCulture) + " mm" : "-");
+                measuredX.HasValue ? FormatLen(measuredX.Value) : "-",
+                measuredY.HasValue ? FormatLen(measuredY.Value) : "-");
 
             double? flat = Flatness();
             if (flat.HasValue)
-                sb.AppendFormat("\nFlatness (Z range): {0} mm", flat.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendFormat("\nFlatness (Z range): {0}", FormatLen(flat.Value));
 
             double? skew = SkewDegrees(), diag = DiagonalDelta();
             if (skew.HasValue && diag.HasValue)
-                sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1} mm)",
+                sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1})",
                     skew.Value.ToString("0.###", CultureInfo.InvariantCulture),
-                    diag.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                    FormatLen(diag.Value));
 
             if (measureRun && probed < 4)
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);

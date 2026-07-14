@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>112 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>113 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -229,6 +229,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Root-caused the Machinist Vise corner 4/2 face-probe margin flip-flop (a physical tip-clearance problem, not size-estimate slop) and fixed it with a live tool-diameter lookup; dropped the readout-only corners 1/3; first clean end-to-end Machinist Vise Start Job run on real hardware.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr105">105</a></td></tr>
 <tr><td>Start Job tab left-aligned, vise labels say exact not estimated, vise corner-probe motion after TLO ref no longer over-travels</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr109">109</a></td></tr>
 <tr><td>Generates an O-word-loop .nc file for reproducing the controller-wedge-on-Reset bug over Serial/Telnet</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr110">110</a></td></tr>
+<tr><td>Measure auto-disables for Touch Plate + non-conductive stock (can't detect edges electrically); measured size/flatness/skew readout now follows the selected mm/in units instead of always showing mm.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr113">113</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -415,7 +416,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">110</td><td><a href="#pr110">Reset-repro test-case generator (Help &gt; Support)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+308</span> <span class="del">-21</span></td></tr>
 <tr><td class="n">111</td><td><a href="#pr111">Durable console log; crash/debug logs consolidated</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+164</span> <span class="del">-16</span></td></tr>
 <tr><td class="n">112</td><td><a href="#pr112">Program view popup resized to exactly the right third of the client area</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+11</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (112 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1046</span> <span class="del">13</span> <span class="add">+142</span><br><span class="k">Lines:</span> <span class="add">+45486</span> <span class="del">-8804</span></td></tr>
+<tr><td class="n">113</td><td><a href="#pr113">Start Job Measure/units fit-and-finish</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+35</span> <span class="del">-9</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (113 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1047</span> <span class="del">13</span> <span class="add">+142</span><br><span class="k">Lines:</span> <span class="add">+45521</span> <span class="del">-8813</span></td></tr>
 </table>
 </div>
 
@@ -2575,6 +2577,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">11</td><td class="num del">4</td></tr>
 </table>
 <div class="desc"><p>The on-demand Program view overlay was a <code>Border</code> anchored right with a fixed <code>MinWidth="560" MaxWidth="720"</code> - on the app's minimum window width that could occupy up to ~58% of the client area. Replaced with a proper 3-equal-column <code>Grid.ColumnDefinitions</code> layout, with the overlay in the rightmost column (<code>Grid.Column="2"</code>, <code>HorizontalAlignment="Stretch"</code>) - it now always occupies exactly one third of the client width, regardless of window size.</p></div>
+</div>
+<!-- ===== #113 ===== -->
+<div class="pr">
+<h2 id="pr113"><span class="badge">#113</span>Start Job: touch-plate-safe Measure gating + unit-aware measured-size readout</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">35</td><td class="num del">9</td></tr>
+</table>
+<div class="desc"><p>Two Start Job fit-and-finish fixes, found while HW-testing the Machinist Vise fixture:</p><ul><li><strong>Measure gating.</strong> A separate touch plate against non-conductive stock only closes the circuit at the plate itself - the stock's own edges never trigger it, so the 4-corner edge probing Measure depends on can't work. The Measure checkbox now auto-disables (and unchecks, so a stale checked-but-disabled state can't reach Generate) whenever Touch Plate + unchecked Stock conductive is selected, with a tooltip explaining the fix (switch to 3D Probe, or check Stock conductive). Re-enables live when either control changes, and is applied correctly on load from a persisted config.</li><li><strong>Unit-aware readout.</strong> The post-run "Measured stock" summary (X/Y size, flatness, squareness/diagonal delta) and the drawing overlay's edge dimension labels were always shown in mm regardless of the mm/in radio selection. Both now convert through the existing FromMm() unit helper and label the correct unit, matching the input fields above them. The Fusion-add-in clipboard copy (Copy size) and the internal g-code emitter intentionally stay in mm - those are machine-consumed contracts, not display output.</li></ul></div>
 </div>
 </section>
 
