@@ -2,10 +2,15 @@
  * ConsoleLog.cs - part of Grbl Code Sender
  *
  * Always-on mirror of the on-screen Console tab (GrblViewModel.ResponseLog) to
- * %AppData%\ioSender\logs\console.log - a durable record that survives the 2000-line
- * in-memory trim and, more importantly, survives a UI freeze (the very failure mode this was
- * built to diagnose: a firmware debug flood once locked the WPF UI thread for the length of a
- * job, hiding the console from the user exactly when it mattered most).
+ * %AppData%\ioSender\logs\console_<run-timestamp>.log - a durable record that survives the
+ * 2000-line in-memory trim and, more importantly, survives a UI freeze (the very failure mode
+ * this was built to diagnose: a firmware debug flood once locked the WPF UI thread for the
+ * length of a job, hiding the console from the user exactly when it mattered most).
+ *
+ * A fresh, timestamped file per run (rather than one ever-growing appended file) keeps each
+ * ioSender launch's log independently identifiable - useful when correlating a specific repro
+ * attempt against its own log rather than scrolling through prior runs first. Old files are
+ * pruned by age on startup so they don't accumulate forever.
  *
  * The write itself runs on a dedicated background thread, fed by a BlockingCollection queue -
  * ResponseLog changes are appended to the UI thread (Dispatcher-marshalled), so the file I/O
@@ -34,12 +39,18 @@ namespace CNC.Core
         /// <summary>Full path of the active log file, or empty if logging couldn't start.</summary>
         public static string LogPath { get { return _path ?? string.Empty; } }
 
+        // Best-effort retention: run-timestamped files never get overwritten (unlike the old single
+        // appended console.log), so without pruning they'd accumulate forever.
+        private const int RetentionDays = 10;
+
         /// <summary>Start the background writer. Safe to call once at startup; never throws.</summary>
         public static void Init()
         {
             try
             {
-                _path = Path.Combine(Resources.ResolveLogsDirectory(), "console.log");
+                string dir = Resources.ResolveLogsDirectory();
+                PruneOld(dir);
+                _path = Path.Combine(dir, "console_" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture) + ".log");
             }
             catch { _path = null; return; }
 
@@ -50,6 +61,24 @@ namespace CNC.Core
                 "{0}\r\n===== ioSender console log - run started {1} =====",
                 new string('=', 72),
                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)));
+        }
+
+        private static void PruneOld(string dir)
+        {
+            try
+            {
+                DateTime cutoff = DateTime.Now.AddDays(-RetentionDays);
+                foreach (string file in Directory.GetFiles(dir, "console_*.log*"))
+                {
+                    try
+                    {
+                        if (File.GetLastWriteTime(file) < cutoff)
+                            File.Delete(file);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
         }
 
         /// <summary>Mirror one console line to the log. No-op if Init wasn't called or failed.</summary>
