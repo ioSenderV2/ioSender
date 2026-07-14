@@ -275,9 +275,14 @@
             <cnccontrols:THCMonitorControl x:Name="thcControl" Visibility="Hidden" Canvas.Right="22"/>
         </Canvas>
         <Grid DockPanel.Dock="Left">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
         <!-- StretchTabControl spreads the tab headers across the full strip width (proportional to each
              label). Recomputes only on tab add/remove and a deferred, post-layout resize callback. -->
-        <cnccontrols:StretchTabControl IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
+        <cnccontrols:StretchTabControl Grid.ColumnSpan="3" IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
             <cnccontrols:StretchTabControl.Resources>
                 <Style TargetType="{x:Type TabItem}">
                     <Setter Property="MinHeight" Value="32" />
@@ -288,8 +293,10 @@
                  See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
         </cnccontrols:StretchTabControl>
         <!-- On-demand overlays over the tab content (above the run bar). Toggled in MainWindow.xaml.cs. -->
-        <!-- Program view always pops on the RIGHT. -->
-        <Border x:Name="overlayProgram" HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="560" MaxWidth="720" Margin="0,60,0,0"
+        <!-- Program view always pops on the RIGHT, occupying exactly the rightmost third of the
+             client area (Grid.Column="2" of the 3 equal columns above) - was a fixed 560-720px
+             MinWidth/MaxWidth before, which ran over half the client area on a narrower window. -->
+        <Border x:Name="overlayProgram" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
             <!-- Hosts whichever tool's own ProgramView is connected (Load File/Folder, or a wizard's Generate
                  output) - each carries its own title bar. Nothing shows here (and the "Program" button is
@@ -298,7 +305,7 @@
             <ContentControl x:Name="overlayActiveHost"/>
         </Border>
         <!-- Console log pops directly ABOVE the command box, matching its width (Esc dismisses). -->
-        <Border x:Name="overlayConsole" HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="300" Margin="6,0,0,0"
+        <Border x:Name="overlayConsole" Grid.ColumnSpan="3" HorizontalAlignment="Left" VerticalAlignment="Bottom" Height="300" Margin="6,0,0,0"
                 Width="{Binding ElementName=mdiControl, Path=ActualWidth}"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
             <cnccontrols:ConsoleControl x:Name="overlayConsoleView" LogOnly="True"/>
