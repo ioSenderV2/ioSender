@@ -50,12 +50,12 @@
                         <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"
                                    Text="Actual stock size."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
-                            <Label x:Uid="ls_lblProbe" Content="Probe:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <RadioButton x:Uid="rbProbe3d" x:Name="rbProbe3d" Content="3D Probe" GroupName="StartJobProbeType" IsChecked="True" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            <Label x:Uid="ls_lblProbe" Content="Probe:" Padding="0" VerticalAlignment="Center"/>
+                            <RadioButton x:Uid="rbProbe3d" x:Name="rbProbe3d" Content="3D Probe" GroupName="StartJobProbeType" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
                             <RadioButton x:Uid="rbProbeTouch" x:Name="rbProbeTouch" Content="Touch Plate" GroupName="StartJobProbeType" VerticalAlignment="Center" Margin="14,0,0,0"
                                          ToolTip="Probes by electrical continuity - works on conductive stock directly, or on non-conductive stock via a separate metal touch plate (see 'Stock conductive' below)."/>
                         </StackPanel>
-                        <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
+                        <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="0,2,0,2" VerticalAlignment="Center"
                                   IsEnabled="{Binding ElementName=rbProbeTouch, Path=IsChecked}"
                                   ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">

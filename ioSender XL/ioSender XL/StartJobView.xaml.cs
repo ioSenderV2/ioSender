@@ -192,9 +192,22 @@ namespace GCode_Sender
 
         // The width/height fields are the actual size when not measuring; when Measure is on they are only a
         // conservative estimate pcorner uses to place the far-corner probes (must be a few mm oversize).
+        // Exception: the Machinist Vise's entered sizes are ALWAYS exact (precision machinist stock, not an
+        // estimate to buffer against - see BuildViseProgram's own comment on this), regardless of Measure.
         private void UpdateSizeHint()
         {
-            if (txtSizeHint != null)
+            if (txtSizeHint == null)
+                return;
+
+            bool isVise = SelectedFixture != null && SelectedFixture.Kind == FixtureKind.MachinistVise;
+
+            fldWidth.Label = isVise ? "Exact width (X):" : "Est. width (X):";
+            fldHeight.Label = isVise ? "Exact height (Y):" : "Est. height (Y):";
+            fldThickness.Label = isVise ? "Exact thickness (Z):" : "Est. thickness (Z):";
+
+            if (isVise)
+                txtSizeHint.Text = "Sizes should be exact.";
+            else
                 txtSizeHint.Text = chkMeasure.IsChecked == true
                     ? "Estimate only - make it a few mm larger than actual so the far-corner probes land just outside the stock. Probing measures the true size."
                     : "Actual stock size.";
@@ -320,6 +333,7 @@ namespace GCode_Sender
         private void cbxFixture_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateFixtureWarning();
+            UpdateSizeHint();   // vise sizes are exact, unlike every other fixture kind - see UpdateSizeHint
             InputChanged();
         }
 
@@ -1569,16 +1583,10 @@ namespace GCode_Sender
                 double bottomDepth = Math.Min(thickness, frameRecessMm);
                 L(string.Format("#<_bottom> = [{0} - {1} - 5]", N(jawTopZ), N(bottomDepth)));
 
-                // Rapid to the APPROXIMATE corner position first (same estimate-from-origin idea as the
-                // centre probe's centerX/centerY) before handing off to pcorner.macro - otherwise pcorner's
-                // own first XY move travels there from wherever TLO-ref (or the previous corner) left the
-                // machine, which can be a long, unnecessarily blind traverse. At #<_lv_safe_z> (trusted,
-                // stock top + 5mm) throughout - pcorner.macro takes over its own fine positioning from here.
-                void EmitApproach(double x, double y)
-                {
-                    L("G53 G0 Z[#<_lv_safe_z>]");
-                    L(string.Format("G53 G0 X{0} Y{1}", N(x), N(y)));
-                }
+                // No separate "approach" rapid needed before handing off to pcorner.macro - it retracts to
+                // #<_ls_maxz> (passed below as #<_lv_safe_z>, trusted/verified by the centre probe above)
+                // and moves XY to its own top-probe position itself as its very first actions, so a prior
+                // move here would just be immediately-superseded, wasted motion. Never travels above Safe Z.
 
                 // pcorner.macro's rx/ry (passed below) are its own reference for "just outside this corner's
                 // face - clear air", and its face probes retract-and-rapid straight back out TO that point
@@ -1590,16 +1598,14 @@ namespace GCode_Sender
                 double refXOut = fxPos.X + estW + refMarginMm;
 
                 L("(--- corner 4 = back-right (X-neighbour of the jaw origin) ---)");
-                EmitApproach(refXOut, fxPos.Y + refMarginMm);
-                EmitPcornerCall(L, 4, N(refXOut), N(fxPos.Y + refMarginMm), "0");
+                EmitPcornerCall(L, 4, N(refXOut), N(fxPos.Y + refMarginMm), "0", "#<_lv_safe_z>");
                 L("#<c4x> = #<_corner_x>");
                 L("#<c4y> = #<_corner_y>");
 
                 double refYOut2 = fxPos.Y - estH - refMarginMm;
 
                 L("(--- corner 2 = front-right (diagonal from the jaw origin) ---)");
-                EmitApproach(refXOut, refYOut2);
-                EmitPcornerCall(L, 2, N(refXOut), N(refYOut2), "0");
+                EmitPcornerCall(L, 2, N(refXOut), N(refYOut2), "0", "#<_lv_safe_z>");
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
@@ -1684,13 +1690,17 @@ namespace GCode_Sender
 
         // Call pcorner.macro for one corner - see pcorner.macro's own header for the globals/outputs contract.
         // Shared by BuildProgram (Corner Fence's own origin corner + REUSE corners) and BuildViseProgram (the
-        // two vise-reachable corners, see EmitViseMeasure).
-        private static void EmitPcornerCall(System.Action<string> L, int cornerId, string refx, string refy, string startz)
+        // two vise-reachable corners, see EmitViseMeasure). maxz defaults to "0" (Corner Fence's existing,
+        // more conservative behavior - full retract to machine Z0 between corners, no prior stock-top
+        // knowledge); the vise passes its own already-verified safe height instead, so the macro never
+        // travels any higher than necessary. Always emitted (never left to a stale value from a prior call).
+        private static void EmitPcornerCall(System.Action<string> L, int cornerId, string refx, string refy, string startz, string maxz = "0")
         {
             L(string.Format("#<_ls_corner> = {0}", cornerId));
             L(string.Format("#<_ls_refx> = {0}", Br(refx)));
             L(string.Format("#<_ls_refy> = {0}", Br(refy)));
             L(string.Format("#<_ls_startz> = {0}", Br(startz)));
+            L(string.Format("#<_ls_maxz> = {0}", Br(maxz)));
             L("O<pcorner> CALL [#<_ls_rad>]");   // single arg (tip radius) - grblHAL's CALL resolves with one arg
         }
 

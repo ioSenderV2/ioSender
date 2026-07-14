@@ -47,6 +47,13 @@
 ;                       0 for the 3D probe, and for a touch plate run directly against conductive stock
 ;                       (no plate, no offset). A separate metal touch plate against non-conductive stock
 ;                       sets this to the plate's own known thickness (ProbeDefinition.PlateThickness).
+;   #<_ls_maxz>   = OPTIONAL machine Z of a known-safe travel height, already trusted by the caller (e.g.
+;                       the vise's own centre-of-stock probe, run before any corner calls). When > 0, this
+;                       replaces BOTH the REUSE-corner full retract to machine Z0 (o40 below - normally
+;                       needed so the tool clears clamp/fence hardware between corners, which the vise has
+;                       none of) and the pre-top-probe descent estimate (o41's #<_bottom>+30) with this
+;                       single known height - the tool never travels above it. 0/unset = old behavior
+;                       (Corner Fence, no prior stock-top knowledge - safe but more conservative).
 ;
 ; Outputs (GLOBAL named params, survive the SUB):
 ;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
@@ -66,6 +73,7 @@ O<pcorner> SUB
   #<ry>     = #<_ls_refy>
   #<sz_in>  = #<_ls_startz>
   #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
+  #<maxz>   = #<_ls_maxz>        ; known-safe travel height (machine Z), 0/unset = no prior stock-top knowledge (see file header)
 
   ; Clear G54 so the absolute Z probes below run in machine coordinates. Without this a stale G54 Z
   ; offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
@@ -130,19 +138,28 @@ O<pcorner> SUB
   o40 IF [#<sz_in> GE 9000]
     G53 G0 Z[#<_bottom> + 30]        ; rapid - first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), a COMPUTED safe clearance (floor known from the DISCOVER probe above), travel just above the tallest possible top
   o40 ELSE
-    G53 G0 Z0                       ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
+    o42 IF [#<maxz> GT 0]
+      G53 G0 Z[#<maxz>]             ; rapid - caller already knows a trusted safe height (e.g. the vise's own centre probe) - never go any higher than necessary
+    o42 ELSE
+      G53 G0 Z0                     ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
+    o42 ENDIF
   o40 ENDIF
   #<_topx> = [#<rx> + [#<_ls_topx> * #<sx>]]
   #<_topy> = [#<ry> + [#<_ls_topy> * #<sy>]]
   G53 G0 X[#<_topx>] Y[#<_topy>]    ; rapid - travelling AT the safe height set above
   o41 IF [#<sz_in> LT 9000]
-    ; Descend to the SAME conservative floor+30 estimate the DISCOVER corner uses above - NOT #<_safe_z>,
-    ; which still holds the PREVIOUS corner's height (top+20) at this point in the code (this corner's own
-    ; top probe, which recomputes it, hasn't run yet). Flatness/spacer variance between corners means the
-    ; previous corner's safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale
-    ; height would drive straight into solid stock with nothing to catch it. floor+30 IS a computed safe
-    ; clearance though (same reasoning as o40 above), so this stays a rapid too.
-    G53 G0 Z[#<_bottom> + 30]
+    ; Descend to a safe height before this corner's own top probe - NOT #<_safe_z>, which still holds the
+    ; PREVIOUS corner's height (top+20) at this point in the code (this corner's own top probe, which
+    ; recomputes it, hasn't run yet). Flatness/spacer variance between corners means the previous corner's
+    ; safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale height would drive
+    ; straight into solid stock with nothing to catch it. If the caller already knows a trusted height
+    ; (#<maxz>, e.g. the vise's own centre probe) use that directly; otherwise fall back to the same
+    ; conservative floor+30 estimate the DISCOVER corner uses above (same reasoning as o40 above).
+    o43 IF [#<maxz> GT 0]
+      G53 G0 Z[#<maxz>]
+    o43 ELSE
+      G53 G0 Z[#<_bottom> + 30]
+    o43 ENDIF
   o41 ENDIF
   ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
   ; this seek instead of driving to a deep machine target - a dead/mis-wired probe then alarms near the board
