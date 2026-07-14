@@ -139,3 +139,5 @@ ioSender.g.en-US.resources:startjobview.baml,ls_conductive:System.Windows.Framew
 ioSender.g.en-US.resources:startjobview.baml,rbProbe3d:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,3D Probe
 ioSender.g.en-US.resources:startjobview.baml,rbProbeTouch:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Touch Plate
 ioSender.g.en-US.resources:startjobview.baml,rbProbeTouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probes by electrical continuity - works on conductive stock directly, or on non-conductive stock via a separate metal touch plate (see 'Stock conductive' below)."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_generateResetTestCase:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Generate _reset test case...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_generateResetTestCase:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Write a .nc file that calls an O-word subroutine several times, for reproducing controller-wedge-on-Reset bugs."

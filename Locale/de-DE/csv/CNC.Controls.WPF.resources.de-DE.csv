@@ -1095,9 +1095,6 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,txtFxProbeCircle:Syste
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Label,None,False,True,,Overall length:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe overall length - top of the body to the end of the tip.
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Label,None,False,True,,Overall length of bit:
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Overall length of the bit used to touch off the plate - top of the collet to the end of the bit.
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Label,None,False,True,,Jaw width:
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Start Job). 0 = not set."
@@ -1113,3 +1110,16 @@ CNC.Controls.WPF.g.en-US.resources:pendingchangesdialog.baml,pc_ok:System.Window
 CNC.Controls.WPF.g.en-US.resources:pendingchangesdialog.baml,pc_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_settingsRestoreNoChanges:System.String.$Content,None,True,True,,Nothing to restore - every setting in this file already matches the controller.
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_settingsTimedOut:System.String.$Content,None,True,True,,timed out
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Label,None,False,True,,Overall length of bit:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Overall length of the bit used to touch off the plate - top of the collet to the end of the bit.
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,txt_reset_repro_info:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Writes a .nc file with an O-word subroutine, called several times, that dwells then moves. grblHAL only allows O-word flow control when running from a file-backed stream, so UPLOAD this file to SD Card / the on-board filesystem and RUN it from the SD Card tab - loading it as a normal job will fail with error:80. Press Reset mid-call to test the controller-wedge repro; try the same file over both Serial and Telnet."
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_dwell:CNC.Controls.NumericField.Label,None,False,True,,Dwell:
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_dwell:CNC.Controls.NumericField.Unit,None,False,True,,s
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_travel:CNC.Controls.NumericField.Label,None,False,True,,Travel distance:
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_travel:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_feed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_feed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,fld_reset_repro_calls:CNC.Controls.NumericField.Label,None,False,True,,Number of calls:
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,btn_reset_repro_generate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate...
+CNC.Controls.WPF.g.en-US.resources:resetreprodialog.baml,btn_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close

@@ -1055,6 +1055,11 @@ namespace GCode_Sender
 
         // (The Exit menu item was dropped in the menu overhaul - the window X / Alt+F4 quit via Window_Closing.)
 
+        private void generateResetTestCase_Click(object sender, RoutedEventArgs e)
+        {
+            new ResetReproViewModel().Show();
+        }
+
         // Open the config folder (where App.config, KeyMap0.xml, grbl backups and restore points live) in Explorer,
         // so the user can find/back up/edit those files without hunting for the install directory.
         private void openConfigFolderMenuItem_Click(object sender, RoutedEventArgs e)
