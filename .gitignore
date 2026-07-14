@@ -33,10 +33,9 @@ obj/
 __pycache__/
 EEPROM.DAT
 MyMachine.DAT
-# Bundled grblHAL simulator runtime (everything except the committed docs/config)
+# Bundled grblHAL simulator runtime (everything except the committed docs)
 simulator/*
 !simulator/README.md
-!simulator/sim-build.json
 scene_debug.log
 
 # Git-Bash crash artifacts

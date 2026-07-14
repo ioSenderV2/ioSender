@@ -1,18 +1,22 @@
-This folder is where ioSender looks for the bundled grblHAL simulator (`grblHAL_sim.exe`),
-next to the application executable. **No binary is committed to this repository.**
+This folder (next to the ioSender executable) is where ioSender keeps a grblHAL simulator that
+**matches the currently-connected controller's compile options** - automatically, no user action
+needed. Nothing here is committed to the repository except this file; everything else
+(`grblHAL_sim.exe`, cached `grblHAL_sim-<sig>.exe` copies, the build-signature marker,
+`MyMachine.DAT`, `sim_setup.cfg`) is generated/downloaded at runtime and gitignored.
 
-There are two ways the executable gets here:
+**How it's kept in sync (`SimulatorManager.EnsureMatchedSimulator`, called on every real-controller
+connect):** the connected controller's options (axis count, probe, WCS rotation, ...) are mapped to a
+short signature. If the simulator here doesn't already match it, ioSender fetches a prebuilt
+`sim-<signature>` release from the shared cache, or - if none exists yet - dispatches a parameterized
+build on GitHub Actions (`build-matched-sim` workflow, `ioSenderV2/Simulator`) and installs the result
+once it's ready. This only runs against a real controller connection; it's skipped entirely when
+already talking to a simulator.
 
-1. **Download from the connection dialog (recommended).** When `grblHAL_sim.exe` is not
-   found, the *Simulator* tab shows a **Download** button. It posts the build definition in
-   `sim-build.json` to the grblHAL Web Builder, then extracts `grblHAL_sim.exe` from the
-   returned archive into this folder. To change the simulator's compiled feature set, export a
-   new "Save selection" JSON from the web builder (Simulator driver, Windows board) and replace
-   `sim-build.json`.
-
-2. **Place it manually.** Drop a prebuilt `grblHAL_sim.exe` here (or next to the ioSender
-   executable), e.g. from the grblHAL Simulator build artifacts or your own build.
-
-Once present, the *Simulator* tab can start it and connect to `127.0.0.1:<port>` (default 23).
-Per-machine settings are supplied at runtime via the EEPROM image (`-e`), not baked into the
-build, so the same downloaded executable works for any machine.
+**This is not where a user picks options by hand.** For that, use **Settings > Simulator** in the
+app: pick axes/probe/rotation and click Build. It reuses the same CI workflow and release cache as
+above, but always installs to **`%AppData%\Simulator`** instead of this app-relative folder -
+independent of the auto-matched flow, and writable without elevation even under an all-users (e.g.
+Program Files) install. The Connect dialog's *Simulator* tab is only enabled once
+`%AppData%\Simulator\grblHAL_sim.exe` exists, and launches it (if not already running) on Ok. A
+`sim-options.json` next to that exe records the axes/probe/rotation it was last built with, so the
+Settings tab can restore your picks across sessions.

@@ -11,10 +11,12 @@ namespace CNC.Controls
     // enabled once that file exists (see PortDialog.xaml.cs).
     public partial class SimulatorConfigView : UserControl, IGrblConfigTab
     {
+        private bool restoredOptions;
+
         public SimulatorConfigView()
         {
             InitializeComponent();
-            Loaded += (s, e) => RefreshStatus();
+            Loaded += (s, e) => { RestoreOptions(); RefreshStatus(); };
         }
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.Simulator; } }
@@ -26,6 +28,27 @@ namespace CNC.Controls
         }
 
         private int SelectedAxes { get { return cbxAxes.SelectedIndex + 3; } }
+
+        // Restore the axes/probe/rotation picks that produced the currently-installed exe (read back from
+        // sim-options.json, see SimulatorManager.AppDataActiveOptions) instead of always starting from the
+        // XAML defaults - once only, the first time the tab is shown, so it doesn't stomp a mid-session edit
+        // the user hasn't built yet.
+        private void RestoreOptions()
+        {
+            if (restoredOptions)
+                return;
+            restoredOptions = true;
+
+            var opts = SimulatorManager.AppDataActiveOptions();
+            if (opts == null)
+                return;
+
+            int index = opts.Axes - 3;
+            if (index >= 0 && index < cbxAxes.Items.Count)
+                cbxAxes.SelectedIndex = index;
+            chkProbe.IsChecked = opts.Probe;
+            chkRotation.IsChecked = opts.Rotation;
+        }
 
         // Reflects the currently-installed exe (if any) against the currently-picked options, so the user can
         // tell at a glance whether Build would actually do anything.
@@ -71,7 +94,7 @@ namespace CNC.Controls
                             break;
                         case SimulatorManager.MatchResult.BuildTriggered:
                             Post("Building (build " + sig + ") - this can take a few minutes...", false);
-                            if (SimulatorManager.PollAndInstallAppData(sig))
+                            if (SimulatorManager.PollAndInstallAppData(axes, probe, rotation, sig))
                                 Post("Build ready and installed (build " + sig + ").", true);
                             else
                                 Post("Still building (build " + sig + ") - try Build again shortly.", true);

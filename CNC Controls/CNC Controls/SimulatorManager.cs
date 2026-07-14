@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace CNC.Controls
 {
@@ -830,21 +831,68 @@ namespace CNC.Controls
         // is the Connect dialog's Simulator-tab gate (AppDataSimulatorPresent), so it doesn't need to know
         // about signatures at all.
 
-        private const string AppDataSigMarkerName = "grblHAL_sim.sig";
+        // The human-readable record of what was last built, written alongside the exe - this IS "the json file
+        // used to specify build options" the Settings tab reads back to restore its picks across sessions, and
+        // what a user could hand-edit/inspect without decoding a hash. Both files live under
+        // AppDataSimulatorDir() (%AppData%\Simulator) - never the app's own install folder, so a build works
+        // under an all-users (admin-owned, e.g. Program Files) install with no elevation.
+        public const string AppDataOptionsName = "sim-options.json";
 
-        // Signature the currently-installed %AppData%\Simulator\grblHAL_sim.exe was built for (null if unknown
-        // /none) - lets the tab report "up to date" without re-downloading when the picked options haven't
-        // changed since the last successful build.
-        public static string AppDataActiveSignature()
+        public static string AppDataOptionsPath()
+        {
+            return System.IO.Path.Combine(AppDataSimulatorDir(), AppDataOptionsName);
+        }
+
+        public sealed class ManualSimOptions
+        {
+            public int Axes;
+            public bool Probe;
+            public bool Rotation;
+            public string Signature;
+        }
+
+        // The options the currently-installed %AppData%\Simulator\grblHAL_sim.exe was built for (null if
+        // unknown/none/unparsable) - lets the tab restore its picks across sessions and report "up to date"
+        // without re-downloading when they haven't changed since the last successful build.
+        public static ManualSimOptions AppDataActiveOptions()
         {
             try
             {
-                string p = System.IO.Path.Combine(AppDataSimulatorDir(), AppDataSigMarkerName);
-                if (System.IO.File.Exists(p))
-                    return System.IO.File.ReadAllText(p).Trim();
+                string p = AppDataOptionsPath();
+                if (!System.IO.File.Exists(p))
+                    return null;
+                string json = System.IO.File.ReadAllText(p);
+
+                var axesM = System.Text.RegularExpressions.Regex.Match(json, "\"axes\"\\s*:\\s*(\\d+)");
+                var probeM = System.Text.RegularExpressions.Regex.Match(json, "\"probe\"\\s*:\\s*(true|false)");
+                var rotM = System.Text.RegularExpressions.Regex.Match(json, "\"rotation\"\\s*:\\s*(true|false)");
+                var sigM = System.Text.RegularExpressions.Regex.Match(json, "\"signature\"\\s*:\\s*\"([^\"]*)\"");
+                if (!axesM.Success || !sigM.Success)
+                    return null;
+
+                return new ManualSimOptions
+                {
+                    Axes = int.Parse(axesM.Groups[1].Value, CultureInfo.InvariantCulture),
+                    Probe = probeM.Success && probeM.Groups[1].Value == "true",
+                    Rotation = rotM.Success && rotM.Groups[1].Value == "true",
+                    Signature = sigM.Groups[1].Value
+                };
             }
-            catch { }
-            return null;
+            catch { return null; }
+        }
+
+        public static string AppDataActiveSignature()
+        {
+            return AppDataActiveOptions()?.Signature;
+        }
+
+        private static void WriteAppDataOptions(int axes, bool probe, bool rotation, string signature)
+        {
+            string json = "{\"axes\":" + axes.ToString(CultureInfo.InvariantCulture) +
+                          ",\"probe\":" + (probe ? "true" : "false") +
+                          ",\"rotation\":" + (rotation ? "true" : "false") +
+                          ",\"signature\":\"" + JsonEscape(signature) + "\"}";
+            System.IO.File.WriteAllText(AppDataOptionsPath(), json);
         }
 
         // Map the user's picked options (Settings > Simulator) to compile symbols + a stable signature, same
@@ -860,8 +908,9 @@ namespace CNC.Controls
             return flags;
         }
 
-        // GET the sim-<sig> release and install it as the plain, unsuffixed %AppData%\Simulator\grblHAL_sim.exe.
-        private static bool DownloadAppDataRelease(string sig, out string error)
+        // GET the sim-<sig> release and install it as the plain, unsuffixed %AppData%\Simulator\grblHAL_sim.exe,
+        // alongside a sim-options.json recording the axes/probe/rotation picks that produced it.
+        private static bool DownloadAppDataRelease(int axes, bool probe, bool rotation, string sig, out string error)
         {
             byte[] bytes = DownloadReleaseBytes(sig, out error);
             if (bytes == null)
@@ -871,7 +920,7 @@ namespace CNC.Controls
                 string dir = AppDataSimulatorDir();
                 System.IO.Directory.CreateDirectory(dir);
                 System.IO.File.WriteAllBytes(AppDataSimulatorExePath(), bytes);
-                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, AppDataSigMarkerName), sig);
+                WriteAppDataOptions(axes, probe, rotation, sig);
                 return true;
             }
             catch (System.IO.IOException ioex)
@@ -894,7 +943,7 @@ namespace CNC.Controls
                 return MatchResult.AlreadyCurrent;
 
             string relErr;
-            if (DownloadAppDataRelease(signature, out relErr))
+            if (DownloadAppDataRelease(axes, probe, rotation, signature, out relErr))
                 return MatchResult.InstalledFromRelease;
 
             if (_dispatched.Contains(signature))
@@ -917,14 +966,14 @@ namespace CNC.Controls
 
         // Poll for a just-dispatched sim-<sig> release and install it to %AppData%\Simulator once it appears.
         // Intended to run on a background thread after EnsureAppDataSimulator returns BuildTriggered.
-        public static bool PollAndInstallAppData(string sig, int timeoutSeconds = 600)
+        public static bool PollAndInstallAppData(int axes, bool probe, bool rotation, string sig, int timeoutSeconds = 600)
         {
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
             while (DateTime.UtcNow < deadline)
             {
                 System.Threading.Thread.Sleep(20 * 1000);
                 string err;
-                if (DownloadAppDataRelease(sig, out err))
+                if (DownloadAppDataRelease(axes, probe, rotation, sig, out err))
                     return true;
             }
             return false;

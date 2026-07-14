@@ -1,1 +1,0 @@
-{"driver":"Simulator","URL":"https://github.com/grblHAL/Simulator","board":"WIN64","symbols":["PROBE_ENABLE=1","ACCELERATION_TICKS_PER_SECOND=100","CONTROL_ENABLE=70"],"docker_instance":"","grblHAL":"webBuilder"}
