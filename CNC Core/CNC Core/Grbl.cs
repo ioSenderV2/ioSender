@@ -1491,6 +1491,7 @@ namespace CNC.Core
                     case "NEWOPT":
                         NewOptions = valuepair[1];
                         HasATC = AtcMacrosRequired = HasYModem = RotationSupported = false;   // re-evaluated from this $I's flags below
+                        LatheModeEnabled = false;   // re-evaluated below too - absent "LATHE" means the controller's lathe mode is off
                         string[] s2 = valuepair[1].Split(',');
                         foreach (string value in s2)
                         {
@@ -1606,6 +1607,13 @@ namespace CNC.Core
                                         break;
                                 }
                         }
+                        // Push through the ViewModel instance property (not just the static one above) so
+                        // PropertyChanged fires every time NEWOPT is (re-)parsed, whether lathe mode just
+                        // turned on or off - mirrors DetectNumAxes' own instance-property push for the same
+                        // reason. Lets a subscriber (MainWindow) auto-persist the controller's own lathe-mode
+                        // setting instead of requiring a separate ioSender-side toggle.
+                        if (Grbl.GrblViewModel != null)
+                            Grbl.GrblViewModel.LatheModeEnabled = LatheModeEnabled;
                         break;
 
                     case "FIRMWARE":

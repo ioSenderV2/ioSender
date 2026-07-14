@@ -546,6 +546,20 @@ namespace GCode_Sender
                     Label = CNC.Controls.Lathe.LatheWizardsView.TabDisplayLabel,
                     Reason = CNC.Controls.Lathe.LatheWizardsView.NotEnabledReason } });
 
+            // Lathe mode is no longer a manual ioSender-side toggle - the controller's own NEWOPT reply
+            // reports a "LATHE" capability flag when its Mode of operation setting (Settings > Grbl) is
+            // set to Lathe, and Grbl.cs's NEWOPT parsing pushes that through GrblViewModel.LatheModeEnabled
+            // (firing PropertyChanged) every time it's (re-)parsed. Persist whatever the controller says so
+            // NEXT startup's BuildTabs() above (which runs before a connection exists) shows/hides the
+            // Lathe Wizards tab correctly without waiting on a fresh connection - same one-restart-to-take-
+            // effect behavior the old manual checkbox had, just detected automatically instead.
+            ((GrblViewModel)DataContext).PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(GrblViewModel.LatheModeEnabled) &&
+                    AppConfig.Settings.Base.Lathe.LatheEnabled != GrblInfo.LatheModeEnabled)
+                    AppConfig.Settings.Base.Lathe.LatheEnabled = GrblInfo.LatheModeEnabled;
+            };
+
             // Config already loaded in the constructor; here we only open the connection (deferred so
             // the main window paints first). res == 2: user cancelled / no connection - stay open
             // (disconnected) so the user can connect later via the Connect menu item.
@@ -554,8 +568,6 @@ namespace GCode_Sender
             bool connected = res == 0;
 
             UpdateSimulatorTint();   // pale-yellow background when the startup target is the simulator
-
-            GrblInfo.LatheModeEnabled = AppConfig.Settings.Lathe.IsEnabled;
 
             // App settings now live inside the Settings tab (GrblConfigView forwards Setup to AppConfigView);
             // set the Settings view up first so the app-config controls are populated before the other views.
