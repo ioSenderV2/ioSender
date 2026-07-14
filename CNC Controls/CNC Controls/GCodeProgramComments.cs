@@ -2,12 +2,12 @@
  * GCodeProgramComments.cs - part of CNC Controls library
  *
  * Parses the structured comment lines the Fusion ioSenderBatchPost add-in post-processor emits into the
- * currently loaded program - (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) and (STOCK X=.. Y=.. Z=..) - so any
- * consumer can look up "what diameter/shape is tool N" or "what stock size did the post declare" without
- * re-scanning the program or duplicating the regex. Rebuilt once per completed Load File/Load Folder (see
- * GCode.cs's Program_FileChanged, the shared completion point both funnel through via GCodeJob.FileChanged).
- * Used by CarveView (CNC GCodeViewer, 3D carve simulation) and touch-plate probing's edge-radius compensation
- * (CNC Controls Probing, ProbingViewModel.SelectedProbe).
+ * currently loaded program - (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle] [L=length]) and
+ * (STOCK X=.. Y=.. Z=..) - so any consumer can look up "what diameter/shape/length is tool N" or "what
+ * stock size did the post declare" without re-scanning the program or duplicating the regex. Rebuilt once
+ * per completed Load File/Load Folder (see GCode.cs's Program_FileChanged, the shared completion point
+ * both funnel through via GCodeJob.FileChanged). Used by CarveView (CNC GCodeViewer, 3D carve simulation)
+ * and touch-plate probing's edge-radius compensation (CNC Controls Probing, ProbingViewModel.SelectedProbe).
  *
  */
 
@@ -22,6 +22,7 @@ namespace CNC.Controls
         public double Diameter;
         public string Shape;    // "FLAT" | "BALL" | "VBIT"
         public double Angle;    // V-bit included angle (degrees), 0 for flat/ball
+        public double Length;   // tool length (mm) - DefaultLengthMm when the comment omits L=
     }
 
     public struct GCodeStockInfo
@@ -31,8 +32,12 @@ namespace CNC.Controls
 
     public static class GCodeProgramComments
     {
+        // Used whenever a (TOOL ...) comment omits L= (older post output, or a post that can't determine
+        // the tool's actual length) - a plausible generic stickout, not a measured value.
+        public const double DefaultLengthMm = 40d;
+
         private static readonly Regex rxTool =
-            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?", RegexOptions.IgnoreCase);
+            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?(?:\s+L=([0-9.]+))?", RegexOptions.IgnoreCase);
         private static readonly Regex rxStock =
             new Regex(@"\(\s*STOCK\s+X=([0-9.]+)\s+Y=([0-9.]+)\s+Z=([0-9.]+)", RegexOptions.IgnoreCase);
 
@@ -58,18 +63,48 @@ namespace CNC.Controls
                 if (stock.HasValue)
                     Stock = stock;
 
-                var m = rxTool.Match(line);
-                if (!m.Success)
-                    continue;
-                if (int.TryParse(m.Groups[1].Value, out int t) &&
-                    double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
-                {
-                    double ang = 0d;
-                    if (m.Groups[4].Success)
-                        double.TryParse(m.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out ang);
-                    tools[t] = new GCodeToolInfo { Diameter = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang };
-                }
+                if (TryParseToolLine(line, out int t, out GCodeToolInfo info))
+                    tools[t] = info;
             }
+        }
+
+        // Scan an arbitrary set of program lines for (TOOL ...) comments - the last one per tool number
+        // wins, same as Refresh()'s loop. Used both by Refresh() (the global loaded-job scan) and by
+        // ProgramView.DeclaredTools (per-instance, for a program that carries its own Blocks rather than
+        // deferring to GCode.File.Data).
+        public static IReadOnlyDictionary<int, GCodeToolInfo> ParseTools(IEnumerable<string> lines)
+        {
+            var found = new Dictionary<int, GCodeToolInfo>();
+            foreach (var line in lines)
+            {
+                if (TryParseToolLine(line, out int t, out GCodeToolInfo info))
+                    found[t] = info;
+            }
+            return found;
+        }
+
+        private static bool TryParseToolLine(string line, out int toolNumber, out GCodeToolInfo info)
+        {
+            toolNumber = 0;
+            info = default;
+
+            var m = rxTool.Match(line ?? string.Empty);
+            if (!m.Success)
+                return false;
+            if (!int.TryParse(m.Groups[1].Value, out toolNumber) ||
+                !double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
+                return false;
+
+            double ang = 0d;
+            if (m.Groups[4].Success)
+                double.TryParse(m.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out ang);
+
+            double len = DefaultLengthMm;
+            if (m.Groups[5].Success)
+                double.TryParse(m.Groups[5].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out len);
+
+            info = new GCodeToolInfo { Diameter = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang, Length = len };
+            return true;
         }
 
         // Scan an arbitrary set of program lines for a (STOCK X=.. Y=.. Z=..) comment - the last one wins, same

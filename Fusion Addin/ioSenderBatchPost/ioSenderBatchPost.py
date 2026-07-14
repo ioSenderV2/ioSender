@@ -6,10 +6,11 @@ combines them into a single <folder-name>.nc in the chosen folder - the only fil
 left behind (Fusion's postProcess API only posts one operation at a time, so
 per-op files are an internal step, posted to a temp directory and cleaned up).
 
-The combined file opens with (STOCK X=.. Y=.. Z=..) and (TOOL T=.. D=.. TYPE=..)
-comment lines - the stock size and each tool's diameter and shape - which the
-grblHAL simulator's 3D view reads for material-removal carving; real controllers
-ignore them. Between operations it inserts a (--- seq: name (Tn) ---) section
+The combined file opens with (STOCK X=.. Y=.. Z=..) and (TOOL T=.. D=.. TYPE=.. L=..)
+comment lines - the stock size and each tool's diameter, shape, and length - which
+the grblHAL simulator's 3D view reads for material-removal carving (L= is ignored
+there, it's for the sender's own TLO/probe use); real controllers ignore all of it.
+Between operations it inserts a (--- seq: name (Tn) ---) section
 marker + G53 G0 Z0 + M6 Tn (unless the post already emitted one), with
 Fusion-Personal-Use rapids restored. Load it directly with ioSender's File > Load
 - the section markers drive the same collapsible per-toolpath outline view that
@@ -51,6 +52,11 @@ CMD_DESC = ('Post every operation in every setup to its own '
 # workspace "Actions" panel (where the stock Post Process button lives). If the
 # button does not appear in your Fusion version, change this id.
 PANEL_ID = 'CAMActionPanel'
+
+# Emitted as a (TOOL ...) comment's L= value whenever a tool's actual length can't be read from Fusion
+# (see _tool_geometry) - a plausible generic stickout, not a measured value. Matches
+# GCodeProgramComments.DefaultLengthMm on the ioSender side.
+DEFAULT_TOOL_LENGTH_MM = 40.0
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +166,20 @@ def _tool_geometry(op):
             # double it. (Matches SRWCommands; verify against a real v-bit.)
             angle = int(round(math.degrees(float(raw_angle)) * 2.0))
 
+        # Tool length (mm), for the sender's TLO/probe use (see TOOL_TABLE_FORMAT.md's L= key) - NOT used
+        # by the simulator's own carve. 'tool_overallLength' confirmed against a real Fusion document
+        # (2026-07-13: read 5.08/6.35 cm for two real tools, matching their actual overall length).
+        # Falls back to DEFAULT_TOOL_LENGTH_MM if a future tool/tool-type doesn't set it.
+        raw_length = _pval('tool_overallLength')
+        try:
+            length_mm = float(raw_length) * 10.0 if raw_length is not None else None   # cm -> mm
+        except Exception:
+            length_mm = None
+        if length_mm is None or length_mm <= 0.0:
+            length_mm = DEFAULT_TOOL_LENGTH_MM
+
         return {'number': _get_tool_number(op), 'diameter': diameter_mm,
-                'type': ttype, 'angle': angle}
+                'type': ttype, 'angle': angle, 'length': length_mm}
     except Exception:
         return None
 
@@ -240,7 +258,8 @@ def _tool_table_lines(stock, tools):
     for t in sorted(tools.values(), key=lambda d: d['number']):
         dstr = _format_tool_diameter(t['diameter'])
         angle = (' A=%d' % t['angle']) if (t['type'] == 'VBIT' and t['angle'] is not None) else ''
-        lines.append('(TOOL T=%d D=%-6sTYPE=%s%s)' % (t['number'], dstr, t['type'], angle))
+        length = t.get('length', DEFAULT_TOOL_LENGTH_MM)
+        lines.append('(TOOL T=%d D=%-6sTYPE=%s%s L=%d)' % (t['number'], dstr, t['type'], angle, round(length)))
     return lines
 
 

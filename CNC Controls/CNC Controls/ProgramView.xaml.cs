@@ -64,6 +64,16 @@ namespace CNC.Controls
             }
         }
 
+        // This program's declared per-tool geometry (diameter/shape/angle/length), from its own
+        // (TOOL T=n D=d TYPE=.. [A=..] [L=..]) comments (the Fusion ioSenderBatchPost add-in's format - see
+        // GCodeProgramComments) - empty when the program has none. Unlike DeclaredStock this is available on
+        // ANY ProgramView instance, not just the loaded job - a wizard/generated program's own tool comments
+        // (if it has any) are just as meaningful per-instance as the loaded job's.
+        public IReadOnlyDictionary<int, GCodeToolInfo> DeclaredTools
+        {
+            get { return GCodeProgramComments.ParseTools(ProgramLines()); }
+        }
+
         // This program's EFFECTIVE stock size: DeclaredStock if the program declares one, else the machine's
         // full work envelope (GrblInfo.MaxTravel) as a conservative default/sanity bound - always defined
         // (never null) on the loaded-job instance.
