@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>105 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>110 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -203,6 +203,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>New Fixture definitions library (named, typed workholding positions) in Machine Setup, consumed by Start Job's fixture picker - retires the old single-slot G28 named-position combo.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr94">94</a></td></tr>
 <tr><td>GCodeProgramComments extracted as a shared parser for a loaded program's (TOOL)/(STOCK) comments, reused by touch-plate edge-radius compensation and CarveView's 3D carve simulation; touch-plate diameter fix.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr96">96</a></td></tr>
 <tr><td>Restore-from-file now previews only the rows that would actually change, colors them live as it applies, and offers automatic rollback on a mid-run failure; the G28 flyout gained a read-only fixture-position picker; every generated macro is now saved to disk; fixed a real crash switching to the Start Job tab.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr104">104</a></td></tr>
+<tr><td>3D probe/touch plate dialogs now both measure overall length (body/collet top to tip)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr107">107</a></td></tr>
+<tr><td>Lathe Wizards availability now follows the controller's own Mode-of-operation setting, not a separate ioSender toggle</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr108">108</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -225,6 +227,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Root-caused the vise Start Job error:71 storm (a dangling-paren comment corrupting the grblHAL parser) and a real MDI-queue pacing bug it exposed; added a jaw keep-out toolpath check, spacer-aware Z math, and Cancel-issues-Feed-Hold during a corner probe.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr102">102</a></td></tr>
 <tr><td>Touch Plate as an alternative probe for Start Job/vise Set position; partial vise Measure; fixed a real TLO-reference near-miss.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr103">103</a></td></tr>
 <tr><td>Root-caused the Machinist Vise corner 4/2 face-probe margin flip-flop (a physical tip-clearance problem, not size-estimate slop) and fixed it with a live tool-diameter lookup; dropped the readout-only corners 1/3; first clean end-to-end Machinist Vise Start Job run on real hardware.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr105">105</a></td></tr>
+<tr><td>Start Job tab left-aligned, vise labels say exact not estimated, vise corner-probe motion after TLO ref no longer over-travels</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr109">109</a></td></tr>
+<tr><td>Generates an O-word-loop .nc file for reproducing the controller-wedge-on-Reset bug over Serial/Telnet</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr110">110</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -247,6 +251,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>3-line run view &mdash; on Cycle Start a generated program collapses to previous / current / next line at the bottom of the tab; click the title bar to expand</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr76">76</a></td></tr>
 <tr><td>Save program... now works for a wizard's generated preview, and the floating Program popup no longer shows a redundant second copy of the loaded job already docked in the Job tab.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr93">93</a></td></tr>
 <tr><td>The Fusion ioSenderBatchPost add-in always combines every operation into one .nc; Load File now recognizes its section markers and shows the same collapsible outline Load Folder used to, so Load Folder is retired.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr97">97</a></td></tr>
+<tr><td>(TOOL) comments carry a tool's overall length (L=), read from Fusion and exposed per-program</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr106">106</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -401,7 +406,12 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">103</td><td><a href="#pr103">Start Job: Touch Plate probing, vise partial Measure</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">22</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+513</span> <span class="del">-115</span></td></tr>
 <tr><td class="n">104</td><td><a href="#pr104">Settings restore redesign, G28 fixture picker, crash fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">18</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+327</span> <span class="del">-93</span></td></tr>
 <tr><td class="n">105</td><td><a href="#pr105">Vise touch-plate margin fix, first full run</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+94</span> <span class="del">-58</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (105 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1011</span> <span class="del">13</span> <span class="add">+139</span><br><span class="k">Lines:</span> <span class="add">+44773</span> <span class="del">-8676</span></td></tr>
+<tr><td class="n">106</td><td><a href="#pr106">(TOOL) comment gains an L= tool-length parameter</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+88</span> <span class="del">-24</span></td></tr>
+<tr><td class="n">107</td><td><a href="#pr107">Probe definitions unified on an overall-length measurement, like (TOOL)'s L=</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+61</span> <span class="del">-30</span></td></tr>
+<tr><td class="n">108</td><td><a href="#pr108">Lathe mode auto-detected from the controller, manual toggle removed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-5</span></td></tr>
+<tr><td class="n">109</td><td><a href="#pr109">Start Job: align Probe/Stock-conductive rows, exact-size vise labels, tighten TLO-ref motion</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+55</span> <span class="del">-28</span></td></tr>
+<tr><td class="n">110</td><td><a href="#pr110">Reset-repro test-case generator (Help &gt; Support)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+308</span> <span class="del">-21</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (110 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1040</span> <span class="del">13</span> <span class="add">+141</span><br><span class="k">Lines:</span> <span class="add">+45311</span> <span class="del">-8784</span></td></tr>
 </table>
 </div>
 
@@ -2479,6 +2489,65 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">94</td><td class="num del">58</td></tr>
 </table>
 <div class="desc"><p>Closes out the Machinist Vise touch-plate corner-probe thread: root-caused why the corner 4/2 face-probe margin kept flip-flopping between two wrong extremes, fixed it, dropped a pair of probes that weren't earning their keep, and ran the whole thing clean on real hardware for the first time.</p><ul><li><strong>Root cause:</strong> <code>rx</code>/<code>ry</code> (pushed outside the exact edge, the face-probe's outward retreat/descent point) and <code>_topx</code>/<code>_topy</code> = <code>rx - topClearance</code> (pulled back inside, the initial top-probe point) are computed from the SAME reference in series inside <code>pcorner.macro</code>, not two independent points - and entered vise stock sizes are precision-exact, so the margin was never covering size uncertainty, only physical tip clearance so a vertical descent doesn't land exactly on the corner.</li><li><strong>Fix:</strong> both margins now derive from the ACTUAL tip radius currently in the collet (<code>refMarginMm = radius + 5</code>, <code>topClearance = refMarginMm + 10</code>, so the top-probe point always nets 10mm inside the true edge regardless of radius - previously <code>topClearance</code>(10) &lt; <code>refMarginMm</code>(15), guaranteeing an overshoot).</li><li><strong>Live tip diameter, no firmware tool table (N_TOOLS=0):</strong> new <code>StartJobView.ActiveOrFallbackProbeDiameter()</code> prefers the loaded program's own <code>(TOOL T=n D=...)</code> comment for the currently loaded tool (<code>GCodeProgramComments.DiameterFor</code>, the same source the general Probing tab already uses) over the touch-plate probe definition's fallback diameter field.</li><li><strong>Corners 1/3 dropped entirely</strong> (jaw-covered edge, Z-only readout) - they never fed size (corners 2/4 vs. the known jaw origin only), origin, or skew (deliberately never computed), just an extra flatness data point, while carrying the same corner-catch risk 2/4 just got fixed for.</li></ul><p class="foot">Hardware-verified 2026-07-14: corners 2/4 probe cleanly with real working clearance, and a full Start Job run (probe -&gt; size -&gt; park -&gt; set origin -&gt; M2) completed end-to-end for the first time. Builds clean Debug.</p></div>
+</div>
+<!-- ===== #106 ===== -->
+<div class="pr">
+<h2 id="pr106"><span class="badge">#106</span>(TOOL) comment gains an L= tool-length parameter</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeProgramComments.cs</td><td class="num add">53</td><td class="num del">18</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProgramView.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">Fusion Addin/ioSenderBatchPost/ioSenderBatchPost.py</td><td class="num add">25</td><td class="num del">6</td></tr>
+</table>
+<div class="desc"><p>Extends the Fusion add-in's <code>(TOOL T=n D=d TYPE=..)</code> comment syntax with an optional <code>L=&lt;mm&gt;</code> tool-length parameter, so a program can declare each tool's overall length the same way it already declares diameter and shape.</p><ul><li><strong>Fusion add-in:</strong> reads the CAM tool's <code>tool_overallLength</code> parameter (cm -&gt; mm) and emits <code>L=&lt;mm&gt;</code> alongside <code>D=</code>/<code>TYPE=</code>; falls back to a 40mm default when a tool has no usable length.</li><li><strong>GCodeProgramComments:</strong> parses the new key into <code>GCodeToolInfo.Length</code> (same 40mm default for programs generated before this change, or when a comment omits it).</li><li><strong>ProgramView.DeclaredTools:</strong> new property (mirrors <code>DeclaredStock</code>) exposing every tool's parsed diameter/shape/angle/length for the current program instance - available on any <code>ProgramView</code>, not just the loaded job.</li></ul><p class="foot">Verified end-to-end against a real Fusion CAM project: debug dump confirmed tool_overallLength is the correct parameter, and the generated .nc file carried correct non-default L= values. Builds clean Debug.</p></div>
+</div>
+<!-- ===== #107 ===== -->
+<div class="pr">
+<h2 id="pr107"><span class="badge">#107</span>Probe definitions unified on an overall-length measurement, like (TOOL)'s L=</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinition.cs</td><td class="num add">8</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml</td><td class="num add">13</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinitionEditDialog.xaml.cs</td><td class="num add">5</td><td class="num del">4</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">35</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>The 3D probe dialog's "Probe length" field/schematic measured stylus-only (body-bottom to tip) - a measurement that doesn't compose with anything else measured from a known datum. Renamed to <code>OverallLength</code> (top of body to end of tip) so it reads the same way a CAM tool's overall length does, and updated the label, tooltip, and schematic dimension line to match.</p><ul><li><strong>Touch plate:</strong> added a matching <code>BitLength</code> field ("Overall length of bit", default 40mm) plus a schematic dimension line, since the plate probe also needs to know how far the bit's tip sits below the collet.</li></ul><p class="foot">UI-verified via the WpfUiTestServer: both dialogs' schematics and field labels checked by screenshot for the 3D probe and touch plate types.</p></div>
+</div>
+<!-- ===== #108 ===== -->
+<div class="pr">
+<h2 id="pr108"><span class="badge">#108</span>Lathe mode auto-detected from the controller, manual toggle removed</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">14</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls Lathe/CNC Controls Lathe/LatheWizardsView.xaml.cs</td><td class="num add">4</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">0</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>grblHAL's own <code>$I</code> NEWOPT reply already reports a <code>LATHE</code> capability flag when the controller's Mode of operation setting (Settings &gt; Grbl) is set to Lathe, so the separate Settings: App checkbox was redundant - and could disagree with the controller's actual mode.</p><ul><li><strong>Grbl.cs</strong> pushes <code>LatheModeEnabled</code> through <code>GrblViewModel</code> on every NEWOPT parse (firing <code>PropertyChanged</code>, mirroring <code>DetectNumAxes</code>'s own pattern).</li><li><strong>MainWindow</strong> persists whatever the controller reports, so next startup's tab-availability check (which runs before a connection exists) is right without waiting on a fresh connection.</li><li>Lathe Wizards' unavailable reason now points at Settings &gt; Grbl &gt; Mode of operation instead of the removed App-tab checkbox.</li></ul><p class="foot">Unverified on real lathe-enabled hardware - the detection wiring hasn't been exercised against a controller actually reporting LATHE.</p></div>
+</div>
+<!-- ===== #109 ===== -->
+<div class="pr">
+<h2 id="pr109"><span class="badge">#109</span>Start Job: align Probe/Stock-conductive rows, exact-size vise labels, tighten TLO-ref motion</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">27</td><td class="num del">17</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">25</td><td class="num del">8</td></tr>
+</table>
+<div class="desc"><p>Left-align the <code>Probe:</code> row and <code>Stock conductive</code> checkbox to match the flush-left fields below them instead of a right-aligned label column.</p><ul><li><strong>Machinist vise fixture:</strong> stock size is measured directly off the vise jaws, not estimated - the size hint text and per-field labels now say "Exact width/height/thickness" instead of "Est. ..." when that fixture is selected.</li><li><strong>Generated Start Job code:</strong> after setting the TLO reference and pausing at G30, the vise corner-probe sequence used to bounce through several higher-than-necessary moves (safe Z, over to corner 4, back up to Z0, over the stock, down to Z0 again) before probing. It now goes straight from G30 to over the corner-4/2 approach position, drops to Safe Z once, and probes - <code>pcorner.macro</code> takes an explicit <code>#&lt;_ls_maxz&gt;</code> clearance height instead of hardcoding <code>Z0</code>/<code>#&lt;_bottom&gt;+30</code>.</li></ul><p class="foot">Hardware-verified: Start Job now runs the vise flow start to finish without the extra moves.</p></div>
+</div>
+<!-- ===== #110 ===== -->
+<div class="pr">
+<h2 id="pr110"><span class="badge">#110</span>Reset-repro test-case generator (Help &gt; Support)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ResetReproDialog.xaml</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ResetReproDialog.xaml.cs</td><td class="num add">173</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">105</td><td class="num del">21</td></tr>
+</table>
+<div class="desc"><p>Writes a .nc file with an O-word subroutine, called several times, that dwells then moves - a controlled way to reproduce the controller-wedge-on-Reset bug under investigation. grblHAL only allows O-word flow control from a file-backed stream, so the file must be uploaded to SD Card / the on-board filesystem and run from there rather than loaded as a normal job.</p><ul><li>Lets Reset be tested mid-call, and the same file compared over both Serial and Telnet transports.</li></ul><p class="foot">Tool built and verified to generate a valid file; the actual hardware repro run against it is next session's work.</p></div>
 </div>
 </section>
 
