@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,15 +9,17 @@ namespace CNC.Controls
     // Settings > Simulator: lets the user pick grblHAL compile options and build a simulator via the same
     // CI workflow the auto-matched flow uses (SimulatorManager's EnsureMatchedSimulator/DispatchBuild), but
     // installed to a fixed %AppData%\Simulator\grblHAL_sim.exe - the Connect dialog's Simulator tab is only
-    // enabled once that file exists (see PortDialog.xaml.cs).
+    // enabled once that file exists (see PortDialog.xaml.cs). When a real controller is connected, defaults
+    // the picks to match it (from $I's OPT/NEWOPT, already parsed into GrblInfo) and Build also copies its
+    // live settings into EEPROM.DAT so the simulator boots up configured like the real machine.
     public partial class SimulatorConfigView : UserControl, IGrblConfigTab
     {
-        private bool restoredOptions;
+        private bool seededDefaults;
 
         public SimulatorConfigView()
         {
             InitializeComponent();
-            Loaded += (s, e) => { RestoreOptions(); RefreshStatus(); };
+            Loaded += (s, e) => { SeedDefaults(); RefreshStatus(); };
         }
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.Simulator; } }
@@ -29,23 +32,35 @@ namespace CNC.Controls
 
         private int SelectedAxes { get { return cbxAxes.SelectedIndex + 3; } }
 
-        // Restore the axes/probe/rotation picks that produced the currently-installed exe (read back from
-        // sim-options.json, see SimulatorManager.AppDataActiveOptions) instead of always starting from the
-        // XAML defaults - once only, the first time the tab is shown, so it doesn't stomp a mid-session edit
-        // the user hasn't built yet.
-        private void RestoreOptions()
+        // Seed axes/probe/rotation once, the first time the tab is shown, so it doesn't stomp a mid-session
+        // edit the user hasn't built yet. Prefers the CONNECTED controller's actual options (from $I's
+        // OPT/NEWOPT, already parsed into GrblInfo - same properties BuildOptionSymbols reads for the
+        // auto-matched flow) over whatever was last built, since matching real hardware is the point; falls
+        // back to the picks that produced the currently-installed exe (sim-options.json) when nothing's
+        // connected.
+        private void SeedDefaults()
         {
-            if (restoredOptions)
+            if (seededDefaults)
                 return;
-            restoredOptions = true;
+            seededDefaults = true;
+
+            if (SimulatorManager.IsRealControllerConnected())
+            {
+                int index = CNC.Core.GrblInfo.NumAxes - 3;
+                if (index >= 0 && index < cbxAxes.Items.Count)
+                    cbxAxes.SelectedIndex = index;
+                chkProbe.IsChecked = CNC.Core.GrblInfo.HasProbe;
+                chkRotation.IsChecked = CNC.Core.GrblInfo.RotationSupported;
+                return;
+            }
 
             var opts = SimulatorManager.AppDataActiveOptions();
             if (opts == null)
                 return;
 
-            int index = opts.Axes - 3;
-            if (index >= 0 && index < cbxAxes.Items.Count)
-                cbxAxes.SelectedIndex = index;
+            int savedIndex = opts.Axes - 3;
+            if (savedIndex >= 0 && savedIndex < cbxAxes.Items.Count)
+                cbxAxes.SelectedIndex = savedIndex;
             chkProbe.IsChecked = opts.Probe;
             chkRotation.IsChecked = opts.Rotation;
         }
@@ -77,6 +92,7 @@ namespace CNC.Controls
             btnBuild.IsEnabled = false;
             int axes = SelectedAxes;
             bool probe = chkProbe.IsChecked == true, rotation = chkRotation.IsChecked == true;
+            bool copyMachineSettings = SimulatorManager.IsRealControllerConnected();
             txtStatus.Text = "Checking for a matching build...";
 
             ThreadPool.QueueUserWorkItem(_ =>
@@ -85,40 +101,64 @@ namespace CNC.Controls
                 {
                     string sig, detail;
                     var r = SimulatorManager.EnsureAppDataSimulator(axes, probe, rotation, out sig, out detail);
+                    bool installed;
+                    string exeStatus;
                     switch (r)
                     {
                         case SimulatorManager.MatchResult.AlreadyCurrent:
-                            Post("Already up to date (build " + sig + ").", true);
-                            break;
+                            installed = true; exeStatus = "Already up to date (build " + sig + ")."; break;
                         case SimulatorManager.MatchResult.InstalledFromRelease:
-                            Post("Installed (build " + sig + ").", true);
-                            break;
+                            installed = true; exeStatus = "Installed (build " + sig + ")."; break;
                         case SimulatorManager.MatchResult.BuildTriggered:
-                            Post("Building (build " + sig + ") - this can take a few minutes...", false);
-                            if (SimulatorManager.PollAndInstallAppData(axes, probe, rotation, sig))
-                                Post("Build ready and installed (build " + sig + ").", true);
-                            else
-                                Post("Still building (build " + sig + ") - try Build again shortly.", true);
+                            SetStatus("Building (build " + sig + ") - this can take a few minutes...");
+                            installed = SimulatorManager.PollAndInstallAppData(axes, probe, rotation, sig);
+                            exeStatus = installed
+                                ? "Build ready and installed (build " + sig + ")."
+                                : "Still building (build " + sig + ") - try Build again shortly.";
                             break;
-                        case SimulatorManager.MatchResult.Failed:
-                            Post(detail ?? "Build failed.", true);
-                            break;
+                        default:
+                            Finish(detail ?? "Build failed.");
+                            return;
                     }
+
+                    // Also copy the connected controller's live settings into EEPROM.DAT, so the simulator
+                    // boots up configured like the real machine - same NVRAM-replay mechanism the Grbl tab's
+                    // "Copy to simulator" button uses (BuildMyMachineEeprom), aimed at this exe/folder instead.
+                    if (!installed || !copyMachineSettings)
+                    {
+                        Finish(exeStatus);
+                        return;
+                    }
+
+                    SetStatus(exeStatus + " Copying connected machine's settings...");
+                    var cmds = CNC.Core.GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
+                    string eepromErr = "no settings to copy.";
+                    bool eepromOk = cmds.Count > 0 && SimulatorManager.BuildAppDataEeprom(cmds, out eepromErr);
+                    Finish(exeStatus + (eepromOk
+                        ? " Machine settings copied to EEPROM.DAT."
+                        : " Settings copy failed" + (string.IsNullOrEmpty(eepromErr) ? "." : (": " + eepromErr))));
                 }
-                catch (Exception ex) { Post(ex.Message, true); }
+                catch (Exception ex) { Finish(ex.Message); }
             });
         }
 
-        // Marshal a status update (and optionally re-enable Build + refresh the up-to-date check) to the UI thread.
-        private void Post(string text, bool reenable)
+        // Marshal an in-progress status update to the UI thread (Build stays disabled).
+        private void SetStatus(string text)
+        {
+            try { Dispatcher.BeginInvoke((Action)(() => txtStatus.Text = text)); }
+            catch { }
+        }
+
+        // Marshal the final status to the UI thread, refresh the path readout, and re-enable Build.
+        private void Finish(string text)
         {
             try
             {
                 Dispatcher.BeginInvoke((Action)(() =>
                 {
                     txtStatus.Text = text;
-                    if (reenable)
-                        btnBuild.IsEnabled = true;
+                    txtPath.Text = SimulatorManager.AppDataSimulatorPresent() ? SimulatorManager.AppDataSimulatorExePath() : string.Empty;
+                    btnBuild.IsEnabled = true;
                 }));
             }
             catch { }

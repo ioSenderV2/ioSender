@@ -71,6 +71,16 @@ namespace CNC.Controls
             return System.IO.File.Exists(AppDataSimulatorExePath());
         }
 
+        // True when we're talking to a real grblHAL controller right now (not the bundled simulator itself,
+        // and not a plain grbl that lacks the NEWOPT-derived properties BuildOptionSymbols/the manual picker
+        // read). The precondition for Settings > Simulator to default its picks to match the connected
+        // hardware, and for offering to copy its live NVRAM into the manually-built simulator.
+        public static bool IsRealControllerConnected()
+        {
+            return CNC.Core.Comms.com != null && CNC.Core.Comms.com.IsOpen &&
+                   !AppConfig.Settings.Base.StartSimulator && CNC.Core.GrblInfo.IsGrblHAL;
+        }
+
         // True if a process matching the exe's name is running, regardless of who started it (a prior ioSender
         // session, or the user by hand) - unlike IsSimulatorRunning below, which only tracks an instance THIS
         // manager launched. Used to decide whether a fresh launch is needed at all.
@@ -421,26 +431,53 @@ namespace CNC.Controls
         }
 
         // Build MyMachine.DAT by replaying the given "$id=value" settings into a throwaway, headless instance of
-        // the bundled simulator: it serializes them into its NVRAM file exactly as real grblHAL would, so the
-        // simulator then boots with the same context as the real controller. Settings the sim doesn't support
-        // are simply rejected and skipped. Returns false (with a reason) on failure.
+        // the bundled (app-relative) simulator - see BuildEeprom below for how. Returns false (with a reason)
+        // on failure.
         public static bool BuildMyMachineEeprom(System.Collections.Generic.IList<string> settingCommands, out string error)
         {
             error = null;
             string exe = FindExecutable("grblHAL_sim.exe");
             if (exe == null) { error = "the bundled simulator was not found."; return false; }
-            if (settingCommands == null || settingCommands.Count == 0) { error = "no settings to copy."; return false; }
 
             string eeprom = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), MyMachineEepromName);
+            return BuildEeprom(exe, eeprom, settingCommands, out error);
+        }
+
+        // Same idea, for the manually-built %AppData%\Simulator simulator: writes EEPROM.DAT next to it -
+        // grblHAL's own default NVRAM filename (the sim falls back to it when launched with no -e and no
+        // MyMachine.DAT present, see the Simulator repo's main.c), so nothing else needs to be told about it.
+        public const string AppDataEepromName = "EEPROM.DAT";
+
+        public static string AppDataEepromPath()
+        {
+            return System.IO.Path.Combine(AppDataSimulatorDir(), AppDataEepromName);
+        }
+
+        public static bool BuildAppDataEeprom(System.Collections.Generic.IList<string> settingCommands, out string error)
+        {
+            error = null;
+            if (!AppDataSimulatorPresent()) { error = "no simulator has been built yet."; return false; }
+            return BuildEeprom(AppDataSimulatorExePath(), AppDataEepromPath(), settingCommands, out error);
+        }
+
+        // Shared: replay "$id=value" settings into a throwaway, headless instance of the given simulator exe -
+        // it serializes them into destPath's NVRAM exactly as real grblHAL would, so a later normal launch
+        // pointed at that folder boots with the same context as the connected controller. Settings the sim
+        // doesn't support are simply rejected and skipped.
+        private static bool BuildEeprom(string exePath, string destPath, System.Collections.Generic.IList<string> settingCommands, out string error)
+        {
+            error = null;
+            if (settingCommands == null || settingCommands.Count == 0) { error = "no settings to copy."; return false; }
+
             Process sim = null;
             try
             {
-                try { if (System.IO.File.Exists(eeprom)) System.IO.File.Delete(eeprom); } catch { }   // start from defaults
+                try { if (System.IO.File.Exists(destPath)) System.IO.File.Delete(destPath); } catch { }   // start from defaults
 
                 int port = FreeTcpPort();
-                var psi = new ProcessStartInfo(exe, string.Format("-e \"{0}\" -p {1}", eeprom, port))
+                var psi = new ProcessStartInfo(exePath, string.Format("-e \"{0}\" -p {1}", destPath, port))
                 {
-                    WorkingDirectory = System.IO.Path.GetDirectoryName(exe),
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exePath),
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -452,7 +489,7 @@ namespace CNC.Controls
                     try { client = new System.Net.Sockets.TcpClient("127.0.0.1", port); }
                     catch { System.Threading.Thread.Sleep(100); }   // wait for the sim to bind its listener
                 }
-                if (client == null) { error = "could not connect to the bundled simulator."; return false; }
+                if (client == null) { error = "could not connect to the simulator."; return false; }
 
                 using (client)
                 using (var stream = client.GetStream())
@@ -467,7 +504,7 @@ namespace CNC.Controls
                     }
                     System.Threading.Thread.Sleep(250);   // let the final NVRAM write flush to disk
                 }
-                return System.IO.File.Exists(eeprom);
+                return System.IO.File.Exists(destPath);
             }
             catch (Exception ex) { error = ex.Message; return false; }
             finally
