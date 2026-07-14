@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>110 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>112 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -252,6 +252,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Save program... now works for a wizard's generated preview, and the floating Program popup no longer shows a redundant second copy of the loaded job already docked in the Job tab.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr93">93</a></td></tr>
 <tr><td>The Fusion ioSenderBatchPost add-in always combines every operation into one .nc; Load File now recognizes its section markers and shows the same collapsible outline Load Folder used to, so Load Folder is retired.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr97">97</a></td></tr>
 <tr><td>(TOOL) comments carry a tool's overall length (L=), read from Fusion and exposed per-program</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr106">106</a></td></tr>
+<tr><td>The Program view overlay (Load File/Folder, wizard output) was a fixed 560-720px panel that ran over half the client area on a narrower window - now always exactly the right third.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr112">112</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -263,6 +264,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Bind any main + second-level tab to a key &mdash; right-click Bind-to-Key + header badges</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr79">79</a></td></tr>
 <tr><td>Start Job no longer writes a start_job.macro file or seeds a catalog entry - it already ran entirely in-memory like the other Generate/Cycle Start wizards.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr92">92</a></td></tr>
 <tr><td>Two probe-tip-losing collision bugs fixed in pcorner.macro (found probing a Corner Fence fixture on hardware); MacroProcessor now truncates an oversized auto-generated comment instead of having the controller silently reject the whole line.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr99">99</a></td></tr>
+<tr><td>Console tab now mirrors to a durable, timestamped log file per run - survives a UI freeze or a firmware debug flood that used to leave no record behind.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr111">111</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -411,7 +413,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">108</td><td><a href="#pr108">Lathe mode auto-detected from the controller, manual toggle removed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-5</span></td></tr>
 <tr><td class="n">109</td><td><a href="#pr109">Start Job: align Probe/Stock-conductive rows, exact-size vise labels, tighten TLO-ref motion</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+55</span> <span class="del">-28</span></td></tr>
 <tr><td class="n">110</td><td><a href="#pr110">Reset-repro test-case generator (Help &gt; Support)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+308</span> <span class="del">-21</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (110 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1040</span> <span class="del">13</span> <span class="add">+141</span><br><span class="k">Lines:</span> <span class="add">+45311</span> <span class="del">-8784</span></td></tr>
+<tr><td class="n">111</td><td><a href="#pr111">Durable console log; crash/debug logs consolidated</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+164</span> <span class="del">-16</span></td></tr>
+<tr><td class="n">112</td><td><a href="#pr112">Program view popup resized to exactly the right third of the client area</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+11</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (112 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1046</span> <span class="del">13</span> <span class="add">+142</span><br><span class="k">Lines:</span> <span class="add">+45486</span> <span class="del">-8804</span></td></tr>
 </table>
 </div>
 
@@ -2548,6 +2552,29 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">105</td><td class="num del">21</td></tr>
 </table>
 <div class="desc"><p>Writes a .nc file with an O-word subroutine, called several times, that dwells then moves - a controlled way to reproduce the controller-wedge-on-Reset bug under investigation. grblHAL only allows O-word flow control from a file-backed stream, so the file must be uploaded to SD Card / the on-board filesystem and run from there rather than loaded as a normal job.</p><ul><li>Lets Reset be tested mid-call, and the same file compared over both Serial and Telnet transports.</li></ul><p class="foot">Tool built and verified to generate a valid file; the actual hardware repro run against it is next session's work.</p></div>
+</div>
+<!-- ===== #111 ===== -->
+<div class="pr">
+<h2 id="pr111"><span class="badge">#111</span>Durable per-run console log; crash/debug logs consolidated under logs\</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/ConsoleLog.cs</td><td class="num add">118</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/DebugLog.cs</td><td class="num add">1</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">27</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">6</td><td class="num del">10</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Every console line the on-screen Console tab shows is now also mirrored to <code>%AppData%\ioSender\logs\console_&lt;run-timestamp&gt;.log</code> - a durable record that survives the 2000-line in-memory trim and, more importantly, survives a UI freeze (the failure mode this was built to diagnose: a firmware debug flood once froze the WPF UI for the length of a job, with no record afterward of what had actually happened). The write runs on a dedicated background thread fed by a queue, so a traffic burst can't freeze the UI a second way. Files are timestamped per run (not a single ever-growing file) and pruned after 10 days.</p><ul><li><strong>Crash log and debug log consolidated</strong> - both moved from directly under <code>%AppData%\ioSender\</code> into the same new <code>logs\</code> subfolder, sharing one resolution helper (<code>Resources.ResolveLogsDirectory()</code>) instead of duplicated fallback logic.</li><li><strong>Help &gt; Support &gt; "Generate reset test case..."</strong> is now hidden from the menu (a diagnostic tool, not something a normal user needs) - still reachable via UI Automation for test tooling.</li></ul><p class="foot">Grew out of a multi-session firmware controller-wedge investigation (Reset during a named G-code macro call could leave the controller needing a power-cycle) - this logging groundwork is what made the rapid flash/reproduce/read-log iteration loop possible. Root cause found and fixed upstream in grblHAL core (PRs <a href="https://github.com/grblHAL/core/pull/987">#987</a>, <a href="https://github.com/grblHAL/core/pull/988">#988</a>), hardware-verified.</p></div>
+</div>
+<!-- ===== #112 ===== -->
+<div class="pr">
+<h2 id="pr112"><span class="badge">#112</span>Program view popup resized to exactly the right third of the client area</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">11</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>The on-demand Program view overlay was a <code>Border</code> anchored right with a fixed <code>MinWidth="560" MaxWidth="720"</code> - on the app's minimum window width that could occupy up to ~58% of the client area. Replaced with a proper 3-equal-column <code>Grid.ColumnDefinitions</code> layout, with the overlay in the rightmost column (<code>Grid.Column="2"</code>, <code>HorizontalAlignment="Stretch"</code>) - it now always occupies exactly one third of the client width, regardless of window size.</p></div>
 </div>
 </section>
 
