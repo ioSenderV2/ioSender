@@ -1400,11 +1400,17 @@ namespace CNC.Controls
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a
         // connection is fully up (GrblInfo loaded, so $I/GrblInfo.IpAddress is available). On a network
         // connection store the IP just used (most recent wins); on a serial connection seed it from the
-        // controller's reported IP only while still unset. The bundled simulator (127.0.0.1) is excluded.
+        // controller's reported IP only while still unset. The bundled simulator's address (always
+        // 127.0.0.1, static and useless to remember) is excluded from BOTH branches - the elseif used to
+        // have no such guard, so a simulator's own $I-reported IP (if it reports one at all) could still
+        // slip in and clobber a real machine's remembered NetworkHost.
         public void CaptureConnectedIp()
         {
+            if (Base.StartSimulator)
+                return;
+
             string target = Base.PortParams ?? string.Empty, lower = target.ToLower();
-            bool isNetwork = !Base.StartSimulator && !lower.StartsWith("com") && target.Contains(":");
+            bool isNetwork = !lower.StartsWith("com") && target.Contains(":");
 
             string ip = null;
             if (isNetwork)
