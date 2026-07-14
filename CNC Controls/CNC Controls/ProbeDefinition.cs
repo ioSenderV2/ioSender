@@ -34,9 +34,9 @@ namespace CNC.Controls
     {
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
-        private double _diameter = 2d, _bodyDiameter = 42d, _probeLength = 50d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
+        private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
-                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d;
+                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public ProbeType ProbeType { get { return _type; } set { _type = value; OnChanged(); OnChanged(nameof(TypeName)); } }
@@ -65,9 +65,9 @@ namespace CNC.Controls
         // minimum standoff held during G28 / rapid clearance moves so the body never strikes the stock.
         public double BodyDiameter { get { return _bodyDiameter; } set { _bodyDiameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }
 
-        // 3D-probe stylus/shaft length BELOW the body (excludes the body itself) - the reach from body-bottom
-        // to the end of the tip. Informational/clearance reference, not consumed by any macro today.
-        public double ProbeLength { get { return _probeLength; } set { _probeLength = value; OnChanged(); } }
+        // 3D-probe overall length: top of the body to the end of the tip. Informational/clearance reference,
+        // not consumed by any macro today.
+        public double OverallLength { get { return _overallLength; } set { _overallLength = value; OnChanged(); } }
 
         // Minimum XY standoff (body radius) to keep clear of the work on G28/rapid clearance moves.
         [System.Xml.Serialization.XmlIgnore]
@@ -83,6 +83,7 @@ namespace CNC.Controls
         public double ProbeOffsetY { get { return _offsetY; } set { _offsetY = value; OnChanged(); } }
         public double PlateThickness { get { return _plateThickness; } set { _plateThickness = value; OnChanged(); } } // touch plate Z offset (work Z0 = top - thickness)
         public double LipWidth { get { return _lipWidth; } set { _lipWidth = value; OnChanged(); } }                  // touch plate lip XY offset from the stock edge
+        public double BitLength { get { return _bitLength; } set { _bitLength = value; OnChanged(); } }                // overall length of the bit touching the plate (informational reference)
         public double SetterHeight { get { return _setterHeight; } set { _setterHeight = value; OnChanged(); } }      // tool setter trigger height
         public double SpinRPM { get { return _spinRPM; } set { _spinRPM = value; OnChanged(); } }                     // spinning edge finder RPM (0 = none)
 
@@ -95,11 +96,11 @@ namespace CNC.Controls
 
         public void CopyFrom(ProbeDefinition o)
         {
-            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; ProbeLength = o.ProbeLength; ProbeFeedRate = o.ProbeFeedRate;
+            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; OverallLength = o.OverallLength; ProbeFeedRate = o.ProbeFeedRate;
             LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
-            PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
+            PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; BitLength = o.BitLength; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

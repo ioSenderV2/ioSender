@@ -1092,9 +1092,12 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxDlgSetPos:System.
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxTestPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Test position
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxTestPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,txtFxProbeCircle:System.Windows.Controls.TextBlock.Text,Text,True,True,,probe diameter
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Label,None,False,True,,Probe length:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Label,None,False,True,,Overall length:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe stylus length below the body (excludes the body itself) - body-bottom to the end of the tip.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe overall length - top of the body to the end of the tip.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Label,None,False,True,,Overall length of bit:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_bitlength:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Overall length of the bit used to touch off the plate - top of the collet to the end of the bit.
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Label,None,False,True,,Jaw width:
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_jawWidth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Start Job). 0 = not set."

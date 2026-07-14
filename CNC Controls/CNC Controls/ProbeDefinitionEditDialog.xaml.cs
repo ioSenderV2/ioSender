@@ -80,13 +80,14 @@ namespace CNC.Controls
             }
 
             // The 3D probe also has a large body; its radius is the minimum standoff for rapid/G28 moves
-            // and drives the Load Stock approach clearance. Probe length (stylus below the body, excluding
-            // the body itself) is informational.
+            // and drives the Load Stock approach clearance. Overall length (top of body to end of tip) is
+            // informational.
             Show(fldBody, type == ProbeType.ThreeDProbe);
             Show(fldLength, type == ProbeType.ThreeDProbe);
 
             Show(fldPlate, type == ProbeType.TouchPlate);
             Show(fldLip, type == ProbeType.TouchPlate);
+            Show(fldBitLength, type == ProbeType.TouchPlate);
             Show(fldSetter, type == ProbeType.ToolSetter);
             Show(fldSpin, type == ProbeType.EdgeFinder);
 
@@ -116,14 +117,14 @@ namespace CNC.Controls
             switch (type)
             {
                 case ProbeType.ThreeDProbe:
-                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.ProbeLength = 50d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.OverallLength = 100d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d;
                     d.ProbeOffsetX = 0d; d.ProbeOffsetY = 0d;
                     break;
 
                 case ProbeType.TouchPlate:
                     d.ProbeDiameter = 6d;   // bit in the collet
-                    d.PlateThickness = 12d; d.LipWidth = 10d; d.XYClearance = 5d; d.Depth = 5d;
+                    d.PlateThickness = 12d; d.LipWidth = 10d; d.BitLength = 40d; d.XYClearance = 5d; d.Depth = 5d;
                     d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d; d.RapidsFeedRate = 0d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d;
                     break;

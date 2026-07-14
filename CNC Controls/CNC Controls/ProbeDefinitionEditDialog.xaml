@@ -56,9 +56,10 @@
             <StackPanel Grid.Column="0" VerticalAlignment="Top">
                 <local:NumericField x:Name="fldDiameter" x:Uid="pd_diameter" Label="Tip diameter:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate)." Margin="0,2,0,0" Value="{Binding Path=ProbeDiameter, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldBody" x:Uid="pd_body" Label="Body diameter:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance." Margin="0,2,0,0" Value="{Binding Path=BodyDiameter, Mode=TwoWay}"/>
-                <local:NumericField x:Name="fldLength" x:Uid="pd_length" Label="Probe length:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe stylus length below the body (excludes the body itself) - body-bottom to the end of the tip." Margin="0,2,0,0" Value="{Binding Path=ProbeLength, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldLength" x:Uid="pd_length" Label="Overall length:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="3D probe overall length - top of the body to the end of the tip." Margin="0,2,0,0" Value="{Binding Path=OverallLength, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldPlate" x:Uid="pd_plate" Label="Plate thickness:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="Plate height - work Z0 is the plate top minus this." Margin="0,2,0,0" Value="{Binding Path=PlateThickness, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldLip" x:Uid="pd_lip" Label="Lip width:" ColonAt="120" Unit="mm" Format="##0.0##" ToolTip="How far the plate's edge sticks out past the stock corner." Margin="0,2,0,0" Value="{Binding Path=LipWidth, Mode=TwoWay}"/>
+                <local:NumericField x:Name="fldBitLength" x:Uid="pd_bitlength" Label="Overall length of bit:" ColonAt="120" Unit="mm" Format="###0.0##" ToolTip="Overall length of the bit used to touch off the plate - top of the collet to the end of the bit." Margin="0,2,0,0" Value="{Binding Path=BitLength, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldSetter" x:Uid="pd_setter" Label="Setter height:" ColonAt="120" Unit="mm" Format="-###0.0##" ToolTip="Trigger height of the tool setter." Margin="0,2,0,0" Value="{Binding Path=SetterHeight, Mode=TwoWay}"/>
                 <local:NumericField x:Name="fldSpin" x:Uid="pd_spin" Label="Spin speed:" ColonAt="120" Unit="RPM" Format="#####0" ToolTip="Spinning edge-finder speed; 0 = does not spin." Margin="0,2,0,0" Value="{Binding Path=SpinRPM, Mode=TwoWay}"/>
             </StackPanel>
@@ -83,11 +84,11 @@
                             <Line Style="{StaticResource DimLine}" X1="120" Y1="204" X2="120" Y2="226"/>
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="82" Canvas.Top="228" Text="Tip diameter"/>
 
-                            <!-- probe length: body BOTTOM to the END of the tip (excludes the body itself), alongside the right of the shape -->
-                            <Line Style="{StaticResource DimLine}" X1="160" Y1="122" X2="160" Y2="202"/>
-                            <Line Style="{StaticResource DimLine}" X1="156" Y1="122" X2="164" Y2="122"/>
+                            <!-- overall length: TOP of the body to the END of the tip, alongside the right of the shape -->
+                            <Line Style="{StaticResource DimLine}" X1="160" Y1="34" X2="160" Y2="202"/>
+                            <Line Style="{StaticResource DimLine}" X1="156" Y1="34" X2="164" Y2="34"/>
                             <Line Style="{StaticResource DimLine}" X1="156" Y1="202" X2="164" Y2="202"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="168" Canvas.Top="128" Text="Probe length">
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="168" Canvas.Top="100" Text="Overall length">
                                 <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
                             </TextBlock>
                         </Canvas>
@@ -100,6 +101,13 @@
                             <Line Style="{StaticResource DimLine}" X1="64" Y1="40" X2="64" Y2="54"/>
                             <Line Style="{StaticResource DimLine}" X1="80" Y1="40" X2="80" Y2="54"/>
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="38" Canvas.Top="24" Text="Bit diameter"/>
+                            <!-- bit overall length: top of the bit (in the collet) to the end touching the plate -->
+                            <Line Style="{StaticResource DimLine}" X1="50" Y1="54" X2="50" Y2="122"/>
+                            <Line Style="{StaticResource DimLine}" X1="46" Y1="54" X2="54" Y2="54"/>
+                            <Line Style="{StaticResource DimLine}" X1="46" Y1="122" X2="54" Y2="122"/>
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="12" Canvas.Top="62" Text="Bit length">
+                                <TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform>
+                            </TextBlock>
                             <!-- plate top (overhangs the stock edge) -->
                             <Rectangle Canvas.Left="40" Canvas.Top="122" Width="136" Height="18" Fill="#FFBFC6CC" Stroke="#FF848B92"/>
                             <!-- lip: protrudes down from the plate edge; its inner face registers on the stock side -->
