@@ -1,0 +1,40 @@
+name: Rolling release
+
+# Builds ioSender XL in Release config and republishes it as the single
+# rolling "latest" GitHub Release on every push to master. No version tags -
+# install.ps1 always pulls whatever's tagged "latest".
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release
+        run: msbuild "ioSender XL\ioSender XL.sln" -restore -t:Build -p:Configuration=Release -m -nologo -v:minimal -clp:ErrorsOnly
+
+      - name: Zip build output
+        shell: pwsh
+        run: |
+          $src = "ioSender XL\ioSender XL\bin\Release"
+          Compress-Archive -Path "$src\*" -DestinationPath "ioSender.zip" -Force
+
+      - name: Publish rolling "latest" release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: ioSender (latest master build)
+          body: Automatically built from the latest commit on `master`. Not a versioned release - see commit history for what changed.
+          allowUpdates: true
+          removeArtifacts: true
+          makeLatest: true
+          prerelease: true
+          artifacts: ioSender.zip
+          token: ${{ secrets.GITHUB_TOKEN }}

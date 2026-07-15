@@ -11,6 +11,13 @@ A task-oriented guide with **novice / intermediate / machinist** reading paths, 
 
 `master` (default) is the whole product — clone and build it (build notes below); it is consumed whole. The upstream-submittable PR-era history lives frozen in the archive repo [`stevenrwood/ioSender`](https://github.com/stevenrwood/ioSender) at tag `pr-era-cutoff`.
 
+### ⚡ Quick install (Windows, no build tools needed)
+Open PowerShell and run:
+```powershell
+irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex
+```
+Downloads the latest build, installs it to `%LocalAppData%\Programs\ioSender`, adds a desktop shortcut, and launches it. No admin rights needed. Re-run the same command any time to update.
+
 ---
 
 ## ioSender — a gcode sender for grblHAL and Grbl controllers
@@ -46,7 +53,7 @@ If you ship ioSender with a prebuilt simulator for convenience, include the simu
 
 ---
 
-Latest release is [2.0.47](https://github.com/terjeio/ioSender/releases/tag/2.0.47), see the [changelog](changelog.md) for details. 
+See the [Quick install](#-quick-install-windows-no-build-tools-needed) section above to install V2, and [`Overview.html`](Overview.html) for the full changelog.
 
 ---
 
