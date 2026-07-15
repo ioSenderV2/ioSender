@@ -54,10 +54,12 @@ namespace CNC.Controls
         // The manually-built simulator's home (Settings > Simulator, see BuildManualOptionSymbols /
         // EnsureAppDataSimulator below) - independent of the auto-matched one above, which lives in the app
         // folder and is keyed to the connected controller's options rather than a user's explicit picks.
-        // %AppData%\Simulator (not under \ioSender\) so it survives an app reinstall/relocate.
+        // %AppData%\ioSender\Simulator - CNC.Core.Resources.ConfigPath is the same per-user folder the app's
+        // own App.config/logs/Backups already live in (falls back to the app's install folder only if
+        // AppData itself is unavailable, same as everything else that uses ConfigPath).
         public static string AppDataSimulatorDir()
         {
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Simulator");
+            return System.IO.Path.Combine(CNC.Core.Resources.ConfigPath, "Simulator");
         }
 
         public static string AppDataSimulatorExePath()
@@ -875,7 +877,7 @@ namespace CNC.Controls
         // The human-readable record of what was last built, written alongside the exe - this IS "the json file
         // used to specify build options" the Settings tab reads back to restore its picks across sessions, and
         // what a user could hand-edit/inspect without decoding a hash. Both files live under
-        // AppDataSimulatorDir() (%AppData%\Simulator) - never the app's own install folder, so a build works
+        // AppDataSimulatorDir() (%AppData%\ioSender\Simulator) - never the app's own install folder, so a build works
         // under an all-users (admin-owned, e.g. Program Files) install with no elevation.
         public const string AppDataOptionsName = "sim-options.json";
 

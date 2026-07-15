@@ -396,7 +396,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" x:Uid="txt_simWizardDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Build a grblHAL simulator matching this machine's axes, probe, rotation and other options - detected automatically from the connected controller, no picks needed here. Installs to %AppData%\Simulator, the same simulator the Connect dialog's Simulator tab launches. For manual option control or later rebuilds, use Settings &gt; Simulator."/>
+                               Text="Build a grblHAL simulator matching this machine's axes, probe, rotation and other options - detected automatically from the connected controller, no picks needed here. Installs to %AppData%\ioSender\Simulator, the same simulator the Connect dialog's Simulator tab launches. For manual option control or later rebuilds, use Settings &gt; Simulator."/>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4,0,0">
                         <Button x:Uid="btn_buildSimWizard" x:Name="btnBuildSimWizard" Content="Build simulator matching this machine" Padding="14,2" MinHeight="26" Click="BuildSimWizard_Click"/>
                     </StackPanel>
