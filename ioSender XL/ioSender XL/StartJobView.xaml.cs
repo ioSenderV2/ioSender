@@ -46,7 +46,13 @@ namespace GCode_Sender
             RegexOptions.IgnoreCase);
         // corner-1 DISCOVER pass prints the spoilboard reference Z: "PC z_spoil=..". Thickness = top - spoilboard.
         private static readonly Regex rxSpoil = new Regex(@"PC\s+z_spoil\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-        private double? measuredX = null, measuredY = null, spoilZ = null;
+        // BuildViseProgram's corner 1/3 Z probes (jaw-covered edge, Y-face blocked): "LS_VISE_ZC1=.." / "LS_VISE_ZC3=..".
+        private static readonly Regex rxViseCornerZ = new Regex(@"LS_VISE_ZC([13])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        // BuildViseProgram's corner 1/3 left-edge X-face probes: "LS_VISE_CX1=.." / "LS_VISE_CX3=..".
+        private static readonly Regex rxViseCornerX = new Regex(@"LS_VISE_CX([13])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        // BuildViseProgram's left-edge skew (corner 1 vs corner 3 X, over the entered height): "LS_VISE_SKEW=..".
+        private static readonly Regex rxViseSkew = new Regex(@"LS_VISE_SKEW\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        private double? measuredX = null, measuredY = null, spoilZ = null, viseLeftEdgeSkewDeg = null;
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
@@ -475,6 +481,35 @@ namespace GCode_Sender
                 hit = true;
             }
 
+            foreach (Match m in rxViseCornerZ.Matches(msg))
+            {
+                int c = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+                if (double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double z))
+                {
+                    cornerZ[c] = z;
+                    hit = true;
+                }
+            }
+
+            // X only (never Y) for corners 1/3 - Has(c) still requires both, so this never fools the
+            // full-quad gates (measured/skew/diagonal) that assume Corner Fence's 4-point geometry.
+            foreach (Match m in rxViseCornerX.Matches(msg))
+            {
+                int c = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+                if (double.TryParse(m.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double x))
+                {
+                    cornerX[c] = x;
+                    hit = true;
+                }
+            }
+
+            var msk = rxViseSkew.Match(msg);
+            if (msk.Success && double.TryParse(msk.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double skew))
+            {
+                viseLeftEdgeSkewDeg = skew;
+                hit = true;
+            }
+
             if (hit)
                 Dispatcher.BeginInvoke(new System.Action(ShowResult));
         }
@@ -482,7 +517,7 @@ namespace GCode_Sender
         // Clear measured size + per-corner data for a fresh run, then refresh the readout.
         private void ResetResults()
         {
-            measuredX = measuredY = spoilZ = null;
+            measuredX = measuredY = spoilZ = viseLeftEdgeSkewDeg = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
             ShowResult();
@@ -703,6 +738,47 @@ namespace GCode_Sender
                     canvas.Children.Add(lbl);
                 }
             }
+            else if (isVise)
+            {
+                // The vise's partial Measure never has all 4 corners' XY (1/3 are Z-only - the jaw blocks
+                // face-probing there, see BuildViseProgram), so `measured` above is never true here even
+                // though up to 4 Z readings may be in cornerZ[]. There's also no spoilboard reference to
+                // subtract (pcorner.macro's z_spoil is only printed by its DISCOVER pass, and every vise
+                // corner call runs in REUSE mode - see EmitPcornerCall's startz="0" - so spoilZ is always
+                // null for a vise run). Show each probed corner relative to the LOWEST one instead - reads
+                // as a flatness map, anchored at the drawing's estimated-rectangle corner positions.
+                double? baseZ = null;
+                for (int c = 1; c <= 4; c++)
+                    if (cornerZ[c].HasValue && (!baseZ.HasValue || cornerZ[c].Value < baseZ.Value))
+                        baseZ = cornerZ[c].Value;
+
+                if (baseZ.HasValue)
+                {
+                    for (int c = 1; c <= 4; c++)
+                    {
+                        if (!cornerZ[c].HasValue)
+                            continue;
+
+                        Point pt = P(c);
+                        string text = string.Format(CultureInfo.InvariantCulture, "z+{0:0.0}", cornerZ[c].Value - baseZ.Value);
+                        var lbl = new TextBlock
+                        {
+                            Text = text,
+                            FontSize = 11d,
+                            TextAlignment = TextAlignment.Center,
+                            Background = Brushes.White,
+                            Padding = new Thickness(2d, 0d, 2d, 0d),
+                            Foreground = Brushes.Black
+                        };
+                        lbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                        var dir = new Vector(pt.X - ctr.X, pt.Y - ctr.Y);
+                        if (dir.Length > 1e-6) dir.Normalize();
+                        Canvas.SetLeft(lbl, pt.X + dir.X * 22d - lbl.DesiredSize.Width / 2d);
+                        Canvas.SetTop(lbl, pt.Y + dir.Y * 22d - lbl.DesiredSize.Height / 2d);
+                        canvas.Children.Add(lbl);
+                    }
+                }
+            }
 
             return canvas;
         }
@@ -769,6 +845,12 @@ namespace GCode_Sender
                 sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1})",
                     skew.Value.ToString("0.###", CultureInfo.InvariantCulture),
                     FormatLen(diag.Value));
+
+            // Vise-only: SkewDegrees()/DiagonalDelta() need a full 4-corner XY quad, which the vise never has
+            // (corners 1/3 are Y-face-blocked - see BuildViseProgram). This is its own left-edge-vs-jaw-Y-face
+            // check, from corners 1/3's probed X alone (see rxViseSkew/LS_VISE_SKEW).
+            if (viseLeftEdgeSkewDeg.HasValue)
+                sb.AppendFormat("\nVise left-edge skew: {0}°", viseLeftEdgeSkewDeg.Value.ToString("0.###", CultureInfo.InvariantCulture));
 
             if (measureRun && probed < 4)
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);
@@ -1447,8 +1529,9 @@ namespace GCode_Sender
         // Set position capture is a likely root cause of the earlier misses, so re-run Set position (ideally
         // with Touch Plate, since the jaw is bare conductive metal) before trusting this on a given fixture.
         // Probes straight down at the CENTRE of the entered stock footprint, per the user's confirmed design.
-        // Optional partial Measure (corners 2+4 only, see the `measure` block below) - the jaw is assumed
-        // machine-aligned (square to the axes), so skew is never computed here, only width/height/flatness.
+        // Optional partial Measure (corners 2/4 full XY+Z, corners 1/3 Z-only, see the `measure` block below) -
+        // the jaw is assumed machine-aligned (square to the axes), so skew is never computed here, only
+        // width/height/flatness.
         // UNVERIFIED on hardware - this is a first cut (see the file header note).
         private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm)
         {
@@ -1553,18 +1636,20 @@ namespace GCode_Sender
             if (setTloRef)
                 EmitTloReference(L, p, touchPlate);
 
-            // Partial Measure (opt-in): corners 1 (FL) and 3 (BL) sit right where the fixed jaw covers that
-            // edge - a face-probe there would drive into the jaw, and corner 3's XY is the jaw origin itself
-            // anyway (nothing to probe). Only corners 2 (FR, diagonal) and 4 (BR, X-neighbour) are clear of
-            // the jaw on both faces, so only those get probed (pcorner.macro face+Z); corners 1/3 are skipped
-            // entirely - they'd only ever be Z-only readout, not used for size/origin, and not worth the
-            // extra probe moves/risk (see git history for the dropped Z-only variant if revisiting).
-            // Width/height come from corner 2+4 against the KNOWN jaw origin (no corner-1 fallback needed -
-            // unlike Corner Fence, the origin here is exact, not itself probed). Skew is NOT computed: corner
-            // 1's Y is only an ESTIMATE (never independently face-probed, blocked by the jaw), so there is no
-            // real 4th point to check the stock is actually square against - any skew number here would be
-            // fabricated, not measured. HARDWARE-VERIFIED end-to-end (2026-07-13/14: full Start Job run,
-            // corners 2/4 through park/set-origin/M2, succeeded after the margin tuning above).
+            // Partial Measure (opt-in): corners 2 (FR, diagonal) and 4 (BR, X-neighbour) are clear of the jaw
+            // on both faces, so they get the full pcorner.macro face+Z probe. Corners 1 (FL) and 3 (BL) sit
+            // along the jaw-covered EDGE, but the jaw's own body only blocks their Y face (it sits at the
+            // BACK, at/near the origin's Y) - both are clear in X, so EmitViseCornerProbe gets each corner's
+            // own Z (inset 5mm into the stock) AND its true left-edge X (backed off 15mm outward to open air,
+            // then sought back in). Width/height still come from corner 2+4 against the known jaw origin (X
+            // averaged since both sit on the same far edge; Y from corner 2 alone - corner 4 shares the
+            // origin's Y and contributes nothing there, see the size_y comment below). Left-edge skew now
+            // DOES get computed, from corner 1 vs corner 3's X over the entered (exact) height - see below.
+            // Corner 3's own probed X/Z also become the WCS origin itself (see the G10 line at the end of
+            // this method) instead of the fixed fxPos.X / centre-probe Z. HARDWARE-VERIFIED end-to-end
+            // (2026-07-13/14: full Start Job run, corners 2/4 through park/set-origin/M2, succeeded after the
+            // margin tuning above) - the corner 1/3 X-face probe and origin/skew wiring above are UNVERIFIED,
+            // first cut (2026-07-15).
             if (measure)
             {
                 L("(--- measure (partial): corners 2+4 face-probed via pcorner.macro ---)");
@@ -1635,22 +1720,51 @@ namespace GCode_Sender
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
-                // Corners 1/3 (jaw-covered edge, Z-only) were dropped: they contributed nothing to size/origin
-                // (that's corners 2/4 vs the known jaw origin only) or skew (deliberately not computed - see
-                // above), just an extra flatness readout, and shared the same corner-catch risk corners 2/4
-                // just got fixed for - not worth two more probe moves per run for readout-only data.
-                L("(--- size: corner 2/4 X and Y against the known jaw origin, averaged ---)");
+                // Corners 1/3 (jaw-covered edge, Y-face only - the jaw's own body sits at the BACK, near the
+                // origin's Y, so it never blocks an X-face approach at either corner): straight-down Z at a
+                // point inset 5mm into the stock (clear of the unverified edge), then an X-face probe backed
+                // off 15mm outward from the true corner to open air, seeking back in - see
+                // EmitViseCornerProbe. Corner 3's X doubles as a real measurement of the origin corner itself
+                // (used below to set the WCS origin); corner 1's X pairs with it to compute left-edge skew
+                // (the Y separation between them is the entered height, trusted exact for a vise - see the
+                // "Exact height" field label logic above).
+                double inset = 5d;
+                L("(--- corner 1 = front-left (Z + X-face probe, inset 5mm for Z / 15mm backoff for X) ---)");
+                EmitViseCornerProbe(L, 1, fxPos.X + inset, fxPos.Y - estH + inset, fxPos.X, expectedTopZ, p, plateOffset, thickness, touchTipRadius, "#<c1z>", "#<c1x>");
+
+                L("(--- corner 3 = back-left / jaw origin (Z + X-face probe) ---)");
+                EmitViseCornerProbe(L, 3, fxPos.X + inset, fxPos.Y - inset, fxPos.X, expectedTopZ, p, plateOffset, thickness, touchTipRadius, "#<c3z>", "#<c3x>");
+
+                // X: corner 2 and corner 4 BOTH sit at the far X edge (corner 4 is the X-neighbour, corner 2
+                // the diagonal) - two independent measurements of the same span, so averaging is correct.
+                // Y: only corner 2 (the diagonal) is offset in Y from the origin - corner 4 is the
+                // X-neighbour, sharing the origin's OWN Y - so it contributes ~0, not a second measurement.
+                // Averaging it in against corner 2's real span silently halved size_y (caught 2026-07-15 on a
+                // 12x3in stock reading back 12 x 1.49in - corner 4's near-zero Y delta was dragging the
+                // average down). Y must come from corner 2 alone.
+                L("(--- size: X from corner 2/4 averaged, Y from corner 2 alone (see comment above) ---)");
                 L(string.Format("#<size_x> = [[[#<c2x> - {0}] + [#<c4x> - {0}]] / 2]", N(fxPos.X)));
-                L(string.Format("#<size_y> = [[[{0} - #<c2y>] + [{0} - #<c4y>]] / 2]", N(fxPos.Y)));
+                L(string.Format("#<size_y> = [{0} - #<c2y>]", N(fxPos.Y)));
                 L("(PRINT, LS_X=#<size_x>)");
                 L("(PRINT, LS_Y=#<size_y>)");
+
+                // Left-edge skew: corner 1 vs corner 3 X, over the KNOWN (entered, exact) Y separation - the
+                // jaw's own Y-face is trusted machine-aligned (never itself re-probed), so this checks whether
+                // the LEFT edge is actually parallel to it. ATAN[y]/[x] returns degrees (RS274NGC convention).
+                L(string.Format("#<_vise_skew> = ATAN[#<c1x> - #<c3x>]/[{0}]", N(estH)));
+                L("(PRINT, LS_VISE_SKEW=#<_vise_skew>)");
             }
 
             L("(--- park at G30 (before the origin - keeps all G53 moves at WCO=0) ---)");
             EmitGotoG30(L);
 
+            // Origin: when Measure ran, corner 3's own probed X/Z (the jaw-origin corner itself) replace the
+            // fixed fxPos.X and the centre-footprint Z probe - a real measurement of the origin instead of an
+            // assumption. Without Measure, fall back to the always-available fxPos.X/_stock_z as before.
+            string originX = measure ? "[#<c3x>]" : N(fxPos.X);
+            string originZ = measure ? "[#<c3z>]" : "[#<_stock_z>]";
             L("(--- set work origin: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
-            L(string.Format("G10 L2 {0} X{1} Y{2} Z[#<_stock_z>]", pCode(wcsP), N(fxPos.X), N(fxPos.Y)));
+            L(string.Format("G10 L2 {0} X{1} Y{2} Z{3}", pCode(wcsP), originX, N(fxPos.Y), originZ));
             L(wcs + "  (activate the coordinate system)");
             L("M2");
 
@@ -1728,6 +1842,53 @@ namespace GCode_Sender
             L(string.Format("#<_ls_startz> = {0}", Br(startz)));
             L(string.Format("#<_ls_maxz> = {0}", Br(maxz)));
             L("O<pcorner> CALL [#<_ls_rad>]");   // single arg (tip radius) - grblHAL's CALL resolves with one arg
+        }
+
+        // Stock-top Z + left-edge X probe for a vise's jaw-covered corners (1=FL, 3=BL/origin). The jaw only
+        // blocks Y-face probing there (its own body sits at the BACK, at/near the origin's Y - see
+        // BuildViseProgram's header) - both corners are clear of it in X, so unlike the Z-only-first-cut this
+        // now also finds the true left edge:
+        //   1) Z: straight down at (zProbeX, zProbeY) - caller insets that 5mm off the true corner (into the
+        //      stock) so the tip lands on solid material, not right at the unverified edge.
+        //   2) X face: back off 15mm OUTWARD (-X) from the TRUE corner (trueX, trueY) to open air, drop to
+        //      this corner's own just-probed top minus half the entered thickness (material midpoint - same
+        //      "always inside the material" reasoning as pcorner.macro's start_z), then seek back INWARD
+        //      (+X) to find the actual face. Radius-compensated with sx=+1, the same convention pcorner.macro
+        //      uses for LEFT corners (1,3).
+        // outZVar/outXVar are GLOBAL named params (e.g. "#<c1z>"/"#<c1x>") so the caller can read them back for
+        // size/skew/origin use, same idiom as EmitPcornerCall's #<c2x> etc.
+        private static void EmitViseCornerProbe(System.Action<string> L, int cornerId, double zProbeX, double zProbeY, double trueX, double expectedTopZ, ProbeDefinition p, double plateOffset, double thickness, double tipRadius, string outZVar, string outXVar)
+        {
+            L("G53 G0 Z[#<_lv_safe_z>]");                                   // rapid - VERIFIED safe height (centre probe)
+            L(string.Format("G53 G0 X{0} Y{1}", N(zProbeX), N(zProbeY)));   // rapid - travelling AT that height
+            L(string.Format("#<_lv_descent> = [{0} + 5]", N(expectedTopZ)));
+            L("G53 G1 F1000 Z[#<_lv_descent>]");
+            L(string.Format("G38.2 Z[#<_lv_descent> - 15] F{0}", N(SearchFeed(p))));
+            L("G91 G1 Z2 F1000");
+            L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
+            L(string.Format("{0} = [#5063 - {1}]", outZVar, N(plateOffset)));
+            L("G91 G1 Z10 F1000");
+            L("G90");
+            L(string.Format("(PRINT, LS_VISE_ZC{0}={1})", cornerId, outZVar));
+
+            // X face probe: same Y as the Z probe above (zProbeY, already inset 5mm off the true corner into
+            // the stock) - NOT the true corner Y. At the true corner Y the vise jaw itself is right there
+            // (2026-07-15 HW run: probed straight into the jaw), so the whole X-face approach needs to be off
+            // that line by the same 5mm the Z probe already uses to clear it.
+            L("G53 G0 Z[#<_lv_safe_z>]");
+            L(string.Format("G53 G0 X{0} Y{1}", N(trueX - 15d), N(zProbeY)));
+            L(string.Format("#<_vsz> = [{0} - {1}]", outZVar, N(thickness / 2d)));
+            L(string.Format("G53 G0 Z[{0} + 12]", outZVar));   // rapid down to within 12mm of the KNOWN top (just probed)
+            L("G53 G1 F1000 Z[#<_vsz>]");                      // controlled - final descent to the face-probe depth
+            L(string.Format("G38.2 X{0} F{1}", N(trueX + 20d), N(SearchFeed(p))));   // coarse seek back toward/past the corner
+            L("#<_vxc> = #5061");
+            L("G1 X[#<_vxc> - 4] F1000");                      // back off so the deflecting ball releases before the slow re-probe
+            L(string.Format("G38.2 X[#<_vxc> + 6] F{0}", N(p.LatchFeedRate)));   // slow re-probe
+            L("#<_vxtrig> = #5061");
+            L("G1 X[#<_vxtrig> - 10] F1000");
+            L("G90");
+            L(string.Format("{0} = [#<_vxtrig> + {1}]", outXVar, N(tipRadius)));
+            L(string.Format("(PRINT, LS_VISE_CX{0}={1})", cornerId, outXVar));
         }
 
         private static void EmitGotoG30(System.Action<string> L)
