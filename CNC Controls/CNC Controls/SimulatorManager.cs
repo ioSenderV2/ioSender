@@ -989,7 +989,24 @@ namespace CNC.Controls
             {
                 string dir = AppDataSimulatorDir();
                 System.IO.Directory.CreateDirectory(dir);
-                System.IO.File.WriteAllBytes(AppDataSimulatorExePath(), bytes);
+                string exe = AppDataSimulatorExePath();
+
+                // A prior build's exe (e.g. auto-launched on startup/reconnect, or still running from an
+                // earlier Connect) locks the file - overwriting it would otherwise throw every single time,
+                // and PollAndInstallAppData would silently retry that same failure for its whole 10-minute
+                // window before giving up with a misleading "still building" message. Stop it first so the
+                // install can actually succeed; the user just asked to update this exact exe.
+                if (IsProcessRunningByExe(exe))
+                {
+                    try
+                    {
+                        foreach (var p in Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(exe)))
+                            try { p.Kill(); p.WaitForExit(2000); } catch { }
+                    }
+                    catch { }
+                }
+
+                System.IO.File.WriteAllBytes(exe, bytes);
                 WriteAppDataOptions(opts, sig);
                 return true;
             }
