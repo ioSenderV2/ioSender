@@ -133,7 +133,21 @@ namespace CNC.Controls
                 if ((prop.IsWebSocket = orgport.ToLower().StartsWith("ws://")))
                     parsenet(orgport.Substring(5));
                 else if (orgport.IndexOf(':') > 0 && !orgport.ToLower().StartsWith("com")) // host:port (IP or hostname)
-                    parsenet(orgport);
+                {
+                    // The simulator's own target (127.0.0.1:<port>) is also host:port-shaped, but it must
+                    // NOT clobber the Network tab's IP field - that should keep showing the last REAL
+                    // network host (already seeded from Base.NetworkHost above), not the simulator's
+                    // meaningless loopback address. Only the port carries over, for the Simulator tab's own
+                    // port field; HighlightActiveConnection selects the Simulator tab regardless of this.
+                    if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.StartSimulator)
+                    {
+                        string[] simValues = orgport.Split(':');
+                        int simPort;
+                        prop.NetPort = simValues.Length == 2 && int.TryParse(simValues[1], out simPort) ? simPort : 23;
+                    }
+                    else
+                        parsenet(orgport);
+                }
                 else
                 {
                     string portname = orgport.Substring(0, orgport.IndexOf(':'));
