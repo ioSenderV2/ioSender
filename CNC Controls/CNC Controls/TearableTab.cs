@@ -11,6 +11,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace CNC.Controls
@@ -66,6 +67,8 @@ namespace CNC.Controls
     internal sealed class TearOffWindow : Window
     {
         private readonly ContentControl contentHost;
+        private readonly ScaleTransform zoom = new ScaleTransform(1, 1);
+        private const double ZoomStep = 0.1, ZoomMin = 0.5, ZoomMax = 3.0;
 
         public TearOffWindow(string title, UIElement content, Action onRedock)
         {
@@ -103,10 +106,47 @@ namespace CNC.Controls
             DockPanel.SetDock(titleBar, Dock.Top);
             root.Children.Add(titleBar);
 
-            contentHost = new ContentControl { Content = content };
+            // LayoutTransform (not RenderTransform): the content actually re-measures/reflows at the new
+            // size (text stays sharp, hit-testing lines up), rather than just visually stretching pixels.
+            contentHost = new ContentControl { Content = content, LayoutTransform = zoom };
             root.Children.Add(contentHost);
 
             Content = root;
+
+            // Ctrl+Alt+= / Ctrl+Alt+- zoom the content in/out, Ctrl+Alt+0 resets - applies to whatever tab
+            // was torn off (Console, 3D View, Program, ...), not tab-specific.
+            PreviewKeyDown += OnPreviewKeyDown;
+        }
+
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt))
+                return;
+
+            switch (e.Key)
+            {
+                case Key.OemPlus:
+                case Key.Add:
+                    SetZoom(zoom.ScaleX + ZoomStep);
+                    e.Handled = true;
+                    break;
+                case Key.OemMinus:
+                case Key.Subtract:
+                    SetZoom(zoom.ScaleX - ZoomStep);
+                    e.Handled = true;
+                    break;
+                case Key.D0:
+                case Key.NumPad0:
+                    SetZoom(1.0);
+                    e.Handled = true;
+                    break;
+            }
+        }
+
+        private void SetZoom(double scale)
+        {
+            scale = Math.Max(ZoomMin, Math.Min(ZoomMax, scale));
+            zoom.ScaleX = zoom.ScaleY = scale;
         }
 
         // Detach the content so the caller can move it back into a TabItem; leaves this window empty
