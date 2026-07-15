@@ -57,6 +57,7 @@
                 <Separator/>
                 <MenuItem x:Uid="mnu_support" x:Name="menuSupport" Header="_Support">
                     <MenuItem x:Uid="mnu_checkForUpdates" Header="_Check for updates..." Click="checkForUpdates_Click" ToolTip="Check if a newer version of ioSender is available on GitHub."/>
+                    <MenuItem x:Uid="mnu_rollbackVersion" Header="_Roll back to previous version..." Click="rollbackVersion_Click" ToolTip="Swap back to the ioSender build installed before the last update. Only goes back one version - it does not work if you have not updated at least once."/>
                     <MenuItem x:Uid="mnu_openConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
                     <MenuItem x:Uid="mnu_generateResetTestCase" Header="Generate _reset test case..." Click="generateResetTestCase_Click" ToolTip="Write a .nc file that calls an O-word subroutine several times, for reproducing controller-wedge-on-Reset bugs." Visibility="Collapsed"/>
                 </MenuItem>

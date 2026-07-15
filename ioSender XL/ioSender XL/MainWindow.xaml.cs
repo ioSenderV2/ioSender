@@ -1130,7 +1130,6 @@ namespace GCode_Sender
             // (it's a rolling master build, not a versioned release). install.ps1 uses the same
             // by-tag endpoint for the same reason.
             const string releasesUrl = "https://api.github.com/repos/ioSenderV2/ioSender/releases/tags/latest";
-            const string releasesPageUrl = "https://github.com/ioSenderV2/ioSender/releases/tag/latest";
 
             try
             {
@@ -1173,10 +1172,13 @@ namespace GCode_Sender
                     else
                     {
                         var result = AppDialogs.Show(
-                            string.Format("A newer build of ioSender is available.\n\nYour build: {0}\nLatest build: {1}\n\nWould you like to open the releases page?", ShortSha(BuildInfo.CommitSha), ShortSha(latestSha)),
+                            string.Format("A newer build of ioSender is available.\n\nYour build: {0}\nLatest build: {1}\n\nUpdate now? ioSender will close, download and install the new build, and relaunch.", ShortSha(BuildInfo.CommitSha), ShortSha(latestSha)),
                             "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes)
-                            System.Diagnostics.Process.Start(releasesPageUrl);
+                        {
+                            LaunchInstaller(null);
+                            Close();
+                        }
                     }
                 }
             }
@@ -1195,6 +1197,40 @@ namespace GCode_Sender
                 AppDialogs.Show("An error occurred while checking for updates:\n" + ex.Message,
                     "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        // Roll back to the build install.ps1 saved under ioSender\previous (the last update, one
+        // version deep - see install.ps1's -Rollback). Reuses that one engine rather than
+        // re-implementing the folder swap here.
+        private void rollbackVersion_Click(object sender, RoutedEventArgs e)
+        {
+            var result = AppDialogs.Show(
+                "Roll back to the previously installed ioSender build?\n\nioSender will close and the prior build will relaunch. This only works if you have updated at least once - it goes back one version, not further.",
+                "Roll Back to Previous Version", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            LaunchInstaller("-Rollback");
+            Close();
+        }
+
+        // Fetch install.ps1 fresh from GitHub and run it detached (visible PowerShell window, same as
+        // the documented one-liner) so it can update/roll back files this running process has locked.
+        // Always fetching fresh (rather than shipping a local copy) means a fixed installer bug is
+        // picked up automatically instead of running a stale one baked into an old build.
+        private static void LaunchInstaller(string arguments)
+        {
+            const string installScriptUrl = "https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1";
+            string command = string.IsNullOrEmpty(arguments)
+                ? $"& ([scriptblock]::Create((irm '{installScriptUrl}')))"
+                : $"& ([scriptblock]::Create((irm '{installScriptUrl}'))) {arguments}";
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"" + command.Replace("\"", "\\\"") + "\"",
+                UseShellExecute = true
+            });
         }
 
         private static string ShortSha(string sha) => sha.Length >= 7 ? sha.Substring(0, 7) : sha;
