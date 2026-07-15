@@ -131,6 +131,7 @@ namespace CNC.Controls
             TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
             TabKeyBinder.AttachTabBinding(tabStepFixtures, "Tab.MachineSetup.Fixtures");
             TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
+            TabKeyBinder.AttachTabBinding(tabStepSimulator, "Tab.MachineSetup.Simulator");
 
             model = DataContext as GrblViewModel;
             DataContextChanged += (s, e) => { if (DataContext is GrblViewModel) model = (GrblViewModel)DataContext; };
@@ -266,6 +267,7 @@ namespace CNC.Controls
                 case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
                 case "Tab.MachineSetup.Fixtures": target = tabStepFixtures; break;
                 case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
+                case "Tab.MachineSetup.Simulator": target = tabStepSimulator; break;
                 default: target = null; break;
             }
 
@@ -1004,6 +1006,9 @@ namespace CNC.Controls
             // generated this nested TabControl's items.
             if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepMacros)
                 Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
+
+            if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepSimulator)
+                Dispatcher.BeginInvoke((System.Action)RefreshSimulatorStep, System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void RefreshMacroStatus()
@@ -1034,6 +1039,105 @@ namespace CNC.Controls
             }
             else
                 AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // ---- Step 8: build a simulator matching this machine ----
+
+        private void RefreshSimulatorStep()
+        {
+            if (btnBuildSimWizard == null)
+                return;
+
+            bool connected = SimulatorManager.IsRealControllerConnected();
+            btnBuildSimWizard.IsEnabled = connected;
+            txtSimWizardStatus.Text = connected
+                ? string.Empty
+                : "Connect to the real machine first - this step builds from its detected options.";
+        }
+
+        // One button: derive options from the connected controller exactly like SimulatorConfigView's
+        // SeedDefaults does (no picks to make here - the machine already specifies everything), ensure a
+        // matching %AppData%\Simulator build exists, then copy this machine's live settings into it. Same
+        // background-thread + Dispatcher.BeginInvoke pattern as SimulatorConfigView.btnBuild_Click - these
+        // calls are blocking network/process I/O and must not run on the UI thread.
+        private void BuildSimWizard_Click(object sender, RoutedEventArgs e)
+        {
+            if (!SimulatorManager.IsRealControllerConnected())
+                return;
+
+            btnBuildSimWizard.IsEnabled = false;
+            var opts = new SimulatorManager.ManualSimOptions
+            {
+                Axes = GrblInfo.NumAxes,
+                Probe = GrblInfo.HasProbe,
+                Rotation = GrblInfo.RotationSupported,
+                LatheUvw = GrblInfo.LatheUVWModeEnabled,
+                SafetyDoor = (GrblInfo.OptionalSignals & Signals.SafetyDoor) != 0,
+                EStop = (GrblInfo.OptionalSignals & Signals.EStop) != 0
+            };
+            txtSimWizardStatus.Text = "Checking for a matching build...";
+
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string sig, detail;
+                    var r = SimulatorManager.EnsureAppDataSimulator(opts, out sig, out detail);
+                    bool installed;
+                    string exeStatus;
+                    switch (r)
+                    {
+                        case SimulatorManager.MatchResult.AlreadyCurrent:
+                            installed = true; exeStatus = "Already up to date (build " + sig + ")."; break;
+                        case SimulatorManager.MatchResult.InstalledFromRelease:
+                            installed = true; exeStatus = "Installed (build " + sig + ")."; break;
+                        case SimulatorManager.MatchResult.BuildTriggered:
+                            SetSimWizardStatus("Building (build " + sig + ") - this can take a few minutes...");
+                            installed = SimulatorManager.PollAndInstallAppData(opts, sig);
+                            exeStatus = installed
+                                ? "Build ready and installed (build " + sig + ")."
+                                : "Still building (build " + sig + ") - try again shortly.";
+                            break;
+                        default:
+                            FinishSimWizard(detail ?? "Build failed.");
+                            return;
+                    }
+
+                    if (!installed)
+                    {
+                        FinishSimWizard(exeStatus);
+                        return;
+                    }
+
+                    SetSimWizardStatus(exeStatus + " Copying this machine's settings...");
+                    var cmds = GrblSettings.Settings.Select(s => "$" + s.Id + "=" + s.Value).ToList();
+                    string eepromErr = "no settings to copy.";
+                    bool eepromOk = cmds.Count > 0 && SimulatorManager.BuildAppDataEeprom(cmds, out eepromErr);
+                    FinishSimWizard(exeStatus + (eepromOk
+                        ? " Machine settings copied to EEPROM.DAT."
+                        : " Settings copy failed" + (string.IsNullOrEmpty(eepromErr) ? "." : (": " + eepromErr))));
+                }
+                catch (Exception ex) { FinishSimWizard(ex.Message); }
+            });
+        }
+
+        private void SetSimWizardStatus(string text)
+        {
+            try { Dispatcher.BeginInvoke((System.Action)(() => txtSimWizardStatus.Text = text)); }
+            catch { }
+        }
+
+        private void FinishSimWizard(string text)
+        {
+            try
+            {
+                Dispatcher.BeginInvoke((System.Action)(() =>
+                {
+                    txtSimWizardStatus.Text = text;
+                    btnBuildSimWizard.IsEnabled = SimulatorManager.IsRealControllerConnected();
+                }));
+            }
+            catch { }
         }
 
         // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
