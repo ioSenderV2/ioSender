@@ -83,6 +83,15 @@ namespace CNC.Controls
                    !AppConfig.Settings.Base.StartSimulator && CNC.Core.GrblInfo.IsGrblHAL;
         }
 
+        // The exact complement of IsRealControllerConnected: true when the active connection IS the
+        // bundled/manually-built simulator itself. Settings > Simulator and Machine Setup's "build a
+        // simulator" step both hide while this is true - building/matching a simulator to "the connected
+        // machine" makes no sense when the connected machine already is one.
+        public static bool IsSimulatorConnection()
+        {
+            return CNC.Core.Comms.com != null && CNC.Core.Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
+        }
+
         // True if a process matching the exe's name is running, regardless of who started it (a prior ioSender
         // session, or the user by hand) - unlike IsSimulatorRunning below, which only tracks an instance THIS
         // manager launched. Used to decide whether a fresh launch is needed at all.

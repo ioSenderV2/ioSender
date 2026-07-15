@@ -116,18 +116,19 @@ namespace CNC.Controls
             if (grblmodel != null)
                 grblmodel.Message = string.Empty;
 
-            var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
-
             _viewActive = activate;
 
             if (activate)
             {
                 settingsSnapshot = SerializeConfig(AppConfig.Settings.Base);
                 ApplyPanelVisibility();
+                UpdateSimulatorTabVisibility();
+                var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
                 EnterTab(cur);
             }
             else
             {
+                var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
                 LeaveTab(cur);
 
                 // Once a restart is under way the replacement instance is already launching and its splash is
@@ -328,6 +329,17 @@ namespace CNC.Controls
                 LeaveTab(removed);
                 EnterTab(added);
             }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Settings > Simulator makes no sense while the active connection IS the simulator (there's no
+        // "connected machine" left to build a matching one from) - hidden rather than merely disabled, and
+        // bumped off if it happened to be the selected tab when the sim connection was made.
+        private void UpdateSimulatorTabVisibility()
+        {
+            bool hide = SimulatorManager.IsSimulatorConnection();
+            tabSimulator.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
+            if (hide && tabConfig.SelectedItem == tabSimulator)
+                tabConfig.SelectedItem = tabGrbl;
         }
 
         private void EnterTab(TabItem tab)

@@ -389,6 +389,7 @@ namespace CNC.Controls
                 UpdateLimitState();
                 UpdateApplyState();
                 RefreshMacroStatus();   // queries the filesystem once so step 7's colour is right on open
+                UpdateSimulatorStepVisibility();
             }
             else
             {
@@ -1062,6 +1063,20 @@ namespace CNC.Controls
 
         // Same readout as Settings > Simulator's RefreshStatus: build id + whether it still matches this
         // machine's current options, or a plain "not built yet" - not just an enabled/disabled button.
+        // Step 8 makes no sense while the active connection IS the simulator (there's no "connected
+        // machine" left to build a matching one from) - hidden rather than merely disabled, and bumped off
+        // if it happened to be the selected step when the sim connection was made.
+        private void UpdateSimulatorStepVisibility()
+        {
+            if (tabStepSimulator == null)
+                return;
+
+            bool hide = SimulatorManager.IsSimulatorConnection();
+            tabStepSimulator.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
+            if (hide && tabSteps.SelectedItem == tabStepSimulator)
+                tabSteps.SelectedItem = tabStepOverview;
+        }
+
         private void RefreshSimulatorStep()
         {
             if (btnBuildSimWizard == null)
