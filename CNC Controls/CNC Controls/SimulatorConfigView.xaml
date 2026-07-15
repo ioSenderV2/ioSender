@@ -19,6 +19,10 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Label x:Uid="lbl_simAxes" Grid.Row="0" Grid.Column="0" Content="Axes:" HorizontalContentAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,4"/>
@@ -33,8 +37,24 @@
             <Label x:Uid="lbl_simProbe" Grid.Row="1" Grid.Column="0" Content="" Margin="0,0,8,4"/>
             <CheckBox x:Uid="chk_simProbe" x:Name="chkProbe" Grid.Row="1" Grid.Column="1" Content="Probe input" IsChecked="True" VerticalAlignment="Center" Margin="0,0,0,4"/>
 
-            <Label x:Uid="lbl_simRotation" Grid.Row="2" Grid.Column="0" Content="" Margin="0,0,8,0"/>
-            <CheckBox x:Uid="chk_simRotation" x:Name="chkRotation" Grid.Row="2" Grid.Column="1" Content="Coordinate-system rotation (WCSROT)" VerticalAlignment="Center" Margin="0,0,0,0"/>
+            <Label x:Uid="lbl_simRotation" Grid.Row="2" Grid.Column="0" Content="" Margin="0,0,8,4"/>
+            <CheckBox x:Uid="chk_simRotation" x:Name="chkRotation" Grid.Row="2" Grid.Column="1" Content="Coordinate-system rotation (WCSROT)" VerticalAlignment="Center" Margin="0,0,0,4"/>
+
+            <Label x:Uid="lbl_simLatheUvw" Grid.Row="3" Grid.Column="0" Content="" Margin="0,0,8,4"/>
+            <CheckBox x:Uid="chk_simLatheUvw" x:Name="chkLatheUvw" Grid.Row="3" Grid.Column="1" Content="Lathe U/V/W words" VerticalAlignment="Center" Margin="0,0,0,4"/>
+
+            <Label x:Uid="lbl_simSafetyDoor" Grid.Row="4" Grid.Column="0" Content="" Margin="0,0,8,4"/>
+            <CheckBox x:Uid="chk_simSafetyDoor" x:Name="chkSafetyDoor" Grid.Row="4" Grid.Column="1" Content="Safety door input" VerticalAlignment="Center" Margin="0,0,0,4"/>
+
+            <Label x:Uid="lbl_simEStop" Grid.Row="5" Grid.Column="0" Content="" Margin="0,0,8,4"/>
+            <CheckBox x:Uid="chk_simEStop" x:Name="chkEStop" Grid.Row="5" Grid.Column="1" Content="E-stop input" VerticalAlignment="Center" Margin="0,0,0,4"/>
+
+            <Label x:Uid="lbl_simYGanged" Grid.Row="6" Grid.Column="0" Content="" Margin="0,0,8,0"/>
+            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
+                <CheckBox x:Uid="chk_simYGanged" x:Name="chkYGanged" Content="Ganged Y axis (dual motor)" VerticalAlignment="Center"/>
+                <CheckBox x:Uid="chk_simYAutoSquare" x:Name="chkYAutoSquare" Content="Auto-square" VerticalAlignment="Center" Margin="16,0,0,0"
+                          ToolTip="Implies Ganged Y axis - checking this alone still enables it."/>
+            </StackPanel>
         </Grid>
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">

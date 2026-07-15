@@ -32,12 +32,28 @@ namespace CNC.Controls
 
         private int SelectedAxes { get { return cbxAxes.SelectedIndex + 3; } }
 
-        // Seed axes/probe/rotation once, the first time the tab is shown, so it doesn't stomp a mid-session
-        // edit the user hasn't built yet. Prefers the CONNECTED controller's actual options (from $I's
-        // OPT/NEWOPT, already parsed into GrblInfo - same properties BuildOptionSymbols reads for the
-        // auto-matched flow) over whatever was last built, since matching real hardware is the point; falls
-        // back to the picks that produced the currently-installed exe (sim-options.json) when nothing's
-        // connected.
+        // Everything currently picked in the UI, packaged for SimulatorManager.
+        private SimulatorManager.ManualSimOptions CurrentOptions()
+        {
+            return new SimulatorManager.ManualSimOptions
+            {
+                Axes = SelectedAxes,
+                Probe = chkProbe.IsChecked == true,
+                Rotation = chkRotation.IsChecked == true,
+                LatheUvw = chkLatheUvw.IsChecked == true,
+                SafetyDoor = chkSafetyDoor.IsChecked == true,
+                EStop = chkEStop.IsChecked == true,
+                YGanged = chkYGanged.IsChecked == true,
+                YAutoSquare = chkYAutoSquare.IsChecked == true
+            };
+        }
+
+        // Seed every option once, the first time the tab is shown, so it doesn't stomp a mid-session edit the
+        // user hasn't built yet. Prefers the CONNECTED controller's actual options (from $I's OPT/NEWOPT,
+        // already parsed into GrblInfo) over whatever was last built, since matching real hardware is the
+        // point; falls back to the picks that produced the currently-installed exe (sim-options.json) when
+        // nothing's connected. Ganged/auto-square have no $I equivalent to detect - left at their prior/
+        // default value either way, since they're not something a controller reports.
         private void SeedDefaults()
         {
             if (seededDefaults)
@@ -51,6 +67,9 @@ namespace CNC.Controls
                     cbxAxes.SelectedIndex = index;
                 chkProbe.IsChecked = CNC.Core.GrblInfo.HasProbe;
                 chkRotation.IsChecked = CNC.Core.GrblInfo.RotationSupported;
+                chkLatheUvw.IsChecked = CNC.Core.GrblInfo.LatheUVWModeEnabled;
+                chkSafetyDoor.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.SafetyDoor) != 0;
+                chkEStop.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.EStop) != 0;
                 return;
             }
 
@@ -63,6 +82,11 @@ namespace CNC.Controls
                 cbxAxes.SelectedIndex = savedIndex;
             chkProbe.IsChecked = opts.Probe;
             chkRotation.IsChecked = opts.Rotation;
+            chkLatheUvw.IsChecked = opts.LatheUvw;
+            chkSafetyDoor.IsChecked = opts.SafetyDoor;
+            chkEStop.IsChecked = opts.EStop;
+            chkYGanged.IsChecked = opts.YGanged;
+            chkYAutoSquare.IsChecked = opts.YAutoSquare;
         }
 
         // Reflects the currently-installed exe (if any) against the currently-picked options, so the user can
@@ -81,7 +105,7 @@ namespace CNC.Controls
             txtPath.Text = SimulatorManager.AppDataSimulatorExePath();
 
             string sig;
-            SimulatorManager.BuildManualOptionSymbols(SelectedAxes, chkProbe.IsChecked == true, chkRotation.IsChecked == true, out sig);
+            SimulatorManager.BuildManualOptionSymbols(CurrentOptions(), out sig);
             txtStatus.Text = sig == SimulatorManager.AppDataActiveSignature()
                 ? "Up to date with the options below."
                 : "Installed, but built for different options - click Build to update.";
@@ -90,8 +114,7 @@ namespace CNC.Controls
         private void btnBuild_Click(object sender, RoutedEventArgs e)
         {
             btnBuild.IsEnabled = false;
-            int axes = SelectedAxes;
-            bool probe = chkProbe.IsChecked == true, rotation = chkRotation.IsChecked == true;
+            var opts = CurrentOptions();
             bool copyMachineSettings = SimulatorManager.IsRealControllerConnected();
             txtStatus.Text = "Checking for a matching build...";
 
@@ -100,7 +123,7 @@ namespace CNC.Controls
                 try
                 {
                     string sig, detail;
-                    var r = SimulatorManager.EnsureAppDataSimulator(axes, probe, rotation, out sig, out detail);
+                    var r = SimulatorManager.EnsureAppDataSimulator(opts, out sig, out detail);
                     bool installed;
                     string exeStatus;
                     switch (r)
@@ -111,7 +134,7 @@ namespace CNC.Controls
                             installed = true; exeStatus = "Installed (build " + sig + ")."; break;
                         case SimulatorManager.MatchResult.BuildTriggered:
                             SetStatus("Building (build " + sig + ") - this can take a few minutes...");
-                            installed = SimulatorManager.PollAndInstallAppData(axes, probe, rotation, sig);
+                            installed = SimulatorManager.PollAndInstallAppData(opts, sig);
                             exeStatus = installed
                                 ? "Build ready and installed (build " + sig + ")."
                                 : "Still building (build " + sig + ") - try Build again shortly.";

@@ -552,8 +552,12 @@ namespace CNC.Controls
         // Repo hosting the build-matched-sim workflow and the sim-<sig> release cache (ioSender V2 org).
         public const string SimulatorRepo = "ioSenderV2/Simulator";
         public const string MatchedWorkflowFile = "build-matched-sim.yml";
-        // ref the dispatch runs on - the repo's default branch, which carries the workflow.
-        public const string MatchedWorkflowRef = "master";
+        // ref the dispatch runs on - integration, NOT the repo's default branch (master). master has never
+        // carried littlefs/ATC/YModem/macro-plugin support (a 594-line driver.c gap) - a master-built sim
+        // silently fell back to a bare manual-pause M6, never actually exercising macro-driven ATC the way
+        // a real tc.macro-based machine does. integration has the full feature set and is what a CI build
+        // needs to match a real controller's behavior.
+        public const string MatchedWorkflowRef = "integration";
         // Records which option signature the active grblHAL_sim.exe was built for.
         private const string SigMarkerName = "grblHAL_sim.sig";
 
@@ -880,12 +884,21 @@ namespace CNC.Controls
             return System.IO.Path.Combine(AppDataSimulatorDir(), AppDataOptionsName);
         }
 
+        // Every compile-time option Settings > Simulator can toggle. Lathe mode, spindle variability, and
+        // tool-change mode itself are runtime $-settings (confirmed against grbl core), NOT compile-time -
+        // they don't belong here; only genuine #define-gated capabilities do. Ganged/auto-square target Y
+        // specifically (not per-axis X/Y/Z) - the common gantry-router setup this is built for.
         public sealed class ManualSimOptions
         {
             public int Axes;
             public bool Probe;
             public bool Rotation;
-            public string Signature;
+            public bool LatheUvw;
+            public bool SafetyDoor;
+            public bool EStop;
+            public bool YGanged;
+            public bool YAutoSquare;
+            public string Signature;   // only meaningful when read back from sim-options.json
         }
 
         // The options the currently-installed %AppData%\Simulator\grblHAL_sim.exe was built for (null if
@@ -901,8 +914,6 @@ namespace CNC.Controls
                 string json = System.IO.File.ReadAllText(p);
 
                 var axesM = System.Text.RegularExpressions.Regex.Match(json, "\"axes\"\\s*:\\s*(\\d+)");
-                var probeM = System.Text.RegularExpressions.Regex.Match(json, "\"probe\"\\s*:\\s*(true|false)");
-                var rotM = System.Text.RegularExpressions.Regex.Match(json, "\"rotation\"\\s*:\\s*(true|false)");
                 var sigM = System.Text.RegularExpressions.Regex.Match(json, "\"signature\"\\s*:\\s*\"([^\"]*)\"");
                 if (!axesM.Success || !sigM.Success)
                     return null;
@@ -910,12 +921,23 @@ namespace CNC.Controls
                 return new ManualSimOptions
                 {
                     Axes = int.Parse(axesM.Groups[1].Value, CultureInfo.InvariantCulture),
-                    Probe = probeM.Success && probeM.Groups[1].Value == "true",
-                    Rotation = rotM.Success && rotM.Groups[1].Value == "true",
+                    Probe = JsonBool(json, "probe"),
+                    Rotation = JsonBool(json, "rotation"),
+                    LatheUvw = JsonBool(json, "latheUvw"),
+                    SafetyDoor = JsonBool(json, "safetyDoor"),
+                    EStop = JsonBool(json, "eStop"),
+                    YGanged = JsonBool(json, "yGanged"),
+                    YAutoSquare = JsonBool(json, "yAutoSquare"),
                     Signature = sigM.Groups[1].Value
                 };
             }
             catch { return null; }
+        }
+
+        private static bool JsonBool(string json, string key)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(json, "\"" + key + "\"\\s*:\\s*(true|false)");
+            return m.Success && m.Groups[1].Value == "true";
         }
 
         public static string AppDataActiveSignature()
@@ -923,22 +945,33 @@ namespace CNC.Controls
             return AppDataActiveOptions()?.Signature;
         }
 
-        private static void WriteAppDataOptions(int axes, bool probe, bool rotation, string signature)
+        private static void WriteAppDataOptions(ManualSimOptions opts, string signature)
         {
-            string json = "{\"axes\":" + axes.ToString(CultureInfo.InvariantCulture) +
-                          ",\"probe\":" + (probe ? "true" : "false") +
-                          ",\"rotation\":" + (rotation ? "true" : "false") +
+            string json = "{\"axes\":" + opts.Axes.ToString(CultureInfo.InvariantCulture) +
+                          ",\"probe\":" + (opts.Probe ? "true" : "false") +
+                          ",\"rotation\":" + (opts.Rotation ? "true" : "false") +
+                          ",\"latheUvw\":" + (opts.LatheUvw ? "true" : "false") +
+                          ",\"safetyDoor\":" + (opts.SafetyDoor ? "true" : "false") +
+                          ",\"eStop\":" + (opts.EStop ? "true" : "false") +
+                          ",\"yGanged\":" + (opts.YGanged ? "true" : "false") +
+                          ",\"yAutoSquare\":" + (opts.YAutoSquare ? "true" : "false") +
                           ",\"signature\":\"" + JsonEscape(signature) + "\"}";
             System.IO.File.WriteAllText(AppDataOptionsPath(), json);
         }
 
         // Map the user's picked options (Settings > Simulator) to compile symbols + a stable signature, same
-        // scheme as BuildOptionSymbols above but from explicit picks instead of GrblInfo.
-        public static string BuildManualOptionSymbols(int axes, bool probe, bool rotation, out string signature)
+        // scheme as BuildOptionSymbols above but from explicit picks instead of GrblInfo. Auto-square implies
+        // ganged (driver_opts.h) - checking Auto-square alone still emits Y_GANGED so the combination is valid.
+        public static string BuildManualOptionSymbols(ManualSimOptions opts, out string signature)
         {
-            var symbols = new System.Collections.Generic.List<string> { "N_AXIS=" + axes };
-            if (probe) symbols.Add("PROBE_ENABLE=1");
-            if (rotation) symbols.Add("ROTATION_ENABLE=1");
+            var symbols = new System.Collections.Generic.List<string> { "N_AXIS=" + opts.Axes };
+            if (opts.Probe) symbols.Add("PROBE_ENABLE=1");
+            if (opts.Rotation) symbols.Add("ROTATION_ENABLE=1");
+            if (opts.LatheUvw) symbols.Add("LATHE_UVW_OPTION=1");
+            if (opts.SafetyDoor) symbols.Add("SAFETY_DOOR_ENABLE=1");
+            if (opts.EStop) symbols.Add("ESTOP_ENABLE=1");
+            if (opts.YGanged || opts.YAutoSquare) symbols.Add("Y_GANGED=1");
+            if (opts.YAutoSquare) symbols.Add("Y_AUTO_SQUARE=1");
             symbols.Sort(StringComparer.Ordinal);
             string flags = string.Join(" ", symbols);
             signature = ShortHash(flags);
@@ -946,8 +979,8 @@ namespace CNC.Controls
         }
 
         // GET the sim-<sig> release and install it as the plain, unsuffixed %AppData%\Simulator\grblHAL_sim.exe,
-        // alongside a sim-options.json recording the axes/probe/rotation picks that produced it.
-        private static bool DownloadAppDataRelease(int axes, bool probe, bool rotation, string sig, out string error)
+        // alongside a sim-options.json recording the picks that produced it.
+        private static bool DownloadAppDataRelease(ManualSimOptions opts, string sig, out string error)
         {
             byte[] bytes = DownloadReleaseBytes(sig, out error);
             if (bytes == null)
@@ -957,7 +990,7 @@ namespace CNC.Controls
                 string dir = AppDataSimulatorDir();
                 System.IO.Directory.CreateDirectory(dir);
                 System.IO.File.WriteAllBytes(AppDataSimulatorExePath(), bytes);
-                WriteAppDataOptions(axes, probe, rotation, sig);
+                WriteAppDataOptions(opts, sig);
                 return true;
             }
             catch (System.IO.IOException ioex)
@@ -971,16 +1004,16 @@ namespace CNC.Controls
         // Ensure %AppData%\Simulator\grblHAL_sim.exe matches the given options, same fallback chain as
         // EnsureMatchedSimulator (already current -> shared release cache -> dispatch a CI build). Blocking on
         // network I/O - call from a background thread.
-        public static MatchResult EnsureAppDataSimulator(int axes, bool probe, bool rotation, out string signature, out string detail)
+        public static MatchResult EnsureAppDataSimulator(ManualSimOptions opts, out string signature, out string detail)
         {
             detail = null;
-            string flags = BuildManualOptionSymbols(axes, probe, rotation, out signature);
+            string flags = BuildManualOptionSymbols(opts, out signature);
 
             if (signature == AppDataActiveSignature() && AppDataSimulatorPresent())
                 return MatchResult.AlreadyCurrent;
 
             string relErr;
-            if (DownloadAppDataRelease(axes, probe, rotation, signature, out relErr))
+            if (DownloadAppDataRelease(opts, signature, out relErr))
                 return MatchResult.InstalledFromRelease;
 
             if (_dispatched.Contains(signature))
@@ -1003,14 +1036,14 @@ namespace CNC.Controls
 
         // Poll for a just-dispatched sim-<sig> release and install it to %AppData%\Simulator once it appears.
         // Intended to run on a background thread after EnsureAppDataSimulator returns BuildTriggered.
-        public static bool PollAndInstallAppData(int axes, bool probe, bool rotation, string sig, int timeoutSeconds = 600)
+        public static bool PollAndInstallAppData(ManualSimOptions opts, string sig, int timeoutSeconds = 600)
         {
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
             while (DateTime.UtcNow < deadline)
             {
                 System.Threading.Thread.Sleep(20 * 1000);
                 string err;
-                if (DownloadAppDataRelease(axes, probe, rotation, sig, out err))
+                if (DownloadAppDataRelease(opts, sig, out err))
                     return true;
             }
             return false;

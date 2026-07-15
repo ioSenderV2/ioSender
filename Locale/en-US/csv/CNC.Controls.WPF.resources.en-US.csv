@@ -964,3 +964,9 @@ CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simRotation:Syst
 CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simBuild:System.Windows.Controls.ContentControl.Content,Button,True,True,,Build
 CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simOpenFolder:System.Windows.Controls.ContentControl.Content,Button,True,True,,Open folder
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Simulator
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simLatheUvw:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Lathe U/V/W words
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simSafetyDoor:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Safety door input
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simEStop:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,E-stop input
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simYGanged:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Ganged Y axis (dual motor)
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simYAutoSquare:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-square
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simYAutoSquare:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Implies Ganged Y axis - checking this alone still enables it.
