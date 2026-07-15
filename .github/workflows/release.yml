@@ -37,4 +37,8 @@ jobs:
           makeLatest: true
           prerelease: true
           artifacts: ioSender.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Default GITHUB_TOKEN can't create releases here - org policy locks
+          # default workflow permissions to read-only, and changing it needs
+          # org-admin (not available to this repo's maintainer token). Use a
+          # PAT stored as a repo secret instead.
+          token: ${{ secrets.RELEASE_TOKEN }}
