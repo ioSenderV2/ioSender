@@ -17,6 +17,13 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      - name: Embed build commit
+        shell: pwsh
+        run: |
+          $sha = "${{ github.sha }}"
+          $path = "ioSender XL\ioSender XL\BuildInfo.cs"
+          (Get-Content $path -Raw) -replace '"dev"', "`"$sha`"" | Set-Content $path -NoNewline
+
       - name: Build Release
         run: msbuild "ioSender XL\ioSender XL.sln" -restore -t:Build -p:Configuration=Release -m -nologo -v:minimal -clp:ErrorsOnly
 
@@ -31,7 +38,9 @@ jobs:
         with:
           tag: latest
           name: ioSender (latest master build)
-          body: Automatically built from the latest commit on `master`. Not a versioned release - see commit history for what changed.
+          # Kept to a single "build:<branch>@<sha>" marker (same convention as the firmware repo's
+          # "drv:<ref>@<sha>") so the app's Check for Updates can parse it without a JSON library.
+          body: "build:master@${{ github.sha }}"
           allowUpdates: true
           removeArtifacts: true
           makeLatest: true
