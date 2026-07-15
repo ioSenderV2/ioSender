@@ -33,6 +33,11 @@ namespace CNC.Controls
                     return;
 
                 var detached = tab.Content as UIElement;
+                // Capture the resolved (possibly inherited) DataContext before detaching - a bare Window
+                // has no ancestor to inherit from, so without this the content's bindings (e.g.
+                // ConsoleControl's inherited GrblViewModel) silently go null: blank display, and any
+                // action routed through the model (like sending console input) becomes a no-op.
+                var dataContext = (detached as FrameworkElement)?.DataContext;
                 tab.Content = null;
                 owner.Items.Remove(tab);
 
@@ -44,7 +49,8 @@ namespace CNC.Controls
                     win.Close();
                 })
                 {
-                    Owner = Window.GetWindow(owner)
+                    Owner = Window.GetWindow(owner),
+                    DataContext = dataContext
                 };
                 win.Show();
             };
