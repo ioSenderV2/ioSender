@@ -248,4 +248,13 @@
     </ItemGroup>
     <Copy SourceFiles="@(SimulatorFiles)" DestinationFolder="$(OutDir)simulator\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
+  <!-- Copy the bundled teensy_loader_cli (vendored + built from tools\teensy_loader_cli, see its build.ps1)
+       into <output>\firmware-tools\ so Machine Setup's firmware-update flash step finds it via
+       AppDomain.BaseDirectory. Mirrors CopySimulator above. -->
+  <Target Name="CopyFirmwareTools" AfterTargets="Build">
+    <ItemGroup>
+      <FirmwareToolsFiles Include="$(ProjectDir)..\..\firmware-tools\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FirmwareToolsFiles)" DestinationFolder="$(OutDir)firmware-tools\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

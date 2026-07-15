@@ -1086,6 +1086,14 @@ namespace CNC.Core
         public static string Firmware { get; internal set; } = "Grbl";
         public static bool ExtendedProtocol { get; internal set; }
         public static string Identity { get; private set; } = string.Empty;
+        // Raw "[BUILD:...]" line (custom SRW build-stamp report - report.c::report_build_info, see
+        // touch_build_stamp.py), e.g. "2026-07-15 12:34:56 drv:srw/local-build-config@abc1234 grbl:heads/srw/combined".
+        // Empty on stock firmware / other boards that don't emit this line.
+        public static string BuildStamp { get; private set; } = string.Empty;
+        // "<branch>@<short-sha>" parsed out of BuildStamp's "drv:" field - the driver (iMXRT1062) repo checkout
+        // that produced this firmware. Used to compare against the latest CI-built firmware for update checks.
+        public static string DriverRef { get; private set; } = string.Empty;
+        public static string DriverSha { get; private set; } = string.Empty;
         public static string Options { get; private set; } = string.Empty;
         public static string NewOptions { get; private set; } = string.Empty;
         public static string TrinamicDrivers { get; private set; } = string.Empty;
@@ -1438,6 +1446,25 @@ namespace CNC.Core
                 DetectNumAxes(data);
         }
 
+        // Extract "drv:<branch>@<sha>" from the raw build stamp (see touch_build_stamp.py's ref() format).
+        // Format: "<timestamp> drv:<ref> grbl:<ref>" - split on whitespace rather than ':' since the
+        // timestamp and the branch name itself can both contain colons/slashes.
+        private static void ParseBuildStamp(string stamp)
+        {
+            BuildStamp = stamp;
+            DriverRef = DriverSha = string.Empty;
+
+            foreach (string field in stamp.Split(' '))
+            {
+                if (!field.StartsWith("drv:"))
+                    continue;
+                DriverRef = field.Substring(4);
+                int at = DriverRef.LastIndexOf('@');
+                DriverSha = at >= 0 ? DriverRef.Substring(at + 1) : string.Empty;
+                break;
+            }
+        }
+
         private static void UpdateProbes(Probes probes)
         {
             if (probes.HasFlag(Core.Probes.Standard))
@@ -1672,6 +1699,8 @@ namespace CNC.Core
                             NumFans = int.Parse(data.Substring(6).TrimEnd(']'));
                         else if (data.StartsWith("[IP:") || data.StartsWith("[STA IP:") || data.StartsWith("[AP IP:"))
                             IpAddress = data.Substring(data.IndexOf(':') + 1).TrimEnd(']');
+                        else if (data.StartsWith("[BUILD:"))
+                            ParseBuildStamp(data.Substring(7).TrimEnd(']'));
                         break;
                 }
             }
