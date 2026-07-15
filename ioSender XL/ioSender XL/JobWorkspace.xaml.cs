@@ -52,23 +52,13 @@ namespace GCode_Sender
                 if (ctl == null)
                     continue;
 
-                var tab = new TabItem { Header = d.Label, Content = ctl };
+                // Every center tab is tearable: double-click its header to pop it into its own window,
+                // double-click that window's title bar to dock it back (CNC.Controls.TearableTab).
+                var tab = TearableTab.Attach(tabGCode, d.Label, ctl);
                 if (node.Component == LayoutKeys.Toolpath3D)
                 {
                     tab3D = tab;
                     gcodeRenderer = ctl as RenderControl;
-                }
-                else if (node.Component == LayoutKeys.Console)
-                {
-                    // Double-clicking the Console tab pops the console out into its own floating window
-                    // (replaces the removed "Open Console" menu item; the Esc shortcut still toggles it).
-                    var header = new TextBlock { Text = d.Label, ToolTip = "Double-click to open the console in a separate window." };
-                    header.MouseLeftButtonDown += (s, e) =>
-                    {
-                        if (e.ClickCount == 2)
-                            (System.Windows.Application.Current.MainWindow as MainWindow)?.OpenConsoleWindow();
-                    };
-                    tab.Header = header;
                 }
                 tabGCode.Items.Add(tab);
             }
