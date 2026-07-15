@@ -14,7 +14,7 @@ namespace CNC.Controls
     // live settings into EEPROM.DAT so the simulator boots up configured like the real machine.
     public partial class SimulatorConfigView : UserControl, IGrblConfigTab
     {
-        private bool seededDefaults;
+        private bool restoredFromDisk;
 
         public SimulatorConfigView()
         {
@@ -27,7 +27,29 @@ namespace CNC.Controls
         public void Activate(bool activate)
         {
             if (activate)
+            {
+                // Unlike the disk-restore fallback below, hardware sync re-runs every time this tab
+                // becomes visible while connected (not just once) - visiting Settings > Simulator is
+                // supposed to show what Build would actually do against the machine you're on RIGHT NOW,
+                // not whatever happened to be true the first time this control ever loaded (e.g. before
+                // you'd connected yet).
+                if (SimulatorManager.IsRealControllerConnected())
+                    SyncFromHardware();
                 RefreshStatus();
+            }
+        }
+
+        private void SyncFromHardware()
+        {
+            int index = CNC.Core.GrblInfo.NumAxes - 3;
+            if (index >= 0 && index < cbxAxes.Items.Count)
+                cbxAxes.SelectedIndex = index;
+            chkProbe.IsChecked = CNC.Core.GrblInfo.HasProbe;
+            chkToolsetter.IsChecked = CNC.Core.GrblInfo.HasToolSetter;
+            chkRotation.IsChecked = CNC.Core.GrblInfo.RotationSupported;
+            chkLatheUvw.IsChecked = CNC.Core.GrblInfo.LatheUVWModeEnabled;
+            chkSafetyDoor.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.SafetyDoor) != 0;
+            chkEStop.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.EStop) != 0;
         }
 
         private int SelectedAxes { get { return cbxAxes.SelectedIndex + 3; } }
@@ -49,31 +71,23 @@ namespace CNC.Controls
             };
         }
 
-        // Seed every option once, the first time the tab is shown, so it doesn't stomp a mid-session edit the
-        // user hasn't built yet. Prefers the CONNECTED controller's actual options (from $I's OPT/NEWOPT,
-        // already parsed into GrblInfo) over whatever was last built, since matching real hardware is the
-        // point; falls back to the picks that produced the currently-installed exe (sim-options.json) when
-        // nothing's connected. Ganged/auto-square have no $I equivalent to detect - left at their prior/
-        // default value either way, since they're not something a controller reports.
+        // First show: prefer the CONNECTED controller's actual options (see SyncFromHardware, also re-run on
+        // every later Activate while connected - see there for why). Falls back to the picks that produced
+        // the currently-installed exe (sim-options.json), once only, when nothing's connected on first show -
+        // there's no live source to keep re-syncing that from, so once is right (a later Build overwrites it
+        // anyway). Ganged/auto-square have no $I equivalent to detect - left at their prior/default value
+        // either way, since they're not something a controller reports.
         private void SeedDefaults()
         {
-            if (seededDefaults)
-                return;
-            seededDefaults = true;
-
             if (SimulatorManager.IsRealControllerConnected())
             {
-                int index = CNC.Core.GrblInfo.NumAxes - 3;
-                if (index >= 0 && index < cbxAxes.Items.Count)
-                    cbxAxes.SelectedIndex = index;
-                chkProbe.IsChecked = CNC.Core.GrblInfo.HasProbe;
-                chkToolsetter.IsChecked = CNC.Core.GrblInfo.HasToolSetter;
-                chkRotation.IsChecked = CNC.Core.GrblInfo.RotationSupported;
-                chkLatheUvw.IsChecked = CNC.Core.GrblInfo.LatheUVWModeEnabled;
-                chkSafetyDoor.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.SafetyDoor) != 0;
-                chkEStop.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.EStop) != 0;
+                SyncFromHardware();
                 return;
             }
+
+            if (restoredFromDisk)
+                return;
+            restoredFromDisk = true;
 
             var opts = SimulatorManager.AppDataActiveOptions();
             if (opts == null)
