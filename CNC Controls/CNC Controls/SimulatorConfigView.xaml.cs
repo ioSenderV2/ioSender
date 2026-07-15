@@ -39,6 +39,7 @@ namespace CNC.Controls
             {
                 Axes = SelectedAxes,
                 Probe = chkProbe.IsChecked == true,
+                Toolsetter = chkToolsetter.IsChecked == true,
                 Rotation = chkRotation.IsChecked == true,
                 LatheUvw = chkLatheUvw.IsChecked == true,
                 SafetyDoor = chkSafetyDoor.IsChecked == true,
@@ -66,6 +67,7 @@ namespace CNC.Controls
                 if (index >= 0 && index < cbxAxes.Items.Count)
                     cbxAxes.SelectedIndex = index;
                 chkProbe.IsChecked = CNC.Core.GrblInfo.HasProbe;
+                chkToolsetter.IsChecked = CNC.Core.GrblInfo.HasToolSetter;
                 chkRotation.IsChecked = CNC.Core.GrblInfo.RotationSupported;
                 chkLatheUvw.IsChecked = CNC.Core.GrblInfo.LatheUVWModeEnabled;
                 chkSafetyDoor.IsChecked = (CNC.Core.GrblInfo.OptionalSignals & CNC.Core.Signals.SafetyDoor) != 0;
@@ -81,6 +83,7 @@ namespace CNC.Controls
             if (savedIndex >= 0 && savedIndex < cbxAxes.Items.Count)
                 cbxAxes.SelectedIndex = savedIndex;
             chkProbe.IsChecked = opts.Probe;
+            chkToolsetter.IsChecked = opts.Toolsetter;
             chkRotation.IsChecked = opts.Rotation;
             chkLatheUvw.IsChecked = opts.LatheUvw;
             chkSafetyDoor.IsChecked = opts.SafetyDoor;

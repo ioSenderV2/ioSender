@@ -1070,6 +1070,7 @@ namespace CNC.Controls
             {
                 Axes = GrblInfo.NumAxes,
                 Probe = GrblInfo.HasProbe,
+                Toolsetter = GrblInfo.HasToolSetter,
                 Rotation = GrblInfo.RotationSupported,
                 LatheUvw = GrblInfo.LatheUVWModeEnabled,
                 SafetyDoor = (GrblInfo.OptionalSignals & Signals.SafetyDoor) != 0,

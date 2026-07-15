@@ -894,6 +894,7 @@ namespace CNC.Controls
         {
             public int Axes;
             public bool Probe;
+            public bool Toolsetter;
             public bool Rotation;
             public bool LatheUvw;
             public bool SafetyDoor;
@@ -924,6 +925,7 @@ namespace CNC.Controls
                 {
                     Axes = int.Parse(axesM.Groups[1].Value, CultureInfo.InvariantCulture),
                     Probe = JsonBool(json, "probe"),
+                    Toolsetter = JsonBool(json, "toolsetter"),
                     Rotation = JsonBool(json, "rotation"),
                     LatheUvw = JsonBool(json, "latheUvw"),
                     SafetyDoor = JsonBool(json, "safetyDoor"),
@@ -951,6 +953,7 @@ namespace CNC.Controls
         {
             string json = "{\"axes\":" + opts.Axes.ToString(CultureInfo.InvariantCulture) +
                           ",\"probe\":" + (opts.Probe ? "true" : "false") +
+                          ",\"toolsetter\":" + (opts.Toolsetter ? "true" : "false") +
                           ",\"rotation\":" + (opts.Rotation ? "true" : "false") +
                           ",\"latheUvw\":" + (opts.LatheUvw ? "true" : "false") +
                           ",\"safetyDoor\":" + (opts.SafetyDoor ? "true" : "false") +
@@ -968,6 +971,7 @@ namespace CNC.Controls
         {
             var symbols = new System.Collections.Generic.List<string> { "N_AXIS=" + opts.Axes };
             if (opts.Probe) symbols.Add("PROBE_ENABLE=1");
+            if (opts.Toolsetter) symbols.Add("TOOLSETTER_ENABLE=1");
             if (opts.Rotation) symbols.Add("ROTATION_ENABLE=1");
             if (opts.LatheUvw) symbols.Add("LATHE_UVW_OPTION=1");
             if (opts.SafetyDoor) symbols.Add("SAFETY_DOOR_ENABLE=1");
