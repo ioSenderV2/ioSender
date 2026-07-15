@@ -1043,6 +1043,25 @@ namespace CNC.Controls
 
         // ---- Step 8: build a simulator matching this machine ----
 
+        // What Settings > Simulator would auto-detect from this controller right now (SimulatorConfigView.
+        // SyncFromHardware derives the same fields the same way) - shared by the status readout below and
+        // the Build click itself, so they can never disagree about what "matching this machine" means.
+        private static SimulatorManager.ManualSimOptions CurrentMachineOptions()
+        {
+            return new SimulatorManager.ManualSimOptions
+            {
+                Axes = GrblInfo.NumAxes,
+                Probe = GrblInfo.HasProbe,
+                Toolsetter = GrblInfo.HasToolSetter,
+                Rotation = GrblInfo.RotationSupported,
+                LatheUvw = GrblInfo.LatheUVWModeEnabled,
+                SafetyDoor = (GrblInfo.OptionalSignals & Signals.SafetyDoor) != 0,
+                EStop = (GrblInfo.OptionalSignals & Signals.EStop) != 0
+            };
+        }
+
+        // Same readout as Settings > Simulator's RefreshStatus: build id + whether it still matches this
+        // machine's current options, or a plain "not built yet" - not just an enabled/disabled button.
         private void RefreshSimulatorStep()
         {
             if (btnBuildSimWizard == null)
@@ -1050,9 +1069,25 @@ namespace CNC.Controls
 
             bool connected = SimulatorManager.IsRealControllerConnected();
             btnBuildSimWizard.IsEnabled = connected;
-            txtSimWizardStatus.Text = connected
-                ? string.Empty
-                : "Connect to the real machine first - this step builds from its detected options.";
+
+            if (!connected)
+            {
+                txtSimWizardStatus.Text = "Connect to the real machine first - this step builds from its detected options.";
+                return;
+            }
+
+            if (!SimulatorManager.AppDataSimulatorPresent())
+            {
+                txtSimWizardStatus.Text = "No simulator built yet.";
+                return;
+            }
+
+            string sig;
+            SimulatorManager.BuildManualOptionSymbols(CurrentMachineOptions(), out sig);
+            string activeSig = SimulatorManager.AppDataActiveSignature();
+            txtSimWizardStatus.Text = sig == activeSig
+                ? "Ready for Connect (build " + sig + ")."
+                : "Installed (build " + activeSig + "), but this machine's options have changed since - rebuild recommended.";
         }
 
         // One button: derive options from the connected controller exactly like SimulatorConfigView's
@@ -1066,16 +1101,7 @@ namespace CNC.Controls
                 return;
 
             btnBuildSimWizard.IsEnabled = false;
-            var opts = new SimulatorManager.ManualSimOptions
-            {
-                Axes = GrblInfo.NumAxes,
-                Probe = GrblInfo.HasProbe,
-                Toolsetter = GrblInfo.HasToolSetter,
-                Rotation = GrblInfo.RotationSupported,
-                LatheUvw = GrblInfo.LatheUVWModeEnabled,
-                SafetyDoor = (GrblInfo.OptionalSignals & Signals.SafetyDoor) != 0,
-                EStop = (GrblInfo.OptionalSignals & Signals.EStop) != 0
-            };
+            var opts = CurrentMachineOptions();
             txtSimWizardStatus.Text = "Checking for a matching build...";
 
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
