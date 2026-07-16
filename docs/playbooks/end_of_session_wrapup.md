@@ -13,9 +13,17 @@ always `/clear`.
    → [add_changelog_entry.md](add_changelog_entry.md), [regenerate_overview_pdf.md](regenerate_overview_pdf.md).
 3. **Pushed all the way to remote** — `origin/integration` **and** `v2/master`. → `tools\push-all.ps1`
    (checks ahead/behind, pushes both, verifies both refs land; `-DryRun` to preview).
+3.5. **Wait for the rolling-release CI build to finish** — the push to `v2/master` triggers
+   `.github/workflows/release.yml` (`Rolling release`) on `ioSenderV2/ioSender`. It can fail for
+   reasons nothing local catches (clean-runner build vs. a locally cached `-restore`). Run
+   `tools\wait-for-release.ps1` and **wait for it to exit** before moving on - it polls until the run
+   for this push's commit completes and exits 0/1 on success/failure. **If it fails, stop and
+   surface the failure** (link + a look at the log) instead of writing the summary as if everything
+   shipped clean - don't silently proceed to steps 5/6 on a red build.
 4. **New docs published to gh-pages** (only if the manual changed).
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
+   Include the CI result from step 3.5.
 6. **THEN capture the conversation log** — the `-Once` call, → [capture_conversation_log.md](capture_conversation_log.md).
 
 ## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
@@ -29,6 +37,12 @@ message than the `-Once` call* is already on disk and gets captured. Therefore:
   marker-phrase test.)
 - The old flow ran the capture and *then* wrote the summary as trailing text — which pushed the summary to
   the following run. Don't do that.
+
+## Ready command (step 3.5)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
+```
 
 ## Ready command (step 6)
 
