@@ -184,6 +184,38 @@ def _tool_geometry(op):
         return None
 
 
+def _force_flood_coolant(op):
+    """grbl.cps has no code for Fusion's 'air' or 'mist' coolant settings (postProcess raises
+    "Unsupported 'air'/'mist' coolant") - only 'flood' (M8) and 'disabled' are supported. Remap an
+    op's coolant to Flood before posting when it's set to Air or Mist. Returns True if changed."""
+    try:
+        params = op.parameters
+    except Exception:
+        return False
+    p = params.itemByName('tool_coolant')
+    if p is None:
+        p = params.itemByName('coolant')
+    if p is None:
+        return False
+    try:
+        cur = p.value.value
+    except Exception:
+        return False
+    if not (isinstance(cur, str) and cur.lower() in ('air', 'mist')):
+        return False
+    try:
+        p.value.value = 'flood'
+        return True
+    except Exception:
+        pass
+    try:
+        p.expression = 'flood'
+        return True
+    except Exception:
+        pass
+    return False
+
+
 def _read_stock_dims(setup):
     """Stock box size (x, y, z mm) from a setup's parameters, or None. Prefers the
     computed box dims, then the box corners, then the fixed-box dims (all cm->mm)."""
@@ -592,6 +624,9 @@ def _post_all(folder, post_file, stock_override=None, apply_stock=False):
             # Setup name when a setup has one op (the common case where the
             # setup is named after the machining step); else Setup_Op.
             display_name = setup.name if op_count == 1 else '%s_%s' % (setup.name, op.name)
+
+            if _force_flood_coolant(op):
+                log.append('%s: coolant Air/Mist -> Flood (grbl.cps has no code for Air/Mist)' % display_name)
 
             if not _ensure_toolpath(cam, op):
                 failures.append('%s: toolpath generation failed' % display_name)
