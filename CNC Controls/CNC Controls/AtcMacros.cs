@@ -129,8 +129,27 @@ namespace CNC.Controls
                     foreach (string name in Required)
                     {
                         MacroStatusRow found;
-                        if (present.TryGetValue(name, out found))
-                            rows.Add(new MacroStatusRow { Name = name, Size = found.Size, FS = found.FS, State = stale ? MacroState.Outdated : MacroState.Installed });
+                        bool present1 = present.TryGetValue(name, out found);
+                        int sz = 0;
+                        bool sizeKnown = present1 && int.TryParse(found.Size, out sz);
+
+                        // A zero-length file is present-by-name but not actually installed - confirmed on real
+                        // hardware: an interrupted/truncated write left tc.macro at 0 bytes, which still matched
+                        // here (name present, sidecar checksum untouched since IT wasn't rewritten) and reported
+                        // Installed, so M6 T8 silently ran the FIRMWARE'S DEFAULT tool change instead of the
+                        // macro - no error, no gate, just a TLO reference that quietly never got set. Treated as
+                        // Missing (not just Outdated) so the Machine Setup gate still fires on it.
+                        bool empty = sizeKnown && sz <= 0;
+
+                        // Beyond zero: any size that doesn't match the embedded copy's own byte count is a
+                        // cheap, per-file signal of PARTIAL truncation/corruption too - no controller round-trip
+                        // needed (Size is already in the listing), and unlike the atc.sum sidecar it can't go
+                        // stale independently (ExpectedSize is derived fresh from this install's embedded macro
+                        // every call). Flagged Outdated rather than Missing - the file IS there, just wrong.
+                        bool sizeMismatch = sizeKnown && sz > 0 && sz != ExpectedSize(name);
+
+                        if (present1 && !empty)
+                            rows.Add(new MacroStatusRow { Name = name, Size = found.Size, FS = found.FS, State = (stale || sizeMismatch) ? MacroState.Outdated : MacroState.Installed });
                         else
                             rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
                     }
@@ -169,13 +188,27 @@ namespace CNC.Controls
                 // Enumerate current files across every mount (also refreshes the SD Card tab's cache).
                 GrblSDCard.Load(model, false);
 
+                // A zero-length file counts as absent here too (same reasoning as GetStatus above) - otherwise
+                // EnsureProvisioned's whole point (self-healing a broken install) can't fire for exactly the
+                // failure it exists to catch: a truncated/interrupted write leaves the name present at 0 bytes,
+                // which - without this check - satisfies Required.All(present.Contains) and never gets re-sent.
                 var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var sizeByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 foreach (DataRowView rv in GrblSDCard.Files)
                 {
                     if ((string)rv.Row["Dir"] == GrblSDCard.EmptyMountMarker)
                         continue;                                   // skip empty-filesystem placeholder rows
-                    present.Add(Path.GetFileName((string)rv.Row["Name"]));
+                    if (rv.Row.Table.Columns.Contains("Size") && rv.Row["Size"] is int sz && sz <= 0)
+                        continue;                                   // zero-length - treat as not present
+                    string nm = Path.GetFileName((string)rv.Row["Name"]);
+                    present.Add(nm);
+                    if (rv.Row.Table.Columns.Contains("Size") && rv.Row["Size"] is int s)
+                        sizeByName[nm] = s;
                 }
+                // A required macro present at the wrong (nonzero) byte count is PARTIAL truncation/corruption -
+                // same cheap per-file discriminator as GetStatus, folded into `stale` below so a re-upload still
+                // fires even if the aggregate atc.sum sidecar didn't happen to catch it.
+                bool anySizeMismatch = Required.Any(n => sizeByName.TryGetValue(n, out int s) && s != ExpectedSize(n));
 
                 // Target littlefs specifically: it persists with no SD card and (unlike the SD root) is writable
                 // over YModem on this firmware. Fall back to the root / first mount if no littlefs is reported.
@@ -188,7 +221,7 @@ namespace CNC.Controls
 
                 bool missing = !Required.All(present.Contains);
                 string embeddedSum = EmbeddedChecksum();
-                bool stale = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != embeddedSum;
+                bool stale = anySizeMismatch || ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != embeddedSum;
 
                 if (!missing && !stale)
                     return ProvisionResult.UpToDate;   // present and current - nothing to do
@@ -354,6 +387,23 @@ namespace CNC.Controls
                 using (var r = new StreamReader(s))
                     return r.ReadToEnd();
             }
+        }
+
+        // Byte length of the embedded copy, as written to the controller (UTF8, matching YModemWrite's own
+        // encoding) - a cheap first-order discriminator alongside the aggregate atc.sum checksum. Unlike that
+        // sidecar, this needs no extra controller round-trip (Size is already in the listing GetStatus/
+        // EnsureProvisioned fetch anyway) and catches PARTIAL truncation too, not just a 0-byte file - and it
+        // can't go stale independently the way the sidecar could (it's derived fresh from THIS install's
+        // embedded macro every call, never written to the controller or cached).
+        static readonly Dictionary<string, int> _expectedSizeCache = new Dictionary<string, int>();
+        static int ExpectedSize(string name)
+        {
+            int size;
+            if (_expectedSizeCache.TryGetValue(name, out size))
+                return size;
+            size = System.Text.Encoding.UTF8.GetByteCount(ReadEmbedded(name) ?? string.Empty);
+            _expectedSizeCache[name] = size;
+            return size;
         }
 
         // Stream <content> to the controller as <name> on the target (littlefs) filesystem via YModem. First
