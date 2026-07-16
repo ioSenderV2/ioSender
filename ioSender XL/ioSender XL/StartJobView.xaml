@@ -49,6 +49,9 @@
                                    Text="Stock over 1 in (25.4 mm) thick - the probe macros assume 1 in or less and will miss the top of taller stock."/>
                         <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"
                                    Text="Actual stock size."/>
+                        <Button x:Name="btnCopyFromStock" x:Uid="ls_copyFromStock" Content="Copy from loaded program's STOCK" HorizontalAlignment="Left"
+                                Margin="4,2,0,2" Padding="6,2" FontSize="11" Visibility="Collapsed" Click="CopyFromStock_Click"
+                                ToolTip="The loaded program's own (STOCK X=.. Y=.. Z=..) comment differs from the values above - click to copy it in."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
                             <Label x:Uid="ls_lblProbe" Content="Probe:" Padding="0" VerticalAlignment="Center"/>
                             <RadioButton x:Uid="rbProbe3d" x:Name="rbProbe3d" Content="3D Probe" GroupName="StartJobProbeType" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
@@ -74,8 +77,14 @@
                         <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
                                   IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
                                   ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
+                        <CheckBox x:Uid="ls_exactsize" x:Name="chkExactSize" Content="Stock size is exact" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
+                                  IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                  ToolTip="Off (default): width/height above are a conservative ESTIMATE - a few mm larger than actual - so far-corner references land safely outside the stock. On: they are treated as exact, and corners 2-4 probe close to their computed true position instead (corner 2 assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2). Faster and tighter, but a wrong entered size can miss the stock - only enable if you trust the numbers."/>
                         <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference" IsChecked="True" Margin="0,2,0,2" VerticalAlignment="Center"
                                   ToolTip="Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."/>
+                        <cnccontrols:NumericField x:Name="fldCornerMargin" x:Uid="ls_cornermargin" Label="Corner travel margin (Z):" ColonAt="160" Unit="mm" Format="##0.0##" Value="10"
+                                                  Margin="0,4,0,2" IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                                  ToolTip="Corners 2-4 travel at corner 1's own measured stock top plus this margin, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
                     </StackPanel>
                 </GroupBox>
             </ScrollViewer>

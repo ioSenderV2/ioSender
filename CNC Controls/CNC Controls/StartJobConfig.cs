@@ -21,6 +21,16 @@ namespace CNC.Controls
         // for the face-probe start height is spoilboard + spacer - without this a thin sheet gets probed down in
         // the spacer/tape band instead of on the metal. 0 = no spacer (bare fence). Passed to pcorner as _ls_spacer.
         public double SpacerThickness = 0d;
+        // Corner Fence Measure only: corners 2-4 travel at corner 1's own measured stock top plus this margin
+        // (see pcorner.macro's #<_ls_maxz>) instead of retracting fully to machine top between corners. Must
+        // clear any fence/clamp hardware between corners on this fixture - not a universal default, hence
+        // adjustable rather than hardcoded.
+        public double CornerTravelMarginMm = 10d;
+        // Corner Fence Measure only: off (default) treats width/height as a conservative estimate (padded);
+        // on, they're trusted exact and corners 2-4 probe close to their computed true position (corner 2
+        // assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2) instead of the padded
+        // reference. See BuildProgram - only changes the REFERENCE fed to pcorner.macro, not the macro itself.
+        public bool ExactSize = false;
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

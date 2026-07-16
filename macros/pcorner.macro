@@ -138,7 +138,12 @@ O<pcorner> SUB
   o40 IF [#<sz_in> GE 9000]
     G53 G0 Z[#<_bottom> + 30]        ; rapid - first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), a COMPUTED safe clearance (floor known from the DISCOVER probe above), travel just above the tallest possible top
   o40 ELSE
-    o42 IF [#<maxz> GT 0]
+    ; NE 0, not GT 0 (2026-07 bug, confirmed on real hardware on both this path and o43 below): #<maxz> is a
+    ; MACHINE Z coordinate, and on a machine that homes Z to the top (Z0) with the whole work envelope below
+    ; that, every real value here is NEGATIVE - "GT 0" silently failed for every legitimate maxz the caller
+    ; ever passed (the vise's own #<_lv_safe_z>, Corner Fence's #<c1_maxz>), falling through to the ELSE
+    ; branch every time with no error, just quietly slower/more conservative than intended.
+    o42 IF [#<maxz> NE 0]
       G53 G0 Z[#<maxz>]             ; rapid - caller already knows a trusted safe height (e.g. the vise's own centre probe) - never go any higher than necessary
     o42 ELSE
       G53 G0 Z0                     ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
@@ -155,7 +160,7 @@ O<pcorner> SUB
     ; straight into solid stock with nothing to catch it. If the caller already knows a trusted height
     ; (#<maxz>, e.g. the vise's own centre probe) use that directly; otherwise fall back to the same
     ; conservative floor+30 estimate the DISCOVER corner uses above (same reasoning as o40 above).
-    o43 IF [#<maxz> GT 0]
+    o43 IF [#<maxz> NE 0]
       G53 G0 Z[#<maxz>]
     o43 ELSE
       G53 G0 Z[#<_bottom> + 30]
@@ -181,6 +186,16 @@ O<pcorner> SUB
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
   #<_safe_z> = [#<_z_top> + 20]     ; safe travel height now known: 20 mm above this corner's top
+  ; Repositioning within this corner (the X-face and Y-face retreats, and the exit retreat below) prefer the
+  ; CALLER'S trusted #<maxz> (e.g. the operator-set Corner travel margin, or the vise's own centre probe) over
+  ; freshly recomputing _safe_z - when the caller has one, it's a single, predictable height good for the
+  ; whole run, not a per-corner value that changes call to call for no reason the operator can see. #<_safe_z>
+  ; itself is still always computed (needed as the fallback here, and as what a LATER corner call reads via
+  ; #<maxz> once it's been threaded back out by the caller).
+  #<_retreat_z> = #<_safe_z>
+  o44 IF [#<maxz> NE 0]
+    #<_retreat_z> = #<maxz>
+  o44 ENDIF
   G91 G1 Z10 F1000
   G90
   (PRINT, PC z_top=#<_z_top>)
@@ -210,7 +225,7 @@ O<pcorner> SUB
   ; From the top-probe position (over solid stock, verified above) move ONLY X back out to the reference
   ; (the face) - Y unchanged, so the pre-seek position is anchored to a point already known to be over
   ; material rather than a separately estimated offset. Descend to start_z, then seek toward the face.
-  G53 G0 Z[#<_safe_z>]              ; rapid - retract only to just above the stock top (top + 20, VERIFIED by the probe just run), not machine top
+  G53 G0 Z[#<_retreat_z>]           ; rapid - the trusted known-safe height when the caller has one, else just above this corner's own top (VERIFIED by the probe just run)
   G53 G0 X[#<rx>] Y[#<_topy>]       ; rapid - travelling AT the verified safe height
   G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (just probed) - controlled feed only takes over for the final approach
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
@@ -225,15 +240,17 @@ O<pcorner> SUB
   G90
   (PRINT, PC x_trig=#<x_trig>)
 
-  ; ================= Y face probe (route axis-at-a-time around the corner) =================
-  ; Retract to safe Z first - the X face probe left the tip near start_z (probing depth), and the top-probe
-  ; XY is over solid stock, so crossing there at probing depth would drag the tip across the stock top.
-  ; Back to the top-probe XY, STILL AT SAFE HEIGHT move ONLY Y out to the reference (clear air outside the
-  ; Y face) - X unchanged. Only THEN descend to start_z: (topx, ry) is clear of stock (Y outside the face),
-  ; whereas (topx, topy) is the exact point the top probe just touched - descending there would hit stock.
-  G53 G0 Z[#<_safe_z>]              ; rapid - verified-safe height (see X face above)
-  G53 G0 X[#<_topx>] Y[#<_topy>]    ; rapid - travelling AT that height
-  G53 G0 Y[#<ry>]                   ; rapid - still AT that height
+  ; ================= Y face probe =================
+  ; Retract to a trusted safe height first - the X face probe left the tip near start_z (probing depth), so
+  ; crossing at that depth would drag the tip across the stock top. Once at that height, go straight (X AND Y
+  ; together) to the Y-face-start position (topx, ry) - no need to detour via the top-probe XY (topx, topy)
+  ; first: that routing was only needed because the OLD retreat height was this corner's own freshly-computed
+  ; _safe_z, not independently verified clear of the stock along an arbitrary diagonal. #<_retreat_z> (above)
+  ; is either that same _safe_z or the caller's own trusted height - both are clear of the stock everywhere in
+  ; the vicinity, not just directly above the last probed point, so a diagonal move at that height is exactly
+  ; as safe as the old axis-at-a-time routing, just one move instead of two.
+  G53 G0 Z[#<_retreat_z>]           ; rapid - verified/trusted safe height (see X face above)
+  G53 G0 X[#<_topx>] Y[#<ry>]       ; rapid - diagonal, straight to the Y-face-start position, AT that height
   G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (see X face above)
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
@@ -252,9 +269,9 @@ O<pcorner> SUB
   #<_corner_z> = [#<_z_top> - #<_ls_plateoffset>]   ; 0 for the 3D probe and touch-plate-on-conductive-stock (no-op)
   (PRINT, PC OUT c=#<corner> x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
 
-  ; retract to just above the stock top - the next corner travels at this height. Rapid: _safe_z is a
-  ; VERIFIED height (20mm above this corner's just-probed top), so this retract only ever moves AWAY from
-  ; material, never toward it.
-  G53 G0 Z[#<_safe_z>]
+  ; retract before returning to the caller - the next corner travels at this height. Rapid: #<_retreat_z> is
+  ; either a VERIFIED height (20mm above this corner's just-probed top) or the caller's own trusted one, so
+  ; this retract only ever moves AWAY from material, never toward it.
+  G53 G0 Z[#<_retreat_z>]
   (PRINT, PC EXIT)
 O<pcorner> ENDSUB

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StartJobView.xaml.cs - part of ioSender XL
  *
  * "Load stock" top-level tab. Pick a probe definition + the stock corner the probe is parked over +
@@ -52,7 +52,9 @@ namespace GCode_Sender
         private static readonly Regex rxViseCornerX = new Regex(@"LS_VISE_CX([13])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
         // BuildViseProgram's left-edge skew (corner 1 vs corner 3 X, over the entered height): "LS_VISE_SKEW=..".
         private static readonly Regex rxViseSkew = new Regex(@"LS_VISE_SKEW\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-        private double? measuredX = null, measuredY = null, spoilZ = null, viseLeftEdgeSkewDeg = null;
+        // BuildViseProgram's centre-footprint stock-top Z probe: "LS_VISE_Z=..".
+        private static readonly Regex rxViseCenterZ = new Regex(@"LS_VISE_Z\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        private double? measuredX = null, measuredY = null, spoilZ = null, viseLeftEdgeSkewDeg = null, viseCenterZ = null;
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
@@ -111,9 +113,9 @@ namespace GCode_Sender
             // re-gate immediately rather than waiting for the next Activate/capability refresh.
             rbProbe3d.Checked += (s, e) => { UpdateProbeWarning(); InputChanged(); };
             rbProbeTouch.Checked += (s, e) => { UpdateProbeWarning(); InputChanged(); };
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => { MarkSizeFieldsTouched(); InputChanged(); });
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => { MarkSizeFieldsTouched(); InputChanged(); });
-            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { MarkSizeFieldsTouched(); UpdateThicknessWarning(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); UpdateThicknessWarning(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldSpacer, (s, e) => InputChanged());
         }
 
@@ -140,10 +142,11 @@ namespace GCode_Sender
             fldHeight.Value = ConvertUnit(fldHeight.Value, isImperial, newImperial);
             fldThickness.Value = ConvertUnit(fldThickness.Value, isImperial, newImperial);
             fldSpacer.Value = ConvertUnit(fldSpacer.Value, isImperial, newImperial);
+            fldCornerMargin.Value = ConvertUnit(fldCornerMargin.Value, isImperial, newImperial);
 
             isImperial = newImperial;
             string unit = isImperial ? "in" : "mm";
-            fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = unit;
+            fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = fldCornerMargin.Unit = unit;
             UpdateThicknessWarning();
             UpdateDrawing();
         }
@@ -156,15 +159,34 @@ namespace GCode_Sender
             return toImperial ? mm / 25.4d : mm;
         }
 
-        // Auto-fill Width/Height/Thickness from the loaded job's own (STOCK X=.. Y=.. Z=..) comment (the
-        // Fusion ioSenderBatchPost add-in's format), via ProgramView.LoadedJob.DeclaredStock - computed fresh
-        // from GCode.File.Data each time, not a cached global. Only a genuine DECLARED comment counts as
-        // "explicitly set for this job" (clears the stale-value warning gate, Generate_Click) - deliberately
-        // NOT ProgramView.Stock's envelope-defaulted fallback, which would otherwise silently overwrite the
-        // fields with the full machine travel on every tab activate when no program has a STOCK comment.
-        // Silent no-op in that case - manual entry still works exactly as before, and Generate's stale-value/
-        // envelope checks still catch an unset or oversized guess.
-        private void TryAutoFillStockFromProgram()
+        // Width/Height/Thickness are the operator's own entered numbers for THIS stock - Start Job must never
+        // silently overwrite them from whatever program happens to be loaded (confirmed unwanted: a job loaded
+        // for an unrelated reason, or loaded AFTER the fields were already set for the stock on the machine,
+        // was clobbering the just-entered values). Instead: if the loaded job's own (STOCK X=.. Y=.. Z=..)
+        // comment (the Fusion ioSenderBatchPost add-in's format, via ProgramView.LoadedJob.DeclaredStock -
+        // computed fresh from GCode.File.Data each time, not cached) differs from what's currently entered,
+        // reveal btnCopyFromStock instead of applying anything - the operator decides. No declared comment,
+        // or it matches what's already entered (within rounding), and the button just stays hidden.
+        private const double StockMatchToleranceMm = 0.05d;
+        private void CheckStockAgainstProgram()
+        {
+            if (btnCopyFromStock == null)
+                return;
+
+            var stock = CNC.Controls.ProgramView.LoadedJob?.DeclaredStock;
+            if (stock == null)
+            {
+                btnCopyFromStock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            bool matches = Math.Abs(ToMm(fldWidth.Value) - stock.Value.X) < StockMatchToleranceMm &&
+                           Math.Abs(ToMm(fldHeight.Value) - stock.Value.Y) < StockMatchToleranceMm &&
+                           Math.Abs(ToMm(fldThickness.Value) - stock.Value.Z) < StockMatchToleranceMm;
+            btnCopyFromStock.Visibility = matches ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void CopyFromStock_Click(object sender, RoutedEventArgs e)
         {
             var stock = CNC.Controls.ProgramView.LoadedJob?.DeclaredStock;
             if (stock == null)
@@ -183,8 +205,9 @@ namespace GCode_Sender
                 loadingInputs = false;
             }
             sizeFieldsTouched = true;
+            btnCopyFromStock.Visibility = Visibility.Collapsed;
             if (model != null)
-                model.Message = "Stock size loaded from the program's (STOCK) comment.";
+                model.Message = "Stock size copied from the program's (STOCK) comment.";
         }
 
         // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
@@ -390,7 +413,7 @@ namespace GCode_Sender
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
-                TryAutoFillStockFromProgram();
+                CheckStockAgainstProgram();
                 RefreshFixtures();
                 UpdateSizeHint();
                 Subscribe(true);
@@ -510,6 +533,13 @@ namespace GCode_Sender
                 hit = true;
             }
 
+            var mcz = rxViseCenterZ.Match(msg);
+            if (mcz.Success && double.TryParse(mcz.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double vcz))
+            {
+                viseCenterZ = vcz;
+                hit = true;
+            }
+
             if (hit)
                 Dispatcher.BeginInvoke(new System.Action(ShowResult));
         }
@@ -517,7 +547,7 @@ namespace GCode_Sender
         // Clear measured size + per-corner data for a fresh run, then refresh the readout.
         private void ResetResults()
         {
-            measuredX = measuredY = spoilZ = viseLeftEdgeSkewDeg = null;
+            measuredX = measuredY = spoilZ = viseLeftEdgeSkewDeg = viseCenterZ = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
             ShowResult();
@@ -717,7 +747,7 @@ namespace GCode_Sender
                     Point pt = P(c);
                     double ang = AngleAt(c);
 
-                    string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}°", ang);
+                    string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang);
                     if (spoilZ.HasValue && cornerZ[c].HasValue)
                         text += string.Format(CultureInfo.InvariantCulture, "\nt={0:0.0}", cornerZ[c].Value - spoilZ.Value);
 
@@ -745,14 +775,15 @@ namespace GCode_Sender
                 // though up to 4 Z readings may be in cornerZ[]. There's also no spoilboard reference to
                 // subtract (pcorner.macro's z_spoil is only printed by its DISCOVER pass, and every vise
                 // corner call runs in REUSE mode - see EmitPcornerCall's startz="0" - so spoilZ is always
-                // null for a vise run). Show each probed corner relative to the LOWEST one instead - reads
-                // as a flatness map, anchored at the drawing's estimated-rectangle corner positions.
-                double? baseZ = null;
-                for (int c = 1; c <= 4; c++)
-                    if (cornerZ[c].HasValue && (!baseZ.HasValue || cornerZ[c].Value < baseZ.Value))
-                        baseZ = cornerZ[c].Value;
+                // null for a vise run). Show each probed corner - and the centre-footprint probe - relative
+                // to the fixture's own jaw origin instead: SelectedFixture.Coords is stored corner_z + 8mm
+                // (FixtureKinds.VisePositionMarginMm, see RunViseCornerProbe/BuildViseProgram's jawTopZ), so
+                // back that out to the true bare-jaw-top Z first, matching the descent math Start Job used.
+                double? jawTopZ = null;
+                if (SelectedFixture != null && SelectedFixture.HasPosition)
+                    jawTopZ = new Position(SelectedFixture.Coords).Z - FixtureKinds.VisePositionMarginMm;
 
-                if (baseZ.HasValue)
+                if (jawTopZ.HasValue)
                 {
                     for (int c = 1; c <= 4; c++)
                     {
@@ -760,7 +791,7 @@ namespace GCode_Sender
                             continue;
 
                         Point pt = P(c);
-                        string text = string.Format(CultureInfo.InvariantCulture, "z+{0:0.0}", cornerZ[c].Value - baseZ.Value);
+                        string text = string.Format(CultureInfo.InvariantCulture, "z+{0:0.0}", cornerZ[c].Value - jawTopZ.Value);
                         var lbl = new TextBlock
                         {
                             Text = text,
@@ -776,6 +807,24 @@ namespace GCode_Sender
                         Canvas.SetLeft(lbl, pt.X + dir.X * 22d - lbl.DesiredSize.Width / 2d);
                         Canvas.SetTop(lbl, pt.Y + dir.Y * 22d - lbl.DesiredSize.Height / 2d);
                         canvas.Children.Add(lbl);
+                    }
+
+                    if (viseCenterZ.HasValue)
+                    {
+                        string ctext = string.Format(CultureInfo.InvariantCulture, "centre z+{0:0.0}", viseCenterZ.Value - jawTopZ.Value);
+                        var clbl = new TextBlock
+                        {
+                            Text = ctext,
+                            FontSize = 11d,
+                            TextAlignment = TextAlignment.Center,
+                            Background = Brushes.White,
+                            Padding = new Thickness(2d, 0d, 2d, 0d),
+                            Foreground = Brushes.DimGray
+                        };
+                        clbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                        Canvas.SetLeft(clbl, ctr.X - clbl.DesiredSize.Width / 2d);
+                        Canvas.SetTop(clbl, ctr.Y - clbl.DesiredSize.Height / 2d);
+                        canvas.Children.Add(clbl);
                     }
                 }
             }
@@ -842,7 +891,7 @@ namespace GCode_Sender
 
             double? skew = SkewDegrees(), diag = DiagonalDelta();
             if (skew.HasValue && diag.HasValue)
-                sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1})",
+                sb.AppendFormat("\nSquareness: skew {0}Â°   (diagonal Î” {1})",
                     skew.Value.ToString("0.###", CultureInfo.InvariantCulture),
                     FormatLen(diag.Value));
 
@@ -850,7 +899,7 @@ namespace GCode_Sender
             // (corners 1/3 are Y-face-blocked - see BuildViseProgram). This is its own left-edge-vs-jaw-Y-face
             // check, from corners 1/3's probed X alone (see rxViseSkew/LS_VISE_SKEW).
             if (viseLeftEdgeSkewDeg.HasValue)
-                sb.AppendFormat("\nVise left-edge skew: {0}°", viseLeftEdgeSkewDeg.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendFormat("\nVise left-edge skew: {0}Â°", viseLeftEdgeSkewDeg.Value.ToString("0.###", CultureInfo.InvariantCulture));
 
             if (measureRun && probed < 4)
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);
@@ -1007,9 +1056,10 @@ namespace GCode_Sender
             bool measureVise = fx.Kind == FixtureKind.MachinistVise && chkMeasure.IsChecked == true;
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
+            bool exactSize = measure && chkExactSize.IsChecked == true;
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
-                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value), thicknessMm, touchPlate, stockConductive)
+                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value), thicknessMm, touchPlate, stockConductive, ToMm(fldCornerMargin.Value), exactSize)
                 : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p));
             ResetResults();
             SaveInputs();
@@ -1036,14 +1086,16 @@ namespace GCode_Sender
                 isImperial = s.IsImperial;
                 rbUnitsIn.IsChecked = isImperial;
                 rbUnitsMm.IsChecked = !isImperial;
-                fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = isImperial ? "in" : "mm";
+                fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = fldCornerMargin.Unit = isImperial ? "in" : "mm";
                 fldWidth.Value = FromMm(s.Width);
                 fldHeight.Value = FromMm(s.Height);
                 fldThickness.Value = FromMm(s.Thickness);
                 fldSpacer.Value = FromMm(s.SpacerThickness);
+                fldCornerMargin.Value = FromMm(s.CornerTravelMarginMm);
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkMeasure.IsChecked = s.Measure;
                 chkRotate.IsChecked = s.ApplyRotation;
+                chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 chkStockConductive.IsChecked = s.StockConductive;
                 rbProbeTouch.IsChecked = s.Probe == "TouchPlate";
@@ -1070,11 +1122,13 @@ namespace GCode_Sender
                     Height = ToMm(fldHeight.Value),
                     Thickness = ToMm(fldThickness.Value),
                     SpacerThickness = ToMm(fldSpacer.Value),
+                    CornerTravelMarginMm = ToMm(fldCornerMargin.Value),
                     IsImperial = isImperial,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
                     Measure = chkMeasure.IsChecked == true,
                     ApplyRotation = chkRotate.IsChecked == true,
+                    ExactSize = chkExactSize.IsChecked == true,
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,
                     Probe = rbProbeTouch.IsChecked == true ? "TouchPlate" : "ThreeDProbe",
@@ -1239,7 +1293,7 @@ namespace GCode_Sender
         // edge-probing here. That gets its own generator, BuildViseProgram (below), not this one -
         // Generate_Click branches on ProbesEdges to pick between them. BuildViseProgram has its OWN partial
         // Measure (2 of 4 corners, no skew) via the same pcorner.macro this function calls.
-        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive)
+        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius (3D probe) / bit radius (touch plate) -> edge comp
             // Touch plate against non-conductive stock needs a real physical plate, whose known PlateThickness
@@ -1280,7 +1334,7 @@ namespace GCode_Sender
             // controller runs the four CALLs back-to-back under flow control (each publishes its globals before
             // the next reads them) - which keeps Feed Hold/Stop live and the UI responsive. Results still stream
             // back as (PRINT ...) messages.
-            void EmitCall(int cornerId, string refx, string refy, string startz) { EmitPcornerCall(L, cornerId, refx, refy, startz); }
+            void EmitCall(int cornerId, string refx, string refy, string startz, string maxz = "0") { EmitPcornerCall(L, cornerId, refx, refy, startz, maxz); }
 
             L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
             // Split across short lines - grblHAL rejects a line over its receive-buffer size ("Max characters
@@ -1356,6 +1410,40 @@ namespace GCode_Sender
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
 
+            if (exactSize)
+            {
+                // Re-probe corner 1 itself, tight, using the just-measured position as the reference instead
+                // of the operator's rough jogged one (DISCOVER above needs a WIDE clearance reference since
+                // it's unverified; now that corner 1 is actually known, refine it the same way corners 2-4 get
+                // probed tightly) - it's the anchor everything else is computed from, so its own precision
+                // matters most. Corner 1 is the ORIGIN corner: unlike corner 2 (whose own pcorner-sx is the
+                // NEGATION of host sox), the origin's own sx/sy always match host sox/soy directly (no far-edge
+                // sign flip - it doesn't have a "far edge" of its own to invert against), so both topx/topy come
+                // out symmetric this time: ref = trueCorner1 - 10*(sox,soy), topx = topy = 15. Same +-5mm/+-10mm
+                // pattern as corner 2's re-derivation, worked through fresh for this corner's own sign
+                // convention rather than assumed to match corner 2's (that assumption is what broke corner 2).
+                L("(--- exact-size: re-probe corner 1 tight, using its own just-measured position ---)");
+                L(string.Format("#<_ls_topx> = {0}", N(15d)));
+                L(string.Format("#<_ls_topy> = {0}", N(15d)));
+                string refX1b = plusMinus("#<c1x>", -sox, 10d);
+                string refY1b = plusMinus("#<c1y>", -soy, 10d);
+                // REUSE mode (startz = the spoilboard-anchored #<_start_z> DISCOVER already published) - no
+                // second spoilboard probe needed. maxz = #<_safe_z>, the height DISCOVER just verified (this
+                // corner's own top + 20) - safe and already known, no need to retract to machine Z0 for a
+                // revisit of the same spot.
+                EmitCall(id1, refX1b, refY1b, "#<_start_z>", "#<_safe_z>");
+                L("#<c1x> = #<_corner_x>");
+                L("#<c1y> = #<_corner_y>");
+                L("#<c1z> = #<_corner_z>");
+            }
+
+            // Known-safe travel height for corners 2-4 (see pcorner.macro's #<_ls_maxz>) - corner 1's own
+            // measured stock top plus the operator-set travel margin, NOT hardcoded (adjustable in case a
+            // given fence/clamp setup needs more clearance than the default). Computed as its own variable,
+            // not inlined into the EmitCall args, so Br()'s "wrap in brackets if it contains a space" heuristic
+            // doesn't double-bracket an already-bracketed expression - a bare variable reference has no spaces.
+            L(string.Format("#<c1_maxz> = [#<c1z> + {0}]", N(cornerTravelMarginMm)));
+
             // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == a plain Start Job
             // (origin + TLO ref). The 3D probe is already in the spindle (installed at the top), so this is the
             // M6 T8 "reference" path in tc.macro: reset the ref, probe the puck at G59.3, store the probe machine-Z
@@ -1363,25 +1451,108 @@ namespace GCode_Sender
             // corners (probed in work coords) and the end-of-run origin block are unaffected. Needs ATC + a
             // toolsetter at G59.3 (both already in the PREREQ). tc.macro is what applies the ref on later M6s.
             if (setTloRef)
+            {
                 EmitTloReference(L, p, touchPlate);
+                // tc.macro's M6 T8 parks at G30 - an arbitrary, possibly-distant point not verified clear of
+                // any fence/clamp hardware, unlike corner-to-corner travel (a known area, already crossed
+                // once). Explicit full retract for JUST this leg, as its own discrete step - not baked into
+                // maxz (that used to zero out maxz for corner 2's ENTIRE call, which also meant its internal
+                // face-probe repositioning fell back to a freshly-computed height instead of the same trusted
+                // one corners 3/4 use, for no reason - see the conversation this came from). Once retracted,
+                // corner 2 gets the same trusted #<c1_maxz> as everything else below.
+                L("G53 G0 Z0");
+            }
 
             if (measure)
             {
                 // The other three reuse start_z; references come from the probed origin + estimate on the spanning
                 // axis and the fixture instance's saved position on the shared axis. corner 2 = X-neighbour,
                 // 3 = Y-neighbour, 4 = diagonal.
+                //
+                // maxz = #<c1_maxz> (corner 1's own measured Zstock + the travel margin, computed above) -
+                // replaces BOTH the full retract-to-machine-Z0 between corners AND the generic floor+30
+                // pre-top-probe estimate with this tighter, ACTUALLY-MEASURED height, same mechanism the vise
+                // path already uses for its own centre probe. Confirmed with the operator this clears the
+                // fence/clamp hardware between corners on this setup before wiring it in. Used uniformly for
+                // every corner including corner 2 - the G30-detour's OWN full retract is now its own explicit
+                // step above (see setTloRef), not folded into a corner-2-specific maxz override.
+                const string maxz = "#<c1_maxz>";
+
+                // Corner 2's exact-mode waypoints (all three - top-probe, X-face-seek start, Y-face-seek start -
+                // hand-specified, no nudges: symmetric +-5mm inset for the top-probe / +-10mm outset for each
+                // face-seek's own crossing axis, minimal skew so no separate secondary-axis correction needed).
+                // X and Y are NOT symmetric in which DIRECTION is "inset toward interior", despite the equal
+                // magnitudes: corner 2 sits at the FAR X edge (trueX = c1x + sox*width), so inset-toward-
+                // interior in X means SUBTRACTING sox*5 (back toward the origin); it sits at the SAME Y edge as
+                // corner 1 (shares c1y), so inset-toward-interior in Y means ADDING soy*5 (soy is documented as
+                // the stock interior direction FROM the origin - corner 2 doesn't have its own "far Y edge" to
+                // subtract from the way it does in X). Confirmed on real hardware: using -soy*5 for Y sent the
+                // top-probe to Corner1Y-5, which alarmed "Probe fail" - Alarm:5, dead air, not the intended
+                // inset-into-material point.
+                //   top-probe    = (trueX - sox*5,  trueY + soy*5)
+                //   X-face start = (trueX + sox*10, trueY + soy*5)    <- same Y as top-probe (pcorner's own _topy)
+                //   Y-face start = (trueX - sox*5,  trueY - soy*10)   <- same X as top-probe (pcorner's own _topx)
+                // pcorner.macro ties all three to one ref/topx/topy triple (_topx = rx + topx*sx; X-face start =
+                // (rx, _topy); Y-face start = (_topx, ry)) - solving for that triple against the three targets
+                // above: ref = trueCorner + (sox*10, -soy*10), topx = 15, topy = 15 (both positive this time -
+                // the earlier -15 came from wrongly mirroring X's sign convention onto Y, see above).
+                double outset = estW + 10d;
+                string refX2 = plusMinus("#<c1x>", sox, outset);
+                string refY2 = plusMinus("#<c1y>", -soy, 10d);   // c1y - soy*10
+
+                if (exactSize)
+                {
+                    L("(--- exact-size: corner 2's hand-specified top-probe/face-seek geometry ---)");
+                    L(string.Format("#<_ls_topx> = {0}", N(15d)));
+                    L(string.Format("#<_ls_topy> = {0}", N(15d)));
+                }
+                else
+                {
+                    refX2 = plusMinus("#<c1x>", sox, estW);
+                    refY2 = refY;
+                }
+
                 L(string.Format("(--- corner 2 = {0} (X-neighbour) ---)", Name(xn)));
-                EmitCall(CornerId(xn), plusMinus("#<c1x>", sox, estW), refY, "#<_start_z>");
+                EmitCall(CornerId(xn), refX2, refY2, "#<_start_z>", maxz);
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
+                string c3refx, c3refy, c4refx, c4refy;
+                if (exactSize)
+                {
+                    // Dropped the skew-corrected perpendicular-vector prediction (measured c1->c2 direction) -
+                    // skew is minimal on this setup, and that correction was never re-derived for the new hand-
+                    // specified 5mm-inset/10mm-outset pattern; combined with corner 2's topx/topy=15 (tuned for
+                    // ITS OWN sign relationship to host sox/soy) it put corner 3's probe 20mm off in X on real
+                    // hardware. Use corner 1's coordinates directly instead, same +-5mm/+-10mm pattern as corner
+                    // 1 and 2, re-derived fresh for each corner's own pcorner sx/sy relationship to host sox/soy
+                    // rather than assumed to match (that assumption is what broke corner 2, then corner 3):
+                    //   corner 3 (Y-neighbour, BackLeft when origin=FrontLeft): sx=+sox (shares X with origin,
+                    //     like corner 1's own axes - "interior" = +sox), sy=-soy (far Y edge, like corner 2's X -
+                    //     "interior" = -soy). ref = (c1x - sox*10, c1y + soy*(height+10)).
+                    //   corner 4 (diagonal): sx=-sox, sy=-soy (far edge on BOTH axes, like corner 2 on both) -
+                    //     ref = (c1x + sox*(width+10), c1y + soy*(height+10)).
+                    // topx/topy come out 15/15 for every corner regardless of which axis is negated - it's a
+                    // magnitude relationship (outset - (-inset) = 10-(-5) = 15) independent of sign convention -
+                    // so the values corner 2 already set stay correct here, nothing to re-emit.
+                    c3refx = plusMinus("#<c1x>", -sox, 10d);
+                    c3refy = plusMinus("#<c1y>", soy, estH + 10d);
+                    c4refx = plusMinus("#<c1x>", sox, estW + 10d);
+                    c4refy = plusMinus("#<c1y>", soy, estH + 10d);
+                }
+                else
+                {
+                    c3refx = refX; c3refy = plusMinus("#<c1y>", soy, estH);
+                    c4refx = plusMinus("#<c1x>", sox, estW); c4refy = plusMinus("#<c1y>", soy, estH);
+                }
+
                 L(string.Format("(--- corner 3 = {0} (Y-neighbour) ---)", Name(yn)));
-                EmitCall(CornerId(yn), refX, plusMinus("#<c1y>", soy, estH), "#<_start_z>");
+                EmitCall(CornerId(yn), c3refx, c3refy, "#<_start_z>", maxz);
                 L("#<c3x> = #<_corner_x>");
                 L("#<c3y> = #<_corner_y>");
 
                 L(string.Format("(--- corner 4 = {0} (diagonal) ---)", Name(dg)));
-                EmitCall(CornerId(dg), plusMinus("#<c1x>", sox, estW), plusMinus("#<c1y>", soy, estH), "#<_start_z>");
+                EmitCall(CornerId(dg), c4refx, c4refy, "#<_start_z>", maxz);
                 L("#<c4x> = #<_corner_x>");
                 L("#<c4y> = #<_corner_y>");
 
