@@ -65,6 +65,35 @@ namespace CNC.Controls
         private static volatile int jogAxis = -1;
         private static bool _uiSelectionRestored = false;   // restore the saved jog selection only once per run
 
+        // Guards against sending an overlapping, unacknowledged $J - confirmed on real hardware (2026-07-15
+        // console log) that three Y+ jog clicks landing within ~500ms, before the first $J's "ok" came back,
+        // left the controller completely wedged (no ok/status/response to ANYTHING, including a bare $I,
+        // until a power cycle). This doesn't fix that firmware bug, it just stops ioSender's own jog buttons
+        // from being able to trigger it via fast repeated clicks. Static/shared like jogAxis above - multiple
+        // jog panels (main window + flyouts) can all fire at the same controller. The timeout is a safety net
+        // only, not the normal path: it's long enough that a genuinely wedged controller stays gated (nothing
+        // would get through anyway), but short enough that a single dropped "ok" from one console glitch
+        // doesn't lock jogging out for the rest of the session.
+        private static volatile bool jogAckPending = false;
+        private static DateTime jogSentAtUtc = DateTime.MinValue;
+        private static GrblViewModel jogAckModel = null;
+        private const int JogAckTimeoutMs = 2000;
+
+        private static void EnsureJogAckSubscription(GrblViewModel model)
+        {
+            if (model == null || ReferenceEquals(jogAckModel, model))
+                return;
+            if (jogAckModel != null)
+                jogAckModel.OnCommandResponseReceived -= JogAckReceived;
+            jogAckModel = model;
+            model.OnCommandResponseReceived += JogAckReceived;
+        }
+
+        private static void JogAckReceived(string data)
+        {
+            jogAckPending = false;
+        }
+
         private const Key xplus = Key.J, xminus = Key.H, yplus = Key.K, yminus = Key.L, zplus = Key.I, zminus = Key.M, aplus = Key.U, aminus = Key.N;
 
         public JogBaseControl()
@@ -503,10 +532,18 @@ namespace CNC.Controls
 
             if (cmd == "stop") {
                 jogAxis = -1;
+                jogAckPending = false;   // cancel is a realtime byte, not gated - and clears whatever it's cancelling
                 cmd = ((char)GrblConstants.CMD_JOG_CANCEL).ToString();
             }
             else
             {
+                // Refuse to fire another $J while the previous one hasn't been acknowledged yet (see
+                // jogAckPending's declaration above) - drop this click rather than risk the overlapping-jog
+                // wedge. The timeout means a genuinely stuck controller re-opens the gate eventually rather
+                // than locking the UI out permanently, but by then nothing sent would get through anyway.
+                if (jogAckPending && (DateTime.UtcNow - jogSentAtUtc).TotalMilliseconds < JogAckTimeoutMs)
+                    return;
+
                 int axis = GrblInfo.AxisLetterToIndex(cmd[0]);
 
                 // Unified modifier tiers (panel buttons + keyboard arrows, sharing the keyboard's own Slow/Fast/Step
@@ -580,6 +617,13 @@ namespace CNC.Controls
                 }
                 else
                     cmd = string.Format("$J=G91{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), distance.ToInvariantString(), Math.Ceiling(jogFeed).ToInvariantString());
+            }
+
+            if (cmd.Length > 1 && cmd.StartsWith("$J", StringComparison.Ordinal))
+            {
+                jogAckPending = true;
+                jogSentAtUtc = DateTime.UtcNow;
+                EnsureJogAckSubscription(model);
             }
 
             model.ExecuteCommand(cmd);
