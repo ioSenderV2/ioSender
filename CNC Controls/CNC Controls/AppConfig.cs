@@ -335,6 +335,10 @@ namespace CNC.Controls
         // 2/4/... = that many times faster, 0 = as fast as the host can (motion finishes near-instantly).
         // Edit in App.config; not exposed in Settings:App yet.
         public double SimulatorSpeedup { get; set; } = 1.0;
+        // Firmware identity (BuildStamp, or "<Version> <Identity>" as a fallback) seen on the last
+        // successful connection - wired to GrblInfo.LastKnownBuild at startup (see AppConfig.RegisterSections)
+        // so a firmware change across connections/reboots can be flagged in the console.
+        public string LastFirmwareBuild { get; set; } = string.Empty;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -1310,6 +1314,17 @@ namespace CNC.Controls
 
             _startupPort = port;
             _startupBaud = baud;
+
+            // Firmware-change detection (GrblInfo.Get(), called per connection): seed from the persisted
+            // value, persist back on change, and surface a console message when it actually changes across
+            // connections (CNC.Core can't see AppConfig/ResponseLog styling directly, so these are hooks).
+            GrblInfo.LastKnownBuild = Base.LastFirmwareBuild;
+            GrblInfo.PersistHook = build => { Base.LastFirmwareBuild = build; Save(); };
+            GrblInfo.FirmwareChangedHook = (was, now) =>
+            {
+                if (Grbl.GrblViewModel != null)
+                    Grbl.GrblViewModel.ResponseLog.Add(string.Format("[MSG:Firmware changed since last connection - was: {0}, now: {1}]", was, now));
+            };
 
             return status;
         }

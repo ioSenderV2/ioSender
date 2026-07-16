@@ -118,6 +118,7 @@
     </Compile>
     <Compile Include="BuildInfo.cs" />
     <Compile Include="CrashReporter.cs" />
+    <Compile Include="HangWatchdogReporter.cs" />
     <Compile Include="JobWorkspace.xaml.cs">
       <DependentUpon>JobWorkspace.xaml</DependentUpon>
     </Compile>

@@ -1093,6 +1093,19 @@ namespace CNC.Core
         // "<branch>@<short-sha>" parsed out of BuildStamp's "drv:" field - the driver (iMXRT1062) repo checkout
         // that produced this firmware. Used to compare against the latest CI-built firmware for update checks.
         public static string DriverRef { get; private set; } = string.Empty;
+        // Firmware identity seen on the previous successful connection, for detecting a firmware change
+        // across connections/reboots (BuildStamp when present, else "<Version> <Identity>"). Set by the
+        // app at startup from persisted config (AppConfig.Settings.Base.LastFirmwareBuild); Get() below
+        // compares against it each connection and calls FirmwareChangedHook + a console message when
+        // it differs from a non-empty previous value, then persists the new one via PersistHook.
+        public static string LastKnownBuild { get; set; } = string.Empty;
+        public static Action<string, string> FirmwareChangedHook { get; set; }
+        public static Action<string> PersistHook { get; set; }
+        // Fired when a "[MSG:Restart after controller hang processing: <line>]" turns up (see the
+        // iMXRT1062 driver's hang watchdog) - the app wires this to a report-it dialog. Argument is the
+        // g-code line/command that was in flight when the controller hung, exactly as the firmware sent it.
+        public static Action<string> HangDetectedHook { get; set; }
+        private const string HangRestartPrefix = "[MSG:Restart after controller hang processing: ";
         public static string DriverSha { get; private set; } = string.Empty;
         public static string Options { get; private set; } = string.Empty;
         public static string NewOptions { get; private set; } = string.Empty;
@@ -1299,6 +1312,18 @@ namespace CNC.Core
 
             if (!Resources.IsLegacyController)
                 IsGrblHAL = IsGrblHAL || Firmware == "grblHAL";
+
+            if (IsLoaded)
+            {
+                string identity = !string.IsNullOrEmpty(BuildStamp) ? BuildStamp : string.Format("{0} {1}", Version, Identity);
+                if (!string.IsNullOrEmpty(LastKnownBuild) && LastKnownBuild != identity)
+                    FirmwareChangedHook?.Invoke(LastKnownBuild, identity);
+                if (LastKnownBuild != identity)
+                {
+                    LastKnownBuild = identity;
+                    PersistHook?.Invoke(identity);
+                }
+            }
 
             return res == true;
         }
@@ -1689,6 +1714,19 @@ namespace CNC.Core
                     case "CLUSTER":
                         LightBurnCluster = true;
                         SystemInfo.Add(data);
+                        break;
+
+                    case "MSG":
+                        // $I is queried at connect with model.Silent = true (the rest of this response
+                        // is boilerplate, not worth showing) - but a [MSG:...] line here is the
+                        // controller actively telling the user something (e.g. the hang-watchdog's
+                        // "Restart after controller hang processing: ..." - see the iMXRT1062 driver),
+                        // so surface it to the console regardless of Silent.
+                        SystemInfo.Add(data);
+                        if (Grbl.GrblViewModel != null)
+                            Grbl.GrblViewModel.ResponseLog.Add(data);
+                        if (data.StartsWith(HangRestartPrefix))
+                            HangDetectedHook?.Invoke(data.Substring(HangRestartPrefix.Length).TrimEnd(']'));
                         break;
 
                     default:

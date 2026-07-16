@@ -215,6 +215,12 @@ namespace GCode_Sender
             main.AttachSplash(splash);
             main.Show();   // shown with Opacity 0 / not in taskbar; Window_Load -> CompleteStartup runs unseen
 
+            // A hang-watchdog restart is discovered mid-connect (GrblInfo.Get(), on the connect thread),
+            // so defer the dialog to ApplicationIdle same as the crash-report prompt below.
+            CNC.Core.GrblInfo.HangDetectedHook = line =>
+                Dispatcher.BeginInvoke(new Action(() => HangWatchdogReporter.Report(main, line)),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
             // If a previous run crashed, offer to report it - deferred to ApplicationIdle so it appears
             // after the main window is up, not competing with the splash. Fires once (sentinel cleared).
             if (CrashReporter.HasPendingReport())

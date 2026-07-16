@@ -358,15 +358,18 @@ namespace GCode_Sender
         }
 
         // Auto-reconnect re-established the link (e.g. after a $REBOOT). Re-run the handshake so refreshed
-        // capabilities ($I: ATC, tool count, ...) replace the pre-reboot values. Mark init as pending; the
-        // GrblState handler re-runs InitSystem once the controller reports a non-Alarm state, and we also try
-        // immediately in case it comes back idle (no state change to trigger the handler).
+        // capabilities ($I: ATC, tool count, ...) replace the pre-reboot values. Runs immediately regardless
+        // of Alarm state - $I is explicitly Alarm-safe on the firmware side (build_info()'s own state guard
+        // allows STATE_ALARM), and a boot after any reset commonly lands in Alarm (homing required), which
+        // used to defer this until the GrblState handler below caught a later unlock - too late to surface
+        // e.g. a hang-watchdog restart notice (GrblInfo.HangDetectedHook) promptly. The GrblState handler
+        // still covers the case where InitSystem itself fails while stuck in Alarm (isBooted && initOK == false).
         private void OnReconnectInit()
         {
             initOK = false;
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
-                if (initOK == false && model.GrblState.State != GrblStates.Alarm)
+                if (initOK == false)
                     initOK = InitSystem();
             }), DispatcherPriority.ApplicationIdle);
         }

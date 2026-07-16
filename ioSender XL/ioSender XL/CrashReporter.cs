@@ -369,6 +369,7 @@ namespace GCode_Sender
             grid.Children.Add(preview);
             grid.Children.Add(buttons);
             win.Content = grid;
+            CNC.Controls.DialogScaling.Apply(win);
 
             try { win.ShowDialog(); } catch { }
             return send;
