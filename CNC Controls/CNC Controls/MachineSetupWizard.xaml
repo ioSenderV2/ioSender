@@ -346,8 +346,6 @@
                         <Button x:Uid="fxl_add" x:Name="btnFixtureAdd" Content="Add" Click="FixtureAdd_Click" Margin="0,0,0,4" MinHeight="26"/>
                         <Button x:Uid="fxl_edit" x:Name="btnFixtureEdit" Content="Edit" Click="FixtureEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                         <Button x:Uid="fxl_delete" x:Name="btnFixtureDelete" Content="Delete" Click="FixtureDelete_Click" Margin="0,0,0,10" MinHeight="26" IsEnabled="False"/>
-                        <Button x:Uid="fxl_setpos" x:Name="btnFixtureSetPosition" Content="Set position" Click="FixtureSetPosition_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"
-                                ToolTip="Store the current machine position as the selected fixture's reference start point."/>
                     </StackPanel>
                 </Grid>
             </TabItem>

@@ -936,7 +936,7 @@ namespace CNC.Controls
         private void Fixtures_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             bool sel = grdFixtures.SelectedItem is Fixture;
-            btnFixtureEdit.IsEnabled = btnFixtureDelete.IsEnabled = btnFixtureSetPosition.IsEnabled = sel;
+            btnFixtureEdit.IsEnabled = btnFixtureDelete.IsEnabled = sel;
         }
 
         private void Fixtures_DoubleClick(object sender, MouseButtonEventArgs e)
@@ -988,28 +988,6 @@ namespace CNC.Controls
                 Fixtures.Items.Remove(sel);
                 Fixtures.Save();
             }
-        }
-
-        // Captures the CURRENT machine position as the selected fixture's reference start point (the point
-        // the corner probe reads from - NOT a firmware G28 write, kept only in this fixture's own Coords).
-        // Also available inside the Add/Edit dialog itself, and from Start Job.
-        private void FixtureSetPosition_Click(object sender, RoutedEventArgs e)
-        {
-            var sel = grdFixtures.SelectedItem as Fixture;
-            if (sel == null)
-                return;
-
-            string coords = Fixtures.CurrentCoordsCsv(model);
-            if (coords == null)
-            {
-                if (model != null)
-                    model.Message = "Machine position unknown - home first to save a fixture position.";
-                return;
-            }
-
-            sel.Coords = coords;
-            Fixtures.Save();
-            grdFixtures.Items.Refresh();
         }
 
         // ---- Step 7: controller macros status ----

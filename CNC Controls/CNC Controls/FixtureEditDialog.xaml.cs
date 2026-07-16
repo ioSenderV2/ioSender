@@ -75,12 +75,18 @@ namespace CNC.Controls
                 : ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 
-        // Disable both position buttons while a vise corner probe is running (it moves the machine
-        // asynchronously - see RunViseCornerProbe) so a second click can't overlap it.
+        // Disable both position buttons AND OK while a vise corner probe is running (it moves the machine
+        // asynchronously - see RunViseCornerProbe) so a second click can't overlap it, and so OK/Enter can't
+        // close the dialog before the probe finishes. Closing mid-probe would copy the clone's STILL-STALE
+        // Coords back to the real fixture (EditSelectedFixture's sel.CopyFrom(edit)) - the probe's own eventual
+        // OnViseCornerProbeDone write lands on the now-discarded clone, so the fresh result is silently lost.
+        // Confirmed on real hardware: btnOk's IsDefault="True" let Enter (or an impatient click) close the
+        // dialog mid-probe, and Start Job then ran off the old stale corner with no visible error.
         private void SetBusy(bool busy)
         {
             _probing = busy;
             btnSetPosition.IsEnabled = !busy;
+            btnOk.IsEnabled = !busy;
             UpdateTestPositionEnabled();
         }
 
