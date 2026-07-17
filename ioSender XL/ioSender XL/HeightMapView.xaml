@@ -92,13 +92,18 @@
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Button x:Uid="hm_start" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
-                            IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"/>
+                            IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"
+                            ToolTip="Start probing the height map grid."/>
                     <Button x:Uid="hm_stop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
-                            IsEnabled="{Binding IsJobRunning}"/>
+                            IsEnabled="{Binding IsJobRunning}"
+                            ToolTip="Cancel the height map probing in progress."/>
                     <Button x:Uid="hm_apply" Content="Apply" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
-                            IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
-                    <Button x:Uid="hm_save" Content="Save" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Save_Click"/>
-                    <Button x:Uid="hm_load" Content="Load" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Load_Click"/>
+                            IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                            ToolTip="Rewrite the loaded program to follow the probed surface."/>
+                    <Button x:Uid="hm_save" Content="Save" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Save_Click"
+                            ToolTip="Save the height map to a file (.map) to reuse later."/>
+                    <Button x:Uid="hm_load" Content="Load" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Load_Click"
+                            ToolTip="Load a previously saved height map (.map) file."/>
                 </StackPanel>
             </StackPanel>
         </Grid>

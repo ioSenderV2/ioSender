@@ -186,9 +186,12 @@
                 IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
             />
             <StackPanel Orientation="Horizontal" Margin="0,5">
-                <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Padding="5,0" IsEnabled="{Binding Path=IsPredefined, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsNotPredefined}}" Margin="3,0" Click="btnCurrPos_Click"/>
-                <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Padding="5,0" IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnClearAll_Click"/>
-                <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Padding="5,0" Margin="3,0" Click="btnSetAll_Click"/>
+                <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Padding="5,0" IsEnabled="{Binding Path=IsPredefined, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsNotPredefined}}" Margin="3,0" Click="btnCurrPos_Click"
+                        ToolTip="Copy the current machine position into the fields above (not written to the controller yet)."/>
+                <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Padding="5,0" IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnClearAll_Click"
+                        ToolTip="Clear this work offset (set every axis to 0) on the controller."/>
+                <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Padding="5,0" Margin="3,0" Click="btnSetAll_Click"
+                        ToolTip="Write all axis fields above to this work offset on the controller."/>
             </StackPanel>
         </StackPanel>
     </Grid>

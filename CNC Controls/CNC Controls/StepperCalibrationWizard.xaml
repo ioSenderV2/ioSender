@@ -35,7 +35,8 @@
         <StackPanel Orientation="Vertical" Margin="0,5,0,0" MinWidth="360" HorizontalAlignment="Left" Grid.ColumnSpan="2">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_axis" x:Name="lblTool" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="70"/>
-                <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index" ItemsSource="{Binding Path=Axes}" SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="0,2">
+                <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index" ItemsSource="{Binding Path=Axes}" SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="0,2"
+                          ToolTip="Axis to calibrate. Resolution below is read from its current steps/mm setting.">
                     <ComboBox.IsEnabled>
                         <MultiBinding Converter="{StaticResource StateToBooleanConverter}">
                             <Binding Path="GrblState"/>
@@ -85,9 +86,11 @@
                 <local:NumericField x:Uid="fld_resolution" Label="Resolution:" IsReadOnly="True" Format="###0.000###"
                     Value="{Binding Resolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}"
                     Unit="{Binding ResolutionUnit, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}"/>
-                <Button x:Uid="btn_update" Content="Save" Tag="save" Focusable="False" IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Right" Margin="3,0" VerticalAlignment="Center" MinWidth="50" Click="Button_Click"/>
+                <Button x:Uid="btn_update" Content="Save" Tag="save" Focusable="False" IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Right" Margin="3,0" VerticalAlignment="Center" MinWidth="50" Click="Button_Click"
+                        ToolTip="Write the resolution above to the axis' steps/mm setting."/>
             </StackPanel>
-            <Button x:Uid="btn_stop" Tag="stop" Content="Stop" HorizontalAlignment="Right" Margin="0,5,60,0" MinWidth="75" Click="Button_Click">
+            <Button x:Uid="btn_stop" Tag="stop" Content="Stop" HorizontalAlignment="Right" Margin="0,5,60,0" MinWidth="75" Click="Button_Click"
+                    ToolTip="Stop the axis while it is moving.">
                 <Button.IsEnabled>
                     <MultiBinding Converter="{StaticResource StateToBooleanConverter}">
                         <Binding Path="GrblState"/>

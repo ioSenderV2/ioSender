@@ -64,12 +64,14 @@
         </DataGrid>
 
         <StackPanel Grid.Row="0" Grid.Column="1" MinWidth="92" Margin="8,0,0,0">
-            <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"/>
+            <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"
+                    ToolTip="Create a new macro and open it for editing."/>
             <Button x:Name="btnView" x:Uid="btn_macroView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
                     ToolTip="Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."/>
             <Button x:Name="btnEdit" x:Uid="btn_macroEdit" Content="Edit" Click="btnEdit_Click" Style="{StaticResource SideButton}"
                     ToolTip="Edit the macro's definition - the inline G-code, or the @&lt;path&gt; reference line (to change or remove the path). Saved changes are read back."/>
-            <Button x:Name="btnDelete" x:Uid="btn_macroDelete" Content="Delete" Click="btnDelete_Click" Style="{StaticResource SideButton}"/>
+            <Button x:Name="btnDelete" x:Uid="btn_macroDelete" Content="Delete" Click="btnDelete_Click" Style="{StaticResource SideButton}"
+                    ToolTip="Delete the selected macro. This does not delete a referenced @&lt;path&gt; file."/>
         </StackPanel>
 
     </Grid>

@@ -26,7 +26,8 @@
                 <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
                           ItemsSource="{Binding Path=CalAxes, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                           SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                          HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="2"/>
+                          HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="2"
+                          ToolTip="Axis to calibrate. Current steps/mm below is read from its existing setting."/>
             </StackPanel>
             <local:NumericField x:Uid="fld_sccurrent" Label="Current steps/mm:" ColonAt="120" IsReadOnly="True" Format="###0.000###"
                 Value="{Binding CurrentResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="steps/mm"/>
@@ -71,9 +72,11 @@
         </ScrollViewer>
         <!-- Generate / Save pinned at the bottom of the input column (Cycle Start runs the generated program) -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8,5,6" HorizontalAlignment="Right">
-            <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+            <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"
+                    ToolTip="Generate the scratch test program from the settings above and load it for Cycle Start to run."/>
             <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
-                    IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"/>
+                    IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"
+                    ToolTip="Write the steps/mm value implied by the row highlighted green to the axis' setting."/>
         </StackPanel>
         </Grid>
         <!-- Right: measurements grid (the generated program previews in the bottom Program View, not here) -->

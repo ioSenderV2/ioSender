@@ -1143,3 +1143,149 @@ CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simToolsetter:Sy
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fwVersion:System.Windows.Controls.TextBlock.Text,Text,True,True,,Not connected.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_checkFwUpdate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Check for firmware update
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_updateFirmware:System.Windows.Controls.ContentControl.Content,Button,True,True,,Update firmware…
+CNC.Controls.WPF.g.en-US.resources:toolview.baml,btn_currPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the current machine position into the fields above (not written to the controller yet).
+CNC.Controls.WPF.g.en-US.resources:toolview.baml,btn_clear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear this tool's offsets (set X/Y/Z/tip radius to 0) on the controller.
+CNC.Controls.WPF.g.en-US.resources:toolview.baml,btn_setAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write all axis fields above to this tool's offset on the controller.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_overview:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Read this first: what each setup step below configures.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_machine:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Pick your machine's make/product/model (or Custom) to pre-fill typical values.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_home:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set the corner your machine homes to.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_axis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Set travel, max rate and steps/mm for each axis."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_homing:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Configure limit switches, homing and soft limits."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_probes:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_fixtures:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Define named workholding fixtures (vise, fence, etc.) used by Start Job."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_macros:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Install and manage controller-side macros (tool-change, corner probe)."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_simulator:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Build a grblHAL simulator matching this machine's configuration.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_basicConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grbl/grblHAL settings ($$) - core controller configuration.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_appConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,ioSender application settings.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_joggingConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Configure jog speeds, distances, and keyboard/controller jogging behavior."
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_gcodeConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,G-code interpreter and program-handling settings.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_keysConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Map keyboard shortcuts and game controller/joystick buttons.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_macrosConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Manage user-defined macros available from the Macro toolbar.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_mainPageConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Customize which panels appear on the main page.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Configure and build the bundled grblHAL simulator.
+CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,grp_dro:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.
+CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,btn_zeroAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set the work coordinate to 0 on all axes at the current position.
+CNC.Controls.WPF.g.en-US.resources:drobasecontrol.baml,btnZero:System.Windows.Controls.ContentControl.Content,Button,True,True,,0
+CNC.Controls.WPF.g.en-US.resources:drobasecontrol.baml,btnZero:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set the work coordinate to 0 on this axis at the current position.
+CNC.Controls.WPF.g.en-US.resources:jogcontrol.baml,grp_uijog:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Move the machine along each axis. Pick a step distance/feed preset, or hold for continuous jog."
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,grp_spindle:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Control the spindle: set RPM, turn it on/off and choose direction, and adjust the RPM override."
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,cbxSpindle:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Select which spindle these controls apply to (multi-spindle configurations only).
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_off:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn the spindle off.
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_cw:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the spindle clockwise (M3).
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_ccw:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the spindle counter-clockwise (M4).
+CNC.Controls.WPF.g.en-US.resources:coolantcontrol.baml,grp_coolant:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn coolant and fan outputs on or off.
+CNC.Controls.WPF.g.en-US.resources:coolantcontrol.baml,lbl_flood:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn flood coolant on or off.
+CNC.Controls.WPF.g.en-US.resources:coolantcontrol.baml,lbl_mist:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn mist coolant on or off.
+CNC.Controls.WPF.g.en-US.resources:coolantcontrol.baml,lbl_fan:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn the auxiliary fan output on or off.
+CNC.Controls.WPF.g.en-US.resources:feedcontrol.baml,grp_feedrate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Current feed rate, plus feed and rapid override sliders."
+CNC.Controls.WPF.g.en-US.resources:mdicontrol.baml,grp_mdi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Manual Data Input - type a G-code command and press Enter or Send to run it directly on the controller.
+CNC.Controls.WPF.g.en-US.resources:mdicontrol.baml,cbo_mdi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Enter a G-code command (MDI block) and press Enter or Send to run it on the controller. Use Up/Down to recall recent commands.
+CNC.Controls.WPF.g.en-US.resources:mdicontrol.baml,btn_send:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Send the entered G-code command to the controller.
+CNC.Controls.WPF.g.en-US.resources:overridecontrol.baml,sldOverride:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Drag to change the override percentage.
+CNC.Controls.WPF.g.en-US.resources:overridecontrol.baml,btnOvReset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\reset.png
+CNC.Controls.WPF.g.en-US.resources:overridecontrol.baml,btnOvReset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reset the override to 100%.
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_D:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Back-left corner (D).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_CD:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Middle of the back edge (C-D).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_C:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Back-right corner (C).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_AD:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Middle of the left edge (A-D).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_Center:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Center.
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_CB:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Middle of the right edge (C-B).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_A:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Front-left corner (A).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_AB:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Middle of the front edge (A-B).
+CNC.Controls.WPF.g.en-US.resources:origincontrol.baml,rb_corner_B:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Front-right corner (B).
+CNC.Controls.WPF.g.en-US.resources:offsetview.baml,btn_currPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the current machine position into the fields above (not written to the controller yet).
+CNC.Controls.WPF.g.en-US.resources:offsetview.baml,btn_clear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear this work offset (set every axis to 0) on the controller.
+CNC.Controls.WPF.g.en-US.resources:offsetview.baml,btn_setAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write all axis fields above to this work offset on the controller.
+CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_errors:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Look up what each Grbl/grblHAL error code means.
+CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_alarms:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Look up what each Grbl/grblHAL alarm code means.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,lbl_websocket:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Connect over WebSocket instead of a plain TCP socket - use this only if your controller's network stack requires it (most grblHAL network builds use plain TCP).
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,fld_netPort:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,TCP/WebSocket port to connect to. Must match the port configured in the controller's network settings.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,cbxHost:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Type an IP address or hostname to connect to, or pick one discovered by Scan network."
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_scanNetwork:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Scan the local network for grblHAL controllers and list them above.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asgen:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Generate the auto-square test program from the settings above and load it for Cycle Start to run.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asapply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the offset above to the squaring setting.
+CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_ashome:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Re-home the machine so the newly applied offset takes effect.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,cbxAxis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Axis to calibrate. Current steps/mm below is read from its existing setting.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,btn_scgen:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Generate the scratch test program from the settings above and load it for Cycle Start to run.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,btn_scsave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the steps/mm value implied by the row highlighted green to the axis' setting.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,cbxAxis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Axis to calibrate. Resolution below is read from its current steps/mm setting.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,btn_update:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the resolution above to the axis' steps/mm setting.
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,btn_stop:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Stop the axis while it is moving.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisX:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,X
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the X axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisY:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Y
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the Y axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisZ:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Z
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisZ:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the Z axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisA:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,A
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisA:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the A axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisB:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,B
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisB:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the B axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisC:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,C
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,tmc_axisC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show and tune the C axis stepper driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,lbl_configure:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Store the slider's stallGuard threshold to the selected axis' driver.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,lbl_stallGuardEnable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Filter the SG_RESULT reading for a steadier load signal at the cost of slower response.
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,btn_getStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Print the selected axis driver's registers (temperature, current, fault flags) above."
+CNC.Controls.WPF.g.en-US.resources:trinamicview.baml,btn_getStatusAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Print status registers for every enabled axis' driver above.
+CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Capture a log burst from the controller and plot Target, Actual and Error."
+CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,sldError:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Scale the Error trace to make small deviations easier to see.
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simProbe:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Include a touch-probe input, needed for tool-length and workpiece probing."
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simToolsetter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Include a separate toolsetter probe input, used for automatic tool-length measurement."
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simRotation:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Build with support for the WCSROT plugin (rotating the active work coordinate system).
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simLatheUvw:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Build with lathe mode enabled, adding the U/V/W axis words."
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simSafetyDoor:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Include a safety door input that pauses the job when opened.
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simEStop:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Include a dedicated emergency-stop input.
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simYGanged:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Build with a second motor driving the Y axis (dual gantry motors).
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simBuild:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Dispatch a GitHub Actions build of the simulator with the options above and install the result.
+CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,btn_simOpenFolder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the folder containing the installed simulator executable.
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_clear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear the console output above.
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_verbose:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Log every command sent and response received, not just errors and alarms."
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_filterRT:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Hide the frequent realtime status reports (?) to keep the log readable.
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_showAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Log every realtime status report instead of only ones that changed.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_sendToController:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Send the selected lines directly to the controller, bypassing the normal streamer queue."
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_startFromHere:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the program starting at the selected line.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_copyToMDI:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the selected line's g-code to the MDI input.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_ToggleBreak:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Toggle a breakpoint on the selected line to pause the job when it is reached.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Save the currently loaded program to a file.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_startFromToolpath:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the program starting at the first line of this toolpath.
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_runOneToolpath:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Run only the lines belonging to this toolpath, then stop."
+CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Save the currently loaded program to a file.
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_add:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a new probe definition.
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_edit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit the selected probe definition.
+CNC.Controls.WPF.g.en-US.resources:probedefinitionsdialog.baml,pdl_delete:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Delete the selected probe definition.
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_gotoG28:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move to the G28 pre-defined position (the firmware's first home-return slot).
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_gotoG30:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move to the G30 pre-defined position (the firmware's second home-return slot).
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_goto:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Move to the origin of the selected work coordinate system.
+CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,btn_go:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run the outline trace at the feed rate above - ensure the tool tip is clear of any obstructions first.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,chk_macroPrompt:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask for confirmation before running this macro.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,cbo_macroKey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Function key that runs this macro when no job is running. Each key can be assigned to only one macro.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroCreate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Create
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroCreate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create a new macro and open it for editing.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroView:System.Windows.Controls.ContentControl.Content,Button,True,True,,View
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroEdit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroEdit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Edit the macro's definition - the inline G-code, or the @&lt;path&gt; reference line (to change or remove the path). Saved changes are read back."
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroDelete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroDelete:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Delete the selected macro. This does not delete a referenced @&lt;path&gt; file.
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,cbxMacro:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Select a macro to edit, or type a new name and click Add to create one."
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a new macro with the name typed above.
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,chk_confirm:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ask for confirmation each time this macro is run, instead of running it immediately."
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,chk_viewAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Show only g-code files, hiding other files stored on the card."
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_create:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Create
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createNew:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_New content...
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createNew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create a new file: opens Notepad; the file is written to the controller when you close it.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createUpload:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,From _file...
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_createUpload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create from an existing local file (upload).
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_view:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_View
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_view:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open a copy of the file in Notepad (changes are not saved back).
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_edit:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Edit
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_edit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Edit the file in Notepad; saved back to the controller when you close Notepad.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_load:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Load
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_load:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_loadRun:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load and _run
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_loadRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load the program into ioSender and start it.
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_copyTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Cop_y to
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_moveTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Move to
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Install or update the controller-side macros (tc, pcorner) on the controller's LittleFS - required for the Start Job / automatic tool-change sequence."
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btn_upload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Upload a local file to the controller's storage.

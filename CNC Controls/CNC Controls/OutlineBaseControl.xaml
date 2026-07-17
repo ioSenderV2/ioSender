@@ -27,6 +27,6 @@
             <Run x:Uid="txt_line2" Text="Ensure tool tip is clear of any obstructions!" Foreground="Red" FontWeight="Bold"/>
         </TextBlock>
         <local:NumericField x:Uid="lbl_feedrate" Label="Feed rate:" Value="{Binding Path=FeedRate, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=UserControl}}" Unit="{Binding Path=FeedrateUnit, Mode=OneWay}" Format="###0" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Left" Margin="5,5,0,5" VerticalAlignment="Top"/>
-        <Button x:Uid="btn_go" Content="Go" IsEnabled="{Binding Path=IsFileLoaded}" Grid.Row="1" Grid.Column="1" MinWidth="50" HorizontalAlignment="Right" Margin="0,5,8,5" VerticalAlignment="Top" Click="button_Go" />
+        <Button x:Uid="btn_go" Content="Go" IsEnabled="{Binding Path=IsFileLoaded}" Grid.Row="1" Grid.Column="1" MinWidth="50" HorizontalAlignment="Right" Margin="0,5,8,5" VerticalAlignment="Top" Click="button_Go" ToolTip="Run the outline trace at the feed rate above - ensure the tool tip is clear of any obstructions first."/>
     </Grid>
 </UserControl>
