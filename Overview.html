@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>130 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>131 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -316,6 +316,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Message boxes are now the app's own scaled window instead of the native OS dialog, so they read on a high-DPI display at whatever zoom Ctrl+Alt+Plus/Minus is set to.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr127">127</a></td></tr>
 <tr><td>Tooltip text now scales with UiScale zoom instead of staying fixed-size, unreadably small at high zoom.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr129">129</a></td></tr>
 <tr><td>-simulator connects to the bundled simulator on startup, launching it first if needed - joins the existing -port/-baud flags for serial/network.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr130">130</a></td></tr>
+<tr><td>ToolTips added to SpindleControl, Goto/Outline action buttons, the Macro Manager/Editor dialogs, and PortDialog's network connection settings.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr131">131</a></td></tr>
 </table>
 </div>
 
@@ -451,7 +452,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">128</td><td><a href="#pr128">Analog joystick jog was jerky under continuous hold - moved off the UI thread</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+52</span> <span class="del">-13</span></td></tr>
 <tr><td class="n">129</td><td><a href="#pr129">Tooltips now scale with the app's UiScale zoom</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+15</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">130</td><td><a href="#pr130">New -simulator command-line flag to auto-connect to the bundled simulator on startup</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+33</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (130 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1145</span> <span class="del">13</span> <span class="add">+158</span><br><span class="k">Lines:</span> <span class="add">+50514</span> <span class="del">-9080</span></td></tr>
+<tr><td class="n">131</td><td><a href="#pr131">Medium-priority tooltips (spindle, goto/outline, macros, network)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+177</span> <span class="del">-16</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (131 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1158</span> <span class="del">13</span> <span class="add">+158</span><br><span class="k">Lines:</span> <span class="add">+50691</span> <span class="del">-9096</span></td></tr>
 </table>
 </div>
 
@@ -2827,6 +2829,21 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">33</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>Serial and network already had a scriptable startup path via the existing <code>-port</code>/<code>-baud</code> flags (e.g. <code>-port COM3 -baud 115200</code>, <code>-port 192.168.1.50:23</code>) - both wired straight into the same startup connect path the Connect dialog uses, bypassing it entirely. The bundled simulator had no equivalent: a raw <code>-port 127.0.0.1:23</code> would only work if the simulator process happened to already be running, since launching it first requires setting <code>Base.StartSimulator</code> and the simulator exe/args - fields only the Connect dialog's Simulator tab populated.</p><ul><li><strong>New <code>-simulator</code> flag</strong> - rewrites the startup target to <code>127.0.0.1:&lt;port&gt;</code> and marks it as a simulator connection (the same fields the Connect dialog's Simulator tab sets), so the existing <code>EnsureSimulatorRunning</code> launches the bundled sim before connecting, exactly mirroring a manual Simulator-tab connect. Reuses the last simulator port if the saved target was itself already a simulator connection, otherwise defaults to 23 (the Connect dialog's own default).</li><li><strong>Graceful no-op if nothing's built yet</strong> - shows a message and falls through to the normal startup path instead of trying to connect to a nonexistent exe, if nothing has been built to <code>%AppData%\Simulator</code> yet (same precondition the Connect dialog's Simulator tab already enforces).</li></ul><p class="foot">Verified end-to-end: <code>build.ps1 -Launch -simulator</code> launched the bundled simulator and connected automatically with no dialog, confirmed via the console log's boot banner + handshake.</p></div>
+</div>
+<!-- ===== #131 ===== -->
+<div class="pr">
+<h2 id="pr131"><span class="badge">#131</span>Medium-priority tooltips: spindle, goto/outline, macro dialogs, network connection settings</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SpindleControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GotoBaseControl.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OutlineBaseControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroManagerDialog.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroEditor.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml</td><td class="num add">5</td><td class="num del">4</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">160</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Fills in the next tier of secondary controls left without hover guidance: the spindle direction radio buttons, the Goto/Outline action buttons, the Macro Manager/Macro Editor dialogs, and PortDialog's network tab (WebSocket, port, host, Scan network) - the last of these connection-critical settings had no guidance at all.</p><ul><li><strong>SpindleControl, GotoBaseControl, OutlineBaseControl, MacroManagerDialog, MacroEditor</strong> - added <code>ToolTip</code> to each control listed above; none of these five files had ever been registered with <code>tools/locadd.py</code>, so they were also missing rows for their <em>existing</em> ToolTips (e.g. Macro Manager's View/Edit/Prompt/Key column tooltips) - backfilled along with the new ones.</li><li><strong>PortDialog.xaml</strong> - added a <code>x:Uid</code> to the network-port <code>NumericTextBox</code> (previously un-addressable) and tooltips to the WebSocket checkbox, port field, host combo, and Scan network button.</li></ul><p class="foot">Verified: Debug build clean; test-server run confirmed all Goto/Outline/Spindle controls realize on the main window, and the PortDialog Network tab (WebSocket/Port/IP address/Scan network) renders correctly via <code>/screenshot/dlg_connection</code>. <code>tools/locadd.py</code> backfilled 160 rows across all 7 locale CSVs and is idempotent on a second run.</p></div>
 </div>
 </section>
 
