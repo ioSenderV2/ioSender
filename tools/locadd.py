@@ -73,6 +73,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/OutlineBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MacroManagerDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MacroEditor.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/SDCardView.xaml', 'CNC.Controls.WPF'),
 
     # CNC.Controls.Probing (the probing tab library - redesign + Start Job probing control)
     ('CNC Controls Probing/CNC Controls Probing/StartJobControl.xaml', 'CNC.Controls.Probing'),

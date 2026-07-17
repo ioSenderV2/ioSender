@@ -36,34 +36,34 @@
             </ComboBox>
 
             <Label x:Uid="lbl_simProbe" Grid.Row="1" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simProbe" x:Name="chkProbe" Grid.Row="1" Grid.Column="1" Content="Probe input" IsChecked="True" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simProbe" x:Name="chkProbe" Grid.Row="1" Grid.Column="1" Content="Probe input" IsChecked="True" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate probe input signal."/>
 
             <Label x:Uid="lbl_simToolsetter" Grid.Row="2" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simToolsetter" x:Name="chkToolsetter" Grid.Row="2" Grid.Column="1" Content="Toolsetter probe input" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simToolsetter" x:Name="chkToolsetter" Grid.Row="2" Grid.Column="1" Content="Toolsetter probe input" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate tool-setter input signal."/>
 
             <Label x:Uid="lbl_simRotation" Grid.Row="3" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simRotation" x:Name="chkRotation" Grid.Row="3" Grid.Column="1" Content="Coordinate-system rotation (WCSROT)" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simRotation" x:Name="chkRotation" Grid.Row="3" Grid.Column="1" Content="Coordinate-system rotation (WCSROT)" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate rotational axis support."/>
 
             <Label x:Uid="lbl_simLatheUvw" Grid.Row="4" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simLatheUvw" x:Name="chkLatheUvw" Grid.Row="4" Grid.Column="1" Content="Lathe U/V/W words" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simLatheUvw" x:Name="chkLatheUvw" Grid.Row="4" Grid.Column="1" Content="Lathe U/V/W words" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate lathe UVW axis mapping."/>
 
             <Label x:Uid="lbl_simSafetyDoor" Grid.Row="5" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simSafetyDoor" x:Name="chkSafetyDoor" Grid.Row="5" Grid.Column="1" Content="Safety door input" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simSafetyDoor" x:Name="chkSafetyDoor" Grid.Row="5" Grid.Column="1" Content="Safety door input" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate safety door input signal."/>
 
             <Label x:Uid="lbl_simEStop" Grid.Row="6" Grid.Column="0" Content="" Margin="0,0,8,4"/>
-            <CheckBox x:Uid="chk_simEStop" x:Name="chkEStop" Grid.Row="6" Grid.Column="1" Content="E-stop input" VerticalAlignment="Center" Margin="0,0,0,4"/>
+            <CheckBox x:Uid="chk_simEStop" x:Name="chkEStop" Grid.Row="6" Grid.Column="1" Content="E-stop input" VerticalAlignment="Center" Margin="0,0,0,4" ToolTip="Simulate emergency stop input signal."/>
 
             <Label x:Uid="lbl_simYGanged" Grid.Row="7" Grid.Column="0" Content="" Margin="0,0,8,0"/>
             <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal">
-                <CheckBox x:Uid="chk_simYGanged" x:Name="chkYGanged" Content="Ganged Y axis (dual motor)" VerticalAlignment="Center"/>
+                <CheckBox x:Uid="chk_simYGanged" x:Name="chkYGanged" Content="Ganged Y axis (dual motor)" VerticalAlignment="Center" ToolTip="Simulate Y-axis ganged/dual-motor configuration."/>
                 <CheckBox x:Uid="chk_simYAutoSquare" x:Name="chkYAutoSquare" Content="Auto-square" VerticalAlignment="Center" Margin="16,0,0,0"
                           ToolTip="Implies Ganged Y axis - checking this alone still enables it."/>
             </StackPanel>
         </Grid>
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"/>
-            <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click"/>
+            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click" ToolTip="Rebuild the simulator with the selected configuration."/>
+            <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click" ToolTip="Open the simulator build folder in Explorer."/>
         </StackPanel>
 
         <TextBlock x:Uid="txt_simStatus" x:Name="txtStatus" TextWrapping="Wrap" Margin="0,10,0,0" Opacity="0.85"/>

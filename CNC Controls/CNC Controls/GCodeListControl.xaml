@@ -40,12 +40,12 @@
         </DataGrid.Columns>
         <DataGrid.ContextMenu>
             <ContextMenu x:Name="ctxMenu" Opened="ctxMenu_Opened">
-                <MenuItem x:Uid="mnu_sendToController" Header="Send to controller" IsEnabled="{Binding Path=MultipleSelected}" Click="SendController_Click" />
-                <MenuItem x:Uid="mnu_startFromHere" Header="Start from here" IsEnabled="{Binding Path=SingleSelected}" Click="StartHere_Click" />
-                <MenuItem x:Uid="mnu_copyToMDI" Header="Copy to MDI" IsEnabled="{Binding Path=SingleSelected}" Click="CopyMDI_Click" />
-				<MenuItem x:Uid="mnu_ToggleBreak" Header="Toggle Break" IsEnabled="{Binding Path=SingleSelected}" Click="ToggleBreak_Click" />
+                <MenuItem x:Uid="mnu_sendToController" Header="Send to controller" IsEnabled="{Binding Path=MultipleSelected}" Click="SendController_Click" ToolTip="Send the selected G-code line to the controller." />
+                <MenuItem x:Uid="mnu_startFromHere" Header="Start from here" IsEnabled="{Binding Path=SingleSelected}" Click="StartHere_Click" ToolTip="Start job execution from the selected line." />
+                <MenuItem x:Uid="mnu_copyToMDI" Header="Copy to MDI" IsEnabled="{Binding Path=SingleSelected}" Click="CopyMDI_Click" ToolTip="Copy the selected line to the MDI command entry." />
+				<MenuItem x:Uid="mnu_ToggleBreak" Header="Toggle Break" IsEnabled="{Binding Path=SingleSelected}" Click="ToggleBreak_Click" ToolTip="Toggle breakpoint on the selected line (pause execution here)." />
                 <Separator/>
-                <MenuItem x:Uid="mnu_saveProgram" x:Name="mnuSaveProgram" Header="Save program..." Click="SaveProgram_Click" />
+                <MenuItem x:Uid="mnu_saveProgram" x:Name="mnuSaveProgram" Header="Save program..." Click="SaveProgram_Click" ToolTip="Save the current G-code program to a file." />
                 <MenuItem x:Uid="mnu_transformCtx" x:Name="mnuTransform" Header="Transform" />
 			</ContextMenu>
         </DataGrid.ContextMenu>
@@ -67,10 +67,10 @@
                                             <DockPanel HorizontalAlignment="Stretch" Background="Transparent">
                                                 <DockPanel.ContextMenu>
                                                     <ContextMenu>
-                                                        <MenuItem x:Uid="mnu_startFromToolpath" Header="Start from this toolpath" Click="StartSection_Click"/>
-                                                        <MenuItem x:Uid="mnu_runOneToolpath" Header="Run just this toolpath" Click="RunSection_Click"/>
+                                                        <MenuItem x:Uid="mnu_startFromToolpath" Header="Start from this toolpath" Click="StartSection_Click" ToolTip="Start from the beginning of the selected toolpath."/>
+                                                        <MenuItem x:Uid="mnu_runOneToolpath" Header="Run just this toolpath" Click="RunSection_Click" ToolTip="Run only the selected toolpath, then stop."/>
                                                         <Separator/>
-                                                        <MenuItem x:Uid="mnu_saveProgramGrp" Header="Save program..." Click="SaveProgram_Click"/>
+                                                        <MenuItem x:Uid="mnu_saveProgramGrp" Header="Save program..." Click="SaveProgram_Click" ToolTip="Save program options."/>
                                                     </ContextMenu>
                                                 </DockPanel.ContextMenu>
                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" Margin="2,0,0,0"/>
