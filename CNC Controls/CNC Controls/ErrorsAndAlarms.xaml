@@ -7,10 +7,10 @@
         mc:Ignorable="d"
         x:Uid="wnd_errorsAndAlarms" Title="Controller error and alarm codes" Height="500" Width="750" MinHeight="100" MinWidth="150" Icon="App.ico">
     <TabControl>
-        <TabItem x:Uid="tab_errors" Header="Error codes">
+        <TabItem x:Uid="tab_errors" Header="Error codes" ToolTip="Grbl error code reference.">
             <local:GrblErrorList/>
         </TabItem>
-        <TabItem x:Uid="tab_alarms" Header="Alarm codes">
+        <TabItem x:Uid="tab_alarms" Header="Alarm codes" ToolTip="Grbl alarm code reference.">
             <local:GrblAlarmList/>
         </TabItem>
     </TabControl>

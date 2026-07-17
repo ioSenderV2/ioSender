@@ -83,28 +83,28 @@
             </DockPanel>
         </StackPanel>
         <local:StretchTabControl x:Name="tabConfig" PersistKey="Settings" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
-            <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl">
+            <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl" ToolTip="General application settings and UI preferences.">
                 <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </TabItem>
-            <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App">
+            <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App" ToolTip="Advanced application configuration options.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="pnlApp" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
-            <TabItem x:Uid="tab_joggingConfig" x:Name="tabJogging" Header="Jogging">
+            <TabItem x:Uid="tab_joggingConfig" x:Name="tabJogging" Header="Jogging" ToolTip="Configure jog speeds, distances, and keyboard/controller jogging behavior.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="pnlJogging" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
-            <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code">
+            <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code" ToolTip="G-code parser and execution settings.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
-            <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller"/>
-            <TabItem x:Uid="tab_macrosConfig" x:Name="tabMacros" Header="Macros"/>
-            <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page"/>
-            <TabItem x:Uid="tab_simulatorConfig" x:Name="tabSimulator" Header="Simulator">
+            <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller" ToolTip="Customize keyboard shortcuts and hotkeys."/>
+            <TabItem x:Uid="tab_macrosConfig" x:Name="tabMacros" Header="Macros" ToolTip="Manage user-defined macros available from the Macro toolbar."/>
+            <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page" ToolTip="Customize which panels are visible on the main Job tab."/>
+            <TabItem x:Uid="tab_simulatorConfig" x:Name="tabSimulator" Header="Simulator" ToolTip="Simulator connection and feature settings.">
                 <local:SimulatorConfigView x:Name="simConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </TabItem>
         </local:StretchTabControl>

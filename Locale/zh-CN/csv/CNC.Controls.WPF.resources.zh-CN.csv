@@ -1143,3 +1143,22 @@ CNC.Controls.WPF.g.en-US.resources:simulatorconfigview.baml,chk_simToolsetter:Sy
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fwVersion:System.Windows.Controls.TextBlock.Text,Text,True,True,,Not connected.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_checkFwUpdate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Check for firmware update
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_updateFirmware:System.Windows.Controls.ContentControl.Content,Button,True,True,,Update firmware…
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_overview:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Overview of the machine setup wizard steps.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_machine:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Configure basic machine settings and controller type.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_home:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Configure the machine's home position and homing sequence.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_axis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Configure axis direction, travel limits, and resolution."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_homing:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Fine-tune homing speeds, pulloff distance, and behavior."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_probes:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Define probe types and their physical dimensions.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_fixtures:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set up work fixtures and coordinate system origins.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_macros:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Define user macros for common operations.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_simulator:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Configure simulator features for testing without hardware.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_basicConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,General application settings and UI preferences.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_appConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Advanced application configuration options.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_joggingConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Configure jog speeds, distances, and keyboard/controller jogging behavior."
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_gcodeConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,G-code parser and execution settings.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_keysConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Customize keyboard shortcuts and hotkeys.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_macrosConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Manage user-defined macros available from the Macro toolbar.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_mainPageConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Customize which panels are visible on the main Job tab.
+CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Simulator connection and feature settings.
+CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_errors:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grbl error code reference.
+CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_alarms:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grbl alarm code reference.
