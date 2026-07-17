@@ -55,6 +55,10 @@ namespace GCode_Sender
                 // Every center tab is tearable: double-click its header to pop it into its own window,
                 // double-click that window's title bar to dock it back (CNC.Controls.TearableTab).
                 var tab = TearableTab.Attach(tabGCode, d.Label, ctl);
+                // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
+                // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
+                // server can address the center tabs by Uid and select one via its SelectionItem peer.
+                tab.Uid = "tab_" + node.Component;
                 if (node.Component == LayoutKeys.Toolpath3D)
                 {
                     tab3D = tab;

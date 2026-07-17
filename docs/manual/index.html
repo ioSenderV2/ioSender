@@ -553,7 +553,7 @@
            data-track="novice:3,intermediate:0,machinist:0" data-video="pending">
     <h2>Connecting to your machine <a class="anchor" href="#connect">#</a></h2>
     <div class="tags"><span class="tag nov">Novice</span></div>
-    <p>Open the connection dialog from <strong>File&nbsp;&rarr; Connect…</strong> (it reads
+    <p>Open the connection dialog from the <strong>Connect…</strong> menu (it reads
     <em>Reconnect…</em> once you're connected — choosing it drops the current link so you can switch
     targets). The dialog has three tabs:</p>
 
@@ -792,10 +792,12 @@
 
     <h3>Loading a program</h3>
     <ul>
-      <li><strong>File → Load</strong> — open a single g-code file (<code>.nc</code>, <code>.gcode</code>,
-      <code>.tap</code>…).</li>
-      <li><strong>File → Load Folder</strong> — open a whole folder of per-operation <code>.nc</code> files
-      (as a CAM post often produces) and combine them into one ordered program.</li>
+      <li><strong>Load File...</strong> — open a single g-code file (<code>.nc</code>, <code>.gcode</code>,
+      <code>.tap</code>…) using the button on the program-view header (or drag-and-drop a file onto the
+      list).</li>
+      <li><strong>Load Folder...</strong> — open a whole folder of per-operation <code>.nc</code> files
+      (as a CAM post often produces) and combine them into one ordered program, using the program-view
+      header button (or drag-and-drop a folder onto the list).</li>
     </ul>
     <p>Large files and folders load on a background thread, so the window stays responsive while a big program
     parses. In ioSender <em>a program is a program</em>: whether it came from a file, a folder, or a wizard,
@@ -831,8 +833,14 @@
     <a href="#gcode-viewer">3D viewer</a>.</p>
 
     <div class="callout tip"><span class="k">Transforms</span><br>
-      <strong>File → Transform</strong> can rotate the program, convert arcs to lines, add drag-knife moves and
-      more before you run — handy for fitting a job to your stock orientation.</div>
+      <strong>Right-click → Transform</strong> in the program list can rotate the program, convert arcs to
+      lines, add drag-knife moves and more before you run — handy for fitting a job to your stock
+      orientation.</div>
+
+    <div class="callout tip"><span class="k">Pop-out console</span><br>
+      Double-click the <strong>Console</strong> tab to pop it out into its own floating window — handy for
+      watching traffic on a second monitor while you work the Job screen. <kbd>Esc</kbd> still toggles the
+      console.</div>
 
     <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#gcode-viewer">3D viewer</a> · <a href="#clean-results">Clean results</a> · <a href="#sdcard">SD card</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
@@ -883,8 +891,8 @@
     <h2>Machine Setup — commissioning a new controller <a class="anchor" href="#machine-setup">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the six steps">
-      <figcaption>The Machine Setup overview and its six guided steps.</figcaption>
+      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the eight steps">
+      <figcaption>The Machine Setup overview and its eight guided steps.</figcaption>
     </figure>
     <p><strong>Machine Setup</strong> is a guided wizard that walks you through the settings a new machine
     needs before it can safely home and run — in plain-English steps instead of a wall of <code>$</code>
@@ -894,9 +902,9 @@
 
     <div class="callout note"><span class="k">The startup gate</span><br>
       If setup isn't finished, ioSender opens straight on the <em>first incomplete step</em> — so you can't
-      accidentally try to run a half-configured machine. Once all six steps are done, it stops nagging.</div>
+      accidentally try to run a half-configured machine. Once all eight steps are done, it stops nagging.</div>
 
-    <h3>The six steps</h3>
+    <h3>The eight steps</h3>
     <p>An <strong>Overview</strong> page lists them; each is a numbered tab you complete in order.</p>
     <table class="reftab">
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
@@ -905,13 +913,15 @@
       <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
       <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#start-job">Start Job</a> know what's available.</td><td>—</td></tr>
-      <tr><td><strong>6 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
+      <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#start-job">Start Job</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
+      <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
+      <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
 
     <h3>Why the order matters</h3>
     <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
     machine knows its <strong>travel</strong> and homing direction (steps 2–3); probing routines (step 5) need
-    the axes configured; and the macros (step 6) assume a working, homeable machine. Working top-to-bottom
+    the axes configured; and the macros (step 7) assume a working, homeable machine. Working top-to-bottom
     once gets you to a machine that homes, respects its own limits, and can probe.</p>
 
     <div class="callout warn"><span class="k">Have your facts ready</span><br>
@@ -1045,12 +1055,17 @@
       <tr><td><strong>Keyboard &amp; Controller</strong></td><td>Key mappings and game-controller bindings.</td></tr>
       <tr><td><strong>Macros</strong></td><td>Create and edit macros.</td></tr>
       <tr><td><strong>Main Page</strong></td><td>Configure the main-window layout.</td></tr>
+      <tr><td><strong>Simulator</strong></td><td>Build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>) — also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
     </table>
     <div class="callout tip"><span class="k">Grbl tab vs Machine Setup</span><br>
       <a href="#machine-setup">Machine Setup</a> is the <em>guided subset</em> that gets a new machine running;
       the <strong>Grbl</strong> tab here is the <em>full</em> list for fine-tuning. It also keeps
       <strong>backups / restore points</strong>, and the auto-save / prompt-on-save options control whether
       changes are written to the controller immediately or after confirmation.</div>
+
+    <div class="callout note"><span class="k">Camera is opt-in</span><br>
+      The Camera menu only appears once a device is bound: go to <strong>Settings → App → Camera</strong>,
+      pick a device from the dropdown and <strong>Connect</strong>.</div>
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#jogging">Jogging</a> · <a href="#lathe">Lathe</a></div>
   </section>
 
@@ -1074,7 +1089,7 @@
     </ul>
     <div class="callout tip"><span class="k">Also the home of controller macros</span><br>
       The controller-side macro set (e.g. <em>Install ATC macros</em>) lives on this storage too — the same
-      set <a href="#machine-setup">Machine Setup</a> step 6 installs.</div>
+      set <a href="#machine-setup">Machine Setup</a> step 7 installs.</div>
     <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
   </section>
 
