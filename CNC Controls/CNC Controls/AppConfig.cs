@@ -479,6 +479,7 @@ namespace CNC.Controls
         // while the connection is deferred so the window paints first).
         private bool _selectPort = false;
         private bool _forgetNetwork = false;   // -forgetnetwork: force the startup connect dialog, ignore the saved target
+        private bool _useSimulator = false;    // -simulator: connect to the bundled simulator, launching it first if needed
         private string _startupPort = string.Empty, _startupBaud = string.Empty;
 
         public string FileName { get; private set; }
@@ -1132,6 +1133,7 @@ namespace CNC.Controls
         {
             int status = 0;
             _selectPort = false;
+            _useSimulator = false;
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
 
@@ -1178,6 +1180,14 @@ namespace CNC.Controls
 
                     case "-selectport":
                         _selectPort = true;
+                        break;
+
+                    // Connect to the bundled simulator on startup instead of the saved target, launching it
+                    // first if it isn't already running - the command-line equivalent of the Connect dialog's
+                    // Simulator tab. Reuses -port/-baud's existing machinery (see the port-string rewrite
+                    // below, once Base is loaded) rather than inventing a separate connect syntax.
+                    case "-simulator":
+                        _useSimulator = true;
                         break;
 
                     // Testing/repro aid: ignore the saved connection target for this run and show the connection
@@ -1310,6 +1320,38 @@ namespace CNC.Controls
                 Save(CNC.Core.Resources.IniFile);
                 _migratedFormat = false;
                 DeleteFoldedInFiles();   // their data is now in App.config; drop the redundant standalone files
+            }
+
+            // -simulator: rewrite the startup target to 127.0.0.1:<port> and mark it as a simulator
+            // connection (same fields PersistSimulatorChoice sets from the Connect dialog's Simulator tab),
+            // so OpenConnection's EnsureSimulatorRunning launches the bundled sim before connecting. Reuses
+            // the last simulator port if the saved target was itself already a simulator connection;
+            // otherwise falls back to 23 (PortDialog's own default). No-op (with a message) if nothing has
+            // been built to %AppData%\Simulator yet - same precondition the Connect dialog's tab enforces.
+            if (_useSimulator)
+            {
+                if (!SimulatorManager.AppDataSimulatorPresent())
+                {
+                    AppDialogs.Show("No simulator has been built yet - build one in Settings > Simulator, then retry -simulator.",
+                        appname, MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    _useSimulator = false;
+                }
+                else
+                {
+                    int simPort = 23;
+                    if (Base.StartSimulator && !string.IsNullOrEmpty(Base.PortParams))
+                    {
+                        var parts = Base.PortParams.Split(':');
+                        int existing;
+                        if (parts.Length == 2 && int.TryParse(parts[1], out existing))
+                            simPort = existing;
+                    }
+
+                    Base.StartSimulator = true;
+                    Base.SimulatorExe = SimulatorManager.AppDataSimulatorExePath();
+                    Base.SimulatorArgs = "-p " + simPort;
+                    port = "127.0.0.1:" + simPort;
+                }
             }
 
             _startupPort = port;
