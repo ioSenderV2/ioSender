@@ -54,9 +54,12 @@
             <local:CoordValueSetControl x:Uid="lbl_zAxis" x:Name="cvZOffset" Label="Z axis:" Tag="Z" Value="{Binding Path=offset.Z, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Click="cvOffset_Click"/>
             <local:CoordValueSetControl x:Uid="lbl_tipRadius" x:Name="cvTipRadius" Label="Tip radius:" Tag="R" IsEnabled="False" Click="cvOffset_Click"/>
             <StackPanel Orientation="Horizontal" Margin="5,5">
-                <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Margin="3,0" Click="btnCurrPos_Click"/>
-                <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Click="btnClearAll_Click"/>
-                <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Margin="3,0" Click="btnSetAll_Click"/>
+                <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Margin="3,0" Click="btnCurrPos_Click"
+                        ToolTip="Copy the current machine position into the fields above (not written to the controller yet)."/>
+                <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Click="btnClearAll_Click"
+                        ToolTip="Clear this tool's offsets (set X/Y/Z/tip radius to 0) on the controller."/>
+                <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Margin="3,0" Click="btnSetAll_Click"
+                        ToolTip="Write all axis fields above to this tool's offset on the controller."/>
             </StackPanel>
             <TextBlock x:Uid="hlp_toolTableHdr" Text="About the tool table" FontWeight="SemiBold" Margin="5,18,0,2" MaxWidth="360" HorizontalAlignment="Left"/>
             <TextBlock x:Uid="hlp_toolTableBody" TextWrapping="Wrap" MaxWidth="360" HorizontalAlignment="Left" Margin="5,0,0,0"

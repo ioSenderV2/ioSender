@@ -83,10 +83,10 @@
             </DockPanel>
         </StackPanel>
         <local:StretchTabControl x:Name="tabConfig" PersistKey="Settings" DockPanel.Dock="Top" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged">
-            <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl" ToolTip="General application settings and UI preferences.">
+            <TabItem x:Uid="tab_basicConfig" x:Name="tabGrbl" Header="Grbl" ToolTip="Grbl/grblHAL settings ($$) - core controller configuration.">
                 <local:GrblConfigControl x:Name="basicConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </TabItem>
-            <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App" ToolTip="Advanced application configuration options.">
+            <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App" ToolTip="ioSender application settings.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="pnlApp" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
@@ -96,15 +96,15 @@
                     <WrapPanel x:Name="pnlJogging" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
-            <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code" ToolTip="G-code parser and execution settings.">
+            <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code" ToolTip="G-code interpreter and program-handling settings.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
                 </ScrollViewer>
             </TabItem>
-            <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller" ToolTip="Customize keyboard shortcuts and hotkeys."/>
+            <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller" ToolTip="Map keyboard shortcuts and game controller/joystick buttons."/>
             <TabItem x:Uid="tab_macrosConfig" x:Name="tabMacros" Header="Macros" ToolTip="Manage user-defined macros available from the Macro toolbar."/>
-            <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page" ToolTip="Customize which panels are visible on the main Job tab."/>
-            <TabItem x:Uid="tab_simulatorConfig" x:Name="tabSimulator" Header="Simulator" ToolTip="Simulator connection and feature settings.">
+            <TabItem x:Uid="tab_mainPageConfig" x:Name="tabMainPage" Header="Main Page" ToolTip="Customize which panels appear on the main page."/>
+            <TabItem x:Uid="tab_simulatorConfig" x:Name="tabSimulator" Header="Simulator" ToolTip="Configure and build the bundled grblHAL simulator.">
                 <local:SimulatorConfigView x:Name="simConfig" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </TabItem>
         </local:StretchTabControl>

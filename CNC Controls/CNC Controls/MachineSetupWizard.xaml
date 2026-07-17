@@ -59,7 +59,7 @@
         <local:StretchTabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
 
             <!-- Overview -->
-            <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Overview of the machine setup wizard steps.">
+            <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Read this first: what each setup step below configures.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
                         <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
@@ -78,7 +78,7 @@
             </TabItem>
 
             <!-- 1. Machine -->
-            <TabItem x:Uid="tabstep_machine" x:Name="tabStepMachine" ToolTip="Configure basic machine settings and controller type.">
+            <TabItem x:Uid="tabstep_machine" x:Name="tabStepMachine" ToolTip="Pick your machine's make/product/model (or Custom) to pre-fill typical values.">
                 <TabItem.Header><TextBlock x:Uid="step_machine" x:Name="hdrMachine" Text="1 · Machine"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -118,7 +118,7 @@
             </TabItem>
 
             <!-- 2. Home position -->
-            <TabItem x:Uid="tabstep_home" x:Name="tabStepHome" ToolTip="Configure the machine's home position and homing sequence.">
+            <TabItem x:Uid="tabstep_home" x:Name="tabStepHome" ToolTip="Set the corner your machine homes to.">
                 <TabItem.Header><TextBlock x:Uid="step_homePos" x:Name="hdrHome" Text="2 · Home position"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -146,7 +146,7 @@
             </TabItem>
 
             <!-- 3. Axis information -->
-            <TabItem x:Uid="tabstep_axis" x:Name="tabStepAxis" ToolTip="Configure axis direction, travel limits, and resolution.">
+            <TabItem x:Uid="tabstep_axis" x:Name="tabStepAxis" ToolTip="Set travel, max rate and steps/mm for each axis.">
                 <TabItem.Header><TextBlock x:Uid="step_axis" x:Name="hdrAxis" Text="3 · Axis information"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10">
@@ -210,7 +210,7 @@
             </TabItem>
 
             <!-- 4. Homing & limits -->
-            <TabItem x:Uid="tabstep_homing" x:Name="tabStepHoming" ToolTip="Fine-tune homing speeds, pulloff distance, and behavior.">
+            <TabItem x:Uid="tabstep_homing" x:Name="tabStepHoming" ToolTip="Configure limit switches, homing and soft limits.">
                 <TabItem.Header><TextBlock x:Uid="step_homing" x:Name="hdrHoming" Text="4 · Homing &amp; limits"/></TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="10">
@@ -282,7 +282,7 @@
             </TabItem>
 
             <!-- 5. Probe definitions (probes are machine hardware) -->
-            <TabItem x:Uid="tabstep_probes" x:Name="tabStepProbes" ToolTip="Define probe types and their physical dimensions.">
+            <TabItem x:Uid="tabstep_probes" x:Name="tabStepProbes" ToolTip="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets.">
                 <TabItem.Header><TextBlock x:Uid="step_probes" x:Name="hdrProbes" Text="5 · Probe definitions"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -318,7 +318,7 @@
             </TabItem>
 
             <!-- 6. Fixture definitions (the user's own named workholding fixtures - Start Job selects from these) -->
-            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Set up work fixtures and coordinate system origins.">
+            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Define named workholding fixtures (vise, fence, etc.) used by Start Job.">
                 <TabItem.Header><TextBlock x:Uid="step_fixtures" x:Name="hdrFixtures" Text="6 · Fixture definitions"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -351,7 +351,7 @@
             </TabItem>
 
             <!-- 7. Controller macros (ATC tool-change set + Load Stock corner probe) -->
-            <TabItem x:Uid="tabstep_macros" x:Name="tabStepMacros" ToolTip="Define user macros for common operations.">
+            <TabItem x:Uid="tabstep_macros" x:Name="tabStepMacros" ToolTip="Install and manage controller-side macros (tool-change, corner probe).">
                 <TabItem.Header><TextBlock x:Uid="step_ctrlMacros" x:Name="hdrMacros" Text="7 · Controller macros"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -399,7 +399,7 @@
             <!-- 8. Build a simulator matching this machine (optional, non-gating - like Fixtures). One button:
                  by now every option a simulator build needs is already known from this machine's own $I/$$,
                  so there's nothing left to pick. -->
-            <TabItem x:Uid="tabstep_simulator" x:Name="tabStepSimulator" ToolTip="Configure simulator features for testing without hardware.">
+            <TabItem x:Uid="tabstep_simulator" x:Name="tabStepSimulator" ToolTip="Build a grblHAL simulator matching this machine's configuration.">
                 <TabItem.Header><TextBlock x:Uid="step_simulator" x:Name="hdrSimulator" Text="8 · Build simulator"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>

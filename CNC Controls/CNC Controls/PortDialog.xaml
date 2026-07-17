@@ -1,4 +1,4 @@
-﻿<Window x:Class="CNC.Controls.PortDialog"
+<Window x:Class="CNC.Controls.PortDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -80,10 +80,12 @@
             </TabItem>
             <TabItem x:Uid="tab_network" x:Name="tabNetwork" Header="Network">
                 <StackPanel>
-                    <CheckBox x:Uid="lbl_websocket" Content="WebSocket" IsChecked="{Binding Path=IsWebSocket, Mode=TwoWay}" Margin="80,5,0,0" ToolTip="Use WebSocket protocol for network connection."/>
+                    <CheckBox x:Uid="lbl_websocket" Content="WebSocket" IsChecked="{Binding Path=IsWebSocket, Mode=TwoWay}" Margin="80,5,0,0"
+                              ToolTip="Connect over WebSocket instead of a plain TCP socket - use this only if your controller's network stack requires it (most grblHAL network builds use plain TCP)."/>
                     <StackPanel Orientation="Horizontal" Margin="0,5">
                         <Label x:Uid="lbl_netPort" Content="Port:" HorizontalAlignment="Left" HorizontalContentAlignment="Right" Width="80"/>
-                        <local:NumericTextBox x:Uid="fld_netPort" Style="{StaticResource PortErrorStyle}" Width="120" Format="####0" ToolTip="TCP port number for the network connection.">
+                        <local:NumericTextBox x:Uid="fld_netPort" Style="{StaticResource PortErrorStyle}" Width="120" Format="####0"
+                                              ToolTip="TCP/WebSocket port to connect to. Must match the port configured in the controller's network settings.">
                             <local:NumericTextBox.Value>
                                 <Binding Path="NetPort" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                     <Binding.ValidationRules>
@@ -102,7 +104,7 @@
                                   IsTextSearchEnabled="True" TextSearch.TextPath="Host"
                                   HorizontalAlignment="Left" VerticalAlignment="Center" MinHeight="24" Width="240"
                                   ItemsSource="{Binding DiscoveredHosts}" SelectionChanged="cbxHost_SelectionChanged"
-                                  ToolTip="IP address or hostname of the controller.">
+                                  ToolTip="Type an IP address or hostname to connect to, or pick one discovered by Scan network.">
                             <ComboBox.Text>
                                 <Binding Path="IpAddress" Mode="TwoWay" ValidatesOnNotifyDataErrors="True" ValidatesOnDataErrors="True" NotifyOnValidationError="True" UpdateSourceTrigger="PropertyChanged">
                                     <Binding.ValidationRules>
@@ -118,7 +120,8 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Top">
-                        <Button x:Uid="btn_scanNetwork" x:Name="btnScan" Content="Scan network" HorizontalAlignment="Left" Margin="80,0,0,0" MinWidth="120" MinHeight="23" Padding="8,2" Click="btnScan_Click" ToolTip="Scan the local network for available controllers."/>
+                        <Button x:Uid="btn_scanNetwork" x:Name="btnScan" Content="Scan network" HorizontalAlignment="Left" Margin="80,0,0,0" MinWidth="120" MinHeight="23" Padding="8,2" Click="btnScan_Click"
+                                ToolTip="Scan the local network for grblHAL controllers and list them above."/>
                         <TextBlock x:Name="scanStatus" VerticalAlignment="Center" Margin="10,0,0,0" Opacity="0.7"/>
                     </StackPanel>
                 </StackPanel>
