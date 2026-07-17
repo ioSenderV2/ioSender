@@ -14,6 +14,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Xml.Serialization;
 
 namespace CNC.Core
@@ -83,8 +84,12 @@ namespace CNC.Core
             service = controllerService;
             LoadDefaults();
             service.ButtonPressed += OnButtonPressed;
-            service.Polled += OnPolled;   // analog stick / trigger jogging
             service.Connected += (s, e) => service.Rumble(20000, 20000, 150);   // brief "found it" buzz
+
+            // Analog stick/trigger jogging runs on its own background thread rather than off the UI-thread
+            // ButtonService poll timer - see the comment above AnalogJogLoop for why.
+            analogThread = new Thread(AnalogJogLoop) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "AnalogJogPump" };
+            analogThread.Start();
         }
 
         public ControllerAction GetAction(XInputButton button)
@@ -380,10 +385,23 @@ namespace CNC.Core
         }
 
         // ---- analog stick / trigger jogging -----------------------------------------------------
+        //
+        // Runs on its own background thread (AnalogJogLoop), NOT off ControllerService's UI-thread
+        // DispatcherTimer. Keyboard's continuous jog is smooth because it sends ONE $J with an
+        // effectively-infinite distance and lets grblHAL run it until jog-cancel; analog jogging can't do
+        // that (direction/feed must track the stick continuously), so it re-sends a short $J segment
+        // every ~67ms and relies on each new segment landing before the previous one finishes so grblHAL
+        // blends them into continuous motion. On the UI thread, any dispatcher hitch (layout, rendering,
+        // other UI-bound work) can delay a tick past that window - the current segment then runs out,
+        // motion decelerates to a stop, and the next segment's arrival reads as a jerk. A dedicated
+        // background thread with its own sleep-based cadence isn't subject to that contention. Sends bypass
+        // GrblViewModel.ExecuteCommand (which touches ObservableCollections bound to the UI and isn't safe
+        // to call off the UI thread) in favour of Comms.com.WriteCommand directly - the same low-level path
+        // KeypressHandler.SendJogCommand already uses for keyboard jogging.
 
         private const short StickDeadzone = 7000;        // ~21% of full deflection
         private const byte TriggerDeadzone = 40;
-        private const int JogSendEveryNthPoll = 4;       // ~15 Hz at a 60 Hz poll
+        private const int AnalogSendIntervalMs = 67;      // ~15 Hz
         // Each send queues ~JogOverlap intervals of travel, so grbl always has 2-3 jog blocks to blend
         // into continuous motion. Jog-cancel on release flushes the queue, so this adds no overshoot
         // (only a small feed-change latency). Lower it if feed changes feel laggy; raise if it stutters.
@@ -397,21 +415,45 @@ namespace CNC.Core
         public int DeadzonePercent = 21;                 // left-stick deadzone, percent of full deflection
         public bool InvertX = false, InvertY = false, InvertZ = false;
 
-        private int pollCounter = 0;
+        private readonly Thread analogThread;
         private bool analogJogging = false;
 
+        private void AnalogJogLoop()
+        {
+            while (true)
+            {
+                try
+                {
+                    AnalogJogTick();
+                }
+                catch
+                {
+                    // never let a stray exception take down this background thread
+                }
+                Thread.Sleep(AnalogSendIntervalMs);
+            }
+        }
+
         // Left stick -> X/Y, triggers -> Z (RT up, LT down). Proportional feed, jog-cancel on release.
-        private void OnPolled(object sender, EventArgs e)
+        // Polls XInput directly (not via ControllerService.State) so this thread never races the UI-thread
+        // button-poll timer over the shared gamepad snapshot.
+        private void AnalogJogTick()
         {
             EnsureLoaded();
 
-            if (!AnalogJogEnabled)
+            if (!AnalogJogEnabled || !service.IsConnected)
             {
                 StopAnalogJog();
                 return;
             }
 
-            XInputGamepad pad = service.State;
+            XInputState state;
+            if (!XInput.GetState(service.ControllerIndex, out state))
+            {
+                StopAnalogJog();
+                return;
+            }
+            XInputGamepad pad = state.Gamepad;
 
             short stickDeadzone = (short)Math.Max(0, Math.Min(32000, DeadzonePercent / 100.0 * XInput.ThumbMax));
 
@@ -428,9 +470,7 @@ namespace CNC.Core
                 return;
             }
 
-            // Throttle the jog send rate and never queue on top of an un-drained serial line.
-            if (pollCounter++ % JogSendEveryNthPoll != 0)
-                return;
+            // Never queue on top of an un-drained serial line.
             if (Comms.com.OutCount != 0)
                 return;
 
@@ -443,8 +483,8 @@ namespace CNC.Core
             if (feed < 10d)
                 feed = 10d;
 
-            double interval = JogSendEveryNthPoll / 60d;             // seconds between sends
-            double baseDist = maxFeed / 60d * interval * JogOverlap; // mm at max feed per send
+            double interval = AnalogSendIntervalMs / 1000d;           // seconds between sends
+            double baseDist = maxFeed / 60d * interval * JogOverlap;  // mm at max feed per send
             if (!analogJogging)
                 baseDist *= StartupBoost;   // first move of a jog is longer to avoid the start-up jerk
 
@@ -454,7 +494,7 @@ namespace CNC.Core
             AppendAxis(sb, "Z", z * baseDist);
             sb.Append("F").Append(((int)Math.Ceiling(feed)).ToString(CultureInfo.InvariantCulture));
 
-            grbl.ExecuteCommand(sb.ToString());
+            Comms.com.WriteCommand(sb.ToString());
             analogJogging = true;
         }
 
@@ -467,7 +507,6 @@ namespace CNC.Core
 
         private void StopAnalogJog()
         {
-            pollCounter = 0;
             if (analogJogging)
             {
                 analogJogging = false;
