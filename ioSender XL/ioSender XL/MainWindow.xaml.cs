@@ -1462,16 +1462,15 @@ namespace GCode_Sender
             }
         }
 
-        // Tint the whole window pale yellow while connected to the simulator (Base.StartSimulator is set to
-        // the chosen target's sim-ness on each connect) so a virtual machine is unmistakable at a glance -
-        // the gray the app normally shows IS this window background, seen through the transparent content.
-        // Restored to the default gray on a real target or when disconnected. Called from every connect path.
+        // Tint the bottom run-control bar pale yellow while connected to the simulator (Base.StartSimulator is
+        // set to the chosen target's sim-ness on each connect) so a virtual machine is unmistakable at a glance.
+        // Restored to its default light gray on a real target or when disconnected. Called from every connect path.
         private void UpdateSimulatorTint()
         {
             bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
-            Background = new System.Windows.Media.SolidColorBrush(sim
+            runControlBorder.Background = new System.Windows.Media.SolidColorBrush(sim
                 ? System.Windows.Media.Color.FromRgb(0xF7, 0xEF, 0xA8)   // pale yellow = simulator
-                : System.Windows.Media.Color.FromRgb(0xE5, 0xE5, 0xE5)); // default gray
+                : System.Windows.Media.Color.FromRgb(0xF5, 0xF5, 0xF5)); // default light gray
         }
 
         // Right-click "Target" status item -> Validate. Only enabled while connected; exercises the
