@@ -160,9 +160,16 @@ namespace GCode_Sender
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
             CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
 
-            new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
-            PipeServer.FileTransfer += Pipe_FileTransfer;
-            PipeServer.ActivateRequested += BringToForeground;
+            // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
+            // instance must not become a pipe listener either, or a later normal launch would silently
+            // forward its file-open/activate request into this hidden test instance instead of starting
+            // its own window. A -testserver instance is deliberately NOT part of single-instance semantics.
+            if (App.TestServerPort < 0)
+            {
+                new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
+                PipeServer.FileTransfer += Pipe_FileTransfer;
+                PipeServer.ActivateRequested += BringToForeground;
+            }
             AttachBasePropertyChangedHandler();
             WireBarOverlays();
         }

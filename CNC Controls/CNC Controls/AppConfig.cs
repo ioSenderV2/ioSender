@@ -480,6 +480,7 @@ namespace CNC.Controls
         private bool _selectPort = false;
         private bool _forgetNetwork = false;   // -forgetnetwork: force the startup connect dialog, ignore the saved target
         private bool _useSimulator = false;    // -simulator: connect to the bundled simulator, launching it first if needed
+        private int? _useSimulatorPort = null; // optional explicit port from "-simulator <port>"; null = use saved/default (23)
         private string _startupPort = string.Empty, _startupBaud = string.Empty;
 
         public string FileName { get; private set; }
@@ -1134,6 +1135,7 @@ namespace CNC.Controls
             int status = 0;
             _selectPort = false;
             _useSimulator = false;
+            _useSimulatorPort = null;
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
 
@@ -1185,9 +1187,19 @@ namespace CNC.Controls
                     // Connect to the bundled simulator on startup instead of the saved target, launching it
                     // first if it isn't already running - the command-line equivalent of the Connect dialog's
                     // Simulator tab. Reuses -port/-baud's existing machinery (see the port-string rewrite
-                    // below, once Base is loaded) rather than inventing a separate connect syntax.
+                    // below, once Base is loaded) rather than inventing a separate connect syntax. An optional
+                    // port number ("-simulator 8901") picks which port the simulator listens on AND which port
+                    // ioSender connects to - the same simPort variable drives both below - so several instances
+                    // (e.g. parallel test agents) can each run their own simulator without colliding on the
+                    // default port. Only consumed as the port if it actually parses as one, so a bare
+                    // "-simulator" followed by an unrelated arg/file still works exactly as before.
                     case "-simulator":
                         _useSimulator = true;
+                        if (p < args.GetLength(0) && int.TryParse(args[p], out int simulatorPortArg))
+                        {
+                            _useSimulatorPort = simulatorPortArg;
+                            p++;
+                        }
                         break;
 
                     // Testing/repro aid: ignore the saved connection target for this run and show the connection
@@ -1324,10 +1336,11 @@ namespace CNC.Controls
 
             // -simulator: rewrite the startup target to 127.0.0.1:<port> and mark it as a simulator
             // connection (same fields PersistSimulatorChoice sets from the Connect dialog's Simulator tab),
-            // so OpenConnection's EnsureSimulatorRunning launches the bundled sim before connecting. Reuses
-            // the last simulator port if the saved target was itself already a simulator connection;
-            // otherwise falls back to 23 (PortDialog's own default). No-op (with a message) if nothing has
-            // been built to %AppData%\Simulator yet - same precondition the Connect dialog's tab enforces.
+            // so OpenConnection's EnsureSimulatorRunning launches the bundled sim before connecting. An
+            // explicit "-simulator <port>" wins outright; otherwise reuses the last simulator port if the
+            // saved target was itself already a simulator connection, else falls back to 23 (PortDialog's
+            // own default). No-op (with a message) if nothing has been built to %AppData%\Simulator yet -
+            // same precondition the Connect dialog's tab enforces.
             if (_useSimulator)
             {
                 if (!SimulatorManager.AppDataSimulatorPresent())
@@ -1346,6 +1359,8 @@ namespace CNC.Controls
                         if (parts.Length == 2 && int.TryParse(parts[1], out existing))
                             simPort = existing;
                     }
+                    if (_useSimulatorPort.HasValue)
+                        simPort = _useSimulatorPort.Value;
 
                     Base.StartSimulator = true;
                     Base.SimulatorExe = SimulatorManager.AppDataSimulatorExePath();

@@ -162,7 +162,13 @@ namespace GCode_Sender
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
             // (Relaunch supervision is AppLaunch's job - we only read its exit-code protocol, see DoRestart.)
-            if (CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
+            // SKIPPED for a -testserver launch: an automation-driven instance is never meant to be a
+            // singleton - it must be able to run alongside a normal interactive instance (or another
+            // -testserver instance on a different port) without colliding, and must never steal focus
+            // from whatever the user is doing by forwarding into it (see MainWindow's matching skip of
+            // becoming a pipe listener - both sides must agree, or a later normal launch would silently
+            // forward into a hidden test instance instead of starting its own window).
+            if (TestServerPort < 0 && CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
             {
                 CNC.Core.DebugLog.Write("app", "another instance is running - forwarded and exiting");
                 Environment.Exit(0);
