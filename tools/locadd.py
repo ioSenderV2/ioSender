@@ -68,6 +68,11 @@ TARGETS = [
     ('CNC Controls/CNC Controls/SignalsControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/RestorePointDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ResetReproDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/SpindleControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/GotoBaseControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OutlineBaseControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/MacroManagerDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/MacroEditor.xaml', 'CNC.Controls.WPF'),
 
     # CNC.Controls.Probing (the probing tab library - redesign + Start Job probing control)
     ('CNC Controls Probing/CNC Controls Probing/StartJobControl.xaml', 'CNC.Controls.Probing'),

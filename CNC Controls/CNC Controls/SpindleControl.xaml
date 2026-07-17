@@ -36,9 +36,9 @@
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" IsEnabled="{Binding Path=IsSpindleStateEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Orientation="Vertical" Margin="10,2,0,0">
-                    <RadioButton x:Uid="lbl_off" x:Name="rbSpindleOff" Content="Off" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)Off], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click"/>
-                    <RadioButton x:Uid="lbl_cw" x:Name="rbSpindleCW" Content="CW" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)CW], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click"/>
-                    <RadioButton x:Uid="lbl_ccw" x:Name="rbSpindleCCW" Content="CCW" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)CCW], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click"/>
+                    <RadioButton x:Uid="lbl_off" x:Name="rbSpindleOff" Content="Off" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)Off], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click" ToolTip="Turn the spindle off."/>
+                    <RadioButton x:Uid="lbl_cw" x:Name="rbSpindleCW" Content="CW" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)CW], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click" ToolTip="Rotate the spindle clockwise."/>
+                    <RadioButton x:Uid="lbl_ccw" x:Name="rbSpindleCCW" Content="CCW" IsChecked="{Binding Path=SpindleState[(gcode:SpindleState)CCW], Mode=TwoWay}" HorizontalAlignment="Left" Click="rbSpindle_Click" ToolTip="Rotate the spindle counter-clockwise."/>
                 </StackPanel>
                 <local:OverrideControl x:Name="overrideControl" Value="{Binding Path=RPMOverride, Mode=OneWay}" OverrideDisabled="{Binding Path=RPMOverrideDisabled, Mode=OneWay}" CommandGenerated="override_CommandGenerated" Margin="0,0,0,2" Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Bottom" HorizontalAlignment="Right" EncoderMode="SpindleRPM">
                 </local:OverrideControl>

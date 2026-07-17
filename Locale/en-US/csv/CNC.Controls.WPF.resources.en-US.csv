@@ -996,3 +996,19 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_mainPageConfig:System
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Simulator connection and feature settings.
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_errors:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grbl error code reference.
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_alarms:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grbl alarm code reference.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,lbl_websocket:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Use WebSocket protocol for network connection.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,fld_netPort:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,TCP port number for the network connection.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,cbxHost:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,IP address or hostname of the controller.
+CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_scanNetwork:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Scan the local network for available controllers.
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_off:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn the spindle off.
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_cw:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Rotate the spindle clockwise.
+CNC.Controls.WPF.g.en-US.resources:spindlecontrol.baml,lbl_ccw:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Rotate the spindle counter-clockwise.
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_gotoG28:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to the G28 reference position (firmware slot 1).
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_gotoG30:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to the G30 reference position (firmware slot 2).
+CNC.Controls.WPF.g.en-US.resources:gotobasecontrol.baml,btn_goto:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to the selected position.
+CNC.Controls.WPF.g.en-US.resources:outlinebasecontrol.baml,btn_go:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Trace the outline of the loaded job at rapid speed.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroCreate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Create a new macro.
+CNC.Controls.WPF.g.en-US.resources:macromanagerdialog.baml,btn_macroDelete:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Delete the selected macro.
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,cbxMacro:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Select which macro to edit.
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add this macro to the toolbar.
+CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,chk_confirm:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Require confirmation before executing this macro.
