@@ -72,6 +72,16 @@ namespace GCode_Sender
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
 
+            // A -testserver launch must never take OS foreground focus, at any point - not just skip our
+            // own Activate() call. Testing showed the Opacity 0->1 transition in RevealMainWindow (needed
+            // for whole-window RenderTargetBitmap screenshots - see there) is ITSELF enough to make Windows
+            // grant the window initial foreground activation, independent of ShowInTaskbar/Activate()/window
+            // position. The only reliable fix is WS_EX_NOACTIVATE on the raw window style, applied as soon
+            // as the HWND exists (SourceInitialized) - a documented, first-party Win32 flag (not an
+            // undocumented API) that tells Windows this window is never activatable, full stop.
+            if (App.TestServerPort >= 0)
+                SourceInitialized += (s, e) => SetNoActivate();
+
             InitializeComponent();
 
             ui = this;
@@ -196,9 +206,27 @@ namespace GCode_Sender
                 return;
             _revealed = true;
 
+            // Opacity ALWAYS goes to 1, even for -testserver: WpfUiTestServer's /screenshot renders the
+            // window's own Visual via RenderTargetBitmap (an in-memory render, not a screen grab), and that
+            // honours the Window's own Opacity - leaving it at 0 (the startup value) would make every
+            // whole-window screenshot come back blank, breaking automated visual verification.
             Opacity = 1d;
-            ShowInTaskbar = true;
-            Activate();
+
+            if (App.TestServerPort < 0)
+            {
+                ShowInTaskbar = true;
+                Activate();
+            }
+            else
+            {
+                // Parked far outside any real display so the operator never sees it, on top of the
+                // WS_EX_NOACTIVATE style already applied in the constructor (the actual focus-steal fix -
+                // see there). RenderTargetBitmap doesn't care where a window physically sits, so this
+                // doesn't affect screenshots at all.
+                Left = -32000;
+                Top = -32000;
+                ShowInTaskbar = false;
+            }
 
             if (_splash != null)
             {
@@ -275,6 +303,41 @@ namespace GCode_Sender
             lblMessage.FontSize = _baseMessageFontSize * 2.0;
             _messageEmphasisTimer.Stop();                  // restart the 10 s window on every new message
             _messageEmphasisTimer.Start();
+        }
+
+        // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----
+        // GetWindowLongPtr/SetWindowLongPtr are C preprocessor macros, not real DLL exports. On 64-bit
+        // Windows the real export is GetWindowLongPtrW; this app runs 32-bit (AnyCPU without an explicit
+        // 64-bit preference still lands WOW64 here - confirmed via IsWow64Process), where GetWindowLongPtrW
+        // doesn't exist at all - only the older GetWindowLongW (32-bit LONG, not a pointer-sized value)
+        // does. Standard cross-bitness pattern: pick the real export by IntPtr.Size at call time.
+        private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+        {
+            return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : new IntPtr(GetWindowLong32(hWnd, nIndex));
+        }
+        private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+        {
+            return IntPtr.Size == 8
+                ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+                : new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+        }
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+        private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        private const int GWL_EXSTYLE = -20;
+        private const long WS_EX_NOACTIVATE = 0x08000000L;
+        private void SetNoActivate()
+        {
+            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero)
+                return;
+            IntPtr exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+            SetWindowLongPtr(hwnd, GWL_EXSTYLE, (IntPtr)(exStyle.ToInt64() | WS_EX_NOACTIVATE));
         }
 
         // ---- DPI diagnostics ----

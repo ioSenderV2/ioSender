@@ -212,10 +212,14 @@ namespace GCode_Sender
             // Show a status splash, then create the main window invisible (StartupUri removed from App.xaml).
             // CompleteStartup connects/reads settings/validates the machine-setup steps with the splash up, then
             // reveals the main window (on the Machine Setup tab if setup is incomplete) and closes the splash.
+            // A -testserver launch skips the splash entirely and never reveals (see MainWindow.RevealMainWindow) -
+            // it's driven by UIAutomation peers/routed events, neither of which need the window shown or
+            // focused, so an automation-driven instance never pops over the operator's desktop or steals
+            // keyboard focus just by starting up.
             ShutdownMode = ShutdownMode.OnMainWindowClose;
 
-            var splash = new SplashWindow();
-            splash.Show();
+            var splash = TestServerPort < 0 ? new SplashWindow() : null;
+            splash?.Show();
 
             var main = new MainWindow();
             Current.MainWindow = main;
