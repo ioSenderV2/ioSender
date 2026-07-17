@@ -28,7 +28,8 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                             <Label x:Uid="ls_lblFixture" Content="Fixture:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="160" MinHeight="22" VerticalAlignment="Center"
-                                      DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"/>
+                                      DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
+                                      ToolTip="Select the fixture/coordinate system for this job."/>
                         </StackPanel>
                         <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
                                    Text="No fixture with a validated position available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
@@ -63,7 +64,8 @@
                                   ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
                             <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0">
+                            <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0"
+                                      ToolTip="Select the work coordinate system (G54-G59) for this job.">
                                 <ComboBoxItem Content="G54"/>
                                 <ComboBoxItem Content="G55"/>
                                 <ComboBoxItem Content="G56"/>
