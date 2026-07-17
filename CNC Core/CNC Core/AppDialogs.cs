@@ -21,13 +21,22 @@ namespace CNC.Core
 {
     public static class AppDialogs
     {
+        // Set by CNC.Controls.AppMessageBox.Register() at startup so the real (non-test-server) fallback is
+        // our own UiScale-aware window instead of the native, DPI/zoom-oblivious System.Windows.MessageBox.
+        // Signature mirrors MessageBox.Show(owner, message, caption, buttons, icon, defaultResult); owner may
+        // be null. Left null this class still works standalone (falls back to the native MessageBox).
+        public static Func<Window, string, string, MessageBoxButton, MessageBoxImage, MessageBoxResult, MessageBoxResult> CustomMessageBox;
+
         public static MessageBoxResult Show(string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null)
         {
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
-            return answer != null ? ParseResult(answer, buttons)
-                                   : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+            if (answer != null)
+                return ParseResult(answer, buttons);
+            return CustomMessageBox != null
+                ? CustomMessageBox(null, message, caption, buttons, icon, DefaultOrNone(defaultResult))
+                : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
         }
 
         public static MessageBoxResult Show(Window owner, string message, string caption = "",
@@ -37,6 +46,8 @@ namespace CNC.Core
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
                 return ParseResult(answer, buttons);
+            if (CustomMessageBox != null)
+                return CustomMessageBox(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult));
             return owner != null
                 ? MessageBox.Show(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult))
                 : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));

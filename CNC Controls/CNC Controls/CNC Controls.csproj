@@ -139,6 +139,9 @@
     <Compile Include="ProbeDefinitionEditDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionEditDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AppMessageBox.xaml.cs">
+      <DependentUpon>AppMessageBox.xaml</DependentUpon>
+    </Compile>
     <Compile Include="FixtureEditDialog.xaml.cs">
       <DependentUpon>FixtureEditDialog.xaml</DependentUpon>
     </Compile>
@@ -461,6 +464,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ProbeDefinitionEditDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="AppMessageBox.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

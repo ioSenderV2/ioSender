@@ -25,6 +25,7 @@ matching memory file keeps its context and just points here.
 | [publish_standalone_repo.md](publish_standalone_repo.md) | Publish a folder/tool as its own public GitHub repo (+ CLAUDE.md guide) |
 | [nuget_trusted_publishing.md](nuget_trusted_publishing.md) | Package a .NET lib and publish to NuGet via Trusted Publishing (OIDC) |
 | [build_teensy_firmware.md](build_teensy_firmware.md) | Build the grblHAL Teensy 4.1 firmware with PlatformIO |
+| [drive_ui_test_server.md](drive_ui_test_server.md) | Launch ioSender under `-testserver` and drive/verify controls by `x:Uid` over HTTP |
 | [compose_demo_video.md](compose_demo_video.md) | Composite the CNC + app footage into a demo video |
 
 ## Conventions

@@ -157,6 +157,7 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             CNC.Core.ConsoleLog.Init();
+            CNC.Controls.AppMessageBox.Register();
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
