@@ -85,9 +85,9 @@
         <StackPanel Grid.Row="1" Margin="5,0,5,6">
             <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click"/>
-                <Button x:Uid="btn_asapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"/>
-                <Button x:Uid="btn_ashome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"/>
+                <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" ToolTip="Measure the auto-square offset for the ganged axis."/>
+                <Button x:Uid="btn_asapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False" ToolTip="Apply the measured offset to the controller configuration."/>
+                <Button x:Uid="btn_ashome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click" ToolTip="Re-home the machine after applying the offset."/>
             </StackPanel>
         </StackPanel>
         </Grid>
