@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>129 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>130 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -315,6 +315,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Check for Updates now offers &ldquo;Update now?&rdquo; instead of just opening the releases page; new Help &gt; Support &gt; Roll back to previous version undoes the last update</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr120">120</a></td></tr>
 <tr><td>Message boxes are now the app's own scaled window instead of the native OS dialog, so they read on a high-DPI display at whatever zoom Ctrl+Alt+Plus/Minus is set to.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr127">127</a></td></tr>
 <tr><td>Tooltip text now scales with UiScale zoom instead of staying fixed-size, unreadably small at high zoom.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr129">129</a></td></tr>
+<tr><td>-simulator connects to the bundled simulator on startup, launching it first if needed - joins the existing -port/-baud flags for serial/network.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr130">130</a></td></tr>
 </table>
 </div>
 
@@ -449,7 +450,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">127</td><td><a href="#pr127">Scaled message boxes (AppMessageBox)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+323</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">128</td><td><a href="#pr128">Analog joystick jog was jerky under continuous hold - moved off the UI thread</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+52</span> <span class="del">-13</span></td></tr>
 <tr><td class="n">129</td><td><a href="#pr129">Tooltips now scale with the app's UiScale zoom</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+15</span> <span class="del">-1</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (129 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1144</span> <span class="del">13</span> <span class="add">+158</span><br><span class="k">Lines:</span> <span class="add">+50481</span> <span class="del">-9079</span></td></tr>
+<tr><td class="n">130</td><td><a href="#pr130">New -simulator command-line flag to auto-connect to the bundled simulator on startup</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+33</span> <span class="del">-1</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (130 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1145</span> <span class="del">13</span> <span class="add">+158</span><br><span class="k">Lines:</span> <span class="add">+50514</span> <span class="del">-9080</span></td></tr>
 </table>
 </div>
 
@@ -2816,6 +2818,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/App.xaml</td><td class="num add">15</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>ToolTips render in their own <code>Popup</code>, outside <code>MainWindow</code>'s <code>LayoutTransform</code>-scaled visual tree - the same gotcha <code>DialogScaling.cs</code> (<a href="#pr127">#127</a>) already documents for dialog windows. Without accounting for it, tooltip text stayed fixed at 1x regardless of the app's UiScale zoom (Ctrl+Alt+Plus/Minus) - readable at the default size but nearly illegible once the rest of the UI was zoomed up.</p><ul><li><strong>App-wide implicit <code>ToolTip</code> style</strong> (<code>App.xaml</code>) - a <code>LayoutTransform</code> bound to <code>Base.UiScale</code>, the same scaling pattern <code>MainWindow</code> uses for its own content and <code>DialogScaling</code> uses for other top-level windows. No <code>x:Key</code>, so it applies automatically to every tooltip app-wide, including the common <code>ToolTip="..."</code> string shorthand - no per-control changes needed anywhere.</li></ul><p class="foot">Verified by hand: hover tooltip text now grows in step with Ctrl+Alt+Plus zoom.</p></div>
+</div>
+<!-- ===== #130 ===== -->
+<div class="pr">
+<h2 id="pr130"><span class="badge">#130</span>New -simulator command-line flag to auto-connect to the bundled simulator on startup</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">33</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Serial and network already had a scriptable startup path via the existing <code>-port</code>/<code>-baud</code> flags (e.g. <code>-port COM3 -baud 115200</code>, <code>-port 192.168.1.50:23</code>) - both wired straight into the same startup connect path the Connect dialog uses, bypassing it entirely. The bundled simulator had no equivalent: a raw <code>-port 127.0.0.1:23</code> would only work if the simulator process happened to already be running, since launching it first requires setting <code>Base.StartSimulator</code> and the simulator exe/args - fields only the Connect dialog's Simulator tab populated.</p><ul><li><strong>New <code>-simulator</code> flag</strong> - rewrites the startup target to <code>127.0.0.1:&lt;port&gt;</code> and marks it as a simulator connection (the same fields the Connect dialog's Simulator tab sets), so the existing <code>EnsureSimulatorRunning</code> launches the bundled sim before connecting, exactly mirroring a manual Simulator-tab connect. Reuses the last simulator port if the saved target was itself already a simulator connection, otherwise defaults to 23 (the Connect dialog's own default).</li><li><strong>Graceful no-op if nothing's built yet</strong> - shows a message and falls through to the normal startup path instead of trying to connect to a nonexistent exe, if nothing has been built to <code>%AppData%\Simulator</code> yet (same precondition the Connect dialog's Simulator tab already enforces).</li></ul><p class="foot">Verified end-to-end: <code>build.ps1 -Launch -simulator</code> launched the bundled simulator and connected automatically with no dialog, confirmed via the console log's boot banner + handshake.</p></div>
 </div>
 </section>
 
