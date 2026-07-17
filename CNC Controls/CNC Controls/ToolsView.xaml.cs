@@ -59,7 +59,10 @@ namespace CNC.Controls
                 {
                     // Bindable sub-tab: id = "Tab.Tools.<componentKey>" (the Tag stays the layout key for reorder).
                     string tabId = "Tab.Tools." + node.Component;
-                    var tab = new TabItem { Content = ctl, Tag = node.Component };
+                    // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
+                    // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
+                    // server can address the Tools sub-tabs by Uid and select one via its SelectionItem peer.
+                    var tab = new TabItem { Content = ctl, Tag = node.Component, Uid = "tab_" + node.Component };
                     tab.Header = new TabHeaderControl(d.Label, tabId);
                     TabKeyBinder.AttachBindMenu(tab, tabId);
                     tabTools.Items.Add(tab);
