@@ -54,6 +54,14 @@
 ;                       none of) and the pre-top-probe descent estimate (o41's #<_bottom>+30) with this
 ;                       single known height - the tool never travels above it. 0/unset = old behavior
 ;                       (Corner Fence, no prior stock-top knowledge - safe but more conservative).
+;   #<_ls_appz>   = OPTIONAL machine Z override for ONLY this call's very first height change (o40 below) -
+;                       everything else this call still uses #<_ls_maxz>. For a corner reached via a detour
+;                       that left the fixture's footprint entirely (Corner Fence's TLO-reference park at G30
+;                       is the current use), so that one return crossing happens at Z0 (always safe) instead
+;                       of #<_ls_maxz> (only trusted WITHIN the footprint), without losing the trusted height
+;                       for the rest of this corner's own probe sequence. SENTINEL IS 9999 ("unset", not 0) -
+;                       unlike #<_ls_maxz>, Z0 (machine top) is itself a legitimate override value here, so
+;                       0 can't double as "no override". >= 9000 = ignored, use #<_ls_maxz> instead.
 ;
 ; Outputs (GLOBAL named params, survive the SUB):
 ;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
@@ -74,6 +82,7 @@ O<pcorner> SUB
   #<sz_in>  = #<_ls_startz>
   #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
   #<maxz>   = #<_ls_maxz>        ; known-safe travel height (machine Z), 0/unset = no prior stock-top knowledge (see file header)
+  #<appz>   = #<_ls_appz>        ; approach-only override for the FIRST height change below (see file header) - 0/unset = use #<maxz> same as every other height decision this call
 
   ; Clear G54 AND cancel any active G92 offset (AND TLO, belt-and-suspenders) so the absolute Z probes
   ; below run in TRUE machine coordinates. WCO = G5x offset + G92 offset + TLO (grblHAL gc_get_offset,
@@ -100,13 +109,23 @@ O<pcorner> SUB
   o11 ENDIF
   (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in>)
 
+  ; ================= safety rise to machine top (first corner / DISCOVER only, BOTH modes) =================
+  ; Regardless of probe mode, always rise to Z0 (machine top, always clear) and travel to the reference
+  ; XY there BEFORE any descent. Split out from the 3D-probe-only o20 block below (which used to do this
+  ; too, but only inside its own mode-gated condition) - touch plate mode skips o20 entirely (a continuity
+  ; probe can't detect a non-conductive spoilboard), which meant it silently skipped this rise as well,
+  ; going straight from wherever the caller left the machine (e.g. the G30 park position) down to an
+  ; ESTIMATED safe height (o21's placeholder #<_bottom>) with no verified-clear waypoint first.
+  o19 IF [#<sz_in> GE 9000]
+    G90
+    G53 G0 Z0                                     ; rapid - Z0 is the machine top, always clear
+    G53 G0 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]   ; rapid - travelling AT Z0
+  o19 ENDIF
+
   ; ================= spoilboard reference Z (first corner / DISCOVER only, 3D probe only) =================
   ; Probed once at the origin reference (clear air below per preconditions) to anchor thickness;
   ; later corners skip it. Only used to guard very thin stock when picking start_z.
   o20 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 0]]
-    G90
-    G53 G0 Z0                                     ; rapid - Z0 is the machine top, always clear
-    G53 G0 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]   ; rapid - travelling AT Z0
     G53 G1 F1000 Z[#<_ls_spoilz>]          ; controlled - descending toward the (unverified) spoilboard
     ; SAFETY: bound the spoilboard probe to a SHORT reach below the start Z. If the probe fails to trip
     ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
@@ -150,11 +169,24 @@ O<pcorner> SUB
     ; that, every real value here is NEGATIVE - "GT 0" silently failed for every legitimate maxz the caller
     ; ever passed (the vise's own #<_lv_safe_z>, Corner Fence's #<c1_maxz>), falling through to the ELSE
     ; branch every time with no error, just quietly slower/more conservative than intended.
+    ;
+    ; #<appz> (caller-optional, see file header) overrides ONLY this first move - everything else this call
+    ; (the pre-top-probe descent below, the final retreat) still uses the caller's real #<maxz>, same as
+    ; every other corner. Needed for a corner reached via a detour that left the fixture's footprint entirely
+    ; (e.g. Corner Fence's TLO-reference park at G30, not verified clear of fence/clamp hardware) - #<maxz>
+    ; is only trusted WITHIN the footprint (verified by an earlier corner's own measurement), so that one
+    ; return crossing must happen at Z0 instead, without also giving up the trusted height for the rest of
+    ; this corner's own probe sequence. Sentinel is 9999 ("unset"), NOT 0 - unlike #<maxz>, Z0 (machine top)
+    ; is itself a legitimate override value here (that's the whole point), so 0 can't double as "no override".
+    o48 IF [#<appz> LT 9000]
+      G53 G0 Z[#<appz>]
+    o48 ELSE
     o42 IF [#<maxz> NE 0]
       G53 G0 Z[#<maxz>]             ; rapid - caller already knows a trusted safe height (e.g. the vise's own centre probe) - never go any higher than necessary
     o42 ELSE
       G53 G0 Z0                     ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
     o42 ENDIF
+    o48 ENDIF
   o40 ENDIF
   #<_topx> = [#<rx> + [#<_ls_topx> * #<sx>]]
   #<_topy> = [#<ry> + [#<_ls_topy> * #<sy>]]

@@ -1334,7 +1334,7 @@ namespace GCode_Sender
             // controller runs the four CALLs back-to-back under flow control (each publishes its globals before
             // the next reads them) - which keeps Feed Hold/Stop live and the UI responsive. Results still stream
             // back as (PRINT ...) messages.
-            void EmitCall(int cornerId, string refx, string refy, string startz, string maxz = "0") { EmitPcornerCall(L, cornerId, refx, refy, startz, maxz); }
+            void EmitCall(int cornerId, string refx, string refy, string startz, string maxz = "0", string appz = "9999") { EmitPcornerCall(L, cornerId, refx, refy, startz, maxz, appz); }
 
             L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
             // Split across short lines - grblHAL rejects a line over its receive-buffer size ("Max characters
@@ -1512,19 +1512,13 @@ namespace GCode_Sender
                     refY2 = refY;
                 }
 
-                if (setTloRef)
-                {
-                    // The TLO-ref detour just parked at G30 (an arbitrary, possibly-distant point not
-                    // verified clear - see the comment above) and retracted to Z0. Cross to corner 2's
-                    // approach XY WHILE STILL AT Z0, rather than leaving it to pcorner's own internal
-                    // maxz-height travel: pcorner drops Z to #<c1_maxz> FIRST, THEN does its short XY
-                    // nudge to the exact top-probe point - so without this, the G30-to-corner-2 crossing
-                    // (unverified territory) would happen at c1_maxz height instead of Z0.
-                    L(string.Format("G53 G0 X[{0}] Y[{1}]", refX2, refY2));
-                }
-
                 L(string.Format("(--- corner 2 = {0} (X-neighbour) ---)", Name(xn)));
-                EmitCall(CornerId(xn), refX2, refY2, "#<_start_z>", maxz);
+                // setTloRef: the TLO-ref detour just parked at G30 (an arbitrary, possibly-distant point
+                // not verified clear - see the comment above) and retracted to Z0. maxz (#<c1_maxz>) is
+                // only trusted WITHIN the fixture's footprint, so override just this call's first height
+                // change to Z0 (pcorner.macro's #<_ls_appz>) - same structure as every other corner
+                // (straight to the inset XY, then drop for the probe), just approaching at Z0 instead.
+                EmitCall(CornerId(xn), refX2, refY2, "#<_start_z>", maxz, setTloRef ? "0" : "9999");
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
 
@@ -2016,13 +2010,20 @@ namespace GCode_Sender
         // more conservative behavior - full retract to machine Z0 between corners, no prior stock-top
         // knowledge); the vise passes its own already-verified safe height instead, so the macro never
         // travels any higher than necessary. Always emitted (never left to a stale value from a prior call).
-        private static void EmitPcornerCall(System.Action<string> L, int cornerId, string refx, string refy, string startz, string maxz = "0")
+        // appz: OPTIONAL machine Z override for ONLY this call's very first height change (pcorner.macro's
+        // #<_ls_appz>, see its file header) - everything else this call still uses maxz. For a corner reached
+        // via a detour that left the fixture's footprint entirely (the TLO-reference park at G30 below), so
+        // that one return crossing happens at Z0 instead of the footprint-scoped maxz, without losing the
+        // trusted height for the rest of this corner's own probe sequence. "9999" (default) = no override -
+        // NOT "0": Z0 (machine top) is itself a legitimate override value, so it can't double as "unset".
+        private static void EmitPcornerCall(System.Action<string> L, int cornerId, string refx, string refy, string startz, string maxz = "0", string appz = "9999")
         {
             L(string.Format("#<_ls_corner> = {0}", cornerId));
             L(string.Format("#<_ls_refx> = {0}", Br(refx)));
             L(string.Format("#<_ls_refy> = {0}", Br(refy)));
             L(string.Format("#<_ls_startz> = {0}", Br(startz)));
             L(string.Format("#<_ls_maxz> = {0}", Br(maxz)));
+            L(string.Format("#<_ls_appz> = {0}", Br(appz)));
             L("O<pcorner> CALL [#<_ls_rad>]");   // single arg (tip radius) - grblHAL's CALL resolves with one arg
         }
 
