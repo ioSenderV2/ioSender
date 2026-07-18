@@ -1621,6 +1621,14 @@ namespace CNC.Controls
                     job.NextRow.Length = line.Length + 1;
                 }
 
+                // Dry-run mode: also skip the program's own tool changes (M6) entirely - see
+                // StreamPump.SendNext's buffered-path equivalent for the full reasoning.
+                else if (model.IsDryRunMode && job.NextRow.HasToolChange)
+                {
+                    line = "()";
+                    job.NextRow.Length = line.Length + 1;
+                }
+
                 if (job.serialUsed < (serialSize - (int)job.NextRow.Length)
                      && (!jobHasProbe || job.ACKPending < ProbeLookahead))   // cap look-ahead once probing
                 {

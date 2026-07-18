@@ -262,6 +262,19 @@ namespace CNC.Controls
                     len = line.Length + 1;
                 }
 
+                // Dry-run mode: also skip the program's own tool changes (M6) entirely, rather than let
+                // them run - dry run never cuts, so which physical tool is in the spindle doesn't matter,
+                // and running tc.macro (or any M6 handler) here risks it interacting badly with the Z-
+                // offset G92 still active for the rest of the dry run (confirmed on real hardware: it
+                // pushed a toolsetter approach move out of travel - Alarm:2 - and a stale hang-watchdog
+                // timer then reset the controller). Skipping means the dry run just runs straight through
+                // without pausing for a tool swap.
+                else if (model.IsDryRunMode && block.HasToolChange)
+                {
+                    line = "()";
+                    len = line.Length + 1;
+                }
+
                 if (serialUsed < serialSize - len && (!jobHasProbe || inflight.Count < JobControl.ProbeLookahead))
                 {
                     // program-end markers (mirror the legacy SendNextLine bookkeeping)
