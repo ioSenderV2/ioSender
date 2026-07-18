@@ -33,7 +33,12 @@ O<pvisecorner> SUB
   #<ry>  = #<_lv_refy>
   #<rz>  = #<_lv_refz>
 
-  ; Clear G54 so the absolute Z probes below run in machine coordinates (same reasoning as pcorner.macro).
+  ; Clear G54 AND cancel any active G92 offset (AND TLO, belt-and-suspenders) so the absolute Z probes
+  ; below run in TRUE machine coordinates (same reasoning/fix as pcorner.macro - a leftover non-zero
+  ; G92 offset was confirmed as the actual cause via grblHAL's own $G/report.c; G10 L2 P1 alone never
+  ; touches G92).
+  G49
+  G92.1
   G10 L2 P1 X0 Y0 Z0
   G90
   (PRINT, PV ENTER rx=#<rx> ry=#<ry> rz=#<rz> rad=#<rad> clear=#<_lv_clear>)

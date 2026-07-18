@@ -75,9 +75,16 @@ O<pcorner> SUB
   #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
   #<maxz>   = #<_ls_maxz>        ; known-safe travel height (machine Z), 0/unset = no prior stock-top knowledge (see file header)
 
-  ; Clear G54 so the absolute Z probes below run in machine coordinates. Without this a stale G54 Z
-  ; offset makes "G38.2 Z-140" exceed travel (soft-limit alarm).
+  ; Clear G54 AND cancel any active G92 offset (AND TLO, belt-and-suspenders) so the absolute Z probes
+  ; below run in TRUE machine coordinates. WCO = G5x offset + G92 offset + TLO (grblHAL gc_get_offset,
+  ; gcode.c) - G10 L2 P1 alone only zeros the G5x term. Confirmed via a real Start Job failure + reading
+  ; grblHAL's own report.c (is_g92_active()): a leftover non-zero G92 offset (TLO was already clean -
+  ; $G showed G49) was the actual cause - #<_ls_spoilz> (a machine Z) got driven as if it were a work Z
+  ; offset by the stray G92, landing the spoilboard search ~70mm from the real surface instead of the
+  ; ~12mm it expects, well outside the search's travel cap.
   ; Load Stock sets the real origin from the probed machine coordinates after all corners are done.
+  G49
+  G92.1
   G10 L2 P1 X0 Y0 Z0
 
   ; --- direction signs from the corner id ---
