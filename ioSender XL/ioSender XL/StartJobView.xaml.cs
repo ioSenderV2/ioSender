@@ -103,6 +103,8 @@ namespace GCode_Sender
             cbxWcs.SelectionChanged += (s, e) => InputChanged();
             chkMeasure.Checked += (s, e) => { UpdateSizeHint(); InputChanged(); };
             chkMeasure.Unchecked += (s, e) => { UpdateSizeHint(); InputChanged(); };
+            chkExactSize.Checked += (s, e) => { UpdateSizeHint(); InputChanged(); };
+            chkExactSize.Unchecked += (s, e) => { UpdateSizeHint(); InputChanged(); };
             chkRotate.Checked += (s, e) => InputChanged();
             chkRotate.Unchecked += (s, e) => InputChanged();
             chkSetTloRef.Checked += (s, e) => InputChanged();
@@ -229,17 +231,34 @@ namespace GCode_Sender
                 return;
 
             bool isVise = SelectedFixture != null && SelectedFixture.Kind == FixtureKind.MachinistVise;
-
-            fldWidth.Label = isVise ? "Exact width (X):" : "Est. width (X):";
-            fldHeight.Label = isVise ? "Exact height (Y):" : "Est. height (Y):";
-            fldThickness.Label = isVise ? "Exact thickness (Z):" : "Est. thickness (Z):";
+            // "Stock size is exact" (chkExactSize) is only enabled/meaningful while Measure is also checked
+            // (see its XAML IsEnabled binding) - same "the entered numbers ARE the true size, not a
+            // conservative buffer" case the vise is always in, just opt-in per run instead of per fixture kind.
+            bool isExact = !isVise && chkMeasure.IsChecked == true && chkExactSize.IsChecked == true;
 
             if (isVise)
+            {
+                fldWidth.Label = "Exact width (X):";
+                fldHeight.Label = "Exact height (Y):";
+                fldThickness.Label = "Exact thickness (Z):";
                 txtSizeHint.Text = "Sizes should be exact.";
+            }
+            else if (isExact)
+            {
+                fldWidth.Label = "Width (X):";
+                fldHeight.Label = "Height (Y):";
+                fldThickness.Label = "Thickness (Z):";
+                txtSizeHint.Text = "Exact size - corners 2-4 probe close to their computed true position instead of a conservative estimate. Only enable if you trust these numbers; a wrong size can miss the stock.";
+            }
             else
+            {
+                fldWidth.Label = "Est. width (X):";
+                fldHeight.Label = "Est. height (Y):";
+                fldThickness.Label = "Est. thickness (Z):";
                 txtSizeHint.Text = chkMeasure.IsChecked == true
                     ? "Estimate only - make it a few mm larger than actual so the far-corner probes land just outside the stock. Probing measures the true size."
                     : "Actual stock size.";
+            }
         }
 
         // The configured 3D probe supplies the tip radius and the search/latch feeds the program needs.
@@ -750,6 +769,12 @@ namespace GCode_Sender
                     string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang);
                     if (spoilZ.HasValue && cornerZ[c].HasValue)
                         text += "\nt=" + FormatLen(cornerZ[c].Value - spoilZ.Value);
+                    else if (cornerZ[c].HasValue)
+                        // Touch plate: no spoilboard reference (continuity probing can't detect a
+                        // non-conductive spoilboard), so there's no real thickness to compute - show each
+                        // corner's own absolute measured top Z instead. Still a genuine reading (useful for
+                        // spotting unevenness across corners), just not labelled as "thickness".
+                        text += "\nz=" + FormatLen(cornerZ[c].Value);
 
                     var lbl = new TextBlock
                     {
