@@ -3,7 +3,7 @@
  *
  * "Load stock" top-level tab. Pick a probe definition + the stock corner the probe is parked over +
  * the approximate stock size, then Generate an inline grblHAL NGC probe program (shown locally) and
- * Run it through the macro path (MacroProcessor / ExecuteMacro) - which passes NGC expressions, #params
+ * Run it through the macro path (MacroProcessor.Run) - which streams NGC expressions, #params
  * and O-words through to the controller and never touches the loaded job. The program sets the work
  * origin at the corner and (optionally) probes the far faces to measure the stock size, printing the
  * result back over the console where this tab captures it.

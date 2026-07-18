@@ -56,6 +56,7 @@ namespace CNC.Core
         private SDState _sdMounted = SDState.Unmounted;
         private bool _flood, _mist, _fan0, _toolChange, _reset, _isMPos, _isJobRunning, _isProbeSuccess, _pgmEnd, _isParserStateLive, _isTloRefSet;
         private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _autoReporting = false, _hasOutline = false, _isLoading = false;
+        private bool _isDryRunMode = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
         private bool? _mpg;
         private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _autoReportInterval = 0, _spindle_num = 0;
@@ -320,118 +321,6 @@ namespace CNC.Core
             }
         }
 
-        public void ExecuteMacro(string[] commands)
-        {
-            if (commands.Length > 0)
-            {
-                if (!(commands.Length == 1 && Grbl.SendRealtimeCommand(commands[0])))
-                {
-                    bool ok = true;
-                    var parser = new GCodeParser();
-                    parser.ExpressionsSupported = GrblInfo.ExpressionsSupported;   // pass NGC expressions/params through to the controller, as file streaming does
-
-                    for (int i = 0; i < commands.Length; i++)
-                    {
-                        string original = commands[i] = commands[i].Replace("\r", "");
-
-                        // A named O-word flow statement (O<name> CALL/SUB/RETURN/...) is evaluated by the
-                        // controller itself, so forward it as the controller's own file reader would see it
-                        // rather than letting the local block parser rewrite it. Two things matter:
-                        //  - the flow keyword must sit IMMEDIATELY after the O<name> label: grblHAL keeps
-                        //    interior spaces (only leading whitespace is stripped) and its flow parser reads
-                        //    the keyword at the byte right after '>' with no gap-skipping (ngc_flowctrl.c
-                        //    read_command), so "O<pcorner> CALL" lands on the space and faults as
-                        //    "error:81 - Unknown flow statement". Close that gap -> "O<pcorner>CALL".
-                        //  - strip comments: ParseBlock would, and we bypass it; a trailing ";"/"(...)" left
-                        //    on the line would be parsed as call arguments.
-                        // The label case is left as-is (the controller upper-cases it) and any "[expr]" call
-                        // arguments after the keyword are preserved (a space there is fine - the arg reader
-                        // skips it).
-                        // An optional leading line number (N<digits>) is skipped when detecting the O<name>
-                        // label: grblHAL accepts "N## O<name> CALL" (gcode.c "Hack to allow line number with
-                        // O word"), so a numbered flow line must still be forwarded unparsed - otherwise
-                        // ParseBlock rewrites it and the call faults.
-                        string trimmed = original.TrimStart();
-                        int oPos = 0;
-                        if (trimmed.Length > 1 && (trimmed[0] == 'N' || trimmed[0] == 'n') && char.IsDigit(trimmed[1]))
-                        {
-                            int j = 2;
-                            while (j < trimmed.Length && char.IsDigit(trimmed[j]))
-                                j++;
-                            while (j < trimmed.Length && (trimmed[j] == ' ' || trimmed[j] == '\t'))
-                                j++;
-                            oPos = j;
-                        }
-                        if (parser.ExpressionsSupported && trimmed.Length > oPos + 1 && (trimmed[oPos] == 'O' || trimmed[oPos] == 'o') && trimmed[oPos + 1] == '<')
-                        {
-                            string line = StripGCodeComments(original).TrimEnd();
-                            int gt = line.IndexOf('>');
-                            if (gt >= 0)
-                            {
-                                int k = gt + 1;
-                                while (k < line.Length && (line[k] == ' ' || line[k] == '\t'))
-                                    k++;
-                                line = line.Substring(0, gt + 1) + line.Substring(k);
-                            }
-                            commands[i] = line;
-                            continue;
-                        }
-
-                        try
-                        {
-                            parser.ParseBlock(ref commands[i], false);
-                        }
-                        catch (Exception e)
-                        {
-                            // When the controller evaluates expressions itself its parser is
-                            // authoritative: forward a line ioSender cannot parse (e.g. a named
-                            // O-word subroutine call) rather than rejecting it. Otherwise keep the
-                            // previous prompt-to-continue behaviour.
-                            if (parser.ExpressionsSupported)
-                                commands[i] = original;
-                            else if (!(ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, i + 1, original), "ioSender", System.Windows.MessageBoxButton.YesNo) == System.Windows.MessageBoxResult.Yes))
-                                break;
-                        }
-                    }
-
-                    if (ok) foreach (var command in commands)
-                        {
-                            if (ApplyCommand(command))
-                            {
-                                if (ResponseLogVerbose && !string.IsNullOrEmpty(command))
-                                    ResponseLog.Add(command);
-                            }
-                        }
-                }
-            }
-        }
-
-        public void ExecuteMacro(string macro)
-        {
-            if (macro != null && macro != string.Empty)
-                ExecuteMacro(macro.Split('\n'));
-        }
-
-        // Strip g-code comments from a single block: everything from the first ';' (line comment) and any
-        // '(...)' groups. Used when forwarding an O-word call line unparsed, so a trailing comment does not
-        // reach the controller (which would otherwise fault the line). Square-bracket '[...]' expression
-        // arguments are NOT comments and are preserved.
-        private static string StripGCodeComments(string s)
-        {
-            int sc = s.IndexOf(';');
-            if (sc >= 0)
-                s = s.Substring(0, sc);
-
-            int open;
-            while ((open = s.IndexOf('(')) >= 0)
-            {
-                int close = s.IndexOf(')', open + 1);
-                s = close >= 0 ? s.Remove(open, close - open + 1) : s.Substring(0, open);
-            }
-
-            return s;
-        }
-
         private bool canExecuteStartFromBlock(int block)
         {
             return IsFileLoaded && StreamingState == StreamingState.Idle;
@@ -596,6 +485,12 @@ namespace CNC.Core
         public bool GcodeCommandsAllowed { get { return !(IsGCLock || IsJobRunning); } }
         public bool SystemCommandsAllowed { get { return !(_grblState.State == GrblStates.Hold || (_grblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
         public bool IsCheckMode { get { return _grblState.State == GrblStates.Check; } }
+        // Sender-side toggle (not a grbl state): the NEXT run offsets Z clear of stock (G92) and forces
+        // spindle/coolant off for the whole run regardless of program content - M3/M4/M7/M8 lines are
+        // neutralised as they stream (StreamPump.SendNext / JobControl.SendNextLine, via
+        // GCodeBlock.HasSpindleOrCoolantOn) and M5/M9 are sent as a preamble. Cleared (G92.1) at every
+        // job-end path. See JobControl.CycleStart / miDryRun_Click.
+        public bool IsDryRunMode { get { return _isDryRunMode; } set { if (_isDryRunMode != value) { _isDryRunMode = value; OnPropertyChanged(); } } }
         public bool IsSleepMode { get { return _grblState.State == GrblStates.Sleep; } }
         public bool IsG92Active { get { return GrblParserState.IsActive("G92") != null; } }
         public bool IsToolOffsetActive { get { return IsGrblHAL ? GrblParserState.IsActive("G49") == null : !(double.IsNaN(ToolOffset.Z) || ToolOffset.Z == 0d); } }

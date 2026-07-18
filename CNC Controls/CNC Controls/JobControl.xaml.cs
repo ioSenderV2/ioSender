@@ -87,6 +87,11 @@ namespace CNC.Controls
         // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
         private bool jobHasProbe = false, probePending = false;
         internal const int ProbeLookahead = 10;
+        // Set when the currently running job had dry-run mode applied at start (G92 Z-offset queued, M5/M9
+        // preamble sent, and per-line M3/M4/M7/M8 suppression armed for the streamers). Cleared (G92.1 sent)
+        // at every job-end path so the temporary offset never survives past the run. See CycleStart,
+        // OnPumpJobFinished, OnPumpError and AbortPump.
+        private bool dryRunActive = false;
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
@@ -595,6 +600,7 @@ namespace CNC.Controls
         {
             var m = DataContext as GrblViewModel;
             miCheckMode.IsEnabled = m != null && !m.IsJobRunning && !m.IsSleepMode;
+            miDryRun.IsEnabled = m != null && !m.IsJobRunning && !m.IsSleepMode;
         }
 
         private void miCheckMode_Click(object sender, RoutedEventArgs e)
@@ -608,6 +614,17 @@ namespace CNC.Controls
                 Grbl.Reset();
             else if (state == GrblStates.Idle && miCheckMode.IsChecked)
                 m.ExecuteCommand(GrblConstants.CMD_CHECK);
+        }
+
+        // Sender-side toggle only - no grbl command is sent here. CycleStart consults model.IsDryRunMode
+        // when a run actually starts (check mode has no motion, so dry run is skipped there - see CycleStart).
+        private void miDryRun_Click(object sender, RoutedEventArgs e)
+        {
+            var m = DataContext as GrblViewModel;
+            if (m == null)
+                return;
+
+            m.IsDryRunMode = miDryRun.IsChecked;
         }
 
         #endregion
@@ -660,6 +677,18 @@ namespace CNC.Controls
                 }
                 else if (model.IsSDCardJob)
                 {
+                    // Dry run cannot protect an SD-card job: the controller runs it directly off its own SD
+                    // card (CMD_SDCARD_RUN below) - the sender never sees or streams individual lines, so
+                    // there is nothing for the per-line M3/M4/M7/M8 suppression to intercept, and the initial
+                    // M5/M9 preamble would be a false sense of safety if the program turns the spindle back
+                    // on moments later. Refuse rather than silently run unprotected while the toggle is
+                    // checked - see GrblViewModel.IsDryRunMode.
+                    if (model.IsDryRunMode)
+                    {
+                        AppDialogs.Show("Dry run is not supported for SD card jobs - the controller runs them directly, so the sender cannot intercept spindle/coolant commands. Turn dry run off, or load the file into the sender instead.",
+                            "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
                     Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + model.FileName.Substring(7));
                 }
                 else
@@ -675,11 +704,41 @@ namespace CNC.Controls
                     probePending = jobHasProbe = false;
                     job.Started = job.Transferred = job.HasError = job.ToolChanged = false;
                     job.NextRow = Source.Data[job.CurrBlock];
+
+                    // Dry run has no effect in check mode - the controller doesn't move regardless of any
+                    // offset, so skip it there rather than leaving stray preamble commands queued for
+                    // nothing. Queued as a preamble on Source.Commands (mirrors "Start from this toolpath"'s
+                    // modal-reset prolog): it survives PurgeQueue below and is drained ahead of the first
+                    // program line, by SendNextLine (legacy path) or StreamPump.Start's own preamble drain
+                    // (buffered path). M5/M9 go first as a DEFENSIVE measure - the spindle/coolant might
+                    // already be on from a previous operation, and per-line suppression in the streamers
+                    // (GCodeBlock.HasSpindleOrCoolantOn) only neutralises commands IN the program, not
+                    // whatever state the machine is already in when dry run starts.
+                    //
+                    // Also gated on !(Source is a transient macro/tool run): dry-run is a loaded-job-only
+                    // toggle the operator arms from the Cycle Start menu on the Job tab - it must never leak
+                    // into a probing/wizard macro (Start Job, Load Stock, ...) streamed via RunStreamedJobInPlace,
+                    // which shares this same CycleStart. A stray G92 Z offset there corrupts the macro's own
+                    // positioning (e.g. a spoilboard probe search starting ~10mm+ too high and timing out) even
+                    // though the macro never armed dry run itself - it was simply still checked from an earlier,
+                    // unrelated loaded-job test.
+                    if ((dryRunActive = model.IsDryRunMode && model.GrblState.State != GrblStates.Check
+                                          && !((Source as GCode)?.IsTransient ?? false)))
+                    {
+                        double stockZ = ProgramView.LoadedJob != null && ProgramView.LoadedJob.IsLoadedJob ? ProgramView.LoadedJob.Stock.Z : 0d;
+                        double offset = 10d + stockZ;
+                        Source.Commands.Enqueue("M5");
+                        Source.Commands.Enqueue("M9");
+                        Source.Commands.Enqueue("G92Z-" + offset.ToInvariantString());
+                    }
+
                     Comms.com.PurgeQueue();
                     JobTimer.Start();
                     streamingHandler.Call(StreamingState.Send, false);
                     if ((job.IsChecking = model.GrblState.State == GrblStates.Check))
                         model.Message = (string)FindResource("Checking");
+                    else if (dryRunActive)
+                        model.Message = (string)FindResource("DryRun");
 
                     bool? res = null;
                     CancellationToken cancellationToken = new CancellationToken();
@@ -717,12 +776,34 @@ namespace CNC.Controls
             }
         }
 
+        // Clears the temporary dry-run Z offset (G92.1) once the job that set it ends - normal finish, error,
+        // or stop/alarm/connection-lost (all of which route through AbortPump). Deliberately does NOT re-send
+        // M5/M9 here - the run already forced them at start, and re-issuing them on every job end (including
+        // ordinary non-dry-run jobs, since AbortPump is the shared stop path) would fight a job that legitimately
+        // wants to leave the spindle running (M5 is not modal-safe to send blind). No-op if dry run wasn't
+        // active for the run that just ended.
+        private void ClearDryRunOffset()
+        {
+            if (dryRunActive)
+            {
+                dryRunActive = false;
+                Comms.com.WriteCommand("G92.1");
+                // Dry run is a per-run, deliberately-armed toggle, not a sticky mode - it must NOT silently
+                // stay checked into the NEXT run (finished, errored, or stopped/aborted all count: this
+                // fires from OnPumpJobFinished/OnPumpError/AbortPump, the same three paths that got here).
+                // Re-arming it for another dry run is one click; staying silently armed (or silently NOT
+                // armed) across unrelated runs is exactly the kind of state the operator can lose track of.
+                model.IsDryRunMode = false;
+            }
+        }
+
         // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.
         private void OnPumpJobFinished()
         {
             PumpLog.W("OnPumpJobFinished -> JobFinished, state=" + grblState.State);
             pumpActive = false;
             streamingHandler.Count = false;   // pump owned flow control; stop legacy line accounting so a late/trailing response can't re-enter it
+            ClearDryRunOffset();
             streamingHandler.Call(StreamingState.JobFinished, true);
         }
 
@@ -731,6 +812,7 @@ namespace CNC.Controls
             pumpActive = false;
             streamingHandler.Count = false;
             job.HasError = model.IsGrblHAL;
+            ClearDryRunOffset();
             streamingHandler.Call(StreamingState.Error, true);
         }
 
@@ -743,6 +825,7 @@ namespace CNC.Controls
                 streamingHandler.Count = false;
                 pump?.Abort();
             }
+            ClearDryRunOffset();
             idleKickTimer?.Stop();
         }
 
@@ -1482,7 +1565,7 @@ namespace CNC.Controls
                     // call found nothing to send at all - i.e. a real ack just arrived for the last
                     // outstanding write and nothing new was enqueued in the meantime. Getting this backwards
                     // (flipping to Idle the moment the LOCAL queue empties, right after writing) let a tight
-                    // caller loop (e.g. MacroProcessor.ExecuteMacro sending several lines in one C# loop with
+                    // caller loop (e.g. a macro sending several lines via SendCommand in one C# loop with
                     // no real per-line delay) see "Idle" between each SendCommand call and re-kick a fresh
                     // synthetic "go" send for every line - the whole burst went out with zero ack pacing,
                     // confirmed via a comms-tx trace: 14 lines / ~670 bytes in 6ms, before a single real ok
@@ -1521,6 +1604,18 @@ namespace CNC.Controls
                 // which parses (TOOL T=n D=.. TYPE=..) comments for material removal, so it must always get
                 // the full comment regardless of the setting.
                 if ((bool)job.NextRow.IsComment && !AppConfig.Settings.Base.SendComments && !AppConfig.Settings.Base.StartSimulator)
+                {
+                    line = "()";
+                    job.NextRow.Length = line.Length + 1;
+                }
+
+                // Dry-run/verify mode: neutralise spindle-on (M3/M4) and coolant-on (M7/M8) so the operator
+                // can watch the toolpath move without the spindle or coolant ever actually activating,
+                // regardless of what the loaded program contains - the Z-offset alone is NOT a safety
+                // feature, it only avoids hitting stock. HasSpindleOrCoolantOn is precomputed at load time
+                // from the real G-code parser's tokens (GCodeJob.ParseFileLines/AddBlock), not a regex
+                // re-check here. Mirrors StreamPump.SendNext's buffered-path equivalent.
+                else if (model.IsDryRunMode && job.NextRow.HasSpindleOrCoolantOn)
                 {
                     line = "()";
                     job.NextRow.Length = line.Length + 1;

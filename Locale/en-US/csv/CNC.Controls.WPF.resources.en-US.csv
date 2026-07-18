@@ -239,6 +239,7 @@ CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,str_Calibration
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,str_CalibrationInstructions7:System.String.$Content,None,True,True,,7. Repeat from step 4 (or 3). until the measured distance matches the commanded distance with the required accuracy.
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationwizard.baml,str_CalibrationWarnings:System.String.$Content,None,True,True,,Make sure there is room for the axis to move and avoid collision. Return move will add 0.5mm overshoot to remove any backlash from subsequent measurements.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_checking:System.String.$Content,None,True,True,,Checking...
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_dryrun:System.String.$Content,None,True,True,,Dry run - spindle/coolant forced off...
 CNC.Controls.WPF.g.en-US.resources:statuscontrol.baml,str_clearEStop:System.String.$Content,None,True,True,,Clear E-Stop before &lt;Reset&gt;&gt;
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_convBlockOfBlocks:System.String.$Content,None,True,True,,Block: {0}/{1}
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_convNumBlocks:System.String.$Content,None,True,True,,Blocks: {1}
@@ -1111,3 +1112,5 @@ CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,chk_viewAll:System.Windows.Fr
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Install or update the controller-side macros (tc, pcorner) on the controller's LittleFS - required for the Start Job / automatic tool-change sequence."
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btn_upload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Upload a local file to the controller's storage.
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Dry run (spindle/coolant forced off)
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Next run: offset Z clear of stock AND force the spindle/coolant off for the whole run, regardless of what the program contains - watch the toolpath without cutting or spinning anything."

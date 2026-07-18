@@ -77,6 +77,12 @@ namespace CNC.Controls
 
         private readonly bool _transient;
 
+        // True for a macro/tool-generated run (RunStreamedJobInPlace) - a standalone program built with
+        // AddBlock that is streamed WITHOUT becoming the loaded job. Lets CycleStart tell "the operator's
+        // loaded job" apart from "a probing/wizard macro's own g-code", so job-tab-only features (dry-run
+        // mode's Z offset + spindle/coolant suppression) don't leak into macro runs that never armed them.
+        public bool IsTransient { get { return _transient; } }
+
         private GCode()
         {
             Program.FileChanged += Program_FileChanged;
@@ -103,6 +109,13 @@ namespace CNC.Controls
         {
             if (_transient)
                 return;   // a transient (tool-run) program never touches the shared Model or the simulator
+
+            // Dry-run mode is a per-run, deliberately-armed toggle (see GrblViewModel.IsDryRunMode) - it must
+            // never silently carry over onto a DIFFERENT program the operator just loaded. This is the single
+            // point both Load File/Load Folder funnel through (see the comment below), so it can't be missed
+            // by loading via a different route.
+            if (Model != null)
+                Model.IsDryRunMode = false;
 
             // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File/Load
             // Folder - this is the single point both funnel through (GCodeJob.FileChanged), so callers (e.g.

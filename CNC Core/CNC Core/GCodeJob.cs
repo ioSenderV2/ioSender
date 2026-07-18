@@ -124,6 +124,14 @@ namespace CNC.Core
         public bool ProgramEnd { get; set; }
         public bool Ok { get; set; }
 
+        // Set at load time (see GCodeJob.ParseFileLines/AddBlock) from the real G-code parser's tokens for
+        // this line - true iff it contains a spindle-ON (M3/M4) or coolant-ON (M7/M8) command. Consulted by
+        // the streamers (StreamPump.SendNext, JobControl.SendNextLine) to neutralise the line when dry-run/
+        // verify mode is active - see GrblViewModel.IsDryRunMode. NOT set for O-word/#-expression lines that
+        // bypass the parser (GrblInfo.ExpressionsSupported passthrough) - those are macro control flow, not
+        // raw spindle commands, in normal use.
+        public bool HasSpindleOrCoolantOn { get; set; }
+
         // Outline grouping: set when a program is assembled from a folder of
         // per-toolpath files (see GCode.LoadFolder). Null for ordinary single-
         // file loads (the Program list then renders flat, ungrouped).
@@ -158,6 +166,23 @@ namespace CNC.Core
                 sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
             sb.Append(s, close, s.Length - close);
             return sb.ToString();
+        }
+
+        // True iff the tokens just produced by Parser.ParseBlock for the current line include a spindle-ON
+        // (M3/M4) or coolant-ON (M7/M8) command - checked via the real parser's token types, not a regex
+        // guess, so it can't be fooled by e.g. an M3 mentioned inside a comment. Call this IMMEDIATELY after
+        // a successful ParseBlock, before Tokens is overwritten by the next line. See GCodeBlock.
+        // HasSpindleOrCoolantOn for why this exists (dry-run/verify mode spindle safety).
+        private bool CurrentLineHasSpindleOrCoolantOn()
+        {
+            foreach (var t in Parser.Tokens)
+            {
+                if (t is GCSpindleState && (t.Command == Commands.M3 || t.Command == Commands.M4))
+                    return true;
+                if (t is GCCoolantState && (t.Command == Commands.M7 || t.Command == Commands.M8))
+                    return true;
+            }
+            return false;
         }
 
         private string filename = string.Empty;
@@ -292,7 +317,7 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd));
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn() });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -345,11 +370,15 @@ namespace CNC.Core
 
                 // O-word flow (O<name> CALL/IF/WHILE/...) and #-expression lines are evaluated by the CONTROLLER,
                 // not by this block parser. When the controller supports expressions keep them VERBATIM rather
-                // than dropping them - and NEVER prefix an O-word line with a line number (a leading N breaks the
-                // controller's O-word routing) - so generated O-word programs (e.g. Load Stock's corner probe)
-                // can be streamed with flow control instead of being forced onto the MDI path.
+                // than dropping them - and NEVER prefix an O-word OR #-parameter line with a line number (a
+                // leading N breaks the controller's O-word routing, and - confirmed via a real Start Job failure,
+                // error:2 "Bad number format" - ALSO breaks a #<name>=[expr] assignment: "N470#<name>=..." with
+                // no separating space isn't recognised as a parameter assignment) - so generated O-word programs
+                // (e.g. Load Stock's corner probe) and their #<_name>=value setup lines can be streamed with flow
+                // control instead of being forced onto the MDI path.
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
+                bool isParamLine = ts.Length > 0 && ts[0] == '#';
                 bool passThrough = GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0);
 
                 bool parsed;
@@ -360,17 +389,20 @@ namespace CNC.Core
                 {
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
-                    // with error:25). Also never number an O-word line (a leading N breaks O-word routing).
+                    // with error:25). Also never number an O-word or #-parameter line (see above).
                     string nt = block.TrimStart();
                     bool alreadyNumbered = nt.Length > 1 && (nt[0] == 'N' || nt[0] == 'n') && char.IsDigit(nt[1]);
-                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !alreadyNumbered)
+                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !isParamLine && !alreadyNumbered)
                     {
                         LineNumber += 10;
                         block = "N" + LineNumber.ToString() + block;
                     } else
                         LineNumber++;
 
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd));
+                    // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
+                    // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
+                    // successfully - only trust it right after ParseBlock itself returned true.
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();

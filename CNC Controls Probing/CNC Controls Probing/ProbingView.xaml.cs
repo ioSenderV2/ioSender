@@ -45,6 +45,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using System.Threading.Tasks;
 using CNC.Core;
+using CNC.Controls;
 using CNC.GCode;
 
 namespace CNC.Controls.Probing
@@ -236,7 +237,7 @@ namespace CNC.Controls.Probing
                 var macro = AppConfig.Settings.Macros.FirstOrDefault(o => o.Id == id);
                 if (macro != null && AppDialogs.Show(string.Format((string)FindResource("RunMacro"), macro.Name), "Run macro", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
-                    model.Grbl.ExecuteMacro(macro.Code);
+                    MacroProcessor.Run(model.Grbl, macro.Name, macro.Code);
                     return true;
                 }
             }

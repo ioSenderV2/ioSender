@@ -43,6 +43,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Collections.Concurrent;
 using CNC.Core;
+using CNC.Controls;
 using CNC.GCode;
 
 namespace CNC.Controls.Probing
@@ -94,7 +95,7 @@ namespace CNC.Controls.Probing
         {
             if (probing.Macro.SelectedMacro != null) {
                 if(success && probing.Macro.PostJobCommands.Length > 0)
-                    Grbl.ExecuteMacro(probing.Macro.PostJobCommands);
+                    MacroProcessor.Run(Grbl, probing.Macro.SelectedMacro.Name, string.Join("\n", probing.Macro.PostJobCommands));
                 if (probing.Macro.RunOnce)
                     probing.Macro.Clear();
             }

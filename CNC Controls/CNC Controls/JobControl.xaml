@@ -13,6 +13,7 @@
         <system:String x:Uid="str_stop" x:Key="JobStop">Stop</system:String>
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <system:String x:Uid="str_checking" x:Key="Checking">Checking...</system:String>
+        <system:String x:Uid="str_dryrun" x:Key="DryRun">Dry run - spindle/coolant forced off...</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
         <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
              leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
@@ -41,6 +42,14 @@
                     <MenuItem x:Uid="mnu_checkMode" x:Name="miCheckMode" Header="Check mode ($C)" IsCheckable="True"
                               IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}" Click="miCheckMode_Click"
                               ToolTip="Toggle grbl check mode - the controller parses the program without moving, to validate it before a real run."/>
+                    <!-- Sender-side toggle (not a grbl state): the next run offsets Z up by 10mm + stock thickness
+                         (G92) AND forces the spindle/coolant off for the whole run, REGARDLESS of what the loaded
+                         program contains - M3/M4/M7/M8 lines are neutralised as they're sent, and M5/M9 are sent
+                         as a preamble in case the spindle/coolant were already on. Lets the toolpath be watched
+                         move without cutting or spinning. See GrblViewModel.IsDryRunMode / JobControl.CycleStart. -->
+                    <MenuItem x:Uid="mnu_dryRun" x:Name="miDryRun" Header="Dry run (spindle/coolant forced off)" IsCheckable="True"
+                              IsChecked="{Binding Path=IsDryRunMode, Mode=OneWay}" Click="miDryRun_Click"
+                              ToolTip="Next run: offset Z clear of stock AND force the spindle/coolant off for the whole run, regardless of what the program contains - watch the toolpath without cutting or spinning anything."/>
                 </ContextMenu>
             </Button.ContextMenu>
         </Button>

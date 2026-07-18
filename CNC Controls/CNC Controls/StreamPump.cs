@@ -250,6 +250,18 @@ namespace CNC.Controls
                     len = line.Length + 1;
                 }
 
+                // Dry-run/verify mode: neutralise spindle-on (M3/M4) and coolant-on (M7/M8) so the operator
+                // can watch the toolpath move without the spindle or coolant ever actually activating,
+                // regardless of what the loaded program contains - the Z-offset alone is NOT a safety
+                // feature, it only avoids hitting stock. Local rewrite only (same pattern as the comment
+                // case above); HasSpindleOrCoolantOn is precomputed at load time from the real G-code
+                // parser's tokens (GCodeJob.ParseFileLines/AddBlock), not a fragile regex re-check here.
+                else if (model.IsDryRunMode && block.HasSpindleOrCoolantOn)
+                {
+                    line = "()";
+                    len = line.Length + 1;
+                }
+
                 if (serialUsed < serialSize - len && (!jobHasProbe || inflight.Count < JobControl.ProbeLookahead))
                 {
                     // program-end markers (mirror the legacy SendNextLine bookkeeping)

@@ -42,7 +42,12 @@
  *                         developed by editing the file directly. The loaded contents are then
  *                         processed normally (they may use the directives above).
  *
- * Macros containing none of these directives run exactly as before (GrblViewModel.ExecuteMacro).
+ * Every macro, with or without directives, is streamed through the flow-controlled job streamer
+ * (see Flush below) - nothing generated here ever takes the raw MDI path. MDI is reserved
+ * exclusively for text the operator typed into the MDI box (JobControl.SendCommand), so a
+ * feature like dry-run mode (spindle/coolant suppression) that filters streamed content is a
+ * structural guarantee for every macro/wizard/probing run, not a heuristic that depends on what
+ * a burst happens to contain.
  */
 
 using System;
@@ -89,16 +94,13 @@ namespace CNC.Controls
         public static string ActiveProgramName;
 
         // Hook to stream a generated program with full flow control (Feed Hold/Stop live) WITHOUT touching the
-        // loaded job: args are (model, name, lines). Set by the shell (ioSender XL). EVERY streamed run goes
-        // through this - a tool that owns a ProgramView streams into it, a plain macro gets its own run view -
-        // so a run never overwrites the loaded program or hijacks the Job tab.
-        public static System.Action<GrblViewModel, string, string[]> RunStreamedJobInPlace;
-
-        // Above this many g-code lines a single flush is streamed through the flow-controlled job streamer
-        // (GCode.File + Cycle Start) instead of the MDI path. The MDI path has no character-counting flow
-        // control, so a large program overruns the controller's serial buffer (hanging it) and blocks the
-        // UI thread. Kept high enough that the small interactive macros (Load Stock etc.) stay on MDI.
-        private const int StreamLineThreshold = 40;
+        // loaded job: args are (model, name, lines, onDone). Set by the shell (ioSender XL). EVERY streamed run
+        // goes through this - a tool that owns a ProgramView streams into it, a plain macro gets its own run
+        // view - so a run never overwrites the loaded program or hijacks the Job tab. Cycle Start is deferred to
+        // a background dispatcher tick (see the implementation), so this call returns before the burst actually
+        // starts - onDone is invoked once it reaches a true terminal state, letting StreamProgram optionally
+        // wait for it (see Flush's 'wait' parameter) instead of racing the next burst against this one.
+        public static System.Action<GrblViewModel, string, string[], System.Action> RunStreamedJobInPlace;
 
         // Name given to the in-memory program when a flush is streamed (set per run).
         private static string _streamName = "Macro";
@@ -122,19 +124,8 @@ namespace CNC.Controls
 
             SaveGeneratedCopy(name, code);
 
-            // Fast path: no directives -> identical to the previous behaviour (confirm if asked).
-            if (code.IndexOf("(PREREQ", StringComparison.OrdinalIgnoreCase) < 0 &&
-                 code.IndexOf("(MBOX", StringComparison.OrdinalIgnoreCase) < 0 &&
-                  code.IndexOf("(WAITIDLE", StringComparison.OrdinalIgnoreCase) < 0 &&
-                   code.IndexOf("(PROMPT", StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                if (confirm && !ConfirmRun(name))
-                    return false;
-                model.ExecuteMacro(code);
-                return true;
-            }
-
             string[] lines = code.Replace("\r", string.Empty).Split('\n');
+            var buffer = new StringBuilder();
 
             // 1) Prerequisites - evaluated up front, before anything is streamed.
             var conditions = new List<string>();
@@ -191,16 +182,15 @@ namespace CNC.Controls
                 if (!ShowPromptDialog(name, fields))
                     return false;   // cancelled
 
-                var assignments = new StringBuilder();
+                // Assign the globals on the controller before the body runs (so $F=<file> jobs can read
+                // them too) - folded into the same streamed buffer as everything else, never MDI.
                 foreach (var field in fields)
-                    assignments.Append(field.Param).Append('=').Append(field.Value).Append('\n');
-                model.ExecuteMacro(assignments.ToString());
+                    buffer.Append(field.Param).Append('=').Append(field.Value).Append('\n');
             }
             else if (confirm && !ConfirmRun(name))
                 return false;
 
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
-            var buffer = new StringBuilder();
             foreach (var raw in lines)
             {
                 if (IsDirective(raw, "PREREQ"))
@@ -211,7 +201,7 @@ namespace CNC.Controls
                     // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
                     if (Body(raw, "PROMPT").Trim().Length == 0)
                     {
-                        Flush(model, buffer);
+                        Flush(model, buffer, true);
                         if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
                                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                             return false;
@@ -221,7 +211,7 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "MBOX"))
                 {
-                    Flush(model, buffer);
+                    Flush(model, buffer, true);
                     if (!ShowMBox(name, raw))
                         return false;   // Cancel / No - stop here
                     continue;
@@ -229,7 +219,7 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "WAITIDLE"))
                 {
-                    Flush(model, buffer);
+                    Flush(model, buffer, true);
                     if (!WaitForIdle(model))
                     {
                         ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
@@ -241,7 +231,7 @@ namespace CNC.Controls
 
                 buffer.Append(SanitizeComment(ApplySubstitutions(raw, fields))).Append('\n');
             }
-            Flush(model, buffer);
+            Flush(model, buffer, false);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
 
             return true;
         }
@@ -295,12 +285,23 @@ namespace CNC.Controls
             return result;
         }
 
-        // Send the accumulated g-code. A SMALL burst goes via the MDI path (as before) - fine between
-        // directives and required for O-word/parameter macros the streamer's block parser can't handle.
-        // A LARGE burst (a real cutting program) is run through the normal job streamer instead: it has
-        // character-counting flow control and runs on a background thread, so it can't overrun the
-        // controller's serial buffer or freeze the UI - and feed-hold/stop/overrides/progress all work.
-        private static void Flush(GrblViewModel model, StringBuilder buffer)
+        // Send the accumulated g-code. EVERY burst - however small - goes through the flow-controlled job
+        // streamer, never the MDI path: MDI has no character-counting flow control, so a burst sent that way
+        // can overrun the controller's serial buffer (hanging it), blocks the UI thread while it goes out
+        // synchronously, and leaves Feed Hold/Stop queued BEHIND it instead of taking effect immediately.
+        // Reserving MDI for operator-typed text only also means a sender-side content filter (e.g. dry-run
+        // mode's spindle/coolant suppression, see GCodeBlock.HasSpindleOrCoolantOn) is a hard guarantee for
+        // every macro/wizard/probing run - it can't be bypassed by a burst that happens to look "too small
+        // to matter".
+        //
+        // 'wait': RunStreamedJobInPlace only KICKS OFF a burst (Cycle Start is deferred to a dispatcher tick,
+        // it does not run synchronously here) - it shares one RunControl.Source field across every burst, so a
+        // second Flush() before the first burst's deferred Cycle Start has even fired would silently overwrite
+        // it and drop the first burst entirely. Callers with more macro content still to come (before an
+        // MBOX/WAITIDLE/prompt gate) MUST pass wait=true so this burst genuinely finishes first - restoring the
+        // strict ordering the old MDI queue gave for free. The macro's FINAL burst passes wait=false (fire and
+        // forget) so a "Run" click doesn't block until the physical job completes.
+        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait)
         {
             if (buffer.Length == 0)
                 return;
@@ -309,61 +310,43 @@ namespace CNC.Controls
             buffer.Clear();
 
             var lines = code.Replace("\r", string.Empty).Split('\n');
-            int n = 0;
-            bool hasOwordOrExpr = false, hasCall = false, hasFeed = false;
+
+            bool hasOwordOrExpr = false;
             foreach (var l in lines)
             {
                 string t = l.Trim();
                 if (t.Length == 0)
                     continue;
-                n++;
-                bool oword = t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0;
-                if (oword)
-                    hasCall = true;                       // an O-word CALL moves the machine via the called macro
-                if (oword || t.IndexOf('#') >= 0)
+                if (t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || t.IndexOf('#') >= 0)
                     hasOwordOrExpr = true;
-                // A feed/cut move (G1/G2/G3, incl. G01..). Its presence - not line count - is what makes a
-                // burst dangerous to flood: see below.
-                if (!hasFeed && Regex.IsMatch(t, @"(?<![0-9])[Gg]0*[123](?![0-9])"))
-                    hasFeed = true;
             }
 
-            // O-word/#-expression lines can only go through the streamer when the controller evaluates
-            // expressions (the job loader now passes them verbatim in that case, unnumbered); otherwise they
-            // must stay on the MDI path, which forwards them line-by-line for the controller to interpret.
-            bool canStream = !hasOwordOrExpr || GrblInfo.ExpressionsSupported;
-
-            // CRITICAL (safety): anything that actually MOVES the machine - a feed/cut move, or an O-word CALL
-            // (which moves via the called macro) - or a large burst MUST go through the flow-controlled job
-            // streamer, never the MDI path. The MDI path has no character-counting flow control, so a realtime
-            // Feed Hold / Stop queues BEHIND the whole burst and Hold/Stop appear DEAD until it drains, and the
-            // long synchronous send blocks the UI thread (the hourglass). The streamer keeps only ~one planner
-            // buffer outstanding, so realtime commands take effect at once and the UI stays live. No-motion
-            // setup bursts (a few G10/G54/#-set lines between prompts) stay on the quick MDI path.
-            bool mustStream = canStream && (hasFeed || hasCall || n > StreamLineThreshold);
-
-            PumpLog.W(string.Format("FLUSH n={0} hasCall={1} hasFeed={2} hasOwordOrExpr={3} exprSupported={4} canStream={5} mustStream={6}",
-                n, hasCall, hasFeed, hasOwordOrExpr, GrblInfo.ExpressionsSupported, canStream, mustStream));
-
-            if (mustStream)
+            // O-word/#-expression lines can only be streamed verbatim when the controller evaluates
+            // expressions itself (GCodeJob's passthrough, unnumbered); a controller that doesn't report
+            // that support cannot be sent this content at all through ioSender - there is no safe fallback
+            // (MDI is reserved for typed text), so refuse outright rather than send it unfiltered.
+            if (hasOwordOrExpr && !GrblInfo.ExpressionsSupported)
             {
-                if (RunStreamedJobInPlace == null)
-                {
-                    // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
-                    ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
-                        "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                StreamProgram(model, lines);
+                ShowMessage("This macro uses O-word/parameter (#) syntax, which needs the controller to support NGC expressions (EXPR). This controller does not report that support, so ioSender cannot run it.",
+                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
-            else
-                model.ExecuteMacro(code);
+
+            if (RunStreamedJobInPlace == null)
+            {
+                // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
+                ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
+                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            StreamProgram(model, lines, wait);
         }
 
         // Hand a g-code burst to the host to stream with full flow control, into a ProgramView, WITHOUT touching
         // the loaded job. A run flushes several bursts (a park move, then each O<...> CALL); every one takes this
         // path, so a run never overwrites the loaded program or hijacks the Job tab.
-        private static void StreamProgram(GrblViewModel model, string[] lines)
+        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait)
         {
             var code = new List<string>();
             foreach (var l in lines)
@@ -375,7 +358,12 @@ namespace CNC.Controls
             if (code.Count == 0)
                 return;
 
-            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray());
+            bool done = false;
+            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), () => done = true);
+
+            if (wait)
+                while (!done)
+                    EventUtils.DoEvents();
         }
 
         // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -

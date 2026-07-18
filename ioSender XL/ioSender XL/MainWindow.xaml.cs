@@ -168,7 +168,7 @@ namespace GCode_Sender
 
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code) => RunStreamedJobInPlace(m, name, code);
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, onDone) => RunStreamedJobInPlace(m, name, code, onDone);
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
             // instance must not become a pipe listener either, or a later normal launch would silently
@@ -890,10 +890,13 @@ namespace GCode_Sender
         // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
         // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
         // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code)
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, System.Action onDone)
         {
             if (code == null || code.Length == 0)
+            {
+                onDone?.Invoke();
                 return;
+            }
 
             var prog = new CNC.Controls.GCode(m);                        // transient - does not mutate the job/Model
             prog.AddBlock(name, CNC.Core.Action.New);
@@ -916,7 +919,7 @@ namespace GCode_Sender
                 _macroRunView.SetProgram(prog.Data);
                 _macroRunView.Connect();
             }
-            RestoreSourceOnEnd(m, prog);       // revert to the job source when THIS burst ends
+            RestoreSourceOnEnd(m, prog, onDone);   // revert to the job source when THIS burst ends, then signal completion
 
             // Defer CycleStart to a clean dispatcher cycle. Starting it synchronously
             // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
@@ -927,8 +930,9 @@ namespace GCode_Sender
         }
 
         // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
-        // arm on the first running state, fire on the next terminal one, then unsubscribe.
-        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog)
+        // arm on the first running state, fire on the next terminal one, then unsubscribe. onDone (may be null)
+        // is MacroProcessor's completion signal for THIS burst - see Flush's 'wait' parameter.
+        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, System.Action onDone)
         {
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
@@ -942,8 +946,11 @@ namespace GCode_Sender
                 // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
                 // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
                 // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
-                // clears ActiveRun) at JobFinished would close that gate mid-finalization and hang the run.
-                else if (started && (st == StreamingState.Idle || st == StreamingState.NoFile))
+                // clears ActiveRun) at JobFinished would close that gate mid-finalization and hang the run. Error/
+                // Halted are ALSO terminal here (a failed burst - e.g. a probe miss - stays in Error until the
+                // operator clicks Stop/Reset): MacroProcessor.Flush can block on onDone (see its 'wait' param), so
+                // this must fire on a failure too, or a mid-macro error would hang Run() until manual intervention.
+                else if (started && (st == StreamingState.Idle || st == StreamingState.NoFile || st == StreamingState.Error || st == StreamingState.Halted))
                 {
                     m.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(() =>
@@ -964,6 +971,7 @@ namespace GCode_Sender
                             _macroRunViewTimer.Stop();
                             _macroRunViewTimer.Start();
                         }
+                        onDone?.Invoke();
                     }));
                 }
             };
