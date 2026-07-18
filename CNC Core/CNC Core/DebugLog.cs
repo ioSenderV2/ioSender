@@ -10,13 +10,13 @@
  * flagged run, WITHOUT hand-rolling a throwaway logger and tearing it down again.
  *
  * Companion to the crash log (App.xaml.cs) and the serial-wire Console verbose log;
- * this one is for app-internal state/flow, not the wire protocol.
+ * this one is for app-internal state/flow, not the wire protocol. File creation and size-based
+ * rotation are handled by LogFile - the same primitive ConsoleLog and the crash logger use; this
+ * class just owns the enable flag, the category filter, and line formatting.
  */
 
 using System;
 using System.Globalization;
-using System.IO;
-using System.Text;
 
 namespace CNC.Core
 {
@@ -27,18 +27,14 @@ namespace CNC.Core
     public static class DebugLog
     {
         private static readonly object _sync = new object();
-        private static string _path;
+        private static LogFile _log;
         private static System.Collections.Generic.HashSet<string> _categories; // null = all categories
-
-        // Guard against a single unbounded file across long sessions: when the log passes
-        // this size it is rolled to ".1" (previous ".1" discarded) and a fresh file started.
-        private const long MaxBytes = 8 * 1024 * 1024;
 
         /// <summary>True when tracing is on. Callers may test this to skip building an expensive message.</summary>
         public static bool Enabled { get; private set; }
 
         /// <summary>Full path of the active log file, or empty when disabled.</summary>
-        public static string LogPath { get { return _path ?? string.Empty; } }
+        public static string LogPath { get { return _log?.Path ?? string.Empty; } }
 
         /// <summary>
         /// Turn tracing on. <paramref name="enabled"/> is normally the result of the "-debuglog" flag /
@@ -63,14 +59,11 @@ namespace CNC.Core
                         _categories.Add(c.Trim());
                 }
 
-                try
+                _log = LogFile.Open("ioSender.debug");
+                if (_log == null)
                 {
-                    _path = Path.Combine(Resources.ResolveLogsDirectory(), "ioSender.debug.log");
-                }
-                catch
-                {
-                    try { _path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ioSender.debug.log"); }
-                    catch { _path = null; Enabled = false; return; }
+                    Enabled = false;
+                    return;
                 }
 
                 // Run-start banner so multiple runs appended to the same file stay separable.
@@ -121,26 +114,7 @@ namespace CNC.Core
         {
             lock (_sync)
             {
-                if (_path == null)
-                    return;
-                try
-                {
-                    try
-                    {
-                        var fi = new FileInfo(_path);
-                        if (fi.Exists && fi.Length > MaxBytes)
-                        {
-                            string bak = _path + ".1";
-                            if (File.Exists(bak))
-                                File.Delete(bak);
-                            File.Move(_path, bak);
-                        }
-                    }
-                    catch { /* rotation is best-effort */ }
-
-                    File.AppendAllText(_path, text, Encoding.UTF8);
-                }
-                catch { /* logging must never take the app down */ }
+                _log?.Write(text);
             }
         }
     }

@@ -9,8 +9,10 @@
  *
  * A fresh, timestamped file per run (rather than one ever-growing appended file) keeps each
  * ioSender launch's log independently identifiable - useful when correlating a specific repro
- * attempt against its own log rather than scrolling through prior runs first. Old files are
- * pruned by age on startup so they don't accumulate forever.
+ * attempt against its own log rather than scrolling through prior runs first. "latest_console.log"
+ * is (hard-)linked to the current run's file so it never has to be hunted down by timestamp.
+ * File creation, size-based rotation and age-based pruning are all handled by LogFile - the same
+ * primitive DebugLog and the crash logger use.
  *
  * The write itself runs on a dedicated background thread, fed by a BlockingCollection queue -
  * ResponseLog changes are appended to the UI thread (Dispatcher-marshalled), so the file I/O
@@ -20,8 +22,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.IO;
-using System.Text;
 using System.Threading;
 
 namespace CNC.Core
@@ -29,30 +29,22 @@ namespace CNC.Core
     public static class ConsoleLog
     {
         private static readonly BlockingCollection<string> _queue = new BlockingCollection<string>();
-        private static string _path;
+        private static LogFile _log;
         private static Thread _writer;
-
-        // Guard against a single unbounded file across long sessions: when the log passes this
-        // size it is rolled to ".1" (previous ".1" discarded) and a fresh file started.
-        private const long MaxBytes = 8 * 1024 * 1024;
-
-        /// <summary>Full path of the active log file, or empty if logging couldn't start.</summary>
-        public static string LogPath { get { return _path ?? string.Empty; } }
 
         // Best-effort retention: run-timestamped files never get overwritten (unlike the old single
         // appended console.log), so without pruning they'd accumulate forever.
         private const int RetentionDays = 10;
 
+        /// <summary>Full path of the active log file, or empty if logging couldn't start.</summary>
+        public static string LogPath { get { return _log?.Path ?? string.Empty; } }
+
         /// <summary>Start the background writer. Safe to call once at startup; never throws.</summary>
         public static void Init()
         {
-            try
-            {
-                string dir = Resources.ResolveLogsDirectory();
-                PruneOld(dir);
-                _path = Path.Combine(dir, "console_" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture) + ".log");
-            }
-            catch { _path = null; return; }
+            _log = LogFile.Open("console", perRun: true, retentionDays: RetentionDays, latestLinkName: "latest_console.log");
+            if (_log == null)
+                return;
 
             _writer = new Thread(WriterLoop) { IsBackground = true, Name = "ConsoleLogWriter" };
             _writer.Start();
@@ -63,28 +55,10 @@ namespace CNC.Core
                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)));
         }
 
-        private static void PruneOld(string dir)
-        {
-            try
-            {
-                DateTime cutoff = DateTime.Now.AddDays(-RetentionDays);
-                foreach (string file in Directory.GetFiles(dir, "console_*.log*"))
-                {
-                    try
-                    {
-                        if (File.GetLastWriteTime(file) < cutoff)
-                            File.Delete(file);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-        }
-
         /// <summary>Mirror one console line to the log. No-op if Init wasn't called or failed.</summary>
         public static void Write(string line)
         {
-            if (_path == null || line == null)
+            if (_log == null || line == null)
                 return;
             Enqueue(string.Format(CultureInfo.InvariantCulture, "{0}  {1}",
                 DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture), line));
@@ -98,21 +72,7 @@ namespace CNC.Core
         private static void WriterLoop()
         {
             foreach (var line in _queue.GetConsumingEnumerable())
-            {
-                try
-                {
-                    var fi = new FileInfo(_path);
-                    if (fi.Exists && fi.Length > MaxBytes)
-                    {
-                        string bak = _path + ".1";
-                        if (File.Exists(bak))
-                            File.Delete(bak);
-                        File.Move(_path, bak);
-                    }
-                    File.AppendAllText(_path, line + "\r\n", Encoding.UTF8);
-                }
-                catch { /* logging must never take the app down */ }
-            }
+                _log.Write(line + "\r\n");
         }
     }
 }

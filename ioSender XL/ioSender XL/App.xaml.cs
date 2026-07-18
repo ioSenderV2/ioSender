@@ -372,15 +372,13 @@ namespace GCode_Sender
         }
 
         // Append a timestamped crash entry to %AppData%\ioSender\logs\ioSender.crash.log (falls back to the
-        // app folder if the config dir isn't resolved yet, e.g. a crash during early startup). Returns the
-        // path written, or a best-effort path string if the write itself failed. Never throws.
+        // app folder if the config dir isn't resolved yet, e.g. a crash during early startup). File creation
+        // and the 8MB/.1 size rollover are handled by LogFile - the same primitive ConsoleLog/DebugLog use.
+        // Returns the path written, or a best-effort path string if the write itself failed. Never throws.
         private static string WriteCrashLog(string source, Exception ex)
         {
-            string dir;
-            try { dir = CNC.Core.Resources.ResolveLogsDirectory(); }
-            catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
-
-            string path = Path.Combine(dir, "ioSender.crash.log");
+            var log = CNC.Core.LogFile.Open("ioSender.crash");
+            string path = log?.Path ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ioSender.crash.log");
 
             try
             {
@@ -392,7 +390,7 @@ namespace GCode_Sender
                 sb.AppendLine("Exception  :");
                 sb.AppendLine(ex?.ToString() ?? "(no exception object)");
                 sb.AppendLine();
-                File.AppendAllText(path, sb.ToString());
+                log?.Write(sb.ToString());
             }
             catch { /* last resort: nothing more we can do */ }
 
