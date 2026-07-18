@@ -725,11 +725,39 @@ namespace CNC.Controls
                     if ((dryRunActive = model.IsDryRunMode && model.GrblState.State != GrblStates.Check
                                           && !((Source as GCode)?.IsTransient ?? false)))
                     {
-                        double stockZ = ProgramView.LoadedJob != null && ProgramView.LoadedJob.IsLoadedJob ? ProgramView.LoadedJob.Stock.Z : 0d;
+                        // DeclaredStock (NOT the .Stock property) - .Stock falls back to the machine's FULL
+                        // Z travel range as a conservative default when the program has no (STOCK ...)
+                        // comment, which is right for other features but wildly wrong here. No declaration
+                        // = 0 extra clearance, not the whole machine.
+                        double stockZ = ProgramView.LoadedJob != null && ProgramView.LoadedJob.IsLoadedJob ? (ProgramView.LoadedJob.DeclaredStock?.Z ?? 0d) : 0d;
                         double offset = 10d + stockZ;
                         Source.Commands.Enqueue("M5");
                         Source.Commands.Enqueue("M9");
-                        Source.Commands.Enqueue("G92Z-" + offset.ToInvariantString());
+                        // G21 first: offset is always computed in mm (stockZ from DeclaredStock.Z, which the
+                        // Fusion post always declares in mm) - without forcing units here, this preamble runs
+                        // in WHATEVER modal state the controller happens to be in at Cycle Start (leftover
+                        // from an earlier G20 command, a previous job, etc.), and a G20 (inch) controller
+                        // reads "G92Z-17" as -17 IN (~432mm), not -17mm - a massive, silent overshoot instead
+                        // of the intended small clearance.
+                        Source.Commands.Enqueue("G21");
+
+                        // "G92 Zk" does NOT set an absolute offset - it makes WHEREVER THE MACHINE CURRENTLY
+                        // IS read as work-Z=k. The bug this replaces just sent "G92Z-<offset>" unconditionally,
+                        // which only gives the intended clearance if the machine happens to already be sitting
+                        // at the stock surface when Cycle Start runs - it never was (typically wherever the
+                        // last job/macro parked, e.g. Start Job's G30). Confirmed on real hardware: a machine
+                        // parked ~67mm above the true stock plus the intended 17mm clearance gave a 84mm gap,
+                        // not 17mm - exactly this bug's arithmetic.
+                        //
+                        // Fix: compute the k that ACTUALLY produces "work-zero is offset mm above the true
+                        // stock", using where the machine really is right now (MachinePosition, live) and
+                        // where work-zero really is right now (WorkPositionOffset, live - assumes G92 is 0
+                        // here, which ClearDryRunOffset's G92.1 guarantees between runs). Derivation: G92 Zk
+                        // sets WCO_new = MachinePosition.Z - k; we want WCO_new = WorkPositionOffset.Z + offset
+                        // (true work-zero, shifted up by the clearance) => k = MachinePosition.Z -
+                        // (WorkPositionOffset.Z + offset).
+                        double k = model.MachinePosition.Z - (model.WorkPositionOffset.Z + offset);
+                        Source.Commands.Enqueue("G92Z" + k.ToInvariantString());
                     }
 
                     Comms.com.PurgeQueue();

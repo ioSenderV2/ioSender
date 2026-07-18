@@ -177,15 +177,23 @@ namespace CNC.Core
             return sb.ToString();
         }
 
-        // True iff the tokens just produced by Parser.ParseBlock for the current line include a spindle-ON
-        // (M3/M4) or coolant-ON (M7/M8) command - checked via the real parser's token types, not a regex
-        // guess, so it can't be fooled by e.g. an M3 mentioned inside a comment. Call this IMMEDIATELY after
-        // a successful ParseBlock, before Tokens is overwritten by the next line. See GCodeBlock.
-        // HasSpindleOrCoolantOn for why this exists (dry-run/verify mode spindle safety).
-        private bool CurrentLineHasSpindleOrCoolantOn()
+        // Parser.Tokens is a CUMULATIVE, whole-file list (Parser.Reset() clears it once per file load, not
+        // per ParseBlock() call - CarveView/Viewer/GCodeRotate/GCodeWrap/GCodeCompress/GCodeTransform/
+        // ArcsToLines/StartJobView etc. all rely on it staying that way). The two helpers below must only
+        // look at the tokens THIS call to ParseBlock just appended - NOT the whole list - or the first M3/M6
+        // anywhere in a file would flag every line after it too (confirmed on real hardware: a dry run with
+        // an early tool change silently turned the entire rest of the program into no-op comments - hundreds
+        // of instant acks, zero motion). Callers pass the Tokens.Count captured BEFORE the ParseBlock call.
+
+        // True iff the tokens just produced by Parser.ParseBlock for the current line (Parser.Tokens[tokenStart..])
+        // include a spindle-ON (M3/M4) or coolant-ON (M7/M8) command - checked via the real parser's token
+        // types, not a regex guess, so it can't be fooled by e.g. an M3 mentioned inside a comment. See
+        // GCodeBlock.HasSpindleOrCoolantOn for why this exists (dry-run/verify mode spindle safety).
+        private bool CurrentLineHasSpindleOrCoolantOn(int tokenStart)
         {
-            foreach (var t in Parser.Tokens)
+            for (int i = tokenStart; i < Parser.Tokens.Count; i++)
             {
+                var t = Parser.Tokens[i];
                 if (t is GCSpindleState && (t.Command == Commands.M3 || t.Command == Commands.M4))
                     return true;
                 if (t is GCCoolantState && (t.Command == Commands.M7 || t.Command == Commands.M8))
@@ -194,13 +202,13 @@ namespace CNC.Core
             return false;
         }
 
-        // True iff the tokens just produced by Parser.ParseBlock for the current line include M6 (tool
-        // change). Same calling convention/reasoning as CurrentLineHasSpindleOrCoolantOn - see
-        // GCodeBlock.HasToolChange.
-        private bool CurrentLineHasToolChange()
+        // True iff the tokens just produced by Parser.ParseBlock for the current line (Parser.Tokens[tokenStart..])
+        // include M6 (tool change). Same calling convention/reasoning as CurrentLineHasSpindleOrCoolantOn -
+        // see GCodeBlock.HasToolChange.
+        private bool CurrentLineHasToolChange(int tokenStart)
         {
-            foreach (var t in Parser.Tokens)
-                if (t.Command == Commands.M6)
+            for (int i = tokenStart; i < Parser.Tokens.Count; i++)
+                if (Parser.Tokens[i].Command == Commands.M6)
                     return true;
             return false;
         }
@@ -313,6 +321,7 @@ namespace CNC.Core
                     if (block.Length > 1 && block[0] == '(')
                         block = SanitizeCommentParens(block);
 
+                    int tokenStart = Parser.Tokens.Count;
                     if (Parser.ParseBlock(ref block, false, out ln, out isComment))
                     {
                         if (ln > 0)
@@ -337,7 +346,7 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(), HasToolChange = CurrentLineHasToolChange() });
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart) });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -401,6 +410,7 @@ namespace CNC.Core
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
                 bool passThrough = GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0);
 
+                int tokenStart = Parser.Tokens.Count;
                 bool parsed;
                 try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
                 catch { if (!passThrough) throw; parsed = false; }
@@ -422,7 +432,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(), HasToolChange = parsed && CurrentLineHasToolChange() });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart) });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
