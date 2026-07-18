@@ -554,6 +554,7 @@ namespace CNC.Controls
             root.Children.Add(buttons);
 
             win.Content = root;
+            DialogScaling.Apply(win);
 
             ok.Click += (s, e) => {
                 for (int i = 0; i < boxes.Count; i++)
@@ -797,6 +798,7 @@ namespace CNC.Controls
             }
             root.Children.Add(bar);
             win.Content = root;
+            DialogScaling.Apply(win);
             win.Closed += (s, e) => frame.Continue = false;
 
             // Keep keyboard jogging live while the prompt is up. The prompt is a separate top-level window, so

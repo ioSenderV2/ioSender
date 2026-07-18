@@ -148,7 +148,7 @@ namespace GCode_Sender
             string unit = isImperial ? "in" : "mm";
             fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = fldCornerMargin.Unit = unit;
             UpdateThicknessWarning();
-            UpdateDrawing();
+            ShowResult();   // re-format the bottom-left readout (X=/Y=/etc, FormatLen) too, not just the drawing - it was left stale on a unit toggle
         }
 
         private static double ConvertUnit(double v, bool fromImperial, bool toImperial)
@@ -749,7 +749,7 @@ namespace GCode_Sender
 
                     string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang);
                     if (spoilZ.HasValue && cornerZ[c].HasValue)
-                        text += string.Format(CultureInfo.InvariantCulture, "\nt={0:0.0}", cornerZ[c].Value - spoilZ.Value);
+                        text += "\nt=" + FormatLen(cornerZ[c].Value - spoilZ.Value);
 
                     var lbl = new TextBlock
                     {
@@ -1510,6 +1510,17 @@ namespace GCode_Sender
                 {
                     refX2 = plusMinus("#<c1x>", sox, estW);
                     refY2 = refY;
+                }
+
+                if (setTloRef)
+                {
+                    // The TLO-ref detour just parked at G30 (an arbitrary, possibly-distant point not
+                    // verified clear - see the comment above) and retracted to Z0. Cross to corner 2's
+                    // approach XY WHILE STILL AT Z0, rather than leaving it to pcorner's own internal
+                    // maxz-height travel: pcorner drops Z to #<c1_maxz> FIRST, THEN does its short XY
+                    // nudge to the exact top-probe point - so without this, the G30-to-corner-2 crossing
+                    // (unverified territory) would happen at c1_maxz height instead of Z0.
+                    L(string.Format("G53 G0 X[{0}] Y[{1}]", refX2, refY2));
                 }
 
                 L(string.Format("(--- corner 2 = {0} (X-neighbour) ---)", Name(xn)));
