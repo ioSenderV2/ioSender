@@ -57,8 +57,13 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="mainSlotsLeft" Margin="5,0,0,0" MinWidth="250"/>
             </ScrollViewer>
+            <!-- Capped (not just MinWidth) so Feed/Spindle/Outline (the panels that consistently land here -
+                 see BuildMainPanels) can't stretch wide on their own content (Outline's wrapped warning text
+                 in particular) at the expense of the Program/3D View/Console workspace, which only gets
+                 whatever's left over from this DockPanel-docked-right region. Content wraps to more lines
+                 instead - the ScrollViewer already handles any resulting overflow height. -->
             <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250"/>
+                <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
             </ScrollViewer>
         </Grid>
         <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a).
