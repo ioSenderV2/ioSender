@@ -179,6 +179,12 @@
     <Compile Include="CoolantControl.xaml.cs">
       <DependentUpon>CoolantControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="RtspCamerasControl.xaml.cs">
+      <DependentUpon>RtspCamerasControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ScenarioNameDialog.xaml.cs">
+      <DependentUpon>ScenarioNameDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CoordValueSetControl.xaml.cs">
       <DependentUpon>CoordValueSetControl.xaml</DependentUpon>
     </Compile>
@@ -471,6 +477,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ScenarioNameDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ProbeMotionParamsDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -496,6 +506,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="CoolantControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="RtspCamerasControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

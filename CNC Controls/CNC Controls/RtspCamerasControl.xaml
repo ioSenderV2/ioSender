@@ -1,0 +1,15 @@
+<UserControl x:Class="CNC.Controls.RtspCamerasControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="80" d:DesignWidth="250">
+    <!-- RecordToggleStyle (the record/stop glyph) now lives in App.xaml's Application.Resources, shared
+         with MainWindow's run-bar "All" button - see App.xaml. -->
+    <GroupBox x:Uid="grp_rtspCameras" x:Name="grpRtspCameras" Header="OBS Control" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250"
+              ToolTip="Demo-shoot recording control (armed with -demomarker; needs each source's OBS name configured - see ObsBridge.cs).">
+        <StackPanel x:Name="rows" HorizontalAlignment="Left" Margin="3,0,0,0" VerticalAlignment="Top" MinWidth="184"/>
+    </GroupBox>
+</UserControl>

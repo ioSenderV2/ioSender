@@ -34,6 +34,14 @@ namespace CNC.Controls
         {
             new ActionInfo { Id = "UiScaleUp",   Label = "Zoom in (UI scale)",  DefaultKey = Key.OemPlus,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "UiScaleDown", Label = "Zoom out (UI scale)", DefaultKey = Key.OemMinus, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            // Demo-shoot RTSP camera control (RtspCamerasControl / ObsBridge.SetCameraRecording) - only
+            // does anything with -demomarker's OBS bridge armed and that camera's hotkey names configured.
+            new ActionInfo { Id = "ObsCamAStart", Label = "OBS: Front Left camera - Start recording", DefaultKey = Key.F9,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            new ActionInfo { Id = "ObsCamAStop",  Label = "OBS: Front Left camera - Stop recording",  DefaultKey = Key.F10, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            new ActionInfo { Id = "ObsCamBStart", Label = "OBS: Front Right camera - Start recording", DefaultKey = Key.F11, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            new ActionInfo { Id = "ObsCamBStop",  Label = "OBS: Front Right camera - Stop recording",  DefaultKey = Key.F12, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            new ActionInfo { Id = "ObsAppStart",  Label = "OBS: App/screen capture - Start recording", DefaultKey = Key.F7,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+            new ActionInfo { Id = "ObsAppStop",   Label = "OBS: App/screen capture - Stop recording",  DefaultKey = Key.F8,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
         };
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();

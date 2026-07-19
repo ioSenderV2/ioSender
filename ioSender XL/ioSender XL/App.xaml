@@ -18,6 +18,34 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Camera-app record/stop glyph, not a colored button: a red circle (idle - press to start)
+             swaps to a red square (recording - press to stop) via an IsChecked trigger. Both shapes
+             stay in the template always; only Visibility toggles, so there's no ContentPresenter/Content
+             dependency. Shared by RtspCamerasControl's per-camera/All toggles and MainWindow's run-bar
+             "All" button (btnAllRecord) - both drive/reflect the same CNC.Core.ObsBridge state. -->
+        <Style x:Key="RecordToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="#22000000" CornerRadius="14" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Ellipse x:Name="RecordDot" Width="14" Height="14" Fill="Red"/>
+                                <Rectangle x:Name="StopSquare" Width="12" Height="12" Fill="Red" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="RecordDot" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="StopSquare" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="Button" x:Key="btnSidebar">
             <Setter Property="Background" Value="#FFEFEFEF"/>
             <Setter Property="Template">

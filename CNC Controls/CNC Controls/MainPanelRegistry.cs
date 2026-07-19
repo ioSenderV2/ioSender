@@ -73,7 +73,8 @@ namespace CNC.Controls
             new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KbdJogGridControl(), canBeFlyout: false),
             new AssignableItem("DRO", "DRO (work)", PanelKind.Panel, () => new DROControl()),
             new AssignableItem("ProgramLimits", "Program limits", PanelKind.Panel, () => new LimitsControl()),
-            new AssignableItem("MachinePosition", "Machine Position", PanelKind.Panel, () => new MachinePositionControl())
+            new AssignableItem("MachinePosition", "Machine Position", PanelKind.Panel, () => new MachinePositionControl()),
+            new AssignableItem("RtspCameras", "OBS Control", PanelKind.Panel, () => new RtspCamerasControl())
         };
 
         // Special flyout-only items (flyout instances are supplied by the host window).
@@ -102,6 +103,9 @@ namespace CNC.Controls
             // can't be assigned, and so a previously-placed one is dropped on next layout build, when it is off.
             if (AppConfig.Settings.Base != null && !AppConfig.Settings.Base.Jog.KeyboardEnable)
                 list.RemoveAll(i => i.Name == "KeyboardJogging");
+            // OBS Control only makes sense during a demo shoot - same drop-when-off treatment.
+            if (!CNC.Core.DemoMarker.Enabled)
+                list.RemoveAll(i => i.Name == "RtspCameras");
             return list;
         }
 
