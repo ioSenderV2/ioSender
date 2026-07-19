@@ -60,6 +60,12 @@ namespace GCode_Sender
         // "on, use the default port". Read by MainWindow.CompleteStartup once the UI is fully built.
         public static int TestServerPort = -1;
 
+        // -message=text - shows an informational popup once the main window is revealed. Null = no popup.
+        // Diagnostic/dev convenience: lets whoever is launching the app for someone to test a specific change
+        // tell them what to look for, without a separate out-of-band message. Skipped for a -testserver launch
+        // (no one is watching that window interactively). Set by OnStartup below, read by MainWindow.RevealMainWindow.
+        public static string StartupMessage = null;
+
         public App()
         {
             // Pin the resource assembly to this exe BEFORE InitializeComponent loads App.xaml (the first
@@ -122,6 +128,11 @@ namespace GCode_Sender
                             int eq = arg.IndexOf('=');
                             int tp;
                             TestServerPort = (eq >= 0 && int.TryParse(arg.Substring(eq + 1), out tp)) ? tp : 0;
+                        }
+                        // -message=text  show an informational popup once the main window is up (see StartupMessage)
+                        else if (arg.StartsWith("-message=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            StartupMessage = arg.Substring("-message=".Length);
                         }
                         break;
                 }

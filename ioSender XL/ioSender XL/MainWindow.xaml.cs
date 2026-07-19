@@ -233,6 +233,16 @@ namespace GCode_Sender
                 _splash.Close();
                 _splash = null;
             }
+
+            // -message=text (see App.StartupMessage) - deferred one dispatcher tick so the window has actually
+            // painted before the popup steals focus. Skipped for -testserver: no one is watching that window.
+            if (App.TestServerPort < 0 && !string.IsNullOrEmpty(App.StartupMessage))
+            {
+                string msg = App.StartupMessage;
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                    CNC.Core.AppDialogs.Show(this, msg, "Startup message", MessageBoxButton.OK, MessageBoxImage.None)),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
         }
 
         // ---- bottom-bar overlays: program view (toggle) and/or console log (on command-box focus) ----
@@ -268,6 +278,32 @@ namespace GCode_Sender
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
             btnTimeLapse.Visibility = CNC.Core.DemoMarker.Enabled ? Visibility.Visible : Visibility.Collapsed;
+
+            // Run-bar "All" recording toggle - same gating as Timelapse (see above). Resyncs from
+            // ObsBridge just like RtspCamerasControl's own "All" row, so either control reflects the
+            // other's state regardless of which one (or a keyboard shortcut) triggered a change.
+            btnAllRecord.Visibility = btnTimeLapse.Visibility;
+            CNC.Core.ObsBridge.CamerasChanged += AllRecord_Resync;
+            AllRecord_Resync();
+        }
+
+        private bool _suppressAllRecordToggled;
+
+        private void AllRecord_Resync()
+        {
+            _suppressAllRecordToggled = true;
+            bool allRecording = true;
+            for (int i = 0; i < CNC.Core.ObsBridge.Cameras.Length; i++)
+                allRecording &= CNC.Core.ObsBridge.IsCameraRecording(i);
+            btnAllRecord.IsChecked = allRecording;
+            _suppressAllRecordToggled = false;
+        }
+
+        private void AllRecord_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_suppressAllRecordToggled)
+                return;
+            CNC.Controls.RtspCamerasControl.ToggleAll(this, btnAllRecord.IsChecked == true);
         }
 
         // ---- status-bar message emphasis ----
@@ -785,6 +821,15 @@ namespace GCode_Sender
             ActionKeyBinder.Register("UiScaleUp", k => { AppConfig.Settings.Base.UiScale += 0.05; return true; });
             ActionKeyBinder.Register("UiScaleDown", k => { AppConfig.Settings.Base.UiScale -= 0.05; return true; });
 
+            // Demo-shoot RTSP camera hotkeys - route through ObsBridge.SetCameraRecording, the same entry
+            // point the RtspCamerasControl panel's toggles use, so either can drive the other's state.
+            ActionKeyBinder.Register("ObsCamAStart", k => { CNC.Core.ObsBridge.SetCameraRecording(0, true); return true; });
+            ActionKeyBinder.Register("ObsCamAStop", k => { CNC.Core.ObsBridge.SetCameraRecording(0, false); return true; });
+            ActionKeyBinder.Register("ObsCamBStart", k => { CNC.Core.ObsBridge.SetCameraRecording(1, true); return true; });
+            ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Core.ObsBridge.SetCameraRecording(1, false); return true; });
+            ActionKeyBinder.Register("ObsAppStart", k => { CNC.Core.ObsBridge.SetCameraRecording(2, true); return true; });
+            ActionKeyBinder.Register("ObsAppStop", k => { CNC.Core.ObsBridge.SetCameraRecording(2, false); return true; });
+
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
                 // Delay loading until app is ready
@@ -863,6 +908,8 @@ namespace GCode_Sender
                     RevealMainWindow();   // setup complete (or simulator): straight to the normal UI
                     return;
                 }
+                // TEMP DIAGNOSTIC (2026-07-19) - ATC macro gate false-positive investigation.
+                ConsoleLog.Write(string.Format("[MainWindow] ForceMachineSetupIfNeeded: initial check step={0}, re-checking after 1200ms settle...", step));
 
                 // Confirm after a short settle: a connect/reset can momentarily yield a stale read - in
                 // particular the macro check (step 6) does a synchronous filesystem listing that comes back
@@ -876,6 +923,10 @@ namespace GCode_Sender
                     if (GrblSettings.IsLoaded)
                     {
                         int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                        // TEMP DIAGNOSTIC (2026-07-19) - see above. step2==0 means the settle re-check
+                        // caught a transient race (as designed); step2!=0 means it's still incomplete after
+                        // settling, i.e. NOT just the known post-reset stale-listing race.
+                        ConsoleLog.Write(string.Format("[MainWindow] ForceMachineSetupIfNeeded: settled re-check step={0} (was {1})", step2, step));
                         if (step2 != 0)
                             ShowMachineSetup(step2);   // select the Machine Setup tab before revealing
                     }
