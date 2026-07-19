@@ -551,18 +551,23 @@ namespace CNC.Controls
 
             AppConfig.Settings.Save();
 
-            // Supervised: just exit with the relaunch sentinel and let the AppLaunch parent restart us.
-            // No in-process Process.Start, so the splash-over-teardown race (#81) is impossible here.
-            if (CNC.Core.RelaunchSupervisor.IsSupervised)
-            {
-                Application.Current.Shutdown(CNC.Core.RelaunchSupervisor.RelaunchExitCode);
-                return;
-            }
-
-            // Unsupervised fallback (headless/dev, or AppLaunch.exe absent): relaunch ourselves in-process.
+            // Relaunch ourselves in-process. The new process is told IOSENDER_SELF_RELAUNCH=1 (env var, not a
+            // CLI arg - simplest way to pass a flag through Process.Start that can't collide with real argv)
+            // so its own single-instance probe (App.xaml.cs OnStartup) skips checking for a running instance:
+            // this instance is still mid-teardown at that point and may still be listening on the singleton
+            // pipe for a moment (NamedPipeServerStream.WaitForConnection() isn't reliably cancelable via
+            // Dispose on .NET Framework, so there's no reliable way to force-close our own listener first) -
+            // without the skip, the new process would detect us, fold into us, and exit, so "Restart" would
+            // just close the app instead of relaunching it.
             try
             {
-                System.Diagnostics.Process.Start(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName,
+                    UseShellExecute = false
+                };
+                psi.EnvironmentVariables["IOSENDER_SELF_RELAUNCH"] = "1";
+                System.Diagnostics.Process.Start(psi);
                 Application.Current.Shutdown();
             }
             catch { _restarting = false; }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart

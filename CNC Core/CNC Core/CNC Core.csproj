@@ -71,7 +71,6 @@
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
     <Compile Include="ObsBridge.cs" />
-    <Compile Include="RelaunchSupervisor.cs" />
     <Compile Include="EltimaStream.cs" />
     <Compile Include="GCode.cs" />
     <Compile Include="GCodeEmulator.cs" />

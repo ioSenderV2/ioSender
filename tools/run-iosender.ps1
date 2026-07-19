@@ -5,11 +5,11 @@
 .DESCRIPTION
     build.ps1 is the build[+launch] loop; this is its runtime complement for the
     debug/test cycle where the binary is already built and you just need to bounce
-    it. It kills BOTH ioSender.exe and the AppLaunch supervisor (build.ps1 only
-    kills ioSender), relaunches the existing exe with the usual test flags, polls
-    to confirm it came up, and surfaces the crash/exit files the app drops.
+    it. It kills ioSender.exe, relaunches the existing exe with the usual test
+    flags, polls to confirm it came up, and surfaces the crash/exit files the
+    app drops.
 
-    Consolidates the hand-rolled "Get-Process ioSender,AppLaunch | Stop-Process;
+    Consolidates the hand-rolled "Get-Process ioSender | Stop-Process;
     Start-Sleep; Start-Process ...; Get-Process ..." one-liners (64 of them in the
     last week of transcripts) into one wrapper.
 
@@ -27,7 +27,7 @@
     blocking on a modal dialog. Omit for interactive testing.
 
 .PARAMETER KillOnly
-    Kill ioSender + AppLaunch and stop - do not launch.
+    Kill ioSender and stop - do not launch.
 
 .PARAMETER Status
     Do not kill or launch: just report running PIDs + the last exit.json / crash.log.
@@ -45,7 +45,7 @@
 
 .EXAMPLE
     tools\run-iosender.ps1 -KillOnly
-    Kill ioSender + AppLaunch and leave it dead.
+    Kill ioSender and leave it dead.
 #>
 [CmdletBinding()]
 param(
@@ -69,7 +69,7 @@ $crashLog = Join-Path $appData 'ioSender.crash.log'
 $exitJson = Join-Path $appData 'ioSender.exit.json'
 
 function Show-Status {
-    $procs = Get-Process ioSender, AppLaunch -ErrorAction SilentlyContinue
+    $procs = Get-Process ioSender -ErrorAction SilentlyContinue
     if ($procs) {
         Write-Host "==> running:" -ForegroundColor Green
         $procs | Select-Object Name, Id, @{n = 'RAM(MB)'; e = { [int]($_.WorkingSet64 / 1MB) } } | Format-Table -AutoSize | Out-String | Write-Host
@@ -91,7 +91,7 @@ function Show-Status {
 if ($Status) { Show-Status; exit 0 }
 
 if (-not $NoKill) {
-    $killed = Get-Process ioSender, AppLaunch -ErrorAction SilentlyContinue
+    $killed = Get-Process ioSender -ErrorAction SilentlyContinue
     if ($killed) {
         $killed | Stop-Process -Force
         Start-Sleep -Milliseconds 800

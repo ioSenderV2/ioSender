@@ -172,14 +172,20 @@ namespace GCode_Sender
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
-            // (Relaunch supervision is AppLaunch's job - we only read its exit-code protocol, see DoRestart.)
             // SKIPPED for a -testserver launch: an automation-driven instance is never meant to be a
             // singleton - it must be able to run alongside a normal interactive instance (or another
             // -testserver instance on a different port) without colliding, and must never steal focus
             // from whatever the user is doing by forwarding into it (see MainWindow's matching skip of
             // becoming a pipe listener - both sides must agree, or a later normal launch would silently
             // forward into a hidden test instance instead of starting its own window).
-            if (TestServerPort < 0 && CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
+            // ALSO SKIPPED when GrblConfigView.DoRestart launched us as a self-relaunch: the prior instance
+            // is still mid-teardown and may still be listening on the single-instance pipe for a moment
+            // (NamedPipeServerStream.WaitForConnection() isn't reliably cancelable by Dispose on .NET
+            // Framework, so the old listener can't be relied on to have closed by the time we probe it) -
+            // without this we'd detect it, forward into a process that's about to disappear, and exit
+            // ourselves, so "Restart" would just close the app instead of relaunching it.
+            bool selfRelaunch = Environment.GetEnvironmentVariable("IOSENDER_SELF_RELAUNCH") == "1";
+            if (!selfRelaunch && TestServerPort < 0 && CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
             {
                 CNC.Core.DebugLog.Write("app", "another instance is running - forwarded and exiting");
                 Environment.Exit(0);

@@ -125,6 +125,6 @@ namespace CNC.Controls
             catch
             {
             }
-        } 
+        }
     }
 }
