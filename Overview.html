@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>141 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>147 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -208,6 +208,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>3D probe/touch plate dialogs now both measure overall length (body/collet top to tip)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr107">107</a></td></tr>
 <tr><td>Lathe Wizards availability now follows the controller's own Mode-of-operation setting, not a separate ioSender toggle</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr108">108</a></td></tr>
 <tr><td>Machine tab shows connected grblHAL version/build and can check GitHub for a newer SRW-fork build, then flash it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr118">118</a></td></tr>
+<tr><td>Corner Fence schematic is now a real 3-zone red/green/cream diagram sized off the active 3D probe; Position row gets a checkmark + directly-editable X/Y/Z fields instead of a raw coordinate string.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr143">143</a></td></tr>
+<tr><td>Clicking Machine Setup while the machine was moving (e.g. right after a G30) could freeze that tab for the rest of the session.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr144">144</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -272,6 +274,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The Program view overlay (Load File/Folder, wizard output) was a fixed 560-720px panel that ran over half the client area on a narrower window - now always exactly the right third.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr112">112</a></td></tr>
 <tr><td>Double-click any Job-view center tab's header (Program, 3D View, Console) to pop it into its own borderless window, resizable and Ctrl+Alt+=/- zoomable; double-click that window's title bar to dock it back. Replaces the old Console-only popout special case.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr116">116</a></td></tr>
 <tr><td>ioSenderBatchPost now remaps Fusion's Air/Mist coolant setting to Flood before posting - grbl.cps has no code for Air/Mist and raised "Unsupported 'air' coolant", failing every operation using it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr122">122</a></td></tr>
+<tr><td>Feed rate/Spindle/Outline could stretch wide enough (Outline's wrapped warning text especially) to squeeze the Program/3D View/Console workspace.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr145">145</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -285,6 +288,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Two probe-tip-losing collision bugs fixed in pcorner.macro (found probing a Corner Fence fixture on hardware); MacroProcessor now truncates an oversized auto-generated comment instead of having the controller silently reject the whole line.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr99">99</a></td></tr>
 <tr><td>Console tab now mirrors to a durable, timestamped log file per run - survives a UI freeze or a firmware debug flood that used to leave no record behind.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr111">111</a></td></tr>
 <tr><td>Console shows a controller restart-after-hang notice (with a report-it dialog) and a firmware-change notice, right on reconnect.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr126">126</a></td></tr>
+<tr><td>OBS Control panel + F7-F12 hotkeys start/stop the 2 Tapo RTSP cameras and the app screen-capture source individually, filing each take into a named subfolder.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr142">142</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -327,6 +331,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A fresh -testserver launch no longer grabs OS foreground focus from whatever the operator is doing, and WpfUiTestServer's /screenshot stays fully functional (previously trading one for the other).</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr132">132</a></td></tr>
 <tr><td>ToolTips added to SpindleControl, Goto/Outline action buttons, the Macro Manager/Editor dialogs, and PortDialog's network connection settings.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr133">133</a></td></tr>
 <tr><td>ConsoleLog, DebugLog and the crash logger each reimplemented the same file-path resolution and 8MB rotation - now share one CNC.Core.LogFile; the crash log previously had no size cap at all, and console_*.log gains a live "latest_console.log" hard link.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr135">135</a></td></tr>
+<tr><td>AppMessageBox's text bumped 13pt -&gt; 19.5pt (+50%), fixing every AppDialogs.Show call app-wide at once.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr146">146</a></td></tr>
+<tr><td>-message=text pops up an informational dialog once the main window is revealed - handy for telling someone what to test when launching a build for them.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr147">147</a></td></tr>
 </table>
 </div>
 
@@ -473,7 +479,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">139</td><td><a href="#pr139">Start Job: touch-plate Z0 rise, corner 2 approach height</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+50</span> <span class="del">-17</span></td></tr>
 <tr><td class="n">140</td><td><a href="#pr140">Start Job: exact-size labels, touch-plate corner Z readout</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-4</span></td></tr>
 <tr><td class="n">141</td><td><a href="#pr141">Dry run: Z clearance math fix + token-accumulation over-suppression fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+56</span> <span class="del">-18</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (141 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1205</span> <span class="del">13</span> <span class="add">+159</span><br><span class="k">Lines:</span> <span class="add">+51477</span> <span class="del">-9471</span></td></tr>
+<tr><td class="n">142</td><td><a href="#pr142">OBS/Tapo camera recording control, independent of OBS's main Record button</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+473</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">143</td><td><a href="#pr143">Fixture edit dialog: redesigned Corner Fence schematic + directly-editable X/Y/Z position</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">21</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+526</span> <span class="del">-108</span></td></tr>
+<tr><td class="n">144</td><td><a href="#pr144">Machine Setup tab could go permanently unresponsive after a mid-move tab switch</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+25</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">145</td><td><a href="#pr145">Job tab workspace lost width priority to the Feed/Spindle/Outline column</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">146</td><td><a href="#pr146">Message box text was too small</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+1</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">147</td><td><a href="#pr147">-message launch flag: show a popup once the app is up</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (147 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1237</span> <span class="del">13</span> <span class="add">+163</span><br><span class="k">Lines:</span> <span class="add">+52570</span> <span class="del">-9586</span></td></tr>
 </table>
 </div>
 
@@ -2980,6 +2992,75 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">26</td><td class="num del">16</td></tr>
 </table>
 <div class="desc"><p>Two independent bugs, both surfaced chasing the same symptom (dry run's Z clearance reading wildly different from the intended 10mm + stock thickness) on real hardware, with the operator's own live measurements pinning down the exact arithmetic.</p><ul><li><strong>G92 is relative to current position, not absolute.</strong> <code>G92 Zk</code> makes WHEREVER THE MACHINE CURRENTLY IS read as work-Z=k - it has no notion of "the stock" at all. The previous code sent a fixed <code>G92Z-&lt;offset&gt;</code> from wherever Cycle Start happened to be pressed (typically wherever the last job/macro parked, e.g. Start Job's G30 - nowhere near the stock), so the resulting clearance was "however far the machine already was from the stock" plus the intended offset, not the offset alone. Now computes the actual <code>G92</code> value needed to put work-zero exactly <code>offset</code> mm above the TRUE stock top, using the machine's live current position and the live (pre-offset) work-coordinate-offset: <code>k = MachinePosition.Z - (WorkPositionOffset.Z + offset)</code>.</li><li><strong>Token-accumulation over-suppression, found along the way.</strong> <code>GCodeBlock.HasSpindleOrCoolantOn</code>/<code>HasToolChange</code> scanned <code>Parser.Tokens</code> - a CUMULATIVE, whole-file list (cleared only once per file load, not per line; several other features - the 3D carve view, rotate/wrap, etc. - all rely on it staying that way) - so once the first <code>M3/M4/M6/M7/M8</code> appeared anywhere in a file, every line after it was flagged too, silently turning the entire rest of the program into no-op comments during a dry run. Confirmed on real hardware: hundreds of instant acks, zero motion, ending in a Hold then a reset. Both helpers now only scan the token slice added by that specific line's own parse call.</li></ul><p class="foot">Confirmed fixed on real hardware after both fixes landed - dry run's Z clearance now matches the intended offset regardless of where the machine starts.</p></div>
+</div>
+<!-- ===== #142 ===== -->
+<div class="pr">
+<h2 id="pr142"><span class="badge">#142</span>OBS/Tapo camera recording control, independent of OBS's main Record button</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RtspCamerasControl.xaml.cs</td><td class="num add">247</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RtspCamerasControl.xaml</td><td class="num add">15</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ScenarioNameDialog.xaml.cs</td><td class="num add">61</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ScenarioNameDialog.xaml</td><td class="num add">20</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ObsBridge.cs</td><td class="num add">70</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml</td><td class="num add">28</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPanelRegistry.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>New "OBS Control" panel (RtspCamerasControl) starts/stops recording on the 2 Tapo RTSP cameras (Front Left/Front Right) plus the app's own screen-capture source, independently of OBS's main Record button - via obs-websocket v5's <code>SetSourceFilterEnabled</code> against each camera's own Source Record filter instance (not <code>TriggerHotkeyByName</code>, whose hotkey names collide across filter instances).</p><ul><li><strong>Per-camera + "All" toggles</strong> - red circle (idle) swaps to a red square (recording); a matching "All" toggle also lives on the main run bar next to Timelapse.</li><li><strong>F7-F12 hotkeys</strong> registered per camera/app via ActionKeyBinder, driving the same ObsBridge entry point as the panel buttons.</li><li><strong>"All" stop</strong> prompts for a take name and files the 3 resulting recordings into a named subfolder (matched by source name or camera label, since Source Record's actual output filename uses the label).</li></ul><p class="foot">Gated behind <code>-demomarker</code> (same visibility rule as Timelapse) - a demo-shoot-only affordance, hidden in normal use. Built for filming ioSender manual videos.</p></div>
+</div>
+<!-- ===== #143 ===== -->
+<div class="pr">
+<h2 id="pr143"><span class="badge">#143</span>Fixture edit dialog: redesigned Corner Fence schematic + directly-editable X/Y/Z position</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml</td><td class="num add">135</td><td class="num del">51</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">116</td><td class="num del">27</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">33</td><td class="num del">1</td></tr>
+<tr><td class="mono">tools/render-harness/ (new)</td><td class="num add">114</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/playbooks/drive_ui_test_server.md</td><td class="num add">37</td><td class="num del">15</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">91</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>The dialog is restructured to match ProbeDefinitionEditDialog's pattern (fields on the left half, schematic on the right half). The Corner Fence schematic is now a real 3-zone diagram - red keep-clear fence rails, a green near-corner reference zone, a cream far zone - all sized off the active 3D probe's body diameter (radius = D/2), replacing the old single dashed clearance circle. (The real bug behind "the green area looks too small" turned out to be an SVG arc sweep-flag silently picking the wrong of the two circles through the given endpoints/radius - not a colour or semantics issue.)</p><ul><li><strong>Position row</strong> is now Set/Test buttons + a checkmark (green once Test position succeeds) inline with the label, followed by <strong>directly-editable X/Y/Z Axis fields</strong> - an alternative to re-jogging for a small nudge or a known-good value.</li><li><strong>Test position now rapids</strong> (G53G0) through its retract/traverse/drop-to-target travel, like every other Goto button, instead of crawling at G1 F1000.</li><li>Fixed a real hardware bug where Test position's completion callback could silently never fire (and the checkmark never turn green) if the app's StreamingState already happened to equal Send/SendMDI from unrelated prior activity - the completion watcher is now armed directly from the macro runner's own "did it start" signal instead of inferring it from a property-change event that could be silently suppressed. An Alarm mid-probe no longer leaks that watcher's subscription forever, either.</li><li>Added a warning note across the dialog's bottom: the 3D probe must be installed before Set/Test, and the saved position must be within ~10&nbsp;mm of the spoilboard.</li></ul><p class="foot"><code>tools/render-harness/</code> (new, kept permanently): a standalone WPF tool that renders the real dialog class against the real on-disk AppConfig, for verifying modal dialogs the UI test server can't reach - built after two rounds of a hand-copied XAML mock silently drifting from what the real dialog actually rendered. Fully HW-verified end to end.</p></div>
+</div>
+<!-- ===== #144 ===== -->
+<div class="pr">
+<h2 id="pr144"><span class="badge">#144</span>Machine Setup tab could go permanently unresponsive after a mid-move tab switch</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">25</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>MachineSetupWizard.Activate(true) called RefreshMacroStatus() synchronously - but that queries the controller's filesystem listing via a call that pumps the WPF dispatcher, and tab activation runs from MainWindow's tab-switch handler <em>during</em> that switch's own layout pass. A pumped-dispatcher wait colliding with an active layout pass throws mid-switch, after the new tab was already marked current but before the switch actually finished - leaving the tab looking selected but frozen, permanently (a mid-layout-pass exception doesn't self-heal the visual tree). A second call site in the same file already deferred the identical call for this exact documented reason; this one just never got the same treatment.</p><p class="foot">Reproduced and root-caused via targeted diagnostic logging against a live G28+G30-then-click-Machine-Setup repro; fixed by deferring the call, matching the existing pattern. Confirmed fixed on real hardware.</p></div>
+</div>
+<!-- ===== #145 ===== -->
+<div class="pr">
+<h2 id="pr145"><span class="badge">#145</span>Job tab workspace lost width priority to the Feed/Spindle/Outline column</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">6</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The right-hand slot panel (Feed rate/Spindle/Outline) only had a MinWidth, so it could stretch as wide as its content wanted at the expense of the Program/3D View/Console workspace, which only got whatever width was left over. Capped at MaxWidth=260 - that column's content wraps to more lines instead, which its own ScrollViewer already handles.</p></div>
+</div>
+<!-- ===== #146 ===== -->
+<div class="pr">
+<h2 id="pr146"><span class="badge">#146</span>Message box text was too small</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppMessageBox.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>AppMessageBox is the one funnel every message box in the app (146+ call sites, via AppDialogs.Show) routes through, so bumping its text size here fixes all of them at once.</p></div>
+</div>
+<!-- ===== #147 ===== -->
+<div class="pr">
+<h2 id="pr147"><span class="badge">#147</span>-message launch flag: show a popup once the app is up</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">51</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Dev/testing convenience, same idiom as the existing <code>-testserver</code>/<code>-debuglog</code> flags: <code>-message="text"</code> shows a plain informational popup once the main window is up and painted, skipped for a <code>-testserver</code> launch since no one is watching that window interactively.</p><p class="foot">Also folds in MainWindow's run-bar copy of the OBS Control "All" recording toggle (see the camera-control entry above) and standing diagnostic logging for an intermittent, still-unreproduced ATC-macro-gate false positive.</p></div>
 </div>
 </section>
 
