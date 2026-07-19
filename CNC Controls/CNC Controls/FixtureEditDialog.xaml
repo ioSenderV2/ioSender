@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
         d:DesignHeight="360" d:DesignWidth="600"
-        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="600"
+        SizeToContent="Height" ResizeMode="NoResize" Width="760"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Fixture" Icon="App.ico">
     <Window.Resources>
         <!-- Dimension-annotation styling shared by the per-kind schematics (matches ProbeDefinitionEditDialog). -->
@@ -21,26 +21,6 @@
         </Style>
     </Window.Resources>
     <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top">
-            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                <Label x:Uid="fxd_name" Content="Name:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <TextBox x:Uid="txtFxName" x:Name="txtName" MinWidth="200" MinHeight="22" VerticalContentAlignment="Center"
-                         Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                <Label x:Uid="fxd_kind" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <ComboBox x:Uid="cbxKind" x:Name="cbxKind" MinWidth="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxKind_SelectionChanged">
-                    <ComboBoxItem x:Uid="fxd_kindCorner" Content="Corner fence" Tag="CornerFence"/>
-                    <ComboBoxItem x:Uid="fxd_kindVise" Content="Machinist vise" Tag="MachinistVise"/>
-                    <ComboBoxItem x:Uid="fxd_kindDoghole" Content="Dog-hole/grid corner" Tag="DogHoleGridCorner"/>
-                    <ComboBoxItem x:Uid="fxd_kindVacuum" Content="Vacuum table zero-corner" Tag="VacuumTableZeroCorner"/>
-                </ComboBox>
-            </StackPanel>
-            <TextBlock x:Name="txtNotImplemented" Foreground="#C0392B" TextWrapping="Wrap" Margin="120,4,0,0" FontSize="11" Visibility="Collapsed"
-                       Text="This fixture type isn't wired to a working probe macro yet - it can be defined, but Start Job will block Generate for it."/>
-            <Separator Margin="0,7"/>
-        </StackPanel>
-
         <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="fxd_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" MinWidth="75" MinHeight="24" IsDefault="True"/>
@@ -48,32 +28,87 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- Fields on the left, a per-kind schematic on the right (which offset is which is not obvious from
-             a number alone - same reasoning as ProbeDefinitionEditDialog's schematic panel). -->
+        <!-- Spans the full dialog width (both columns) - both Test position (every kind) and Set
+             position (vise only) run the real probe, so this applies regardless of which schematic is
+             showing. Docked Bottom AFTER the OK/Cancel row above, so DockPanel stacks it directly over
+             those buttons rather than the schematic. -->
+        <TextBlock x:Uid="fxd_probeNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#C0392B" FontSize="16.5" Margin="0,10,0,0"
+                   Text="The 3D probe must be installed before Set/Test position - and the saved position must be within ~10 mm above the spoilboard (the probe search is capped to 12 mm below it)."/>
+
+        <!-- Fields (incl. Name/Type - moved INTO this column 2026-07-18, they used to span the whole
+             dialog in their own top-docked StackPanel, at odds with "left column" framing) on the
+             left HALF, a per-kind schematic on the right HALF - "*"/"*" columns for a genuine 50/50
+             split (was Auto/Auto, letting the schematic shrink to its own content instead of actually
+             claiming half the dialog; a MinWidth="230" band-aid for that was added and removed again
+             2026-07-18 without fixing the real problem). -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                    <Label x:Uid="fxd_name" Content="Name:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                    <TextBox x:Uid="txtFxName" x:Name="txtName" MinWidth="200" MinHeight="22" VerticalContentAlignment="Center"
+                             Text="{Binding Path=Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Label x:Uid="fxd_kind" Content="Type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                    <ComboBox x:Uid="cbxKind" x:Name="cbxKind" MinWidth="170" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxKind_SelectionChanged">
+                        <ComboBoxItem x:Uid="fxd_kindCorner" Content="Corner fence" Tag="CornerFence"/>
+                        <ComboBoxItem x:Uid="fxd_kindVise" Content="Machinist vise" Tag="MachinistVise"/>
+                        <ComboBoxItem x:Uid="fxd_kindDoghole" Content="Dog-hole/grid corner" Tag="DogHoleGridCorner"/>
+                        <ComboBoxItem x:Uid="fxd_kindVacuum" Content="Vacuum table zero-corner" Tag="VacuumTableZeroCorner"/>
+                    </ComboBox>
+                </StackPanel>
+                <TextBlock x:Name="txtNotImplemented" Foreground="#C0392B" TextWrapping="Wrap" Margin="120,4,0,0" FontSize="11" Visibility="Collapsed"
+                           Text="This fixture type isn't wired to a working probe macro yet - it can be defined, but Start Job will block Generate for it."/>
+                <Separator Margin="0,7"/>
+
+                <!-- Position: label + Set/Test inline, checkmark trailing (2026-07-19 - replaced the old
+                     "value on its own row + buttons on their own row" layout: the raw coordinate string
+                     ("195.479,-599.379,-102.731") is gone entirely now that X/Y/Z are their own editable
+                     fields below, so there's no long value left to wrap and the buttons fit inline. -->
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Label x:Uid="fxd_position" Content="Position:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                    <TextBlock x:Uid="txtFxPosition" x:Name="txtPosition" VerticalAlignment="Center" MinWidth="150" Text="Not set" Foreground="#7F8C8D"/>
-                    <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnSetPosition_Click"
+                    <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set" Padding="8,0" MinHeight="22" Margin="8,0,0,0" Click="btnSetPosition_Click"
                             ToolTip="Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: clear of both faces (within the schematic's circle) AND within ~10 mm above the spoilboard - the spoilboard probe searches only 12 mm down from here. Not written to firmware G28 - kept only in this fixture's own definition."/>
-                    <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test position" Padding="8,0" MinHeight="22" Margin="4,0,0,0" Click="btnTestPosition_Click"
+                    <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test" Padding="8,0" MinHeight="22" Margin="6,0,0,0" Click="btnTestPosition_Click"
                             ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
+                    <!-- Checkmark (Segoe MDL2 Assets E73E) - bright green + bold when fx.PositionValidated, gray
+                         otherwise; Collapsed entirely when there's no position yet. Set in UpdatePositionDisplay.
+                         Sized well above the buttons (was FontSize=14, same as body text - green #2E7D32 vs
+                         gray #9E9E9E was too subtle a difference to notice at that size; confirmed via a
+                         diagnostic log that PositionValidated WAS correctly reaching True on real hardware, so
+                         this was a visibility/contrast bug, not a logic bug - bumped size + a punchier green
+                         instead of continuing to chase logic that was already working.) -->
+                    <!-- FontWeight has no visual effect on Segoe MDL2 Assets glyphs (they're fixed icon shapes,
+                         not stroked text) - "bolder" here means bigger, not FontWeight=Bold (kept anyway,
+                         harmless). -->
+                    <TextBlock x:Name="txtValidatedCheck" FontFamily="Segoe MDL2 Assets" Text="&#xE73E;" FontSize="30" FontWeight="Bold"
+                               VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed"
+                               ToolTip="Green = Test position last succeeded. Gray = not tested since this position was set."/>
                 </StackPanel>
+                <!-- X/Y/Z Axis: direct numeric edit of the same Coords Set position captures - an
+                     alternative for a small nudge or a known-good value without re-jogging. Editing any
+                     of them invalidates PositionValidated exactly like a fresh Set position (Fixture.SetAxis
+                     routes through the Coords setter). -->
+                <local:NumericField x:Name="fldPositionX" x:Uid="fxd_posX" Label="X Axis:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding X, Mode=TwoWay}" Margin="0,6,0,2"
+                                     ToolTip="Direct edit of this position's X - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."/>
+                <local:NumericField x:Name="fldPositionY" x:Uid="fxd_posY" Label="Y Axis:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding Y, Mode=TwoWay}" Margin="0,2"
+                                     ToolTip="Direct edit of this position's Y - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."/>
+                <local:NumericField x:Name="fldPositionZ" x:Uid="fxd_posZ" Label="Z Axis:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding Z, Mode=TwoWay}" Margin="0,2"
+                                     ToolTip="Direct edit of this position's Z - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."/>
 
                 <!-- Vise-only: the jaw is bare metal, always conductive - Touch Plate probes it directly (no
                      separate plate object, no thickness offset needed - see FixtureActiveProbe). -->
-                <StackPanel x:Name="pnlFxProbeType" Orientation="Horizontal" Margin="0,8,0,2" Visibility="Collapsed">
+                <WrapPanel x:Name="pnlFxProbeType" Margin="0,8,0,2" Visibility="Collapsed">
                     <Label x:Uid="fxd_lblProbe" Content="Probe:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                     <RadioButton x:Uid="fxd_rbProbe3d" x:Name="rbFxProbe3d" Content="3D Probe" GroupName="FxProbeType" IsChecked="True" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     <RadioButton x:Uid="fxd_rbProbeTouch" x:Name="rbFxProbeTouch" Content="Touch Plate" GroupName="FxProbeType" VerticalAlignment="Center" Margin="14,0,0,0"
                                  ToolTip="The jaw is bare metal (always conductive) - probes by electrical continuity, same physical probe input as the 3D probe."/>
-                </StackPanel>
+                </WrapPanel>
 
                 <!-- Vise-only: drawing-only dimensions (Start Job's stock drawing + this dialog's own schematic
                      could use them too) - pvisecorner.macro doesn't read either, it finds the jaw corner by
@@ -89,35 +124,80 @@
             <!-- Per-kind schematic: shows where each offset is measured from/to. One Canvas per shape (the
                  three edge-probing kinds share a schematic - only the numbers differ), toggled in code-behind
                  (UpdateFieldVisibility) like the fields; Viewbox scales it. -->
-            <Border Grid.Column="1" Margin="16,0,0,0" Width="230" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="#FFFAFAFA">
-                <Viewbox Stretch="Uniform" Margin="8">
-                    <Grid Width="220" Height="250">
+            <Border Grid.Column="1" Margin="16,0,0,0" BorderBrush="#FFCCCCCC" BorderThickness="1" Background="#FFFAFAFA">
+                <Viewbox Stretch="Uniform" StretchDirection="Both" Margin="8">
+                    <!-- No fixed Width/Height here - each Canvas below declares its own (they need
+                         different heights: drwKnownPosition's vise content needs more room than
+                         drwCornerStyle's compacted corner diagram). Collapsed children contribute
+                         nothing to layout, so this Grid auto-sizes to whichever Canvas is visible -
+                         a shared fixed Height here (172, sized for Corner Fence only) previously
+                         clipped/overlapped the vise schematic's own content, found via the render
+                         harness's FixtureEditDialog.Vise scenario 2026-07-18. -->
+                    <Grid>
 
                         <!-- Corner-probing kinds (Corner fence / Dog-hole / Vacuum): jog the probe tip anywhere
                              inside the clearance circle - clear of both corner faces - and click Set position.
                              pcorner.macro probes the spoilboard, stock top, and both edges from that one point,
-                             using the live probe definition (no per-fixture offsets to fill in). -->
-                        <Canvas x:Name="drwCornerStyle">
+                             using the live probe definition (no per-fixture offsets to fill in). The "Jog clear
+                             of both faces..." instruction lives on btnSetPosition's own ToolTip (not duplicated
+                             here) - this whole schematic is sized to Corner Fence's own sparse field list
+                             (Name/Type/Position only - no per-fixture offsets to fill in), not the taller
+                             generic size shared with the other schematic-bearing dialogs. -->
+                        <Canvas x:Name="drwCornerStyle" Width="220" Height="172">
                             <!-- Front-left convention (pcorner.macro: FL has sx=+1 "stock is +X of a left
                                  corner", sy=+1 "stock is +Y of a front corner"). In a standard top-down plan
                                  view (+X right, +Y up/away-from-operator) that puts the front-left corner
                                  at the BOTTOM-LEFT, with the stock extending up and to the right from it. -->
 
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
-                                       Text="Jog the probe tip inside the circle (clear of both faces) AND within ~10 mm above the spoilboard (clear air below), then click Set position."/>
-
                             <!-- stock -->
-                            <Rectangle Canvas.Left="70" Canvas.Top="50" Width="130" Height="140" Fill="#FFDDDDDD" Stroke="#FF888888"/>
+                            <Rectangle Canvas.Left="60" Canvas.Top="0" Width="90" Height="85" Fill="#FFDDDDDD" Stroke="#FF888888"/>
 
-                            <!-- clearance circle CENTERED ON the reference dot (50,210) - the stock corner
-                                 (70,190) sits on its boundary, so the circle illustrates the reference's
-                                 distance from the corner, sized to the current 3D probe's body diameter
-                                 (label set in code-behind, UpdateProbeCircleLabel). -->
-                            <Ellipse Canvas.Left="22" Canvas.Top="182" Width="56" Height="56" Stroke="{StaticResource DimBrush}"
-                                     StrokeThickness="1.5" StrokeDashArray="3,2"/>
-                            <Ellipse Canvas.Left="46" Canvas.Top="206" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
-                            <TextBlock x:Uid="txtFxProbeCircle" x:Name="txtProbeCircle" Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="150" Text="probe diameter"/>
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="228" Text="Reference (Set position)"/>
+                            <!-- Three zones, all anchored on the STOCK CORNER (60,85), traced/specced from a
+                                 real target jig (FenceOriginTarget.stl) + user geometry rules 2026-07-18: both
+                                 the small quarter-disk's radius AND rectRedV/H's "outward" (width) dimension =
+                                 D/2, D being the ACTIVE 3D probe's own body diameter - computed at runtime in
+                                 UpdateProbeCircleLabel, not hardcoded (see code-behind); XAML values below are
+                                 just the initial/design-time placeholders. Z-order matters: the large zone is
+                                 drawn first (a plain rect), the small one drawn over its near corner (a filled
+                                 quarter-disk) so what's left of the large one visible is exactly "beyond the
+                                 D/2 radius" - no boolean subtraction needed, just paint order.
+
+                                 GREEN = the SMALL quarter-disk near the corner (within D/2) = stock < 1" / a
+                                 smaller probe. CREAM = the LARGE zone (everything beyond D/2) = stock >= 1"
+                                 with 3D probe.
+
+                                 IMPORTANT ARC-FLAG GOTCHA (found 2026-07-18 rendering pixel-by-pixel with a
+                                 standalone harness, not visible at a glance): "A{r},{r} 0 0 1 x,y" with
+                                 sweep-flag=1 does NOT produce the quarter-circle centered at the corner even
+                                 though both endpoints ARE exactly r from the corner - of the two circles of
+                                 radius r through those 2 points, sweep=1 silently picks the OTHER one,
+                                 rendering a much smaller "moon sliver" instead of the intended disk. sweep-
+                                 flag=0 (large-arc=0) is the one that's actually centered at the corner -
+                                 verified by rendering all 4 flag combinations and sampling pixel colors, not
+                                 by eyeballing a preview. -->
+                            <Rectangle x:Name="rectLargeZone" Canvas.Left="4" Canvas.Top="85" Width="56" Height="46" Fill="#FFE8E2D0" Stroke="#FFAFA890" StrokeThickness="1"/>
+                            <Path x:Name="pathSmallZone" Fill="#FF6B9E5E" Stroke="#FF4A7A3E" StrokeThickness="1"
+                                  Data="M60,85 L32,85 A28,28 0 0 0 60,113 Z"/>
+
+                            <!-- Red: KEEP CLEAR - the fence rails themselves, running along the stock's own
+                                 two edges (left + bottom), 30 mm long each x D/2 wide, meeting at the same
+                                 corner. Opposite side from the reference zones by construction - the rails sit
+                                 where the stock is, the reference sits outside both faces, same "clear of both
+                                 faces" rule pcorner.macro requires. -->
+                            <Rectangle x:Name="rectRedV" Canvas.Left="32" Canvas.Top="45" Width="28" Height="40" Fill="#FFB5453C" Stroke="#FF7A2E28" StrokeThickness="1"/>
+                            <Rectangle x:Name="rectRedH" Canvas.Left="60" Canvas.Top="85" Width="40" Height="28" Fill="#FFB5453C" Stroke="#FF7A2E28" StrokeThickness="1"/>
+
+                            <!-- Reference dot: the stock ORIGIN itself (the stock corner pcorner.macro
+                                 resolves) - fixed at the corner regardless of D, not an example jog point. -->
+                            <Ellipse Canvas.Left="56" Canvas.Top="81" Width="8" Height="8" Fill="#FFE24A4A" Stroke="#FF802020" StrokeThickness="1.2"/>
+
+                            <!-- Legend - the zones are too small at this scale to label in place. -->
+                            <Rectangle Canvas.Left="2" Canvas.Top="133" Width="10" Height="10" Fill="#FFB5453C" Stroke="#FF7A2E28"/>
+                            <TextBlock x:Name="txtRedLegend" Style="{StaticResource DimText}" Canvas.Left="16" Canvas.Top="132" Text="Keep clear (fence rails)"/>
+                            <Rectangle Canvas.Left="2" Canvas.Top="146" Width="10" Height="10" Fill="#FFE8E2D0" Stroke="#FFAFA890"/>
+                            <TextBlock x:Uid="txtFxProbeCircle" x:Name="txtProbeCircle" Style="{StaticResource DimText}" Canvas.Left="16" Canvas.Top="145" Text="Stock &gt;= 1&quot; with 3D probe"/>
+                            <Rectangle Canvas.Left="2" Canvas.Top="159" Width="10" Height="10" Fill="#FF6B9E5E" Stroke="#FF4A7A3E"/>
+                            <TextBlock x:Name="txtGreenLegend" Style="{StaticResource DimText}" Canvas.Left="16" Canvas.Top="158" Text="Stock &lt; 1&quot;"/>
                         </Canvas>
 
                         <!-- Machinist vise: Set position runs pvisecorner.macro (a dedicated macro - the reference
@@ -130,9 +210,13 @@
                              (+X right, +Y up/away-from-operator): the fixed jaw runs along X at the BACK (top of
                              the drawing), the vise opens/closes along Y toward the operator (bottom), moving jaw
                              at the front. -->
-                        <Canvas x:Name="drwKnownPosition" Visibility="Collapsed">
-                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="200"
-                                       Text="VISE MUST BE EMPTY (no stock clamped). Jog the probe tip inside the circle (over the fixed jaw, near its front-left corner) AND within ~10 mm above the jaw top, then click Set position."/>
+                        <Canvas x:Name="drwKnownPosition" Width="220" Height="250" Visibility="Collapsed">
+                            <!-- Shortened 2026-07-18 (was 5 lines, wrapping down far enough to overlap
+                                 "~10 mm dia." below it - a pre-existing bug, more visible now this
+                                 schematic renders larger). Full detail is still on btnSetPosition's own
+                                 ToolTip. -->
+                            <TextBlock Style="{StaticResource DimText}" Canvas.Left="2" Canvas.Top="2" TextWrapping="Wrap" Width="216"
+                                       Text="VISE MUST BE EMPTY. Jog inside the circle, ~10 mm above the jaw top, then Set position."/>
                             <TextBlock Style="{StaticResource DimText}" Canvas.Left="40" Canvas.Top="64" Text="~10 mm dia."/>
                             <!-- fixed jaw (back, along X) -->
                             <Rectangle Canvas.Left="45" Canvas.Top="95" Width="130" Height="22" Fill="#FF9AA7B4" Stroke="#FF4A6070" StrokeThickness="1.5"/>

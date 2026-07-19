@@ -14,10 +14,12 @@
  */
 
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -90,25 +92,74 @@ namespace CNC.Controls
             UpdateTestPositionEnabled();
         }
 
-        // The clearance circle in the schematic is sized to the ACTIVE probe's body diameter (the physical
-        // constraint - see FixtureEditDialog.xaml.cs class comment). Re-labelled whenever the vise-only Probe:
-        // selection changes (see the Checked handlers wired in the constructor); "no probe defined yet" falls
-        // back to a generic hint.
+        // Corner-schematic scale: px per mm for the drawing's own fixed coordinate space (Grid Width=220,
+        // corner anchored at (60,85) - see the XAML comments by pathSmallZone/rectRedV/rectRedH).
+        private const double SchematicPxPerMm = 4d / 3d;
+        private const double DefaultBodyDiameterMm = 42d;   // used only if no 3D probe is defined yet
+
+        // Redraws the corner schematic's D/2-driven geometry - both the small quarter-disk's radius (cream:
+        // stock < 1") AND the red fence rails' "outward" width equal HALF the active 3D probe's body
+        // diameter (user-specified rule 2026-07-18: the boundary is a circle centered on the stock origin
+        // with radius D/2) - and updates the legend text to match. Called whenever the active probe could
+        // have changed (vise Probe: radio, or just on load).
         private void UpdateProbeCircleLabel()
         {
             var probe = FixtureActiveProbe();
+            double bodyDiameter = probe?.BodyDiameter > 0 ? probe.BodyDiameter : DefaultBodyDiameterMm;
+            double radiusPx = (bodyDiameter / 2d) * SchematicPxPerMm;
+
+            const double cornerX = 60d, cornerY = 85d, railLengthPx = 40d;   // 30 mm, fixed - see XAML comment
+
+            // Green quarter-disk: a true circle centered ON the corner, radius D/2 - both arc endpoints are
+            // exactly radiusPx from (cornerX,cornerY) by construction, so that's the arc's real center.
+            // sweep-flag MUST be 0 here (large-arc=0, sweep=0) - sweep=1 looks equally plausible from the
+            // endpoints/radius alone but silently picks the OTHER of the 2 circles through those points,
+            // rendering a much smaller wrong sliver instead of the disk (see the XAML comment - found by
+            // rendering all 4 flag combos and sampling pixel colors, not visible at a glance).
+            pathSmallZone.Data = Geometry.Parse(string.Format(CultureInfo.InvariantCulture,
+                "M{0},{1} L{2},{1} A{3},{3} 0 0 0 {0},{4} Z",
+                cornerX, cornerY, cornerX - radiusPx, radiusPx, cornerY + radiusPx));
+
+            // Cream backdrop: kept a bit larger than the disk cut into it, proportionally, so there's
+            // always visible cream margin around the green disk regardless of D.
+            double zoneWidth = radiusPx * 1.8d, zoneHeight = radiusPx * 1.6d;
+            rectLargeZone.Width = zoneWidth;
+            rectLargeZone.Height = zoneHeight;
+            Canvas.SetLeft(rectLargeZone, cornerX - zoneWidth);
+            Canvas.SetTop(rectLargeZone, cornerY);
+
+            rectRedV.Width = radiusPx;
+            rectRedV.Height = railLengthPx;
+            Canvas.SetLeft(rectRedV, cornerX - radiusPx);
+            Canvas.SetTop(rectRedV, cornerY - railLengthPx);
+
+            rectRedH.Width = railLengthPx;
+            rectRedH.Height = radiusPx;
+            Canvas.SetLeft(rectRedH, cornerX);
+            Canvas.SetTop(rectRedH, cornerY);
+
+            string radiusText = string.Format(CultureInfo.InvariantCulture, "{0:0.#} mm", bodyDiameter / 2d);
+            txtRedLegend.Text = "Keep clear (fence rails, 30 x " + radiusText + ")";
+            txtGreenLegend.Text = "Stock < 1\" (radius " + radiusText + ")";
             txtProbeCircle.Text = probe != null
-                ? string.Format("~{0:0.#} mm", probe.BodyDiameter)
-                : "probe diameter";
+                ? string.Format(CultureInfo.InvariantCulture, "Stock >= 1\" with 3D probe (~{0:0.#} mm)", probe.BodyDiameter)
+                : "Stock >= 1\" with 3D probe";
         }
 
         private void UpdatePositionDisplay()
         {
             var fx = DataContext as Fixture;
             if (fx == null || !fx.HasPosition)
-                txtPosition.Text = "Not set";
+            {
+                txtValidatedCheck.Visibility = Visibility.Collapsed;
+            }
             else
-                txtPosition.Text = fx.Coords + (fx.PositionValidated ? "  (validated)" : "  (not tested)");
+            {
+                txtValidatedCheck.Visibility = Visibility.Visible;
+                txtValidatedCheck.Foreground = fx.PositionValidated
+                    ? new SolidColorBrush(Color.FromRgb(0x1B, 0xC4, 0x4B))    // bright/saturated green - was too muted (0x2E7D32) to read against gray at small size
+                    : new SolidColorBrush(Color.FromRgb(0xBD, 0xBD, 0xBD));  // light gray - not tested (yet, or since last change)
+            }
         }
 
         private void btnSetPosition_Click(object sender, RoutedEventArgs e)
@@ -224,7 +275,8 @@ namespace CNC.Controls
             SetBusy(true);
             model.Message = "Probing the fixed jaw's corner...";
 
-            var handler = WatchAsyncCompletion(() => OnViseCornerProbeDone(fx));
+            var started = new RunStarted();
+            var handler = WatchAsyncCompletion(() => OnViseCornerProbeDone(fx), started);
 
             // confirm:false - clicking "Set position" IS the explicit confirmation. A "Run macro?" Yes/No gate
             // here would block between the jogged position being captured (above) and the probe actually
@@ -234,14 +286,20 @@ namespace CNC.Controls
             // wherever the operator actually ended up - confirmed on real hardware: the printed rx/ry exactly
             // matched an EARLIER jog position, not the later one the operator had settled on before clicking Yes.
             bool ran = MacroProcessor.Run(model, "Set fixture position", b.ToString(), false);
-            if (!ran)
+            if (ran)
+                started.Value = true;
+            else
             {
-                // Aborted before streaming even started (PREREQ failed) - the PropertyChanged handler will
-                // never see Send, so unhook it here instead of waiting forever.
+                // Aborted before streaming even started (PREREQ failed) - unhook here instead of waiting forever.
                 model.PropertyChanged -= handler;
                 SetBusy(false);
             }
         }
+
+        // Mutable "has the run genuinely started" flag, set by the CALLER right after MacroProcessor.Run
+        // returns true - see WatchAsyncCompletion below for why this replaced watching for a Send/SendMDI
+        // PropertyChanged transition.
+        private class RunStarted { public bool Value; }
 
         // Watches a just-started macro run (MacroProcessor.Run, called by the caller right after this) to its
         // TRUE completion and invokes onDone then - necessary whenever the code contains an O-word CALL or a
@@ -253,21 +311,38 @@ namespace CNC.Controls
         // exactly this reason (fixed via confirm:false above), and - found while investigating that - Test
         // position's own snippet has the same bug (its G91 G1 retract lines force the same streamed path; its
         // old comment claiming a synchronous MDI path was simply wrong). Mirrors MainWindow.RestoreSourceOnEnd's
-        // arm-on-Send/fire-on-Idle pattern. Returns the subscribed handler so the caller can unhook it if
-        // MacroProcessor.Run itself reports the run never started (PREREQ failed) - otherwise it waits forever
-        // for a Send/SendMDI transition that will never come.
-        private System.ComponentModel.PropertyChangedEventHandler WatchAsyncCompletion(System.Action onDone)
+        // arm-on-Send/fire-on-Idle pattern.
+        //
+        // "started" used to be armed by OBSERVING a PropertyChanged transition into Send/SendMDI - but
+        // GrblViewModel.StreamingState's setter (and JobControl's own internal dedup before assigning it)
+        // no-ops when the value doesn't actually CHANGE. If StreamingState already equalled Send/SendMDI from
+        // unrelated prior activity (e.g. a jog run right before clicking Test position - confirmed on real
+        // hardware via the console log: a jog immediately preceded a Test click that never got its completion
+        // callback), the transition INTO that same value fires no event at all, "started" never arms, and the
+        // eventual return to Idle is silently ignored forever - Test position would then probe successfully but
+        // the checkmark never turns green, because OnTestPositionDone simply never runs. Fixed by having the
+        // CALLER arm "started" from MacroProcessor.Run's own return value (already a reliable synchronous
+        // "streaming has begun" signal - see the comment above) instead of inferring it from an event that can
+        // be silently suppressed.
+        //
+        // Returns the subscribed handler so the caller can unhook it if MacroProcessor.Run itself reports the
+        // run never started (PREREQ failed) - otherwise it waits forever for a transition that will never come.
+        private System.ComponentModel.PropertyChangedEventHandler WatchAsyncCompletion(System.Action onDone, RunStarted started)
         {
-            bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
             {
                 if (e.PropertyName != nameof(GrblViewModel.StreamingState))
                     return;
                 var st = model.StreamingState;
-                if (st == StreamingState.Send || st == StreamingState.SendMDI)
-                    started = true;
-                else if (started && (st == StreamingState.Idle || st == StreamingState.NoFile))
+                // Idle/NoFile is normal completion; Stop is JobControl's Alarm-abort route (GrblStateChanged's
+                // GrblStates.Alarm case calls streamingHandler.Call(StreamingState.Stop, false) - see
+                // JobControl.xaml.cs) - an Alarm mid-probe (e.g. Test position's G38.2 search coming up empty)
+                // never reaches Idle/NoFile at all. Without this case the handler stayed subscribed forever -
+                // found on real hardware: an Alarm here left it firing onDone (touching this now-closed
+                // dialog's controls and the cloned Fixture) on literally the next unrelated StreamingState
+                // Idle/NoFile transition anywhere else in the app, whenever that happened to occur.
+                if (started.Value && (st == StreamingState.Idle || st == StreamingState.NoFile || st == StreamingState.Stop))
                 {
                     model.PropertyChanged -= handler;
                     Dispatcher.BeginInvoke(new System.Action(onDone));
@@ -321,11 +396,16 @@ namespace CNC.Controls
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
             b.AppendLine("G10 L2 P1 X0 Y0 Z0");   // clear G54 - absolute Z probe below runs in machine coords, same as pcorner.macro
-            // Controlled feed, not a bare rapid - same "avoid rapids" precaution applied to pcorner.macro/
-            // pvisecorner.macro this round, so an unexpected surface gets a gentle contact, not a fast one.
-            b.AppendLine("G53 G1 F1000 Z0");
-            b.AppendLine(string.Format("G53 G1 F1000 X{0} Y{1}", x, y));
-            b.AppendLine(string.Format("G53 G1 F1000 Z{0}", z));
+            // Safe-Z travel to the saved reference: rapid (G0) retract to machine Z0, rapid XY, rapid drop to
+            // the saved Z - the same staged Z0/XY/Z pattern and G53G0 rapids GotoBaseControl.SafeGotoMachine
+            // uses for every other "go to a saved position" button in the app (found on real hardware to be
+            // needed here too - the earlier G1 F1000 feed-rate version crawled to XY instead of rapiding).
+            // Only the G38.2 probe searches below (already feed-limited to searchF/latchF) actually touch
+            // anything - this travel never reaches the target surface, so a rapid here is no less safe than
+            // any other Goto button's rapid.
+            b.AppendLine("G53G0Z0");
+            b.AppendLine(string.Format("G53G0X{0}Y{1}", x, y));
+            b.AppendLine(string.Format("G53G0Z{0}", z));
             b.AppendLine(string.Format("G38.2 Z[{0} - 12] F{1}", z, searchF));
             b.AppendLine("G91 G1 Z2 F1000");
             b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
@@ -344,9 +424,12 @@ namespace CNC.Controls
             UpdatePositionDisplay();
             SetBusy(true);
 
-            var handler = WatchAsyncCompletion(() => OnTestPositionDone(fx));
+            var started = new RunStarted();
+            var handler = WatchAsyncCompletion(() => OnTestPositionDone(fx), started);
             bool ran = MacroProcessor.Run(model, "Test fixture position", b.ToString(), true);
-            if (!ran)
+            if (ran)
+                started.Value = true;
+            else
             {
                 model.PropertyChanged -= handler;
                 SetBusy(false);
@@ -359,6 +442,12 @@ namespace CNC.Controls
             fx.PositionValidated = model.GrblState.State != GrblStates.Alarm;
             UpdatePositionDisplay();
             SetBusy(false);
+            // The macro's own (PRINT, Test position OK - ...) message gets clobbered by JobControl's generic
+            // "<Program> ready - press Cycle Start to run" banner (SetActiveProgramReady) - Test position reuses
+            // the same stay-put-program machinery as a wizard tool, and that banner fires synchronously as part
+            // of the Idle transition, before this deferred callback runs. Re-assert a clear final message here,
+            // same as OnViseCornerProbeDone already does for Set position.
+            model.Message = fx.PositionValidated ? "Test position OK - validated." : "Test position failed or alarmed - not validated.";
         }
 
         private void SelectKind(FixtureKind kind)

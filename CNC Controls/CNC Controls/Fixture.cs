@@ -126,11 +126,43 @@ namespace CNC.Controls
         public string Coords
         {
             get { return _coords; }
-            set { _coords = value; PositionValidated = false; OnChanged(); OnChanged(nameof(HasPosition)); }
+            set
+            {
+                _coords = value; PositionValidated = false;
+                OnChanged(); OnChanged(nameof(HasPosition)); OnChanged(nameof(X)); OnChanged(nameof(Y)); OnChanged(nameof(Z));
+            }
         }
 
         [XmlIgnore]
         public bool HasPosition { get { return !string.IsNullOrEmpty(_coords); } }
+
+        // Direct per-axis edit of Coords (FixtureEditDialog's X/Y/Z Axis fields - an alternative to jogging
+        // there and clicking Set position). Reads/writes through the same CSV Coords holds (CurrentCoordsCsv's
+        // format: comma-joined values for GrblInfo.AxisFlags's enabled axes, in index order) - X/Y/Z are
+        // always indices 0/1/2. Setting any axis re-invalidates PositionValidated via the Coords setter, same
+        // as a fresh Set position jog.
+        [XmlIgnore]
+        public double X { get { return GetAxis(0); } set { SetAxis(0, value); } }
+        [XmlIgnore]
+        public double Y { get { return GetAxis(1); } set { SetAxis(1, value); } }
+        [XmlIgnore]
+        public double Z { get { return GetAxis(2); } set { SetAxis(2, value); } }
+
+        private double GetAxis(int index)
+        {
+            if (!HasPosition)
+                return 0d;
+            double v = new Position(_coords).Values[index];
+            return double.IsNaN(v) ? 0d : v;
+        }
+
+        private void SetAxis(int index, double value)
+        {
+            var pos = HasPosition ? new Position(_coords) : new Position();
+            pos.Values[index] = value;
+            var idx = GrblInfo.AxisFlags.ToIndices();
+            Coords = string.Join(",", idx.Select(i => (double.IsNaN(pos.Values[i]) ? 0d : pos.Values[i]).ToInvariantString("F3")));
+        }
 
         // Set true only when "Test position" (FixtureEditDialog) has actually run the real spoilboard probe
         // search from this Coords and the controller did NOT alarm - i.e. the saved position is proven to

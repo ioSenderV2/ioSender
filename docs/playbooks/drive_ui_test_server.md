@@ -127,24 +127,43 @@ real stop, not a pause. To automate again in the same running process you'd need
 
 ## Standalone in-process render (for content the test server can't reach)
 
-For a WPF `Window` that isn't the mainWindow (e.g. verifying `AppMessageBox` scaling in isolation),
-a throwaway console harness referencing the built `CNC.Core.dll`/`CNC.Controls.WPF.dll` and rendering
-via `RenderTargetBitmap` works, but has real gotchas — expect to spend time on these if you build one:
+For a WPF `Window` that isn't the mainWindow (e.g. a modal dialog opened via `ShowDialog()`, or
+verifying `AppMessageBox` scaling in isolation) — **use `tools/render-harness/`**, a permanent
+project for exactly this (built 2026-07-18; see its own `README.md` for full usage and the gotchas
+below in detail). Renders the **real dialog class** against the **real on-disk `AppConfig`** via
+`RenderTargetBitmap`, no visible window needed:
 
-- **Copy the whole `bin\Debug` folder's DLLs next to the harness**, not just the two you reference —
-  transitive deps (RP.Math, websocket-sharp, etc.) need to resolve too.
+```powershell
+cd tools\render-harness
+dotnet build                                          # also syncs fresh DLLs/en-US/config
+dotnet bin\Debug\net462\render-harness.exe FixtureEditDialog
+```
+
+Add a new scenario (a name + a `Func<Window>` that builds the real dialog with minimal real objects)
+to `Scenarios.All` in `Program.cs` rather than hand-rolling a fresh throwaway console app each time —
+**don't fall back to a hand-copied XAML mock of the dialog's content instead of the real class**; that
+approach silently drifted from what the real dialog actually rendered *twice* while fixing
+`FixtureEditDialog`'s schematic (real control templates, real `UiScale`, real `DialogScaling` all
+differ from a mock), costing a full round-trip each time before the drift was caught.
+
+Gotchas the harness's csproj/`Program.cs` already handle (know these before touching either):
+
+- **Must be net462, not net8/9/10** — the app's own WPF assemblies are net462; a modern .NET host
+  cannot load net462-compiled WPF types (different `PresentationFramework` binaries entirely).
+- **`CNC.Core` has its own `enum Action`**, colliding with `System.Action` in any file with
+  `using CNC.Core;` — qualify as `System.Action` explicitly (same fix as `ObsBridge.cs`).
+- **Copy the whole `bin\Debug` folder's DLLs next to the harness**, not just the ones referenced —
+  transitive deps (RP.Math, websocket-sharp, etc.) need to resolve too. The harness's `SyncAppBinaries`
+  MSBuild target does this automatically on every build.
 - **Copy `ioSender.exe.config` → `<harness>.exe.config`.** Without it, `Properties.Settings.Default`
-  has no schema and `AppConfig.Settings.Base` throws/stays null.
-- **Call `AppConfig.Settings.LoadConfig("name")` before touching `.Base`** — just accessing the
+  has no schema and `AppConfig.Settings.Base` throws/stays null. Also automated.
+- **Call `AppConfig.Settings.LoadConfig("ioSender")` before touching `.Base`** — just accessing the
   `Settings` singleton doesn't load anything; `Base` is null until `LoadConfig` runs (mirrors
-  `MainWindow.xaml.cs`'s `AppConfig.Settings.LoadConfig(Title)` call). This reads the real on-disk
-  config (read-only, since the harness never calls `Save()`) — safe.
-- **The compiled BAML for `CNC.Controls.WPF` lives in the `en-US` *satellite* resource DLL**
-  (`en-US\CNC.Controls.WPF.resources.dll`), not the main assembly — this project has
-  `[assembly: NeutralResourcesLanguage("en-US", UltimateResourceFallbackLocation.Satellite)]`. Copy
-  that `en-US` subfolder too, **and re-copy it after every rebuild** — a stale satellite DLL silently
-  keeps showing the *old* XAML with no error, which reads exactly like a real layout bug (this cost
-  real time: a `Window MaxWidth` removal appeared to do nothing until the satellite was refreshed).
+  `MainWindow.xaml.cs`'s own call). Reads the real on-disk config, read-only — the harness never
+  calls `Save()`.
+- **The compiled BAML for `CNC.Controls.WPF` lives in the `en-US` *satellite* resource DLL**, not the
+  main assembly. The `SyncAppBinaries` target re-copies it on every build — a stale satellite DLL
+  silently keeps showing the *old* XAML with no error, which reads exactly like a real layout bug.
 - **Set `Thread.CurrentThread.CurrentUICulture` before creating any WPF object** — otherwise the
   satellite-culture resource probe throws `MissingSatelliteAssemblyException` even for a plain
   invariant-culture run.
@@ -154,3 +173,6 @@ via `RenderTargetBitmap` works, but has real gotchas — expect to spend time on
 - **Pump layout until the size stabilizes, not just N fixed iterations** — `LayoutTransform`-driven
   `SizeToContent` regrowth (e.g. a UiScale zoom) can take several dispatcher passes to settle; render
   too early and you get a plausible-looking but wrong (smaller/clipped) capture.
+- **The harness syncs from `CNC Controls`'s own `bin\Debug`** — if that's stale (edited XAML/code-behind
+  but haven't rebuilt ioSender), the harness renders the STALE version with no warning. Run
+  `.\build.ps1 -Configuration Debug` in the repo root first.

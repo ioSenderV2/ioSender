@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone in-process renderer for WPF Windows/dialogs that AREN'T reachable through the
+    WpfUiTestServer test-server route (docs/playbooks/drive_ui_test_server.md) - chiefly modal
+    dialogs opened via ShowDialog() from a parent Window, which the test server's mainWindow-only
+    screenshot endpoint can't see into. Renders the REAL dialog class with the REAL AppConfig
+    loaded (not a hand-copied XAML mock - that approach silently drifted from reality twice while
+    building the FixtureEditDialog schematic, 2026-07-18) via RenderTargetBitmap, no visible window
+    needed. See README.md in this folder for usage and the gotchas that bit us building this.
+
+    net462 (SDK-style, targeting the old framework) because the app's own WPF assemblies are net462
+    - a net8/net9/net10 host cannot load net462-compiled WPF types (different PresentationFramework
+    binaries), confirmed by hitting exactly that wall before switching this project to net462.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CNC.Core">
+      <HintPath>..\..\CNC Core\CNC Core\bin\Debug\CNC.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Controls.WPF">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Controls.WPF.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="RP.Math">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Auto-sync transitive deps + the en-US satellite (BAML lives there, not the main assembly -
+       see README) + the real App.config on every build, so this never silently renders against a
+       stale copy. Source is CNC Controls' own bin\Debug - rebuild ioSender first if this looks off. -->
+  <Target Name="SyncAppBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
+      <SourceEnUS Include="..\..\CNC Controls\CNC Controls\bin\Debug\en-US\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(SourceEnUS)" DestinationFolder="$(OutDir)en-US\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config" DestinationFiles="$(OutDir)render-harness.exe.config" SkipUnchangedFiles="true" Condition="Exists('..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config')" />
+  </Target>
+
+</Project>

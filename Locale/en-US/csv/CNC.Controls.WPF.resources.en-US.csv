@@ -922,9 +922,9 @@ CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_ok:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_position:System.Windows.Controls.ContentControl.Content,Label,True,True,,Position:
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,txtFxPosition:System.Windows.Controls.TextBlock.Text,Text,True,True,,Not set
-CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxDlgSetPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set position
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxDlgSetPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxDlgSetPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: clear of both faces (within the schematic's circle) AND within ~10 mm above the spoilboard - the spoilboard probe searches only 12 mm down from here. Not written to firmware G28 - kept only in this fixture's own definition."
-CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxTestPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Test position
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxTestPos:System.Windows.Controls.ContentControl.Content,Button,True,True,,Test
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,btnFxTestPos:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."
 CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,txtFxProbeCircle:System.Windows.Controls.TextBlock.Text,Text,True,True,,probe diameter
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_length:CNC.Controls.NumericField.Label,None,False,True,,Overall length:
@@ -1114,3 +1114,13 @@ CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btn_upload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Upload a local file to the controller's storage.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Dry run (spindle/coolant forced off)
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Next run: offset Z clear of stock AND force the spindle/coolant off for the whole run, regardless of what the program contains - watch the toolpath without cutting or spinning anything."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posX:CNC.Controls.NumericField.Label,None,False,True,,X Axis:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posX:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Direct edit of this position's X - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posY:CNC.Controls.NumericField.Label,None,False,True,,Y Axis:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posY:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Direct edit of this position's Y - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posZ:CNC.Controls.NumericField.Label,None,False,True,,Z Axis:
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posZ:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_posZ:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Direct edit of this position's Z - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."
+CNC.Controls.WPF.g.en-US.resources:fixtureeditdialog.baml,fxd_probeNote:System.Windows.Controls.TextBlock.Text,Text,True,True,,The 3D probe must be installed before Set/Test position - and the saved position must be within ~10 mm above the spoilboard (the probe search is capped to 12 mm below it).

@@ -157,3 +157,4 @@ ioSender.g.en-US.resources:heightmapview.baml,hm_save:System.Windows.FrameworkEl
 ioSender.g.en-US.resources:heightmapview.baml,hm_load:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a previously saved height map (.map) file.
 ioSender.g.en-US.resources:startjobview.baml,cbxFixture:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Fixture to reference for this job (defined in Machine Setup Wizard &gt; Fixture definitions).
 ioSender.g.en-US.resources:startjobview.baml,cbxWcs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Work coordinate system (G54-G59) to set this job's origin in.
+ioSender.g.en-US.resources:mainwindow.baml,btnAllRecord:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,OBS Control - All: click to start/stop every camera together
