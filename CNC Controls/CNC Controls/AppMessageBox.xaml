@@ -16,7 +16,7 @@
         </StackPanel>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <Image x:Name="imgIcon" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,14,0" Stretch="None"/>
-            <TextBlock x:Name="txtMessage" TextWrapping="Wrap" MaxWidth="440" VerticalAlignment="Center" FontSize="13"/>
+            <TextBlock x:Name="txtMessage" TextWrapping="Wrap" MaxWidth="440" VerticalAlignment="Center" FontSize="19.5"/>
         </StackPanel>
     </DockPanel>
 </Window>
