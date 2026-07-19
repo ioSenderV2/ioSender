@@ -219,8 +219,20 @@ namespace CNC.Controls
             if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
             {
                 var macros = AtcMacros.GetStatus(Grbl.GrblViewModel);
-                if (macros.Any(r => r.State != AtcMacros.MacroState.Installed))
+                var bad = macros.Where(r => r.State != AtcMacros.MacroState.Installed).ToList();
+                if (bad.Count > 0)
+                {
+                    // TEMP DIAGNOSTIC (2026-07-19) - "all green but the gate trips anyway" investigation.
+                    // Reported intermittent/random - most likely the same right-after-reset filesystem-
+                    // listing race ForceMachineSetupIfNeeded's own 1200ms re-check was added for (a synchronous
+                    // GetStatus filesystem listing coming back empty/stale immediately post-reset), but this
+                    // logs the OFFENDING macro name+state+size+FS every time this trips, from every caller
+                    // (not just the wizard's own gate), to actually pin down which macro/state it is instead
+                    // of guessing. Remove once resolved.
+                    ConsoleLog.Write("[MachineSetupWizard] FirstIncompleteStep: step 7 tripped - " +
+                        string.Join(", ", bad.Select(r => string.Format("{0}={1}(size={2},fs={3})", r.Name, r.State, r.Size, r.FS))));
                     return 7;
+                }
             }
 
             return 0;
@@ -390,7 +402,18 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
                 UpdateApplyState();
-                RefreshMacroStatus();   // queries the filesystem once so step 7's colour is right on open
+                // Deferred (2026-07-19 - "Machine Setup tab permanently unresponsive" investigation): this
+                // Activate(true) runs from MainWindow.TabMode_SelectionChanged, DURING the tab-switch's own
+                // layout pass (the newly-selected tab's content is being measured/arranged right now).
+                // AtcMacros.GetStatus pumps the dispatcher waiting for the controller's filesystem listing -
+                // Steps_SelectionChanged (below) already defers the SAME call for exactly this reason ("throws
+                // if run during the layout pass that generated this nested TabControl's items") - this call
+                // site was calling it synchronously/undeferred instead, the one place that comment's warning
+                // wasn't followed. A pumped-dispatcher wait colliding with an active layout pass here would
+                // throw mid-tab-switch, after UIViewModel.CurrentView was already reassigned but before the
+                // switch finished - explaining why the tab looked selected-but-frozen and never recovered on
+                // its own (a mid-layout-pass exception doesn't reliably self-heal the visual tree).
+                Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
                 UpdateSimulatorStepVisibility();
                 RefreshFirmwareVersion();
             }
