@@ -11,9 +11,17 @@
     </UserControl.Resources>
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="340"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="1*" MinWidth="340"/>
+            <!-- Dedicated splitter column, not "sit on the col 0/1 boundary" - the latter puts the splitter
+                 BEHIND column 0's content (declared first in XAML), which has no margin carved out for it and
+                 so swallows its hit-test area entirely (no resize cursor ever appears) - see StartJobView.xaml
+                 for the fuller explanation; same fix the Job tab's splitters already use successfully. -->
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="2*"/>
         </Grid.ColumnDefinitions>
+
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
 
         <!-- Left: scrolling inputs on top, warnings + Generate/Apply/Save/Load pinned at the bottom -->
         <Grid Grid.Column="0">
@@ -109,7 +117,7 @@
         </Grid>
 
         <!-- Right: steps/help on top, 3D view of the planned grid / probed surface (blue low -> red high) below -->
-        <Grid Grid.Column="1" Margin="8,0,0,0">
+        <Grid Grid.Column="2" Margin="8,0,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>

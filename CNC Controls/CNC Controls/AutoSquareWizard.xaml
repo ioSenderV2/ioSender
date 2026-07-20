@@ -8,9 +8,12 @@
              d:DesignHeight="520" d:DesignWidth="980">
     <Grid VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="450"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="1*" MinWidth="450"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="2*"/>
         </Grid.ColumnDefinitions>
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
         <!-- Left: scrolling inputs on top, action buttons pinned at the column bottom (shared tool layout) -->
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
@@ -96,7 +99,7 @@
         </Grid>
         <!-- Right: scaled diagram (top) / instructions / result formula (bottom). The generated program itself
              previews in the bottom Program View, not here. -->
-        <Grid Grid.Column="1" Margin="8,5,5,5">
+        <Grid Grid.Column="2" Margin="8,5,5,5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*" MinHeight="120"/>

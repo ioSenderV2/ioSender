@@ -34,40 +34,67 @@
             <!-- MDI / Signals / Status moved to the fixed main-window run-control bar (Phase 2c). -->
             <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"/>
         </StackPanel>
-        <DockPanel x:Name="dp" DockPanel.Dock="Left" Margin="5,5,5,0" MinWidth="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-            <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels). Signals/Status now
-                 live in the fixed bottom run-control bar (Phase 2c). -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel x:Name="t1" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-            </ScrollViewer>
-        </DockPanel>
-        <Grid x:Name="rhGrid" DockPanel.Dock="Right" >
+        <!-- Left sidebar / center workspace (Program-3D View-Console tabs) / right sidebar, now a Grid with
+             draggable GridSplitters between each pair instead of a DockPanel's fixed Left/fill/Right docking -
+             a DockPanel gives no way for the user to resize a docked region against its neighbour. Left/right
+             columns stay Auto (size-to-content, same as the DockPanel.Dock behavior they replace) with their
+             original MinWidth floors; dragging a splitter overrides Auto with an explicit pixel width, the
+             normal WPF idiom for a resizable Auto column. rhGrid's OWN internal mainSlotsLeft/mainSlotsRight
+             split keeps its existing MaxWidth=260 cap on the right one - not made draggable here, that width
+             was deliberately tuned to protect the center workspace, not the same kind of thing as these three
+             top-level regions. -->
+        <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto" MinWidth="220"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" x:Name="joggerRow"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"/>
-            <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
-                 balanced by height (see BuildMainPanels), so they fit instead of a rigid split. Each column
-                 is a ScrollViewer so an over-tall stack scrolls instead of clipping (worse at high DPI). -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel x:Name="mainSlotsLeft" Margin="5,0,0,0" MinWidth="250"/>
-            </ScrollViewer>
-            <!-- Capped (not just MinWidth) so Feed/Spindle/Outline (the panels that consistently land here -
-                 see BuildMainPanels) can't stretch wide on their own content (Outline's wrapped warning text
-                 in particular) at the expense of the Program/3D View/Console workspace, which only gets
-                 whatever's left over from this DockPanel-docked-right region. Content wraps to more lines
-                 instead - the ScrollViewer already handles any resulting overflow height. -->
-            <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
-            </ScrollViewer>
+
+            <DockPanel x:Name="dp" Grid.Column="0" Margin="5,5,5,0" MinWidth="220" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+                <!-- Configurable region: populated from Config.LeftPanels (BuildLeftPanels). Signals/Status now
+                     live in the fixed bottom run-control bar (Phase 2c). -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="t1" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                </ScrollViewer>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+
+            <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a).
+                 Run controls (JobControl) now live in the fixed main-window bottom bar (Phase 2c). -->
+            <local:JobWorkspace x:Name="workspace" Grid.Column="2"/>
+
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+
+            <Grid x:Name="rhGrid" Grid.Column="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" x:Name="joggerRow"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"/>
+                <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
+                     balanced by height (see BuildMainPanels), so they fit instead of a rigid split. Each column
+                     is a ScrollViewer so an over-tall stack scrolls instead of clipping (worse at high DPI). -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="mainSlotsLeft" Margin="5,0,0,0" MinWidth="250"/>
+                </ScrollViewer>
+                <!-- Capped (not just MinWidth) so Feed/Spindle/Outline (the panels that consistently land here -
+                     see BuildMainPanels) can't stretch wide on their own content (Outline's wrapped warning text
+                     in particular) at the expense of the Program/3D View/Console workspace, which only gets
+                     whatever's left over from this region. Content wraps to more lines instead - the
+                     ScrollViewer already handles any resulting overflow height. -->
+                <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
+                </ScrollViewer>
+            </Grid>
         </Grid>
-        <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a).
-             Run controls (JobControl) now live in the fixed main-window bottom bar (Phase 2c). -->
-        <local:JobWorkspace x:Name="workspace"/>
     </DockPanel>
 </UserControl>

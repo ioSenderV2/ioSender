@@ -30,9 +30,12 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="310*"/>
+            <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="665*"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Orientation="Vertical" Margin="0,5,0,0" MinWidth="360" HorizontalAlignment="Left" Grid.ColumnSpan="2">
+        <GridSplitter Grid.Column="1" Grid.RowSpan="2" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+        <StackPanel Orientation="Vertical" Margin="0,5,0,0" MinWidth="360" HorizontalAlignment="Left" Grid.ColumnSpan="3">
             <StackPanel Orientation="Horizontal">
                 <Label x:Uid="lbl_axis" x:Name="lblTool" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="70"/>
                 <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index" ItemsSource="{Binding Path=Axes}" SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="0,2"
@@ -103,7 +106,7 @@
                 </Button.IsEnabled>
             </Button>
         </StackPanel>
-        <TextBlock TextWrapping="NoWrap" MinWidth="800" Grid.Row="1" HorizontalAlignment="Left" Margin="5,0,0,254" Grid.ColumnSpan="2" Grid.RowSpan="2">
+        <TextBlock TextWrapping="NoWrap" MinWidth="800" Grid.Row="1" HorizontalAlignment="Left" Margin="5,0,0,254" Grid.ColumnSpan="3" Grid.RowSpan="2">
             <TextBlock.Text>
                 <MultiBinding Converter="{StaticResource PositionConverter}">
                     <Binding Path="Position"/>
@@ -111,8 +114,8 @@
                 </MultiBinding>
             </TextBlock.Text>
         </TextBlock>
-        <local:JogControl x:Name="DRO" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.ColumnSpan="2" Grid.Row="2" MinHeight="255" MinWidth="980"/>
-        <Grid Grid.Column="1" Grid.Row="0" Margin="5,5,0,0">
+        <local:JogControl x:Name="DRO" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.ColumnSpan="3" Grid.Row="2" MinHeight="255" MinWidth="980"/>
+        <Grid Grid.Column="2" Grid.Row="0" Margin="5,5,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
