@@ -15,10 +15,10 @@
 ;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
 ;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
 ;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
-;   #<_ls_thickness> = estimated stock thickness (mm). The X/Y face probes search at the material's
-;                   MIDPOINT (top - thickness/2) - safely inside the material for any thickness, rather
-;                   than a fixed offset below the top (which could miss thin stock or catch a top chamfer
-;                   on thick stock).
+;   #<_ls_thickness> = estimated stock thickness (mm). UNUSED by this macro as of 2026-07-20 (the X/Y face
+;                   probes now search at a FIXED 5mm below the measured top instead of the material
+;                   midpoint - see #<_start_z> below) - still accepted/passed by callers for now, kept here
+;                   in case it's wanted again.
 ;   #<_ls_spoilx>, #<_ls_spoily> = offset (mm) from the reference, along this corner's stock-interior
 ;                   direction, to the spoilboard-probe XY (always 0,0 - AT the reference).
 ;   #<_ls_topx>, #<_ls_topy>     = offset (mm) from the reference, into the stock, to the stock-top probe
@@ -69,10 +69,12 @@
 ;                                per corner = flatness
 ;   #<_start_z>                 published by the DISCOVER call as the REUSE flag for later corners
 ;
-; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 3 mm AND <= ~25 mm (1 in)
-;   thick - the stock-top probe now starts just above 1 in for speed, so taller stock would be missed;
-;   Z probes seek to -140 (keep within $132). The DISCOVER reference must have clear air below it
-;   to the spoilboard (no fence/clamp) and be >= body-radius outside the faces.
+; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 5 mm (the face probes
+;   now seek at a FIXED 5mm below the measured top, not the material midpoint - thinner stock has its side
+;   face searched below its own bottom) AND <= ~25 mm (1 in) thick - the stock-top probe now starts just
+;   above 1 in for speed, so taller stock would be missed; Z probes seek to -140 (keep within $132). The
+;   DISCOVER reference must have clear air below it to the spoilboard (no fence/clamp) and be >= body-radius
+;   outside the faces.
 
 O<pcorner> SUB
   #<rad>    = #1                 ; tip radius = the single CALL arg; rest via globals
@@ -246,11 +248,12 @@ O<pcorner> SUB
     (PRINT, PC bottom=#<_bottom> [touch plate, from measured top])
   o22 ENDIF
 
-  ; ================= start_z for the face probes (centre tip at the material's MIDPOINT) =================
-  ; top - thickness/2 always lands inside the material regardless of thickness (unlike a fixed offset below
-  ; the top, which could miss thin stock or catch a top chamfer/rounded edge on thick stock) - self-safe by
-  ; construction, so no #<_bottom>-based thin-stock fallback is needed here anymore.
-  #<_start_z> = [#<_z_top> - [#<_ls_thickness> / 2]]
+  ; ================= start_z for the face probes (fixed 5mm below the measured top) =================
+  ; Was top - thickness/2 (material midpoint) - changed to a fixed 5mm inset (2026-07-20, user request):
+  ; simpler and independent of the caller's estimated #<_ls_thickness>, which is only ever an estimate
+  ; before Measure has actually run. 5mm clears a top chamfer/rounded edge on any stock thick enough to
+  ; probe at all (preconditions require >= 3mm... clamped up to the zfloor safety below regardless).
+  #<_start_z> = [#<_z_top> - 5]
   ; SAFETY: never position the probe below the machine's Z soft-limit floor (#<_ls_zfloor>, passed by Load Stock
   ; from $132). When the stock sits low - its top near the Z travel bottom - start_z can fall below
   ; reachable Z, and the G53 G1 descent to it trips Alarm:2 (soft limit). Clamp up to the floor; the side face is
