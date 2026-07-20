@@ -108,6 +108,12 @@ $newEntries = $entries.Values | Where-Object { $_.N -gt $previousThrough } | Sor
 
 # --- 4. Release notes --------------------------------------------------------
 $lines = @("## ioSender $newVersion", "")
+$lines += "### Install / update"
+$lines += "Run in PowerShell (installs fresh or updates an existing install to this version):"
+$lines += '```powershell'
+$lines += "irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex"
+$lines += '```'
+$lines += ""
 if ($newEntries.Count -eq 0) {
     $lines += "No changelog entries in this build (see [Overview.html](https://github.com/$Repo/blob/master/Overview.html#features-and-fixes) for the full history)."
 } else {
@@ -117,12 +123,6 @@ if ($newEntries.Count -eq 0) {
         $lines += "- **[$($e.Tag)] #$($e.N)** $plain"
     }
 }
-$lines += ""
-$lines += "### Install / update"
-$lines += "Run in PowerShell (installs fresh or updates an existing install to this version):"
-$lines += '```powershell'
-$lines += "irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex"
-$lines += '```'
 $lines += ""
 $lines += "<!-- changelog-through:$currentMax -->"
 $notes = ($lines -join "`n")
