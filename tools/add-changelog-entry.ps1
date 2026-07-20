@@ -104,7 +104,9 @@ if ($secIdx -lt 0) { Fail "no </section> found" }
 $content = $content.Insert($secIdx, $detail)
 
 # --- 4. TOC row (insert before the totals row) -----------------------------
-$tocRow = "<tr><td class=""n"">$N</td><td><a href=""#pr$N"">$tocTitle</a></td><td class=""sz""><span class=""k"">Files:</span> <span class=""chg"">$fChg</span> <span class=""del"">$fDel</span> <span class=""add"">+$fNew</span><br><span class=""k"">Lines:</span> <span class=""add"">+$linesAdd</span> <span class=""del"">-$linesDel</span></td></tr>`n"
+# Version cell starts blank - the release workflow stamps it with the actual version
+# (e.g. "2.8") once this entry ships in a published release; see release.yml.
+$tocRow = "<tr><td class=""n"">$N</td><td><a href=""#pr$N"">$tocTitle</a></td><td class=""sz""><span class=""k"">Files:</span> <span class=""chg"">$fChg</span> <span class=""del"">$fDel</span> <span class=""add"">+$fNew</span><br><span class=""k"">Lines:</span> <span class=""add"">+$linesAdd</span> <span class=""del"">-$linesDel</span></td><td class=""ver""></td></tr>`n"
 $totIdx = $content.IndexOf('<tr class="tot">')
 if ($totIdx -lt 0) { Fail "no <tr class=""tot""> totals row found" }
 $content = $content.Insert($totIdx, $tocRow)

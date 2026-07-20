@@ -3,10 +3,10 @@
     One-line installer for ioSender V2 - no build tools, no admin rights.
 
 .DESCRIPTION
-    Downloads the latest rolling "latest" release build, installs it to
+    Downloads the latest published ioSender release, installs it to
     %LocalAppData%\Programs\ioSender, creates a desktop shortcut, and
     launches it. Safe to re-run any time - it always updates to the newest
-    build, moving the prior install to a "previous" subfolder first so you
+    version, moving the prior install to a "previous" subfolder first so you
     can roll back one version with -Rollback.
 
 .PARAMETER Rollback
@@ -66,9 +66,10 @@ if ($Rollback) {
 }
 
 Write-Host "==> Fetching latest ioSender release info ..." -ForegroundColor Cyan
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/latest" -Headers @{ 'User-Agent' = 'ioSender-installer' }
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'ioSender-installer' }
 $asset = $release.assets | Where-Object { $_.name -eq 'ioSender.zip' } | Select-Object -First 1
-if (-not $asset) { throw "No ioSender.zip asset found on the 'latest' release of $repo." }
+if (-not $asset) { throw "No ioSender.zip asset found on the latest release ($($release.tag_name)) of $repo." }
+Write-Host "==> Latest published version: $($release.tag_name)" -ForegroundColor Cyan
 
 Write-Host "==> Downloading $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB) ..." -ForegroundColor Cyan
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempZip -UseBasicParsing

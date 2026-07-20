@@ -1,8 +1,13 @@
-name: Rolling release
+name: Versioned release
 
-# Builds ioSender XL in Release config and republishes it as the single
-# rolling "latest" GitHub Release on every push to master. No version tags -
-# install.ps1 always pulls whatever's tagged "latest".
+# Builds ioSender XL in Release config and publishes a real versioned GitHub Release
+# (2.1, 2.2, ...) on every push to master, with notes drawn from the Overview.html
+# changelog entries new since the previous release. install.ps1 and the in-app
+# Check for Updates both pull the actual GitHub "latest release".
+#
+# After publishing, this workflow also commits Overview.html's TOC "version" stamps
+# back to master (tools/cut-release.ps1 fills them in) - guarded with [skip release]
+# in that commit's message so it doesn't retrigger itself.
 on:
   push:
     branches: [master]
@@ -11,18 +16,28 @@ on:
 jobs:
   build-and-publish:
     runs-on: windows-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Compute version + changelog delta
+        id: relinfo
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: ./tools/cut-release.ps1 -Repo ${{ github.repository }} -Html Overview.html -NotesOut release-notes.md
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Embed build commit
+      - name: Embed build commit + version
         shell: pwsh
         run: |
-          $sha = "${{ github.sha }}"
           $path = "ioSender XL\ioSender XL\BuildInfo.cs"
-          (Get-Content $path -Raw) -replace '"dev"', "`"$sha`"" | Set-Content $path -NoNewline
+          $content = Get-Content $path -Raw
+          $content = $content -replace 'CommitSha = "dev"', "CommitSha = `"${{ github.sha }}`""
+          $content = $content -replace 'Version = "dev"', 'Version = "${{ steps.relinfo.outputs.version }}"'
+          Set-Content $path $content -NoNewline
 
       - name: Build Release
         run: msbuild "ioSender XL\ioSender XL.sln" -restore -t:Build -p:Configuration=Release -m -nologo -v:minimal -clp:ErrorsOnly
@@ -33,21 +48,27 @@ jobs:
           $src = "ioSender XL\ioSender XL\bin\Release"
           Compress-Archive -Path "$src\*" -DestinationPath "ioSender.zip" -Force
 
-      - name: Publish rolling "latest" release
+      - name: Publish release v${{ steps.relinfo.outputs.version }}
         uses: ncipollo/release-action@v1
         with:
-          tag: latest
-          name: ioSender (latest master build)
-          # Kept to a single "build:<branch>@<sha>" marker (same convention as the firmware repo's
-          # "drv:<ref>@<sha>") so the app's Check for Updates can parse it without a JSON library.
-          body: "build:master@${{ github.sha }}"
-          allowUpdates: true
-          removeArtifacts: true
+          tag: v${{ steps.relinfo.outputs.version }}
+          name: ioSender ${{ steps.relinfo.outputs.version }}
+          bodyFile: ${{ steps.relinfo.outputs.notesFile }}
           makeLatest: true
-          prerelease: true
+          prerelease: false
           artifacts: ioSender.zip
           # Default GITHUB_TOKEN can't create releases here - org policy locks
           # default workflow permissions to read-only, and changing it needs
           # org-admin (not available to this repo's maintainer token). Use a
           # PAT stored as a repo secret instead.
           token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Commit changelog version stamps
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Overview.html
+          git commit -m "chore: stamp v${{ steps.relinfo.outputs.version }} changelog entries [skip release]"
+          git push "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:master

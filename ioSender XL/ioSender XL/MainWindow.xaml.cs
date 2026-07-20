@@ -1240,25 +1240,20 @@ namespace GCode_Sender
             about.ShowDialog();
         }
 
-        // Check for updates: query the GitHub releases API for the rolling "latest" release of
-        // ioSenderV2/ioSender and compare its commit against the one this binary was built from.
-        // There's no version number to compare (rolling releases aren't versioned) - .github/workflows/
-        // release.yml stamps BuildInfo.CommitSha at build time and puts the same commit in the release's
-        // body as "build:master@<sha>" (same convention FirmwareUpdateManager uses for "drv:<ref>@<sha>").
+        // Check for updates: query GitHub's "latest release" for ioSenderV2/ioSender (a real,
+        // versioned, non-prerelease release now - .github/workflows/release.yml publishes one on
+        // every push to master, tag "v<version>") and compare its version against the one this
+        // binary was built with (BuildInfo.Version, stamped by that same workflow).
         private async void checkForUpdates_Click(object sender, RoutedEventArgs e)
         {
-            if (BuildInfo.CommitSha == "dev")
+            if (BuildInfo.Version == "dev")
             {
-                AppDialogs.Show("This is a local development build with no embedded commit, so it can't be compared against a release.\n\nRun install.ps1 to install the latest published build.",
+                AppDialogs.Show("This is a local development build with no embedded version, so it can't be compared against a release.\n\nRun install.ps1 to install the latest published build.",
                     "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            // By tag, not GitHub's "/releases/latest" - that endpoint explicitly excludes
-            // prereleases/drafts, and the rolling "latest" release is published as a prerelease
-            // (it's a rolling master build, not a versioned release). install.ps1 uses the same
-            // by-tag endpoint for the same reason.
-            const string releasesUrl = "https://api.github.com/repos/ioSenderV2/ioSender/releases/tags/latest";
+            const string releasesUrl = "https://api.github.com/repos/ioSenderV2/ioSender/releases/latest";
 
             try
             {
@@ -1277,31 +1272,28 @@ namespace GCode_Sender
                     // (distinct from a connectivity problem, which would throw below).
                     if (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
-                        AppDialogs.Show(string.Format("No published releases were found for ioSender, so there is nothing to compare against.\n\nYou are running commit {0}.", ShortSha(BuildInfo.CommitSha)),
+                        AppDialogs.Show(string.Format("No published releases were found for ioSender, so there is nothing to compare against.\n\nYou are running version {0}.", BuildInfo.Version),
                             "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
                         return;
                     }
                     httpResponse.EnsureSuccessStatusCode();
                     var response = await httpResponse.Content.ReadAsStringAsync();
-                    string latestSha = ParseGitHubReleaseCommit(response);
-                    if (string.IsNullOrEmpty(latestSha))
+                    string latestVersion = ParseGitHubReleaseTag(response);
+                    if (string.IsNullOrEmpty(latestVersion))
                     {
-                        AppDialogs.Show("Could not determine the latest release's commit.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        AppDialogs.Show("Could not determine the latest release's version.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
 
-                    bool upToDate = latestSha.StartsWith(BuildInfo.CommitSha, StringComparison.OrdinalIgnoreCase)
-                                 || BuildInfo.CommitSha.StartsWith(latestSha, StringComparison.OrdinalIgnoreCase);
-
-                    if (upToDate)
+                    if (CompareVersions(BuildInfo.Version, latestVersion) >= 0)
                     {
-                        AppDialogs.Show(string.Format("You are running the latest build (commit {0}).", ShortSha(BuildInfo.CommitSha)),
+                        AppDialogs.Show(string.Format("You are running the latest version ({0}).", BuildInfo.Version),
                             "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
                         var result = AppDialogs.Show(
-                            string.Format("A newer build of ioSender is available.\n\nYour build: {0}\nLatest build: {1}\n\nUpdate now? ioSender will close, download and install the new build, and relaunch.", ShortSha(BuildInfo.CommitSha), ShortSha(latestSha)),
+                            string.Format("A newer version of ioSender is available.\n\nYour version: {0}\nLatest version: {1}\n\nUpdate now? ioSender will close, download and install the new build, and relaunch.", BuildInfo.Version, latestVersion),
                             "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes)
                         {
@@ -1362,13 +1354,11 @@ namespace GCode_Sender
             });
         }
 
-        private static string ShortSha(string sha) => sha.Length >= 7 ? sha.Substring(0, 7) : sha;
-
-        // Parse the "build:<branch>@<sha>" marker out of a GitHub release's "body" field.
-        // Minimal JSON parsing to avoid adding a JSON library dependency.
-        private static string ParseGitHubReleaseCommit(string json)
+        // Parse the "tag_name" field (e.g. "v2.8") out of a GitHub release JSON response and strip
+        // the leading "v". Minimal JSON parsing to avoid adding a JSON library dependency.
+        private static string ParseGitHubReleaseTag(string json)
         {
-            const string key = "\"body\"";
+            const string key = "\"tag_name\"";
             int idx = json.IndexOf(key);
             if (idx < 0)
                 return null;
@@ -1381,15 +1371,23 @@ namespace GCode_Sender
             int end = json.IndexOf('"', start + 1);
             if (end < 0)
                 return null;
-            string body = json.Substring(start + 1, end - start - 1);
+            string tag = json.Substring(start + 1, end - start - 1);
+            return tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag.Substring(1) : tag;
+        }
 
-            const string marker = "build:";
-            int at = body.IndexOf(marker);
-            if (at < 0)
-                return null;
-            string rest = body.Substring(at + marker.Length);
-            int sep = rest.IndexOf('@');
-            return sep >= 0 ? rest.Substring(sep + 1) : null;
+        // Compares two "major.minor" version strings numerically (not lexically, so "2.9" < "2.10").
+        // Returns <0 if a<b, 0 if equal, >0 if a>b.
+        private static int CompareVersions(string a, string b)
+        {
+            int[] Parts(string v) => v.Split('.').Select(p => int.TryParse(p, out int n) ? n : 0).ToArray();
+            int[] pa = Parts(a), pb = Parts(b);
+            for (int i = 0; i < Math.Max(pa.Length, pb.Length); i++)
+            {
+                int va = i < pa.Length ? pa[i] : 0;
+                int vb = i < pb.Length ? pb[i] : 0;
+                if (va != vb) return va - vb;
+            }
+            return 0;
         }
 
         // Top-level Connect/Reconnect item: "Connect..." when disconnected, "Reconnect..." when connected
