@@ -60,8 +60,9 @@ namespace GCode_Sender
 
     public partial class MainWindow : Window
     {
-        private const string version = "2.0.1";
-        public static string Version { get { return version; } }
+        // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
+        private const string legacyVersion = "2.0.1";
+        public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
@@ -86,7 +87,7 @@ namespace GCode_Sender
 
             ui = this;
 //            GCodeViewer = viewer;
-            Title = string.Format(Title, version);
+            Title = string.Format(Title, Version);
             BaseWindowTitle = Title;
 
             // Register the Lathe wizard profile sections before the document is read (AppConfig itself
@@ -1264,7 +1265,7 @@ namespace GCode_Sender
                 using (var client = new System.Net.Http.HttpClient())
                 {
                     // GitHub API requires a User-Agent header
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("ioSender/" + version);
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("ioSender/" + Version);
                     client.Timeout = TimeSpan.FromSeconds(15);
 
                     var httpResponse = await client.GetAsync(releasesUrl);

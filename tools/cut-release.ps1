@@ -109,9 +109,9 @@ $newEntries = $entries.Values | Where-Object { $_.N -gt $previousThrough } | Sor
 # --- 4. Release notes --------------------------------------------------------
 $lines = @("## ioSender $newVersion", "")
 $lines += "### Install / update"
-$lines += "Run in PowerShell (installs fresh or updates an existing install to this version):"
-$lines += '```powershell'
-$lines += "irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex"
+$lines += "Run from CMD or PowerShell:"
+$lines += '```'
+$lines += "powershell `"irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex`""
 $lines += '```'
 $lines += ""
 if ($newEntries.Count -eq 0) {

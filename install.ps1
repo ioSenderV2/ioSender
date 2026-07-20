@@ -16,7 +16,12 @@
     goes back one version.
 
 .EXAMPLE
+    From PowerShell:
     irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex
+
+.EXAMPLE
+    From CMD (or PowerShell):
+    powershell "irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex"
 
 .EXAMPLE
     irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex -Rollback
