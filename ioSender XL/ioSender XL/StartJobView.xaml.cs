@@ -748,40 +748,59 @@ namespace GCode_Sender
             Canvas.SetTop(dot, op.Y - 5.5);
             canvas.Children.Add(dot);
 
-            // Per-corner labels (measuring run only): interior angle (red if off-square) + stock thickness
-            // (corner top minus spoilboard Z) at every corner, placed just outside the corner.
+            // Per-corner labels (measuring run only): interior angle (red if off-square) INSIDE the box -
+            // it's a property of the drawn shape itself - and stock thickness/Z (a reading ABOUT the
+            // material at that point, not the shape) OUTSIDE the corner, as two separate labels.
             if (measured)
             {
+                const double labelOffset = 30d;   // px from the corner, in/out along the corner-to-centre direction
                 for (int c = 1; c <= 4; c++)
                 {
                     Point pt = P(c);
                     double ang = AngleAt(c);
+                    var dir = new Vector(pt.X - ctr.X, pt.Y - ctr.Y);
+                    if (dir.Length > 1e-6) dir.Normalize();
 
-                    string text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang);
-                    if (spoilZ.HasValue && cornerZ[c].HasValue)
-                        text += "\nt=" + FormatLen(cornerZ[c].Value - spoilZ.Value);
-                    else if (cornerZ[c].HasValue)
-                        // Touch plate: no spoilboard reference (continuity probing can't detect a
-                        // non-conductive spoilboard), so there's no real thickness to compute - show each
-                        // corner's own absolute measured top Z instead. Still a genuine reading (useful for
-                        // spotting unevenness across corners), just not labelled as "thickness".
-                        text += "\nz=" + FormatLen(cornerZ[c].Value);
-
-                    var lbl = new TextBlock
+                    var angLbl = new TextBlock
                     {
-                        Text = text,
-                        FontSize = 11d,
+                        Text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang),
+                        FontSize = 22d,
                         TextAlignment = TextAlignment.Center,
                         Background = Brushes.White,
                         Padding = new Thickness(2d, 0d, 2d, 0d),
                         Foreground = Math.Abs(ang - 90.0) > 0.5 ? Brushes.Firebrick : Brushes.Black
                     };
-                    lbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                    var dir = new Vector(pt.X - ctr.X, pt.Y - ctr.Y);
-                    if (dir.Length > 1e-6) dir.Normalize();
-                    Canvas.SetLeft(lbl, pt.X + dir.X * 22d - lbl.DesiredSize.Width / 2d);
-                    Canvas.SetTop(lbl, pt.Y + dir.Y * 22d - lbl.DesiredSize.Height / 2d);
-                    canvas.Children.Add(lbl);
+                    angLbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    Canvas.SetLeft(angLbl, pt.X - dir.X * labelOffset - angLbl.DesiredSize.Width / 2d);
+                    Canvas.SetTop(angLbl, pt.Y - dir.Y * labelOffset - angLbl.DesiredSize.Height / 2d);
+                    canvas.Children.Add(angLbl);
+
+                    string zText = null;
+                    if (spoilZ.HasValue && cornerZ[c].HasValue)
+                        zText = "t=" + FormatLen(cornerZ[c].Value - spoilZ.Value);
+                    else if (cornerZ[c].HasValue)
+                        // Touch plate: no spoilboard reference (continuity probing can't detect a
+                        // non-conductive spoilboard), so there's no real thickness to compute - show each
+                        // corner's own absolute measured top Z instead. Still a genuine reading (useful for
+                        // spotting unevenness across corners), just not labelled as "thickness".
+                        zText = "z=" + FormatLen(cornerZ[c].Value);
+
+                    if (zText != null)
+                    {
+                        var zLbl = new TextBlock
+                        {
+                            Text = zText,
+                            FontSize = 22d,
+                            TextAlignment = TextAlignment.Center,
+                            Background = Brushes.White,
+                            Padding = new Thickness(2d, 0d, 2d, 0d),
+                            Foreground = Brushes.Black
+                        };
+                        zLbl.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                        Canvas.SetLeft(zLbl, pt.X + dir.X * labelOffset - zLbl.DesiredSize.Width / 2d);
+                        Canvas.SetTop(zLbl, pt.Y + dir.Y * labelOffset - zLbl.DesiredSize.Height / 2d);
+                        canvas.Children.Add(zLbl);
+                    }
                 }
             }
             else if (isVise)
@@ -855,7 +874,7 @@ namespace GCode_Sender
             var lbl = new TextBlock
             {
                 Text = FromMm(mm).ToString("0.#", CultureInfo.InvariantCulture) + (isImperial ? " in" : " mm"),
-                FontSize = 12d,
+                FontSize = 24d,
                 Foreground = Brushes.DimGray,
                 Background = Brushes.White,
                 Padding = new Thickness(2d, 0d, 2d, 0d)
