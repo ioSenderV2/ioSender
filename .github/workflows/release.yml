@@ -21,7 +21,17 @@ jobs:
     runs-on: windows-latest
     if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
     steps:
+      # Check out using our own PAT (not the default low-privilege GITHUB_TOKEN) so the
+      # credential actions/checkout persists for the whole job - and that every later git
+      # push in this job reuses automatically - already has write access. Avoids the fragile
+      # dance of manually replacing that persisted credential in a later step (three failed
+      # attempts: URL-embedded creds got "Invalid username or token"; "git -c
+      # http.extraheader=... push" added a second header instead of replacing one, "Duplicate
+      # header: Authorization"; and re-tried as one -c token, which didn't survive PowerShell's
+      # native-argument handling for a key this complex and got silently dropped entirely).
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Compute version + changelog delta
         id: relinfo
@@ -79,19 +89,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Overview.html
           git commit -m "chore: stamp v${{ steps.relinfo.outputs.version }} changelog entries [skip release]"
-          # actions/checkout persists its own low-privilege GITHUB_TOKEN as a git
-          # http.extraheader Authorization header. URL-embedded credentials
-          # (x-access-token:TOKEN@github.com) proved unreliable here ("Invalid
-          # username or token" even with a token ncipollo/release-action accepted
-          # fine moments earlier in the same job). Passing our own header via
-          # "git -c key=value push" as ONE token failed too - PowerShell's native-
-          # argument handling for a key this complex (colons/slashes in the URL
-          # subsection) didn't reliably survive, and the whole -c apparently got
-          # dropped ("could not read Username ... No such file or directory" - no
-          # credential found at all). Set it with plain "git config" instead (key
-          # and value as separate, cleanly-quoted arguments, replacing the
-          # persisted one instead of layering a second value on top of it).
-          git config --local --unset-all http.https://github.com/.extraheader
-          $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ secrets.RELEASE_TOKEN }}"))
-          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $b64"
           git push origin HEAD:master
