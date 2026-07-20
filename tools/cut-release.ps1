@@ -104,7 +104,10 @@ foreach ($m in [regex]::Matches($content, $glanceRe)) {
     }
 }
 
-$newEntries = $entries.Values | Where-Object { $_.N -gt $previousThrough } | Sort-Object N
+# @(...) forces an array even for a single match - a bare pipeline result for exactly one
+# item is a lone PSCustomObject, whose .Count is $null, which made "-gt 0" guards below
+# silently false for single-entry releases (a real bug that shipped and bit #156/#157).
+$newEntries = @($entries.Values | Where-Object { $_.N -gt $previousThrough } | Sort-Object N)
 
 # --- 4. Release notes --------------------------------------------------------
 $lines = @("## ioSender $newVersion", "")
@@ -131,25 +134,17 @@ $notes = ($lines -join "`n")
 $prevLabel = if ($prevVersion) { $prevVersion } else { '<none>' }
 Write-Host "Version: $newVersion  (previous: $prevLabel, through #$previousThrough -> #$currentMax, $($newEntries.Count) new entries)" -ForegroundColor Green
 
-# --- 5. Stamp the TOC "ver" column for newly-included entries --------------
+# --- 5. Insert a "Version N.N" subheader row above the first new entry -----
 if (-not $DryRun -and $newEntries.Count -gt 0) {
-    foreach ($e in $newEntries) {
-        $existingRe = "<tr><td class=""n"">$($e.N)</td>.*?<td class=""ver"">([^<]*)</td></tr>"
-        $existing = [regex]::Match($content, $existingRe)
-        if (-not $existing.Success) {
-            Write-Host "WARN: no TOC row found for #$($e.N)" -ForegroundColor Yellow
-            continue
-        }
-        $already = $existing.Groups[1].Value
-        if ($already -eq $newVersion) { continue }          # already correctly stamped - nothing to do
-        if ($already -ne '') {
-            Write-Host "WARN: #$($e.N) TOC ver cell already says '$already', not overwriting with '$newVersion'" -ForegroundColor Yellow
-            continue
-        }
-        $pattern = "(<tr><td class=""n"">$($e.N)</td>.*?<td class=""ver"">)(</td>)"
-        $content = [regex]::Replace($content, $pattern, { param($m) $m.Groups[1].Value + $newVersion + $m.Groups[2].Value }, 1)
+    $firstN = ($newEntries | Sort-Object N | Select-Object -First 1).N
+    $marker = "<tr><td class=""n"">$firstN</td>"
+    if ($content.Contains($marker)) {
+        $hdr = "<tr class=""ver-hdr""><td colspan=""3"">Version $newVersion</td></tr>`n"
+        $content = $content.Replace($marker, $hdr + $marker)
+        [System.IO.File]::WriteAllText($Html, $content)
+    } else {
+        Write-Host "WARN: no TOC row found for #$firstN - version subheader not inserted" -ForegroundColor Yellow
     }
-    [System.IO.File]::WriteAllText($Html, $content)
 }
 
 # --- outputs for the workflow ------------------------------------------------
