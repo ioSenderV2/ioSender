@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>149 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>155 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -249,6 +249,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>"Stock size is exact" was wired into Generate but never fed back into the field labels/hint text (stayed on "Est. ..."); touch-plate corners now show their own measured top Z on the schematic instead of a thickness value that mode can never actually compute.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr140">140</a></td></tr>
 <tr><td>G92 Zk does not set an absolute offset - it makes wherever the machine currently is read as work-Z=k - so a fixed "G92Z-17" only gave the intended clearance if the machine happened to already be sitting at the stock surface, which it never was; a machine parked ~67mm above the stock plus the intended 17mm gave an 84mm gap instead of 17mm.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr141">141</a></td></tr>
 <tr><td>Every Generate button now saves its program for post-mortem; fixed a real hardware ALARM:2 on Start Job's Corner 2 probe (renamed misleading "Corner travel margin" field to "Safe Z delta", warn below 10mm)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr149">149</a></td></tr>
+<tr><td>Corner Fence's origin-corner XY and the spoilboard Z are captured ONCE by Test position and reused every job, instead of re-locating them on every Start Job run</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr151">151</a></td></tr>
+<tr><td>NumericField.Value is always mm now for mm/in fields; a new inheritable IsImperial flag flips a whole panel's display units at once, and typed unit suffixes (1&quot;, .5in, 12.5mm) are accepted</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr152">152</a></td></tr>
+<tr><td>Corner Fence/Start Job's X/Y face probes now search a fixed 5mm below the measured top instead of the material midpoint (top - thickness/2)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr153">153</a></td></tr>
+<tr><td>Edge length labels doubled 12pt-&gt;24pt; per-corner angle moved inside the box while thickness/Z stays outside, both at 22pt instead of one combined 11pt label</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr154">154</a></td></tr>
+<tr><td>Calibrate steps/mm by probing a reference block of known true size against a Corner Fence, instead of V-bit scratch marks measured by hand; Start Job now warns when a measured exact size implies bad calibration</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr155">155</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -335,6 +340,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>ConsoleLog, DebugLog and the crash logger each reimplemented the same file-path resolution and 8MB rotation - now share one CNC.Core.LogFile; the crash log previously had no size cap at all, and console_*.log gains a live "latest_console.log" hard link.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr135">135</a></td></tr>
 <tr><td>AppMessageBox's text bumped 13pt -&gt; 19.5pt (+50%), fixing every AppDialogs.Show call app-wide at once.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr146">146</a></td></tr>
 <tr><td>-message=text pops up an informational dialog once the main window is revealed - handy for telling someone what to test when launching a build for them.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr147">147</a></td></tr>
+<tr><td>Drag to resize the setup/drawing split on Start Job, Height Map, and 7 Probing/Tools sub-tabs, plus the Job tab's left sidebar / centre workspace / right sidebar</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr150">150</a></td></tr>
 </table>
 </div>
 
@@ -489,7 +495,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">147</td><td><a href="#pr147">-message launch flag: show a popup once the app is up</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">148</td><td><a href="#pr148">Restart-to-apply fix; AppLaunch removed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">8</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+32</span> <span class="del">-425</span></td></tr>
 <tr><td class="n">149</td><td><a href="#pr149">Generate-to-disk logging; Safe Z delta fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+48</span> <span class="del">-18</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (149 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1249</span> <span class="del">21</span> <span class="add">+163</span><br><span class="k">Lines:</span> <span class="add">+52650</span> <span class="del">-10029</span></td></tr>
+<tr><td class="n">150</td><td><a href="#pr150">User-draggable GridSplitters: Start Job, Height Map, Probing/Tools sub-tabs, Job tab's 3 regions</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+120</span> <span class="del">-59</span></td></tr>
+<tr><td class="n">151</td><td><a href="#pr151">Start Job probes the fence's origin corner once instead of twice</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+276</span> <span class="del">-54</span></td></tr>
+<tr><td class="n">152</td><td><a href="#pr152">NumericField stores canonical mm internally; unit toggle is display-only</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+221</span> <span class="del">-54</span></td></tr>
+<tr><td class="n">153</td><td><a href="#pr153">pcorner.macro side probes at a fixed 5mm below top, not the stock midpoint</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">-13</span></td></tr>
+<tr><td class="n">154</td><td><a href="#pr154">Start Job stock schematic: bigger, clearer dimension/angle/thickness labels</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+39</span> <span class="del">-20</span></td></tr>
+<tr><td class="n">155</td><td><a href="#pr155">New Tools sub-tab: Stepper Calibration (Probe) + Start Job calibration-mismatch warning</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+683</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (155 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1280</span> <span class="del">21</span> <span class="add">+165</span><br><span class="k">Lines:</span> <span class="add">+54005</span> <span class="del">-10233</span></td></tr>
 </table>
 </div>
 
@@ -3095,6 +3107,81 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/en-US/csv/ioSender.resources.en-US.csv</td><td class="num add">2</td><td class="num del">2</td></tr>
 </table>
 <div class="desc"><p>Two related fixes from a real hardware debugging session.</p><ul><li><strong>Generate-to-disk logging</strong> - every tab with a Generate button (Start Job, Auto square, Stepper calibration, Surface spoilboard) now writes its generated program to <code>%AppData%\ioSender\Generated\&lt;name&gt;.macro</code> at generate-time via a new shared <code>MacroProcessor.PublishGenerated</code> helper, instead of only when the program actually streams via <code>MacroProcessor.Run</code>. This makes the exact generated program inspectable for post-mortem even if the run alarms out immediately or Run is never pressed.</li><li><strong>Start Job Corner 2 ALARM:2, hardware-confirmed root cause</strong> - the field controlling the safe crossing height between corners (<code>c1_maxz</code> = corner 1's measured stock top + this value) had silently persisted at 0mm, leaving zero clearance for corner-to-corner travel. Renamed the confusingly-named "Corner travel margin (Z)" field to <strong>"Safe Z delta"</strong>, and Generate now warns (not blocks) if it's set below the 10mm default - confirmed on real hardware that 5mm was still not enough clearance and broke a probe tip; 1&quot; (25.4mm) ran Start Job through to completion.</li></ul></div>
+</div>
+<!-- ===== #150 ===== -->
+<div class="pr">
+<h2 id="pr150"><span class="badge">#150</span>User-draggable GridSplitters: Start Job, Height Map, Probing/Tools sub-tabs, Job tab's 3 regions</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">58</td><td class="num del">31</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml</td><td class="num add">11</td><td class="num del">3</td></tr>
+<tr><td class="mono">Probing sub-tabs (Center/Edge ext/Edge int/Tool length)</td><td class="num add">26</td><td class="num del">12</td></tr>
+<tr><td class="mono">Tools sub-tabs (Auto Square/Stepper cal/Stepper cal scratch/Surface spoilboard)</td><td class="num add">25</td><td class="num del">13</td></tr>
+</table>
+<div class="desc"><p>Every 2-column "setup inputs | drawing" view now has a real draggable divider instead of a fixed split. First attempt put the splitter on the shared column boundary (behind the input panel's own content, which swallowed its hit-test area - no resize cursor ever appeared on most views, and one that did show a cursor still didn't drag); fixed by giving each splitter its own dedicated column, the same approach already proven on the Job tab's two dividers.</p><ul><li><strong>Job tab</strong> - left sidebar / Program-3D View-Console tabs / right sidebar converted from a DockPanel's fixed Left/fill/Right docking to a Grid with two GridSplitters. The right sidebar's own internal Feed/Spindle/Outline column split keeps its existing MaxWidth=260 cap untouched.</li><li><strong>Start Job / Height Map</strong> - left column also made proportional (min original px width) instead of a hardcoded pixel width, so it no longer gets squeezed as the window widens.</li></ul><p class="foot">User-verified on real hardware across all views.</p></div>
+</div>
+<!-- ===== #151 ===== -->
+<div class="pr">
+<h2 id="pr151"><span class="badge">#151</span>Start Job probes the fence's origin corner once instead of twice</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">52</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">104</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">48</td><td class="num del">42</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">24</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">17</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Fixture.CornerOffsetX/Y and Fixture.SpoilboardZ (new): captured once by FixtureEditDialog's "Test position" via a real pcorner.macro probe against the physical fence, instead of Start Job re-locating the corner and re-probing the spoilboard every single job. StartJobView.BuildProgram's corner-1 probe now runs in REUSE mode using these cached values, landing directly on the tight 5mm-inset anchor in one probe instead of a loose locate pass followed by a tight re-probe (the old "exact size" corner-1 block, now removed).</p><ul><li><strong>Fixtures.SetItems/Load</strong> now mutate the existing collection in place instead of replacing the reference - MachineSetupWizard binds its fixture grid before AppConfig.LoadConfig() runs, so a reference swap was silently orphaning that binding (only fixtures added/edited in-session ever showed).</li><li><strong>Fixture.Coords</strong> setter no longer clears CornerOffsetX/Y/SpoilboardZ itself - that fired during XML deserialization too (property setters run in declared order), silently zeroing a just-loaded valid offset on every app load.</li><li><strong>OffsetFlyout's</strong> G28 fixture picker was filtering the SHARED default CollectionView of the app-wide Fixtures.Items, which leaked its "validated only" filter into every other control bound directly to that same collection (Machine Setup's own fixture grid showed only one fixture, looking like the rest had been deleted). Now uses its own private ListCollectionView.</li><li><strong>StartJobView</strong> - Width/Height/Thickness/units used to be the only fields gated on a fixture being selected; Probe type, Set origin, Measure/Rotate/Exact-size/TLO-ref and Safe Z delta were left fully interactive with none chosen. Gated as one block now. Left column was also a hardcoded 360px width, squeezing text as the window widened - now proportional.</li></ul><p class="foot">Two real hardware bugs found and fixed along the way: the corner-locate probe was silently inheriting a stale DISCOVER flag (probed the spoilboard twice), and it parked 10mm outward instead of at the true corner, landing 5mm outside the corner instead of inside it.</p></div>
+</div>
+<!-- ===== #152 ===== -->
+<div class="pr">
+<h2 id="pr152"><span class="badge">#152</span>NumericField stores canonical mm internally; unit toggle is display-only</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericTextBox.cs</td><td class="num add">86</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">62</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml.cs</td><td class="num add">31</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">40</td><td class="num del">50</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml</td><td class="num add">2</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Closes the long-standing improvement-backlog item: NumericField.Value is now ALWAYS canonical mm for any field whose Unit is "mm"/"in" - every other Unit ("mm/min", "s", "deg", "%", ...) is completely untouched, so this is a no-op for the ~286 existing NumericField uses that never touch inches.</p><ul><li><strong>NumericField.IsImperial</strong> (new, inheritable) - set ONCE on a container (a tab's root panel), every NumericField underneath picks it up automatically via WPF property inheritance and re-displays its already-canonical Value in the new unit - no per-field looping, no external code touching Value at all.</li><li><strong>Input parsing</strong> moved from strict per-keystroke rejection to commit-time (blur/Enter) for length-unit fields, so it can accept free typing including an inline unit suffix that overrides the field's own displayed unit for that one entry.</li><li><strong>StartJobView migrated</strong> as the proof of concept: every ToMm/FromMm wrapper around a NumericField.Value read/write is gone; the unit-toggle handler is now a single SetIsImperial call instead of manually converting 5 fields.</li></ul><p class="foot">AutoSquareWizard/SurfaceSpoilboardWizard/StepperCalibrationScratchWizard still have their own pre-existing manual ToMm/FromMm wiring - not yet migrated.</p></div>
+</div>
+<!-- ===== #153 ===== -->
+<div class="pr">
+<h2 id="pr153"><span class="badge">#153</span>pcorner.macro side probes at a fixed 5mm below top, not the stock midpoint</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">16</td><td class="num del">13</td></tr>
+</table>
+<div class="desc"><p>Was top - thickness/2 (self-safe for any thickness, but dependent on the caller's estimated stock thickness, which is only ever a guess before Measure has actually run) - now a fixed 5mm inset per user request. The thickness global is no longer read by this macro at all (still accepted from callers, kept in case it's wanted again).</p><p class="foot">Not self-safe for very thin stock the way the midpoint approach was - anything under ~5mm has its side face searched below its own bottom face. Documented minimum stock thickness precondition bumped from 3mm to 5mm.</p></div>
+</div>
+<!-- ===== #154 ===== -->
+<div class="pr">
+<h2 id="pr154"><span class="badge">#154</span>Start Job stock schematic: bigger, clearer dimension/angle/thickness labels</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">39</td><td class="num del">20</td></tr>
+</table>
+<div class="desc"><p>Per-corner angle + thickness/Z used to be one combined label outside the corner; split into two - angle (a property of the drawn box shape) now sits INSIDE toward the centre, thickness/Z (a material reading at that point, not the shape) stays OUTSIDE past the corner. Offset bumped 22px -&gt; 30px so the larger text doesn't crowd the corner.</p></div>
+</div>
+<!-- ===== #155 ===== -->
+<div class="pr">
+<h2 id="pr155"><span class="badge">#155</span>New Tools sub-tab: Stepper Calibration (Probe) + Start Job calibration-mismatch warning</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml.cs</td><td class="num add">497</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml</td><td class="num add">64</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ToolsView.xaml.cs</td><td class="num add">39</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">33</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">37</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">4</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LibStrings.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>New Tools sub-tab "Stepper Calibration (Probe)": calibrates steps/mm by probing a reference block of ALREADY-KNOWN true size against a validated Corner Fence fixture, instead of V-bit scratch marks measured by hand with calipers - removes the manual-measurement step that was the likely source of an existing bad calibration (a probed touch is far more repeatable than reading a scratch mark with calipers). Reuses the corner-1 single-probe optimization (<a href="#pr151">#151</a>). Parks at G30 and prompts to install the probe before touching anything, same as Start Job; the tab itself is disabled whenever no 3D probe is configured. Shows the actual <code>new = current &times; measured &divide; true</code> calculation next to the measured values, plus an Undo button that reverts to the steps/mm value from right before the last Save.</p><ul><li><strong>Start Job</strong> - a one-shot warning dialog fires when "Stock size is exact" is checked and the measured X/Y differs from the entered exact size by more than 0.5mm once all 4 corners are in - suggests running Stepper calibration, since that mismatch is exactly what motivated building this tool.</li><li><strong>Old "Stepper calibration"</strong> tool renamed to "Stepper calibration (Manual)" to disambiguate. Tools tab reordered (Probe, Squareness, Spoilboard, Scratch, Manual, then Tool table/Trinamic/PID) via a one-time layout-tree fixup.</li></ul><p class="foot">User-verified on real hardware: converged from a ~1.5mm measured error to sub-0.01mm over two calibration passes. An inverted first attempt at the steps/mm formula made the error WORSE (~1.5mm -&gt; ~4mm) before landing on the correct <code>current &times; measured &divide; true</code> direction.</p></div>
 </div>
 </section>
 
