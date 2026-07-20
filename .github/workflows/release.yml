@@ -83,11 +83,15 @@ jobs:
           # http.extraheader Authorization header. URL-embedded credentials
           # (x-access-token:TOKEN@github.com) proved unreliable here ("Invalid
           # username or token" even with a token ncipollo/release-action accepted
-          # fine moments earlier in the same job). Reusing the same extraheader
-          # mechanism with -c ADDS a second header instead of replacing it (git
-          # allows multiple values for this key) - GitHub then rejects the push
-          # with "Duplicate header: Authorization". Clear the persisted one first,
-          # then set ours as the only one.
+          # fine moments earlier in the same job). Passing our own header via
+          # "git -c key=value push" as ONE token failed too - PowerShell's native-
+          # argument handling for a key this complex (colons/slashes in the URL
+          # subsection) didn't reliably survive, and the whole -c apparently got
+          # dropped ("could not read Username ... No such file or directory" - no
+          # credential found at all). Set it with plain "git config" instead (key
+          # and value as separate, cleanly-quoted arguments, replacing the
+          # persisted one instead of layering a second value on top of it).
           git config --local --unset-all http.https://github.com/.extraheader
           $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ secrets.RELEASE_TOKEN }}"))
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $b64" push origin HEAD:master
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $b64"
+          git push origin HEAD:master
