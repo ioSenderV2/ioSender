@@ -46,12 +46,17 @@ function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; exit 1 }
 $prevVersion = $null
 $previousThrough = 0
 if (-not $DryRun) {
-    # A 404 (no releases yet, or the only release is a prerelease - which /releases/latest
-    # excludes) is expected the first time this runs; gh writes that to stderr, which under
-    # $ErrorActionPreference='Stop' would otherwise abort the script even with 2>$null.
-    $prevJson = $null
-    try { $prevJson = & gh api "repos/$Repo/releases/latest" 2>$null } catch { $prevJson = $null }
-    if ($LASTEXITCODE -eq 0 -and $prevJson) {
+    # Don't let pwsh 7.3+'s $PSNativeCommandUseErrorActionPreference turn a nonzero gh
+    # exit into a terminating exception here - a 404 (no releases yet, or the only release
+    # is a prerelease, which /releases/latest excludes) is an expected outcome, not a bug,
+    # and we want to see gh's own stderr on any OTHER failure rather than silently guessing.
+    $savedPref = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+    $prevJson = & gh api "repos/$Repo/releases/latest" 2>&1
+    $ghExit = $LASTEXITCODE
+    $PSNativeCommandUseErrorActionPreference = $savedPref
+
+    if ($ghExit -eq 0 -and $prevJson) {
         $prev = $prevJson | ConvertFrom-Json
         $tag = $prev.tag_name -replace '^v', ''
         # Only trust it as a real version if it's "major.minor" - guards against the old
@@ -61,9 +66,13 @@ if (-not $DryRun) {
             $prevVersion = $tag
             $m = [regex]::Match($prev.body, 'changelog-through:(\d+)')
             if ($m.Success) { $previousThrough = [int]$m.Groups[1].Value }
+        } else {
+            Write-Host "Previous release tag '$($prev.tag_name)' isn't a version (probably the old rolling 'latest') - treating as no previous release." -ForegroundColor Yellow
         }
+    } elseif ($ghExit -ne 0) {
+        Write-Host "gh api releases/latest exited $ghExit : $prevJson" -ForegroundColor Yellow
+        Write-Host "Treating as no previous release (expected on the very first run; investigate if this repeats)." -ForegroundColor Yellow
     }
-    $LASTEXITCODE = 0
 }
 
 # --- 2. Next version ---------------------------------------------------------
