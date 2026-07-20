@@ -508,9 +508,7 @@ namespace CNC.Controls
 
             // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
             program = string.Join("\r\n", BuildProgram());
-            EnsureProgramView();
-            programView.SetProgramText(program);
-            programView.Connect();
+            MacroProcessor.PublishGenerated("Surface spoilboard", program, EnsureProgramView, () => programView);
         }
 
         // Localized message via LibStrings, with \n expanded to real newlines.

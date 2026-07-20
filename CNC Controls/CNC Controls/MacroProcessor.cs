@@ -239,8 +239,11 @@ namespace CNC.Controls
         // Persist a copy of every macro/generated program to %AppData%\ioSender\Generated\<name>.macro,
         // overwriting each run - a debugging aid so "what did Generate actually build" is always inspectable
         // on disk, since the streamed program itself (StreamProgram/RunStreamedJobInPlace) never touches the
-        // filesystem. Best-effort: a write failure must never block the run itself.
-        private static void SaveGeneratedCopy(string name, string code)
+        // filesystem. Best-effort: a write failure must never block the run itself. Public so a tab's own
+        // Generate button can call it directly at generate-time (not just when MacroProcessor.Run streams it) -
+        // the file is then on disk for post-mortem even if the run alarms out before completing, or the
+        // operator never presses Run at all.
+        public static void SaveGeneratedCopy(string name, string code)
         {
             try
             {
@@ -249,6 +252,22 @@ namespace CNC.Controls
                 System.IO.File.WriteAllText(System.IO.Path.Combine(Resources.GeneratedFolder, fileName), code);
             }
             catch { /* best-effort - never let a diagnostic write block the actual run */ }
+        }
+
+        // Common tail of every tab's Generate button: save the diagnostic copy, then hand the program text to
+        // that tab's own preview ProgramView. Every Generate handler (Start Job, Auto square, Stepper
+        // calibration, Surface spoilboard) builds its program text its own way - that part stays at the call
+        // site - but once built, all four do the exact same four steps with it; only this tail was duplicated
+        // four times. ensureProgramView/getProgramView are the caller's own lazy-init method/field (each tab
+        // owns its ProgramView independently, so there's no shared base to hang a field on) - getProgramView is
+        // read AFTER ensureProgramView() runs, so it sees the just-created instance on first call.
+        public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView)
+        {
+            SaveGeneratedCopy(name, program);
+            ensureProgramView();
+            var view = getProgramView();
+            view.SetProgramText(program);
+            view.Connect();
         }
 
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -

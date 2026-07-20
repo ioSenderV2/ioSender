@@ -621,9 +621,7 @@ namespace CNC.Controls
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
-            EnsureProgramView();
-            programView.SetProgramText(program);
-            programView.Connect();   // refresh + show this tool's own view
+            MacroProcessor.PublishGenerated("Auto square", program, EnsureProgramView, () => programView);   // refresh + show this tool's own view
         }
 
         private void Run()

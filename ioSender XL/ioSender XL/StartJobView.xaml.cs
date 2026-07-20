@@ -1082,6 +1082,24 @@ namespace GCode_Sender
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
             bool exactSize = measure && chkExactSize.IsChecked == true;
+
+            // Safe Z delta only matters once corners 2-4 are actually crossed (measure) - it's the height ABOVE
+            // corner 1's own measured top that corner-to-corner travel and each corner's pre-top-probe descent
+            // trusts as clear, instead of retracting fully to machine top every time (see pcorner.macro's
+            // #<_ls_maxz>). Too small and that crossing height can clip the stock/fixture on the way to a
+            // corner whose own top sits higher than corner 1's (flatness/spacer variance) - confirmed on real
+            // hardware: 5mm was not enough and broke a probe tip. 10mm is the field's own default; warn (not
+            // block) below that so an operator who knows their setup can still go tighter deliberately.
+            const double minSafeZDeltaMm = 10d;
+            double safeZDeltaMm = ToMm(fldCornerMargin.Value);
+            if (measure && safeZDeltaMm < minSafeZDeltaMm)
+            {
+                if (AppDialogs.Show(string.Format("Safe Z delta is {0} mm - less than the recommended {1} mm minimum. Too little clearance here can clip the stock/fixture crossing between corners. Generate anyway?",
+                        N(safeZDeltaMm), N(minSafeZDeltaMm)),
+                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return;
+            }
+
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
                                cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value), thicknessMm, touchPlate, stockConductive, ToMm(fldCornerMargin.Value), exactSize)
@@ -1093,9 +1111,8 @@ namespace GCode_Sender
             // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
             MacroProcessor.ActiveProgramName = "Start Job";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
-            EnsureProgramView();
-            programView.SetProgramText(program);
-            programView.Connect();   // Start Job owns its ProgramView; the overlay hosts it and it titles itself
+            // Start Job owns its ProgramView; the overlay hosts it and it titles itself
+            MacroProcessor.PublishGenerated("Start Job", program, EnsureProgramView, () => programView);
         }
 
         // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder
