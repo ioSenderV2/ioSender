@@ -7,9 +7,22 @@
              mc:Ignorable="d" d:DesignHeight="560" d:DesignWidth="720">
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="360"/>
-            <ColumnDefinition Width="*"/>
+            <!-- Proportional (min 1/3 of the window), not a hardcoded pixel width - a fixed Width="360" here
+                 used to stay pinned at that pixel width regardless of window size, so widening the window just
+                 gave the Stock drawing (right column) all the extra space, squeezing the setup fields'
+                 wrapped/truncated text into an ever-smaller fraction of a wide window. -->
+            <ColumnDefinition Width="1*" MinWidth="360"/>
+            <!-- Splitter gets its OWN column, not "sit on the col 0/1 boundary" - the latter puts the splitter
+                 BEHIND column 0's content in z-order (declared first in XAML), and that content (the
+                 ScrollViewer/GroupBox) has no margin carved out for it, so it swallows the splitter's hit-test
+                 area entirely - confirmed on real hardware: no resize cursor ever appeared. A dedicated column
+                 is the same fix the Job tab's two splitters already use successfully. -->
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="2*"/>
         </Grid.ColumnDefinitions>
+
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
 
         <!-- Left: scrolling inputs on top, warnings/result + Generate/Run pinned at the bottom-left -->
         <Grid Grid.Column="0">
@@ -36,6 +49,13 @@
                         <TextBlock x:Name="txtFixtureWarning" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
                                    Text="This fixture type isn't supported yet."/>
                         <Separator Margin="0,4"/>
+                        <!-- Everything below needs a fixture picked first (its saved reference/probe geometry is
+                             what every field here means something in terms of) - disabled as ONE block
+                             (pnlInputs.IsEnabled, set in UpdateFixtureWarning) rather than field-by-field, so
+                             disabling a fixture-dependent field can never be forgotten, and a disabled ANCESTOR
+                             overrides each control's own IsEnabled/binding (e.g. Rotate's own chkMeasure-driven
+                             binding) without fighting it - standard WPF subtree-disable behavior. -->
+                        <StackPanel x:Name="pnlInputs">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                             <Label x:Uid="ls_lblUnits" Content="Stock size units:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <RadioButton x:Uid="rbUnitsMm" x:Name="rbUnitsMm" Content="mm" GroupName="StockSizeUnits" VerticalAlignment="Center" Margin="4,0,0,0" Checked="Units_Checked"/>
@@ -87,6 +107,7 @@
                         <cnccontrols:NumericField x:Name="fldCornerMargin" x:Uid="ls_cornermargin" Label="Safe Z delta:" ColonAt="160" Unit="mm" Format="##0.0##" Value="10"
                                                   Margin="0,4,0,2" IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
                                                   ToolTip="Corners 2-4 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
             </ScrollViewer>
@@ -110,7 +131,7 @@
 
         <!-- Right: stock drawing - a rectangle from the approximate size before measuring; the true probed
              quad with the measured X/Y spans and each corner's interior angle once a measuring run completes. -->
-        <GroupBox x:Uid="ls_grpDrawing" Header="Stock" Grid.Column="1" Margin="8,0,0,0">
+        <GroupBox x:Uid="ls_grpDrawing" Header="Stock" Grid.Column="2" Margin="8,0,0,0">
             <Border x:Name="drawingHost" Background="White" SnapsToDevicePixels="True" SizeChanged="DrawingHost_SizeChanged"/>
         </GroupBox>
     </Grid>

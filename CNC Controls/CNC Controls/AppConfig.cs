@@ -943,6 +943,8 @@ namespace CNC.Controls
                         if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
                             macro.FKey = macro.Id;
 
+                    ApplyOneTimeFixups();
+
                     ok = true;
                 }
                 catch
@@ -954,6 +956,28 @@ namespace CNC.Controls
             }
 
             return ok;
+        }
+
+        // One-time config fixups: converting/invalidating already-persisted data after a code change
+        // that changes what a saved value MEANS (not a permanent back-compat shim - the fixup runs every
+        // load, but is written to be a no-op once every file in the wild has actually been through it,
+        // and is meant to be deleted once that's confirmed). Normally empty - add a block here when a
+        // change needs one, remove it again once testing on real saved App.config files is done.
+        private void ApplyOneTimeFixups()
+        {
+            // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
+            // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
+            // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
+            // "never actually probed under this scheme" - force those fixtures back to not-validated so the
+            // operator is prompted to re-run Test position (which now also captures the corner offset).
+            // 2026-07-20 (later same day): Fixture.SpoilboardZ is new too, added right after CornerOffsetX/Y -
+            // a fixture tested in the short window between those two changes has X/Y populated but
+            // SpoilboardZ still 0 (StartJobView.BuildProgram would seed #<_bottom> from a bogus 0). Same fixup,
+            // same reasoning, separate condition since X/Y alone no longer implies "fully captured."
+            foreach (var fx in Fixtures.Items)
+                if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
+                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
+                    fx.PositionValidated = false;
         }
 
         public void Shutdown()

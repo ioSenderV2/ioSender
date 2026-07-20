@@ -36,8 +36,23 @@ namespace CNC.Controls
             if (code == "G28")
             {
                 cbxFixture.Visibility = Visibility.Visible;
-                cbxFixture.ItemsSource = Fixtures.Items;
-                cbxFixture.Items.Filter = o => (o as Fixture)?.PositionValidated == true;
+                // A dedicated ListCollectionView, NOT "ItemsSource = Fixtures.Items; Items.Filter = ...":
+                // WPF caches ONE default CollectionView per source collection instance (CollectionViewSource.
+                // GetDefaultView) and setting ItemsSource directly to a shared IEnumerable makes ItemsControl.
+                // Items an alias for that SAME default view - so a filter set here used to apply to EVERY
+                // other control bound directly to Fixtures.Items, anywhere in the app. Confirmed on real
+                // hardware: this filter (validated-only) leaked into MachineSetupWizard's grdFixtures, which
+                // has no filter of its own and expects to show every fixture - only "Small Vise" (the one
+                // validated fixture) ever showed there, looking exactly like the other 3 fixtures had been
+                // deleted. IsLiveFiltering + LiveFilteringProperties so this dropdown still updates itself the
+                // moment Test position validates a fixture, same as the old shared-filter behavior did.
+                var view = new System.Windows.Data.ListCollectionView(Fixtures.Items)
+                {
+                    Filter = o => (o as Fixture)?.PositionValidated == true,
+                    IsLiveFiltering = true
+                };
+                view.LiveFilteringProperties.Add(nameof(Fixture.PositionValidated));
+                cbxFixture.ItemsSource = view;
             }
 
             IsVisibleChanged += OffsetFlyout_IsVisibleChanged;

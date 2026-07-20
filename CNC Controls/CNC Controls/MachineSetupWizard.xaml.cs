@@ -385,6 +385,13 @@ namespace CNC.Controls
 
             if (activate)
             {
+                // Belt-and-suspenders re-bind (Fixtures.SetItems now mutates its collection in place rather
+                // than replacing it - see Fixture.cs - so this is no longer load-bearing, but costs nothing
+                // and guards against the same "bound before the data existed" class of bug for any future
+                // library that doesn't get the same treatment).
+                grdProbes.ItemsSource = ProbeDefinitions.Items;
+                grdFixtures.ItemsSource = Fixtures.Items;
+
                 BuildAxes();
                 LoadCurrentSettings();
 

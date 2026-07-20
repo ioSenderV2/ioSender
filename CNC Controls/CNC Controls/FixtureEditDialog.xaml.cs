@@ -14,9 +14,11 @@
  */
 
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -28,6 +30,11 @@ namespace CNC.Controls
     {
         private readonly GrblViewModel model;
         private bool _probing;   // true while RunViseCornerProbe's async streamed run is in flight
+
+        // Picks up Test position's (PRINT, SPOIL_Z=..) line - same (PRINT, TAG=value) idiom StartJobView.
+        // rxResult already parses for LS_X/LS_Y - controller print/debug comments arrive as Message updates.
+        private static readonly Regex rxSpoilZ = new Regex(@"SPOIL_Z\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        private double? _capturedSpoilZ;
 
         public FixtureEditDialog(Fixture fixture, GrblViewModel model)
         {
@@ -191,6 +198,12 @@ namespace CNC.Controls
             }
 
             fx.Coords = coords;
+            // A stale CornerOffsetX/Y/SpoilboardZ is meaningless once the reference it was measured from moves -
+            // clear it here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
+            // setter's own comment for why that broke on real hardware).
+            fx.CornerOffsetX = 0d;
+            fx.CornerOffsetY = 0d;
+            fx.SpoilboardZ = 0d;
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
         }
@@ -370,7 +383,9 @@ namespace CNC.Controls
 
         // Run the REAL spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro's DISCOVER phase
         // uses) from the saved position, right now - so a bad Z capture (too far above the spoilboard for the
-        // capped search to reach) is caught here, before it aborts a real Start Job run.
+        // capped search to reach) is caught here, before it aborts a real Start Job run. For edge-probing kinds
+        // (CornerFence) this also locates the true stock corner and stores it as Fixture.CornerOffsetX/Y - see
+        // the block below the spoilboard search.
         private void btnTestPosition_Click(object sender, RoutedEventArgs e)
         {
             var fx = DataContext as Fixture;
@@ -391,8 +406,11 @@ namespace CNC.Controls
             string searchF = probe.ProbeFeedRate.ToInvariantString("0.0##"), latchF = probe.LatchFeedRate.ToInvariantString("0.0##");
 
             var b = new StringBuilder();
-            b.AppendLine("(Test position - spoilboard probe search only, 12 mm cap matching pcorner.macro's DISCOVER phase)");
-            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("(Test position - spoilboard probe search, 12 mm cap matching pcorner.macro's DISCOVER phase)");
+            // EXPR (grblHAL NGC expressions) is only actually exercised by the corner-locate O<pcorner> CALL
+            // below (edge-probing kinds), but requiring it up front for every kind is harmless - keeps this in
+            // sync with Start Job's own PREREQ for the same macro.
+            b.AppendLine("(PREREQ, connected, homed, noalarm, EXPR)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
             b.AppendLine("G10 L2 P1 X0 Y0 Z0");   // clear G54 - absolute Z probe below runs in machine coords, same as pcorner.macro
@@ -414,6 +432,62 @@ namespace CNC.Controls
             b.AppendLine("G90");
             b.AppendLine(string.Format("#<_tp_margin> = [{0} - #<_tp_z>]", z));
             b.AppendLine("(PRINT, Test position OK - spoilboard is #<_tp_margin> mm below the saved Z (cap is 12 mm).)");
+            // Machine-readable echo of the raw probed Z, same (PRINT, TAG=value) idiom StartJobView.rxResult
+            // already parses for LS_X/LS_Y - picked up below via Model_PropertyChanged so it can be stored as
+            // Fixture.SpoilboardZ (edge-probing kinds only, see below).
+            b.AppendLine("(PRINT, SPOIL_Z=#<_tp_z>)");
+
+            // Edge-probing kinds only (CornerFence today): also locate the true stock corner, ONCE, via a real
+            // pcorner.macro DISCOVER pass (same wide-clearance search Start Job's own corner-1 probe used to run
+            // EVERY job) - then park at a point 5mm INSIDE that corner (the same tight anchor Start Job's old
+            // "exact size" re-probe used) so OnTestPositionDone can read the machine's resting XY back and store
+            // it as Fixture.CornerOffsetX/Y (relative to Coords). The fence is bolted down, so this only needs
+            // doing once - Start Job then points its own single corner-1 probe straight at this stored anchor
+            // instead of locating it fresh every run. See the "double probe of corner 1" backlog item.
+            if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented)
+            {
+                double topClearance = probe.MinStandoff + 9d;   // same wide clearance Start Job's DISCOVER pass uses
+                const double thicknessAssumedMm = 6d;           // small on purpose - lands the face search near the top, safely inside any real stock
+                b.AppendLine("(--- locate the true corner (edge-probing kinds only) ---)");
+                b.AppendLine("#<_ls_corner> = 1");   // FrontLeft - the only origin StartJobView.SelectedCorner ever uses
+                b.AppendLine(string.Format("#<_ls_refx> = {0}", x));
+                b.AppendLine(string.Format("#<_ls_refy> = {0}", y));
+                b.AppendLine(string.Format("#<_ls_rad> = {0}", (probe.ProbeDiameter / 2d).ToInvariantString("0.0##")));
+                b.AppendLine("#<_ls_spacer> = 0");
+                b.AppendLine(string.Format("#<_ls_thickness> = {0}", thicknessAssumedMm.ToInvariantString("0.0##")));
+                b.AppendLine("#<_ls_mode> = 0");
+                b.AppendLine("#<_ls_plateoffset> = 0");
+                b.AppendLine("#<_ls_spoilx> = 0");
+                b.AppendLine("#<_ls_spoily> = 0");
+                b.AppendLine(string.Format("#<_ls_topx> = {0}", topClearance.ToInvariantString("0.0##")));
+                b.AppendLine(string.Format("#<_ls_topy> = {0}", topClearance.ToInvariantString("0.0##")));
+                b.AppendLine(string.Format("#<_ls_spoilz> = {0}", z));
+                b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
+                b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
+                b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+                // REUSE mode (startz < 9000), NOT DISCOVER (9999): the spoilboard search just above already
+                // found the spoilboard, so pcorner.macro's own internal spoilboard probe (DISCOVER's o20 block)
+                // would be a second, redundant one - confirmed on real hardware (Test position visibly probed
+                // the spoilboard twice before ever reaching the corner). REUSE needs #<_bottom> pre-set (the
+                // global pcorner's REUSE path reads for its seek-depth cap) - #<_ls_startz> itself is never
+                // read for its VALUE, only compared against 9000, so any REUSE-range literal works; this
+                // block never explicitly set it before, so it silently inherited whatever a PRIOR pcorner call
+                // on the controller left behind (Start Job's own corner-1 call leaves 9999 = DISCOVER) - that
+                // stale global, not a deliberate choice, is what put this in DISCOVER mode.
+                b.AppendLine("#<_bottom> = #<_tp_z>");   // the spoilboard search above already found this; spacer unknown at fixture-test time (0)
+                b.AppendLine("#<_ls_startz> = 0");
+                b.AppendLine("#<_ls_maxz> = 0");
+                b.AppendLine("#<_ls_appz> = 9999");
+                b.AppendLine(string.Format("O<pcorner> CALL [#<_ls_rad>]"));
+                // Park AT the true corner itself (not an inset/outset point) - CornerOffsetX/Y must be the raw
+                // true-corner-minus-Coords delta, because StartJobView.BuildProgram is the one place that adds
+                // the +5mm interior inset (#<_ls_topx> = CornerOffsetX + 5) on top of it. Parking at an already-
+                // adjusted point here would double up/cancel that adjustment - confirmed on real hardware:
+                // parking 10mm OUTWARD here (matching the old exact-size re-probe's own reference point) made
+                // BuildProgram's "+5 inward" net to 5mm OUTSIDE the corner instead of 5mm inside it.
+                b.AppendLine("G53 G1 F1000 X[#<_corner_x>] Y[#<_corner_y>] Z[#<_corner_z> + 20]");
+                b.AppendLine("(PRINT, Corner located - CX=#<_corner_x> CY=#<_corner_y>)");
+            }
 
             // The G91 G1 retract lines above are feed moves, so MacroProcessor.Flush routes this through the
             // ASYNC streamed job path, not the synchronous MDI path (see WatchAsyncCompletion's comment) - Run()
@@ -424,14 +498,26 @@ namespace CNC.Controls
             UpdatePositionDisplay();
             SetBusy(true);
 
+            _capturedSpoilZ = null;
+            PropertyChangedEventHandler spoilZHandler = (s, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
+                    return;
+                var m = rxSpoilZ.Match(model.Message);
+                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+                    _capturedSpoilZ = v;
+            };
+            model.PropertyChanged += spoilZHandler;
+
             var started = new RunStarted();
-            var handler = WatchAsyncCompletion(() => OnTestPositionDone(fx), started);
+            var handler = WatchAsyncCompletion(() => { model.PropertyChanged -= spoilZHandler; OnTestPositionDone(fx); }, started);
             bool ran = MacroProcessor.Run(model, "Test fixture position", b.ToString(), true);
             if (ran)
                 started.Value = true;
             else
             {
                 model.PropertyChanged -= handler;
+                model.PropertyChanged -= spoilZHandler;
                 SetBusy(false);
             }
         }
@@ -440,6 +526,20 @@ namespace CNC.Controls
         private void OnTestPositionDone(Fixture fx)
         {
             fx.PositionValidated = model.GrblState.State != GrblStates.Alarm;
+            // Edge-probing kinds: the macro above parked the machine at the tight corner anchor as its very
+            // last move, so the CURRENT machine position now IS that anchor - same "read back after the macro
+            // parks there" idiom OnViseCornerProbeDone uses for Set position. Store it relative to Coords (the
+            // saved reference), not as an absolute XY - Coords is what Start Job re-reads it against later.
+            if (fx.PositionValidated && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented)
+            {
+                var refPos = new Position(fx.Coords);
+                fx.CornerOffsetX = model.MachinePosition.X - refPos.X;
+                fx.CornerOffsetY = model.MachinePosition.Y - refPos.Y;
+                // Captured off the (PRINT, SPOIL_Z=..) line via spoilZHandler above - lets Start Job reuse this
+                // spoilboard search instead of repeating it every job (StartJobView.BuildProgram).
+                if (_capturedSpoilZ.HasValue)
+                    fx.SpoilboardZ = _capturedSpoilZ.Value;
+            }
             UpdatePositionDisplay();
             SetBusy(false);
             // The macro's own (PRINT, Test position OK - ...) message gets clobbered by JobControl's generic

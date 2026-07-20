@@ -96,6 +96,9 @@ namespace CNC.Controls
         private bool _positionValidated = false;
         private double _jawWidth = 0d;
         private double _maxOpening = 0d;
+        private double _cornerOffsetX = 0d;
+        private double _cornerOffsetY = 0d;
+        private double _spoilboardZ = 0d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public FixtureKind Kind { get { return _kind; } set { _kind = value; OnChanged(); OnChanged(nameof(KindName)); OnChanged(nameof(Implemented)); } }
@@ -107,6 +110,26 @@ namespace CNC.Controls
         // Maximum jaw opening (mm) - how far the moving jaw can travel from the fixed jaw. 0 = not set: the
         // drawing places the moving jaw right at the stock's edge instead of at the vise's true throat depth.
         public double MaxOpening { get { return _maxOpening; } set { _maxOpening = value; OnChanged(); } }
+
+        // Edge-probing kinds only (CornerFence today - see FixtureKinds.ProbesEdges/Implemented). The true
+        // stock corner's XY, relative to Coords, captured ONCE by FixtureEditDialog's "Test position" via a
+        // real pcorner.macro probe (same as Start Job's own corner-1 DISCOVER pass used to do every run) -
+        // the fence is bolted down, so this offset is reproducible run to run. Start Job then points corner
+        // 1's SINGLE probe directly at the tight ~5mm-inset anchor (StartJobView.BuildProgram) instead of a
+        // loose locate pass followed by a tight re-probe - see the "double probe of corner 1" backlog item.
+        // 0/0 means "never captured under this scheme" (fresh fixture, or one saved before this feature) -
+        // BuildProgram refuses to generate until Test position has been re-run (real 0,0 offsets never occur
+        // in practice - Coords is always jogged well clear of the corner).
+        public double CornerOffsetX { get { return _cornerOffsetX; } set { _cornerOffsetX = value; OnChanged(); } }
+        public double CornerOffsetY { get { return _cornerOffsetY; } set { _cornerOffsetY = value; OnChanged(); } }
+
+        // Edge-probing kinds only, same scheme as CornerOffsetX/Y: the spoilboard's machine Z at Coords,
+        // captured ONCE by Test position's own spoilboard search. The fence is bolted down and the spoilboard
+        // doesn't move, so this is exactly as reproducible run to run as CornerOffsetX/Y already is - Start
+        // Job reuses it directly (StartJobView.BuildProgram) instead of re-probing the spoilboard every job,
+        // same "trust the once-tested fixture reference" model already applied to X/Y. 0 means "never
+        // captured" (see CornerOffsetX/Y's own comment - real 0 never occurs in practice).
+        public double SpoilboardZ { get { return _spoilboardZ; } set { _spoilboardZ = value; OnChanged(); } }
 
         // Friendly kind name for the list grid (derived, not persisted).
         [XmlIgnore]
@@ -129,6 +152,14 @@ namespace CNC.Controls
             set
             {
                 _coords = value; PositionValidated = false;
+                // NOT the place to clear CornerOffsetX/Y (that was tried and broke on real hardware): this
+                // setter also runs during XML deserialization (XmlSerializer assigns CornerOffsetX/Y, then
+                // Coords, then PositionValidated, in declared order - see Fixture.cs's own property order),
+                // so clearing here would zero a just-loaded, perfectly valid offset EVERY app load, moments
+                // before PositionValidated's own element deserializes and restores "true" over top of it -
+                // silently corrupting Start Job's saved reference while showing a green check. Callers that
+                // genuinely re-jog the position (FixtureEditDialog.btnSetPosition_Click) clear the offset
+                // themselves, right there, not through this setter.
                 OnChanged(); OnChanged(nameof(HasPosition)); OnChanged(nameof(X)); OnChanged(nameof(Y)); OnChanged(nameof(Z));
             }
         }
@@ -183,6 +214,8 @@ namespace CNC.Controls
             Name = o.Name; Kind = o.Kind;
             Coords = o.Coords; PositionValidated = o.PositionValidated;
             JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
+            CornerOffsetX = o.CornerOffsetX; CornerOffsetY = o.CornerOffsetY;
+            SpoilboardZ = o.SpoilboardZ;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -213,7 +246,10 @@ namespace CNC.Controls
 
         public static void Load()
         {
-            _items = new ObservableCollection<Fixture>();
+            if (_items == null)
+                _items = new ObservableCollection<Fixture>();
+            else
+                _items.Clear();
         }
 
         // Persisted as the "Fixtures" section of App.config. Saving writes the whole sectioned config.
@@ -228,10 +264,23 @@ namespace CNC.Controls
             return new FixtureList { Items = new List<Fixture>(Items) };
         }
 
-        // Load the library from the App.config section (called by ConfigStore at startup).
+        // Load the library from the App.config section (called by ConfigStore at startup). Mutates the
+        // EXISTING collection in place (Clear + re-add) instead of replacing the _items reference: MainWindow's
+        // InitializeComponent() builds the whole tab tree - including MachineSetupWizard, which binds
+        // grdFixtures.ItemsSource = Fixtures.Items in its constructor - BEFORE AppConfig.Settings.LoadConfig()
+        // runs (see MainWindow.xaml.cs). A premature Items access there used to lazily create an EMPTY
+        // collection via Load() and bind the grid to THAT object; this method then created a brand new object
+        // with the real 4 fixtures and reassigned the static field, orphaning the grid's already-bound
+        // reference - the grid stayed on the stale empty collection for the rest of the session (confirmed on
+        // real hardware: Fixture definitions showed only fixtures added/mutated in-session, nothing from the
+        // loaded file). Mutating in place means whichever collection object got bound early is the SAME one
+        // this populates.
         public static void SetItems(FixtureList list)
         {
-            _items = new ObservableCollection<Fixture>();
+            if (_items == null)
+                _items = new ObservableCollection<Fixture>();
+            else
+                _items.Clear();
             if (list?.Items != null)
                 foreach (var d in list.Items)
                     _items.Add(d);

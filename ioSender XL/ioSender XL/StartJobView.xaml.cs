@@ -382,16 +382,17 @@ namespace GCode_Sender
             bool showRotate = (fx == null || FixtureKinds.ProbesEdges(fx.Kind)) && GrblInfo.RotationSupported;
             chkRotate.Visibility = showRotate ? Visibility.Visible : Visibility.Collapsed;
 
-            // Size fields describe THIS fixture's stock - meaningless (and easy to fill in against the wrong
-            // assumptions) before a fixture is even chosen. Spacer/backer (sacrificial sheet/spoilboard under
-            // the stock, e.g. plywood resting on the jaw top under a thin aluminium part) is the same concept
-            // for every kind: pcorner.macro's effective floor is spoilboard + spacer for Corner Fence, and
-            // BuildViseProgram now reads it too - the jaw top alone isn't where the stock actually sits.
+            // Every field below (size, units, probe type, set-origin WCS, measure/rotate/exact-size/TLO-ref,
+            // Safe Z delta) describes something meaningless before a fixture is even chosen - its saved
+            // reference is what the generated program probes from. Gated as ONE block (pnlInputs, see the
+            // XAML) rather than field-by-field: individually gating only size/units/spacer used to leave the
+            // rest (Probe type, Set origin, Measure, Rotate, TLO ref, Safe Z delta) fully interactive with no
+            // fixture selected - confusing (some fields greyed, some not, for no visible reason) and easy to
+            // forget when adding a new field. A disabled ancestor overrides each control's own IsEnabled/
+            // binding (e.g. Rotate's own chkMeasure-driven binding), so this doesn't fight them.
             bool fixtureChosen = fx != null;
-            fldWidth.IsEnabled = fldHeight.IsEnabled = fldThickness.IsEnabled = fixtureChosen;
-            rbUnitsMm.IsEnabled = rbUnitsIn.IsEnabled = fixtureChosen;
+            pnlInputs.IsEnabled = fixtureChosen;
             fldSpacer.Visibility = fixtureChosen ? Visibility.Visible : Visibility.Collapsed;
-            fldSpacer.IsEnabled = fixtureChosen;
 
             UpdateDrawing();   // origin-corner marker (+ jaws for a vise) tracks the selected fixture's kind
         }
@@ -1040,6 +1041,24 @@ namespace GCode_Sender
                 return;
             }
 
+            // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y and reuses Fixture.SpoilboardZ
+            // instead of locating the corner + spoilboard fresh (see BuildProgram) - a fixture saved/tested
+            // before those features shipped (or one whose Coords was re-set since, which zeros both - see
+            // Fixture.Coords) has 0s here, which would aim the tight probe at a point right next to the jogged
+            // reference and/or seed a bogus safety floor. Neither is ever legitimately exactly 0 (Coords is
+            // always jogged clear of the corner and above the spoilboard), so this is a safe "never actually
+            // tested under this scheme" check.
+            // OR, not AND: SpoilboardZ was added after CornerOffsetX/Y (same Test run captures all three
+            // together now), so a fixture tested between those two changes could have X/Y populated but
+            // SpoilboardZ still 0 - any ONE of the three being unset makes #<_bottom> below untrustworthy.
+            if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
+                && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
+            {
+                AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
+                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
             // Width/Height/Thickness are silently restored from LAST session's saved values on tab activation
             // (LoadInputs) - fine as a starting point, but not necessarily right for THIS stock. Confirm before
             // generating from numbers nobody has actually looked at for this job (TryAutoFillStockFromProgram
@@ -1427,9 +1446,9 @@ namespace GCode_Sender
             L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-            // Z of the fixture instance's saved position - the spoilboard-probe Z-start now comes from THIS
-            // (decoupled from the firmware's G28 Z, #5163) so it matches whichever instance is selected.
-            L(string.Format("#<_ls_spoilz> = {0}", N(fxPos.Z)));
+            // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is no longer emitted -
+            // corner 1 now runs REUSE mode too (Fixture.SpoilboardZ seeds #<_bottom> directly, below), so no
+            // call in this whole program ever takes the DISCOVER branch anymore.
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
@@ -1444,40 +1463,27 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
 
-            // Corner 1 = the selected origin corner: reference = the fixture instance's saved position,
-            // start_z = 9999 -> DISCOVER (publishes #<_start_z>).
-            L(string.Format("(--- corner 1 = {0} (origin): reference {1}, discover Z ---)", cornerName, fx.Name));
-            EmitCall(id1, refX, refY, "9999");
+            // Corner 1 = the selected origin corner: reference = the fixture instance's saved position. REUSE
+            // mode (NOT DISCOVER/9999) - Fixture.SpoilboardZ (FixtureEditDialog's "Test position", a one-time
+            // probe against the physical fence/spoilboard) seeds #<_bottom> directly, so this call skips
+            // pcorner.macro's own spoilboard probe entirely instead of re-running it every job (same "trust the
+            // once-tested fixture reference" model CornerOffsetX/Y already uses for the corner XY - see the
+            // "double probe of corner 1" backlog item). topx/topy point straight at CornerOffsetX/Y's tight
+            // ~5mm-inset anchor, same as before. CornerOffsetX/Y encode the true corner's position under
+            // sx=sy=+1 (SelectedCorner is always FrontLeft today - see its getter) plus the same 5mm interior
+            // inset the old exact-size re-probe used (topx = offset + inset lands 5mm inside the true corner,
+            // same derivation as corner 2's own hand-specified anchor below).
+            const double cornerInsetMm = 5d;
+            L(string.Format("(--- corner 1 = {0} (origin): reference {1} ---)", cornerName, fx.Name));
+            L(string.Format("#<_bottom> = [{0} + {1}]", N(fx.SpoilboardZ), N(spacer)));
+            L(string.Format("#<_ls_topx> = {0}", N(fx.CornerOffsetX + cornerInsetMm)));
+            L(string.Format("#<_ls_topy> = {0}", N(fx.CornerOffsetY + cornerInsetMm)));
+            EmitCall(id1, refX, refY, "0");
+            L(string.Format("#<_ls_topx> = {0}", N(topClearance)));   // restore for corners 2-4's default (non-exact) path below
+            L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             L("#<c1x> = #<_corner_x>");
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
-
-            if (exactSize)
-            {
-                // Re-probe corner 1 itself, tight, using the just-measured position as the reference instead
-                // of the operator's rough jogged one (DISCOVER above needs a WIDE clearance reference since
-                // it's unverified; now that corner 1 is actually known, refine it the same way corners 2-4 get
-                // probed tightly) - it's the anchor everything else is computed from, so its own precision
-                // matters most. Corner 1 is the ORIGIN corner: unlike corner 2 (whose own pcorner-sx is the
-                // NEGATION of host sox), the origin's own sx/sy always match host sox/soy directly (no far-edge
-                // sign flip - it doesn't have a "far edge" of its own to invert against), so both topx/topy come
-                // out symmetric this time: ref = trueCorner1 - 10*(sox,soy), topx = topy = 15. Same +-5mm/+-10mm
-                // pattern as corner 2's re-derivation, worked through fresh for this corner's own sign
-                // convention rather than assumed to match corner 2's (that assumption is what broke corner 2).
-                L("(--- exact-size: re-probe corner 1 tight, using its own just-measured position ---)");
-                L(string.Format("#<_ls_topx> = {0}", N(15d)));
-                L(string.Format("#<_ls_topy> = {0}", N(15d)));
-                string refX1b = plusMinus("#<c1x>", -sox, 10d);
-                string refY1b = plusMinus("#<c1y>", -soy, 10d);
-                // REUSE mode (startz = the spoilboard-anchored #<_start_z> DISCOVER already published) - no
-                // second spoilboard probe needed. maxz = #<_safe_z>, the height DISCOVER just verified (this
-                // corner's own top + 20) - safe and already known, no need to retract to machine Z0 for a
-                // revisit of the same spot.
-                EmitCall(id1, refX1b, refY1b, "#<_start_z>", "#<_safe_z>");
-                L("#<c1x> = #<_corner_x>");
-                L("#<c1y> = #<_corner_y>");
-                L("#<c1z> = #<_corner_z>");
-            }
 
             // Known-safe travel height for corners 2-4 (see pcorner.macro's #<_ls_maxz>) - corner 1's own
             // measured stock top plus the operator-set travel margin, NOT hardcoded (adjustable in case a
