@@ -27,8 +27,9 @@ namespace CNC.Controls
         private static void RegisterTools()
         {
             ComponentRegistry.Register(LayoutKeys.ToolTable, L("TabToolTable", "Tool table"), () => new ToolView());
-            ComponentRegistry.Register(LayoutKeys.StepperCal, L("TabStepperCal", "Stepper calibration"), () => new StepperCalibrationWizard());
+            ComponentRegistry.Register(LayoutKeys.StepperCal, L("TabStepperCal", "Stepper calibration (Manual)"), () => new StepperCalibrationWizard());
             ComponentRegistry.Register(LayoutKeys.StepperScratch, L("TabStepperScratch", "Stepper calibration (scratch)"), () => new StepperCalibrationScratchWizard());
+            ComponentRegistry.Register(LayoutKeys.StepperCalProbe, L("TabStepperCalProbe", "Stepper calibration (probe)"), () => new StepperCalibrationProbeWizard());
             ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, L("TabSurfaceSpoilboard", "Surface spoilboard"), () => new SurfaceSpoilboardWizard());
             ComponentRegistry.Register(LayoutKeys.Squareness, L("TabSquareness", "Squareness"), () => new AutoSquareWizard());
             ComponentRegistry.Register(LayoutKeys.Trinamic, L("TabTrinamic", "Trinamic tuner"), () => new TrinamicView());
@@ -99,7 +100,44 @@ namespace CNC.Controls
 
         public void Activate(bool activate, ViewType chgMode)
         {
+            if (activate)
+            {
+                EnsureToolsCurrent();
+                UpdateStepperCalProbeAvailability();
+            }
             ActivateTab(tabTools.SelectedItem as TabItem ?? tabTools.Items[0] as TabItem, activate);
+        }
+
+        // Stepper Calibration (probe) needs a real 3D probe to do anything useful - grey the whole tab out
+        // (not just its own Generate/Save buttons) when none is configured, re-checked every time Tools is
+        // activated so it reflects a probe added/removed in Machine Setup mid-session.
+        private void UpdateStepperCalProbeAvailability()
+        {
+            var tab = tabTools.Items.Cast<TabItem>().FirstOrDefault(t => (t.Tag as string) == LayoutKeys.StepperCalProbe);
+            if (tab != null)
+                tab.IsEnabled = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
+        }
+
+        // BuildTools() runs in the constructor, reading AppConfig.Settings.Layout at THAT moment - but
+        // MainWindow's InitializeComponent builds the whole tab tree (including this view) before
+        // AppConfig.LoadConfig() runs, so a tool newly merged into the layout tree by a one-time fixup
+        // (AppConfig.ApplyOneTimeFixups, which runs during LoadConfig) is never picked up on its own -
+        // confirmed on real hardware: a new tool stayed invisible in Tools even after the fixup correctly
+        // patched the persisted tree. Rebuild ONLY if the tab set genuinely differs from the current tree -
+        // not on every activation, which would otherwise destroy/recreate every sub-tab (losing its state)
+        // on every tab switch. Order-sensitive (SequenceEqual) so a user's own drag-reorder - already
+        // persisted back into the same tree via TabsReordered/ReorderSlot - never triggers a spurious rebuild.
+        private void EnsureToolsCurrent()
+        {
+            var toolsNode = LayoutTree.Flatten(AppConfig.Settings.Layout).FirstOrDefault(n => n.Component == LayoutKeys.Tools);
+            var slot = toolsNode?.Slot(LayoutKeys.SlotTools);
+            if (slot == null)
+                return;
+
+            var wanted = slot.Items.Select(n => n.Component).ToList();
+            var have = tabTools.Items.Cast<TabItem>().Select(t => t.Tag as string).ToList();
+            if (!wanted.SequenceEqual(have))
+                BuildTools();
         }
 
         public void CloseFile() { }

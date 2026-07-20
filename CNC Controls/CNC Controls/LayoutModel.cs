@@ -69,6 +69,7 @@ namespace CNC.Controls
         // Tools container slot + tool components
         public const string SlotTools = "tools";
         public const string ToolTable = "ToolTable", StepperCal = "StepperCal", StepperScratch = "StepperScratch",
+                            StepperCalProbe = "StepperCalProbe",
                             SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness",
                             Trinamic = "Trinamic", PID = "PID";
 
@@ -96,8 +97,9 @@ namespace CNC.Controls
                     new LayoutNode(LayoutKeys.LatheWizards),
                     new LayoutNode(LayoutKeys.Tools,
                         new LayoutSlot(LayoutKeys.SlotTools, new[] {
-                            LayoutKeys.ToolTable, LayoutKeys.StepperCal, LayoutKeys.StepperScratch,
-                            LayoutKeys.SurfaceSpoilboard, LayoutKeys.Squareness, LayoutKeys.Trinamic, LayoutKeys.PID })),
+                            LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
+                            LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
+                            LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
                     new LayoutNode(LayoutKeys.MachineSetup)));
         }
     }

@@ -350,6 +350,9 @@
     <Compile Include="AutoSquareWizard.xaml.cs">
       <DependentUpon>AutoSquareWizard.xaml</DependentUpon>
     </Compile>
+    <Compile Include="StepperCalibrationProbeWizard.xaml.cs">
+      <DependentUpon>StepperCalibrationProbeWizard.xaml</DependentUpon>
+    </Compile>
     <Compile Include="StripGCodeConfigControl.xaml.cs">
       <DependentUpon>StripGCodeConfigControl.xaml</DependentUpon>
     </Compile>
@@ -704,6 +707,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="AutoSquareWizard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="StepperCalibrationProbeWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

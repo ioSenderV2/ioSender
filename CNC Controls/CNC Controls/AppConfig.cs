@@ -553,6 +553,10 @@ namespace CNC.Controls
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
             RegisterFolded<ScratchParams>("StepperCalScratch",
                 () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
+            // No legacy standalone file (new section) - "StepperCalProbe.xml" never exists, so ImportLegacy is
+            // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
+            RegisterFolded<StepperCalProbeParams>("StepperCalProbe",
+                () => StepperCalibrationProbeWizard.SectionConfig, v => StepperCalibrationProbeWizard.SectionConfig = v, "StepperCalProbe.xml");
             RegisterFolded<StartJobSettings>("StartJob",
                 () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
 
@@ -978,6 +982,35 @@ namespace CNC.Controls
                 if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
                     && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
                     fx.PositionValidated = false;
+
+            // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to
+            // DefaultLayout.Build(), but that only seeds a FRESH profile - an already-persisted Layout tree
+            // (this app supports per-user tab reordering, so most real profiles have one) never gets a
+            // newly-introduced component merged in on its own; LayoutTree.EnsureEssentials only guarantees
+            // the top-level Essential tabs, not a leaf inside an existing slot. Also reorders the Tools slot
+            // to the requested sequence (a one-time explicit preference, same mechanism as a correctness
+            // fixup) - this supersedes/subsumes the earlier "just append if missing" version, since a full
+            // reorder already guarantees the new tab exists too. The "tools" slot lives on the "Tools" CHILD
+            // node, not the root - Root.Slot(SlotTools) always returned null (confirmed via diagnostics: the
+            // root only has the top-level "tabs" slot) - ToolsView.BuildTools's own working code finds it the
+            // same way this now does: flatten the tree, find the Tools component node, THEN read its slot.
+            var toolsNode = LayoutTree.Flatten(layoutSection?.Root).FirstOrDefault(n => n.Component == LayoutKeys.Tools);
+            var toolsSlot = toolsNode?.Slot(LayoutKeys.SlotTools);
+            if (toolsSlot != null)
+            {
+                string[] desiredOrder = {
+                    LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
+                    LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
+                    LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID
+                };
+                var byKey = toolsSlot.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
+                var reordered = desiredOrder.Select(k => byKey.TryGetValue(k, out var n) ? n : new LayoutNode(k)).ToList();
+                foreach (var n in toolsSlot.Items)   // future-proofing: keep anything unexpected, appended at the end
+                    if (!desiredOrder.Contains(n.Component))
+                        reordered.Add(n);
+                if (!toolsSlot.Items.Select(n => n.Component).SequenceEqual(reordered.Select(n => n.Component)))
+                    toolsSlot.Items = reordered;
+            }
         }
 
         public void Shutdown()

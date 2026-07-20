@@ -45,6 +45,7 @@ namespace CNC.Controls
         Base,
         StepperCalibration,
         StepperCalibrationScratch,
+        StepperCalibrationProbe,
         Trinamic,
         PidTuning,
         MachineSetup,

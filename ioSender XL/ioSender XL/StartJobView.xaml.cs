@@ -55,6 +55,9 @@ namespace GCode_Sender
         // BuildViseProgram's centre-footprint stock-top Z probe: "LS_VISE_Z=..".
         private static readonly Regex rxViseCenterZ = new Regex(@"LS_VISE_Z\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
         private double? measuredX = null, measuredY = null, spoilZ = null, viseLeftEdgeSkewDeg = null, viseCenterZ = null;
+        // One-shot per run: suppresses the calibration-suggestion dialog (ShowResult) from firing again on
+        // every later PRINT line once all 4 corners have already arrived once this run.
+        private bool sizeWarningShown = false;
         // Per-corner probed machine coords, indexed by the macro's corner id 1..4 = FL,FR,BL,BR.
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
@@ -560,6 +563,7 @@ namespace GCode_Sender
             measuredX = measuredY = spoilZ = viseLeftEdgeSkewDeg = viseCenterZ = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
+            sizeWarningShown = false;
             ShowResult();
         }
 
@@ -573,6 +577,39 @@ namespace GCode_Sender
             btnCopySize.IsEnabled = measuredX.HasValue && measuredY.HasValue;
             // Verify skew needs all four corners (a full measure run) and a controller that applies WCS rotation.
             btnVerify.IsEnabled = GrblInfo.RotationSupported && Has(1) && Has(2) && Has(3) && Has(4);
+
+            CheckSizeAgainstEntered(probed);
+        }
+
+        // "Stock size is exact" means the operator is claiming Width/Height ARE the true size (not a
+        // conservative over-estimate) - so once all 4 corners are in, a real mismatch against the measured
+        // size isn't probe noise, it's the machine not moving the commanded distance. Confirmed on real
+        // hardware: a 429mm (per a Woodpeckers precision ruler) MDF panel measured 427.787 x 427.464mm - a
+        // ~1.2-1.5mm error over 429mm (~0.3%) is exactly the size/shape of a steps-per-mm calibration error,
+        // not measurement noise, and it's what caused corners 2-4's face probes to nearly miss the stock
+        // (their reference point is derived from the ENTERED exact size, so this class of error compounds
+        // there too). One-shot per run (sizeWarningShown) - only checked once all 4 corners have arrived,
+        // not re-shown as later PRINT lines (spoilZ, skew, ...) keep calling ShowResult.
+        private const double SizeMismatchWarnMm = 0.5d;
+        private void CheckSizeAgainstEntered(int probed)
+        {
+            if (sizeWarningShown || probed < 4 || chkExactSize.IsChecked != true || !measuredX.HasValue || !measuredY.HasValue)
+                return;
+
+            double dx = Math.Abs(measuredX.Value - fldWidth.Value);
+            double dy = Math.Abs(measuredY.Value - fldHeight.Value);
+            if (dx <= SizeMismatchWarnMm && dy <= SizeMismatchWarnMm)
+                return;
+
+            sizeWarningShown = true;
+            Dispatcher.BeginInvoke(new System.Action(() => AppDialogs.Show(string.Format(
+                "Measured size ({0} x {1}) differs from the entered exact size ({2} x {3}) by more than {4} - " +
+                "X off by {5}, Y off by {6}. That's larger than normal probe noise for stock claimed to be exact; " +
+                "it looks like the machine isn't moving the commanded distance. Consider running Stepper calibration " +
+                "(Machine Setup > Tools) to check steps/mm on each axis.",
+                FormatLen(measuredX.Value), FormatLen(measuredY.Value), FormatLen(fldWidth.Value), FormatLen(fldHeight.Value),
+                FormatLen(SizeMismatchWarnMm), FormatLen(dx), FormatLen(dy)),
+                "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning)));
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion

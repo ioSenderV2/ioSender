@@ -64,7 +64,7 @@
     <system:String x:Uid="str_tabMachineSetup" x:Key="TabMachineSetup">Machine Setup</system:String>
     <!-- Tools container sub-tab labels (built in code by ToolsView.RegisterTools). -->
     <system:String x:Uid="str_tabToolTable" x:Key="TabToolTable">Tool table</system:String>
-    <system:String x:Uid="str_tabStepperCal" x:Key="TabStepperCal">Stepper calibration</system:String>
+    <system:String x:Uid="str_tabStepperCal" x:Key="TabStepperCal">Stepper calibration (Manual)</system:String>
     <system:String x:Uid="str_tabStepperScratch" x:Key="TabStepperScratch">Stepper calibration (scratch)</system:String>
     <system:String x:Uid="str_tabSurfaceSpoilboard" x:Key="TabSurfaceSpoilboard">Surface spoilboard</system:String>
     <system:String x:Uid="str_tabSquareness" x:Key="TabSquareness">Squareness</system:String>
