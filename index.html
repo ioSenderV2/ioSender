@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en" data-track="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ioSender V2 &mdash; User Manual</title>
+<style>
+  /* ============================================================
+     ioSender V2 User Manual — single-file, self-contained.
+     No external assets except screenshots under ./img/ .
+     Author in this file; screenshots link relative (see README.md).
+     ============================================================ */
+  :root{
+    --bg:#ffffff; --fg:#1b1f23; --muted:#57606a; --faint:#8c959f;
+    --accent:#0a3069; --link:#0969da; --line:#d0d7de; --hair:#eaeef2;
+    --card:#f6f8fa; --card2:#fbfcfd; --code:#0a3069;
+    --nov:#1a7f37; --int:#0969da; --mac:#8250df;
+    --sidebar:300px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --faint:#6e7681;
+      --accent:#6ea8ff; --link:#4493f8; --line:#30363d; --hair:#21262d;
+      --card:#161b22; --card2:#12171e; --code:#79c0ff;
+      --nov:#3fb950; --int:#4493f8; --mac:#bc8cff;
+    }
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:"Segoe UI",Arial,sans-serif;color:var(--fg);background:var(--bg);
+       font-size:16px;line-height:1.55;}
+  a{color:var(--link);text-decoration:none;} a:hover{text-decoration:underline;}
+  code,.mono{font-family:"Cascadia Code",Consolas,monospace;font-size:.9em;color:var(--code);
+       background:var(--card);padding:1px 5px;border-radius:4px;}
+  kbd{font-family:Consolas,monospace;font-size:.82em;background:var(--card);border:1px solid var(--line);
+       border-bottom-width:2px;border-radius:4px;padding:1px 6px;color:var(--fg);}
+
+  /* ---- layout ---- */
+  .wrap{display:flex;align-items:flex-start;max-width:1200px;margin:0 auto;}
+  nav.side{position:sticky;top:0;height:100vh;width:var(--sidebar);flex:0 0 var(--sidebar);
+       overflow-y:auto;border-right:1px solid var(--line);padding:16px 14px 40px;background:var(--card2);}
+  main{flex:1 1 auto;min-width:0;padding:24px 40px 120px;}
+  @media (max-width:860px){
+    .wrap{display:block;} nav.side{position:static;height:auto;width:auto;border-right:none;
+       border-bottom:1px solid var(--line);} main{padding:20px 18px 80px;}
+  }
+
+  /* ---- sidebar ---- */
+  .brand{font-weight:700;font-size:1.05rem;color:var(--accent);margin:2px 0 2px;}
+  .brand small{display:block;font-weight:400;color:var(--faint);font-size:.72rem;letter-spacing:.04em;
+       text-transform:uppercase;margin-top:2px;}
+  .search{width:100%;margin:14px 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+       background:var(--bg);color:var(--fg);font-size:.9rem;}
+  .search::placeholder{color:var(--faint);}
+  .tracks{display:flex;gap:6px;margin:10px 0 6px;flex-wrap:wrap;}
+  .chip{flex:1 1 auto;text-align:center;font-size:.74rem;font-weight:600;padding:6px 4px;border-radius:999px;
+       border:1px solid var(--line);cursor:pointer;-webkit-user-select:none;user-select:none;color:var(--muted);
+       background:var(--bg);white-space:nowrap;}
+  .chip[data-t=novice].on{color:#fff;background:var(--nov);border-color:var(--nov);}
+  .chip[data-t=intermediate].on{color:#fff;background:var(--int);border-color:var(--int);}
+  .chip[data-t=machinist].on{color:#fff;background:var(--mac);border-color:var(--mac);}
+  .chip.on{color:#fff;}
+  .track-note{font-size:.76rem;color:var(--muted);margin:2px 2px 8px;min-height:1.1em;}
+  .navsec{font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);
+       margin:16px 2px 4px;font-weight:700;}
+  nav.side ol,nav.side ul{list-style:none;margin:0;padding:0;}
+  nav.side li{margin:0;}
+  nav.side a.topic{display:flex;align-items:baseline;gap:7px;padding:4px 8px;border-radius:6px;
+       color:var(--fg);font-size:.9rem;}
+  nav.side a.topic:hover{background:var(--card);text-decoration:none;}
+  nav.side a.topic.active{background:var(--card);font-weight:600;color:var(--accent);}
+  nav.side a.topic .num{color:var(--faint);font-size:.72rem;min-width:1.2em;font-family:Consolas,monospace;}
+  nav.side a.topic.hidden{display:none;}
+  .lvl{display:inline-block;width:7px;height:7px;border-radius:50%;flex:0 0 auto;margin-top:.45em;}
+  .lvl.nov{background:var(--nov);} .lvl.int{background:var(--int);} .lvl.mac{background:var(--mac);}
+  .lvl.none{background:var(--line);}
+
+  /* ---- content ---- */
+  h1.page{font-size:1.9rem;margin:0 0 4px;color:var(--fg);}
+  .lead{color:var(--muted);font-size:1.02rem;max-width:60ch;margin:0 0 22px;}
+  section.topic{scroll-margin-top:14px;padding:26px 0 8px;border-top:1px solid var(--hair);}
+  section.topic:first-of-type{border-top:none;padding-top:6px;}
+  section.topic h2{font-size:1.4rem;color:var(--accent);margin:0 0 2px;display:flex;align-items:center;gap:10px;}
+  section.topic h2 .anchor{font-size:.8rem;color:var(--faint);opacity:0;transition:opacity .1s;}
+  section.topic h2:hover .anchor{opacity:1;}
+  .tags{display:flex;gap:6px;margin:6px 0 12px;flex-wrap:wrap;}
+  .tag{font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:999px;letter-spacing:.03em;}
+  .tag.nov{color:var(--nov);border:1px solid var(--nov);}
+  .tag.int{color:var(--int);border:1px solid var(--int);}
+  .tag.mac{color:var(--mac);border:1px solid var(--mac);}
+  section.topic h3{font-size:1.05rem;margin:20px 0 4px;color:var(--fg);}
+  section.topic p{margin:8px 0;} section.topic ul,section.topic ol{margin:8px 0;padding-left:22px;}
+  section.topic li{margin:4px 0;}
+  figure{margin:16px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card2);}
+  figure img{display:block;width:100%;height:auto;}
+  figure figcaption{padding:8px 12px;color:var(--muted);font-size:.86rem;border-top:1px solid var(--hair);}
+  .shot-todo{padding:26px 14px;text-align:center;color:var(--faint);font-size:.86rem;
+       background:repeating-linear-gradient(45deg,var(--card),var(--card) 12px,var(--card2) 12px,var(--card2) 24px);}
+  /* ---- inline diagrams (theme-aware via CSS vars) ---- */
+  .svgfig{background:var(--card2);padding:8px 6px;}
+  .svgfig svg{display:block;width:100%;height:auto;}
+  .d-bed{fill:var(--hair);stroke:var(--line);stroke-width:2;}
+  .d-stock{fill:var(--int);fill-opacity:.13;stroke:var(--int);stroke-width:2;}
+  .d-part{fill:var(--card);stroke:var(--line);stroke-width:2;}
+  .d-spindle{fill:var(--muted);}
+  .d-stepper{fill:var(--faint);}
+  .d-dash{stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4;fill:none;}
+  .d-lead{stroke:var(--faint);stroke-width:1;fill:none;}
+  .d-flow{stroke:var(--faint);stroke-width:1.6;fill:none;}
+  .d-arrow{fill:var(--muted);}
+  .d-arrowf{fill:var(--faint);}
+  .ax-x{stroke:#cf222e;stroke-width:2.4;fill:none;} .tx-x{fill:#cf222e;font:700 13px "Segoe UI",Arial;}
+  .ax-y{stroke:#1a7f37;stroke-width:2.4;fill:none;} .tx-y{fill:#1a7f37;font:700 13px "Segoe UI",Arial;}
+  .ax-z{stroke:#0969da;stroke-width:2.4;fill:none;} .tx-z{fill:#0969da;font:700 13px "Segoe UI",Arial;}
+  .d-label{fill:var(--fg);font:600 13px "Segoe UI",Arial;}
+  .d-sub{fill:var(--muted);font:12px "Segoe UI",Arial;}
+  .d-tag{fill:var(--accent);font:700 13px "Segoe UI",Arial;}
+  .d-warn{fill:#d97706;font:600 12px "Segoe UI",Arial;} .d-warnbox{fill:var(--card);stroke:#d97706;stroke-width:1.6;}
+  .d-good{fill:var(--nov);font:600 12px "Segoe UI",Arial;} .d-goodbox{fill:var(--card);stroke:var(--nov);stroke-width:1.6;}
+  .d-box{fill:var(--card);stroke:var(--line);stroke-width:1.4;}
+  .d-boxtx{fill:var(--fg);font:12px "Segoe UI",Arial;}
+  .d-dot{fill:var(--accent);}
+  .d-tiny{fill:var(--muted);font:11px "Segoe UI",Arial;}
+  .callout{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:10px 14px;margin:14px 0;
+       background:var(--card);}
+  .callout.tip{border-left-color:var(--nov);}
+  .callout.warn{border-left-color:#d97706;}
+  .callout.note{border-left-color:var(--int);}
+  .callout .k{font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+  .stub{color:var(--faint);font-style:italic;}
+  .xref{font-size:.9rem;color:var(--muted);margin-top:14px;}
+  /* ---- task video (lazy YouTube embed / "coming soon") ---- */
+  .video-panel{margin:14px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
+  .video-pending{display:flex;align-items:center;gap:11px;padding:12px 14px;color:var(--muted);font-size:.9rem;}
+  .video-pending .ic{font-size:1.3rem;flex:0 0 auto;}
+  .video-cta{display:flex;align-items:center;gap:13px;padding:12px 14px;cursor:pointer;}
+  .video-cta:hover{background:var(--hair);}
+  .video-cta .play{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-size:1.05rem;}
+  .video-cta .txt{font-weight:600;color:var(--fg);}
+  .video-cta .sub{display:block;font-weight:400;color:var(--muted);font-size:.82rem;margin-top:1px;}
+  .video-embed{position:relative;width:100%;aspect-ratio:16/9;background:#000;}
+  .video-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .pathnav{display:flex;justify-content:space-between;gap:10px;margin:26px 0 0;padding-top:14px;
+       border-top:1px solid var(--hair);font-size:.9rem;}
+  .pathnav a{display:inline-block;padding:8px 12px;border:1px solid var(--line);border-radius:8px;}
+  .pathnav a.hidden{visibility:hidden;}
+  table.reftab{width:100%;border-collapse:collapse;margin:12px 0;font-size:.92rem;}
+  table.reftab th,table.reftab td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--hair);vertical-align:top;}
+  table.reftab th{color:var(--muted);border-bottom:1.5px solid var(--line);}
+  .searchmiss{display:none;color:var(--muted);padding:20px 4px;}
+  .hidden{display:none !important;}
+  h4.subh{margin:14px 0 4px;font-size:.98rem;}
+  p.flow{text-align:center;color:var(--muted);}
+  #pathnav{display:none;}
+  .topbar{display:none;}
+  @media (max-width:860px){.topbar{display:block;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ================= SIDEBAR ================= -->
+<nav class="side">
+  <div class="brand">ioSender&nbsp;V2<small>User&nbsp;Manual</small></div>
+  <input id="q" class="search" type="search" placeholder="Search topics…" autocomplete="off" aria-label="Search topics">
+
+  <div class="tracks" role="group" aria-label="Reading tracks">
+    <span class="chip" data-t="novice" title="A guided path for first-time users">Novice</span>
+    <span class="chip" data-t="intermediate" title="For users comfortable with the basics">Intermediate</span>
+    <span class="chip" data-t="machinist" title="Depth: setup, calibration, advanced flows">Machinist</span>
+  </div>
+  <div class="track-note" id="trackNote">Pick a track for a guided reading order, or browse by subject below.</div>
+
+  <div class="navsec" id="navHeading">Subjects (A&ndash;Z)</div>
+  <ol id="toc"><!-- built by JS from the sections in <main> --></ol>
+  <div class="searchmiss" id="searchmiss">No topics match.</div>
+</nav>
+
+<!-- ================= CONTENT ================= -->
+<main id="content">
+
+  <h1 class="page">ioSender&nbsp;V2 User Manual</h1>
+  <p class="lead">Everything you need to drive your grblHAL / Grbl machine with ioSender&nbsp;V2 — from
+  first connection to squaring the gantry and running a job. Choose a <strong>reading track</strong> in the
+  sidebar for a guided order, jump straight to a <strong>subject</strong>, or press <kbd>F1</kbd> inside the
+  app to land on the page for whatever you're looking at.</p>
+
+  <!-- ========================================================================
+       TOPIC AUTHORING NOTES (delete-free; ignored by readers):
+       • Each topic is  <section class="topic" id="ANCHOR" data-title="…" data-level="nov|int|mac">
+         The id/ANCHOR is the deep-link target used by the in-app F1/"?" hook and MUST equal the
+         view's HelpTopic (see ../manual/README.md → anchor map).
+       • data-level sets the DOT + which track(s) surface it first; data-track-order (optional,
+         comma list e.g. "novice:3,intermediate:1") controls track sequencing — omit and JS falls
+         back to document order within a track by level.
+       • Screenshots:  <figure><img src="img/ANCHOR-thing.png" alt="…"><figcaption>…</figcaption></figure>
+         Until a shot exists, drop a <div class="shot-todo">screenshot: …</div> placeholder.
+       ======================================================================== -->
+
+  <!-- ===================== INTRO TO CNC ===================== -->
+  <section class="topic" id="intro-to-cnc" data-title="Intro to CNC — the big picture" data-level="nov"
+           data-track="novice:1,intermediate:0,machinist:0">
+    <h2>Intro to CNC — the big picture <a class="anchor" href="#intro-to-cnc">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span></div>
+    <p>New to CNC? There's a lot to take in at once — motors, coordinates, probes, g-code, bits, tool
+    changes. This page walks the whole picture <em>once</em>, in plain language, so the rest of the manual
+    (and your machine) stops feeling like alphabet soup. Nothing here is ioSender-specific; it's the mental
+    model every CNC user carries. Read it once, skim it later.</p>
+
+    <h3>What a CNC actually is</h3>
+    <p>A <strong>CNC</strong> (Computer Numerical Control) machine moves a spinning cutting tool through a
+    piece of material along paths a computer controls, carving away material to leave the shape you want.
+    It's <strong>subtractive</strong>: you start with a block or sheet of material — the <strong>stock</strong>
+    — and remove everything that isn't the part. (A 3D printer is the opposite: it <em>adds</em> material.)</p>
+    <p>For hobby and small-shop work the common machine is a <strong>router</strong> or small
+    <strong>mill</strong>: a motor called the <strong>spindle</strong> spins a cutting <strong>bit</strong>,
+    and the machine moves that bit in three directions — the three <strong>axes</strong>:</p>
+    <ul>
+      <li><strong>X</strong> — left/right, usually along the front beam.</li>
+      <li><strong>Y</strong> — front/back, along the length of the bed.</li>
+      <li><strong>Z</strong> — up/down (into and out of the material).</li>
+    </ul>
+    <p>Bigger or fancier machines add a rotary <strong>A</strong> axis (a 4th axis that spins the stock), but
+    X/Y/Z is the core.</p>
+
+    <h3>Different shapes of machine</h3>
+    <p>They mostly come in two layouts:</p>
+    <ul>
+      <li><strong>Gantry router</strong> — a flat bed with a bridge (the <em>gantry</em>) that rides
+      front-to-back and carries the spindle. Most hobby routers look like this; great for large flat sheets.</li>
+      <li><strong>Moving-table mill</strong> — the table slides under a fixed column. More rigid, better for
+      metal, usually smaller work area.</li>
+    </ul>
+    <p>ioSender drives both, plus lathes. The concepts below are the same either way.</p>
+
+    <h3>Home, machine coordinates, and work coordinates</h3>
+    <p>This is the concept that trips up every beginner, so it's worth getting straight:</p>
+    <ul>
+      <li><strong>Homing.</strong> When you power on, the machine has no idea where it is. <em>Homing</em>
+      drives each axis until it trips a switch at a known corner — that establishes the machine's
+      <strong>home position</strong>. From then on the controller always knows where it is.</li>
+      <li><strong>Machine coordinates (MCS).</strong> A fixed grid pinned to the machine, with its origin at
+      home. These never move. You rarely program in them directly — they're used for fixed spots like the
+      tool-change position or a parking location.</li>
+      <li><strong>Work coordinates (WCS).</strong> Where <em>your part</em> is. You pick a
+      <strong>work origin</strong> — typically a corner of your stock and the top surface — and call it
+      <code>0,&nbsp;0,&nbsp;0</code>. Your program is written around that origin. grbl gives you several work
+      coordinate systems (<code>G54</code>–<code>G59.3</code>) so you can store more than one setup.</li>
+    </ul>
+    <p>The key insight: <strong>your CAM program is written around a work origin it can't know the real
+    location of.</strong> "Zeroing" (usually with a probe) is how you tell the machine <em>where that work
+    origin sits in machine space</em>. Do that well and the part lands exactly where you intend. See
+    <a href="#offsets">Work offsets</a> and <a href="#start-job">Start Job</a>.</p>
+    <figure class="svgfig">
+      <svg viewBox="0 0 640 360" role="img" aria-label="Diagram: machine coordinates versus work coordinates">
+        <defs>
+          <marker id="ahm" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="d-arrow"/></marker>
+          <marker id="ahx" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#cf222e"/></marker>
+          <marker id="ahy" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1a7f37"/></marker>
+        </defs>
+        <!-- table -->
+        <rect x="70" y="60" width="500" height="250" rx="6" class="d-bed"/>
+        <text x="76" y="52" class="d-sub">machine table</text>
+        <!-- stock -->
+        <rect x="250" y="150" width="200" height="120" rx="4" class="d-stock"/>
+        <text x="258" y="144" class="d-sub">your stock</text>
+        <!-- machine origin (home) at lower-left of table -->
+        <line x1="70" y1="310" x2="158" y2="310" class="ax-x" marker-end="url(#ahx)"/>
+        <line x1="70" y1="310" x2="70" y2="222" class="ax-y" marker-end="url(#ahy)"/>
+        <text x="150" y="326" class="tx-x">X</text>
+        <text x="52" y="228" class="tx-y">Y</text>
+        <circle cx="70" cy="310" r="4" class="d-dot"/>
+        <text x="80" y="332" class="d-tag">Machine origin (home)</text>
+        <text x="80" y="348" class="d-sub">MCS &nbsp;0, 0, 0 &mdash; fixed to the machine</text>
+        <!-- work origin at lower-left of stock -->
+        <line x1="250" y1="270" x2="322" y2="270" class="ax-x" marker-end="url(#ahx)"/>
+        <line x1="250" y1="270" x2="250" y2="205" class="ax-y" marker-end="url(#ahy)"/>
+        <text x="316" y="288" class="tx-x">X</text>
+        <text x="230" y="210" class="tx-y">Y</text>
+        <circle cx="250" cy="270" r="4" class="d-dot"/>
+        <line x1="258" y1="264" x2="466" y2="210" class="d-lead"/>
+        <text x="470" y="206" class="d-tag">Work origin (G54)</text>
+        <text x="470" y="222" class="d-sub">WCS 0, 0, 0 &mdash; floats with stock</text>
+        <!-- offset vector -->
+        <line x1="70" y1="310" x2="246" y2="272" class="d-dash" marker-end="url(#ahm)"/>
+        <text x="158" y="250" class="d-warn" text-anchor="middle">work offset</text>
+        <text x="158" y="264" class="d-tiny" text-anchor="middle">(set by probing)</text>
+      </svg>
+      <figcaption>Machine coordinates are fixed to the machine (origin at the home corner); work coordinates float with your stock. The <strong>work offset</strong> is the gap between them — that's what probing measures and stores in G54.</figcaption>
+    </figure>
+
+    <h3>Anatomy — the major components</h3>
+    <p>Working from the frame up:</p>
+    <figure class="svgfig">
+      <svg viewBox="0 0 700 430" role="img" aria-label="Diagram: the major parts of a gantry CNC router">
+        <defs>
+          <marker id="ahl" markerWidth="9" markerHeight="9" refX="1" refY="3" orient="auto"><circle cx="2.5" cy="3" r="2" class="d-arrowf"/></marker>
+        </defs>
+        <!-- table / bed -->
+        <rect x="110" y="330" width="430" height="26" rx="3" class="d-bed"/>
+        <!-- spoilboard -->
+        <rect x="140" y="315" width="370" height="16" rx="2" class="d-part"/>
+        <!-- gantry uprights -->
+        <rect x="190" y="150" width="28" height="180" rx="3" class="d-part"/>
+        <rect x="422" y="150" width="28" height="180" rx="3" class="d-part"/>
+        <!-- X beam -->
+        <rect x="175" y="120" width="300" height="34" rx="4" class="d-part"/>
+        <!-- stepper on beam end -->
+        <rect x="449" y="123" width="26" height="26" rx="2" class="d-stepper"/>
+        <circle cx="462" cy="136" r="6" class="d-bed"/>
+        <!-- Z carriage -->
+        <rect x="290" y="112" width="76" height="62" rx="4" class="d-box"/>
+        <!-- spindle -->
+        <rect x="315" y="172" width="26" height="58" rx="3" class="d-spindle"/>
+        <!-- bit -->
+        <path d="M322,230 L334,230 L328,250 Z" class="d-spindle"/>
+        <!-- ===== labels (right) ===== -->
+        <line x1="475" y1="137" x2="556" y2="110" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="560" y="114" class="d-label">X beam (gantry)</text>
+        <line x1="366" y1="140" x2="556" y2="152" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="560" y="156" class="d-label">Z carriage (up / down)</text>
+        <line x1="341" y1="200" x2="556" y2="198" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="560" y="202" class="d-label">Spindle</text>
+        <line x1="328" y1="250" x2="556" y2="244" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="560" y="248" class="d-label">Cutting bit</text>
+        <line x1="475" y1="136" x2="556" y2="300" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="560" y="304" class="d-label">Stepper motor</text>
+        <!-- ===== labels (left) ===== -->
+        <line x1="150" y1="322" x2="70" y2="300" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="14" y="304" class="d-label">Spoilboard</text>
+        <line x1="150" y1="343" x2="70" y2="360" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="14" y="364" class="d-label">Table / bed</text>
+        <line x1="204" y1="250" x2="70" y2="230" class="d-lead" marker-start="url(#ahl)"/>
+        <text x="14" y="226" class="d-label">Y-axis rails</text>
+        <text x="14" y="242" class="d-sub">(gantry travel)</text>
+      </svg>
+      <figcaption>A gantry router in front view. The gantry (X beam) rides the Y-axis rails front-to-back; the Z carriage rides the beam and carries the spindle. X = red, Y = green, Z = blue by convention.</figcaption>
+    </figure>
+    <table class="reftab">
+      <tr><th>Part</th><th>What it does</th></tr>
+      <tr><td><strong>Bed &amp; Y-axis rails</strong></td><td>The base and the front-to-back travel the gantry rides on.</td></tr>
+      <tr><td><strong>X beam / gantry</strong></td><td>The bridge that moves along Y and carries the Z axis left-to-right.</td></tr>
+      <tr><td><strong>Z carriage</strong></td><td>Rides the gantry up and down; holds the spindle.</td></tr>
+      <tr><td><strong>Spindle</strong></td><td>Spins the cutting bit — a trim router or a proper VFD-driven spindle.</td></tr>
+      <tr><td><strong>Spoilboard</strong></td><td>A flat, sacrificial surface on the bed. You can cut slightly into it, screw workholding into it, and it gives a known flat reference (often <a href="#tools">surfaced flat by the machine itself</a>).</td></tr>
+      <tr><td><strong>Stepper motors</strong></td><td>Turn electrical pulses into precise rotation. (Closed-loop steppers and servos add position feedback so they can't silently lose steps.)</td></tr>
+    </table>
+    <p>The motors' rotation is turned into straight-line motion by a <strong>drive mechanism</strong>, and the
+    type tells you a lot about a machine's cost and precision:</p>
+    <table class="reftab">
+      <tr><th>Drive</th><th>Character</th></tr>
+      <tr><td><strong>V-wheels</strong> on extrusion</td><td>Cheap, light, easy — but the least rigid. Common on entry machines.</td></tr>
+      <tr><td><strong>Linear rails / guides</strong></td><td>Hardened rails with recirculating bearings: rigid and precise.</td></tr>
+      <tr><td><strong>Rack &amp; pinion</strong></td><td>A gear on a toothed rack — good for long travels on big machines.</td></tr>
+      <tr><td><strong>Lead screw / ball screw</strong></td><td>A turning screw drives a nut. Precise; ball screws are low-friction and repeatable. Common on Z and on smaller machines.</td></tr>
+    </table>
+
+    <h3>Probes — how the machine "feels" for position</h3>
+    <p>A probe lets the machine <em>touch</em> something and record exactly where it was, instead of you
+    eyeballing it. Four kinds you'll hear about:</p>
+    <table class="reftab">
+      <tr><th>Probe</th><th>Used for</th></tr>
+      <tr><td><strong>Touch plate</strong></td><td>A conductive plate of known thickness. Touch the bit to it to set Z zero (and sometimes an XY corner). The cheapest option.</td></tr>
+      <tr><td><strong>3D probe</strong> (edge finder)</td><td>A spring-loaded stylus that trips when it touches in <em>any</em> direction. The workhorse: finds edges, corners and centres, and measures stock — used to set your work origin accurately.</td></tr>
+      <tr><td><strong>Toolsetter</strong></td><td>A fixed button at a known machine location. The tool touches it to measure its <strong>length</strong> — the key to painless tool changes (below).</td></tr>
+      <tr><td><strong>Touch/edge combos</strong></td><td>Many setups use a touch plate <em>or</em> a 3D probe for XY plus a toolsetter for tool length.</td></tr>
+    </table>
+    <p>ioSender's <a href="#probing">Probing</a> tab and <a href="#start-job">Start Job</a> drive these routines for you.</p>
+
+    <h3>The controller &amp; the grbl language</h3>
+    <p>The <strong>controller</strong> is the machine's brain — a small board (grblHAL on a Teensy or STM32,
+    or classic Grbl on an Arduino) running firmware that speaks the <strong>grbl</strong> protocol. It:</p>
+    <ul>
+      <li>Reads <strong>g-code</strong> and generates the precise step pulses that move the motors.</li>
+      <li>Watches the limit switches and probes.</li>
+      <li>Stores its configuration in <strong>non-volatile memory (NVRAM)</strong> — numbered
+      <strong>settings</strong> like <code>$100</code> (X steps/mm), <code>$110</code> (X max rate),
+      <code>$120</code> (acceleration), homing and limits. These survive power-off. You read them with
+      <code>$$</code> and change them like <code>$100=80.000</code>. ioSender's
+      <a href="#settings">Settings</a> tab is a friendly front end to all of them, so you rarely type raw
+      <code>$</code> commands.</li>
+    </ul>
+    <p><strong>Command syntax</strong> comes in two flavours: <em>g-code</em> (<code>G0</code>/<code>G1</code>
+    moves, <code>M3</code>/<code>M5</code> spindle, <code>M8</code> coolant…) and grbl's <em>system</em>
+    commands (<code>$$</code> dump settings, <code>$H</code> home, <code>$X</code> unlock, <code>?</code> for
+    a live status report).</p>
+    <div class="callout tip"><span class="k">Good news</span><br>
+      Almost nobody hand-writes more than a few lines of g-code — a quick jog, a facing pass, a one-off MDI
+      command. <strong>The real program comes from CAD/CAM:</strong> you draw the part in CAD, generate
+      toolpaths in CAM, and a <em>post-processor</em> spits out the g-code file for your machine. That file
+      is what you load and run. You'll spend far more time in CAD/CAM than in g-code.</div>
+
+    <h3>How a milling job flows</h3>
+    <p>A CAM program is organised as <strong>operations</strong>, each producing <strong>toolpaths</strong> —
+    the routes the bit follows (clear a pocket, cut a profile, face a surface, carve a relief). When the next
+    operation needs a different bit, the program pauses for a <strong>tool change</strong>. So a typical job
+    reads like:</p>
+    <p class="flow"><code>rough pocket (¼″ end mill)</code> → <em>tool change</em> → <code>finish contour (⅛″ end mill)</code> → <em>tool change</em> → <code>V-carve detail (60° V-bit)</code></p>
+    <p>ioSender streams the file move-by-move, shows a live <a href="#gcode-viewer">3D view</a> of the
+    toolpath, and stops at each tool change so you (or an automatic changer) can swap bits.</p>
+
+    <h3>Bits — the cutting tools</h3>
+    <p>The bit shape decides what a cut can do:</p>
+    <table class="reftab">
+      <tr><th>Bit</th><th>Good for</th></tr>
+      <tr><td><strong>Flat / square end mill</strong></td><td>General cutting, pockets, profiles, flat bottoms.</td></tr>
+      <tr><td><strong>Ball nose</strong></td><td>Rounded tip for smooth 3D contours and carving/finishing.</td></tr>
+      <tr><td><strong>V-bit</strong></td><td>Pointed — sign-making, V-carving lettering, chamfers.</td></tr>
+      <tr><td><strong>Up-cut / down-cut / compression</strong></td><td>Flute direction controls chips: up-cut clears chips upward, down-cut leaves a clean top edge, compression does both (great for sheet goods).</td></tr>
+      <tr><td><strong>Surfacing / spoilboard bit</strong></td><td>Big flat cutter for flattening the spoilboard or stock.</td></tr>
+    </table>
+    <p>Size matters too: <strong>diameter</strong> (⅛″, ¼″, 6&nbsp;mm…) and flute length set how fine the
+    detail and how deep the cut — small bits for detail, big bits for hogging material fast.</p>
+
+    <h3>Why tool changes are the hard part</h3>
+    <p>Every time you swap bits mid-job you risk introducing <strong>error</strong>, in two ways:</p>
+    <ol>
+      <li><strong>Z reference moves.</strong> A new bit sits at a different length, so "where Z zero is"
+      changes — you must re-establish it or the next cut is too deep or too shallow.</li>
+      <li><strong>XY origin can shift.</strong> Bump the stock or lose your zero and the <em>whole part</em>
+      moves. Once you've cut some of it, that's usually a ruined workpiece.</li>
+    </ol>
+    <p>Doing this by hand, mid-job, is exactly where beginners lose parts.</p>
+
+    <h4 class="subh">Tool change with just a touch plate</h4>
+    <p>Pause → spindle stops → jog clear → swap the bit → set the touch plate on the stock top → jog the bit
+    down until it touches → set Z zero from the plate thickness → remove the plate → resume. It works, but
+    you re-zero Z against the stock surface <em>every</em> change (which may not be perfectly flat), and you
+    must never nudge the XY origin. Lots of little chances to fat-finger it.</p>
+
+    <h4 class="subh">Tool change with a 3D probe + toolsetter (automatic)</h4>
+    <p>The trick is <strong>measure once, reference forever</strong>:</p>
+    <ul>
+      <li>At the <em>start</em> you set the XY (and top-of-stock) work origin <strong>once</strong> with the
+      3D probe, and measure a reference tool length on the toolsetter.</li>
+      <li>On <em>every</em> tool change the machine drives to the <strong>toolsetter</strong> — a fixed,
+      known location — and measures the new bit's length automatically, computing the offset.</li>
+    </ul>
+    <p>Because the toolsetter is at a fixed machine position, <strong>the stock origin is never re-touched
+    after that first probe</strong> — only the tool length changes, and the machine handles that itself. No
+    re-zeroing by hand, no chance to bump the XY origin. <em>That</em> is how automatic (and even
+    semi-automatic) tool changing eliminates the human error: the risky step simply never happens again.
+    Even if you swap the bit by hand, letting the toolsetter re-measure length keeps Z correct and XY
+    untouched.</p>
+    <figure class="svgfig">
+      <svg viewBox="0 0 700 430" role="img" aria-label="Diagram: manual touch-plate tool change versus automatic toolsetter tool change">
+        <defs>
+          <marker id="ahf" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="d-arrowf"/></marker>
+        </defs>
+        <!-- lane titles -->
+        <text x="175" y="30" class="d-tag" text-anchor="middle">Touch plate only</text>
+        <text x="525" y="30" class="d-tag" text-anchor="middle">3D probe + toolsetter (auto)</text>
+        <line x1="350" y1="16" x2="350" y2="414" class="d-lead"/>
+        <!-- ===== left lane ===== -->
+        <g>
+          <rect x="65" y="52" width="220" height="38" rx="6" class="d-box"/><text x="175" y="75" class="d-boxtx" text-anchor="middle">Pause &amp; swap the bit</text>
+          <rect x="65" y="104" width="220" height="38" rx="6" class="d-warnbox"/><text x="175" y="127" class="d-boxtx" text-anchor="middle">Place touch plate on stock</text>
+          <rect x="65" y="156" width="220" height="38" rx="6" class="d-warnbox"/><text x="175" y="179" class="d-boxtx" text-anchor="middle">Jog down until it touches</text>
+          <rect x="65" y="208" width="220" height="38" rx="6" class="d-warnbox"/><text x="175" y="231" class="d-boxtx" text-anchor="middle">Set Z zero (plate thickness)</text>
+          <rect x="65" y="260" width="220" height="38" rx="6" class="d-box"/><text x="175" y="283" class="d-boxtx" text-anchor="middle">Remove plate &amp; resume</text>
+          <line x1="175" y1="90" x2="175" y2="104" class="d-flow" marker-end="url(#ahf)"/>
+          <line x1="175" y1="142" x2="175" y2="156" class="d-flow" marker-end="url(#ahf)"/>
+          <line x1="175" y1="194" x2="175" y2="208" class="d-flow" marker-end="url(#ahf)"/>
+          <line x1="175" y1="246" x2="175" y2="260" class="d-flow" marker-end="url(#ahf)"/>
+          <rect x="55" y="322" width="240" height="66" rx="6" class="d-warnbox"/>
+          <text x="175" y="344" class="d-warn" text-anchor="middle">Z re-zeroed on the stock</text>
+          <text x="175" y="360" class="d-warn" text-anchor="middle">every single change &mdash;</text>
+          <text x="175" y="376" class="d-warn" text-anchor="middle">XY origin must not move</text>
+        </g>
+        <!-- ===== right lane ===== -->
+        <g>
+          <rect x="415" y="52" width="220" height="38" rx="6" class="d-goodbox"/><text x="525" y="70" class="d-boxtx" text-anchor="middle">Set XY + top-Z origin ONCE</text><text x="525" y="84" class="d-sub" text-anchor="middle">(3D probe, at job start)</text>
+          <rect x="415" y="104" width="220" height="38" rx="6" class="d-box"/><text x="525" y="127" class="d-boxtx" text-anchor="middle">Tool change → go to toolsetter</text>
+          <rect x="415" y="156" width="220" height="38" rx="6" class="d-box"/><text x="525" y="179" class="d-boxtx" text-anchor="middle">Auto-measure tool length</text>
+          <rect x="415" y="208" width="220" height="38" rx="6" class="d-box"/><text x="525" y="231" class="d-boxtx" text-anchor="middle">Resume — Z corrected for you</text>
+          <line x1="525" y1="90" x2="525" y2="104" class="d-flow" marker-end="url(#ahf)"/>
+          <line x1="525" y1="142" x2="525" y2="156" class="d-flow" marker-end="url(#ahf)"/>
+          <line x1="525" y1="194" x2="525" y2="208" class="d-flow" marker-end="url(#ahf)"/>
+          <!-- loop back arrow: every tool change repeats measure, never the origin -->
+          <path d="M635,227 C672,227 672,123 638,123" class="d-flow" marker-end="url(#ahf)"/>
+          <text x="678" y="178" class="d-sub" text-anchor="middle" transform="rotate(90 678 178)">each change</text>
+          <rect x="405" y="322" width="240" height="66" rx="6" class="d-goodbox"/>
+          <text x="525" y="344" class="d-good" text-anchor="middle">Stock origin never re-touched</text>
+          <text x="525" y="360" class="d-good" text-anchor="middle">after the first probe &mdash;</text>
+          <text x="525" y="376" class="d-good" text-anchor="middle">no chance to bump XY</text>
+        </g>
+      </svg>
+      <figcaption>The manual touch-plate change (left) re-establishes Z against the stock on every swap and risks moving the XY origin. With a toolsetter (right) you probe the origin once; each tool change only re-measures length at a fixed location, so the part's origin is never disturbed.</figcaption>
+    </figure>
+    <div class="callout note"><span class="k">In ioSender</span><br>
+      <a href="#start-job">Start Job</a> sets the work origin with the probe, and the
+      <a href="#tools">Tools</a> / tool-change flow uses the toolsetter to re-measure length on each change —
+      so multi-tool jobs stay accurate without re-zeroing.</div>
+
+    <h3>What people actually make with a CNC</h3>
+    <ul>
+      <li><strong>Carvings, reliefs &amp; lithophanes</strong> — ball-nose finishing of detailed 3D surfaces:
+      signs, decorative panels, backlit lithophanes.</li>
+      <li><strong>Cutting complex shapes from sheet goods</strong> — profile-cut <em>all</em> the parts for a
+      custom cabinet, puzzles, templates or enclosures out of plywood, MDF or acrylic in one job.</li>
+      <li><strong>Small metal parts</strong> — brackets, plates and enclosures machined from aluminium (with
+      the right bits, feeds and a rigid enough machine).</li>
+      <li><strong>Engraving, PCB isolation, inlays and joinery</strong> — fine detail work where hand tools
+      can't hold the tolerance.</li>
+    </ul>
+
+    <div class="callout tip"><span class="k">Where next</span><br>
+      That's the whole mental model. Now hit <a href="#getting-started">Getting started</a> to meet the
+      ioSender window, then <a href="#connect">Connect</a> to your machine — the Novice track walks you
+      through the rest in order (use the <em>Next</em> button below).</div>
+
+    <div class="xref">Related: <a href="#offsets">Work offsets (WCS)</a> · <a href="#probing">Probing</a> · <a href="#settings">Settings (grbl)</a> · <a href="#start-job">Start Job</a> · <a href="#tools">Tools</a></div>
+  </section>
+
+  <!-- ===================== GETTING STARTED ===================== -->
+  <section class="topic" id="getting-started" data-title="Getting started" data-level="nov"
+           data-track="novice:2,intermediate:0,machinist:0">
+    <h2>Getting started <a class="anchor" href="#getting-started">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span></div>
+    <p>ioSender&nbsp;V2 is an <strong>all-in-one</strong> g-code sender for grblHAL and Grbl controllers. It
+    streams your g-code to the machine and gives you everything around that job — connection, jogging,
+    probing, work-offset setup, tool changes, machine commissioning and a live 3D view of the toolpath.</p>
+
+    <h3>The main window at a glance</h3>
+    <p>Across the top is a row of <strong>tabs</strong>. The important ones, left to right:</p>
+    <table class="reftab">
+      <tr><th>Tab</th><th>What it's for</th></tr>
+      <tr><td><a href="#start-job">Start Job</a></td><td>The front door: measure your stock, set the origin, and launch a job.</td></tr>
+      <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run bar.</td></tr>
+      <tr><td><a href="#machine-setup">Machine&nbsp;Setup</a></td><td>Guided first-time commissioning of a new controller.</td></tr>
+      <tr><td><a href="#tools">Tools</a></td><td>Tool table, spoilboard surfacing, gantry squaring, stepper calibration, Trinamic/PID.</td></tr>
+      <tr><td><a href="#probing">Probing</a></td><td>Edge/corner/center/tool-length probing routines.</td></tr>
+      <tr><td><a href="#settings">Settings</a></td><td>All grbl <code>$</code> settings plus the app's own preferences.</td></tr>
+    </table>
+
+    <h3>Your first five minutes</h3>
+    <ol>
+      <li><a href="#connect">Connect</a> to the controller (serial port or network).</li>
+      <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once.</li>
+      <li>Learn to <a href="#jogging">jog</a> — move the machine safely by hand.</li>
+      <li>Load some g-code on the <a href="#job">Job</a> tab, or use <a href="#start-job">Start Job</a>.</li>
+      <li>Know your <a href="#errors-alarms">errors &amp; alarms</a> for when something stops.</li>
+    </ol>
+
+    <div class="callout note"><span class="k">Novice track</span><br>
+      Click <strong>Novice</strong> in the sidebar and the topics reorder into a first-time-user reading
+      path. Use the <em>Next</em> button at the foot of each page to walk it in order.</div>
+  </section>
+
+  <!-- ===================== CONNECT ===================== -->
+  <section class="topic" id="connect" data-title="Connecting to your machine" data-level="nov"
+           data-track="novice:3,intermediate:0,machinist:0" data-video="pending">
+    <h2>Connecting to your machine <a class="anchor" href="#connect">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span></div>
+    <p>Open the connection dialog from the <strong>Connect…</strong> menu (it reads
+    <em>Reconnect…</em> once you're connected — choosing it drops the current link so you can switch
+    targets). The dialog has three tabs:</p>
+
+    <figure>
+      <img src="img/connect-dialog.png" alt="The ioSender connection dialog with Serial, Network and Simulator tabs">
+      <figcaption>The connection dialog. Pick the transport that matches how your controller is wired.</figcaption>
+    </figure>
+
+    <table class="reftab">
+      <tr><th>Tab</th><th>Use when…</th><th>You enter</th></tr>
+      <tr><td>Serial</td><td>The controller is on a USB / COM port (most machines).</td><td>The <code>COM</code> port and baud rate.</td></tr>
+      <tr><td>Network</td><td>The controller has Ethernet / Wi-Fi (telnet or websocket).</td><td><code>host:port</code> — a hostname or IP and port.</td></tr>
+      <tr><td>Simulator</td><td>You have no hardware and want to try the app, or test a job offline.</td><td>Nothing — ioSender starts and connects to a bundled grblHAL simulator.</td></tr>
+    </table>
+
+    <div class="callout tip"><span class="k">Tip</span><br>
+      ioSender remembers your last successful target and can auto-reconnect if the connection drops
+      mid-session. The current target is shown in the status bar.</div>
+
+    <h3>What happens on connect</h3>
+    <p>Once the link opens, ioSender runs a <strong>handshake</strong> with the controller: it reads the
+    firmware build, the axis count, and the available options (probing, WCS rotation, plugins), then enables
+    only the tabs that controller actually supports. This is also when the
+    <a href="#getting-started">option-matched simulator</a> is selected, if you're running one.</p>
+
+    <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#settings">Settings</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
+  </section>
+
+  <!-- ===================== JOGGING ===================== -->
+  <section class="topic" id="jogging" data-title="Jogging &amp; the DRO" data-level="nov"
+           data-track="novice:4,intermediate:0,machinist:0">
+    <h2>Jogging &amp; the DRO <a class="anchor" href="#jogging">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span></div>
+    <p><strong>Jogging</strong> is moving the machine by hand — to reach a corner of your stock, line up a
+    probe, or clear the bit away before a job. It's the first thing to get comfortable with, because
+    everything else (probing, zeroing, tool changes) starts with putting the machine where you want it.</p>
+
+    <h3>The DRO — reading position</h3>
+    <p>The <strong>DRO</strong> (digital read-out) shows where each axis is, in two coordinate systems (see
+    <a href="#intro-to-cnc">Intro → coordinates</a>):</p>
+    <ul>
+      <li><strong>Work position</strong> — relative to <em>your</em> work origin. This is what you usually
+      watch; it reads <code>0</code> at the origin you set.</li>
+      <li><strong>Machine position</strong> — relative to the machine's home corner. Fixed, set by homing.</li>
+    </ul>
+    <p>The per-axis <strong>zero</strong> buttons set the <em>work</em> origin at the current spot — handy for
+    quick manual setups (though probing is more repeatable, see <a href="#start-job">Start Job</a>).</p>
+
+    <h3>Two ways to jog</h3>
+    <p><strong>On-screen jog pad</strong> — arrow buttons for each axis, with:</p>
+    <ul>
+      <li><strong>Distance</strong> presets (smallest → largest) — how far one press moves.</li>
+      <li><strong>Feed rate</strong> — how fast it jogs.</li>
+      <li><strong>Continuous</strong> — hold to move, release to stop, instead of a fixed step.</li>
+    </ul>
+    <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
+    continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
+    of the distance shown as <em>Jog step</em> in the status bar.</p>
+    <div class="callout note"><span class="k">Keyboard focus</span><br>
+      Keyboard jogging works whenever the <a href="#job">Job</a> screen is active — even if focus has drifted
+      to a side panel — but it's suppressed while you're typing in a text box (so you can enter numbers
+      without the machine lurching).</div>
+
+    <h3>Step vs continuous</h3>
+    <p><strong>Step</strong> moves an exact distance per press — use small steps for fine positioning near the
+    work. <strong>Continuous</strong> covers ground quickly — use it for big moves, then switch to small steps
+    to close in.</p>
+
+    <div class="callout warn"><span class="k">Jog safely</span><br>
+      Always know where Z is. Raise Z before large X/Y moves so the bit clears clamps and stock, jog at a
+      sensible feed near the work, and remember soft limits will stop a jog that would exceed travel
+      (that's an <a href="#errors-alarms">alarm</a>, not a fault).</div>
+
+    <div class="callout tip"><span class="k">Firmware jog ($5x)</span><br>
+      ioSender can mirror your jog step/feed settings down to the controller's keypad settings
+      (<code>$50</code>–<code>$55</code>, from the grblHAL KEYPAD plugin) so a physical pendant jogs the same
+      way. Configure this under <a href="#settings">Settings → Jogging</a>.</div>
+
+    <div class="xref">Related: <a href="#connect">Connect</a> · <a href="#job">The Job screen</a> · <a href="#gcode-viewer">3D viewer (click-to-jog)</a> · <a href="#settings">Settings</a></div>
+  </section>
+
+  <!-- ===================== CLEAN RESULTS (Intermediate opener) ===================== -->
+  <section class="topic" id="clean-results" data-title="Getting clean, repeatable results" data-level="int"
+           data-track="novice:0,intermediate:1,machinist:0">
+    <h2>Getting clean, repeatable results <a class="anchor" href="#clean-results">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+    <p>You can load a file and press Cycle Start — now you want parts that come out <em>clean</em> and the
+    <em>same every time</em>. The gap between a rough, torn, or failed cut and a crisp one is almost never the
+    machine; it's a handful of fundamentals. This page is the checklist that separates "it moved" from "it
+    worked." The <strong>Intermediate</strong> track then walks the reference pages in the order you'd use them
+    on a real job.</p>
+
+    <h3>1. Workholding — the part must not move</h3>
+    <p>If the stock shifts, the job is ruined, and it's the single most common cause of scrapped parts. Ways to
+    hold work down:</p>
+    <ul>
+      <li><strong>Clamps</strong> — low-profile or step clamps at the edges. Keep them <em>out of the
+      toolpath</em> and preview in the <a href="#gcode-viewer">3D viewer</a> to be sure.</li>
+      <li><strong>Screws into the spoilboard</strong> — through waste areas; rock-solid for sheet goods.</li>
+      <li><strong>Painter's tape + CA glue</strong> — tape both surfaces, superglue between: surprisingly
+      strong, no clamps in the way, great for thin/small parts.</li>
+      <li><strong>Vise / fixture</strong> — for repeat parts and metal.</li>
+    </ul>
+    <div class="callout tip"><span class="k">Rule of thumb</span><br>
+      Hold down <em>near</em> where the cutting forces are, and remember climb cutting can pull the work — clamp
+      against that pull.</div>
+
+    <h3>2. Feeds &amp; speeds — make chips, not dust</h3>
+    <p>This is the concept that most changes your results. Four numbers interact:</p>
+    <table class="reftab">
+      <tr><th>Term</th><th>What it is</th></tr>
+      <tr><td><strong>Spindle speed</strong> (RPM)</td><td>How fast the bit turns.</td></tr>
+      <tr><td><strong>Feed rate</strong></td><td>How fast the bit moves through material (mm/min or in/min).</td></tr>
+      <tr><td><strong>Chip load</strong></td><td>Bite per tooth = feed ÷ (RPM × flutes). The number tooling charts quote.</td></tr>
+      <tr><td><strong>Depth of cut (DOC)</strong> &amp; <strong>stepover (WOC)</strong></td><td>How deep each pass goes, and how much of the bit's width engages side-to-side.</td></tr>
+    </table>
+    <p>Too <em>slow</em> a feed makes the bit rub — heat, dull edges, burning in wood. Too <em>fast</em> snaps
+    bits. The goal is well-formed <strong>chips</strong>, not fine dust or a screaming cut. Start from the
+    tooling maker's chart or a feeds-and-speeds calculator, then trust your ears and eyes (below).</p>
+    <div class="callout note"><span class="k">Sensible starting points</span><br>
+      Roughing DOC ≈ ½–1× the bit diameter in wood (much less in aluminium); stepover ≈ 40–50% of diameter for
+      roughing, 10–20% for a fine finish. Prefer a <em>ramp</em> or helical entry over plunging straight down.</div>
+
+    <h3>3. Climb vs conventional, tabs &amp; ramping</h3>
+    <ul>
+      <li><strong>Climb</strong> (cutter rotation matches feed direction) leaves a cleaner edge but pulls into
+      the work — great on a rigid machine. <strong>Conventional</strong> is safer on lighter, flexier machines.
+      Your CAM sets this per toolpath.</li>
+      <li><strong>Tabs</strong> — when cutting all the way through, leave small tabs (or an onion-skin) so parts
+      don't shift or launch when they free.</li>
+      <li><strong>Ramp / lead-in</strong> — enter the cut gradually instead of stabbing down; easier on the bit
+      and the finish.</li>
+    </ul>
+
+    <h3>4. Chip clearing &amp; cooling</h3>
+    <p>Recutting chips dulls bits and builds heat. Use a dust boot and vacuum for wood; an air blast or
+    mist/coolant for metal. If a cut is smoking or the chips are brown, something's wrong — stop and check
+    feeds/speeds.</p>
+
+    <h3>5. A disciplined, repeatable origin</h3>
+    <p>Repeatability comes from setting the work origin the <em>same way every time</em>. Probe it rather than
+    eyeballing, verify Z zero, and know exactly where <code>0,&nbsp;0,&nbsp;0</code> sits on your stock.
+    <a href="#start-job">Start Job</a> and <a href="#probing">Probing</a> exist to make this identical run to
+    run — that's what turns "it worked once" into "it works every time." See also
+    <a href="#offsets">Work offsets</a>.</p>
+
+    <div class="callout tip"><span class="k">Pre-flight checklist</span><br>
+      Stock secured · correct bit, fully seated · origin probed &amp; Z verified · safe Z retract height ·
+      spindle on &amp; up to speed · dust/coolant running · toolpath previewed in the
+      <a href="#gcode-viewer">3D viewer</a> · feed-override and <strong>Stop</strong> within reach.</div>
+
+    <div class="callout note"><span class="k">Reading the cut</span><br>
+      Your senses are a live feedback loop: a clean shearing sound and curled chips mean good feeds/speeds; a
+      high whine and dust mean you're rubbing; chatter marks mean too much engagement or not enough rigidity.
+      Adjust the <strong>feed-rate override</strong> on the fly and note what worked for next time.</div>
+
+    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#probing">Probing</a> · <a href="#tools">Tools (surface the spoilboard)</a> · <a href="#gcode-viewer">3D viewer</a></div>
+  </section>
+
+  <!-- ===================== ACCURACY & CALIBRATION (Machinist opener) ===================== -->
+  <section class="topic" id="accuracy-calibration" data-title="Accuracy, calibration &amp; repeatability" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:1">
+    <h2>Accuracy, calibration &amp; repeatability <a class="anchor" href="#accuracy-calibration">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <p>This track is for when "close enough" isn't. You want the machine to land on a <em>number</em> — the
+    part measures what the drawing says, and the tenth part matches the first. Getting there is a discipline:
+    <strong>measure, calibrate in the right order, then verify.</strong> This page is the philosophy and the
+    sequence; the <strong>Machinist</strong> track then takes you into the depth pages that do each step.</p>
+
+    <h3>Three different things people call "accuracy"</h3>
+    <table class="reftab">
+      <tr><th>Term</th><th>Meaning</th></tr>
+      <tr><td><strong>Accuracy</strong></td><td>The machine lands on the correct <em>absolute</em> dimension (a 100&nbsp;mm move is 100&nbsp;mm).</td></tr>
+      <tr><td><strong>Repeatability</strong></td><td>It lands in the <em>same</em> place every time, even if that place is slightly off.</td></tr>
+      <tr><td><strong>Resolution</strong></td><td>The smallest step it can command. Fine resolution ≠ accurate — you can be precise and wrong.</td></tr>
+    </table>
+
+    <h3>What steals accuracy</h3>
+    <ul>
+      <li><strong>Wrong steps/mm</strong> — every dimension scales off by the same %. Round holes, wrong size.</li>
+      <li><strong>Out-of-square axes / poor tram</strong> — rectangles come out as parallelograms; surfacing
+      leaves scallops or a taper; diagonals don't match.</li>
+      <li><strong>Backlash</strong> — slop on a direction reversal; shows as doubled lines or undersized pockets.</li>
+      <li><strong>Lost steps</strong> — open-loop steppers stalling under load; the machine <em>thinks</em> it
+      moved but didn't. (Closed-loop steppers/servos remove this failure mode.)</li>
+      <li><strong>Z reference drift &amp; deflection</strong> — inconsistent tool-length referencing, or the
+      machine flexing under cut.</li>
+    </ul>
+
+    <h3>Calibrate in this order</h3>
+    <p>Each step assumes the previous one is done — calibrating out of order means re-doing work.</p>
+    <ol>
+      <li><strong>Steps/mm</strong> (<code>$100</code>–<code>$102</code>) — command a long known distance,
+      measure the actual travel, correct the number. Do X, Y, Z. ioSender's stepper-calibration and
+      scratch-line tools in <a href="#tools">Tools</a> automate the maths.</li>
+      <li><strong>Squaring &amp; tramming</strong> — get the gantry square to the axes
+      (<a href="#tools">Auto Square</a> uses a Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
+      the spindle perpendicular to the bed (surface a test patch, read the scallops), and the frame square
+      (measure the diagonals of a big rectangle).</li>
+      <li><strong>Backlash</strong> — put a dial indicator on each axis, reverse direction, read the lost
+      motion. Fix it mechanically (belt tension, anti-backlash nuts) — that beats software compensation.</li>
+      <li><strong>Homing repeatability</strong> — home several times and confirm it returns to the same machine
+      position; set pull-off, homing feed/seek, and hard/soft limits in <a href="#settings">Settings</a>.</li>
+      <li><strong>Tool-length strategy</strong> — a consistent reference (toolsetter) so a tool change doesn't
+      move Z. Decide your master/reference tool. See <a href="#intro-to-cnc">Intro → tool changes</a>.</li>
+      <li><strong>WCS discipline</strong> — use <code>G54</code>–<code>G59.3</code> deliberately; set offsets
+      with <code>G10&nbsp;L2/L20</code>; keep an <code>R0</code>-before-<code>G53</code> habit; know at every
+      line whether you're in machine or work space. Skew/rotation via <code>G10&nbsp;L2&nbsp;R</code>
+      (<a href="#start-job">Start Job</a> uses this).</li>
+    </ol>
+
+    <h3>Then verify</h3>
+    <p>Calibration isn't done until you've <em>proved</em> it: cut a test — a circle-diamond-square, a
+    calibration cube, or a simple gauge — and measure it with calipers or an indicator. Adjust and repeat until
+    the numbers match. A <a href="#heightmap">height map</a> can compensate a surface you can't make physically
+    flatter (e.g. PCB isolation).</p>
+
+    <div class="callout note"><span class="k">Closed-loop ≠ calibrated</span><br>
+      Closed-loop steppers and servos remove the "lost steps" failure mode, but they don't fix geometry — a
+      machine that's out of square is out of square whether or not it can report position. You still calibrate.</div>
+
+    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#tools">Tools (Auto Square, stepper cal, Trinamic/PID)</a> · <a href="#probing">Probing</a> · <a href="#offsets">Work offsets</a> · <a href="#heightmap">Height map</a></div>
+  </section>
+
+  <!-- ===================== THE JOB SCREEN ===================== -->
+  <section class="topic" id="job" data-title="The Job screen (running g-code)" data-level="nov"
+           data-track="novice:5,intermediate:3,machinist:0">
+    <h2>The Job screen — running g-code <a class="anchor" href="#job">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span><span class="tag int">Intermediate</span></div>
+    <figure>
+      <img src="img/job-runscreen.png" alt="The Job screen: DRO, g-code program list, jog pad and the run bar">
+      <figcaption>The Job screen with a program loaded: g-code list, live 3D view and the run bar.</figcaption>
+    </figure>
+    <p>The <strong>Job</strong> screen is where you load g-code, watch it, and run it. It's the home base
+    you return to for every job.</p>
+
+    <h3>Loading a program</h3>
+    <ul>
+      <li><strong>Load File...</strong> — open a single g-code file (<code>.nc</code>, <code>.gcode</code>,
+      <code>.tap</code>…) using the button on the program-view header (or drag-and-drop a file onto the
+      list).</li>
+      <li><strong>Load Folder...</strong> — open a whole folder of per-operation <code>.nc</code> files
+      (as a CAM post often produces) and combine them into one ordered program, using the program-view
+      header button (or drag-and-drop a folder onto the list).</li>
+    </ul>
+    <p>Large files and folders load on a background thread, so the window stays responsive while a big program
+    parses. In ioSender <em>a program is a program</em>: whether it came from a file, a folder, or a wizard,
+    it shows in the same g-code list and runs the same way.</p>
+
+    <h3>The g-code list &amp; the 3D view</h3>
+    <p>The loaded program appears as a scrolling line list beside the live <a href="#gcode-viewer">3D
+    viewer</a>, which draws the whole toolpath and highlights progress as it runs.</p>
+
+    <h3>The run bar</h3>
+    <table class="reftab">
+      <tr><th>Control</th><th>Does</th></tr>
+      <tr><td><strong>Cycle Start</strong></td><td>Begin the program — or resume after a feed hold.</td></tr>
+      <tr><td><strong>Feed Hold</strong></td><td>Pause: the machine decelerates smoothly and holds position (spindle keeps running). Cycle Start resumes.</td></tr>
+      <tr><td><strong>Stop</strong></td><td>End the run.</td></tr>
+      <tr><td><strong>Reset</strong></td><td>Soft-reset the controller — stops motion, clears an <a href="#errors-alarms">alarm</a>, and returns to a known idle state.</td></tr>
+      <tr><td><strong>Optional stop</strong></td><td>Honour <code>M1</code> optional-stop pauses in the program.</td></tr>
+    </table>
+    <div class="callout warn"><span class="k">Feed Hold vs Reset</span><br>
+      <strong>Feed Hold</strong> is a graceful, resumable pause — use it first. <strong>Reset</strong> is the
+      hard stop that also clears alarms but ends the job. Keep a hand near Feed Hold / Stop whenever you start
+      a cut, and near the physical <strong>E-Stop</strong> for a true emergency.</div>
+
+    <h3>Overrides</h3>
+    <p>Tune a running job <em>without editing the g-code</em>: adjust <strong>Feed rate</strong>,
+    <strong>Rapids</strong> and <strong>Spindle</strong> live (with a reset-to-default), and watch the
+    <strong>run time</strong>. Overrides are how you dial in feeds by ear on the fly — see
+    <a href="#clean-results">reading the cut</a>.</p>
+
+    <h3>Start from a toolpath</h3>
+    <p>If you need to restart partway through — after a broken bit or a stopped job — you can begin from a
+    chosen point rather than the top, with a safe Z-up move first. Pick the point in the
+    <a href="#gcode-viewer">3D viewer</a>.</p>
+
+    <div class="callout tip"><span class="k">Transforms</span><br>
+      <strong>Right-click → Transform</strong> in the program list can rotate the program, convert arcs to
+      lines, add drag-knife moves and more before you run — handy for fitting a job to your stock
+      orientation.</div>
+
+    <div class="callout tip"><span class="k">Pop-out console</span><br>
+      Double-click the <strong>Console</strong> tab to pop it out into its own floating window — handy for
+      watching traffic on a second monitor while you work the Job screen. <kbd>Esc</kbd> still toggles the
+      console.</div>
+
+    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#gcode-viewer">3D viewer</a> · <a href="#clean-results">Clean results</a> · <a href="#sdcard">SD card</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
+  </section>
+
+  <!-- ===================== START JOB ===================== -->
+  <section class="topic" id="start-job" data-title="Start Job — measure stock &amp; set origin" data-level="nov"
+           data-track="novice:6,intermediate:4,machinist:8" data-video="pending">
+    <h2>Start Job — measure stock &amp; set the origin <a class="anchor" href="#start-job">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span><span class="tag int">Intermediate</span></div>
+    <p><strong>Start Job</strong> is the guided front door to running a part. Instead of jogging around and
+    zeroing by eye, you let the machine <em>probe</em> your stock: it finds the real size and position,
+    optionally corrects for how the stock sits skewed on the table, sets the work origin, and takes a
+    tool-length reference — then launches the job.</p>
+
+    <figure>
+      <img src="img/start-job-panel.png" alt="The Start Job setup panel">
+      <figcaption>The Start Job setup panel.</figcaption>
+    </figure>
+
+    <h3>The steps</h3>
+    <ol>
+      <li><strong>Stock</strong> — enter your nominal stock size, or let the probe measure it.</li>
+      <li><strong>Measure stock size (probe all 4 corners)</strong> — the machine touches each corner so it
+      knows the true X/Y extent and where the stock actually is.</li>
+      <li><strong>Set work rotation from skew</strong> — if the stock isn't perfectly square to the axes,
+      ioSender computes the small rotation and applies it as a work-coordinate rotation, so you don't have to
+      dial the material in by hand.</li>
+      <li><strong>Set tool-length reference</strong> — probes the tool so Z is referenced correctly.</li>
+      <li><strong>Set origin in</strong> — choose which corner (or centre) of the stock the g-code origin
+      sits at, then <strong>Generate</strong>.</li>
+    </ol>
+
+    <div class="callout note"><span class="k">Verify skew</span><br>
+      <strong>Verify skew</strong> re-touches the two back corners to double-check the rotation it measured
+      before you commit to cutting.</div>
+
+    <div class="callout warn"><span class="k">Behind the scenes</span><br>
+      Start Job writes a controller-side <code>start_job.macro</code> and performs an automatic 3D probe as
+      part of the sequence. It must land on the Job tab to bootstrap the controller handshake. The work
+      rotation uses grblHAL's <code>G10&nbsp;L2&nbsp;R</code> — measured skew is applied as its negative.</div>
+
+    <div class="xref">Related: <a href="#probing">Probing</a> · <a href="#offsets">Work offsets</a> · <a href="#job">The Job screen</a></div>
+  </section>
+
+  <!-- ===================== MACHINE SETUP ===================== -->
+  <section class="topic" id="machine-setup" data-title="Machine Setup (commissioning)" data-level="int"
+           data-track="novice:7,intermediate:2,machinist:4" data-video="pending">
+    <h2>Machine Setup — commissioning a new controller <a class="anchor" href="#machine-setup">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the eight steps">
+      <figcaption>The Machine Setup overview and its eight guided steps.</figcaption>
+    </figure>
+    <p><strong>Machine Setup</strong> is a guided wizard that walks you through the settings a new machine
+    needs before it can safely home and run — in plain-English steps instead of a wall of <code>$</code>
+    numbers. Do it <strong>once</strong> when you first connect a controller (and again after a firmware
+    reset). It writes real grbl settings to the controller's <a href="#intro-to-cnc">NVRAM</a>, so it's how
+    you turn a blank board into <em>your</em> machine.</p>
+
+    <div class="callout note"><span class="k">The startup gate</span><br>
+      If setup isn't finished, ioSender opens straight on the <em>first incomplete step</em> — so you can't
+      accidentally try to run a half-configured machine. Once all eight steps are done, it stops nagging.</div>
+
+    <h3>The eight steps</h3>
+    <p>An <strong>Overview</strong> page lists them; each is a numbered tab you complete in order.</p>
+    <table class="reftab">
+      <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
+      <tr><td><strong>1 · Machine</strong></td><td>Start from your machine — pick your machine so the later steps begin from sensible defaults instead of blanks.</td><td>—</td></tr>
+      <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
+      <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
+      <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
+      <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#start-job">Start Job</a> know what's available.</td><td>—</td></tr>
+      <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#start-job">Start Job</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
+      <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
+      <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
+    </table>
+
+    <h3>Why the order matters</h3>
+    <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
+    machine knows its <strong>travel</strong> and homing direction (steps 2–3); probing routines (step 5) need
+    the axes configured; and the macros (step 7) assume a working, homeable machine. Working top-to-bottom
+    once gets you to a machine that homes, respects its own limits, and can probe.</p>
+
+    <div class="callout warn"><span class="k">Have your facts ready</span><br>
+      Steps 2–4 describe physical reality — which corner homes, how far each axis travels, your drive type and
+      switch wiring. If you're unsure, your machine's build documentation or the maker's default profile is the
+      source of truth. Getting <code>$23</code> (home direction) or the limit-switch type wrong will make
+      homing drive the wrong way or fault.</div>
+
+    <div class="callout tip"><span class="k">Setup vs Settings vs Calibration</span><br>
+      Machine Setup gets you <em>safe and running</em>. The <a href="#settings">Settings</a> tab then exposes
+      <em>every</em> <code>$</code> setting for fine-tuning, and <a href="#accuracy-calibration">Accuracy &amp;
+      calibration</a> covers dialing in steps/mm and squareness to a real dimension.</div>
+
+    <div class="xref">Related: <a href="#connect">Connect</a> · <a href="#settings">Settings (grbl $)</a> · <a href="#probing">Probing</a> · <a href="#tools">Tools</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a></div>
+  </section>
+
+  <!-- ===================== PROBING ===================== -->
+  <section class="topic" id="probing" data-title="Probing" data-level="int"
+           data-track="novice:0,intermediate:5,machinist:5" data-video="pending">
+    <h2>Probing <a class="anchor" href="#probing">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/probing-tabs.png" alt="The Probing tab and its routine sub-tabs">
+      <figcaption>The Probing routines, with the probe selector at the top.</figcaption>
+    </figure>
+    <p><strong>Probing</strong> is how the machine <em>touches</em> the work to measure position precisely,
+    instead of you lining it up by eye (see <a href="#intro-to-cnc">Intro → probes</a>). The Probing tab
+    gathers the individual routines, each on its own sub-tab:</p>
+    <table class="reftab">
+      <tr><th>Routine</th><th>Finds</th></tr>
+      <tr><td><strong>Edge finder, external</strong></td><td>An outside edge of your stock — sets that axis's work zero.</td></tr>
+      <tr><td><strong>Edge finder, internal</strong></td><td>The inside of a bore or pocket.</td></tr>
+      <tr><td><strong>Center finder</strong></td><td>The centre of a hole or a round boss.</td></tr>
+      <tr><td><strong>Tool length offset</strong></td><td>The length of the current tool (against a toolsetter or plate).</td></tr>
+      <tr><td><a href="#heightmap">Height map</a></td><td>A grid of Z heights across a surface, for compensation.</td></tr>
+    </table>
+
+    <h3>Pick the probe, get its parameters</h3>
+    <p>A <strong>Probe:</strong> selector chooses which physical probe you're using (3D probe, touch plate,
+    toolsetter). The routine's parameters — tip diameter, feeds, travel — come from that probe's
+    <strong>definition</strong>, which you declared in <a href="#machine-setup">Machine Setup → Probe
+    definitions</a>. Change the probe and the numbers follow. <strong>Pre/post macros</strong> can run
+    controller-side macros around a probe cycle.</p>
+
+    <p>A successful probe writes the result into the active <a href="#offsets">work offset</a> or the tool
+    length. Use these routines for one-off measurements; for the everyday "measure the stock and set the
+    origin" sequence, <a href="#start-job">Start Job</a> chains them together for you.</p>
+
+    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#offsets">Work offsets</a> · <a href="#heightmap">Height map</a> · <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#intro-to-cnc">Intro → probes</a></div>
+  </section>
+
+  <!-- ===================== TOOLS ===================== -->
+  <section class="topic" id="tools" data-title="Tools (surfacing, squaring, calibration)" data-level="int"
+           data-track="novice:0,intermediate:7,machinist:3" data-video="pending">
+    <h2>Tools — surfacing, squaring &amp; calibration <a class="anchor" href="#tools">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/tools-tab.png" alt="The Tools tab">
+      <figcaption>The Tools tab gathers the machine utilities (Surface Spoilboard shown).</figcaption>
+    </figure>
+    <p>The <strong>Tools</strong> tab gathers the machine utilities — the jobs you do <em>to</em> the machine
+    rather than <em>with</em> it. Each sub-tab carries its own "About…" guidance in the app.</p>
+    <table class="reftab">
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td><strong>Tool table</strong></td><td>Define your tools (number, diameter, length) so tool changes and offsets know each bit.</td></tr>
+      <tr><td><strong>Surface Spoilboard</strong></td><td>Generate a facing program to flatten the spoilboard (or stock) dead flat to the machine — the reference every job sits on.</td></tr>
+      <tr><td><strong>Auto Square</strong></td><td>Square a ganged (dual-motor) axis using a Phil&nbsp;Barrett offset (<code>$170+</code>). Only the ganged axis is writable; the offset is a fine trim.</td></tr>
+      <tr><td><strong>Stepper calibration / scratch</strong></td><td>Dial in steps/mm accurately over a long span (the scratch-line trick). Feeds <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</td></tr>
+      <tr><td><strong>Trinamic</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard) if your controller has them.</td></tr>
+      <tr><td><strong>PID</strong></td><td>Tune closed-loop / spindle PID where applicable.</td></tr>
+    </table>
+    <div class="callout note"><span class="k">Big programs run for real</span><br>
+      Generators like Surface Spoilboard can emit thousands of lines; ioSender routes those through the actual
+      job streamer, so surfacing runs smoothly instead of freezing the UI.</div>
+    <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a> · <a href="#intro-to-cnc">Intro → bits</a></div>
+  </section>
+
+  <!-- ===================== OFFSETS ===================== -->
+  <section class="topic" id="offsets" data-title="Work offsets (WCS)" data-level="int"
+           data-track="novice:0,intermediate:6,machinist:6">
+    <h2>Work offsets (WCS) <a class="anchor" href="#offsets">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/offsets-table.png" alt="The work-offset table (G54 to G59.3)">
+      <figcaption>The work-offset table (G54–G59.3).</figcaption>
+    </figure>
+    <p>A <strong>work offset</strong> is the stored gap between the machine's home and a work origin (see the
+    <a href="#intro-to-cnc">Intro diagram</a>). grbl keeps several of them so you can have more than one setup
+    ready at once — the <strong>work coordinate systems</strong> <code>G54</code> through <code>G59.3</code>.
+    Your program runs in whichever one is active (<code>G54</code> by default).</p>
+
+    <h3>The Offsets tab</h3>
+    <p>It shows the table of WCS offsets (plus the tool-length and other system offsets). For each you can:</p>
+    <ul>
+      <li><strong>Get current position</strong> — capture where the machine is now into that offset (a manual
+      alternative to probing).</li>
+      <li>Type values directly, then <strong>Set all</strong> to apply.</li>
+      <li><strong>Clear all</strong> — zero an offset out.</li>
+    </ul>
+    <p>Most of the time you don't edit these by hand: <a href="#probing">Probing</a> and
+    <a href="#start-job">Start Job</a> populate the <em>active</em> WCS for you when you zero on your stock.
+    The Offsets tab is for reviewing them, nudging a value, or setting up a second fixture.</p>
+
+    <div class="callout note"><span class="k">Machinist — G10 &amp; discipline</span><br>
+      Under the hood, offsets are set with <code>G10&nbsp;L2</code> (define a WCS in absolute machine
+      coordinates) or <code>G10&nbsp;L20</code> (define it so the <em>current</em> position equals given work
+      coordinates — what "zero here" does). A work rotation for skewed stock uses <code>G10&nbsp;L2&nbsp;R</code>.
+      Keep an <code>R0</code>-before-<code>G53</code> habit so a leftover rotation never contaminates a
+      machine-coordinate move. See <a href="#accuracy-calibration">Accuracy &amp; calibration → WCS discipline</a>.</div>
+
+    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#probing">Probing</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#intro-to-cnc">Intro → coordinates</a></div>
+  </section>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section class="topic" id="settings" data-title="Settings (grbl &amp; app)" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:2">
+    <h2>Settings — grbl &amp; app <a class="anchor" href="#settings">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/settings-grbl.png" alt="The Grbl settings tab with the search box">
+      <figcaption>The Grbl settings tab — searchable, with changed settings highlighted.</figcaption>
+    </figure>
+    <p><strong>Settings</strong> is one flat strip of tabs — the controller's settings plus ioSender's own
+    preferences, in one place:</p>
+    <table class="reftab">
+      <tr><th>Tab</th><th>Contains</th></tr>
+      <tr><td><strong>Grbl</strong></td><td>Every <code>$</code> setting the controller has, with a free-text search and <strong>change highlighting</strong> — settings changed from startup are marked, and you can right-click to revert one.</td></tr>
+      <tr><td><strong>App</strong></td><td>ioSender's own preferences — colours, behaviour, and the lathe-mode switch (see <a href="#lathe">Lathe</a>).</td></tr>
+      <tr><td><strong>Jogging</strong></td><td>Jog steps and feeds, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
+      <tr><td><strong>G Code</strong></td><td>How g-code is sent and interpreted.</td></tr>
+      <tr><td><strong>Keyboard &amp; Controller</strong></td><td>Key mappings and game-controller bindings.</td></tr>
+      <tr><td><strong>Macros</strong></td><td>Create and edit macros.</td></tr>
+      <tr><td><strong>Main Page</strong></td><td>Configure the main-window layout.</td></tr>
+      <tr><td><strong>Simulator</strong></td><td>Build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>) — also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
+    </table>
+    <div class="callout tip"><span class="k">Grbl tab vs Machine Setup</span><br>
+      <a href="#machine-setup">Machine Setup</a> is the <em>guided subset</em> that gets a new machine running;
+      the <strong>Grbl</strong> tab here is the <em>full</em> list for fine-tuning. It also keeps
+      <strong>backups / restore points</strong>, and the auto-save / prompt-on-save options control whether
+      changes are written to the controller immediately or after confirmation.</div>
+
+    <div class="callout note"><span class="k">Camera is opt-in</span><br>
+      The Camera menu only appears once a device is bound: go to <strong>Settings → App → Camera</strong>,
+      pick a device from the dropdown and <strong>Connect</strong>.</div>
+    <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#jogging">Jogging</a> · <a href="#lathe">Lathe</a></div>
+  </section>
+
+  <!-- ===================== SD CARD ===================== -->
+  <section class="topic" id="sdcard" data-title="SD card jobs" data-level="int"
+           data-track="novice:0,intermediate:9,machinist:0">
+    <h2>SD card jobs <a class="anchor" href="#sdcard">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+    <figure>
+      <img src="img/sdcard.png" alt="The SD Card tab listing controller files">
+      <figcaption>Files stored on the controller's SD card.</figcaption>
+    </figure>
+    <p>Many controllers have an <strong>SD card</strong> (or onboard flash) that stores g-code files on the
+    controller itself. The SD Card tab manages those files and can run them directly.</p>
+    <ul>
+      <li><strong>Upload / From file</strong> — copy a local g-code file onto the card.</li>
+      <li><strong>Load and run</strong> — run a file straight <em>from the card</em>: the controller streams
+      it itself, so the job keeps going even if the USB link or ioSender hiccups. Great for long jobs.</li>
+      <li><strong>Manage</strong> — Create, Edit, View, Delete, Move and Copy files; a <em>List CNC files
+      only</em> filter; and an <em>Enable rewind</em> option.</li>
+    </ul>
+    <div class="callout tip"><span class="k">Also the home of controller macros</span><br>
+      The controller-side macro set (e.g. <em>Install ATC macros</em>) lives on this storage too — the same
+      set <a href="#machine-setup">Machine Setup</a> step 7 installs.</div>
+    <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
+  </section>
+
+  <!-- ===================== 3D VIEWER ===================== -->
+  <section class="topic" id="gcode-viewer" data-title="The 3D g-code viewer" data-level="nov"
+           data-track="novice:0,intermediate:8,machinist:0">
+    <h2>The 3D g-code viewer <a class="anchor" href="#gcode-viewer">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+    <figure>
+      <img src="img/gcode-viewer.png" alt="The 3D toolpath viewer and its toolbar">
+      <figcaption>The 3D toolpath viewer and its view toolbar.</figcaption>
+    </figure>
+    <p>The 3D viewer sits beside the g-code list on the <a href="#job">Job</a> screen and draws the entire
+    toolpath before you cut — so you can sanity-check a program, see where it sits on your stock, and watch
+    progress as it runs.</p>
+
+    <h3>Getting around</h3>
+    <ul>
+      <li><strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom, and use the <strong>ViewCube</strong>
+      to snap to a face.</li>
+      <li><strong>Reset view</strong> (<kbd>Ctrl</kbd>+<kbd>V</kbd>) re-fits the machine/program;
+      <strong>Save view</strong> stores the current angle as your default.</li>
+    </ul>
+
+    <h3>What you can show</h3>
+    <p>Toggle the <strong>grid</strong> (<kbd>Ctrl</kbd>+<kbd>G</kbd>), <strong>X/Y/Z axis markers</strong>,
+    the <strong>work envelope</strong> (your machine's travel), the program's <strong>bounding box</strong>,
+    the coordinate system and a text overlay. Colours for cuts, rapids, retracts and the highlight are all
+    configurable, and <strong>Highlight completed cuts</strong> shows how far a running job has got.</p>
+
+    <div class="callout tip"><span class="k">Click to jog</span><br>
+      Hold <kbd>Ctrl</kbd> and click a point in the view to <strong>jog there</strong> — the machine raises Z
+      to a safe height first, then rapids to the spot. A fast way to reach a feature without nudging with the
+      <a href="#jogging">jog</a> keys.</div>
+
+    <p>You can also <strong>start a job from a chosen toolpath</strong> here — pick the point to resume from
+    (see <a href="#job">the Job screen</a>).</p>
+
+    <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#jogging">Jogging</a> · <a href="#start-job">Start Job</a></div>
+  </section>
+
+  <!-- ===================== HEIGHT MAP ===================== -->
+  <section class="topic" id="heightmap" data-title="Height map (surface compensation)" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:7">
+    <h2>Height map — surface compensation <a class="anchor" href="#heightmap">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/heightmap.png" alt="The Height map view with area and grid controls">
+      <figcaption>Building a height map over the probed area.</figcaption>
+    </figure>
+    <p>A <strong>height map</strong> compensates for a surface that isn't perfectly flat. The machine probes a
+    grid of points across your stock, learns the real Z at each, then <em>shifts Z as it cuts</em> to follow
+    the actual surface. The classic use is <strong>PCB isolation milling</strong> or engraving a slightly
+    warped board, where a few tenths of a millimetre of waviness would otherwise ruin the depth.</p>
+    <h3>The workflow</h3>
+    <ol>
+      <li><strong>Set the work origin</strong> on the stock (probe or jog + zero).</li>
+      <li><strong>Choose the area + grid</strong> — the <em>Area to probe</em> and <em>Grid size</em>, or
+      <em>Set from program limits</em> to match your loaded program exactly.</li>
+      <li>Pick the <strong>probe</strong> and <strong>Start</strong> — the machine touches each grid point.</li>
+      <li><strong>Apply</strong> the map to the running program's Z (and <strong>Save</strong> / <strong>Load</strong>
+      to reuse it).</li>
+    </ol>
+    <div class="callout note"><span class="k">Compensate vs fix</span><br>
+      A height map corrects for a surface you <em>can't</em> make flatter. For the machine's own flatness and
+      tram, or to flatten the spoilboard itself, see <a href="#tools">Surface Spoilboard</a> and
+      <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</div>
+    <div class="xref">Related: <a href="#probing">Probing</a> · <a href="#tools">Tools (surfacing)</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a></div>
+  </section>
+
+  <!-- ===================== LATHE ===================== -->
+  <section class="topic" id="lathe" data-title="Lathe mode &amp; wizards" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:9">
+    <h2>Lathe mode &amp; wizards <a class="anchor" href="#lathe">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/lathe-wizard.png" alt="A lathe wizard">
+      <figcaption>A lathe turning wizard.</figcaption>
+    </figure>
+    <p>ioSender also drives <strong>lathes</strong>. Turn on lathe mode under
+    <a href="#settings">Settings → App → Main</a> and the interface switches to a lathe layout — X becomes the
+    diameter/radius axis and Z runs along the spindle.</p>
+    <h3>The wizards</h3>
+    <p>Rather than hand-writing turning g-code, fill in dimensions and let a wizard generate the program:</p>
+    <table class="reftab">
+      <tr><th>Wizard</th><th>Operation</th></tr>
+      <tr><td><strong>Turning</strong></td><td>Reduce diameter along a length.</td></tr>
+      <tr><td><strong>Facing</strong></td><td>Clean up the end of the stock.</td></tr>
+      <tr><td><strong>Parting</strong></td><td>Cut the finished part off.</td></tr>
+      <tr><td><strong>Threading</strong></td><td>Cut a thread.</td></tr>
+    </table>
+    <p>Each produces a normal program that loads and runs on the <a href="#job">Job</a> screen like any other.</p>
+    <div class="xref">Related: <a href="#settings">Settings</a> · <a href="#job">The Job screen</a></div>
+  </section>
+
+  <!-- ===================== ERRORS & ALARMS ===================== -->
+  <section class="topic" id="errors-alarms" data-title="Errors &amp; alarms" data-level="nov"
+           data-track="novice:8,intermediate:10,machinist:10">
+    <h2>Errors &amp; alarms <a class="anchor" href="#errors-alarms">#</a></h2>
+    <div class="tags"><span class="tag nov">Novice</span></div>
+    <figure>
+      <img src="img/errors-dialog.png" alt="The Error and alarm codes dialog">
+      <figcaption>The built-in Error and alarm codes reference (Help menu).</figcaption>
+    </figure>
+    <p>Sooner or later the machine stops and shows a code. Don't panic — grbl is just telling you what
+    happened. There are two kinds, and they mean very different things.</p>
+
+    <div class="callout note"><span class="k">Error vs alarm</span><br>
+      An <strong>error</strong> rejects a <em>single command</em> and tells you why (bad g-code, a setting that
+      isn't allowed right now). The machine keeps its state; fix the command and carry on.<br>
+      An <strong>alarm</strong> means something unsafe happened — the machine <em>locks out motion</em> until
+      you deliberately clear it. Position may no longer be trusted.</div>
+
+    <h3>Clearing an alarm</h3>
+    <ol>
+      <li><strong>Soft-reset</strong> (the <a href="#job">Reset</a> button) to stop and acknowledge.</li>
+      <li><strong>Unlock</strong> with <code>$X</code> <em>only once you've checked it's safe</em> to move.</li>
+      <li><strong>Home</strong> (<code>$H</code>) to re-establish position — the proper way to recover after
+      a limit trip or a reset during motion.</li>
+    </ol>
+
+    <h3>Common alarms</h3>
+    <table class="reftab">
+      <tr><th>Alarm</th><th>Meaning &amp; usual cause</th></tr>
+      <tr><td><strong>1</strong></td><td>Hard limit tripped — a limit switch was hit. Re-home.</td></tr>
+      <tr><td><strong>2</strong></td><td>Soft limit — a commanded move would exceed machine travel. Usually a bad work origin or a program too big for the stock position.</td></tr>
+      <tr><td><strong>3</strong></td><td>Reset while in motion — position lost. Re-home.</td></tr>
+      <tr><td><strong>4 / 5</strong></td><td>Probe failed — didn't start where expected (4) or didn't make contact within travel (5). Check wiring and the probe.</td></tr>
+      <tr><td><strong>6–9</strong></td><td>Homing failed — reset during homing, or a switch wasn't found. Check switch wiring and pull-off.</td></tr>
+    </table>
+
+    <h3>Common errors</h3>
+    <table class="reftab">
+      <tr><th>Error</th><th>Meaning</th></tr>
+      <tr><td><strong>1 / 2</strong></td><td>Bad g-code word or number format — often a stray character or an unsupported command.</td></tr>
+      <tr><td><strong>8</strong></td><td>A <code>$</code> command was sent while not idle — stop the job first.</td></tr>
+      <tr><td><strong>9</strong></td><td>G-code locked out — the machine is in an alarm or jog state. Clear the alarm (above) first.</td></tr>
+      <tr><td><strong>15</strong></td><td>A jog would exceed travel — jog a smaller distance.</td></tr>
+      <tr><td><strong>20</strong></td><td>Unsupported or invalid g-code command for this controller.</td></tr>
+    </table>
+
+    <div class="callout tip"><span class="k">The full list is built in</span><br>
+      <strong>Help → Error and alarm codes</strong> opens a searchable dialog with every code your controller
+      defines — the authoritative reference for anything not in the short lists above.</div>
+
+    <div class="callout warn"><span class="k">Don't just clear and re-run</span><br>
+      A <em>soft-limit</em> alarm (2) or a <em>jog-travel</em> error (15) usually means your work origin or
+      travel is wrong — unlocking and re-running will just crash into the same wall. Fix the cause: re-check
+      your <a href="#offsets">origin</a> or <a href="#machine-setup">travel/homing setup</a> first.</div>
+
+    <div class="xref">Related: <a href="#connect">Connect</a> · <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#job">The Job screen</a> · <a href="#offsets">Work offsets</a></div>
+  </section>
+
+  <!-- foot nav injected by JS when a track is active -->
+  <div class="pathnav" id="pathnav">
+    <a id="prevLink" href="#">&larr; Previous</a>
+    <a id="nextLink" href="#">Next &rarr;</a>
+  </div>
+
+</main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section.topic'));
+  var toc = document.getElementById('toc');
+  var q = document.getElementById('q');
+  var searchmiss = document.getElementById('searchmiss');
+  var navHeading = document.getElementById('navHeading');
+  var trackNote = document.getElementById('trackNote');
+  var pathnav = document.getElementById('pathnav');
+  var LEVEL = {nov:'nov', int:'int', mac:'mac'};
+  var TRACKS = {
+    novice:{label:'Novice', note:'A guided path for a first-time user — connect, jog, run your first job.'},
+    intermediate:{label:'Intermediate', note:'You know the basics — setup, probing, offsets, tools and the viewer.'},
+    machinist:{label:'Machinist', note:'Depth: settings, calibration, squaring, height maps and lathe work.'}
+  };
+
+  // ---- build model from the DOM ----
+  var topics = sections.map(function(s){
+    var order = {};
+    (s.dataset.track||'').split(',').forEach(function(pair){
+      var kv = pair.split(':'); if(kv.length===2){ var n=parseInt(kv[1],10); if(!isNaN(n)) order[kv[0].trim()]=n; }
+    });
+    return {
+      id:s.id, el:s,
+      title:(s.dataset.title||s.id).replace(/&amp;/g,'&'),
+      level:s.dataset.level||'none',
+      order:order,
+      text:(s.textContent||'').toLowerCase()
+    };
+  });
+
+  // ---- TOC render ----
+  function buildToc(list){
+    toc.innerHTML='';
+    list.forEach(function(t){
+      var li=document.createElement('li');
+      var a=document.createElement('a');
+      a.className='topic'; a.href='#'+t.id; a.dataset.id=t.id;
+      var dot=document.createElement('span'); dot.className='lvl '+(LEVEL[t.level]||'none');
+      var label=document.createElement('span'); label.textContent=t.title;
+      if(t._num){ var num=document.createElement('span'); num.className='num'; num.textContent=t._num; a.appendChild(num); }
+      a.appendChild(dot); a.appendChild(label);
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  var activeTrack='';
+  function orderFor(track){
+    // topics that belong to the track (order>0), sorted by their track order
+    var inTrack = topics.filter(function(t){ return t.order[track]>0; })
+                        .sort(function(a,b){ return a.order[track]-b.order[track]; });
+    return inTrack;
+  }
+
+  function applyTrack(track){
+    activeTrack=track;
+    document.documentElement.setAttribute('data-track',track);
+    Array.prototype.forEach.call(document.querySelectorAll('.chip'),function(c){
+      c.classList.toggle('on', c.dataset.t===track);
+    });
+    var list;
+    if(track && TRACKS[track]){
+      navHeading.textContent = TRACKS[track].label+' track';
+      trackNote.textContent = TRACKS[track].note;
+      var seq = orderFor(track);
+      seq.forEach(function(t,i){ t._num=(i+1); });
+      // non-track topics still listed (dimmed at the end, no number) so nothing is unreachable
+      var rest = topics.filter(function(t){ return !(t.order[track]>0); });
+      rest.forEach(function(t){ t._num=null; });
+      list = seq.concat(rest);
+    } else {
+      navHeading.textContent='Subjects (A–Z)';
+      trackNote.textContent='Pick a track for a guided reading order, or browse by subject below.';
+      list = topics.slice().sort(function(a,b){ return a.title.localeCompare(b.title); });
+      list.forEach(function(t){ t._num=null; });
+    }
+    buildToc(list);
+    filter(q.value);
+    updatePathNav();
+  }
+
+  // ---- track chips ----
+  Array.prototype.forEach.call(document.querySelectorAll('.chip'),function(c){
+    c.addEventListener('click',function(){
+      applyTrack(activeTrack===c.dataset.t ? '' : c.dataset.t);
+      try{ localStorage.setItem('iosender_manual_track', activeTrack); }catch(e){}
+    });
+  });
+
+  // ---- search ----
+  function filter(term){
+    term=(term||'').trim().toLowerCase();
+    var any=false;
+    var links=toc.querySelectorAll('a.topic');
+    Array.prototype.forEach.call(links,function(a){
+      var t=topics.filter(function(x){return x.id===a.dataset.id;})[0];
+      var hit = !term || (t && (t.title.toLowerCase().indexOf(term)>=0 || t.text.indexOf(term)>=0));
+      a.classList.toggle('hidden',!hit);
+      if(t) t.el.classList.toggle('hidden', term && !hit);
+      if(hit) any=true;
+    });
+    searchmiss.style.display = any ? 'none':'block';
+  }
+  q.addEventListener('input',function(){ filter(q.value); });
+
+  // ---- scroll spy + path nav ----
+  var current=null;
+  function markActive(id){
+    if(id===current) return; current=id;
+    Array.prototype.forEach.call(toc.querySelectorAll('a.topic'),function(a){
+      a.classList.toggle('active', a.dataset.id===id);
+    });
+    updatePathNav();
+  }
+  function updatePathNav(){
+    if(!activeTrack){ pathnav.style.display='none'; return; }
+    var seq=orderFor(activeTrack); if(!seq.length){ pathnav.style.display='none'; return; }
+    // find current within the sequence (fall back to first)
+    var idx=0; for(var i=0;i<seq.length;i++){ if(seq[i].id===current){ idx=i; break; } }
+    pathnav.style.display='flex';
+    var prev=document.getElementById('prevLink'), next=document.getElementById('nextLink');
+    if(idx>0){ prev.classList.remove('hidden'); prev.href='#'+seq[idx-1].id; prev.textContent='← '+seq[idx-1].title; }
+    else prev.classList.add('hidden');
+    if(idx<seq.length-1){ next.classList.remove('hidden'); next.href='#'+seq[idx+1].id; next.textContent=seq[idx+1].title+' →'; }
+    else next.classList.add('hidden');
+  }
+  var spy=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting) markActive(e.target.id); });
+  },{rootMargin:'-10% 0px -75% 0px',threshold:0});
+  sections.forEach(function(s){ spy.observe(s); });
+
+  // ---- init: restore track, honour deep-link hash ----
+  var saved=''; try{ saved=localStorage.getItem('iosender_manual_track')||''; }catch(e){}
+  applyTrack(saved);
+  if(location.hash){
+    var el=document.getElementById(location.hash.slice(1));
+    if(el){ setTimeout(function(){ el.scrollIntoView(); markActive(el.id); },30); }
+  }
+})();
+
+// Task videos: a section with data-video gets a "Watch on the machine" panel. The YouTube iframe is
+// injected only on click (lazy) so the page stays fast; data-video="pending" shows a coming-soon note.
+// To attach a real video: set data-video="<YouTube id>" on the topic <section> (unlisted is fine).
+(function(){
+  var YT = 'https://www.youtube-nocookie.com/embed/';
+  Array.prototype.forEach.call(document.querySelectorAll('section.topic[data-video]'), function(sec){
+    var id = (sec.getAttribute('data-video') || '').trim();
+    var panel = document.createElement('div');
+    panel.className = 'video-panel';
+    if(!id || id === 'pending'){
+      panel.innerHTML = '<div class="video-pending"><span class="ic">🎬</span>'
+        + '<span>A machine-side walkthrough of this task is on the way — you’ll watch the real steps '
+        + 'with the relevant app screen overlaid.</span></div>';
+    } else {
+      panel.innerHTML = '<div class="video-cta" role="button" tabindex="0" aria-label="Play the video walkthrough">'
+        + '<span class="play">▶</span>'
+        + '<span class="txt">Watch on the machine<span class="sub">See this task done for real, with the app screen shown</span></span></div>';
+      var open = function(){
+        panel.innerHTML = '<div class="video-embed"><iframe src="' + YT + encodeURIComponent(id)
+          + '?rel=0&autoplay=1" title="Video walkthrough" loading="lazy" '
+          + 'allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+      };
+      var cta = panel.querySelector('.video-cta');
+      cta.addEventListener('click', open);
+      cta.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(); } });
+    }
+    // Place after the screenshot if there is one, else after the level tags.
+    var anchor = sec.querySelector('figure') || sec.querySelector('.tags');
+    if(anchor && anchor.parentNode === sec) anchor.insertAdjacentElement('afterend', panel);
+    else sec.insertBefore(panel, sec.children[1] || null);
+  });
+})();
+</script>
+</body>
+</html>
