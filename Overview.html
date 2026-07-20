@@ -152,7 +152,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>155 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>156 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -342,6 +342,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>AppMessageBox's text bumped 13pt -&gt; 19.5pt (+50%), fixing every AppDialogs.Show call app-wide at once.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr146">146</a></td></tr>
 <tr><td>-message=text pops up an informational dialog once the main window is revealed - handy for telling someone what to test when launching a build for them.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr147">147</a></td></tr>
 <tr><td>Drag to resize the setup/drawing split on Start Job, Height Map, and 7 Probing/Tools sub-tabs, plus the Job tab's left sidebar / centre workspace / right sidebar</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr150">150</a></td></tr>
+<tr><td>Every push to master now publishes a real GitHub Release (2.1, 2.2, ...) with notes listing which #N changelog entries shipped in it, instead of overwriting one unversioned rolling build; the TOC gains a Version column showing which release each entry arrived in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr156">156</a></td></tr>
 </table>
 </div>
 
@@ -502,7 +503,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">153</td><td><a href="#pr153">pcorner.macro side probes at a fixed 5mm below top, not the stock midpoint</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">-13</span></td><td class="ver">2.1</td></tr>
 <tr><td class="n">154</td><td><a href="#pr154">Start Job stock schematic: bigger, clearer dimension/angle/thickness labels</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+39</span> <span class="del">-20</span></td><td class="ver">2.1</td></tr>
 <tr><td class="n">155</td><td><a href="#pr155">New Tools sub-tab: Stepper Calibration (Probe) + Start Job calibration-mismatch warning</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+683</span> <span class="del">-4</span></td><td class="ver">2.1</td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (155 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1280</span> <span class="del">21</span> <span class="add">+165</span><br><span class="k">Lines:</span> <span class="add">+54005</span> <span class="del">-10233</span></td><td class="ver"></td></tr>
+<tr><td class="n">156</td><td><a href="#pr156">Versioned releases (2.N) with real changelog notes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+217</span> <span class="del">-58</span></td><td class="ver"></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (156 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1285</span> <span class="del">21</span> <span class="add">+166</span><br><span class="k">Lines:</span> <span class="add">+54222</span> <span class="del">-10291</span></td></tr>
 </table>
 </div>
 
@@ -3183,6 +3185,20 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/IGrblConfigTab.cs</td><td class="num add">1</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>New Tools sub-tab "Stepper Calibration (Probe)": calibrates steps/mm by probing a reference block of ALREADY-KNOWN true size against a validated Corner Fence fixture, instead of V-bit scratch marks measured by hand with calipers - removes the manual-measurement step that was the likely source of an existing bad calibration (a probed touch is far more repeatable than reading a scratch mark with calipers). Reuses the corner-1 single-probe optimization (<a href="#pr151">#151</a>). Parks at G30 and prompts to install the probe before touching anything, same as Start Job; the tab itself is disabled whenever no 3D probe is configured. Shows the actual <code>new = current &times; measured &divide; true</code> calculation next to the measured values, plus an Undo button that reverts to the steps/mm value from right before the last Save.</p><ul><li><strong>Start Job</strong> - a one-shot warning dialog fires when "Stock size is exact" is checked and the measured X/Y differs from the entered exact size by more than 0.5mm once all 4 corners are in - suggests running Stepper calibration, since that mismatch is exactly what motivated building this tool.</li><li><strong>Old "Stepper calibration"</strong> tool renamed to "Stepper calibration (Manual)" to disambiguate. Tools tab reordered (Probe, Squareness, Spoilboard, Scratch, Manual, then Tool table/Trinamic/PID) via a one-time layout-tree fixup.</li></ul><p class="foot">User-verified on real hardware: converged from a ~1.5mm measured error to sub-0.01mm over two calibration passes. An inverted first attempt at the steps/mm formula made the error WORSE (~1.5mm -&gt; ~4mm) before landing on the correct <code>current &times; measured &divide; true</code> direction.</p></div>
+</div>
+<!-- ===== #156 ===== -->
+<div class="pr">
+<h2 id="pr156"><span class="badge">#156</span>Versioned releases (2.N) replace the rolling "latest" build</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">tools/cut-release.ps1</td><td class="num add">130</td><td class="num">0</td></tr>
+<tr><td class="mono">.github/workflows/release.yml</td><td class="num add">40</td><td class="num del">24</td></tr>
+<tr><td class="mono">tools/add-changelog-entry.ps1</td><td class="num add">2</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/BuildInfo.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">40</td><td class="num del">30</td></tr>
+<tr><td class="mono">install.ps1</td><td class="num add">3</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>The rolling "latest" release (one unversioned prerelease, overwritten on every push, with a body no more informative than a commit SHA) is gone. <code>tools/cut-release.ps1</code> now runs on every push to master: it looks up the previous published release, diffs <code>Overview.html</code>'s changelog entries against that release's embedded <code>changelog-through:N</code> marker, and publishes a real numbered release (<code>v2.1</code>, <code>v2.2</code>, ...) whose notes list exactly the #N entries that shipped in it. The Features &amp; Fixes TOC gains a <strong>Version</strong> column, stamped by the same script, so every entry shows which release it first shipped in.</p><p><code>install.ps1</code> and Check for Updates both switched from GitHub's by-tag/prerelease workaround (comparing commit SHAs) to the real <code>releases/latest</code> endpoint, comparing version numbers numerically instead.</p><p>The 13 rolling builds published since 2026-07-15 were backfilled as real historical releases (v2.1-v2.13, each tagged at its actual commit) so the version history matches what actually shipped, rather than starting cold.</p></div>
 </div>
 </section>
 
