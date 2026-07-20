@@ -83,7 +83,11 @@ jobs:
           # http.extraheader Authorization header. URL-embedded credentials
           # (x-access-token:TOKEN@github.com) proved unreliable here ("Invalid
           # username or token" even with a token ncipollo/release-action accepted
-          # fine moments earlier in the same job) - reuse the same extraheader
-          # mechanism actions/checkout itself relies on, just with our token instead.
+          # fine moments earlier in the same job). Reusing the same extraheader
+          # mechanism with -c ADDS a second header instead of replacing it (git
+          # allows multiple values for this key) - GitHub then rejects the push
+          # with "Duplicate header: Authorization". Clear the persisted one first,
+          # then set ours as the only one.
+          git config --local --unset-all http.https://github.com/.extraheader
           $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ secrets.RELEASE_TOKEN }}"))
           git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $b64" push origin HEAD:master

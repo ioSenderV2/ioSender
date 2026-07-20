@@ -152,7 +152,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>158 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>159 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -345,6 +345,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Every push to master now publishes a real GitHub Release (2.1, 2.2, ...) with notes listing which #N changelog entries shipped in it, instead of overwriting one unversioned rolling build; the TOC gains a Version column showing which release each entry arrived in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr156">156</a></td></tr>
 <tr><td>Release notes' install one-liner is now wrapped as powershell "irm ... | iex" so it runs from cmd.exe as well as PowerShell; the main window's title bar showed a stale hardcoded "2.0.1" instead of the actual published release version</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr157">157</a></td></tr>
 <tr><td>The release workflow's post-publish git push (which stamps each changelog entry's TOC row with the version it shipped in) now authenticates via the same http.extraheader mechanism actions/checkout itself uses, instead of an unreliable URL-embedded credential that GitHub intermittently rejected</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr158">158</a></td></tr>
+<tr><td>The previous auth fix for the TOC version-stamp push added a second http.extraheader Authorization value instead of replacing actions/checkout's own, which GitHub rejected as a duplicate header; now clears the persisted one first</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr159">159</a></td></tr>
 </table>
 </div>
 
@@ -508,7 +509,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">156</td><td><a href="#pr156">Versioned releases (2.N) with real changelog notes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+217</span> <span class="del">-58</span></td><td class="ver">2.15</td></tr>
 <tr><td class="n">157</td><td><a href="#pr157">Install command CMD-compatible; window title version fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+13</span> <span class="del">-8</span></td><td class="ver"></td></tr>
 <tr><td class="n">158</td><td><a href="#pr158">Release pipeline auth fix for TOC version stamping</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-3</span></td><td class="ver"></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (158 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1289</span> <span class="del">21</span> <span class="add">+166</span><br><span class="k">Lines:</span> <span class="add">+54241</span> <span class="del">-10302</span></td></tr>
+<tr><td class="n">159</td><td><a href="#pr159">Release pipeline auth fix, take 2 (duplicate header)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+5</span> <span class="del">-1</span></td><td class="ver"></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (159 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1290</span> <span class="del">21</span> <span class="add">+166</span><br><span class="k">Lines:</span> <span class="add">+54246</span> <span class="del">-10303</span></td></tr>
 </table>
 </div>
 
@@ -3223,6 +3225,15 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">.github/workflows/release.yml</td><td class="num add">6</td><td class="num del">3</td></tr>
 </table>
 <div class="desc"><p>The TOC version-stamp commit's push used <code>https://x-access-token:TOKEN@github.com/...</code> URL-embedded credentials, which GitHub rejected with &ldquo;Invalid username or token&rdquo; even though the identical token authenticated the release publish moments earlier in the same job. Switched to setting an <code>http.extraheader</code> Authorization header directly (the same mechanism <code>actions/checkout</code> itself relies on) instead of relying on URL-embedded auth.</p></div>
+</div>
+<!-- ===== #159 ===== -->
+<div class="pr">
+<h2 id="pr159"><span class="badge">#159</span>Release pipeline: TOC version-stamp push fixed (duplicate Authorization header)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">.github/workflows/release.yml</td><td class="num add">5</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Follow-up to #158: setting <code>http.extraheader</code> via <code>git -c</code> layers a second value on top of the one <code>actions/checkout</code> already persisted (git allows multiple values for that key), so both got sent and GitHub returned &ldquo;Duplicate header: Authorization&rdquo; (400). Clear the persisted extraheader first, then set only ours.</p></div>
 </div>
 </section>
 
