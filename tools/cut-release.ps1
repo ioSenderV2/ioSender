@@ -6,8 +6,11 @@
 
 .DESCRIPTION
   Every push to master is a release. This script:
-    1. Looks up the previous published release (gh api) to find its version and the
-       "changelog-through:N" marker embedded (as an HTML comment) in its body.
+    1. Looks up the previous published release (plain REST GET - releases/latest is public
+       on a public repo, no auth needed, which also sidesteps a gh-CLI-specific "Bad
+       credentials" 401 seen in CI even with a token that ncipollo/release-action accepts
+       fine for the actual publish) to find its version and the "changelog-through:N"
+       marker embedded (as an HTML comment) in its body.
     2. Parses Overview.html's at-a-glance tables for every #N entry (description, tag),
        and picks out the ones numbered higher than the previous release's marker.
     3. Computes the next version (2.1, 2.2, ... - seeds at 2.1 if there's no prior release).
@@ -46,18 +49,9 @@ function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; exit 1 }
 $prevVersion = $null
 $previousThrough = 0
 if (-not $DryRun) {
-    # Don't let pwsh 7.3+'s $PSNativeCommandUseErrorActionPreference turn a nonzero gh
-    # exit into a terminating exception here - a 404 (no releases yet, or the only release
-    # is a prerelease, which /releases/latest excludes) is an expected outcome, not a bug,
-    # and we want to see gh's own stderr on any OTHER failure rather than silently guessing.
-    $savedPref = $PSNativeCommandUseErrorActionPreference
-    $PSNativeCommandUseErrorActionPreference = $false
-    $prevJson = & gh api "repos/$Repo/releases/latest" 2>&1
-    $ghExit = $LASTEXITCODE
-    $PSNativeCommandUseErrorActionPreference = $savedPref
-
-    if ($ghExit -eq 0 -and $prevJson) {
-        $prev = $prevJson | ConvertFrom-Json
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+    try {
+        $prev = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'ioSender-cut-release' }
         $tag = $prev.tag_name -replace '^v', ''
         # Only trust it as a real version if it's "major.minor" - guards against the old
         # unversioned rolling "latest" release (tag literally "latest") still being the
@@ -69,9 +63,13 @@ if (-not $DryRun) {
         } else {
             Write-Host "Previous release tag '$($prev.tag_name)' isn't a version (probably the old rolling 'latest') - treating as no previous release." -ForegroundColor Yellow
         }
-    } elseif ($ghExit -ne 0) {
-        Write-Host "gh api releases/latest exited $ghExit : $prevJson" -ForegroundColor Yellow
-        Write-Host "Treating as no previous release (expected on the very first run; investigate if this repeats)." -ForegroundColor Yellow
+    } catch {
+        # A 404 (no releases yet) is an expected outcome, not a bug - the very first run hits this.
+        if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) {
+            Write-Host "No previous release found (expected on the very first run)." -ForegroundColor Yellow
+        } else {
+            Write-Host "WARN: releases/latest lookup failed unexpectedly: $($_.Exception.Message) - treating as no previous release." -ForegroundColor Yellow
+        }
     }
 }
 
