@@ -151,7 +151,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>147 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>149 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -210,6 +210,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Machine tab shows connected grblHAL version/build and can check GitHub for a newer SRW-fork build, then flash it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr118">118</a></td></tr>
 <tr><td>Corner Fence schematic is now a real 3-zone red/green/cream diagram sized off the active 3D probe; Position row gets a checkmark + directly-editable X/Y/Z fields instead of a raw coordinate string.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr143">143</a></td></tr>
 <tr><td>Clicking Machine Setup while the machine was moving (e.g. right after a G30) could freeze that tab for the rest of the session.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr144">144</a></td></tr>
+<tr><td>Settings > Restart now actually relaunches ioSender instead of just closing it; the unused AppLaunch.exe relaunch supervisor is gone</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr148">148</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -247,6 +248,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Touch-plate mode's DISCOVER corner skipped the safety rise to machine top entirely (it was bundled inside the 3D-probe-only spoilboard search block); corner 2's approach after setting the TLO reference now has the same structure as every other corner instead of a bespoke extra waypoint.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr139">139</a></td></tr>
 <tr><td>"Stock size is exact" was wired into Generate but never fed back into the field labels/hint text (stayed on "Est. ..."); touch-plate corners now show their own measured top Z on the schematic instead of a thickness value that mode can never actually compute.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr140">140</a></td></tr>
 <tr><td>G92 Zk does not set an absolute offset - it makes wherever the machine currently is read as work-Z=k - so a fixed "G92Z-17" only gave the intended clearance if the machine happened to already be sitting at the stock surface, which it never was; a machine parked ~67mm above the stock plus the intended 17mm gave an 84mm gap instead of 17mm.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr141">141</a></td></tr>
+<tr><td>Every Generate button now saves its program for post-mortem; fixed a real hardware ALARM:2 on Start Job's Corner 2 probe (renamed misleading "Corner travel margin" field to "Safe Z delta", warn below 10mm)</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr149">149</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -485,7 +487,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">145</td><td><a href="#pr145">Job tab workspace lost width priority to the Feed/Spindle/Outline column</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+6</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">146</td><td><a href="#pr146">Message box text was too small</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+1</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">147</td><td><a href="#pr147">-message launch flag: show a popup once the app is up</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (147 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1237</span> <span class="del">13</span> <span class="add">+163</span><br><span class="k">Lines:</span> <span class="add">+52570</span> <span class="del">-9586</span></td></tr>
+<tr><td class="n">148</td><td><a href="#pr148">Restart-to-apply fix; AppLaunch removed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">8</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+32</span> <span class="del">-425</span></td></tr>
+<tr><td class="n">149</td><td><a href="#pr149">Generate-to-disk logging; Safe Z delta fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+48</span> <span class="del">-18</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (149 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1249</span> <span class="del">21</span> <span class="add">+163</span><br><span class="k">Lines:</span> <span class="add">+52650</span> <span class="del">-10029</span></td></tr>
 </table>
 </div>
 
@@ -3061,6 +3065,36 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">51</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Dev/testing convenience, same idiom as the existing <code>-testserver</code>/<code>-debuglog</code> flags: <code>-message="text"</code> shows a plain informational popup once the main window is up and painted, skipped for a <code>-testserver</code> launch since no one is watching that window interactively.</p><p class="foot">Also folds in MainWindow's run-bar copy of the OBS Control "All" recording toggle (see the camera-control entry above) and standing diagnostic logging for an intermittent, still-unreproduced ATC-macro-gate false positive.</p></div>
+</div>
+<!-- ===== #148 ===== -->
+<div class="pr">
+<h2 id="pr148"><span class="badge">#148</span>"Restart to apply" silently closed the app instead of relaunching; dead AppLaunch supervisor removed</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">15</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PipeServer.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">8</td><td class="num del">2</td></tr>
+<tr><td class="mono">tools/run-iosender.ps1</td><td class="num add">8</td><td class="num del">8</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL.sln</td><td class="num add">0</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/RelaunchSupervisor.cs</td><td class="num add">0</td><td class="num del">38</td></tr>
+<tr><td class="mono">CNC AppLaunch/ (whole project, 7 files)</td><td class="num add">0</td><td class="num del">356</td></tr>
+</table>
+<div class="desc"><p>Clicking <strong>Restart</strong> on any Settings tab that flags a restart-only change just closed ioSender and never reopened it - the new process's own single-instance startup probe found the still-shutting-down old instance still listening on the singleton pipe, forwarded into it, and exited immediately.</p><ul><li><strong>Root cause</strong> - a race between <code>GrblConfigView.DoRestart()</code>'s <code>Process.Start</code>-then-<code>Shutdown</code> fallback and <code>PipeServer</code>'s single-instance check in <code>App.xaml.cs</code>. An earlier attempt at disposing the old listener before relaunching looked correct in isolation but failed under real timing (<code>NamedPipeServerStream.Dispose()</code> doesn't reliably cancel a pending <code>WaitForConnection()</code> on .NET Framework).</li><li><strong>Fix</strong> - the child process is now launched with <code>IOSENDER_SELF_RELAUNCH=1</code>, and <code>App.xaml.cs</code> skips the single-instance probe for that one launch, since it's a known self-relaunch rather than a genuine second instance. Verified end-to-end via UIAutomation: old instance closes, new instance comes up and responds, and a genuine third launch still correctly single-instance-forwards afterward.</li><li><strong>AppLaunch.exe removed entirely</strong> - the <code>CNC AppLaunch</code> project and <code>RelaunchSupervisor.cs</code> implemented an exit-code relaunch-supervisor protocol that turned out to be dead code: <code>install.ps1</code>'s desktop shortcut always launched <code>ioSender.exe</code> directly, so the supervisor path was never actually wired into the real product.</li></ul></div>
+</div>
+<!-- ===== #149 ===== -->
+<div class="pr">
+<h2 id="pr149"><span class="badge">#149</span>Generate buttons now save their program to disk; Start Job Corner 2 ALARM:2 fixed (Safe Z delta)</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">21</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">20</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AutoSquareWizard.xaml.cs</td><td class="num add">1</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml.cs</td><td class="num add">1</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml.cs</td><td class="num add">1</td><td class="num del">3</td></tr>
+<tr><td class="mono">Locale/en-US/csv/ioSender.resources.en-US.csv</td><td class="num add">2</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Two related fixes from a real hardware debugging session.</p><ul><li><strong>Generate-to-disk logging</strong> - every tab with a Generate button (Start Job, Auto square, Stepper calibration, Surface spoilboard) now writes its generated program to <code>%AppData%\ioSender\Generated\&lt;name&gt;.macro</code> at generate-time via a new shared <code>MacroProcessor.PublishGenerated</code> helper, instead of only when the program actually streams via <code>MacroProcessor.Run</code>. This makes the exact generated program inspectable for post-mortem even if the run alarms out immediately or Run is never pressed.</li><li><strong>Start Job Corner 2 ALARM:2, hardware-confirmed root cause</strong> - the field controlling the safe crossing height between corners (<code>c1_maxz</code> = corner 1's measured stock top + this value) had silently persisted at 0mm, leaving zero clearance for corner-to-corner travel. Renamed the confusingly-named "Corner travel margin (Z)" field to <strong>"Safe Z delta"</strong>, and Generate now warns (not blocks) if it's set below the 10mm default - confirmed on real hardware that 5mm was still not enough clearance and broke a probe tip; 1&quot; (25.4mm) ran Start Job through to completion.</li></ul></div>
 </div>
 </section>
 
