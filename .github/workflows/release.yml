@@ -80,7 +80,10 @@ jobs:
           git add Overview.html
           git commit -m "chore: stamp v${{ steps.relinfo.outputs.version }} changelog entries [skip release]"
           # actions/checkout persists its own low-privilege GITHUB_TOKEN as a git
-          # http.extraheader credential, which silently overrides the token embedded
-          # in the push URL below unless cleared first.
-          git config --local --unset-all http.https://github.com/.extraheader
-          git push "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:master
+          # http.extraheader Authorization header. URL-embedded credentials
+          # (x-access-token:TOKEN@github.com) proved unreliable here ("Invalid
+          # username or token" even with a token ncipollo/release-action accepted
+          # fine moments earlier in the same job) - reuse the same extraheader
+          # mechanism actions/checkout itself relies on, just with our token instead.
+          $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${{ secrets.RELEASE_TOKEN }}"))
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $b64" push origin HEAD:master
