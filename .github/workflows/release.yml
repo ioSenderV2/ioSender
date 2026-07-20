@@ -1,9 +1,12 @@
 name: Versioned release
 
 # Builds ioSender XL in Release config and publishes a real versioned GitHub Release
-# (2.1, 2.2, ...) on every push to master, with notes drawn from the Overview.html
-# changelog entries new since the previous release. install.ps1 and the in-app
-# Check for Updates both pull the actual GitHub "latest release".
+# (2.1, 2.2, ...) on every push to master that adds a new Overview.html changelog
+# entry, with notes drawn from the entries new since the previous release. Pushes
+# with no new entry (CI/tooling/docs housekeeping - nothing that would produce a
+# different .zip worth shipping) are computed but not built or published; no
+# version number is consumed. install.ps1 and the in-app Check for Updates both
+# pull the actual GitHub "latest release".
 #
 # After publishing, this workflow also commits Overview.html's TOC "version" stamps
 # back to master (tools/cut-release.ps1 fills them in) - guarded with [skip release]
@@ -28,9 +31,11 @@ jobs:
         run: ./tools/cut-release.ps1 -Repo ${{ github.repository }} -Html Overview.html -NotesOut release-notes.md
 
       - name: Add MSBuild to PATH
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
         uses: microsoft/setup-msbuild@v2
 
       - name: Embed build commit + version
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
         shell: pwsh
         run: |
           $path = "ioSender XL\ioSender XL\BuildInfo.cs"
@@ -40,15 +45,18 @@ jobs:
           Set-Content $path $content -NoNewline
 
       - name: Build Release
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
         run: msbuild "ioSender XL\ioSender XL.sln" -restore -t:Build -p:Configuration=Release -m -nologo -v:minimal -clp:ErrorsOnly
 
       - name: Zip build output
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
         shell: pwsh
         run: |
           $src = "ioSender XL\ioSender XL\bin\Release"
           Compress-Archive -Path "$src\*" -DestinationPath "ioSender.zip" -Force
 
       - name: Publish release v${{ steps.relinfo.outputs.version }}
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
         uses: ncipollo/release-action@v1
         with:
           tag: v${{ steps.relinfo.outputs.version }}

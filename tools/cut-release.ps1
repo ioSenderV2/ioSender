@@ -118,6 +118,12 @@ if ($newEntries.Count -eq 0) {
     }
 }
 $lines += ""
+$lines += "### Install / update"
+$lines += "Run in PowerShell (installs fresh or updates an existing install to this version):"
+$lines += '```powershell'
+$lines += "irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex"
+$lines += '```'
+$lines += ""
 $lines += "<!-- changelog-through:$currentMax -->"
 $notes = ($lines -join "`n")
 [System.IO.File]::WriteAllText($NotesOut, $notes)
