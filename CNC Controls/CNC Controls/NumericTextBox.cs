@@ -100,6 +100,11 @@ namespace CNC.Controls
         public NumberStyles Styles { get { return np.Styles; } }
         public string DisplayFormat { get { return np.DisplayFormat; } }
 
+        // Canonical mm always (see NumericProperties.ToCanonicalMm/FromCanonicalMm) when Unit is a length
+        // unit ("mm"/"in") - the displayed Text is a UNIT CONVERSION of Value, never Value itself, so an
+        // ancestor's IsImperial toggle (NumericField.EffectiveUnit -> this Unit) can reformat the display
+        // without any external code touching Value. Non-length units (the vast majority of existing
+        // fields) are a no-op conversion, so this is behaviorally identical to before for them.
         public static readonly DependencyProperty ValueProperty =
             DependencyProperty.Register(nameof(Value), typeof(double), typeof(NumericTextBox), new PropertyMetadata(double.NaN, new PropertyChangedCallback(OnValueChanged)));
         public double Value
@@ -109,8 +114,32 @@ namespace CNC.Controls
         }
         private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (((NumericTextBox)d).updateText)
-                ((NumericTextBox)d).Text = double.IsNaN((double)e.NewValue) || double.IsNegativeInfinity((double)e.NewValue) ? string.Empty : Math.Round((double)e.NewValue, ((NumericTextBox)d).np.Precision).ToString(((NumericTextBox)d).np.DisplayFormat, CultureInfo.InvariantCulture);
+            var ntb = (NumericTextBox)d;
+            if (ntb.updateText)
+                ntb.Text = double.IsNaN((double)e.NewValue) || double.IsNegativeInfinity((double)e.NewValue) ? string.Empty : FormatValue((double)e.NewValue, ntb.Unit, ntb.np);
+        }
+
+        // Display/parse unit ("mm", "in", or any pass-through non-length unit - see IsLengthUnit). Bound
+        // from NumericField.EffectiveUnit; defaults to "mm" so a NumericTextBox used standalone (outside
+        // NumericField) behaves exactly as before.
+        public static readonly DependencyProperty UnitProperty =
+            DependencyProperty.Register(nameof(Unit), typeof(string), typeof(NumericTextBox), new PropertyMetadata("mm", OnUnitChanged));
+        public string Unit
+        {
+            get { return (string)GetValue(UnitProperty); }
+            set { SetValue(UnitProperty, value); }
+        }
+        private static void OnUnitChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            // Reformat the DISPLAY only - Value (canonical mm) is untouched. This is the whole mechanism
+            // that lets a parent's mm/in toggle flip every field's shown number with zero external code.
+            var ntb = (NumericTextBox)d;
+            ntb.Text = FormatValue(ntb.Value, (string)e.NewValue, ntb.np);
+        }
+
+        private static string FormatValue(double mm, string unit, NumericProperties np)
+        {
+            return Math.Round(NumericProperties.FromCanonicalMm(mm, unit), np.Precision).ToString(np.DisplayFormat, CultureInfo.InvariantCulture);
         }
         //        public static bool CoerceValueChanged(DependencyObject d, object value)
         //        {
@@ -144,6 +173,11 @@ namespace CNC.Controls
         {
             base.OnPreviewKeyUp(e);
 
+            // Length units (mm/in) commit on blur/Enter instead (CommitLengthText) - see OnPreviewTextInput's
+            // comment for why live per-keystroke parsing doesn't work once unit-suffix letters are allowed.
+            if (NumericProperties.IsLengthUnit(Unit))
+                return;
+
             if (e.Key == Key.Delete || e.Key == Key.Back)
             {
                 string text = SelectionLength > 0 ? Text.Remove(SelectionStart, SelectionLength) : Text;
@@ -156,6 +190,19 @@ namespace CNC.Controls
 
         protected override void OnPreviewTextInput(TextCompositionEventArgs e)
         {
+            if (NumericProperties.IsLengthUnit(Unit))
+            {
+                // Free typing: digits/'.'/'-'/'"'/letters all accepted live (so "12.5mm" can be typed at
+                // all - rejecting "m" the instant it's typed the way the strict path below does would make
+                // that impossible) - only clearly-invalid characters are blocked. The real parse, including
+                // interpreting a trailing unit suffix, happens on commit (CommitLengthText - OnLostFocus/
+                // Enter), not per keystroke.
+                char c = e.Text.Length > 0 ? e.Text[0] : '\0';
+                e.Handled = !(char.IsDigit(c) || c == '.' || c == '-' || c == '"' || char.IsLetter(c));
+                base.OnPreviewTextInput(e);
+                return;
+            }
+
             TextBox textBox = (TextBox)e.OriginalSource;
             string text = textBox.SelectionLength > 0 ? textBox.Text.Remove(textBox.SelectionStart, textBox.SelectionLength) : textBox.Text;
             text = text.Insert(textBox.CaretIndex, e.Text);
@@ -171,6 +218,12 @@ namespace CNC.Controls
 
         protected override void OnTextChanged(TextChangedEventArgs e)
         {
+            if (NumericProperties.IsLengthUnit(Unit))
+            {
+                base.OnTextChanged(e);   // no live parse/sync - CommitLengthText (OnLostFocus/Enter) does it
+                return;
+            }
+
             double val = 0d;
             if (double.TryParse(Text == string.Empty ? "NaN" : Text, np.Styles, CultureInfo.InvariantCulture, out val))
             {
@@ -197,6 +250,37 @@ namespace CNC.Controls
             }
             else
                 Text = Math.Round(Value, (np.Precision)).ToString(np.DisplayFormat, CultureInfo.InvariantCulture);
+        }
+
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && NumericProperties.IsLengthUnit(Unit))
+                CommitLengthText();
+            base.OnPreviewKeyDown(e);
+        }
+
+        protected override void OnLostFocus(RoutedEventArgs e)
+        {
+            if (NumericProperties.IsLengthUnit(Unit))
+                CommitLengthText();
+            base.OnLostFocus(e);
+        }
+
+        // Parses the currently-typed text (a number, optionally with a trailing mm/in/" unit suffix) into
+        // canonical mm and commits it to Value, then reformats Text cleanly in the field's OWN unit -
+        // dropping whatever suffix was typed (a field always displays in its own unit; typing "1in" into a
+        // mm-displaying field stores/shows 25.4, it does not switch the field to inches). An unparseable
+        // entry is discarded - Text reverts to the last good Value, the same fallback the old per-keystroke
+        // path used (OnTextChanged's final `else` branch).
+        private void CommitLengthText()
+        {
+            if (NumericProperties.TryParseLength(Text, Unit, out double mm))
+            {
+                updateText = false;
+                Value = mm;
+                updateText = true;
+            }
+            Text = FormatValue(Value, Unit, np);
         }
     }
 }

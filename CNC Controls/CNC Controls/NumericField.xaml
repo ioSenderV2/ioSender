@@ -21,6 +21,7 @@
             IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
             Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
             Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+            Unit="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
             ContextMenuOpening="Data_ContextMenuOpening">
             <local:NumericTextBox.ContextMenu>
                 <ContextMenu>
@@ -32,6 +33,6 @@
                 </ContextMenu>
             </local:NumericTextBox.ContextMenu>
         </local:NumericTextBox>
-        <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto"/>
+        <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto"/>
     </Grid>
 </UserControl>

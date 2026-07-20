@@ -116,6 +116,68 @@ namespace CNC.Controls
 
             return ok && len <= np.Length;
         }
+
+        // A "length" unit is one NumericTextBox actually converts (mm <-> in) - every other Unit string
+        // ("mm/min", "s", "deg", "%", ...) passes through completely unaffected, by design (see the
+        // "trigger on Unit==mm/in only" decision - touching only these two keeps ~286 of ~290 existing
+        // NumericField uses byte-for-byte unchanged).
+        public static bool IsLengthUnit(string unit)
+        {
+            return unit == "mm" || unit == "in";
+        }
+
+        public const double MmPerInch = 25.4d;
+
+        // Value already expressed in `unit` -> canonical mm. Non-length units pass through unchanged.
+        public static double ToCanonicalMm(double value, string unit)
+        {
+            return unit == "in" ? value * MmPerInch : value;
+        }
+
+        // Canonical mm -> the given display unit. Non-length units pass through unchanged.
+        public static double FromCanonicalMm(double mm, string unit)
+        {
+            return unit == "in" ? mm / MmPerInch : mm;
+        }
+
+        // Free-form length text ("12.5", "12.5mm", ".5in", "1\"") -> canonical mm. An explicit trailing
+        // unit suffix overrides defaultUnit for THIS value only - it does not change what the field
+        // itself displays afterward (that's still governed by its own effective Unit).
+        public static bool TryParseLength(string text, string defaultUnit, out double mm)
+        {
+            mm = 0d;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            text = text.Trim();
+            string unit = defaultUnit;
+            string numberPart = text;
+
+            if (text.EndsWith("\"", StringComparison.Ordinal))
+            {
+                unit = "in";
+                numberPart = text.Substring(0, text.Length - 1).TrimEnd();
+            }
+            else if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+            {
+                unit = "mm";
+                numberPart = text.Substring(0, text.Length - 2).TrimEnd();
+            }
+            else if (text.EndsWith("in", StringComparison.OrdinalIgnoreCase))
+            {
+                unit = "in";
+                numberPart = text.Substring(0, text.Length - 2).TrimEnd();
+            }
+
+            if (numberPart.Length == 0 || numberPart == "-")
+                return false;
+
+            if (!double.TryParse(numberPart, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out double v))
+                return false;
+
+            mm = ToCanonicalMm(v, unit);
+            return true;
+        }
     }
 
     public class StringRangeRule : ValidationRule

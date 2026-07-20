@@ -66,11 +66,13 @@ namespace GCode_Sender
         private bool sizeFieldsTouched = false;
         private bool loadingInputs = false;   // true only while LoadInputs is assigning - suppresses the touched flag
 
-        // Display-only unit toggle for the Stock size fields (rbUnitsMm/rbUnitsIn) - Width/Height/Thickness/
-        // Spacer's NumericField.Value is whatever's on screen, in THIS unit; every consumer (BuildProgram, the
-        // drawing, warnings, persistence) needs mm, so reads go through ToMm() and mm-sourced writes (loaded
-        // program STOCK comment, persisted config) go through FromMm(). Never touches the fields' own storage
-        // semantics - just where the conversion happens.
+        // Unit toggle for the Stock size fields (rbUnitsMm/rbUnitsIn). NumericField.Value is ALWAYS
+        // canonical mm now (NumericField/NumericTextBox's own mm<->in conversion, driven by the inherited
+        // NumericField.IsImperial attached property set on pnlInputs in Units_Checked/LoadInputs) - every
+        // consumer (BuildProgram, persistence, CheckStockAgainstProgram) reads/writes fldWidth.Value etc.
+        // directly, no ToMm/FromMm wrapping needed there anymore. isImperial + ToMm/FromMm are kept ONLY
+        // for the free-standing mm-in/text-out formatting helpers below (AddDimLabel, FormatLen) that
+        // format an arbitrary mm value for display without going through a NumericField at all.
         private bool isImperial = false;
         private double ToMm(double displayValue) { return isImperial ? displayValue * 25.4d : displayValue; }
         private double FromMm(double mm) { return isImperial ? mm / 25.4d : mm; }
@@ -127,10 +129,13 @@ namespace GCode_Sender
                 sizeFieldsTouched = true;
         }
 
-        // rbUnitsMm/rbUnitsIn toggle: convert each Stock size field's CURRENTLY DISPLAYED value to the new
-        // unit (so the user sees the same physical size, not the same number relabelled) and swap the Unit
-        // labels. Suppressed while LoadInputs is bulk-assigning (it sets isImperial + the radio buttons
-        // directly, in the already-correct order - this handler firing on top would double-convert).
+        // rbUnitsMm/rbUnitsIn toggle: setting NumericField.IsImperial on pnlInputs (the container all 5
+        // Stock size fields live under - see StartJobView.xaml) is the ENTIRE unit switch - every
+        // NumericField underneath re-displays its already-canonical-mm Value in the new unit automatically
+        // (NumericTextBox.OnUnitChanged), no manual per-field conversion needed anymore. Suppressed while
+        // LoadInputs is bulk-assigning (it sets isImperial + the radio buttons directly, in the
+        // already-correct order - this handler firing on top would be redundant, not harmful, but skip it
+        // for the same reason the old code did).
         private void Units_Checked(object sender, RoutedEventArgs e)
         {
             if (loadingInputs)
@@ -140,25 +145,10 @@ namespace GCode_Sender
             if (newImperial == isImperial)
                 return;
 
-            fldWidth.Value = ConvertUnit(fldWidth.Value, isImperial, newImperial);
-            fldHeight.Value = ConvertUnit(fldHeight.Value, isImperial, newImperial);
-            fldThickness.Value = ConvertUnit(fldThickness.Value, isImperial, newImperial);
-            fldSpacer.Value = ConvertUnit(fldSpacer.Value, isImperial, newImperial);
-            fldCornerMargin.Value = ConvertUnit(fldCornerMargin.Value, isImperial, newImperial);
-
             isImperial = newImperial;
-            string unit = isImperial ? "in" : "mm";
-            fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = fldCornerMargin.Unit = unit;
+            NumericField.SetIsImperial(pnlInputs, isImperial);
             UpdateThicknessWarning();
             ShowResult();   // re-format the bottom-left readout (X=/Y=/etc, FormatLen) too, not just the drawing - it was left stale on a unit toggle
-        }
-
-        private static double ConvertUnit(double v, bool fromImperial, bool toImperial)
-        {
-            if (fromImperial == toImperial)
-                return v;
-            double mm = fromImperial ? v * 25.4d : v;
-            return toImperial ? mm / 25.4d : mm;
         }
 
         // Width/Height/Thickness are the operator's own entered numbers for THIS stock - Start Job must never
@@ -182,9 +172,9 @@ namespace GCode_Sender
                 return;
             }
 
-            bool matches = Math.Abs(ToMm(fldWidth.Value) - stock.Value.X) < StockMatchToleranceMm &&
-                           Math.Abs(ToMm(fldHeight.Value) - stock.Value.Y) < StockMatchToleranceMm &&
-                           Math.Abs(ToMm(fldThickness.Value) - stock.Value.Z) < StockMatchToleranceMm;
+            bool matches = Math.Abs(fldWidth.Value - stock.Value.X) < StockMatchToleranceMm &&
+                           Math.Abs(fldHeight.Value - stock.Value.Y) < StockMatchToleranceMm &&
+                           Math.Abs(fldThickness.Value - stock.Value.Z) < StockMatchToleranceMm;
             btnCopyFromStock.Visibility = matches ? Visibility.Collapsed : Visibility.Visible;
         }
 
@@ -197,9 +187,9 @@ namespace GCode_Sender
             loadingInputs = true;   // these three ARE explicit values (from the program), not a silent restore -
             try                     // suppress MarkSizeFieldsTouched's per-field firing so we can set it once below
             {
-                fldWidth.Value = FromMm(stock.Value.X);
-                fldHeight.Value = FromMm(stock.Value.Y);
-                fldThickness.Value = FromMm(stock.Value.Z);
+                fldWidth.Value = stock.Value.X;
+                fldHeight.Value = stock.Value.Y;
+                fldThickness.Value = stock.Value.Z;
                 UpdateThicknessWarning();
             }
             finally
@@ -218,7 +208,7 @@ namespace GCode_Sender
         private void UpdateThicknessWarning()
         {
             if (txtThickWarn != null)
-                txtThickWarn.Visibility = ToMm(fldThickness.Value) > MaxStockThicknessMm ? Visibility.Visible : Visibility.Collapsed;
+                txtThickWarn.Visibility = fldThickness.Value > MaxStockThicknessMm ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // The width/height fields are the actual size when not measuring; when Measure is on they are only a
@@ -643,7 +633,7 @@ namespace GCode_Sender
             }
             else
             {
-                double ew = Math.Max(ToMm(fldWidth.Value), 1d), eh = Math.Max(ToMm(fldHeight.Value), 1d);
+                double ew = Math.Max(fldWidth.Value, 1d), eh = Math.Max(fldHeight.Value, 1d);
                 mx[1] = 0d;  my[1] = 0d;     // FL
                 mx[2] = ew;  my[2] = 0d;     // FR
                 mx[3] = 0d;  my[3] = eh;     // BL
@@ -691,8 +681,8 @@ namespace GCode_Sender
             canvas.Children.Add(poly);
 
             // dimensions: X along the front edge (FL->FR), Y along the left edge (FL->BL)
-            double dimX = measured && measuredX.HasValue ? measuredX.Value : Math.Max(ToMm(fldWidth.Value), 0d);
-            double dimY = measured && measuredY.HasValue ? measuredY.Value : Math.Max(ToMm(fldHeight.Value), 0d);
+            double dimX = measured && measuredX.HasValue ? measuredX.Value : Math.Max(fldWidth.Value, 0d);
+            double dimY = measured && measuredY.HasValue ? measuredY.Value : Math.Max(fldHeight.Value, 0d);
             AddDimLabel(canvas, P(1), P(2), dimX);
             AddDimLabel(canvas, P(1), P(3), dimY);
 
@@ -1075,7 +1065,7 @@ namespace GCode_Sender
             // one, else the machine's full work envelope (ProgramView.Stock - computed fresh, never a stale
             // cached value). Typed dimensions bigger than that bound are certainly wrong, regardless of who set them.
             var bound = CNC.Controls.ProgramView.LoadedJob?.Stock;
-            double widthMm = ToMm(fldWidth.Value), heightMm = ToMm(fldHeight.Value), thicknessMm = ToMm(fldThickness.Value);
+            double widthMm = fldWidth.Value, heightMm = fldHeight.Value, thicknessMm = fldThickness.Value;
             if (bound != null && bound.Value.X > 0d && bound.Value.Y > 0d &&
                 (widthMm > bound.Value.X || heightMm > bound.Value.Y || (bound.Value.Z > 0d && thicknessMm > bound.Value.Z)))
             {
@@ -1110,7 +1100,7 @@ namespace GCode_Sender
             // hardware: 5mm was not enough and broke a probe tip. 10mm is the field's own default; warn (not
             // block) below that so an operator who knows their setup can still go tighter deliberately.
             const double minSafeZDeltaMm = 10d;
-            double safeZDeltaMm = ToMm(fldCornerMargin.Value);
+            double safeZDeltaMm = fldCornerMargin.Value;
             if (measure && safeZDeltaMm < minSafeZDeltaMm)
             {
                 if (AppDialogs.Show(string.Format("Safe Z delta is {0} mm - less than the recommended {1} mm minimum. Too little clearance here can clip the stock/fixture crossing between corners. Generate anyway?",
@@ -1121,7 +1111,7 @@ namespace GCode_Sender
 
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
-                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, ToMm(fldSpacer.Value), thicknessMm, touchPlate, stockConductive, ToMm(fldCornerMargin.Value), exactSize)
+                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value, thicknessMm, touchPlate, stockConductive, fldCornerMargin.Value, exactSize)
                 : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p));
             ResetResults();
             SaveInputs();
@@ -1147,12 +1137,12 @@ namespace GCode_Sender
                 isImperial = s.IsImperial;
                 rbUnitsIn.IsChecked = isImperial;
                 rbUnitsMm.IsChecked = !isImperial;
-                fldWidth.Unit = fldHeight.Unit = fldThickness.Unit = fldSpacer.Unit = fldCornerMargin.Unit = isImperial ? "in" : "mm";
-                fldWidth.Value = FromMm(s.Width);
-                fldHeight.Value = FromMm(s.Height);
-                fldThickness.Value = FromMm(s.Thickness);
-                fldSpacer.Value = FromMm(s.SpacerThickness);
-                fldCornerMargin.Value = FromMm(s.CornerTravelMarginMm);
+                NumericField.SetIsImperial(pnlInputs, isImperial);
+                fldWidth.Value = s.Width;
+                fldHeight.Value = s.Height;
+                fldThickness.Value = s.Thickness;
+                fldSpacer.Value = s.SpacerThickness;
+                fldCornerMargin.Value = s.CornerTravelMarginMm;
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkMeasure.IsChecked = s.Measure;
                 chkRotate.IsChecked = s.ApplyRotation;
@@ -1179,11 +1169,11 @@ namespace GCode_Sender
             {
                 StartJobConfig.Section = new StartJobSettings
                 {
-                    Width = ToMm(fldWidth.Value),
-                    Height = ToMm(fldHeight.Value),
-                    Thickness = ToMm(fldThickness.Value),
-                    SpacerThickness = ToMm(fldSpacer.Value),
-                    CornerTravelMarginMm = ToMm(fldCornerMargin.Value),
+                    Width = fldWidth.Value,
+                    Height = fldHeight.Value,
+                    Thickness = fldThickness.Value,
+                    SpacerThickness = fldSpacer.Value,
+                    CornerTravelMarginMm = fldCornerMargin.Value,
                     IsImperial = isImperial,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
@@ -1681,7 +1671,7 @@ namespace GCode_Sender
             if (tokens == null || tokens.Count == 0)
                 return;
 
-            double stockH = ToMm(fldHeight.Value);
+            double stockH = fldHeight.Value;
             if (stockH <= 0d)
                 return;
 

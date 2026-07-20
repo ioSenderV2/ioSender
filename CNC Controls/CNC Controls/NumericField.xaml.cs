@@ -98,11 +98,41 @@ namespace CNC.Controls
             set { SetValue(LabelProperty, value); }
         }
 
-        public static readonly DependencyProperty UnitProperty = DependencyProperty.Register(nameof(Unit), typeof(string), typeof(NumericField), new PropertyMetadata("mm"));
+        public static readonly DependencyProperty UnitProperty = DependencyProperty.Register(nameof(Unit), typeof(string), typeof(NumericField), new PropertyMetadata("mm", OnUnitOrIsImperialChanged));
         public string Unit
         {
             get { return (string)GetValue(UnitProperty); }
             set { SetValue(UnitProperty, value); }
+        }
+
+        // Inheritable (FrameworkPropertyMetadataOptions.Inherits) - set ONCE on a container (a tab's root
+        // panel/GroupBox) and every NumericField underneath picks it up automatically, no per-field wiring.
+        // Only affects fields whose own Unit is "mm"/"in" (see NumericProperties.IsLengthUnit) - a field
+        // declared with Unit="deg"/"s"/"mm/min"/etc is never touched by this, inherited or not.
+        public static readonly DependencyProperty IsImperialProperty = DependencyProperty.RegisterAttached(
+            "IsImperial", typeof(bool), typeof(NumericField),
+            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits, OnUnitOrIsImperialChanged));
+        public static bool GetIsImperial(DependencyObject obj) { return (bool)obj.GetValue(IsImperialProperty); }
+        public static void SetIsImperial(DependencyObject obj, bool value) { obj.SetValue(IsImperialProperty, value); }
+
+        // The unit this field actually displays/parses in right now: Unit itself for a non-length field
+        // (pass-through, unaffected by IsImperial), else "in"/"mm" per the inherited IsImperial flag. The
+        // Label (unit suffix text) and NumericTextBox (parsing/formatting/conversion) both read THIS, not
+        // the raw Unit - Unit stays the field's fixed "native declaration" (XAML keeps writing Unit="mm"
+        // exactly as before; only the effective display/parse unit toggles).
+        private static readonly DependencyPropertyKey EffectiveUnitPropertyKey = DependencyProperty.RegisterReadOnly(
+            nameof(EffectiveUnit), typeof(string), typeof(NumericField), new PropertyMetadata("mm"));
+        public static readonly DependencyProperty EffectiveUnitProperty = EffectiveUnitPropertyKey.DependencyProperty;
+        public string EffectiveUnit
+        {
+            get { return (string)GetValue(EffectiveUnitProperty); }
+            private set { SetValue(EffectiveUnitPropertyKey, value); }
+        }
+
+        private static void OnUnitOrIsImperialChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is NumericField nf)
+                nf.EffectiveUnit = NumericProperties.IsLengthUnit(nf.Unit) ? (GetIsImperial(nf) ? "in" : "mm") : nf.Unit;
         }
 
         public static readonly DependencyProperty Tooltip2Property = DependencyProperty.Register(nameof(Tooltip2), typeof(string), typeof(NumericField), new PropertyMetadata(string.Empty));
