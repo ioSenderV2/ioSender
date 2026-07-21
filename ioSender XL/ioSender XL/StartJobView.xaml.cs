@@ -337,14 +337,31 @@ namespace GCode_Sender
         // exactly what caused an Alarm:5 probe fail mid-Start-Job (the 12 mm search cap missed because the
         // saved Z was too far above the spoilboard) - offering it here just invites repeating that instead of
         // validating it in Machine Setup first.
+        // Synthetic "fixture" for the raw firmware G28 stored position - never added to Fixtures.Items/App.config,
+        // just an always-available dropdown entry that recreates the ORIGINAL pre-Fixture-library Start Job
+        // behavior: a loose DISCOVER-mode probe of corner 1 anchored at G28 (read live from the controller at
+        // run-time - #5161/#5162/#5163 - never known to ioSender at generate-time, unlike a real Fixture's cached
+        // Coords/CornerOffsetX/Y/SpoilboardZ), then everything downstream (corners 2-4, Measure, rotation, TLO
+        // ref, origin) runs exactly like a real Corner Fence fixture - it only ever consumes corner 1's OUTPUT
+        // (c1x/c1y/c1z), not how it was obtained. Identified by REFERENCE equality (IsG28), not a name/Kind
+        // match, so a user-named fixture happening to also be called "G28" can never collide with this.
+        // PositionValidated=true so it clears Generate_Click's own "fx.PositionValidated" gate below - it's not
+        // a REAL validated position (there is none to validate - see the class comment), just enough to make
+        // this synthetic entry behave like a normal selectable fixture. Whether G28 itself is actually set is
+        // checked separately, explicitly, in Generate_Click (jog-and-confirm dialog), not via this flag.
+        private static readonly Fixture G28Fixture = new Fixture { Name = "G28 (loose probe)", Kind = FixtureKind.CornerFence, PositionValidated = true };
+        private static bool IsG28(Fixture fx) { return ReferenceEquals(fx, G28Fixture); }
+
         private void RefreshFixtures()
         {
             string current = SelectedFixture?.Name;
             if (string.IsNullOrEmpty(current))
                 current = StartJobConfig.Section?.Fixture;
-            cbxFixture.ItemsSource = Fixtures.Items.Where(f => f.PositionValidated).ToList();
+            var items = Fixtures.Items.Where(f => f.PositionValidated).ToList();
+            items.Add(G28Fixture);   // always available - synthetic, not a saved/validated fixture (see its own comment)
+            cbxFixture.ItemsSource = items;
             if (!string.IsNullOrEmpty(current))
-                cbxFixture.SelectedItem = (cbxFixture.ItemsSource as List<Fixture>).FirstOrDefault(f => f.Name == current);
+                cbxFixture.SelectedItem = items.FirstOrDefault(f => f.Name == current);
         }
 
         private Fixture SelectedFixture { get { return cbxFixture.SelectedItem as Fixture; } }
@@ -1087,6 +1104,25 @@ namespace GCode_Sender
                 return;
             }
 
+            // G28 has no per-fixture saved position to validate (see G28Fixture's own comment) - instead check
+            // the controller's ACTUAL G28 directly, and if it was never set, offer to set it right here rather
+            // than a generic PREREQ failure: the operator still needs to jog somewhere first regardless, so
+            // asking them to do that AND set G28 in one step is more useful than a bare "G28 is not set" refusal
+            // that leaves them to go do it some other way. Cancel aborts Generate entirely, same as everywhere
+            // else a prerequisite isn't met.
+            if (IsG28(fx))
+            {
+                GrblWorkParameters.Get(model);   // fresh $# read - a stale cached value could misreport "set"
+                if (!MacroProcessor.CoordinateSystemDefined("G28"))
+                {
+                    if (AppDialogs.Show("G28 is not set. Jog to the position you want to probe the spoilboard Z from - clear of the stock in X/Y, within ~10mm above the spoilboard in Z - then click OK to set G28 there. Cancel aborts.",
+                            "Start Job", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                        return;
+                    if (!MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false))
+                        return;
+                }
+            }
+
             // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y and reuses Fixture.SpoilboardZ
             // instead of locating the corner + spoilboard fresh (see BuildProgram) - a fixture saved/tested
             // before those features shipped (or one whose Coords was re-set since, which zeros both - see
@@ -1097,7 +1133,7 @@ namespace GCode_Sender
             // OR, not AND: SpoilboardZ was added after CornerOffsetX/Y (same Test run captures all three
             // together now), so a fixture tested between those two changes could have X/Y populated but
             // SpoilboardZ still 0 - any ONE of the three being unset makes #<_bottom> below untrustworthy.
-            if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
+            if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
                 && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
             {
                 AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
@@ -1451,6 +1487,10 @@ namespace GCode_Sender
             L("(within 10mm above the spoilboard in Z - see Test position in Fixture definitions.)");
             L("(Estimated size MUST be conservative - a few mm larger than actual - so far refs land just outside.)");
             L("(Requires grblHAL NGC expressions + pcorner.macro on the controller. VALIDATE before trusting.)");
+            // G28 (the loose-probe synthetic fixture) reads its corner-1 reference live from the controller's
+            // own G28 stored position at run-time. NOT required here via a plain PREREQ condition - Generate_Click
+            // handles an unset G28 explicitly (jog-and-confirm dialog, sets it itself), so by the time this
+            // program ever streams, G28 is guaranteed set.
             L("(PREREQ, connected, homed, EXPR, ATC=1, G30, G59.3)");
             L("G21 G90 G94 G17");
             L("G49");
@@ -1509,22 +1549,41 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
 
-            // Corner 1 = the selected origin corner: reference = the fixture instance's saved position. REUSE
-            // mode (NOT DISCOVER/9999) - Fixture.SpoilboardZ (FixtureEditDialog's "Test position", a one-time
-            // probe against the physical fence/spoilboard) seeds #<_bottom> directly, so this call skips
-            // pcorner.macro's own spoilboard probe entirely instead of re-running it every job (same "trust the
-            // once-tested fixture reference" model CornerOffsetX/Y already uses for the corner XY - see the
-            // "double probe of corner 1" backlog item). topx/topy point straight at CornerOffsetX/Y's tight
-            // ~5mm-inset anchor, same as before. CornerOffsetX/Y encode the true corner's position under
-            // sx=sy=+1 (SelectedCorner is always FrontLeft today - see its getter) plus the same 5mm interior
-            // inset the old exact-size re-probe used (topx = offset + inset lands 5mm inside the true corner,
-            // same derivation as corner 2's own hand-specified anchor below).
-            const double cornerInsetMm = 5d;
+            // Corner 1 = the selected origin corner.
             L(string.Format("(--- corner 1 = {0} (origin): reference {1} ---)", cornerName, fx.Name));
-            L(string.Format("#<_bottom> = [{0} + {1}]", N(fx.SpoilboardZ), N(spacer)));
-            L(string.Format("#<_ls_topx> = {0}", N(fx.CornerOffsetX + cornerInsetMm)));
-            L(string.Format("#<_ls_topy> = {0}", N(fx.CornerOffsetY + cornerInsetMm)));
-            EmitCall(id1, refX, refY, "0");
+            if (IsG28(fx))
+            {
+                // G28 (loose-probe synthetic fixture, see its own comment): DISCOVER mode (9999), anchored at
+                // the controller's own G28 stored position - read live via #5161/#5162/#5163 (grblHAL's G28
+                // named parameters), never known to ioSender at generate-time, unlike a real Fixture's cached
+                // Coords. pcorner.macro probes the spoilboard AND the stock top itself here (both unknown), so
+                // topx/topy use the same LOOSE topClearance corners 2-4 already fall back to - there is no tight
+                // per-fixture offset to point at. This recreates the exact behavior Start Job had before
+                // Fixture.CornerOffsetX/Y/SpoilboardZ existed (see pcorner.macro's own "old firmware G28 slot"
+                // reference).
+                L("#<_ls_spoilz> = #5163");
+                L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
+                L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
+                EmitCall(id1, "#5161", "#5162", "9999");
+            }
+            else
+            {
+                // REUSE mode (NOT DISCOVER/9999) - Fixture.SpoilboardZ (FixtureEditDialog's "Test position", a
+                // one-time probe against the physical fence/spoilboard) seeds #<_bottom> directly, so this call
+                // skips pcorner.macro's own spoilboard probe entirely instead of re-running it every job (same
+                // "trust the once-tested fixture reference" model CornerOffsetX/Y already uses for the corner
+                // XY - see the "double probe of corner 1" backlog item). topx/topy point straight at
+                // CornerOffsetX/Y's tight ~5mm-inset anchor, same as before. CornerOffsetX/Y encode the true
+                // corner's position under sx=sy=+1 (SelectedCorner is always FrontLeft today - see its getter)
+                // plus the same 5mm interior inset the old exact-size re-probe used (topx = offset + inset
+                // lands 5mm inside the true corner, same derivation as corner 2's own hand-specified anchor
+                // below).
+                const double cornerInsetMm = 5d;
+                L(string.Format("#<_bottom> = [{0} + {1}]", N(fx.SpoilboardZ), N(spacer)));
+                L(string.Format("#<_ls_topx> = {0}", N(fx.CornerOffsetX + cornerInsetMm)));
+                L(string.Format("#<_ls_topy> = {0}", N(fx.CornerOffsetY + cornerInsetMm)));
+                EmitCall(id1, refX, refY, "0");
+            }
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));   // restore for corners 2-4's default (non-exact) path below
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             L("#<c1x> = #<_corner_x>");

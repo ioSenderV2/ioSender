@@ -793,8 +793,12 @@ namespace CNC.Controls
 
         // A stored position/offset is treated as "set" if any axis is non-zero. grbl has no explicit
         // "is defined" flag - these default to zero - so one deliberately left at machine zero would
-        // read as unset. Values come from the $# report (GrblWorkParameters), fetched up front in Run.
-        private static bool CoordinateSystemDefined(string code)
+        // read as unset. Values come from the $# report (GrblWorkParameters) - call GrblWorkParameters.Get(model)
+        // first for a fresh read (Run's own PREREQ path does this once up front; a caller checking a stored
+        // position OUTSIDE a PREREQ string, e.g. StartJobView's G28 fixture, must fetch it itself). Public so
+        // callers besides Run's own PREREQ evaluator (e.g. StartJobView, deciding whether to prompt the operator
+        // to set G28 before Generate) can reuse the exact same "is it set" definition instead of duplicating it.
+        public static bool CoordinateSystemDefined(string code)
         {
             var cs = GrblWorkParameters.GetCoordinateSystem(code);
             if (cs == null)
