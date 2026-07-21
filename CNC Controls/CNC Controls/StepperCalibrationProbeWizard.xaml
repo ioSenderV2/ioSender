@@ -37,6 +37,9 @@
                         Value="{Binding TrueWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                     <local:NumericField x:Uid="fld_scpTrueH" x:Name="fldTrueHeight" Label="True height (Y):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
                         Value="{Binding TrueHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                    <local:NumericField x:Uid="fld_scpCornerMargin" x:Name="fldCornerMargin" Label="Safe Z delta:" ColonAt="150" Format="##0.0##" Unit="mm" Margin="0,2"
+                        Value="{Binding CornerTravelMarginMm, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                        ToolTip="Corners 2/3 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
                     <Separator Margin="5,6"/>
                     <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,4" Text="Measured:  X = -   Y = -"/>
                     <TextBlock x:Name="txtSummary" TextWrapping="Wrap" Margin="5,4,5,4"/>

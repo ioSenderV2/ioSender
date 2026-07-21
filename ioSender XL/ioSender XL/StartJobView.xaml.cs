@@ -2168,12 +2168,7 @@ namespace GCode_Sender
             L(string.Format("(PRINT, LS_VISE_CX{0}={1})", cornerId, outXVar));
         }
 
-        private static void EmitGotoG30(System.Action<string> L)
-        {
-            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
-            L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
-            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
-        }
+        private static void EmitGotoG30(System.Action<string> L) => CNC.Controls.MacroProcessor.EmitGotoG30(L);
 
         // Tool-length reference at the toolsetter puck, right after the origin corner while WCO is still 0.
         // "M6 T8" is tc.macro's own sentinel for this ("probe already in spindle, skip the swap prompt") but

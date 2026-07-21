@@ -62,6 +62,16 @@ namespace CNC.Controls
             set { SetValue(TrueHeightProperty, value); }
         }
 
+        // Same field/purpose as StartJobView's fldCornerMargin ("Safe Z delta"): corners 2/3 travel at corner 1's
+        // own measured stock top plus this delta instead of retracting fully to machine top between corners.
+        // Default (15) matches the value this was hardcoded to before the field existed.
+        public static readonly DependencyProperty CornerTravelMarginMmProperty = DependencyProperty.Register(nameof(CornerTravelMarginMm), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(15d));
+        public double CornerTravelMarginMm
+        {
+            get { return (double)GetValue(CornerTravelMarginMmProperty); }
+            set { SetValue(CornerTravelMarginMmProperty, value); }
+        }
+
         public StepperCalibrationProbeWizard()
         {
             InitializeComponent();
@@ -284,7 +294,7 @@ namespace CNC.Controls
             btnSave.IsEnabled = false;
             ShowResult();
 
-            program = BuildProgram(fx, p, trueW, trueH);
+            program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm);
             MacroProcessor.PublishGenerated("Stepper calibration (probe)", program, EnsureProgramView, () => programView);
         }
 
@@ -360,7 +370,7 @@ namespace CNC.Controls
         // both tight/"exact" references derived from the ENTERED true size - the whole premise of this
         // tool is that size is already precisely known, so there's no need for a loose locate pass. Same
         // "5mm inset" anchor formula as StartJobView.BuildProgram's own exact-size corners 2/3.
-        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm)
+        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm, double cornerTravelMarginMm)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -416,7 +426,7 @@ namespace CNC.Controls
             b.AppendLine("#<c1x> = #<_corner_x>");
             b.AppendLine("#<c1y> = #<_corner_y>");
             b.AppendLine("#<c1z> = #<_corner_z>");
-            b.AppendLine("#<c1_maxz> = [#<c1z> + 15]");
+            b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
 
             // Corner 2 (X-neighbour, FrontRight, id=2) - tight reference from the ENTERED true width.
             b.AppendLine("(--- corner 2 (X-neighbour) ---)");
@@ -446,8 +456,8 @@ namespace CNC.Controls
             b.AppendLine("#<size_y> = [#<c3y> - #<c1y>]");
             b.AppendLine("(PRINT, CAL_Y=#<size_y>)");
 
-            b.AppendLine("(--- park clear - no origin/WCS is set by this tool, it only measures ---)");
-            b.AppendLine("G53 G0 Z0");
+            b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
+            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("M2");
 
             return b.ToString();
@@ -460,12 +470,13 @@ namespace CNC.Controls
 
         protected override StepperCalProbeParams Config { get { return SectionConfig; } set { SectionConfig = value; } }
 
-        protected override DependencyProperty[] PersistedProperties => new[] { TrueWidthProperty, TrueHeightProperty };
+        protected override DependencyProperty[] PersistedProperties => new[] { TrueWidthProperty, TrueHeightProperty, CornerTravelMarginMmProperty };
 
         protected override void ApplyConfig(StepperCalProbeParams p)
         {
             TrueWidth = p.TrueWidth;
             TrueHeight = p.TrueHeight;
+            CornerTravelMarginMm = p.CornerTravelMarginMm;
             restoreFixtureName = p.FixtureName;
         }
 
@@ -475,6 +486,7 @@ namespace CNC.Controls
             {
                 TrueWidth = TrueWidth,
                 TrueHeight = TrueHeight,
+                CornerTravelMarginMm = CornerTravelMarginMm,
                 FixtureName = SelectedFixture?.Name ?? restoreFixtureName
             };
         }
@@ -492,6 +504,7 @@ namespace CNC.Controls
     public class StepperCalProbeParams
     {
         public double TrueWidth = 400d, TrueHeight = 400d;
+        public double CornerTravelMarginMm = 15d;
         public string FixtureName = string.Empty;
     }
 }
