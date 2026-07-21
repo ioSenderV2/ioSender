@@ -169,7 +169,7 @@ namespace GCode_Sender
 
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, onDone) => RunStreamedJobInPlace(m, name, code, onDone);
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, onDone);
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
             // instance must not become a pipe listener either, or a later normal launch would silently
@@ -942,7 +942,7 @@ namespace GCode_Sender
         // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
         // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
         // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, System.Action onDone)
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, System.Action onDone)
         {
             if (code == null || code.Length == 0)
             {
@@ -971,20 +971,40 @@ namespace GCode_Sender
                 _macroRunView.SetProgram(prog.Data);
                 _macroRunView.Connect();
             }
-            RestoreSourceOnEnd(m, prog, onDone);   // revert to the job source when THIS burst ends, then signal completion
+            RestoreSourceOnEnd(m, prog, isFinalBurst, onDone);   // revert to the job source when THIS burst ends, then signal completion
 
             // Defer CycleStart to a clean dispatcher cycle. Starting it synchronously
             // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
             // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
             // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
+            //
+            // Background is the lowest priority above idle, so on a macro that streams several short bursts back
+            // to back (e.g. Start Job's park move, or Stepper Calibration's per-corner probes) this can be starved
+            // behind a stream of Normal-priority work (status-report handling, THIS burst's own onDone dispatch)
+            // long enough that it doesn't run until AFTER the burst it belongs to has already finished and
+            // RestoreSourceOnEnd already cleared RunControl.Source. Firing CycleStart at that point still starts
+            // real motion (StreamingState -> Send, GrblState -> Run) but with no RestoreSourceOnEnd handler left
+            // subscribed to catch it (it already unsubscribed at the real terminal state) - MacroProcessor's very
+            // next (WAITIDLE) then walks straight into that untracked stream and aborts ("controller did not
+            // return to idle"), even though the real burst completed cleanly. Confirmed via DebugLog("macro")
+            // tracing 2026-07-21: StreamProgram's wait loop exited with StreamingState already back to Send/Run,
+            // with no corresponding RestoreSourceOnEnd trace for that transition - i.e. nobody's handler was even
+            // watching it. Guard: only actually start if this burst's transient is still the active source: if
+            // RestoreSourceOnEnd already reverted it, this CycleStart is stale and must be skipped.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new System.Action(() => RunControl.CycleStart(0, false)));   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
+                new System.Action(() =>
+                {
+                    if (RunControl.Source == prog)
+                        RunControl.CycleStart(0, false);   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
+                    else
+                        CNC.Core.DebugLog.Write("macro", "RunStreamedJobInPlace: skipped stale deferred CycleStart - burst already finished");
+                }));
         }
 
         // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
         // arm on the first running state, fire on the next terminal one, then unsubscribe. onDone (may be null)
         // is MacroProcessor's completion signal for THIS burst - see Flush's 'wait' parameter.
-        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, System.Action onDone)
+        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
         {
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
@@ -993,6 +1013,8 @@ namespace GCode_Sender
                 if (e.PropertyName != nameof(GrblViewModel.StreamingState))
                     return;
                 var st = m.StreamingState;
+                CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: StreamingState -> {0} (started={1}, GrblState={2})",
+                    st, started, m.GrblState.State));
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
                 // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
@@ -1002,30 +1024,55 @@ namespace GCode_Sender
                 // Halted are ALSO terminal here (a failed burst - e.g. a probe miss - stays in Error until the
                 // operator clicks Stop/Reset): MacroProcessor.Flush can block on onDone (see its 'wait' param), so
                 // this must fire on a failure too, or a mid-macro error would hang Run() until manual intervention.
-                else if (started && (st == StreamingState.Idle || st == StreamingState.NoFile || st == StreamingState.Error || st == StreamingState.Halted))
+                //
+                // NOTE: deliberately fires on the FIRST Idle/NoFile report, not a debounced Nth one - a
+                // debounce here was tried (2026-07-21) and reverted: it requires a SECOND PropertyChanged
+                // notification for StreamingState, but that property only raises PropertyChanged when its
+                // VALUE actually changes - once it settles at Idle, no further report retriggers it, so a
+                // per-report debounce here gets permanently stuck (Flush hangs forever, no message, no
+                // timeout). The real "trailing motion after Idle" race this was trying to catch is instead
+                // handled at the WaitForIdle end (see its comment) using report-driven polling, which DOES
+                // correctly observe every incoming status report regardless of whether a property value
+                // technically changed.
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile && st != StreamingState.Error && st != StreamingState.Halted))
+                    return;
+
+                m.PropertyChanged -= handler;
+                Dispatcher.BeginInvoke(new System.Action(() =>
                 {
-                    m.PropertyChanged -= handler;
-                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    // Revert the streamer to the loaded job, but ONLY if this burst's transient is still the
+                    // source. A stay-put run (Load Stock) streams several bursts back-to-back (the park move,
+                    // then each O<...> CALL); each reverts its own source at its idle, and the guard stops a
+                    // finishing burst from clobbering the source a later burst already set. The tool's own
+                    // ProgramView stays connected across ALL bursts (so each is marked in it and the Job view
+                    // is never touched); the full teardown - disconnect the view, clear the active program -
+                    // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
+                    if (RunControl.Source == prog)
+                        RunControl.Source = null;
+
+                    // The macro's whole run just finished (isFinalBurst) with no error: hide the program view
+                    // completely rather than leaving it sitting in its Compact 3-line state showing wherever
+                    // the last executed line happened to land - there's nothing actionable left to look at.
+                    // Works uniformly for a tool's own preview pane (Start Job, Stepper Calibration, ...) and
+                    // the shared _macroRunView alike, since both go through the same ProgramView.Active/
+                    // Disconnect mechanism. On error (Halted/Error) the view is left up on purpose - see the
+                    // fallback branch below - so the operator can see where/what failed.
+                    if (isFinalBurst && (st == StreamingState.Idle || st == StreamingState.NoFile))
                     {
-                        // Revert the streamer to the loaded job, but ONLY if this burst's transient is still the
-                        // source. A stay-put run (Load Stock) streams several bursts back-to-back (the park move,
-                        // then each O<...> CALL); each reverts its own source at its idle, and the guard stops a
-                        // finishing burst from clobbering the source a later burst already set. The tool's own
-                        // ProgramView stays connected across ALL bursts (so each is marked in it and the Job view
-                        // is never touched); the full teardown - disconnect the view, clear the active program -
-                        // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
-                        if (RunControl.Source == prog)
-                            RunControl.Source = null;
-                        // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
-                        // it); a tool's own view is left alone - it closes on tab-leave.
-                        if (_macroRunViewTimer != null && CNC.Controls.ProgramView.Active == _macroRunView)
-                        {
-                            _macroRunViewTimer.Stop();
-                            _macroRunViewTimer.Start();
-                        }
-                        onDone?.Invoke();
-                    }));
-                }
+                        _macroRunViewTimer?.Stop();
+                        CNC.Controls.ProgramView.Active?.Disconnect();
+                    }
+                    // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
+                    // it); a tool's own view is left alone - it closes on tab-leave.
+                    else if (_macroRunViewTimer != null && CNC.Controls.ProgramView.Active == _macroRunView)
+                    {
+                        _macroRunViewTimer.Stop();
+                        _macroRunViewTimer.Start();
+                    }
+                    CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: about to invoke onDone, StreamingState={0} GrblState={1}",
+                        m.StreamingState, m.GrblState.State));
+                    onDone?.Invoke();
+                }));
             };
             m.PropertyChanged += handler;
         }

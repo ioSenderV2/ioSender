@@ -100,7 +100,10 @@ namespace CNC.Controls
         // a background dispatcher tick (see the implementation), so this call returns before the burst actually
         // starts - onDone is invoked once it reaches a true terminal state, letting StreamProgram optionally
         // wait for it (see Flush's 'wait' parameter) instead of racing the next burst against this one.
-        public static System.Action<GrblViewModel, string, string[], System.Action> RunStreamedJobInPlace;
+        // isFinalBurst (added alongside the wait plumbing below): true only for the macro's own fire-and-forget
+        // closing burst (Flush's wait=false call) - the host uses it to tell "the whole macro just finished" apart
+        // from "one more mid-macro burst just finished, more is coming right behind it".
+        public static System.Action<GrblViewModel, string, string[], bool, System.Action> RunStreamedJobInPlace;
 
         // Name given to the in-memory program when a flush is streamed (set per run).
         private static string _streamName = "Macro";
@@ -270,6 +273,19 @@ namespace CNC.Controls
             view.Connect();
         }
 
+        // Shared by every generator that parks at G30 (StartJobView, StepperCalibrationProbeWizard, ...):
+        // lift to machine top, traverse to the G30 X/Y, then descend to G30 Z. #<_abs_x>/#<_abs_y> are grblHAL's
+        // own live current-machine-position named parameters; every G53 move NAMES both axes explicitly (never a
+        // bare "G53 G0 Z0") - a firmware bug sign-flips a homing-direction-inverted ($23) axis's parser base
+        // after a G53 move that leaves it "unmoved", producing a false Alarm:2. 'L' emits one line (a caller's
+        // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
+        public static void EmitGotoG30(System.Action<string> L)
+        {
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
+            L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
+            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
+        }
+
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
         // Received command line was not executed") and the stream never recovers from the lost line - so an
         // auto-generated comment with interpolated names (a probe/fixture name, say) can silently break an
@@ -378,11 +394,19 @@ namespace CNC.Controls
                 return;
 
             bool done = false;
-            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), () => done = true);
+            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, () =>
+            {
+                done = true;
+                DebugLog.Write("macro", string.Format("StreamProgram: onDone fired, StreamingState={0} GrblState={1}",
+                    model.StreamingState, model.GrblState.State));
+            });
 
             if (wait)
                 while (!done)
                     EventUtils.DoEvents();
+
+            DebugLog.Write("macro", string.Format("StreamProgram: wait loop exited (wait={0}), StreamingState={1} GrblState={2}",
+                wait, model.StreamingState, model.GrblState.State));
         }
 
         // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -
@@ -606,12 +630,23 @@ namespace CNC.Controls
         // while EventUtils.DoEvents keeps status reports (and the UI) flowing.
         private static bool WaitForIdle(GrblViewModel model)
         {
-            // A (WAITIDLE) reached while a flow-controlled job is streaming is a program/structure error: the
-            // stream sequences itself, and pumping the UI here waiting on a job that drives its own completion
-            // can wedge the UI. Fail loudly (abort the macro) instead of hanging.
-            if (model.StreamingState == StreamingState.Send)
-                return false;
+            DebugLog.Write("macro", string.Format("WaitForIdle: enter, StreamingState={0} GrblState={1}",
+                model.StreamingState, model.GrblState.State));
 
+            // NOTE: this used to hard-fail immediately if model.StreamingState == StreamingState.Send on
+            // entry ("a (WAITIDLE) reached while a flow-controlled job is streaming is a program/structure
+            // error"). That check is gone: RunStreamedJobInPlace streams OUR OWN macro bursts through the
+            // exact same StreamingState machinery a real loaded-job run uses, and the two are indistinguishable
+            // from here. In practice, right after Flush(wait:true) returns, StreamingState can already be back
+            // to Send/GrblState=Run because the burst's own trailing motion (e.g. a G30 park rapid) resumed a
+            // moment after RestoreSourceOnEnd's Idle detection fired onDone - confirmed via DebugLog("macro")
+            // tracing + the raw comms log 2026-07-21 (StartJobView and StepperCalibrationProbeWizard both hit
+            // this). The polling below already handles that correctly by construction - it reads GrblState.State
+            // fresh on every incoming status report (not gated on a property VALUE change like a PropertyChanged
+            // subscription would be), waits for genuine motion to start, then requires two consecutive real Idle
+            // reports before trusting completion - so falling straight into it here just waits out that trailing
+            // window instead of aborting on it. A GENUINELY still-running unrelated job is still bounded by the
+            // stall/disconnect check below (2 consecutive silent report timeouts), so this can't hang forever.
             var token = new CancellationToken();
 
             // A $F= job acks immediately and only then starts running, so first wait briefly for
@@ -625,13 +660,19 @@ namespace CNC.Controls
                 PumpForReport(model, token, 500);
 
                 if (model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
+                {
+                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - GrblState={0} while waiting to observe motion start", model.GrblState.State));
                     return false;
+                }
 
                 started = model.GrblState.State != GrblStates.Idle;
             }
 
             if (!started)
+            {
+                DebugLog.Write("macro", "WaitForIdle: never observed motion start within 2000ms - treating as already-finished");
                 return true;    // job finished (or produced no motion) before we could observe it running
+            }
 
             // Wait for completion. Require two consecutive Idle reports since the planner can briefly
             // drain mid-job; bail out if status reports stop arriving (stalled or disconnected).
@@ -642,7 +683,10 @@ namespace CNC.Controls
                 if (!PumpForReport(model, token, 5000))
                 {
                     if (++silentReports >= 2)
+                    {
+                        DebugLog.Write("macro", "WaitForIdle: abort - 2 consecutive silent report timeouts (stalled/disconnected)");
                         return false;
+                    }
                     continue;
                 }
                 silentReports = 0;
@@ -651,11 +695,15 @@ namespace CNC.Controls
                 {
                     case GrblStates.Alarm:
                     case GrblStates.Unknown:
+                        DebugLog.Write("macro", string.Format("WaitForIdle: abort - GrblState={0} while waiting for completion", model.GrblState.State));
                         return false;
 
                     case GrblStates.Idle:
                         if (++idleStreak >= 2)
+                        {
+                            DebugLog.Write("macro", "WaitForIdle: success - 2 consecutive Idle reports");
                             return true;
+                        }
                         break;
 
                     default:
