@@ -31,7 +31,7 @@
             <TextBlock x:Uid="hlp_pidBody" TextWrapping="Wrap"
                        Text="Plots the closed-loop position error of a PID-controlled axis (for example a servo or a spindle) over time, so you can judge how well the loop is tuned.&#10;&#10;Get data captures a log burst from the controller and draws Target (green), Actual (blue) and Error (red). A well-tuned axis tracks the target with little error and no sustained oscillation. Use the slider to scale the error trace. Adjust the PID gains through the controller's $ settings and re-capture to compare."/>
         </StackPanel>
-        <Button x:Uid="btnGetPIDData" x:Name="btnGetPIDData" Content="Get data" HorizontalAlignment="Left"  Margin="10,4,0,-16" VerticalAlignment="Top" MinWidth="75" Click="btnGetPIDData_Click" Grid.Row="1"
+        <Button x:Uid="btnGetPIDData" x:Name="btnGetPIDData" Content="Get data" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left"  Margin="10,4,0,-16" VerticalAlignment="Top" MinWidth="75" Click="btnGetPIDData_Click" Grid.Row="1"
                 ToolTip="Capture a log burst from the controller and plot Target, Actual and Error."/>
         <Label x:Name="lblTarget" Content="Target" Foreground="Green" HorizontalAlignment="Left" Margin="492,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
         <Label x:Name="lblError" Content="Error" Foreground="Red" HorizontalAlignment="Left" Margin="602,4,0,0" VerticalAlignment="Top" Width="50" Grid.Row="1"/>
