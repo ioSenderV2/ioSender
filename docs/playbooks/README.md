@@ -16,6 +16,7 @@ matching memory file keeps its context and just points here.
 | [end_of_session_wrapup.md](end_of_session_wrapup.md) | The full end-of-session sequence, in order |
 | [capture_conversation_log.md](capture_conversation_log.md) | Export this session's conversation to styled HTML |
 | [build_commit_test_loop.md](build_commit_test_loop.md) | The kill→debug+launch→release-verify→commit loop |
+| [turn_workflow_loop.md](turn_workflow_loop.md) | The default per-turn loop: prompt→iterate→build+launch→user tests (no `-testserver` on real HW)→commit; push deferred to end-of-session |
 | [headless_build.md](headless_build.md) | Build (and optionally launch) with build.ps1, no VS GUI |
 | [publish_manual_site.md](publish_manual_site.md) | Push docs/manual to the live gh-pages site |
 | [wire_in_video.md](wire_in_video.md) | Attach a produced video to a manual topic + repoint Help |
