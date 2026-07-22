@@ -150,6 +150,20 @@ namespace GCode_Sender
             // DPI diagnostics (-debuglog): dump the scale WPF actually resolves at startup + on any live change,
             // to see whether "tiny UI" is a DPI/scale problem vs a display-resolution problem.
             Loaded += LogDpiDiagnostics;
+
+            // Silent startup update check - appends "(update available)" to the title bar (via
+            // BaseWindowTitle, the canonical source other code derives Title from on file load/close)
+            // rather than popping a dialog. Fire-and-forget: never blocks startup, and GetNewerVersionSilently
+            // swallows every failure mode itself, so there is nothing to await/observe here.
+            Loaded += async (s, e) =>
+            {
+                string newer = await GetNewerVersionSilently();
+                if (newer != null)
+                {
+                    BaseWindowTitle = BaseWindowTitle + " (update available)";
+                    Title = BaseWindowTitle;
+                }
+            };
             DpiChanged += (s, e) => CNC.Core.DebugLog.Write("dpi",
                 string.Format("DpiChanged: old PixelsPerDip={0} -> new={1}", e.OldDpi.PixelsPerDip, e.NewDpi.PixelsPerDip));
 
@@ -1297,6 +1311,40 @@ namespace GCode_Sender
             About about = new About(BaseWindowTitle) { Owner = Application.Current.MainWindow };
             about.DataContext = DataContext;
             about.ShowDialog();
+        }
+
+        // Silent startup check - same GitHub "latest release" comparison as the interactive Check for
+        // Updates menu item below, but no dialogs and no dev-build release-picker flow: just resolves
+        // whether a newer version exists, so Loaded (below) can append " (update available)" to the
+        // title bar. Kept as its own small method (a little duplicated GET logic) rather than reusing
+        // checkForUpdates_Click, so this new, low-stakes startup path can never regress that already
+        // user-verified interactive flow. Returns null on ANY failure (dev build, no releases, offline,
+        // timeout, parse failure) - a startup check must never surface a network hiccup to the user.
+        private async Task<string> GetNewerVersionSilently()
+        {
+            if (BuildInfo.Version == "dev")
+                return null;   // no fixed version to compare against the same way - see CheckForUpdatesDevBuild
+
+            try
+            {
+                try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("ioSender/" + Version);
+                    client.Timeout = TimeSpan.FromSeconds(15);
+
+                    var httpResponse = await client.GetAsync("https://api.github.com/repos/ioSenderV2/ioSender/releases/latest");
+                    if (!httpResponse.IsSuccessStatusCode)
+                        return null;
+
+                    var response = await httpResponse.Content.ReadAsStringAsync();
+                    string latestVersion = ParseGitHubReleaseTag(response);
+                    return !string.IsNullOrEmpty(latestVersion) && CompareVersions(BuildInfo.Version, latestVersion) < 0
+                        ? latestVersion : null;
+                }
+            }
+            catch { return null; }
         }
 
         // Check for updates: query GitHub's "latest release" for ioSenderV2/ioSender (a real,

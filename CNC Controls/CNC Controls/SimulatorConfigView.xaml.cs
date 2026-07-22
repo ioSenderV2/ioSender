@@ -20,6 +20,18 @@ namespace CNC.Controls
         {
             InitializeComponent();
             Loaded += (s, e) => { SeedDefaults(); RefreshStatus(); };
+
+            // Keep the "up to date" / "click Build to update" status live as the user picks options -
+            // RefreshStatus() only used to run on tab-show and after a build, so toggling a checkbox mid-
+            // visit left the status text stale (reflecting whatever was picked when the tab was last shown)
+            // until the user navigated away and back. Wired centrally here rather than per-control in XAML.
+            RoutedEventHandler onOptionChanged = (s, e) => RefreshStatus();
+            cbxAxes.SelectionChanged += (s, e) => RefreshStatus();
+            foreach (var chk in new[] { chkProbe, chkToolsetter, chkRotation, chkLatheUvw, chkSafetyDoor, chkEStop, chkYGanged, chkYAutoSquare })
+            {
+                chk.Checked += onOptionChanged;
+                chk.Unchecked += onOptionChanged;
+            }
         }
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.Simulator; } }
