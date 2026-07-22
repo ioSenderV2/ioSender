@@ -3,8 +3,8 @@
 Effort on this fork — **your hours** (active time at the computer) and **my load** (Claude: commits driven,
 tokens, context windows) — from the **first commit** to now.
 
-> **Last updated:** 2026-07-07 (through the settings-tree / `-debuglog` / `-forgetNetwork` session).
-> **Covers:** 2026-05-30 (first commit) → 2026-07-07.
+> **Last updated:** 2026-07-22 (through the "Check for Updates on a dev build" session).
+> **Covers:** 2026-05-30 (first commit) → 2026-07-22.
 
 ## How the numbers are derived — read before trusting them
 
@@ -20,6 +20,14 @@ tokens, context windows) — from the **first commit** to now.
   edits + builds + test iteration + docs, cache included). Re-scale linearly if you ever measure a rate.
 - **Scope note:** the first table (through 06-23) counts **all repos** (ioSender + Simulator + firmware);
   the second (from 06-24) is **ioSender only** — recent Simulator/firmware activity was negligible.
+- **Part 3 hours are measured, not estimated** — `effort-tracker.ps1` has been running since 2026-07-07 and
+  `sessions.csv` has real keyboard/mouse timestamps. But "measured" isn't the same as "dense work": a
+  session only ends after a gap of inactivity (5–10 min, tunable — currently running at 10), so a session
+  with sparse input every few minutes over several hours still counts as one continuous block. Several days
+  below show 12–18 "hours" — that's *presence at the computer with ioSender-adjacent activity in the mix*,
+  not 12–18 hours of continuous typing. Treat Part 3 hours as an upper bound, Part 1/2's commit-clustering
+  as a (probably tighter) lower-effort-only estimate. Token figures stay the **same ~0.25 M/commit estimate**
+  as Part 1/2 — no live `/cost` rate was captured this pass either.
 
 ---
 
@@ -92,17 +100,59 @@ Same 90/30 method as Part 1.
 
 ---
 
+## Part 3 — 2026-07-07 (evening) → 2026-07-21  (ioSender only, real measured hours)
+
+Cutoff picks up right where Part 2 left off (last commit counted there was 2026-07-07 18:55). Hours are
+summed straight from `sessions.csv` (session grouped by its **start** date); 2026-07-22 is still in progress
+(tracker running, 11 commits so far) and isn't finalized into this table yet.
+
+| Date | Day | Commits | Real Hrs | Top themes |
+|---|---|--:|--:|---|
+| 07-08 | Wed | 19 | **18.4** | tracker/docs/tooling (convo-logger, playbooks) (7), run-bar/program-view UI (4), G28 fixtures/probe (3) |
+| 07-09 | Thu | 48 | 11.1 | **UI test server** built end-to-end (14), tracker/docs/tooling (10), Start Job/probe consolidation (4), main-menu overhaul (3) |
+| 07-10 | Fri | 17 | 10.5 | UI-scale zoom + NumericField (7), settings/keys rename (3), lathe (2) |
+| 07-11 | Sat | 5 | 10.3 | fixture definitions + Start Job (2), Fusion add-in, UiScale dialogs, loc |
+| 07-12 | Sun | 19 | **14.8** | Start Job / Machinist Vise (9), fixture dialog (3), testserver bump (2), tracker/docs (4) |
+| 07-13 | Mon | 11 | 14.2 | tool-length / probe-definition unification (4), settings restore (2), log consolidation (2) |
+| 07-14 | Tue | 21 | 5.8 | Settings > Simulator / option-matched sim build (11), tear-off tabs (5), tracker/docs (3) |
+| 07-15 | Wed | 8 | 8.4 | zero-friction installer + rolling-release CI (5), vise/probe (1), tracker/docs (2) |
+| 07-16 | Thu | 16 | 11.75 | tracker/docs (6), jog/UI fixes (3), Start Job/vise accuracy (2), ATC macro (1) |
+| 07-17 | Fri | 26 | 12.8 | tooltip sweep (8), tracker/docs (6), Start Job travel/units (4), dry-run mode (4), testserver (2) |
+| 07-18 | Sat | 2 | 12.2 | dry-run Z-clearance fix, manual screenshot audit |
+| 07-19 | Sun | 8 | 4.1 | tab/layout fixes (2), tracker/docs (2), fixture redesign, camera control |
+| 07-20 | Mon | 25 | **14.9** | versioned-release pipeline (11), Stepper Calibration + GridSplitters (6), tracker/docs (4) |
+| 07-21 | Tue | 8 | 13.4 | Run-bar rename/redesign (4), Start Job fixtures (2), macro WAITIDLE fix |
+| **Subtotal** | | **233** | **~162.7 h** | 14 active days |
+
+**By theme (rough):** Start Job/probing/vise/fixtures **~45** · tracker/docs/tooling **~50** · UI test server
+**~18** · UI/jog/tabs/layout **~33** · release/build/install pipeline **~16** · Settings>Simulator/connect
+**~12** · main-menu **3** · ATC/macro **2** · loc **1**
+**What got built (highlights):** flag-gated **UI test server** matured into a full automation harness (screenshot,
+keyboard injection, x:Uid addressing, dialog broker) and became a standalone `WpfUiTestServer` NuGet package ·
+**Machinist Vise** fixture end-to-end (drawing, probe, Start Job programs) · **option-matched Simulator** builder
+(Settings > Simulator, CI build, hardware NVRAM copy) · **zero-friction installer + rolling-release CI**, later
+replaced by **real versioned GitHub Releases (2.N)** · **dry-run mode** (sender-side spindle/coolant-off safety
+run) · tear-off tabs, UI-scale zoom, tooltip sweep across the app · **Stepper Calibration (Probe)** tool + Run-bar
+redesign (Run/Dry Run/Check Run) · tool-length (L=) / probe-definition unification · main-menu overhaul.
+**Shape:** several very long single-block days (07-08, 07-12, 07-20 all 14.8–18.4 h) — see the presence-vs-dense-work
+caveat above before reading these as continuous focused hours.
+
+---
+
 ## Grand total — first commit → now
 
-| | Commits | ~Hours (90/30) | ~Tokens @0.25M/commit |
-|---|--:|--:|--:|
-| Part 1 (05-30→06-23, all repos) | 608 | ~113 h | ~152 M |
-| Part 2 (06-24→07-07, ioSender)  | 254 | ~75 h  | ~64 M  |
-| **Total** | **~862** | **~188 h** | **~215 M** |
+| | Commits | Hours | Method | ~Tokens @0.25M/commit |
+|---|--:|--:|---|--:|
+| Part 1 (05-30→06-23, all repos) | 608 | ~113 h | estimated (commit clustering) | ~152 M |
+| Part 2 (06-24→07-07, ioSender)  | 254 | ~75 h  | estimated (commit clustering) | ~64 M  |
+| Part 3 (07-07→07-21, ioSender)  | 233 | ~163 h | **measured** (`effort-tracker.ps1`) | ~58 M  |
+| **Total** | **~1095** | **~351 h** | mixed | **~274 M** |
 
-- **~188 h** over ~38 active days (~5 h/active day) — honest band ~160–215 h given the ±15% and the
-  under-counted hardware/testing time.
-- **~215 M tokens** ≈ on the order of **~215 context-window-equivalents** (1 M each) of my working context.
+- **~351 h** over ~52 active days — Parts 1/2 are an estimated band (±15%, under-counts un-committed work);
+  Part 3 is measured presence time, which likely **over**counts against "hands on keyboard, focused on
+  ioSender" (see the caveat above). Don't read the jump from ~5 h/active-day (Parts 1/2) to ~11.6 h/active-day
+  (Part 3) as a real behavior change — it's mostly a measurement-method change.
+- **~274 M tokens** ≈ on the order of **~274 context-window-equivalents** (1 M each) of my working context.
   Re-scale everything if you ever pull a real per-commit rate from a live `/cost`.
 
 ---
@@ -110,7 +160,7 @@ Same 90/30 method as Part 1.
 ## Provenance
 Part 1 was reconstructed live in the 2026-06-26 session and existed **only as chat output** until now
 (recovered from the session transcript `~/.claude/projects/c--github-ioSender/3d9c7015-…jsonl`). Part 2 was
-computed from `git log` on 2026-07-07. Neither is measured time.
-
-> **Hours are measured from here on:** `effort-tracker.ps1` now runs at login (10-min idle gap) and writes
-> `sessions.csv`. Next roll-up can use real keyboard time for anything after 2026-07-07.
+computed from `git log` on 2026-07-07. Neither is measured time. Part 3 was computed 2026-07-22 from
+`git log --since "2026-07-07 18:55"` (243 commits) joined against `sessions.csv` (real keyboard/mouse
+presence, grouped by session-start date); 2026-07-22 itself is still in progress and excluded from the
+finalized table above — next roll-up should start there.
