@@ -428,6 +428,7 @@
                 <Button x:Name="btnPreview" x:Uid="btn_preview" Content="Preview" MinWidth="90" Margin="0,0,6,0" IsEnabled="False" Click="Preview_Click"
                         ToolTip="Show the settings that will change when you Apply. Enabled once you make a change."/>
                 <Button x:Name="btnApply" x:Uid="btn_apply" Content="Apply" MinWidth="90" Click="Apply_Click" IsEnabled="False"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         ToolTipService.ShowDuration="60000" ToolTipOpening="btnApply_ToolTipOpening"
                         ToolTip="Write the changed settings to the controller."/>
             </StackPanel>
