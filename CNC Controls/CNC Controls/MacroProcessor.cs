@@ -89,6 +89,49 @@ namespace CNC.Controls
         // subscribe to re-evaluate the "configured input source" highlight (the mint background).
         public static event System.Action ActiveProgramChanged;
 
+        // Generate-mode plumbing: a "Generate first" tool (Start Job, Stepper Calibration, Auto Square,
+        // Surface Spoilboard) no longer owns its own standalone Generate button - it registers itself here
+        // while its tab is active so the shared Run bar (JobControl) can show "Generate" (disabled until
+        // ready) in ActiveRun's place, and hide the Dry Run/Check Run dropdown (neither is meaningful before
+        // something is generated). All are set together on Activate(true) and cleared together on
+        // Activate(false), same lifecycle as ActiveRun/ActiveProgramName. Changes reuse ActiveProgramChanged
+        // (JobControl's one subscriber for all active-program state) rather than adding a second event.
+        private static bool _supportsGenerateMode;
+        public static bool SupportsGenerateMode
+        {
+            get { return _supportsGenerateMode; }
+            set { _supportsGenerateMode = value; ActiveProgramChanged?.Invoke(); }
+        }
+
+        // Live "are this tab's current inputs enough to generate" gate - the tab re-sets this on every input
+        // change (the same checks that used to drive its own Generate button's IsEnabled).
+        private static bool _isGenerateReady;
+        public static bool IsGenerateReady
+        {
+            get { return _isGenerateReady; }
+            set { _isGenerateReady = value; ActiveProgramChanged?.Invoke(); }
+        }
+
+        // False = nothing generated yet (or it was discarded) - Run bar reads "Generate". True = a program is
+        // built and ActiveRun will stream it - Run bar reads "Run". The tab flips this true right after a
+        // successful ActiveGenerate, and false again whenever it discards the program (an input changed, or
+        // JobControl calls DiscardGenerated after the run ends).
+        private static bool _isProgramGenerated;
+        public static bool IsProgramGenerated
+        {
+            get { return _isProgramGenerated; }
+            set { _isProgramGenerated = value; ActiveProgramChanged?.Invoke(); }
+        }
+
+        // The Generate-only action (build + PublishGenerated, no run) - what pressing the Run bar while it
+        // reads "Generate" actually does. Distinct from ActiveRun (which streams an already-generated program).
+        public static System.Action ActiveGenerate;
+
+        // Called by JobControl right after a run this tab owned finishes, to drop the in-memory program and
+        // revert the Run bar back to "Generate". Null-safe to invoke; a tab that has nothing to discard beyond
+        // IsProgramGenerated itself can leave this unset.
+        public static System.Action DiscardGenerated;
+
         // Display name of the active program (set when a wizard registers it), used in the "ready - press Cycle
         // Start" status prompt. Null when no wizard program is active.
         public static string ActiveProgramName;

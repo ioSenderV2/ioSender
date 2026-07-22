@@ -14,19 +14,25 @@
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <system:String x:Uid="str_checking" x:Key="Checking">Checking...</system:String>
         <system:String x:Uid="str_dryrun" x:Key="DryRun">Dry run - spindle/coolant off, tool changes skipped...</system:String>
-        <!-- Run's own button label, switched at runtime (JobControl.xaml.cs's UpdateStartButtonLabel)
+        <!-- Run's own button label, switched at runtime (JobControl.xaml.cs's UpdateRunButtonLabel)
              to reflect the run mode chosen from the mode dropdown to its right - also used for that dropdown's
              own item text, so the label and the choice that produced it always read identically. -->
         <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Run</system:String>
         <system:String x:Uid="str_startModeDryRun" x:Key="StartModeDryRun">Dry Run</system:String>
         <system:String x:Uid="str_startModeCheck" x:Key="StartModeCheck">Check Run</system:String>
-        <!-- btnStart's dynamic tooltip (JobControl.xaml.cs's UpdateStartButtonLabel), shown even while the
+        <!-- Shown instead of Run/Dry Run/Check Run while a "Generate first" tool tab (Start Job, Stepper
+             Calibration, Auto Square, Surface Spoilboard) is focused and hasn't built its program yet - see
+             MacroProcessor.SupportsGenerateMode/IsProgramGenerated and UpdateRunButtonLabel. -->
+        <system:String x:Uid="str_generateLabel" x:Key="GenerateLabel">Generate</system:String>
+        <!-- btnStart's dynamic tooltip (JobControl.xaml.cs's UpdateRunButtonLabel), shown even while the
              button is disabled (ToolTipService.ShowOnDisabled="True" on btnStart) so a new user sees WHY
              instead of a silently unresponsive button. -->
         <system:String x:Uid="str_startTipDisabled" x:Key="StartTipDisabled">Nothing to run yet - load a file (Job tab &gt; Program area) or generate/select a program from a tool tab, then Run becomes available.</system:String>
         <system:String x:Uid="str_startTipNormal" x:Key="StartTipNormal">Start the loaded program. (Alt+R)</system:String>
         <system:String x:Uid="str_startTipDryRun" x:Key="StartTipDryRun">Start the loaded program in Dry Run: Z offset clear of stock, spindle/coolant forced off, tool changes skipped - watch the toolpath without cutting, spinning, or pausing for a tool swap. (Alt+R)</system:String>
         <system:String x:Uid="str_startTipCheck" x:Key="StartTipCheck">Start grbl check mode ($C): the controller parses the program without moving, to validate it before a real run. (Alt+R)</system:String>
+        <system:String x:Uid="str_generateTipDisabled" x:Key="GenerateTipDisabled">Set the required inputs on this tab first, then Generate becomes available. (Alt+R)</system:String>
+        <system:String x:Uid="str_generateTipReady" x:Key="GenerateTipReady">Build the program from this tab's current inputs. (Alt+R)</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
         <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
              leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
@@ -94,13 +100,15 @@
         <StackPanel x:Name="startPanel" Orientation="Horizontal">
             <Button x:Uid="btn_run" x:Name="btnStart" Content="{StaticResource StartModeNormal}" ToolTip="{StaticResource StartTipDisabled}"
                     ToolTipService.ShowOnDisabled="True" Style="{StaticResource RunButtonStyle}"
-                    IsEnabled="{Binding Path=IsRunEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click"/>
+                    IsEnabled="{Binding Path=IsRunActionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click"/>
             <!-- Run-mode picker: Run (normal) / Dry Run / Check Run - replaces the old right-click
                  context menu (mnu_checkMode/mnu_dryRun) with a visible, discoverable dropdown. Selecting an
                  entry both applies the mode (grbl $C / Reset, or the sender-side dry-run flag) AND relabels
-                 btnStart to match - see JobControl.xaml.cs's StartMode_Click/UpdateStartButtonLabel. -->
+                 btnStart to match - see JobControl.xaml.cs's StartMode_Click/UpdateRunButtonLabel. Collapsed
+                 entirely while a Generate-first tool tab is focused (code-behind, UpdateRunButtonLabel) -
+                 Dry Run/Check Run don't apply to those tabs. -->
             <ToggleButton x:Uid="btn_startMode" x:Name="btnStartMode" Style="{StaticResource StartModeToggleStyle}"
-                          IsEnabled="{Binding Path=IsRunEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          IsEnabled="{Binding Path=IsRunActionEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           IsChecked="{Binding IsOpen, ElementName=startModePopup, Mode=TwoWay}"
                           ToolTip="Choose Run, Dry run, or Check mode"/>
         </StackPanel>

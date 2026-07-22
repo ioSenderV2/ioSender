@@ -1149,3 +1149,6 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startMode:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startModeNormal:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Run normally.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startModeDryRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startModeCheck:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateLabel:System.String.$Content,None,True,True,,Generate
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateTipDisabled:System.String.$Content,None,True,True,,"Set the required inputs on this tab first, then Generate becomes available. (Alt+R)"
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateTipReady:System.String.$Content,None,True,True,,Build the program from this tab's current inputs. (Alt+R)

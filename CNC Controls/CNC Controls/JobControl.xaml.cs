@@ -184,22 +184,44 @@ namespace CNC.Controls
             }
             else
                 SetActiveProgramReady(false);
+
+            // IsRunEnabled's own DP callback only re-fires UpdateRunButtonLabel on an actual value CHANGE - but
+            // Generate-mode readiness (MacroProcessor.IsGenerateReady/IsProgramGenerated) can flip without
+            // IsRunEnabled itself changing (e.g. HasActiveProgram was already true from ActiveGenerate being
+            // registered). This event covers both, so just always refresh here too.
+            UpdateRunButtonLabel();
         }
 
         // An "active program" the streamer can run with no loaded job: the legacy MacroProcessor.ActiveRun (tools
-        // not yet migrated) OR a connected ProgramView (stack top). Both coexist during the ProgramView migration;
-        // ProgramView.Active is null until a view connects, so this is inert for tools still on ActiveRun.
-        private static bool HasActiveProgram { get { return MacroProcessor.ActiveRun != null || ProgramView.Active != null; } }
+        // not yet migrated) OR a connected ProgramView (stack top) OR a Generate-first tab registered but not
+        // yet generated (ActiveGenerate) - that last case keeps IsRunEnabled true while such a tab is focused so
+        // IsRunActionEnabled's extra IsGenerateReady gate (see UpdateRunButtonLabel) is what actually governs the
+        // button, not this state-machine flag. Both coexist during the ProgramView migration; ProgramView.Active
+        // is null until a view connects, so this is inert for tools still on ActiveRun.
+        private static bool HasActiveProgram { get { return MacroProcessor.ActiveRun != null || MacroProcessor.ActiveGenerate != null || ProgramView.Active != null; } }
 
         // PropertyChangedCallback (not a manual call at every one of this DP's many "IsRunEnabled = ..."
         // assignment sites throughout this file) keeps btnStart's disabled-state tooltip in sync regardless of
-        // which state-machine branch flips it - see UpdateStartButtonLabel.
+        // which state-machine branch flips it - see UpdateRunButtonLabel.
         public static readonly DependencyProperty IsRunEnabledProperty = DependencyProperty.Register(nameof(IsRunEnabled), typeof(bool), typeof(JobControl),
-            new PropertyMetadata(false, (d, e) => (d as JobControl)?.UpdateStartButtonLabel()));
+            new PropertyMetadata(false, (d, e) => (d as JobControl)?.UpdateRunButtonLabel()));
         public bool IsRunEnabled
         {
             get { return (bool)GetValue(IsRunEnabledProperty); }
             set { SetValue(IsRunEnabledProperty, value); }
+        }
+
+        // The Run bar button's/dropdown's actual IsEnabled (XAML-bound) - IsRunEnabled ANDed with the
+        // Generate-mode readiness gate (MacroProcessor.IsGenerateReady) while a Generate-first tab is focused
+        // and hasn't generated yet. A separate DP rather than overloading IsRunEnabled itself: IsRunEnabled is
+        // also read directly elsewhere (e.g. SetActiveProgramReady) as the plain "is there a runnable source"
+        // state-machine signal, independent of per-tab Generate readiness. Recomputed in UpdateRunButtonLabel,
+        // the single place that already reacts to every input that can change either side of the AND.
+        public static readonly DependencyProperty IsRunActionEnabledProperty = DependencyProperty.Register(nameof(IsRunActionEnabled), typeof(bool), typeof(JobControl));
+        public bool IsRunActionEnabled
+        {
+            get { return (bool)GetValue(IsRunActionEnabledProperty); }
+            set { SetValue(IsRunActionEnabledProperty, value); }
         }
 
         // True when a wizard program is the active source and the machine is idle, ready to run on Run.
@@ -314,7 +336,7 @@ namespace CNC.Controls
                 model.OnCycleStart += OnCycleStart;
                 model.OnStop += OnStop;
                 GCode.File.Model = model;   // wire the loaded job's model (job setup, not the streamed Source)
-                UpdateStartButtonLabel();   // reflect whatever mode is already active (e.g. reattaching to a live controller)
+                UpdateRunButtonLabel();   // reflect whatever mode is already active (e.g. reattaching to a live controller)
             }
         }
 
@@ -368,11 +390,11 @@ namespace CNC.Controls
 
                 case nameof(GrblViewModel.GrblState):
                     GrblStateChanged((sender as GrblViewModel).GrblState);
-                    UpdateStartButtonLabel();   // IsCheckMode is derived from GrblState - no PropertyChanged of its own
+                    UpdateRunButtonLabel();   // IsCheckMode is derived from GrblState - no PropertyChanged of its own
                     break;
 
                 case nameof(GrblViewModel.IsDryRunMode):
-                    UpdateStartButtonLabel();
+                    UpdateRunButtonLabel();
                     break;
 
                 case nameof(GrblViewModel.IsConnectionLost):
@@ -626,7 +648,7 @@ namespace CNC.Controls
         // Run / Check Run, each a Button in the popup tagged with which one it is. Applies the underlying mode
         // exactly as the old checkable menu items did (grbl Reset for check mode, the sender-side IsDryRunMode
         // flag for dry run - see checkModeArmed's own comment for why $C itself is deferred), then relabels
-        // btnStart to match via UpdateStartButtonLabel - so the button's own text is always a live reflection
+        // btnStart to match via UpdateRunButtonLabel - so the button's own text is always a live reflection
         // of the current mode, not just "whatever was last clicked" (e.g. it correctly reverts to Run if check
         // mode exits some other way, like Reset).
         private void StartMode_Click(object sender, RoutedEventArgs e)
@@ -659,7 +681,7 @@ namespace CNC.Controls
                     m.IsDryRunMode = false;
                     break;
             }
-            UpdateStartButtonLabel();
+            UpdateRunButtonLabel();
         }
 
         // Reflects the CURRENT mode, not the last dropdown click - GrblViewModel.IsCheckMode is itself derived
@@ -669,10 +691,31 @@ namespace CNC.Controls
         // ToolTipService.ShowOnDisabled in XAML); enabled -> what THIS press will actually do, matching the
         // selected mode - a plain "Alt+R" static tip left an operator to discover Dry Run/Check Run's real
         // effect (Z offset, spindle/coolant forced off, etc.) only by reading the dropdown's own tooltips first.
-        private void UpdateStartButtonLabel()
+        private void UpdateRunButtonLabel()
         {
             if (model == null || btnStart == null)
                 return;
+
+            // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard) is
+            // focused: it owns no standalone Generate button of its own any more (see MacroProcessor's
+            // Generate-mode plumbing) - the Run bar itself reads "Generate" (gated on IsGenerateReady) until
+            // the tab has built its program, then flips to plain "Run". Dry Run/Check Run never apply to
+            // these tabs, so the mode dropdown is hidden outright for the whole time the tab is focused.
+            if (MacroProcessor.SupportsGenerateMode)
+            {
+                bool generated = MacroProcessor.IsProgramGenerated;
+                btnStart.Content = generated ? FindResource("StartModeNormal") : FindResource("GenerateLabel");
+                IsRunActionEnabled = IsRunEnabled && (generated || MacroProcessor.IsGenerateReady);
+                btnStart.ToolTip = generated ? FindResource("StartTipNormal")
+                                  : IsRunActionEnabled ? FindResource("GenerateTipReady")
+                                  : FindResource("GenerateTipDisabled");
+                if (btnStartMode != null)
+                    btnStartMode.Visibility = Visibility.Collapsed;
+                return;
+            }
+            if (btnStartMode != null)
+                btnStartMode.Visibility = Visibility.Visible;
+            IsRunActionEnabled = IsRunEnabled;
 
             // Neither mode is ever saved to config (IsDryRunMode is a plain in-memory GrblViewModel field,
             // always false on a fresh instance; IsCheckMode is a live read of GrblState.State - see their own
@@ -704,6 +747,17 @@ namespace CNC.Controls
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
+            // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
+            // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
+            // second press, once IsProgramGenerated flips true and the button reads "Run", falls through to
+            // the honorActiveProgram/ActiveRun branch below like any other wizard tab.
+            if (honorActiveProgram && MacroProcessor.SupportsGenerateMode && !MacroProcessor.IsProgramGenerated
+                && MacroProcessor.ActiveGenerate != null && grblState.State == GrblStates.Idle)
+            {
+                MacroProcessor.ActiveGenerate();
+                return;
+            }
+
             // The dropdown's "Check Run" only arms the intent (see checkModeArmed's own comment) - this is
             // where it actually takes effect, right before the run it was meant to gate would otherwise start.
             // Idle-gated same as the old immediate-send behavior (StartMode_Click used to require this too);
@@ -911,7 +965,7 @@ namespace CNC.Controls
             // Check mode ($C) has no auto-exit of its own - grblHAL stays in the Check state after the checked
             // program finishes until an explicit soft reset (see StartMode_Click, which uses the same
             // mechanism to leave it deliberately). Without this, both the controller AND btnStart's label
-            // (model.IsCheckMode is a live read of GrblState, not a separate flag - see UpdateStartButtonLabel)
+            // (model.IsCheckMode is a live read of GrblState, not a separate flag - see UpdateRunButtonLabel)
             // would still show Check Run for the NEXT job too - and since that's the CONTROLLER'S own state,
             // not something ioSender caches, it would look "stuck" even across an app restart if the operator
             // closed ioSender before ever leaving check mode.

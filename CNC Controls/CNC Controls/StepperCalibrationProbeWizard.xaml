@@ -49,8 +49,6 @@
             <StackPanel Grid.Row="1" Margin="5,0,5,6">
                 <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Button x:Uid="btn_scpGenerate" Content="Generate" Tag="generate" Focusable="False" MinWidth="90" MinHeight="26" Margin="0,0,8,0" Click="Button_Click"
-                            ToolTip="Probe the reference block via the selected fixture's Corner Fence and measure its actual X/Y size."/>
                     <Button x:Uid="btn_scpSave" x:Name="btnSave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="90" MinHeight="26" Margin="0,0,8,0" Click="Button_Click" IsEnabled="False"
                             ToolTip="Write the corrected steps/mm ($100/$101) to the controller."/>
                     <Button x:Uid="btn_scpUndo" x:Name="btnUndo" Content="Undo" Tag="undo" Focusable="False" MinWidth="70" MinHeight="26" Click="Button_Click" IsEnabled="False"

@@ -69,6 +69,13 @@ namespace GCode_Sender
         private bool sizeFieldsTouched = false;
         private bool loadingInputs = false;   // true only while LoadInputs is assigning - suppresses the touched flag
 
+        // True only between Activate(true) and Activate(false). Model_PropertyChanged stays subscribed even
+        // while deactivated (see Activate's own comment - it keeps parsing result messages after the tab is
+        // left mid-run), so anything it triggers that writes a MacroProcessor Generate-mode static (which is
+        // GLOBAL, shared with whichever tab is now actually focused) must be gated on this - otherwise a stale
+        // GrblState/Message event on this tab after leaving it could stomp the NEW active tab's IsGenerateReady.
+        private bool isActiveTab = false;
+
         // Unit toggle for the Stock size fields (rbUnitsMm/rbUnitsIn). NumericField.Value is ALWAYS
         // canonical mm now (NumericField/NumericTextBox's own mm<->in conversion, driven by the inherited
         // NumericField.IsImperial attached property set on pnlInputs in Units_Checked/LoadInputs) - every
@@ -306,7 +313,8 @@ namespace GCode_Sender
                 rbProbe3d.IsChecked = true;
 
             bool ok = ActiveProbe() != null;
-            btnGenerate.IsEnabled = ok;
+            if (isActiveTab)
+                MacroProcessor.IsGenerateReady = ok;
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
 
             UpdateMeasureAvailability();
@@ -382,7 +390,8 @@ namespace GCode_Sender
 
             txtNoFixture.Visibility = noFixtures ? Visibility.Visible : Visibility.Collapsed;
             txtFixtureWarning.Visibility = (fx != null && !implemented) ? Visibility.Visible : Visibility.Collapsed;
-            btnGenerate.IsEnabled = ok && ActiveProbe() != null;
+            if (isActiveTab)
+                MacroProcessor.IsGenerateReady = ok && ActiveProbe() != null;
 
             bool showMeasure = fx == null || FixtureKinds.CanMeasure(fx.Kind);
             chkMeasure.Visibility = showMeasure ? Visibility.Visible : Visibility.Collapsed;
@@ -421,9 +430,16 @@ namespace GCode_Sender
         }
 
         // Drop the generated program; Cycle Start (which runs the active program) rebuilds it via Run_Click.
+        // Also registered as MacroProcessor.DiscardGenerated (see Activate) - called there too, right after a
+        // clean run finishes, so the Run bar reverts to "Generate" for the next job rather than re-running
+        // a stale program. Only touch the shared static while THIS tab is actually the focused one (see
+        // isActiveTab's own comment) - an input change firing after the tab was left, or a discard call that
+        // raced a tab switch, must not stomp whichever OTHER Generate-capable tab is now active.
         private void InvalidateProgram()
         {
             program = string.Empty;
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = false;
         }
 
         private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -438,6 +454,7 @@ namespace GCode_Sender
 
         public void Activate(bool activate, ViewType chgMode)
         {
+            isActiveTab = activate;
             if (activate)
             {
                 if (model == null)
@@ -456,11 +473,24 @@ namespace GCode_Sender
                     programView.Connect();     // Load Stock's OWN view (titled "Load Stock") shows in the overlay
                 }
                 MacroProcessor.ActiveRun = () => Run_Click(null, null);            // Cycle Start runs it
+
+                // Generate-mode registration (see MacroProcessor's own comments): the Run bar itself reads
+                // "Generate" until this tab has built its program, then "Run" - no standalone Generate button
+                // of this tab's own any more. IsProgramGenerated picks up whatever 'program' already holds
+                // (e.g. reactivating this tab after a run elsewhere without an intervening input change).
+                MacroProcessor.SupportsGenerateMode = true;
+                MacroProcessor.ActiveGenerate = () => Generate_Click(null, null);
+                MacroProcessor.DiscardGenerated = InvalidateProgram;
+                MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
+                UpdateFixtureWarning();   // also (re)establishes MacroProcessor.IsGenerateReady for the bar
             }
             else
             {
                 SaveInputs();
                 MacroProcessor.ActiveRun = null;
+                MacroProcessor.SupportsGenerateMode = false;
+                MacroProcessor.ActiveGenerate = null;
+                MacroProcessor.DiscardGenerated = null;
                 programView?.Disconnect();                     // active program follows the focused tab
                 // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
                 // the corners populate and the results popup is raised even if the tab is left mid-run. The
@@ -1214,6 +1244,9 @@ namespace GCode_Sender
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             // Start Job owns its ProgramView; the overlay hosts it and it titles itself
             MacroProcessor.PublishGenerated("Start Job", program, EnsureProgramView, () => programView);
+            // Flips the Run bar from "Generate" to "Run" (see isActiveTab's own comment on why this is gated).
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = true;
         }
 
         // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder

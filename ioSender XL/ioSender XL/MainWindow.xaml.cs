@@ -1061,6 +1061,15 @@ namespace GCode_Sender
                     {
                         _macroRunViewTimer?.Stop();
                         CNC.Controls.ProgramView.Active?.Disconnect();
+
+                        // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
+                        // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
+                        // the operator re-generates for the next job rather than re-running a stale program.
+                        // Left alone on error/halt (same condition as the program-view dismiss above) so the
+                        // operator can still inspect/re-run the SAME generated program after fixing whatever
+                        // interrupted it, without redoing Generate.
+                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode)
+                            CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
                     }
                     // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
                     // it); a tool's own view is left alone - it closes on tab-leave.

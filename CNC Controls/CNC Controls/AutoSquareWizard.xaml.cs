@@ -63,6 +63,7 @@ namespace CNC.Controls
 
         public void Activate(bool activate)
         {
+            isActiveTab = activate;
             if (activate)
             {
                 DetectOffsetSetting();
@@ -74,15 +75,49 @@ namespace CNC.Controls
                     programView.Connect();     // this tool's own view shows in the overlay
                 }
                 MacroProcessor.ActiveRun = Run;                                     // Cycle Start runs it
+
+                // Generate-mode registration (see MacroProcessor's own comments / StartJobView for the
+                // reference implementation): the shared Run bar reads "Generate" until this tab has built its
+                // program, then "Run" - no standalone Generate button of this tab's own any more.
+                MacroProcessor.SupportsGenerateMode = true;
+                MacroProcessor.ActiveGenerate = Generate;
+                MacroProcessor.DiscardGenerated = DiscardProgram;
+                MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
+                RefreshReadout();   // (re)establishes MacroProcessor.IsGenerateReady for the bar
             }
             else
             {
                 MacroProcessor.ActiveRun = null;
+                MacroProcessor.SupportsGenerateMode = false;
+                MacroProcessor.ActiveGenerate = null;
+                MacroProcessor.DiscardGenerated = null;
                 programView?.Disconnect();                     // active program follows the focused tab
             }
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
+        }
+
+        // True only between Activate(true)/Activate(false) - guards writes to MacroProcessor's Generate-mode
+        // statics (shared across all Generate-first tabs) so a stale event firing after this tab was left
+        // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
+        private bool isActiveTab = false;
+
+        // The coarse live-readiness gate for the shared Run bar's "Generate" button - mirrors Generate()'s
+        // own first precondition check (travel legs known).
+        private void RefreshGenerateReady(bool travelSet)
+        {
+            if (isActiveTab)
+                MacroProcessor.IsGenerateReady = travelSet;
+        }
+
+        // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
+        // called right after a clean run finishes so the Run bar reverts to "Generate" for the next job.
+        private void DiscardProgram()
+        {
+            program = string.Empty;
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = false;
         }
 
         #endregion
@@ -363,6 +398,8 @@ namespace CNC.Controls
             if (btnApply != null)
                 btnApply.IsEnabled = !measureOnly && travelSet && Math.Abs(NewOffset - CurrentOffset) > 1e-6;
 
+            RefreshGenerateReady(travelSet);
+
             if (txtSummary != null)
             {
                 if (!travelSet)
@@ -594,7 +631,6 @@ namespace CNC.Controls
         {
             switch ((string)((Button)sender).Tag)
             {
-                case "generate": Generate(); break;
                 case "apply": ApplyOffset(); break;
                 case "clear": ClearOffset(); break;
                 case "home": ReHome(); break;
@@ -622,6 +658,8 @@ namespace CNC.Controls
             }
             program = string.Join("\r\n", BuildProgram());
             MacroProcessor.PublishGenerated("Auto square", program, EnsureProgramView, () => programView);   // refresh + show this tool's own view
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
         }
 
         private void Run()

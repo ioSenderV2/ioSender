@@ -44,10 +44,19 @@ namespace CNC.Controls
 
         public void Activate(bool activate)
         {
+            isActiveTab = activate;
             if (activate)
             {
                 DefaultArea();   // size the area to the in-bounds travel envelope (less margins)
-                UpdateSummary();
+
+                // Generate-mode registration (see MacroProcessor's own comments / StartJobView for the
+                // reference implementation): the shared Run bar reads "Generate" until this tab has built its
+                // program, then "Run" - no standalone Generate button of this tab's own any more.
+                MacroProcessor.SupportsGenerateMode = true;
+                MacroProcessor.ActiveGenerate = Generate;
+                MacroProcessor.DiscardGenerated = DiscardProgram;
+                MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
+                UpdateSummary();   // also (re)establishes MacroProcessor.IsGenerateReady for the bar
                 if (!string.IsNullOrEmpty(program))
                 {
                     EnsureProgramView();
@@ -59,11 +68,28 @@ namespace CNC.Controls
             else
             {
                 MacroProcessor.ActiveRun = null;
+                MacroProcessor.SupportsGenerateMode = false;
+                MacroProcessor.ActiveGenerate = null;
+                MacroProcessor.DiscardGenerated = null;
                 programView?.Disconnect();                     // active program follows the focused tab
             }
 
             if (model != null)
                 model.Poller.SetState(activate ? AppConfig.Settings.Base.PollInterval : 0);
+        }
+
+        // True only between Activate(true)/Activate(false) - guards writes to MacroProcessor's Generate-mode
+        // statics (shared across all Generate-first tabs) so a stale event firing after this tab was left
+        // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
+        private bool isActiveTab = false;
+
+        // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
+        // called right after a clean run finishes so the Run bar reverts to "Generate" for the next job.
+        private void DiscardProgram()
+        {
+            program = string.Empty;
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = false;
         }
 
         #endregion
@@ -255,6 +281,13 @@ namespace CNC.Controls
 
             if (txtWarnings != null)
                 txtWarnings.Text = warn;
+
+            // The coarse live-readiness gate for the shared Run bar's "Generate" button: no warning means
+            // Generate()'s own preconditions (bit diameter, stepover, travel, area) all hold. The RPM warning
+            // is a soft "confirm anyway" at Generate time, not a hard block, but gating on it too here just
+            // means the operator sees the confirm dialog with the bar already reading "Generate" either way.
+            if (isActiveTab)
+                MacroProcessor.IsGenerateReady = string.IsNullOrEmpty(warn);
 
             if (txtSummary != null)
             {
@@ -453,13 +486,6 @@ namespace CNC.Controls
             return string.Format("X{0} Y{1}", F(p[0]), F(p[1]));
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
-        {
-            switch ((string)((Button)sender).Tag)
-            {
-                case "generate": Generate(); break;
-            }
-        }
 
         // Run the buffered program via the macro path (like Load Stock): the run-control panel floats, then the
         // program streams - its (PREREQ)/(MBOX)/(WAITIDLE) directives confirm state and prompt to set work zero.
@@ -509,6 +535,8 @@ namespace CNC.Controls
             // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
             program = string.Join("\r\n", BuildProgram());
             MacroProcessor.PublishGenerated("Surface spoilboard", program, EnsureProgramView, () => programView);
+            if (isActiveTab)
+                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
         }
 
         // Localized message via LibStrings, with \n expanded to real newlines.

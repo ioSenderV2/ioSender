@@ -120,7 +120,6 @@
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
-                    <Button x:Uid="ls_generate" x:Name="btnGenerate" Content="Generate" MinWidth="90" MinHeight="26" Click="Generate_Click"/>
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
                     <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
