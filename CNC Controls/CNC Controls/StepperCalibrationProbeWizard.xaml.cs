@@ -72,14 +72,25 @@ namespace CNC.Controls
         // (PRINT, GZSX=..) / (PRINT, GZSY=..) / (PRINT, GZSZ=..) - BuildProgramZ's captured starting position.
         private static readonly Regex rxGZStart = new Regex(@"GZS([XYZ])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
 
-        public static readonly DependencyProperty TrueWidthProperty = DependencyProperty.Register(nameof(TrueWidth), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(400d));
+        // Any of these inputs changing after a Generate makes the sitting 'program' stale (wrong true size/
+        // gauge size/travel margin baked into its G-code) - discard it so the Run bar drops back to
+        // "Generate" and the next press is guaranteed to rebuild from the CURRENT field values, rather than
+        // silently streaming a program built from whatever was entered before the edit.
+        private static void OnCalInputChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var w = (StepperCalibrationProbeWizard)d;
+            w.DiscardProgram();
+            w.RefreshGenerateReady();
+        }
+
+        public static readonly DependencyProperty TrueWidthProperty = DependencyProperty.Register(nameof(TrueWidth), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(400d, OnCalInputChanged));
         public double TrueWidth
         {
             get { return (double)GetValue(TrueWidthProperty); }
             set { SetValue(TrueWidthProperty, value); }
         }
 
-        public static readonly DependencyProperty TrueHeightProperty = DependencyProperty.Register(nameof(TrueHeight), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(400d));
+        public static readonly DependencyProperty TrueHeightProperty = DependencyProperty.Register(nameof(TrueHeight), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(400d, OnCalInputChanged));
         public double TrueHeight
         {
             get { return (double)GetValue(TrueHeightProperty); }
@@ -89,7 +100,7 @@ namespace CNC.Controls
         // Same field/purpose as StartJobView's fldCornerMargin ("Safe Z delta"): corners 2/3 travel at corner 1's
         // own measured stock top plus this delta instead of retracting fully to machine top between corners.
         // Default (15) matches the value this was hardcoded to before the field existed.
-        public static readonly DependencyProperty CornerTravelMarginMmProperty = DependencyProperty.Register(nameof(CornerTravelMarginMm), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(15d));
+        public static readonly DependencyProperty CornerTravelMarginMmProperty = DependencyProperty.Register(nameof(CornerTravelMarginMm), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(15d, OnCalInputChanged));
         public double CornerTravelMarginMm
         {
             get { return (double)GetValue(CornerTravelMarginMmProperty); }
@@ -98,21 +109,21 @@ namespace CNC.Controls
 
         // 1-2-3 gauge block's own known true dimensions, canonical mm (see GaugeUnits_Checked) - default
         // 25.4/50.8/76.2mm = a real 1-2-3 block's 1/2/3 inch sizes.
-        public static readonly DependencyProperty GaugeSize1Property = DependencyProperty.Register(nameof(GaugeSize1), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(25.4d));
+        public static readonly DependencyProperty GaugeSize1Property = DependencyProperty.Register(nameof(GaugeSize1), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(25.4d, OnCalInputChanged));
         public double GaugeSize1
         {
             get { return (double)GetValue(GaugeSize1Property); }
             set { SetValue(GaugeSize1Property, value); }
         }
 
-        public static readonly DependencyProperty GaugeSize2Property = DependencyProperty.Register(nameof(GaugeSize2), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(50.8d));
+        public static readonly DependencyProperty GaugeSize2Property = DependencyProperty.Register(nameof(GaugeSize2), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(50.8d, OnCalInputChanged));
         public double GaugeSize2
         {
             get { return (double)GetValue(GaugeSize2Property); }
             set { SetValue(GaugeSize2Property, value); }
         }
 
-        public static readonly DependencyProperty GaugeSize3Property = DependencyProperty.Register(nameof(GaugeSize3), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(76.2d));
+        public static readonly DependencyProperty GaugeSize3Property = DependencyProperty.Register(nameof(GaugeSize3), typeof(double), typeof(StepperCalibrationProbeWizard), new PropertyMetadata(76.2d, OnCalInputChanged));
         public double GaugeSize3
         {
             get { return (double)GetValue(GaugeSize3Property); }
@@ -245,6 +256,7 @@ namespace CNC.Controls
             btnSave.IsEnabled = false;
             newStepsX = newStepsY = null;
             Persist();   // not a DependencyProperty change - ConfigPanel.Persist() must be called explicitly
+            DiscardProgram();   // a program generated against the PREVIOUS fixture is stale - see OnCalInputChanged
             RefreshGenerateReady();
         }
 
@@ -265,6 +277,7 @@ namespace CNC.Controls
             newStepsX = newStepsY = newStepsZ = null;
             txtWarnings.Text = string.Empty;
             ShowResult();
+            DiscardProgram();   // the sitting program was built for the OTHER axis mode - see OnCalInputChanged
             RefreshGenerateReady();
             Persist();
         }
@@ -286,6 +299,7 @@ namespace CNC.Controls
         {
             reuseStartPos = chkReuseStart.IsChecked == true;
             Persist();
+            DiscardProgram();   // a program already built with/without the reuse-start branch is stale either way
         }
 
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -627,34 +641,6 @@ namespace CNC.Controls
                 lastSavedFromX = fromX;
                 lastSavedFromY = fromY;
                 lastSavedFromZ = fromZ;
-
-                // The saved starting position (chkReuseStart) is an mm value read back via #<_abs_x/y/z>,
-                // which grblHAL computes as raw step count / CURRENT steps_per_mm - changing ANY of X/Y/Z
-                // steps/mm here makes that cached mm number stale: replayed later via G53 G0 Z<oldMm>, it's
-                // reinterpreted under the NEW steps_per_mm and lands at a different physical height than
-                // where it was actually recorded (confirmed on real hardware 2026-07-21: a Z steps/mm Save
-                // made the very next reused-position run undershoot its descent and alarm on the spoilboard
-                // probe). Falls back to a fresh manual jog next run, which re-captures a valid position
-                // under the new calibration.
-                if (fromX.HasValue || fromY.HasValue || fromZ.HasValue)
-                {
-                    hasStartPos = false;
-                    reuseStartPos = false;
-                    chkReuseStart.IsChecked = false;   // fires ReuseStartPos_Changed too - visible, not silent
-                    chkReuseStart.IsEnabled = false;    // re-enabled once a fresh position is captured (Model_PropertyChanged)
-                    Persist();
-
-                    // Invalidating hasStartPos only affects the NEXT GenerateZ() call - it does nothing for
-                    // a program already sitting in 'program' from before this Save, which is exactly what a
-                    // Run press would still stream (Run() only regenerates when 'program' is empty). Discard
-                    // it here too, so the Run bar drops back to "Generate" and the next press is guaranteed
-                    // to rebuild fresh (and correctly fall back to a manual jog) rather than replaying the
-                    // now-stale cached G-code (confirmed on real hardware 2026-07-21: without this, Save
-                    // silently had no effect on the next Run press at all).
-                    program = string.Empty;
-                    if (isActiveTab)
-                        MacroProcessor.IsProgramGenerated = false;
-                }
 
                 AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
                     "Steps/mm updated{0}{1}{2}.",
