@@ -167,6 +167,24 @@ namespace GCode_Sender
             DpiChanged += (s, e) => CNC.Core.DebugLog.Write("dpi",
                 string.Format("DpiChanged: old PixelsPerDip={0} -> new={1}", e.OldDpi.PixelsPerDip, e.NewDpi.PixelsPerDip));
 
+            // Keep sidebarCanvas's top offset in sync with the main-nav tab strip's ACTUAL rendered height,
+            // measured from the real TabPanel part inside tabMode's template, instead of a hardcoded pixel
+            // guess in XAML. History: that guess (originally 34) was tuned against the tab strip's old
+            // MinHeight=32; the Apple-HIG pill redesign raised MinHeight to 34 and two successive manual
+            // re-guesses (36, then 38) both turned out still wrong when checked live - a magic number here
+            // is fundamentally fragile since it has to be re-derived by hand every time the tab template's
+            // rendered size changes for ANY reason (font, DPI, theme). Measuring the real part instead
+            // means it's correct by construction and self-corrects if the template changes again.
+            Loaded += (s, e) =>
+            {
+                var headerPanel = FindVisualChild<System.Windows.Controls.Primitives.TabPanel>(tabMode);
+                if (headerPanel == null)
+                    return;
+                void SyncSidebarTop() => sidebarCanvas.Margin = new Thickness(0, headerPanel.ActualHeight, 0, 0);
+                headerPanel.SizeChanged += (s2, e2) => SyncSidebarTop();
+                SyncSidebarTop();
+            };
+
             if (DataContext is GrblViewModel viewModel)
                 CNC.Core.Grbl.GrblViewModel = viewModel;
 
@@ -425,6 +443,23 @@ namespace GCode_Sender
                     AppConfig.Settings.Base.WindowWidth, AppConfig.Settings.Base.WindowHeight));
             }
             catch (Exception ex) { CNC.Core.DebugLog.Write("dpi", "diag error: " + ex.Message); }
+        }
+
+        // Depth-first search for the first visual-tree descendant of the given type (e.g. the TabPanel
+        // part inside a TabControl's default template). Returns null if none is found.
+        private static T FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+        {
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                if (child is T match)
+                    return match;
+                var found = FindVisualChild<T>(child);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
 
         // ---- Demo-video timelapse window marking (see docs/demo-videos/README.md) ----
