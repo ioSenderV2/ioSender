@@ -89,7 +89,7 @@ namespace CNC.Controls
         internal const int ProbeLookahead = 10;
         // Set when the currently running job had dry-run mode applied at start (G92 Z-offset queued, M5/M9
         // preamble sent, and per-line M3/M4/M7/M8 suppression armed for the streamers). Cleared (G92.1 sent)
-        // at every job-end path so the temporary offset never survives past the run. See CycleStart,
+        // at every job-end path so the temporary offset never survives past the run. See Run,
         // OnPumpJobFinished, OnPumpError and AbortPump.
         private bool dryRunActive = false;
         private volatile StreamingState streamingState = StreamingState.NoFile;
@@ -159,8 +159,8 @@ namespace CNC.Controls
 
             // The run bar is fixed at the main-window bottom and visible on every tab, but its state machine is
             // only "active" on the Grbl tab. A wizard tab registers its program as a runnable source while the
-            // Grbl tab is not active, so refresh the Cycle Start enable directly when the active program changes -
-            // otherwise the bar's enables stay frozen and Cycle Start looks dead on the wizard tab.
+            // Grbl tab is not active, so refresh the Run enable directly when the active program changes -
+            // otherwise the bar's enables stay frozen and Run looks dead on the wizard tab.
             MacroProcessor.ActiveProgramChanged += OnActiveProgramChanged;
             ProgramView.ActiveChanged += OnActiveProgramChanged;   // a connected ProgramView is an active program too
         }
@@ -172,15 +172,15 @@ namespace CNC.Controls
 
             // A wizard program is a runnable source even though the Grbl tab isn't active. Keep status reports
             // flowing so the bar's state machine (GrblStateChanged, relaxed below) stays live - otherwise its
-            // enables freeze and Cycle Start re-disables after the first run.
+            // enables freeze and Run re-disables after the first run.
             if (HasActiveProgram)
                 EnablePolling(true);
 
-            // Refresh Cycle Start now (only meaningful when idle; a running/held job manages its own enables).
+            // Refresh Run now (only meaningful when idle; a running/held job manages its own enables).
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
             {
-                IsCycleStartEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
-                SetActiveProgramReady(HasActiveProgram && IsCycleStartEnabled);
+                IsRunEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                SetActiveProgramReady(HasActiveProgram && IsRunEnabled);
             }
             else
                 SetActiveProgramReady(false);
@@ -191,15 +191,19 @@ namespace CNC.Controls
         // ProgramView.Active is null until a view connects, so this is inert for tools still on ActiveRun.
         private static bool HasActiveProgram { get { return MacroProcessor.ActiveRun != null || ProgramView.Active != null; } }
 
-        public static readonly DependencyProperty IsCycleStartEnabledProperty = DependencyProperty.Register(nameof(IsCycleStartEnabled), typeof(bool), typeof(JobControl));
-        public bool IsCycleStartEnabled
+        // PropertyChangedCallback (not a manual call at every one of this DP's many "IsRunEnabled = ..."
+        // assignment sites throughout this file) keeps btnStart's disabled-state tooltip in sync regardless of
+        // which state-machine branch flips it - see UpdateStartButtonLabel.
+        public static readonly DependencyProperty IsRunEnabledProperty = DependencyProperty.Register(nameof(IsRunEnabled), typeof(bool), typeof(JobControl),
+            new PropertyMetadata(false, (d, e) => (d as JobControl)?.UpdateStartButtonLabel()));
+        public bool IsRunEnabled
         {
-            get { return (bool)GetValue(IsCycleStartEnabledProperty); }
-            set { SetValue(IsCycleStartEnabledProperty, value); }
+            get { return (bool)GetValue(IsRunEnabledProperty); }
+            set { SetValue(IsRunEnabledProperty, value); }
         }
 
-        // True when a wizard program is the active source and the machine is idle, ready to run on Cycle Start.
-        // Drives the green highlight on the Cycle Start button (XAML) - a "press me to run" cue.
+        // True when a wizard program is the active source and the machine is idle, ready to run on Run.
+        // Drives the green highlight on the Run button (XAML) - a "press me to run" cue.
         public static readonly DependencyProperty IsActiveProgramReadyProperty = DependencyProperty.Register(nameof(IsActiveProgramReady), typeof(bool), typeof(JobControl));
         public bool IsActiveProgramReady
         {
@@ -208,7 +212,7 @@ namespace CNC.Controls
         }
 
         // Set the "ready to run the active program" cue. On the false->true edge, also drop a one-time status-line
-        // prompt ("<name> ready - press Cycle Start to run."); the markers/scroll otherwise behave as on the job.
+        // prompt ("<name> ready - press Run to run."); the markers/scroll otherwise behave as on the job.
         private void SetActiveProgramReady(bool ready)
         {
             if (ready == IsActiveProgramReady)
@@ -310,6 +314,7 @@ namespace CNC.Controls
                 model.OnCycleStart += OnCycleStart;
                 model.OnStop += OnStop;
                 GCode.File.Model = model;   // wire the loaded job's model (job setup, not the streamed Source)
+                UpdateStartButtonLabel();   // reflect whatever mode is already active (e.g. reattaching to a live controller)
             }
         }
 
@@ -325,7 +330,7 @@ namespace CNC.Controls
         {
             if (isActive && JobPending)
             {
-                CycleStart(0);
+                Run(0);
             }
         }
 
@@ -363,6 +368,11 @@ namespace CNC.Controls
 
                 case nameof(GrblViewModel.GrblState):
                     GrblStateChanged((sender as GrblViewModel).GrblState);
+                    UpdateStartButtonLabel();   // IsCheckMode is derived from GrblState - no PropertyChanged of its own
+                    break;
+
+                case nameof(GrblViewModel.IsDryRunMode):
+                    UpdateStartButtonLabel();
                     break;
 
                 case nameof(GrblViewModel.IsConnectionLost):
@@ -384,7 +394,7 @@ namespace CNC.Controls
 
                 case nameof(GrblViewModel.StartFromBlockNum):
                     // "Start from this toolpath/block" always streams the loaded job, never a wizard's program.
-                    CycleStart((sender as GrblViewModel).StartFromBlockNum, false);
+                    Run((sender as GrblViewModel).StartFromBlockNum, false);
                     break;
 
                     case nameof(GrblViewModel.IsMPGActive):
@@ -439,7 +449,7 @@ namespace CNC.Controls
         }
 
         public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }
-        // A job is ready to start: a loaded job, or an active wizard program (so the physical Cycle Start button
+        // A job is ready to start: a loaded job, or an active wizard program (so the physical Run button
         // runs a wizard's program too, not just a loaded file). False once a job/stream is actually running.
         public bool JobPending { get { return (Source.IsLoaded || HasActiveProgram) && !JobTimer.IsRunning; } }
 
@@ -505,7 +515,7 @@ namespace CNC.Controls
 
         private bool StartJob(Key key)
         {
-            CycleStart(0);
+            Run(0);
             return true;
         }
 
@@ -590,51 +600,121 @@ namespace CNC.Controls
 
         void btnStart_Click(object sender, RoutedEventArgs e)
         {
-            CycleStart(0);
+            Run(0);
         }
 
-        // Cycle Start right-click -> toggle grbl check mode ($C). Relocated here from the status-bar Check
-        // checkbox: enabled only when not running a job and not asleep. $C from Idle enters check mode; leaving
-        // it (unchecking while in the Check state) needs a soft reset. IsChecked mirrors GrblViewModel.IsCheckMode.
-        private void cycleStartMenu_Opened(object sender, RoutedEventArgs e)
+        // Armed by selecting "Check Run" from the dropdown - NOT the same as model.IsCheckMode (which reflects
+        // the controller ACTUALLY being in Check state right now). $C isn't sent here: picking the mode should
+        // only be a label/intent change (Home and other Idle-gated controls must stay enabled until the
+        // operator actually presses Run) - the real $C fires from Run() itself, right before it would otherwise
+        // start streaming. Cleared by picking a different mode, or once Run() actually sends $C.
+        private bool checkModeArmed = false;
+
+        // Sets the popup's MIN width explicitly at the moment it opens, reading startPanel's already-settled
+        // ActualWidth - see the XAML comment on Popup.Opened for why a live Width binding clips content on
+        // the first open (a WPF Popup-layout-timing quirk, not fixable by just binding harder). MinWidth, not
+        // Width: the row's width varies with whichever mode is CURRENTLY shown (btnStart.Content), and "Run"
+        // is shorter than "Dry Run"/"Check Run" - a fixed Width bound to the row while it reads "Run" clipped
+        // the longer entries. MinWidth keeps the popup at least as wide as the row (the original "full width"
+        // ask) while still letting it grow to fit its own widest item when the row itself is narrower.
+        private void StartModePopup_Opened(object sender, EventArgs e)
         {
-            var m = DataContext as GrblViewModel;
-            miCheckMode.IsEnabled = m != null && !m.IsJobRunning && !m.IsSleepMode;
-            miDryRun.IsEnabled = m != null && !m.IsJobRunning && !m.IsSleepMode;
+            startModePopup.MinWidth = startPanel.ActualWidth;
         }
 
-        private void miCheckMode_Click(object sender, RoutedEventArgs e)
+        // Run's mode dropdown (replaces the old right-click context menu): Run (normal) / Dry
+        // Run / Check Run, each a Button in the popup tagged with which one it is. Applies the underlying mode
+        // exactly as the old checkable menu items did (grbl Reset for check mode, the sender-side IsDryRunMode
+        // flag for dry run - see checkModeArmed's own comment for why $C itself is deferred), then relabels
+        // btnStart to match via UpdateStartButtonLabel - so the button's own text is always a live reflection
+        // of the current mode, not just "whatever was last clicked" (e.g. it correctly reverts to Run if check
+        // mode exits some other way, like Reset).
+        private void StartMode_Click(object sender, RoutedEventArgs e)
         {
+            startModePopup.IsOpen = false;
+
             var m = DataContext as GrblViewModel;
-            if (m == null)
+            if (m == null || !(sender is Button btn))
                 return;
 
             GrblStates state = m.GrblState.State;
-            if (state == GrblStates.Check && !miCheckMode.IsChecked)
-                Grbl.Reset();
-            else if (state == GrblStates.Idle && miCheckMode.IsChecked)
-                m.ExecuteCommand(GrblConstants.CMD_CHECK);
+            switch (btn.Tag as string)
+            {
+                case "check":
+                    m.IsDryRunMode = false;
+                    checkModeArmed = true;
+                    break;
+
+                case "dryrun":
+                    checkModeArmed = false;
+                    if (state == GrblStates.Check)
+                        Grbl.Reset();
+                    m.IsDryRunMode = true;
+                    break;
+
+                default:   // normal Run
+                    checkModeArmed = false;
+                    if (state == GrblStates.Check)
+                        Grbl.Reset();
+                    m.IsDryRunMode = false;
+                    break;
+            }
+            UpdateStartButtonLabel();
         }
 
-        // Sender-side toggle only - no grbl command is sent here. CycleStart consults model.IsDryRunMode
-        // when a run actually starts (check mode has no motion, so dry run is skipped there - see CycleStart).
-        private void miDryRun_Click(object sender, RoutedEventArgs e)
+        // Reflects the CURRENT mode, not the last dropdown click - GrblViewModel.IsCheckMode is itself derived
+        // from GrblState (see its own getter), so this must be re-run on every GrblState change too (e.g. a
+        // Reset elsewhere exits check mode without going through StartMode_Click at all). Also drives btnStart's
+        // tooltip: disabled -> guidance on what to do first (shown even while disabled - see
+        // ToolTipService.ShowOnDisabled in XAML); enabled -> what THIS press will actually do, matching the
+        // selected mode - a plain "Alt+R" static tip left an operator to discover Dry Run/Check Run's real
+        // effect (Z offset, spindle/coolant forced off, etc.) only by reading the dropdown's own tooltips first.
+        private void UpdateStartButtonLabel()
         {
-            var m = DataContext as GrblViewModel;
-            if (m == null)
+            if (model == null || btnStart == null)
                 return;
 
-            m.IsDryRunMode = miDryRun.IsChecked;
+            // Neither mode is ever saved to config (IsDryRunMode is a plain in-memory GrblViewModel field,
+            // always false on a fresh instance; IsCheckMode is a live read of GrblState.State - see their own
+            // declarations) - so there is nothing here to "reset on startup". What LOOKED like the selection
+            // surviving a restart was actually the CONTROLLER genuinely still sitting in its own real Check
+            // state from before (grblHAL has no auto-exit for $C - see ResetRunModeAfterJob), which a fresh
+            // reconnect would truthfully re-report. Belt-and-suspenders anyway: before a real connection
+            // exists (GrblState still Unknown - the pre-connect default), neither mode is meaningful, so
+            // always show plain Run regardless of whatever IsCheckMode/IsDryRunMode happen to read right now.
+            bool connected = model.GrblState.State != GrblStates.Unknown;
+            // checkModeArmed (picked from the dropdown, $C not sent yet - see its own comment) reads the same
+            // as actually being in Check state (a real, already-running check) - both mean "Run will behave
+            // as Check Run", just at different points before/after the operator actually presses it.
+            bool showCheck = checkModeArmed || (connected && model.IsCheckMode);
+            btnStart.Content = showCheck ? FindResource("StartModeCheck")
+                              : connected && model.IsDryRunMode ? FindResource("StartModeDryRun")
+                              : FindResource("StartModeNormal");
+            btnStart.ToolTip = !IsRunEnabled ? FindResource("StartTipDisabled")
+                              : showCheck ? FindResource("StartTipCheck")
+                              : connected && model.IsDryRunMode ? FindResource("StartTipDryRun")
+                              : FindResource("StartTipNormal");
         }
 
         #endregion
 
         // honorActiveProgram: when a wizard tab is up it registers its program as the active program
-        // (MacroProcessor.ActiveRun). A fresh (idle) Cycle Start then runs THAT instead of the loaded job - so one
-        // Cycle Start runs whatever program is active, file/folder or wizard. The internal stream-starters that
+        // (MacroProcessor.ActiveRun). A fresh (idle) Run then runs THAT instead of the loaded job - so one
+        // Run runs whatever program is active, file/folder or wizard. The internal stream-starters that
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
-        public void CycleStart(int fromBlock, bool honorActiveProgram = true)
+        public void Run(int fromBlock, bool honorActiveProgram = true)
         {
+            // The dropdown's "Check Run" only arms the intent (see checkModeArmed's own comment) - this is
+            // where it actually takes effect, right before the run it was meant to gate would otherwise start.
+            // Idle-gated same as the old immediate-send behavior (StartMode_Click used to require this too);
+            // if not idle when Run() fires, silently skip for now (stays armed - a Hold/Tool resume etc. isn't
+            // "starting a check run" anyway, and the next genuine fresh start will pick it up).
+            if (checkModeArmed && grblState.State == GrblStates.Idle)
+            {
+                checkModeArmed = false;
+                model.ExecuteCommand(GrblConstants.CMD_CHECK);
+            }
+
             if (grblState.State == GrblStates.Hold || (grblState.State == GrblStates.Run && grblState.Substate == 1) || (grblState.State == GrblStates.Door && (grblState.Substate == 0 || grblState.Substate == 5)))
                 Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
             else if(grblState.State == GrblStates.Idle && model.SDRewind) {
@@ -659,7 +739,7 @@ namespace CNC.Controls
             {
                 // A wizard tab is active and the machine is idle: run its program (generate-and-run, with its
                 // prompts/flow control) rather than the loaded job. It routes back here with honorActiveProgram:
-                // false to stream. Idle-gated so a Cycle Start mid-run can never re-trigger it.
+                // false to stream. Idle-gated so a Run mid-run can never re-trigger it.
                 MacroProcessor.ActiveRun();
             }
             else if (Source.IsLoaded)
@@ -716,9 +796,9 @@ namespace CNC.Controls
                     // whatever state the machine is already in when dry run starts.
                     //
                     // Also gated on !(Source is a transient macro/tool run): dry-run is a loaded-job-only
-                    // toggle the operator arms from the Cycle Start menu on the Job tab - it must never leak
+                    // toggle the operator arms from the Run dropdown on the Job tab - it must never leak
                     // into a probing/wizard macro (Start Job, Load Stock, ...) streamed via RunStreamedJobInPlace,
-                    // which shares this same CycleStart. A stray G92 Z offset there corrupts the macro's own
+                    // which shares this same Run. A stray G92 Z offset there corrupts the macro's own
                     // positioning (e.g. a spoilboard probe search starting ~10mm+ too high and timing out) even
                     // though the macro never armed dry run itself - it was simply still checked from an earlier,
                     // unrelated loaded-job test.
@@ -735,7 +815,7 @@ namespace CNC.Controls
                         Source.Commands.Enqueue("M9");
                         // G21 first: offset is always computed in mm (stockZ from DeclaredStock.Z, which the
                         // Fusion post always declares in mm) - without forcing units here, this preamble runs
-                        // in WHATEVER modal state the controller happens to be in at Cycle Start (leftover
+                        // in WHATEVER modal state the controller happens to be in at Run (leftover
                         // from an earlier G20 command, a previous job, etc.), and a G20 (inch) controller
                         // reads "G92Z-17" as -17 IN (~432mm), not -17mm - a massive, silent overshoot instead
                         // of the intended small clearance.
@@ -744,7 +824,7 @@ namespace CNC.Controls
                         // "G92 Zk" does NOT set an absolute offset - it makes WHEREVER THE MACHINE CURRENTLY
                         // IS read as work-Z=k. The bug this replaces just sent "G92Z-<offset>" unconditionally,
                         // which only gives the intended clearance if the machine happens to already be sitting
-                        // at the stock surface when Cycle Start runs - it never was (typically wherever the
+                        // at the stock surface when Run runs - it never was (typically wherever the
                         // last job/macro parked, e.g. Start Job's G30). Confirmed on real hardware: a machine
                         // parked ~67mm above the true stock plus the intended 17mm clearance gave a 84mm gap,
                         // not 17mm - exactly this bug's arithmetic.
@@ -804,25 +884,39 @@ namespace CNC.Controls
             }
         }
 
-        // Clears the temporary dry-run Z offset (G92.1) once the job that set it ends - normal finish, error,
-        // or stop/alarm/connection-lost (all of which route through AbortPump). Deliberately does NOT re-send
-        // M5/M9 here - the run already forced them at start, and re-issuing them on every job end (including
-        // ordinary non-dry-run jobs, since AbortPump is the shared stop path) would fight a job that legitimately
-        // wants to leave the spindle running (M5 is not modal-safe to send blind). No-op if dry run wasn't
-        // active for the run that just ended.
-        private void ClearDryRunOffset()
+        // Resets the run-mode selection (Dry Run / Check Run) back to plain Run once the job that used it ends -
+        // normal finish, error, or stop/alarm/connection-lost (all of which route through AbortPump, so this
+        // fires from OnPumpJobFinished/OnPumpError/AbortPump, the same three paths). Neither mode is a sticky
+        // setting the operator meant to leave armed for the NEXT, unrelated job - re-arming either for another
+        // run is one click; staying silently armed (or, for check mode, silently STUCK - see below) across
+        // unrelated runs is exactly the kind of state an operator can lose track of.
+        private void ResetRunModeAfterJob()
         {
+            if (model == null)
+                return;
+
+            checkModeArmed = false;   // belt-and-suspenders - Run() should already have cleared this before $C ever went out
+
             if (dryRunActive)
             {
                 dryRunActive = false;
+                // Deliberately does NOT re-send M5/M9 here - the run already forced them at start, and
+                // re-issuing them on every job end (including ordinary non-dry-run jobs, since AbortPump is
+                // the shared stop path) would fight a job that legitimately wants to leave the spindle running
+                // (M5 is not modal-safe to send blind).
                 Comms.com.WriteCommand("G92.1");
-                // Dry run is a per-run, deliberately-armed toggle, not a sticky mode - it must NOT silently
-                // stay checked into the NEXT run (finished, errored, or stopped/aborted all count: this
-                // fires from OnPumpJobFinished/OnPumpError/AbortPump, the same three paths that got here).
-                // Re-arming it for another dry run is one click; staying silently armed (or silently NOT
-                // armed) across unrelated runs is exactly the kind of state the operator can lose track of.
                 model.IsDryRunMode = false;
             }
+
+            // Check mode ($C) has no auto-exit of its own - grblHAL stays in the Check state after the checked
+            // program finishes until an explicit soft reset (see StartMode_Click, which uses the same
+            // mechanism to leave it deliberately). Without this, both the controller AND btnStart's label
+            // (model.IsCheckMode is a live read of GrblState, not a separate flag - see UpdateStartButtonLabel)
+            // would still show Check Run for the NEXT job too - and since that's the CONTROLLER'S own state,
+            // not something ioSender caches, it would look "stuck" even across an app restart if the operator
+            // closed ioSender before ever leaving check mode.
+            if (model.GrblState.State == GrblStates.Check)
+                Grbl.Reset();
         }
 
         // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.
@@ -831,7 +925,7 @@ namespace CNC.Controls
             PumpLog.W("OnPumpJobFinished -> JobFinished, state=" + grblState.State);
             pumpActive = false;
             streamingHandler.Count = false;   // pump owned flow control; stop legacy line accounting so a late/trailing response can't re-enter it
-            ClearDryRunOffset();
+            ResetRunModeAfterJob();
             streamingHandler.Call(StreamingState.JobFinished, true);
         }
 
@@ -840,7 +934,7 @@ namespace CNC.Controls
             pumpActive = false;
             streamingHandler.Count = false;
             job.HasError = model.IsGrblHAL;
-            ClearDryRunOffset();
+            ResetRunModeAfterJob();
             streamingHandler.Call(StreamingState.Error, true);
         }
 
@@ -853,7 +947,7 @@ namespace CNC.Controls
                 streamingHandler.Count = false;
                 pump?.Abort();
             }
-            ClearDryRunOffset();
+            ResetRunModeAfterJob();
             idleKickTimer?.Stop();
         }
 
@@ -945,7 +1039,7 @@ namespace CNC.Controls
             {
                 using (new UIUtils.WaitCursor())
                 {
-                    IsCycleStartEnabled = false;
+                    IsRunEnabled = false;
 
    //                 grdGCode.DataContext = null;
 
@@ -957,7 +1051,7 @@ namespace CNC.Controls
                     job.CurrBlock = job.LastExecuting = job.PendingLine = job.ACKPending = model.BlockExecuting = 0;
                     job.PgmEndLine = Source.Blocks - 1;
 
-                    IsCycleStartEnabled = true;
+                    IsRunEnabled = true;
                 }
             }
         }
@@ -987,7 +1081,7 @@ namespace CNC.Controls
             {
                 case StreamingState.ToolChange:
                     model.IsJobRunning = false; // only enable UI if no ATC?
-                    IsCycleStartEnabled = true;
+                    IsRunEnabled = true;
                     IsFeedHoldEnabled = (feedHoldEnable = false);
                     IsStopEnabled = true;
                     if (JobTimer.IsRunning)
@@ -1039,7 +1133,7 @@ namespace CNC.Controls
                 {
                     case StreamingState.Halted:
                     case StreamingState.FeedHold:
-                        IsCycleStartEnabled = true;
+                        IsRunEnabled = true;
                         IsFeedHoldEnabled = (feedHoldEnable = false);
                         if ((IsStopEnabled = model.IsJobRunning || model.IsSDCardJob) && !GrblInfo.IsGrblHAL)
                             btnStop.Content = (string)FindResource("JobStop");
@@ -1084,7 +1178,7 @@ namespace CNC.Controls
                     case StreamingState.Idle:
                         if(streamingState == StreamingState.Error)
                         {
-                            IsCycleStartEnabled = !GrblInfo.IsGrblHAL; // BAD! ?
+                            IsRunEnabled = !GrblInfo.IsGrblHAL; // BAD! ?
                             IsFeedHoldEnabled = (feedHoldEnable = false);
                             IsStopEnabled = true;
                             SetStreamingHandler(StreamingHandler.AwaitAction);
@@ -1096,7 +1190,7 @@ namespace CNC.Controls
                     case StreamingState.Send:
                         if (!model.IsJobRunning)
                             model.IsJobRunning = true;
-                        IsCycleStartEnabled = false;
+                        IsRunEnabled = false;
                         IsFeedHoldEnabled = (feedHoldEnable = true) && !model.FeedHoldDisabled;
                         IsStopEnabled = true;
                         IsRewindEnabled = false;
@@ -1156,7 +1250,7 @@ namespace CNC.Controls
                 switch (newState)
                 {
                     case StreamingState.Idle:
-                        IsCycleStartEnabled = !GrblInfo.IsGrblHAL;
+                        IsRunEnabled = !GrblInfo.IsGrblHAL;
                         break;
 
                     case StreamingState.Stop:
@@ -1175,9 +1269,9 @@ namespace CNC.Controls
 
                     // Note: Only entered in legacy mode
                     case StreamingState.Paused:
-                        IsCycleStartEnabled = false;
+                        IsRunEnabled = false;
                         IsFeedHoldEnabled = (feedHoldEnable = false);
-                        IsCycleStartEnabled = true;
+                        IsRunEnabled = true;
                         IsStopEnabled = true;
                         btnStop.Content = (string)FindResource("JobStop");
                         if (job.ACKPending == 0)
@@ -1223,13 +1317,13 @@ namespace CNC.Controls
 
                     case StreamingState.Error:
                     case StreamingState.Halted:
-                        IsCycleStartEnabled = !GrblInfo.IsGrblHAL;
+                        IsRunEnabled = !GrblInfo.IsGrblHAL;
                         IsFeedHoldEnabled = (feedHoldEnable = false);
                         IsStopEnabled = true;
                         break;
 
                     case StreamingState.Send:
-                        IsCycleStartEnabled = false;
+                        IsRunEnabled = false;
                         IsFeedHoldEnabled = (feedHoldEnable = true) && !model.FeedHoldDisabled;
                         IsStopEnabled = true;
                         IsRewindEnabled = false;
@@ -1276,18 +1370,18 @@ namespace CNC.Controls
                     case StreamingState.Idle:
                     case StreamingState.NoFile:
                         IsEnabled = !grblState.MPG;
-                        // Also enabled when a wizard tab is up (its program is the active program Cycle Start runs),
+                        // Also enabled when a wizard tab is up (its program is the active program Run runs),
                         // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
-                        IsCycleStartEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                        IsRunEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
                         IsStopEnabled = model.IsSDCardJob && model.SDRewind;
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                         IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
-                        SetActiveProgramReady(HasActiveProgram && IsCycleStartEnabled);
+                        SetActiveProgramReady(HasActiveProgram && IsRunEnabled);
                         break;
 
                     case StreamingState.Send:
-                        SetActiveProgramReady(false);   // running now - drop the "press Cycle Start" cue
+                        SetActiveProgramReady(false);   // running now - drop the "press Run" cue
                         if (!string.IsNullOrEmpty(model.FileName) && !grblState.MPG)
                             model.IsJobRunning = true;
                         if (JobTimer.IsRunning)
@@ -1305,7 +1399,7 @@ namespace CNC.Controls
 
                     case StreamingState.Error:
                     case StreamingState.Halted:
-                        IsCycleStartEnabled = !grblState.MPG;
+                        IsRunEnabled = !grblState.MPG;
                         IsFeedHoldEnabled = (feedHoldEnable = false);
                         IsStopEnabled = !grblState.MPG;
                         break;
@@ -1320,7 +1414,7 @@ namespace CNC.Controls
 
                     case StreamingState.Stop:
                         IsFeedHoldEnabled = (feedHoldEnable = !(grblState.MPG || grblState.State == GrblStates.Alarm)) && !model.FeedHoldDisabled;
-                        IsCycleStartEnabled = feedHoldEnable && Source.IsLoaded; //!GrblInfo.IsGrblHAL;
+                        IsRunEnabled = feedHoldEnable && Source.IsLoaded; //!GrblInfo.IsGrblHAL;
                         IsStopEnabled = false;
                         IsRewindEnabled = false;
                         model.IsJobRunning = false;
@@ -1384,7 +1478,7 @@ namespace CNC.Controls
 
             // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
             // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
-            // there too (Idle re-enables Cycle Start after a run, Hold/Tool/Alarm behave as on the Grbl tab).
+            // there too (Idle re-enables Run after a run, Hold/Tool/Alarm behave as on the Grbl tab).
             // Also while a job/stream is actually running (JobTimer): a stay-put run (Load Stock) finishes on a
             // non-Grbl tab and parks in AwaitIdle waiting for the controller's final Idle - if its active program
             // was already torn down, neither flag above is set and that Idle would be dropped, leaving the bar
@@ -1410,12 +1504,12 @@ namespace CNC.Controls
                         streamingHandler.Call(StreamingState.Send, false);
                     if (newstate.Substate == 1)
                     {
-                        IsCycleStartEnabled = !grblState.MPG;
+                        IsRunEnabled = !grblState.MPG;
                         IsFeedHoldEnabled = (feedHoldEnable = false);
                     }
                     else if (grblState.Substate == 1)
                     {
-                        IsCycleStartEnabled = false;
+                        IsRunEnabled = false;
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                     }
                     if (!GrblInfo.IsGrblHAL)
@@ -1426,7 +1520,7 @@ namespace CNC.Controls
                     if (grblState.State != GrblStates.Jog)
                     {
                         // In pump mode read the pump's progress mirror, and suspend it so jog/MDI acks during the
-                        // tool change aren't consumed as job-line acks (resumed from CycleStart's Tool branch).
+                        // tool change aren't consumed as job-line acks (resumed from Run's Tool branch).
                         int pendingLine = pumpActive ? pump.PendingLine : job.PendingLine;
                         if (pumpActive)
                             pump.Suspended = true;
@@ -1460,16 +1554,16 @@ namespace CNC.Controls
                     //if (newstate.Substate != 5 && streamingState == StreamingState.Send)
                     //    streamingHandler.Call(StreamingState.FeedHold, false);
                     //else
-                    //    IsCycleStartEnabled = newstate.Substate != 5;
+                    //    IsRunEnabled = newstate.Substate != 5;
 
                     if (newstate.Substate > 0)
                     {
                         if (streamingState == StreamingState.Send)
                             streamingHandler.Call(StreamingState.FeedHold, false);
                         else
-                            IsCycleStartEnabled = false;
+                            IsRunEnabled = false;
                     } else
-                        IsCycleStartEnabled = true;
+                        IsRunEnabled = true;
                     break;
 
                 case GrblStates.Alarm:

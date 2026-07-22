@@ -104,7 +104,7 @@ namespace CNC.Controls
                 { GrblStates.Unknown, "Not connected, or the controller state is unknown." },
                 { GrblStates.Idle, "Ready - idle and waiting for commands." },
                 { GrblStates.Run, "Running - executing a program or commanded motion." },
-                { GrblStates.Hold, "Feed hold - motion is paused. Press Cycle Start to resume." },
+                { GrblStates.Hold, "Feed hold - motion is paused. Press Run to resume." },
                 { GrblStates.Jog, "Jogging - a manual move is in progress." },
                 { GrblStates.Home, "Homing - seeking the machine's reference (limit) switches." },
                 { GrblStates.Check, "Check mode - G-code is parsed and validated but not executed; no motion. Turn it off to cut for real." },

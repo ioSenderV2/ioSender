@@ -89,7 +89,7 @@
             <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Uid="btn_asgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click"
-                        ToolTip="Generate the auto-square test program from the settings above and load it for Cycle Start to run."/>
+                        ToolTip="Generate the auto-square test program from the settings above and load it for Run to run."/>
                 <Button x:Uid="btn_asapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"
                         ToolTip="Write the offset above to the squaring setting."/>
                 <Button x:Uid="btn_ashome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"
@@ -106,7 +106,7 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock x:Uid="txt_asinstr" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
-                       Text="1. Set the framing square's blade &amp; tongue and the drill settings.  2. Generate, then Cycle Start &#8211; it drills the L (red +).  3. Pin the holes, register the square on the two Y-leg pins, and measure the gap at the X-leg pin (arrows).  4. Enter the gap (or a target offset) &#8211; the other is computed &#8211; then Apply offset and Re-home."/>
+                       Text="1. Set the framing square's blade &amp; tongue and the drill settings.  2. Generate, then Run &#8211; it drills the L (red +).  3. Pin the holes, register the square on the two Y-leg pins, and measure the gap at the X-leg pin (arrows).  4. Enter the gap (or a target offset) &#8211; the other is computed &#8211; then Apply offset and Re-home."/>
             <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
                 <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged"/>
             </Border>

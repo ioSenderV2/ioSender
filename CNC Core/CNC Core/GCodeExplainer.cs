@@ -280,7 +280,7 @@ namespace CNC.Core
                 case Commands.G67: return "Cancel modal macro call (G67)";
 
                 // M-codes
-                case Commands.M0: return "Program pause — press Cycle Start to continue (M0)";
+                case Commands.M0: return "Program pause — press Run to continue (M0)";
                 case Commands.M1: return "Optional stop (M1)";
                 case Commands.M2: return "End of program (M2)";
                 case Commands.M30: return "End of program and rewind (M30)";

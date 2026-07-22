@@ -995,7 +995,7 @@ namespace GCode_Sender
                 new System.Action(() =>
                 {
                     if (RunControl.Source == prog)
-                        RunControl.CycleStart(0, false);   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
+                        RunControl.Run(0, false);   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
                     else
                         CNC.Core.DebugLog.Write("macro", "RunStreamedJobInPlace: skipped stale deferred CycleStart - burst already finished");
                 }));

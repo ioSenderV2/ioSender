@@ -54,7 +54,7 @@ namespace CNC.Controls
                     programView.SetProgramText(program);
                     programView.Connect();     // this tool's own view shows in the overlay
                 }
-                MacroProcessor.ActiveRun = Run;                                            // Cycle Start runs it
+                MacroProcessor.ActiveRun = Run;                                            // Run runs it
             }
             else
             {
@@ -506,7 +506,7 @@ namespace CNC.Controls
                                 "Surface spoilboard", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.No)
                 return;
 
-            // Build the program and preview it in the bottom Program View (pops it open); Cycle Start streams it.
+            // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
             program = string.Join("\r\n", BuildProgram());
             MacroProcessor.PublishGenerated("Surface spoilboard", program, EnsureProgramView, () => programView);
         }

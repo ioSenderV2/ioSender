@@ -543,7 +543,7 @@ namespace CNC.Controls
             UpdatePositionDisplay();
             SetBusy(false);
             // The macro's own (PRINT, Test position OK - ...) message gets clobbered by JobControl's generic
-            // "<Program> ready - press Cycle Start to run" banner (SetActiveProgramReady) - Test position reuses
+            // "<Program> ready - press Run to run" banner (SetActiveProgramReady) - Test position reuses
             // the same stay-put-program machinery as a wizard tool, and that banner fires synchronously as part
             // of the Idle transition, before this deferred callback runs. Re-assert a clear final message here,
             // same as OnViseCornerProbeDone already does for Set position.

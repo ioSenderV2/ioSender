@@ -73,10 +73,10 @@
                 Value="{Binding NewResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="steps/mm"/>
         </StackPanel>
         </ScrollViewer>
-        <!-- Generate / Save pinned at the bottom of the input column (Cycle Start runs the generated program) -->
+        <!-- Generate / Save pinned at the bottom of the input column (Run runs the generated program) -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8,5,6" HorizontalAlignment="Right">
             <Button x:Uid="btn_scgen" Content="Generate" Tag="generate" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"
-                    ToolTip="Generate the scratch test program from the settings above and load it for Cycle Start to run."/>
+                    ToolTip="Generate the scratch test program from the settings above and load it for Run to run."/>
             <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
                     IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"
                     ToolTip="Write the steps/mm value implied by the row highlighted green to the axis' setting."/>
@@ -91,7 +91,7 @@
             <StackPanel Grid.Row="0">
                 <TextBlock x:Uid="hlp_scHdr" Text="About scratch calibration" FontWeight="SemiBold" Margin="0,0,0,2"/>
                 <TextBlock x:Uid="hlp_scBody" TextWrapping="Wrap" Margin="0,0,0,10"
-                           Text="Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Cycle Start to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."/>
+                           Text="Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Run to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."/>
                 <TextBlock x:Uid="txt_scresults" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
             </StackPanel>
             <DataGrid x:Uid="dgResults" x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"

@@ -61,7 +61,7 @@
         <!-- Right: how-to. -->
         <Grid Grid.Column="2" Margin="8,5,5,5">
             <TextBlock VerticalAlignment="Top" TextWrapping="Wrap" Foreground="#24292F"
-                       Text="1. Clamp/register the reference block against the Corner Fence, front-left origin, like a real Start Job.  2. Enter its true (already known) width/height.  3. Generate, then Cycle Start - it parks at G30 to confirm the probe, then probes corner 1, then the X and Y neighbours, straight to the tight 5mm-inset anchor (same as Start Job's own corner-1 optimization).  4. Compare Measured to True (left) and check the new-steps/mm calculation, then Save steps/mm to write the correction."/>
+                       Text="1. Clamp/register the reference block against the Corner Fence, front-left origin, like a real Start Job.  2. Enter its true (already known) width/height.  3. Generate, then Run - it parks at G30 to confirm the probe, then probes corner 1, then the X and Y neighbours, straight to the tight 5mm-inset anchor (same as Start Job's own corner-1 optimization).  4. Compare Measured to True (left) and check the new-steps/mm calculation, then Save steps/mm to write the correction."/>
         </Grid>
     </Grid>
 </local:ConfigPanel>

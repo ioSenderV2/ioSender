@@ -677,7 +677,7 @@ namespace GCode_Sender
         public void StartLoadedJob()
         {
             if (GCode.File.IsLoaded)
-                MainWindow.ui.RunControl.CycleStart(0, false);   // stream the loaded job, don't re-enter ActiveRun
+                MainWindow.ui.RunControl.Run(0, false);   // stream the loaded job, don't re-enter ActiveRun
         }
 
 #region UIevents

@@ -83,7 +83,7 @@
     <system:String x:Uid="str_hmSaveTitle" x:Key="HmSaveTitle">Save height map</system:String>
     <system:String x:Uid="str_hmLoadTitle" x:Key="HmLoadTitle">Load height map</system:String>
     <system:String x:Uid="str_hmFileFilter" x:Key="HmFileFilter">Height map files (*.map)|*.map|All files (*.*)|*.*</system:String>
-    <system:String x:Uid="str_readyCycleStart" x:Key="ReadyCycleStart">{0} ready - press Cycle Start to run.</system:String>
+    <system:String x:Uid="str_readyCycleStart" x:Key="ReadyCycleStart">{0} ready - press Run to run.</system:String>
     <!-- Surface spoilboard wizard messages. -->
     <system:String x:Uid="str_sbOverlapHigh" x:Key="SbOverlapHigh">Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.</system:String>
     <system:String x:Uid="str_sbNoTravel" x:Key="SbNoTravel">Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first.</system:String>

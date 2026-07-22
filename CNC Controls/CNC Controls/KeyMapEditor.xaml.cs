@@ -517,7 +517,7 @@ namespace CNC.Controls
             return new List<ActionItem>
             {
                 new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
-                new ActionItem(ControllerAction.CycleStart, "Cycle Start / Resume", "Start the loaded program, or resume after a feed hold."),
+                new ActionItem(ControllerAction.CycleStart, "Run / Resume", "Start the loaded program, or resume after a feed hold."),
                 new ActionItem(ControllerAction.FeedHold, "Feed Hold", "Pause motion (feed hold)."),
                 new ActionItem(ControllerAction.Reset, "Reset (soft-reset)", "Soft-reset the controller (Ctrl-X)."),
                 new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),

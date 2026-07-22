@@ -14,6 +14,19 @@
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <system:String x:Uid="str_checking" x:Key="Checking">Checking...</system:String>
         <system:String x:Uid="str_dryrun" x:Key="DryRun">Dry run - spindle/coolant off, tool changes skipped...</system:String>
+        <!-- Run's own button label, switched at runtime (JobControl.xaml.cs's UpdateStartButtonLabel)
+             to reflect the run mode chosen from the mode dropdown to its right - also used for that dropdown's
+             own item text, so the label and the choice that produced it always read identically. -->
+        <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Run</system:String>
+        <system:String x:Uid="str_startModeDryRun" x:Key="StartModeDryRun">Dry Run</system:String>
+        <system:String x:Uid="str_startModeCheck" x:Key="StartModeCheck">Check Run</system:String>
+        <!-- btnStart's dynamic tooltip (JobControl.xaml.cs's UpdateStartButtonLabel), shown even while the
+             button is disabled (ToolTipService.ShowOnDisabled="True" on btnStart) so a new user sees WHY
+             instead of a silently unresponsive button. -->
+        <system:String x:Uid="str_startTipDisabled" x:Key="StartTipDisabled">Nothing to run yet - load a file (Job tab &gt; Program area) or generate/select a program from a tool tab, then Run becomes available.</system:String>
+        <system:String x:Uid="str_startTipNormal" x:Key="StartTipNormal">Start the loaded program. (Alt+R)</system:String>
+        <system:String x:Uid="str_startTipDryRun" x:Key="StartTipDryRun">Start the loaded program in Dry Run: Z offset clear of stock, spindle/coolant forced off, tool changes skipped - watch the toolpath without cutting, spinning, or pausing for a tool swap. (Alt+R)</system:String>
+        <system:String x:Uid="str_startTipCheck" x:Key="StartTipCheck">Start grbl check mode ($C): the controller parses the program without moving, to validate it before a real run. (Alt+R)</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
         <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
              leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
@@ -22,8 +35,8 @@
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />
         </Style>
-        <!-- Cycle Start glows green when a wizard program is the active source and ready to run ("press me"). -->
-        <Style x:Key="CycleStartButtonStyle" TargetType="Button" BasedOn="{StaticResource JobButtonStyle}">
+        <!-- Run glows green when a wizard program is the active source and ready to run ("press me"). -->
+        <Style x:Key="RunButtonStyle" TargetType="Button" BasedOn="{StaticResource JobButtonStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Path=IsActiveProgramReady, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
                     <Setter Property="Background" Value="#FF4CAF50"/>
@@ -32,31 +45,83 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- The mode-select arrow to Run's right: wide enough to hit reliably (was 16px - a hair-thin sliver
+             that made misclicking Run instead trivially easy) while still reading as part of Run's own
+             silhouette (no border, transparent until hover/checked) rather than a separate control. -->
+        <Style x:Key="StartModeToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}">
+                            <Path Data="M0,0 L4,5 L8,0 Z" Fill="#FF444444" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#FFE0E0E0"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#FFD0D0D0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Popup list items - full width of the popup (StartModePopup's Width is bound to the Run-plus-
+             arrow row, see below), left-aligned text, flat until hovered. -->
+        <Style x:Key="StartModeItemStyle" TargetType="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE8F0FE"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal">
-        <Button x:Uid="btn_cycleStart" x:Name="btnStart" Content="Cycle Start" ToolTip="Alt+R" Style="{StaticResource CycleStartButtonStyle}" IsEnabled="{Binding Path=IsCycleStartEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click">
-            <Button.ContextMenu>
-                <!-- Grbl check mode ($C): the controller parses g-code without moving, to dry-run/validate a
-                     program. Moved here off the status bar; IsChecked mirrors the live GrblViewModel.IsCheckMode. -->
-                <ContextMenu Opened="cycleStartMenu_Opened">
-                    <MenuItem x:Uid="mnu_checkMode" x:Name="miCheckMode" Header="Check mode ($C)" IsCheckable="True"
-                              IsChecked="{Binding Path=IsCheckMode, Mode=OneWay}" Click="miCheckMode_Click"
-                              ToolTip="Toggle grbl check mode - the controller parses the program without moving, to validate it before a real run."/>
-                    <!-- Sender-side toggle (not a grbl state): the next run offsets Z up by 10mm + stock thickness
-                         (G92) AND forces the spindle/coolant off for the whole run, REGARDLESS of what the loaded
-                         program contains - M3/M4/M7/M8 lines are neutralised as they're sent, and M5/M9 are sent
-                         as a preamble in case the spindle/coolant were already on. M6 (tool change) lines are
-                         skipped entirely too - dry run never cuts, so which tool is in the spindle doesn't matter,
-                         and running the tool-change macro while the Z-offset G92 is active risked it interacting
-                         badly with the macro's own positioning (confirmed on real hardware: Alarm:2 + a
-                         hang-watchdog reset). Lets the toolpath be watched move without cutting or spinning.
-                         See GrblViewModel.IsDryRunMode / JobControl.CycleStart. -->
-                    <MenuItem x:Uid="mnu_dryRun" x:Name="miDryRun" Header="Dry run (spindle/coolant forced off)" IsCheckable="True"
-                              IsChecked="{Binding Path=IsDryRunMode, Mode=OneWay}" Click="miDryRun_Click"
-                              ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
-                </ContextMenu>
-            </Button.ContextMenu>
-        </Button>
+        <StackPanel x:Name="startPanel" Orientation="Horizontal">
+            <Button x:Uid="btn_run" x:Name="btnStart" Content="{StaticResource StartModeNormal}" ToolTip="{StaticResource StartTipDisabled}"
+                    ToolTipService.ShowOnDisabled="True" Style="{StaticResource RunButtonStyle}"
+                    IsEnabled="{Binding Path=IsRunEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnStart_Click"/>
+            <!-- Run-mode picker: Run (normal) / Dry Run / Check Run - replaces the old right-click
+                 context menu (mnu_checkMode/mnu_dryRun) with a visible, discoverable dropdown. Selecting an
+                 entry both applies the mode (grbl $C / Reset, or the sender-side dry-run flag) AND relabels
+                 btnStart to match - see JobControl.xaml.cs's StartMode_Click/UpdateStartButtonLabel. -->
+            <ToggleButton x:Uid="btn_startMode" x:Name="btnStartMode" Style="{StaticResource StartModeToggleStyle}"
+                          IsEnabled="{Binding Path=IsRunEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          IsChecked="{Binding IsOpen, ElementName=startModePopup, Mode=TwoWay}"
+                          ToolTip="Choose Run, Dry run, or Check mode"/>
+        </StackPanel>
+        <!-- Width is set explicitly in code-behind (Opened="StartModePopup_Opened"), not via a live
+             ActualWidth binding: binding this directly clips the content on the FIRST open (the Popup's own
+             layout pass runs before startPanel's ActualWidth binding has settled, so it opens sized to 0/stale
+             and Dry Run/Check Run's text gets cut off) - reading ActualWidth explicitly once the popup is
+             actually opening avoids that WPF timing quirk entirely, at the small cost of a one-line handler. -->
+        <Popup x:Name="startModePopup" PlacementTarget="{Binding ElementName=startPanel}" Placement="Bottom"
+               Opened="StartModePopup_Opened" StaysOpen="False" AllowsTransparency="True">
+            <Border Background="White" BorderBrush="#FF999999" BorderThickness="1">
+                <StackPanel>
+                    <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                            ToolTip="Run normally."/>
+                    <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                            ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
+                    <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                            ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
+                </StackPanel>
+            </Border>
+        </Popup>
         <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
         <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
         <Button x:Uid="btn_rewind" x:Name="btnRewind" Content="Rewind" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsRewindEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnRewind_Click"/>
