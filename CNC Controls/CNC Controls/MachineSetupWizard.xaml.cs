@@ -219,6 +219,7 @@ namespace CNC.Controls
             if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
             {
                 var macros = AtcMacros.GetStatus(Grbl.GrblViewModel);
+                _macroStatus = macros;   // share with the tab-color cache - see the field's comment
                 var bad = macros.Where(r => r.State != AtcMacros.MacroState.Installed).ToList();
                 if (bad.Count > 0)
                 {
@@ -299,8 +300,13 @@ namespace CNC.Controls
         private static readonly Brush StepOrange = new SolidColorBrush(Color.FromRgb(0xE6, 0x5A, 0x00));
         private static readonly Brush StepRed = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
 
-        // Last macro-status query (cached so tab colouring doesn't re-hit the controller filesystem).
-        private System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
+        // Last macro-status query. STATIC/shared (not per-instance): FirstIncompleteStep() below already
+        // calls AtcMacros.GetStatus() to decide whether to trip the setup gate - the exact same filesystem
+        // listing + checksum read the step-7 tab color needs. Sharing the result means the color is correct
+        // the moment the wizard opens (e.g. forced open by the gate), not only after the user has manually
+        // clicked into the Controller Macros step once. Was per-instance before, which silently discarded
+        // the gate's own query and left the header uncolored until independently re-queried by tab-visit.
+        private static System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
 
         // Colour every graded step tab from its current state. Fixtures (6) and Build simulator (8) are
         // optional/non-gating - they can never block setup completion - so they're always coloured green
