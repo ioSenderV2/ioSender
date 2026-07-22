@@ -73,8 +73,13 @@ namespace CNC.Controls
         {
             var rows = new List<MacroStatusRow>();
 
+            ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: enter, model={0}, HasFS={1}, comOpen={2}, GrblState={3}/{4}",
+                model != null, GrblInfo.HasFS, Comms.com != null && Comms.com.IsOpen,
+                model?.GrblState.State, model?.GrblState.Substate));
+
             if (model == null || !GrblInfo.HasFS || Comms.com == null || !Comms.com.IsOpen)
             {
+                ConsoleLog.Write("[AtcMacros] GetStatus: short-circuit - reporting all Missing (no model/FS/comms)");
                 foreach (string name in Required)
                     rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
                 return rows;
@@ -91,20 +96,34 @@ namespace CNC.Controls
                     // jump to step 6 even though they are present (and turn green a moment later). The caller
                     // treats an empty list as "unknown" - no gate, no false status; the SD/setup tab re-queries
                     // on show, when no concurrent load is running, and gets the real state.
-                    if (!GrblSDCard.Load(model, false))
+                    bool loaded = GrblSDCard.Load(model, false);
+                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: GrblSDCard.Load returned {0}, GrblState now {1}/{2}",
+                        loaded, model.GrblState.State, model.GrblState.Substate));
+                    if (!loaded)
+                    {
+                        ConsoleLog.Write("[AtcMacros] GetStatus: Load skipped (re-entrancy guard or link down) - returning UNKNOWN (empty)");
                         return new List<MacroStatusRow>();
+                    }
 
                     // Snapshot the values NOW into plain rows - never hold DataRow references past here. The
                     // table can be rebuilt by a poll / another load, which detaches cached rows and throws on
                     // access. ToList() materialises a snapshot so iteration can't fault on a live edit either.
                     var present = new Dictionary<string, MacroStatusRow>(StringComparer.OrdinalIgnoreCase);
+                    int totalRows = 0, detachedSkipped = 0, emptyMountSkipped = 0;
                     foreach (DataRowView rv in GrblSDCard.Files.Cast<DataRowView>().ToList())
                     {
+                        totalRows++;
                         var r = rv.Row;
                         if (r.RowState == DataRowState.Detached || r.RowState == DataRowState.Deleted)
+                        {
+                            detachedSkipped++;
                             continue;
+                        }
                         if ((string)r["Dir"] == GrblSDCard.EmptyMountMarker)
+                        {
+                            emptyMountSkipped++;
                             continue;
+                        }
                         string nm = Path.GetFileName((string)r["Name"]);
                         present[nm] = new MacroStatusRow
                         {
@@ -113,6 +132,8 @@ namespace CNC.Controls
                             FS = r.Table.Columns.Contains("Location") ? r["Location"]?.ToString() : string.Empty
                         };
                     }
+                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: table snapshot - totalRows={0}, detachedSkipped={1}, emptyMountSkipped={2}, present={3}",
+                        totalRows, detachedSkipped, emptyMountSkipped, string.Join(",", present.Keys)));
 
                     FsMount target = GrblSDCard.Mounts.FirstOrDefault(m =>
                                          m.Name.IndexOf("littlefs", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -120,11 +141,16 @@ namespace CNC.Controls
                                      ?? GrblSDCard.Mounts.FirstOrDefault(m => m.Path == "/")
                                      ?? GrblSDCard.Mounts.FirstOrDefault();
                     string destPath = target != null ? target.Path : "/littlefs";
+                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: mounts=[{0}], target={1}, destPath={2}",
+                        string.Join(",", GrblSDCard.Mounts.Select(m => m.Name + "@" + m.Path)), target?.Name, destPath));
 
                     // Only flag Outdated when we actually read a DIFFERENT checksum. An empty/failed read (a
                     // raced FS query right after connect) must NOT flip every present macro to Outdated.
+                    string embeddedSumNow = EmbeddedChecksum();
                     string onFs = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim();
-                    bool stale = onFs.Length > 0 && onFs != EmbeddedChecksum();
+                    bool stale = onFs.Length > 0 && onFs != embeddedSumNow;
+                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: checksum sidecar '{0}' -> onFs='{1}' (len={2}), embedded='{3}', stale={4}, GrblState={5}/{6}",
+                        JoinPath(destPath, ChecksumFile), onFs, onFs.Length, embeddedSumNow, stale, model.GrblState.State, model.GrblState.Substate));
 
                     foreach (string name in Required)
                     {
@@ -132,6 +158,7 @@ namespace CNC.Controls
                         bool present1 = present.TryGetValue(name, out found);
                         int sz = 0;
                         bool sizeKnown = present1 && int.TryParse(found.Size, out sz);
+                        int expected = ExpectedSize(name);
 
                         // A zero-length file is present-by-name but not actually installed - confirmed on real
                         // hardware: an interrupted/truncated write left tc.macro at 0 bytes, which still matched
@@ -146,22 +173,30 @@ namespace CNC.Controls
                         // needed (Size is already in the listing), and unlike the atc.sum sidecar it can't go
                         // stale independently (ExpectedSize is derived fresh from this install's embedded macro
                         // every call). Flagged Outdated rather than Missing - the file IS there, just wrong.
-                        bool sizeMismatch = sizeKnown && sz > 0 && sz != ExpectedSize(name);
+                        bool sizeMismatch = sizeKnown && sz > 0 && sz != expected;
+
+                        ConsoleLog.Write(string.Format(
+                            "[AtcMacros] GetStatus: {0} - present={1}, rawSize='{2}', sizeKnown={3}, sz={4}, expected={5}, empty={6}, sizeMismatch={7}, checksumStale={8}, FS={9}",
+                            name, present1, found?.Size, sizeKnown, sz, expected, empty, sizeMismatch, stale, found?.FS));
 
                         if (present1 && !empty)
                             rows.Add(new MacroStatusRow { Name = name, Size = found.Size, FS = found.FS, State = (stale || sizeMismatch) ? MacroState.Outdated : MacroState.Installed });
                         else
                             rows.Add(new MacroStatusRow { Name = name, State = MacroState.Missing });
+
+                        ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: {0} -> {1}", name, rows[rows.Count - 1].State));
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Couldn't read the filesystem reliably (transient during connect/activate). Report nothing
                     // rather than crash or guess - callers treat an empty list as "unknown" (no gate, no false status).
+                    ConsoleLog.Write("[AtcMacros] GetStatus: EXCEPTION, clearing rows (reporting UNKNOWN) - " + ex);
                     rows.Clear();
                 }
             }
 
+            ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: exit, returning {0} row(s)", rows.Count));
             return rows;
         }
 
@@ -174,19 +209,31 @@ namespace CNC.Controls
         // FTP server here cannot); otherwise the supplied upload delegate (the SD Card tab's FTP path) is used.
         public static ProvisionResult EnsureProvisioned(GrblViewModel model, Func<string, string, bool> upload, Func<UpdateReason, bool> confirmUpload)
         {
+            ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: enter, _provisioning={0}", _provisioning));
             if (_provisioning)
+            {
+                ConsoleLog.Write("[AtcMacros] EnsureProvisioned: re-entrancy guard tripped - Skipped");
                 return ProvisionResult.Skipped;   // re-entrancy guard - see _provisioning
+            }
             _provisioning = true;
             try
             {
                 // Runs whenever an ATC is configured: "ATC=0" (tc.macro missing) or "ATC=1" (present, but its
                 // content may be out of date with a newer ioSender).
+                ConsoleLog.Write(string.Format(
+                    "[AtcMacros] EnsureProvisioned: model={0}, upload={1}, HasFS={2}, AtcMacrosRequired={3}, HasATC={4}, comOpen={5}, GrblState={6}/{7}",
+                    model != null, upload != null, GrblInfo.HasFS, GrblInfo.AtcMacrosRequired, GrblInfo.HasATC,
+                    Comms.com != null && Comms.com.IsOpen, model?.GrblState.State, model?.GrblState.Substate));
                 if (model == null || upload == null || !GrblInfo.HasFS || !(GrblInfo.AtcMacrosRequired || GrblInfo.HasATC)
                      || Comms.com == null || !Comms.com.IsOpen)
+                {
+                    ConsoleLog.Write("[AtcMacros] EnsureProvisioned: precondition failed - Skipped");
                     return ProvisionResult.Skipped;
+                }
 
                 // Enumerate current files across every mount (also refreshes the SD Card tab's cache).
-                GrblSDCard.Load(model, false);
+                bool loaded = GrblSDCard.Load(model, false);
+                ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: GrblSDCard.Load returned {0}", loaded));
 
                 // A zero-length file counts as absent here too (same reasoning as GetStatus above) - otherwise
                 // EnsureProvisioned's whole point (self-healing a broken install) can't fire for exactly the
@@ -205,10 +252,16 @@ namespace CNC.Controls
                     if (rv.Row.Table.Columns.Contains("Size") && rv.Row["Size"] is int s)
                         sizeByName[nm] = s;
                 }
+                ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: present=[{0}], sizeByName=[{1}]",
+                    string.Join(",", present), string.Join(",", sizeByName.Select(kv => kv.Key + "=" + kv.Value))));
                 // A required macro present at the wrong (nonzero) byte count is PARTIAL truncation/corruption -
                 // same cheap per-file discriminator as GetStatus, folded into `stale` below so a re-upload still
                 // fires even if the aggregate atc.sum sidecar didn't happen to catch it.
                 bool anySizeMismatch = Required.Any(n => sizeByName.TryGetValue(n, out int s) && s != ExpectedSize(n));
+                foreach (string n in Required)
+                    ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: {0} - sizeOnFs={1}, expected={2}, mismatch={3}",
+                        n, sizeByName.TryGetValue(n, out int sv) ? sv.ToString() : "(absent)", ExpectedSize(n),
+                        sizeByName.TryGetValue(n, out int sv2) && sv2 != ExpectedSize(n)));
 
                 // Target littlefs specifically: it persists with no SD card and (unlike the SD root) is writable
                 // over YModem on this firmware. Fall back to the root / first mount if no littlefs is reported.
@@ -221,12 +274,22 @@ namespace CNC.Controls
 
                 bool missing = !Required.All(present.Contains);
                 string embeddedSum = EmbeddedChecksum();
-                bool stale = anySizeMismatch || ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim() != embeddedSum;
+                string sidecarRead = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim();
+                bool checksumStale = sidecarRead != embeddedSum;
+                bool stale = anySizeMismatch || checksumStale;
+                ConsoleLog.Write(string.Format(
+                    "[AtcMacros] EnsureProvisioned: missing={0}, anySizeMismatch={1}, sidecarRead='{2}', embeddedSum='{3}', checksumStale={4}, stale={5}, GrblState={6}/{7}",
+                    missing, anySizeMismatch, sidecarRead, embeddedSum, checksumStale, stale, model.GrblState.State, model.GrblState.Substate));
 
                 if (!missing && !stale)
+                {
+                    ConsoleLog.Write("[AtcMacros] EnsureProvisioned: UpToDate - nothing to do");
                     return ProvisionResult.UpToDate;   // present and current - nothing to do
+                }
 
                 bool accepted = confirmUpload == null || confirmUpload(missing ? UpdateReason.Missing : UpdateReason.Outdated);
+                ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: confirmUpload -> accepted={0} (reason={1})",
+                    accepted, missing ? UpdateReason.Missing : UpdateReason.Outdated));
                 if (!accepted)
                     return ProvisionResult.Skipped;   // user declined
 
@@ -237,7 +300,11 @@ namespace CNC.Controls
                 // homing - the upload moves nothing, and the user homes when ready afterwards.
                 if (model.GrblState.State == GrblStates.Alarm)
                 {
+                    ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: controller in Alarm (substate={0}) - sending $X to unlock",
+                        model.GrblState.Substate));
                     Grbl.WaitForResponse(GrblConstants.CMD_UNLOCK);
+                    ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: post-unlock GrblState={0}/{1}",
+                        model.GrblState.State, model.GrblState.Substate));
                     // $X can fail to clear some alarms (e.g. certain homing-required configs still refuse file
                     // ops after unlock). Bail out here rather than fall through to the raw unlink/YModem calls
                     // below: those use Comms.AwaitAck(), which has NO timeout anywhere in this codebase - a
@@ -245,6 +312,7 @@ namespace CNC.Controls
                     // forever instead of failing. Surfacing a clear message beats a silent freeze.
                     if (model.GrblState.State == GrblStates.Alarm)
                     {
+                        ConsoleLog.Write("[AtcMacros] EnsureProvisioned: still in Alarm after $X - bailing out, Failed");
                         model.Message = "ATC macro update skipped: controller is still in alarm - clear it (e.g. Home) and try again.";
                         return ProvisionResult.Failed;
                     }
@@ -344,8 +412,13 @@ namespace CNC.Controls
         static string ReadControllerFile(GrblViewModel model, string path)
         {
             var sb = new System.Text.StringBuilder();
+            var rawResponses = new List<string>();
             bool? res = null;
             var ct = new System.Threading.CancellationToken();
+            string cmd = GrblConstants.CMD_SDCARD_DUMP + path;
+
+            ConsoleLog.Write(string.Format("[AtcMacros] ReadControllerFile: sending '{0}', GrblState={1}/{2}",
+                cmd, model.GrblState.State, model.GrblState.Substate));
 
             Comms.com.PurgeQueue();
             model.SuspendProcessing = true;
@@ -356,11 +429,15 @@ namespace CNC.Controls
             {
                 try { res = WaitFor.AckResponse<string>(
                     ct,
-                    response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[")) sb.AppendLine(response); },
+                    response => {
+                        rawResponses.Add(response);
+                        if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("["))
+                            sb.AppendLine(response);
+                    },
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
-                    400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + path)); }
-                catch { res = false; }
+                    400, () => Comms.com.WriteCommand(cmd)); }
+                catch (Exception ex) { ConsoleLog.Write("[AtcMacros] ReadControllerFile: worker EXCEPTION - " + ex); res = false; }
             }) { IsBackground = true }.Start();
 
             // Hard wall-clock cap so the UI thread can't spin forever if the controller never answers; on timeout
@@ -368,6 +445,11 @@ namespace CNC.Controls
             var sw = System.Diagnostics.Stopwatch.StartNew();
             while (res == null && sw.ElapsedMilliseconds < 3000)
                 EventUtils.DoEvents();
+
+            ConsoleLog.Write(string.Format(
+                "[AtcMacros] ReadControllerFile: '{0}' -> res={1} after {2}ms, rawResponses=[{3}], result='{4}' (len={5}), GrblState now={6}/{7}",
+                cmd, res, sw.ElapsedMilliseconds, string.Join(" | ", rawResponses), sb.ToString().Trim(), sb.Length,
+                model.GrblState.State, model.GrblState.Substate));
 
             model.SuspendProcessing = false;
             return sb.ToString();
