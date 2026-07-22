@@ -189,7 +189,7 @@
                 </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Margin="5,4,5,6" Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Uid="btn_start" Content="Start" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" MinWidth="75" Click="start_Click"/>
+                <Button x:Uid="btn_start" Content="Start" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="{Binding Path=Grbl.IsJobRunning, Converter={StaticResource IsNotRunningConverter}}" Margin="0,0,4,0" MinWidth="75" Click="start_Click"/>
                 <Button x:Uid="btn_stop" Content="Stop" IsEnabled="{Binding Path=Grbl.IsJobRunning}" Margin="0" MinWidth="75" Click="stop_Click"/>
             </StackPanel>
         </Grid>
