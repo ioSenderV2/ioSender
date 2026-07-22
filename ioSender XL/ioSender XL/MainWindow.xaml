@@ -273,7 +273,14 @@
                 </cnccontrols:FeedControl>
             </Grid>
         </Border>
-        <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,34,0,0">
+        <!-- Top margin clears the main-nav tab STRIP (header row only - tabMode.ActualHeight would be the
+             whole TabControl including content, not usable here). Was 34, tuned against the tab strip's
+             old MinHeight=32 (+2px buffer); the Apple-HIG pill redesign raised MinHeight to 34, so this
+             grew to 38 (same +buffer pattern) to keep clearing the strip and stop the always-visible
+             flyout panels (G28/G30/G59.3/Set etc.) overlapping into the tab labels. Still a hardcoded
+             number, not measured - MainNavTabItemStyle's MinHeight (MainWindow.xaml, StretchTabControl.Resources)
+             is the other end of this coupling; if that changes again, this needs a matching nudge. -->
+        <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,38,0,0">
             <ItemsControl x:Name="xx" Width="22" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
