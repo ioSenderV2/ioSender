@@ -100,6 +100,7 @@
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Button x:Uid="hm_start" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
+                            Style="{StaticResource PrimaryButtonStyle}"
                             IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"
                             ToolTip="Start probing the height map grid."/>
                     <Button x:Uid="hm_stop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
