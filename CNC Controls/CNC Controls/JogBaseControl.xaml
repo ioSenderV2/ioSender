@@ -16,11 +16,17 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="SharedStyles.xaml"/>
                 <ResourceDictionary>
-                    <Style x:Key="JogButtonStyle" TargetType="Button">
+                    <!-- Jogging & motion functional color (style guide v0.1): rest state is the category's
+                         "very light" fill with the bold base as ink text; the shared Button template's
+                         hover/press overlay darkens this correctly without needing a separate pressed brush. -->
+                    <Style x:Key="JogButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Setter Property="Width" Value="60"/>
                         <Setter Property="Height" Value="60"/>
                         <Setter Property="Focusable" Value="False"/>
                         <Setter Property="Content" Value="xx"/>
+                        <Setter Property="Background" Value="{StaticResource JogFillBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource JogFillBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource JogBaseBrush}"/>
                     </Style>
                 </ResourceDictionary>
                 <ResourceDictionary>

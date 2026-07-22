@@ -17,22 +17,57 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Label x:Name="label" x:Uid="lbl_NumField" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-        <local:NumericTextBox x:Name="data" Grid.Column="1" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" MinWidth="64"
-            IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-            Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
-            Unit="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
-            ContextMenuOpening="Data_ContextMenuOpening">
-            <local:NumericTextBox.ContextMenu>
-                <ContextMenu>
-                    <MenuItem Command="Cut" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    <MenuItem Command="Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    <MenuItem Command="Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                    <Separator/>
-                    <MenuItem x:Name="miReset" x:Uid="mnu_reset" Header="Reset to default" Click="ResetToDefault_Click"/>
-                </ContextMenu>
-            </local:NumericTextBox.ContextMenu>
-        </local:NumericTextBox>
-        <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto"/>
+        <!-- Value + unit share ONE recessed surface (the field "owns" its unit, not a neighboring label):
+             the outer Border supplies the Apple-style chrome + focus glow; the inner NumericTextBox has its
+             own AppleStyles.xaml template overridden to transparent/borderless here only, so it doesn't
+             double-render a second box inside this one. Every OTHER bare NumericTextBox usage in the app
+             (Spindle, PortDialog, Feed, Lathe controls, ...) is untouched and keeps its own standalone
+             recessed-field look from the app-wide style. -->
+        <Border x:Name="fieldSurface" Grid.Column="1" Grid.ColumnSpan="2" CornerRadius="8" BorderThickness="1" BorderBrush="#FFD5D9DE" SnapsToDevicePixels="True" MinWidth="64">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FFF2F3F5" Offset="0"/>
+                    <GradientStop Color="#FFFDFDFE" Offset="0.15"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=data}" Value="True">
+                            <Setter Property="BorderBrush" Value="#0A84FF"/>
+                            <Setter Property="BorderThickness" Value="2"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel Orientation="Horizontal" Margin="8,3">
+                <local:NumericTextBox x:Name="data" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Center" UndoLimit="9" MinWidth="52"
+                    IsReadOnly="{Binding Path=IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                    Format="{Binding Path=Format, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+                    Unit="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+                    ContextMenuOpening="Data_ContextMenuOpening">
+                    <!-- Bare template, no chrome and no focus trigger of its own - the outer "fieldSurface"
+                         Border above owns the entire visual (background, border, focus glow) so the two
+                         don't end up drawing two nested boxes when focused. -->
+                    <local:NumericTextBox.Template>
+                        <ControlTemplate TargetType="{x:Type local:NumericTextBox}">
+                            <ScrollViewer x:Name="PART_ContentHost" Background="Transparent" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden"/>
+                        </ControlTemplate>
+                    </local:NumericTextBox.Template>
+                    <local:NumericTextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Command="Cut" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Command="Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Command="Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <Separator/>
+                            <MenuItem x:Name="miReset" x:Uid="mnu_reset" Header="Reset to default" Click="ResetToDefault_Click"/>
+                        </ContextMenu>
+                    </local:NumericTextBox.ContextMenu>
+                </local:NumericTextBox>
+                <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                       Padding="3,0,0,0" Foreground="#FF8E8E93" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

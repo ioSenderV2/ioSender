@@ -22,7 +22,7 @@
         </local:LogicalOrConverter>
         <!-- Content-sized (one space of padding each side) instead of a fixed 66px, to keep the run button row
              compact so the jog pad has room to its right. -->
-        <Style x:Key="StatusButtonStyle" TargetType="Button">
+        <Style x:Key="StatusButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />

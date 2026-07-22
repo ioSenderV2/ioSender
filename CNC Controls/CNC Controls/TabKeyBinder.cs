@@ -225,7 +225,8 @@ namespace CNC.Controls
                 VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 FontSize = 9,
-                Opacity = 0.6,
+                FontWeight = FontWeights.Bold,
+                Opacity = 0.8,
                 Margin = new Thickness(10, -3, 0, 0),
                 Visibility = Visibility.Collapsed
             };

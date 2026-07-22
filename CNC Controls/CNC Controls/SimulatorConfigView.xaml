@@ -69,7 +69,8 @@
         </Grid>
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"
+            <!-- The one primary action on this screen: dispatches the build, everything else (Open folder) is secondary. -->
+            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" Style="{StaticResource PrimaryButtonStyle}" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"
                     ToolTip="Dispatch a GitHub Actions build of the simulator with the options above and install the result."/>
             <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click"
                     ToolTip="Open the folder containing the installed simulator executable."/>

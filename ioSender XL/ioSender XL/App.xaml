@@ -4,6 +4,10 @@
              xmlns:local="clr-namespace:GCode_Sender"
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF">
     <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/CNC.Controls.WPF;component/AppleStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
         <local:ProgramSourceConverter x:Key="ProgramSource"/>
         <!-- ToolTips render in their own Popup, outside MainWindow's LayoutTransform-scaled visual tree
              (see DialogScaling.cs for the same gotcha with dialog windows) - without this they stay at
@@ -58,5 +62,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

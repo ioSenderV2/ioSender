@@ -9,7 +9,7 @@
              mc:Ignorable="d"
              FocusVisualStyle="{x:Null}"
              d:DesignHeight="255" Width="Auto">
-    <GroupBox x:Uid="grp_uijog" Header="Jogging" HorizontalAlignment="Left" VerticalAlignment="Top" Width="Auto"
+    <GroupBox x:Uid="grp_uijog" Header="Jogging" HeaderTemplate="{StaticResource JogHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="Auto"
               ToolTip="Move the machine along each axis. Pick a step distance/feed preset, or hold for continuous jog.">
         <local:JogBaseControl x:Name="jogBase"/>
     </GroupBox>

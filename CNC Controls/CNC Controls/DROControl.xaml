@@ -20,7 +20,7 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
+    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
               ToolTip="Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.">
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,5,0,5">
             <Label x:Name="lblXMode" Content="{Binding Path=LatheMode, Mode=OneWay, Converter={StaticResource LatheModeConverter}}" Visibility="{Binding Path=LatheModeEnabled, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}" HorizontalContentAlignment="Right" Margin="20,0,65,0"/>

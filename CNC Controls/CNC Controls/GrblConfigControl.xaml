@@ -58,7 +58,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="ConfigButtonStyle" TargetType="Button">
+        <Style x:Key="ConfigButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinWidth" Value="90" />
             <Setter Property="MaxWidth" Value="120" />
             <Setter Property="Padding" Value="5,0" />

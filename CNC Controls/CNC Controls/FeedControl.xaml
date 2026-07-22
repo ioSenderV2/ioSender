@@ -7,7 +7,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="130" d:DesignWidth="250">
     <Grid>
-        <GroupBox x:Uid="grp_feedrate" x:Name="grpFeedRate" Header="Feed rate" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250"
+        <GroupBox x:Uid="grp_feedrate" x:Name="grpFeedRate" Header="Feed rate" HeaderTemplate="{StaticResource FeedHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250"
                   ToolTip="Current feed rate, plus feed and rapid override sliders.">
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Top" MinWidth="240">
                 <Grid.RowDefinitions>

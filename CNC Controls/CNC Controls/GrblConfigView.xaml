@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <!-- MinHeight/MinWidth (not fixed Height/MaxWidth) so the buttons grow with the text at higher DPI /
              text scaling instead of clipping (see the footer). -->
-        <Style x:Key="ConfigButtonStyle" TargetType="Button">
+        <Style x:Key="ConfigButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinWidth" Value="90" />
             <Setter Property="MinHeight" Value="23" />
             <Setter Property="Padding" Value="8,2" />

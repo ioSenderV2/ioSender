@@ -8,7 +8,7 @@
         d:DesignHeight="360" d:DesignWidth="520">
     <UserControl.Resources>
         <local:MacroReferenceConverter x:Key="MacroRef"/>
-        <Style x:Key="SideButton" TargetType="Button">
+        <Style x:Key="SideButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="Padding" Value="5,0"/>
         </Style>
@@ -64,7 +64,10 @@
         </DataGrid>
 
         <StackPanel Grid.Row="0" Grid.Column="1" MinWidth="92" Margin="8,0,0,0">
-            <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource SideButton}"
+            <!-- The one primary action on this screen: always enabled (unlike View/Edit/Delete, which need a
+                 selection), the entry point when the macro list is empty - same role as Job tab's Load File. -->
+            <Button x:Name="btnCreate" x:Uid="btn_macroCreate" Content="Create" Click="btnCreate_Click" Style="{StaticResource PrimaryButtonStyle}"
+                    Margin="0,0,0,6" Padding="5,0"
                     ToolTip="Create a new macro and open it for editing."/>
             <Button x:Name="btnView" x:Uid="btn_macroView" Content="View" Click="btnView_Click" Style="{StaticResource SideButton}"
                     ToolTip="Open what the macro points to: for an @&lt;path&gt; macro the referenced file (created if missing), otherwise its G-code."/>

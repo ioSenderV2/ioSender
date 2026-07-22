@@ -28,7 +28,7 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_uiJogging" Header="UI Jogging" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
+    <GroupBox x:Uid="grp_uiJogging" Header="UI Jogging" HeaderTemplate="{StaticResource JogHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
         <Grid x:Name="content" Margin="3,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>

@@ -14,7 +14,7 @@
         <local:BoolToVisibleConverter x:Key="IsVisibleConverter" />
     </UserControl.Resources>
     <Grid>
-        <GroupBox x:Uid="grp_spindle" x:Name="grpSpindle" Header="Spindle" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250"
+        <GroupBox x:Uid="grp_spindle" x:Name="grpSpindle" Header="Spindle" HeaderTemplate="{StaticResource FeedHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="250"
                   ToolTip="Control the spindle: set RPM, turn it on/off and choose direction, and adjust the RPM override.">
             <Grid HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="240" Margin="0,0,-2,-3">
                 <Grid.ColumnDefinitions>

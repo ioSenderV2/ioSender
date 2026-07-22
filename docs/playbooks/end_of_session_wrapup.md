@@ -20,6 +20,14 @@ always `/clear`.
    for this push's commit completes and exits 0/1 on success/failure. **If it fails, stop and
    surface the failure** (link + a look at the log) instead of writing the summary as if everything
    shipped clean - don't silently proceed to steps 5/6 on a red build.
+3.6. **Bump the local dev-build version display** — once 3.5 succeeds, update `legacyVersion` in
+   `ioSender XL\ioSender XL\MainWindow.xaml.cs` (~L66) to the version that was JUST published + 1, so
+   local/dev builds show the upcoming version rather than a stale one. This constant is the fallback used
+   whenever `BuildInfo.Version == "dev"` (i.e. every local build - only CI's `release.yml` stamps
+   `BuildInfo.cs` with a real version). Compute the next number the same way
+   `tools\cut-release.ps1` does: latest GitHub release tag `major.minor`, minor+1 (e.g. just shipped 2.22 →
+   set `legacyVersion = "2.23"`). Commit standalone with `[skip release]` (same convention as the TOC-stamp
+   commits) so this metadata-only change doesn't itself trigger a release.
 4. **New docs published to gh-pages** (only if the manual changed).
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).

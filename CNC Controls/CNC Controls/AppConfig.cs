@@ -1505,7 +1505,11 @@ namespace CNC.Controls
                 new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
 #endif
             // Report the target only once the link is actually open (drives the green/red target box).
-            model.ConnectionTarget = (Comms.com != null && Comms.com.IsOpen) ? Base.PortParams : null;
+            // "Simulator" instead of the raw 127.0.0.1:port when the target is the bundled sim - Base.StartSimulator
+            // is the same flag PersistSimulatorChoice sets from the Connect dialog's Simulator tab / -simulator.
+            model.ConnectionTarget = (Comms.com != null && Comms.com.IsOpen)
+                ? (Base.StartSimulator ? "Simulator" : Base.PortParams)
+                : null;
         }
 
         // Auto-launch the simulator on a startup auto-reconnect to a previously-chosen simulator target - the

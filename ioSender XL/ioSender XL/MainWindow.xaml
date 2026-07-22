@@ -297,11 +297,67 @@
              label). Recomputes only on tab add/remove and a deferred, post-layout resize callback. -->
         <cnccontrols:StretchTabControl Grid.ColumnSpan="3" IsEnabled="{Binding Path=IsMPGActive, Converter={StaticResource BooleanConverter}}" Background="Transparent" x:Name="tabMode" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Focusable="False" SelectionChanged="TabMode_SelectionChanged">
             <cnccontrols:StretchTabControl.Resources>
-                <Style TargetType="{x:Type TabItem}">
-                    <Setter Property="MinHeight" Value="32" />
+                <!-- Apple-flavored main-nav tab: a floating rounded pill for the selected tab (macOS System
+                     Settings sidebar style), flat/transparent for unselected ones. Tabs deliberately do NOT
+                     use the per-panel functional color system (Position/Jogging/Feed/Coolant) - a tab like
+                     "Job" contains ALL of those categories at once, so no single category color describes
+                     it correctly. Selected uses the accent's own "light" ramp tier (base 55% + white 45%),
+                     NOT the same solid blue as the primary action button - navigation/"you are here" needs
+                     to read as visually distinct from "click me," and it fixes a real contrast problem the
+                     solid-blue version had (dark text on solid accent blue was hard to read). Base accent
+                     blue is reused as the selected tab's TEXT color on top of that light fill, same pattern
+                     as the functional-category buttons (base = ink text on the derived light background).
+                     This is still navigation chrome, a third, separate use of color from both the primary-
+                     action rule and the functional-panel rule. One ContentPresenter throughout
+                     (x:Name="header") - StretchTabControl.ApplySelectionEmphasis finds it by walking the
+                     visual tree for the first ContentPresenter and bolds/enlarges it on selection, so a
+                     second one for the "selected" state would silently break that.
+
+                     Earlier pass used a flared/mesa Path shape here - looked good in isolated mockups but
+                     wrong in the real app, reverted to a plain pill.
+
+                     KEYED + applied via ItemContainerStyle, not implicit/keyless: an implicit TargetType-only
+                     style here would leak into every OTHER TabControl's TabItems nested anywhere inside this
+                     one's content (e.g. JobWorkspace's Program/3D View/Console TabControl) - WPF's implicit
+                     style lookup walks the LOGICAL tree, and a tab's content is logically parented under the
+                     TabItem that hosts it, so it doesn't stop at this control's own boundary. -->
+                <Style x:Key="MainNavTabItemStyle" TargetType="{x:Type TabItem}">
+                    <Setter Property="MinHeight" Value="34" />
                     <Setter Property="MinWidth" Value="40" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type TabItem}">
+                                <Border x:Name="pill" CornerRadius="8" Margin="2,3" Background="Transparent" SnapsToDevicePixels="True">
+                                    <ContentPresenter x:Name="header" ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Margin="10,5" TextElement.Foreground="#FF48484A"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="pill" Property="Background" Value="{StaticResource AppleAccentLightBrush}"/>
+                                        <Setter TargetName="pill" Property="Effect" Value="{StaticResource ButtonShadowDefault}"/>
+                                        <Setter TargetName="header" Property="TextElement.Foreground" Value="{StaticResource AppleAccentBrush}"/>
+                                    </Trigger>
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                            <Condition Property="IsSelected" Value="False"/>
+                                        </MultiTrigger.Conditions>
+                                        <Setter TargetName="pill" Property="Background" Value="#14000000"/>
+                                    </MultiTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
             </cnccontrols:StretchTabControl.Resources>
+            <!-- Set here (property-element, after Resources) rather than as an attribute on the opening tag:
+                 StaticResource is resolved in document order, and an attribute on the opening tag is parsed
+                 before this element's own Resources child block registers MainNavTabItemStyle - same "target
+                 must appear before" rule as ControlTemplate.Triggers TargetName above. As an attribute this
+                 threw 'Provide value on StaticResourceExtension' at startup. -->
+            <cnccontrols:StretchTabControl.ItemContainerStyle>
+                <StaticResource ResourceKey="MainNavTabItemStyle"/>
+            </cnccontrols:StretchTabControl.ItemContainerStyle>
             <!-- Tabs are built in code from TabRegistry (Phase 1: MainWindow is a container).
                  See RegisterBuiltinTabs()/BuildTabs() in MainWindow.xaml.cs. -->
         </cnccontrols:StretchTabControl>

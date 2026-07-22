@@ -36,7 +36,11 @@
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
         <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
              leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
-        <Style x:Key="JobButtonStyle" TargetType="Button">
+        <!-- BasedOn the app-wide implicit Button style (AppleStyles.xaml) so Feed Hold/Stop/Rewind/Run get
+             the same rounded pill/gradient look as everything else - an explicit x:Key style does NOT
+             inherit the implicit default on its own, it replaces it outright, which is why these buttons
+             rendered as stock unstyled chrome the first time this was wired up. -->
+        <Style x:Key="JobButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Focusable" Value="False" />

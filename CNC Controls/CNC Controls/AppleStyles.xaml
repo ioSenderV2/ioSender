@@ -1,0 +1,190 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:CNC.Controls">
+
+    <!-- Apple-HIG-flavored look for the app's two most-repeated controls: Button and NumericTextBox.
+         Both are keyless (TargetType only) so they apply app-wide once merged into App.xaml, no per-
+         control opt-in. TabItem's equivalent lives in StretchTabControl's own scoped Resources (the
+         main nav's TabControl), not here, since only that control needs the flared-tab treatment. -->
+
+    <!-- Color-by-function palette (style guide v0.1). Each category is TWO resources: -Base (the bold,
+         saturated reference - dot/chip indicators, ink text on light fills, and the WHOLE Primary button)
+         and -Fill (the derived "very light" tier - rest-state background for a functional button cluster).
+         Values are the color-mix(base 25%, white 75%) ramp-formula result, computed once and hardcoded here
+         since XAML has no native color-mix; see the style guide artifact for the derivation and the other
+         ramp steps (light/pressed) - pressed doesn't need its own resource, see the overlay note below. -->
+    <SolidColorBrush x:Key="AppleAccentBrush" Color="#0A84FF"/>       <!-- Primary action - the ONE loud button per screen -->
+    <SolidColorBrush x:Key="AppleAccentLightBrush" Color="#78BBFF"/>  <!-- ramp "light" tier (base 55% + white 45%) - selected-tab fill, deliberately NOT the same blue as the primary button so nav selection and "click me" read as different things; base blue is used as the text color on top of it -->
+
+
+    <SolidColorBrush x:Key="PositionBaseBrush" Color="#1E8F86"/>      <!-- Position & DRO -->
+    <SolidColorBrush x:Key="PositionFillBrush" Color="#C7E3E1"/>
+    <SolidColorBrush x:Key="JogBaseBrush" Color="#4A3A99"/>           <!-- Jogging & motion -->
+    <SolidColorBrush x:Key="JogFillBrush" Color="#D2CEE6"/>
+    <SolidColorBrush x:Key="FeedBaseBrush" Color="#B8722A"/>          <!-- Feed & Spindle, and Status: hold -->
+    <SolidColorBrush x:Key="FeedFillBrush" Color="#EDDCCA"/>
+    <SolidColorBrush x:Key="CoolBaseBrush" Color="#3E7CB8"/>          <!-- Coolant & auxiliary -->
+    <SolidColorBrush x:Key="CoolFillBrush" Color="#CFDEED"/>
+
+    <!-- Panel-title dot indicators: wraps whatever the GroupBox.Header STRING already is (still bound/
+         localized normally via each control's own x:Uid - HeaderTemplate only wraps the rendered value,
+         it doesn't replace the Header property) with a small bold category-color dot. {Binding} with no
+         path is the standard HeaderedContentControl.HeaderTemplate pattern: the template's DataContext IS
+         the Header object itself. -->
+    <DataTemplate x:Key="PositionHeaderTemplate">
+        <StackPanel Orientation="Horizontal">
+            <Ellipse Width="9" Height="9" Fill="{StaticResource PositionBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding}"/>
+        </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="JogHeaderTemplate">
+        <StackPanel Orientation="Horizontal">
+            <Ellipse Width="9" Height="9" Fill="{StaticResource JogBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding}"/>
+        </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="FeedHeaderTemplate">
+        <StackPanel Orientation="Horizontal">
+            <Ellipse Width="9" Height="9" Fill="{StaticResource FeedBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding}"/>
+        </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="CoolHeaderTemplate">
+        <StackPanel Orientation="Horizontal">
+            <Ellipse Width="9" Height="9" Fill="{StaticResource CoolBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="{Binding}"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <SolidColorBrush x:Key="ButtonNeutralBrush" Color="#FFF0EFEB"/>
+    <SolidColorBrush x:Key="ButtonNeutralBorderBrush" Color="#FFDAD5CB"/>
+    <SolidColorBrush x:Key="ButtonDisabledBrush" Color="#FFECEBE7"/>
+    <SolidColorBrush x:Key="ButtonDisabledInkBrush" Color="#FF9C978C"/>
+
+    <DropShadowEffect x:Key="ButtonShadowDefault" Color="#33000000" Direction="270" ShadowDepth="1.2" BlurRadius="4" Opacity="0.5"/>
+
+    <!-- Button: ONE shared template for every color a button can be (neutral default, the primary blue via
+         PrimaryButtonStyle below, or a functional-cluster color set per-instance/per-style via Background+
+         Foreground). Hover/press are a semi-transparent black/white OVERLAY on top of Background, not a
+         brush swap - that's what makes "pressed = a darker shade of the SAME hue" work for any category
+         without a separate pressed-brush resource per color (mirrors the style guide's color-mix() ramp,
+         just done as a translucent layer instead of precomputing every mixed value). Press also gets a
+         springy scale-down/release via BackEase, matching the artifact's press-animation demo. Disabled
+         still forces flat neutral gray regardless of category, per the style guide's disabled rule. -->
+    <Style TargetType="Button">
+        <Setter Property="Padding" Value="14,6"/>
+        <Setter Property="Foreground" Value="#FF2B2A27"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Background" Value="{StaticResource ButtonNeutralBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ButtonNeutralBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleX="1" ScaleY="1"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border" CornerRadius="10" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                            Effect="{StaticResource ButtonShadowDefault}" SnapsToDevicePixels="True">
+                        <Grid>
+                            <Border x:Name="overlayLight" CornerRadius="9" Background="White" Opacity="0"/>
+                            <Border x:Name="overlayDark" CornerRadius="9" Background="Black" Opacity="0"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="overlayLight" Property="Opacity" Value="0.12"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="overlayLight" Property="Opacity" Value="0"/>
+                            <Setter TargetName="overlayDark" Property="Opacity" Value="0.18"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="0.96" Duration="0:0:0.06"/>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="0.96" Duration="0:0:0.06"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.25">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.25">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource ButtonDisabledBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource ButtonNeutralBorderBrush}"/>
+                            <Setter TargetName="border" Property="Effect" Value="{x:Null}"/>
+                            <Setter Property="Foreground" Value="{StaticResource ButtonDisabledInkBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The ONE loud button per screen. Applied explicitly (Style="{StaticResource PrimaryButtonStyle}"),
+         never implicit - everything else stays the neutral default above. -->
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource AppleAccentBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AppleAccentBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- NumericTextBox: recessed rounded field with a focus glow. Every bare usage (Spindle, PortDialog,
+         Feed, GrblConfig, Lathe controls) gets this on its own; NumericField.xaml additionally strips its
+         inner instance's own chrome to transparent so the unit label can share ONE merged surface with it
+         (see NumericField.xaml). -->
+    <LinearGradientBrush x:Key="NumericTextBoxDefaultBackground" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FFF2F3F5" Offset="0"/>
+        <GradientStop Color="#FFFDFDFE" Offset="0.15"/>
+    </LinearGradientBrush>
+
+    <Style TargetType="{x:Type local:NumericTextBox}">
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="#FFD5D9DE"/>
+        <Setter Property="Background" Value="{StaticResource NumericTextBoxDefaultBackground}"/>
+        <Setter Property="Padding" Value="8,3"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:NumericTextBox}">
+                    <!-- Background/BorderBrush/BorderThickness are TemplateBinding'd (not hardcoded) so an
+                         instance can override to Transparent/0 - NumericField.xaml does exactly that to let
+                         its own outer Border supply the chrome instead, merging the unit label into one
+                         surface. -->
+                    <Border x:Name="border" CornerRadius="8" BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AppleAccentBrush}"/>
+                            <Setter TargetName="border" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>
