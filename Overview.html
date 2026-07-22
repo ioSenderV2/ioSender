@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>165 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>170 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -186,6 +186,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Analog stick jog now runs on a dedicated background thread instead of the UI dispatcher - eliminates stutter during a continuous hold.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr128">128</a></td></tr>
 <tr><td>The run bar's "Cycle Start" button is now just "Run"; a small dropdown next to it replaces the old right-click menu for choosing Dry Run / Check Run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr161">161</a></td></tr>
 <tr><td>The status message no longer enlarges then shrinks 10s after every update (which shifted the whole window layout) - the font is now permanently large and a new message instead flashes the bar background light green (or light red for an error/alarm) for 5s.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr163">163</a></td></tr>
+<tr><td>The always-visible pinned-position flyouts (G28/G30/G59.3/etc.) no longer overlap the top tab labels; their vertical offset is now measured from the tab strip's real rendered height instead of a hand-tuned guess.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr170">170</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -216,6 +217,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Corner Fence schematic is now a real 3-zone red/green/cream diagram sized off the active 3D probe; Position row gets a checkmark + directly-editable X/Y/Z fields instead of a raw coordinate string.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr143">143</a></td></tr>
 <tr><td>Clicking Machine Setup while the machine was moving (e.g. right after a G30) could freeze that tab for the rest of the session.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr144">144</a></td></tr>
 <tr><td>Settings > Restart now actually relaunches ioSender instead of just closing it; the unused AppLaunch.exe relaunch supervisor is gone</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr148">148</a></td></tr>
+<tr><td>Title bar silently checks GitHub for a newer release and appends "(update available)"; Settings &gt; Simulator's up-to-date status now updates live as options are toggled, not just on tab-show.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr169">169</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -264,6 +266,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Start Job's fixture dropdown gets a built-in "G28 (loose probe)" entry recreating the original pre-Fixture-library workflow, for jobs that don't have (or don't want) a saved Corner Fence fixture</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr160">160</a></td></tr>
 <tr><td>Start Job / Stepper Calibration (Probe &amp; Scratch) / Auto Square / Surface Spoilboard no longer have their own Generate button &ndash; the shared Run bar reads &quot;Generate&quot; (disabled until ready) then flips to &quot;Run&quot;, with Dry Run/Check Run hidden while on those tabs.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr162">162</a></td></tr>
 <tr><td>Stepper Calibration (Probe) gains a Calibrate: XY steppers / Z stepper (1-2-3 block) toggle - probes the spoilboard once as a baseline, then the block's three sides in turn, fitting a new Z steps/mm by least-squares across all three measurements. Can reuse the last saved starting position to skip the manual jog on repeat runs.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr164">164</a></td></tr>
+<tr><td>Machine Setup's two optional wizard steps now color green instead of staying blank, and share the same macro-status query the SD/ATC gate uses.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr167">167</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -274,6 +277,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>ATC tool-change macro provisioning &mdash; Install ATC macros + seeded Start Job</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr25">25</a></td></tr>
 <tr><td>On an ATC controller the setup gate could dump you at step 6 even though the macros were installed and turned green a moment later</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr88">88</a></td></tr>
 <tr><td>The Machine Setup ATC-macro check now catches a 0-byte or truncated tc/pcorner/pvisecorner.macro on the controller - it used to read as Installed since only the file NAME was checked, not its size, so M6 T8 silently ran the firmware's default tool change instead of the macro.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr123">123</a></td></tr>
+<tr><td>SD Card tab queries its own mount status on activate instead of bailing out to "No card" before the controller has actually reported one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr168">168</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -354,6 +358,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Every push to master now publishes a real GitHub Release (2.1, 2.2, ...) with notes listing which #N changelog entries shipped in it, instead of overwriting one unversioned rolling build; the TOC gains a Version column showing which release each entry arrived in</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr156">156</a></td></tr>
 <tr><td>Release notes' install one-liner is now wrapped as powershell "irm ... | iex" so it runs from cmd.exe as well as PowerShell; the main window's title bar showed a stale hardcoded "2.0.1" instead of the actual published release version</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr157">157</a></td></tr>
 <tr><td>Check for Updates on a local dev build (no embedded version to compare against "latest") now lists every published release with an installable ioSender.zip and lets you pick one to install over the dev build's own bin folder, for quick comparison against a real published build.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr165">165</a></td></tr>
+<tr><td>New color-by-function design system (AppleStyles.xaml) applied app-wide - one primary button per screen, pill-style nav tabs, colored panel-title dots.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr166">166</a></td></tr>
 </table>
 </div>
 
@@ -541,7 +546,12 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">164</td><td><a href="#pr164">Stepper Calibration (Probe): Z axis via a 1-2-3 gauge block</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+640</span> <span class="del">-36</span></td></tr>
 <tr class="ver-hdr"><td colspan="3">Version 2.22</td></tr>
 <tr><td class="n">165</td><td><a href="#pr165">Check for Updates works on dev builds</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+241</span> <span class="del">-10</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (165 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1371</span> <span class="del">21</span> <span class="add">+168</span><br><span class="k">Lines:</span> <span class="add">+56198</span> <span class="del">-10687</span></td></tr>
+<tr><td class="n">166</td><td><a href="#pr166">Apple-HIG visual redesign across all main tabs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">32</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+352</span> <span class="del">-47</span></td></tr>
+<tr><td class="n">167</td><td><a href="#pr167">Machine Setup: optional steps (Fixtures, Simulator) always show green</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+16</span> <span class="del">-5</span></td></tr>
+<tr><td class="n">168</td><td><a href="#pr168">SD Card tab no longer shows "No card" while mount status is still resolving</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+7</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">169</td><td><a href="#pr169">Silent update check in the title bar + live rebuild-status on Settings &gt; Simulator</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+60</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">170</td><td><a href="#pr170">Sidebar flyout panels no longer overlap the main-nav tab strip</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+76</span> <span class="del">-10</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (170 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1410</span> <span class="del">21</span> <span class="add">+169</span><br><span class="k">Lines:</span> <span class="add">+56709</span> <span class="del">-10752</span></td></tr>
 </table>
 </div>
 
@@ -3350,6 +3360,62 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">install.ps1</td><td class="num add">28</td><td class="num del">8</td></tr>
 </table>
 <div class="desc"><p>Previously, Check for Updates on a local <code>build.ps1</code> build just refused ("no embedded version to compare against a release"). It now queries GitHub for every published release that carries an installable <code>ioSender.zip</code> asset, offers a pick-a-release dropdown, and on OK installs the chosen release <strong>over this dev build's own bin folder</strong> (not the normal <code>%LocalAppData%</code> install location) &mdash; useful for quickly comparing a real published build against in-progress dev work without disturbing a separate install.</p><ul><li><strong>New <code>ReleasePickerDialog</code></strong> &mdash; OK/Cancel dropdown of every release with an installable asset, newest first.</li><li><strong><code>install.ps1</code> gains <code>-Tag &lt;version&gt;</code> and <code>-InstallDir &lt;path&gt;</code></strong> &mdash; install a specific release into an arbitrary folder instead of always the latest into the default location; skips the desktop shortcut when a custom install dir is given.</li></ul><p class="foot">User-verified end-to-end: installed 2.15 from a dev build, then updated 2.15 &rarr; 2.21 via the normal Check for Updates path. Builds clean Debug/Release.</p></div>
+</div>
+<!-- ===== #166 ===== -->
+<div class="pr">
+<h2 id="pr166"><span class="badge">#166</span>Apple-HIG visual redesign: design system + all main tabs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppleStyles.xaml</td><td class="num add">190</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml</td><td class="num add">52</td><td class="num del">17</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">58</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroManagerDialog.xaml</td><td class="num add">5</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml</td><td class="num add">7</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">Remaining tab/control XAML (implicit-style adoption, 25 files)</td><td class="num add">27</td><td class="num del">23</td></tr>
+</table>
+<div class="desc"><p>Replaces the flat, monochrome control styling with a small, deliberate design system (<code>AppleStyles.xaml</code>) rolled out across Job, Settings, Probing, Height Map, SD Card, Offsets, Machine Setup and Tools tabs:</p><ul><li><strong>One primary button per screen</strong> - a single solid-accent CTA (Start/Run/Upload/Set/Apply) per tab; every other button stays neutral gray, including when disabled.</li><li><strong>Color-by-function panel dots</strong> - GroupBox headers pick up a small colored dot (position/teal, jogging/purple, feed &amp; spindle/ochre, coolant/steel-blue) via a <code>HeaderTemplate</code> that wraps the existing localized header text without touching localization.</li><li><strong>Pill-style main-nav tabs</strong> - the top-level tab strip gets rounded, spring-animated selection with a light-accent fill, scoped to the top-level <code>StretchTabControl</code> only so it doesn't leak into nested sub-tab strips (Settings, Probing, Tools).</li><li><strong>Recessed numeric fields</strong> - <code>NumericField.xaml</code> switched to <code>TemplateBinding</code> so per-instance background/border overrides (e.g. the merged-unit suffix trick) keep working.</li></ul><p class="foot">Built via parallel worktree agents, one per tab, then merged; every tab reviewed live by the user before merge.</p></div>
+</div>
+<!-- ===== #167 ===== -->
+<div class="pr">
+<h2 id="pr167"><span class="badge">#167</span>Machine Setup: optional steps (Fixtures, Simulator) always show green</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">16</td><td class="num del">5</td></tr>
+</table>
+<div class="desc"><p>The Fixtures and Simulator steps in the Machine Setup wizard are optional - there's no gate to fail - but were left with no step color at all, which read as "not checked yet" rather than "passed". They now always color green. Separately, the step-7 (ATC macros) tab color now reads from the same <code>AtcMacros.GetStatus()</code> query the gate-check itself just ran, instead of issuing a second, potentially-stale query.</p></div>
+</div>
+<!-- ===== #168 ===== -->
+<div class="pr">
+<h2 id="pr168"><span class="badge">#168</span>SD Card tab no longer shows "No card" while mount status is still resolving</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">7</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>The tab treated an <code>Undetected</code> mount status as an immediate "No card" - but that status just means nothing's been reported yet, not that there's no card. It now calls the same file-list query the ATC macro status uses first, and only falls back to "No card" once the status explicitly resolves to <code>Unmounted</code>.</p></div>
+</div>
+<!-- ===== #169 ===== -->
+<div class="pr">
+<h2 id="pr169"><span class="badge">#169</span>Silent update check in the title bar + live rebuild-status on Settings &gt; Simulator</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">48</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorConfigView.xaml.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>On launch, a silent background check against the GitHub releases API appends "(update available)" to the window title if a newer release exists (dev builds and any network/API failure are silently ignored - separate from, and doesn't touch, the existing interactive Check for Updates flow).</p><p>Settings &gt; Simulator's "up to date" / "click Build to update" status text previously only refreshed on tab-show or after a build, so toggling an option checkbox mid-visit left it showing stale info until you navigated away and back. It's now wired to every option control's change event.</p></div>
+</div>
+<!-- ===== #170 ===== -->
+<div class="pr">
+<h2 id="pr170"><span class="badge">#170</span>Sidebar flyout panels no longer overlap the main-nav tab strip</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">7</td><td class="num del">7</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">35</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SidebarItem.cs</td><td class="num add">34</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>The sidebar's flyout panels are positioned two ways that both needed fixing: each flyout's own vertical slot was previously driven by a <code>static</code> running counter that accumulated across the whole app session in item-registration order, unrelated to the actual on-screen tab order - replaced with a <code>TranslatePoint</code> alignment against each flyout's own tab. The container's top margin (clearing the main-nav tab strip) was a hardcoded pixel guess that had to be re-tuned by hand every time the tab strip's rendered height changed (font, DPI, the Apple-HIG pill redesign's <code>MinHeight</code> bump) - two such guesses both proved wrong on live testing. It's now measured from the tab control's real <code>TabPanel</code> template part and kept in sync via <code>SizeChanged</code>, so it self-corrects if the template ever changes again.</p></div>
 </div>
 </section>
 
