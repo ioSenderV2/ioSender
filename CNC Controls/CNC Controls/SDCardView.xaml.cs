@@ -101,14 +101,21 @@ namespace CNC.Controls
                 CanViewAll = GrblInfo.Build >= 20230312;
                 CanRewind = GrblInfo.IsGrblHAL;
 
-                if (GrblInfo.HasSDCard && (DataContext as GrblViewModel).SDCardMountStatus == SDState.Undetected)
+                // Undetected just means "haven't asked the controller this session" - it is NOT the same as
+                // "no card". The old code treated Undetected as a terminal no-card state and gave up without
+                // ever querying, so this tab silently depended on some OTHER view (e.g. Machine Setup's
+                // Controller Macros step, via AtcMacros.GetStatus -> GrblSDCard.Load) having done that query
+                // first and updated SDCardMountStatus as a side effect. Always query here instead - the same
+                // GrblSDCard.Load() ReloadFiles() already wraps - then only show "No card" if the controller's
+                // response actually resolves to Unmounted (a real answer, not just an unasked question).
+                ReloadFiles();
+                if (GrblInfo.HasSDCard && (DataContext as GrblViewModel).SDCardMountStatus == SDState.Unmounted)
                 {
                     GrblSDCard.Clear();
                     if (txtFreeSpace != null)
                         txtFreeSpace.Text = string.Empty;
                     (DataContext as GrblViewModel).Message = (string)FindResource("NoCard");
-                } else
-                    ReloadFiles();
+                }
             }
             else
                 (DataContext as GrblViewModel).Message = string.Empty;
