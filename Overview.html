@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>157 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>161 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -184,6 +184,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Drag a tab header left/right to reorder tabs &mdash; main bar and every sub-tab strip; the order persists across restarts (and agrees with the Edit Main Page editor)</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr60">60</a></td></tr>
 <tr><td>Jog commands now wait for the previous $J's ok before sending another - rapid clicks were able to send an overlapping $J and wedge the controller (no response to anything, not just jog, until a power cycle).</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr121">121</a></td></tr>
 <tr><td>Analog stick jog now runs on a dedicated background thread instead of the UI dispatcher - eliminates stutter during a continuous hold.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr128">128</a></td></tr>
+<tr><td>The run bar's "Cycle Start" button is now just "Run"; a small dropdown next to it replaces the old right-click menu for choosing Dry Run / Check Run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr161">161</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -257,6 +258,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Corner Fence/Start Job's X/Y face probes now search a fixed 5mm below the measured top instead of the material midpoint (top - thickness/2)</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr153">153</a></td></tr>
 <tr><td>Edge length labels doubled 12pt-&gt;24pt; per-corner angle moved inside the box while thickness/Z stays outside, both at 22pt instead of one combined 11pt label</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr154">154</a></td></tr>
 <tr><td>Calibrate steps/mm by probing a reference block of known true size against a Corner Fence, instead of V-bit scratch marks measured by hand; Start Job now warns when a measured exact size implies bad calibration</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr155">155</a></td></tr>
+<tr><td>Start Job / Stepper Calibration (Probe) no longer randomly abort right after the G30 park move with "controller did not return to idle"</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr158">158</a></td></tr>
+<tr><td>Stepper Calibration (Probe) now parks at G30 when done (was left sitting at Z0) and gets its own Safe Z delta field; any Generate'd program hides its preview automatically once it finishes cleanly</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr159">159</a></td></tr>
+<tr><td>Start Job's fixture dropdown gets a built-in "G28 (loose probe)" entry recreating the original pre-Fixture-library workflow, for jobs that don't have (or don't want) a saved Corner Fence fixture</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr160">160</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -522,7 +526,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">156</td><td><a href="#pr156">Versioned releases (2.N) with real changelog notes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+217</span> <span class="del">-58</span></td></tr>
 <tr class="ver-hdr"><td colspan="3">Version 2.19</td></tr>
 <tr><td class="n">157</td><td><a href="#pr157">Install command CMD-compatible; window title version fix</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+13</span> <span class="del">-8</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (157 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1288</span> <span class="del">21</span> <span class="add">+166</span><br><span class="k">Lines:</span> <span class="add">+54235</span> <span class="del">-10299</span></td></tr>
+<tr><td class="n">158</td><td><a href="#pr158">Macro WAITIDLE false-abort after a burst's trailing motion</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+130</span> <span class="del">-35</span></td></tr>
+<tr><td class="n">159</td><td><a href="#pr159">Stepper Calibration (Probe): parks at G30, Safe Z delta field, program view auto-hides on success</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+39</span> <span class="del">-12</span></td></tr>
+<tr><td class="n">160</td><td><a href="#pr160">Start Job: synthetic "G28 (loose probe)" fixture - no saved fixture required</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+83</span> <span class="del">-20</span></td></tr>
+<tr><td class="n">161</td><td><a href="#pr161">Cycle Start renamed to Run, with a proper run-mode dropdown</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">29</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+406</span> <span class="del">-184</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (161 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1331</span> <span class="del">21</span> <span class="add">+166</span><br><span class="k">Lines:</span> <span class="add">+54893</span> <span class="del">-10550</span></td></tr>
 </table>
 </div>
 
@@ -3228,6 +3236,50 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">4</td><td class="num del">3</td></tr>
 </table>
 <div class="desc"><p>The release-notes install command used bare <code>irm ... | iex</code>, which only works in PowerShell - pasting it into cmd.exe just prints an error. It's now wrapped as <code>powershell "irm ... | iex"</code>, which runs correctly from either shell.</p><p>Separately, the main window's title bar (and splash screen) showed a hardcoded <code>2.0.1</code> left over from before the versioned-release pipeline existed, instead of the actual installed release version (e.g. 2.18). <code>MainWindow.Version</code> now reflects <code>BuildInfo.Version</code> for real published builds.</p></div>
+</div>
+<!-- ===== #158 ===== -->
+<div class="pr">
+<h2 id="pr158"><span class="badge">#158</span>Macro WAITIDLE false-abort after a burst's trailing motion</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">56</td><td class="num del">8</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">74</td><td class="num del">27</td></tr>
+</table>
+<div class="desc"><p>A macro's <code>(WAITIDLE)</code> directive could false-abort right after a G30 park move, even though the move completed cleanly - hit intermittently on both Start Job and Stepper Calibration (Probe).</p><ul><li><strong>Root cause</strong> - the streamer's own "burst complete" signal could fire a beat early (a transient Idle status blip between the last line being accepted and the controller actually starting to execute the queued motion), so <code>WAITIDLE</code>'s guard walked straight into the real motion resuming a moment later and aborted.</li><li><strong>Fix</strong> - removed the immediate-fail guard and let <code>WAITIDLE</code> fall into its own already-robust, report-driven completion loop (two consecutive real Idle reports, stall/alarm detection), which correctly waits out the trailing motion instead of racing it.</li></ul><p class="foot">Confirmed via targeted diagnostic tracing + the raw comms log, then verified fixed on real hardware across repeated Start Job and Stepper Calibration (Probe) runs.</p></div>
+</div>
+<!-- ===== #159 ===== -->
+<div class="pr">
+<h2 id="pr159"><span class="badge">#159</span>Stepper Calibration (Probe): parks at G30, Safe Z delta field, program view auto-hides on success</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml.cs</td><td class="num add">19</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">1</td><td class="num del">6</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">16</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Two small usability fixes to Stepper Calibration (Probe), plus a general Generate/Run polish item that applies to every tool tab.</p><ul><li><strong>Parks at G30 when done</strong> - was just lifting to Z0 above the last probed corner, leaving the probe sitting mid-air; now uses the same shared G30-park helper Start Job already relies on (extracted into <code>MacroProcessor.EmitGotoG30</code> so both tools share one tested implementation).</li><li><strong>Safe Z delta field</strong> - the corner-to-corner travel height was hardcoded (15&nbsp;mm); it's now an editable field matching Start Job's own "Safe Z delta", persisted per session.</li><li><strong>Program view auto-hides on success</strong> - any tool's Generate'd program preview used to sit in its shrunk 3-line "run view" state after a clean finish; it now fully hides once the run completes with no error, instead of lingering until a 20-second timer or the next run reused it. On an actual error it's still left up so the operator can see what failed.</li></ul></div>
+</div>
+<!-- ===== #160 ===== -->
+<div class="pr">
+<h2 id="pr160"><span class="badge">#160</span>Start Job: synthetic "G28 (loose probe)" fixture - no saved fixture required</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">6</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">77</td><td class="num del">18</td></tr>
+</table>
+<div class="desc"><p>Start Job's fixture dropdown always has a working option now, even with no fixture library set up: a synthetic <strong>"G28 (loose probe)"</strong> entry, always present (never saved to the fixture library), that recreates the original pre-Fixture-library Start Job behavior.</p><ul><li>Corner 1 probes in a loose DISCOVER pass anchored live at the controller's own G28 stored position, instead of a real Fixture's tight cached corner offset - read at run time (grblHAL's G28 named parameters), never baked into the generated program.</li><li>If G28 isn't set yet, Generate offers to set it on the spot: jog to the position you want to probe the spoilboard from, click OK to store it there (<code>G28.1</code>), or Cancel to back out.</li><li>Everything after corner 1 - Measure, rotation, exact size, tool-length reference, origin set - runs exactly like a real Corner Fence fixture, since it only ever consumes corner 1's measured result, not how it was obtained.</li></ul><p class="foot">User-verified on real hardware, both paths (G28 already set, and G28 unset via the jog-and-confirm dialog).</p></div>
+</div>
+<!-- ===== #161 ===== -->
+<div class="pr">
+<h2 id="pr161"><span class="badge">#161</span>Cycle Start renamed to Run, with a proper run-mode dropdown</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml</td><td class="num add">90</td><td class="num del">25</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">179</td><td class="num del">85</td></tr>
+<tr><td class="mono">Wording touch-ups, "Cycle Start" -&gt; "Run" (13 files: AutoSquareWizard, Converters, FixtureEditDialog, JobView, KeyMapEditor, MainWindow, StepperCalibration{Probe,Scratch}Wizard, SurfaceSpoilboardWizard)</td><td class="num add">18</td><td class="num del">18</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales x 2 resource files)</td><td class="num add">119</td><td class="num del">56</td></tr>
+</table>
+<div class="desc"><p>"Cycle Start" never said what it actually does - renamed to <strong>Run</strong> throughout the run bar, its tooltips, and everywhere else the button is mentioned.</p><ul><li><strong>New mode dropdown</strong> replaces the old right-click context menu: a small arrow to Run's right opens a list of <strong>Run / Dry Run / Check Run</strong> - picking one relabels the button to match, so the current mode is always visible at a glance instead of hidden behind a right-click.</li><li><strong>Disabled-state tooltip</strong> - hovering Run while it's greyed out now explains why (load a file or generate a program first) instead of showing nothing.</li><li><strong>Mode-aware tooltip</strong> - when enabled, the tooltip describes exactly what THIS press will do (plain run, Dry Run's Z-offset/spindle-off behavior, or Check Run's $C validation), not just a static "Alt+R".</li><li><strong>Check Run no longer sends $C until you press Run</strong> - selecting it from the dropdown only arms the intent; previously it activated check mode immediately on selection, which greyed out Home and other Idle-gated controls before the operator had even started anything.</li><li><strong>Always reverts to Run when a job ends</strong> - normal finish, error, or stop/abort all now leave the button back on plain Run (previously Check mode could linger indefinitely, since grblHAL has no auto-exit for $C - it needed an explicit reset, which now happens automatically).</li></ul><p class="foot">User-verified on real hardware across all three modes.</p></div>
 </div>
 </section>
 
