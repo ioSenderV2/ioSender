@@ -772,6 +772,13 @@ namespace CNC.Core
         public int AuxInputValue { get { return _auxinValue; } private set { _auxinValue = value; OnPropertyChanged(); } }
 
         public bool Silent { get; set; } = false;
+
+        // True when the current Message represents a real error/alarm (set by SetErrorMessage, used by
+        // SetGrblError and the Alarm-state transition below) rather than a plain status update - the status
+        // bar flashes light red instead of light green for these (see MainWindow.xaml.cs's FlashMessage).
+        // Reset to false on every OTHER Message assignment so a stale error flag can't outlive its message.
+        public bool IsMessageError { get; private set; } = false;
+
         public string Message
         {
             get { return _message == null ? string.Empty : _message; }
@@ -780,9 +787,27 @@ namespace CNC.Core
                 if (_message != value)
                 {
                     _message = value;
+                    IsMessageError = false;
                     if(!Silent)
                         OnPropertyChanged();
                 }
+            }
+        }
+
+        // Sets Message flagged as an error/alarm (see IsMessageError) - the two real error sources
+        // (SetGrblError, the Alarm-state transition) go through this instead of a plain Message assignment.
+        // Sets IsMessageError BEFORE raising Message's PropertyChanged (mirrors the Message setter's own
+        // dedupe, deliberately NOT routed through it - that setter resets IsMessageError to false as its
+        // first action, which would clobber the flag if set afterward) so a subscriber reacting to the
+        // Message change (MainWindow's FlashMessage) already sees the correct flag, not a stale false.
+        private void SetErrorMessage(string message)
+        {
+            IsMessageError = true;
+            if (_message != message)
+            {
+                _message = message;
+                if (!Silent)
+                    OnPropertyChanged(nameof(Message));
             }
         }
 
@@ -923,7 +948,10 @@ namespace CNC.Core
         public void SetGrblError(int error)
         {
             GrblError = error;
-            Message = error == 0 ? string.Empty : GrblErrors.GetMessage(error.ToString());
+            if (error == 0)
+                Message = string.Empty;
+            else
+                SetErrorMessage(GrblErrors.GetMessage(error.ToString()));
         }
 
         public void ParseGCStatus(string data)
@@ -1509,7 +1537,7 @@ namespace CNC.Core
             }
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
-                Message = GrblAlarms.GetMessage(_grblState.Substate.ToString());
+                SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
             }
             else if (!Silent && (ResponseLogVerbose || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))

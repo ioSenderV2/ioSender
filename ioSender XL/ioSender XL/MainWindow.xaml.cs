@@ -40,6 +40,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using CNC.Core;
 using CNC.Controls;
 using CNC.Converters;
@@ -271,10 +273,16 @@ namespace GCode_Sender
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
-                        EmphasizeMessage();
+                        FlashMessage((s as GrblViewModel)?.IsMessageError == true);
                     else if (e.PropertyName == nameof(GrblViewModel.ConnectionTarget))
                         UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current
                 };
+
+            // Status message permanently shown at double size (was a 10s enlarge-then-shrink animation that
+            // shifted the whole window layout up/down on every message - distracting; see FlashMessage for
+            // the replacement notice mechanism). Doubled once here rather than hardcoding a size, so it
+            // always tracks whatever the ambient/theme default actually is.
+            lblMessage.FontSize *= 2.0;
 
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
@@ -307,39 +315,33 @@ namespace GCode_Sender
             CNC.Controls.RtspCamerasControl.ToggleAll(this, btnAllRecord.IsChecked == true);
         }
 
-        // ---- status-bar message emphasis ----
-        // The status line at the bottom is short and easy to miss. When a new message is written, briefly show
-        // it at twice its normal height so it stands a chance of being noticed, then shrink it back after 10 s
-        // (or when the next message arrives and re-triggers this).
-        private double _baseMessageFontSize = 0;
-        private DispatcherTimer _messageEmphasisTimer;
+        // ---- status-bar message flash ----
+        // The status line at the bottom is short and easy to miss. Used to briefly enlarge its font (10s) to
+        // draw the eye, but that shifted the whole window layout up/down on every message - distracting. The
+        // font is now permanently large (see the constructor) and a new message instead flashes
+        // msgFlashBorder's background light green (normal) or light red (GrblViewModel.IsMessageError) for
+        // 5s, fading back to transparent - same "notice me" job, no layout shift.
+        private static readonly Color FlashColorNormal = Color.FromRgb(0xC8, 0xE6, 0xC9);   // light green
+        private static readonly Color FlashColorError = Color.FromRgb(0xFF, 0xCD, 0xD2);    // light red
 
-        private void EmphasizeMessage()
+        private void FlashMessage(bool isError)
         {
-            if (_baseMessageFontSize <= 0)                 // capture the inherited size once, before we override it
-                _baseMessageFontSize = lblMessage.FontSize;
-
-            if (_messageEmphasisTimer == null)
-            {
-                _messageEmphasisTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-                _messageEmphasisTimer.Tick += (s, e) =>
-                {
-                    _messageEmphasisTimer.Stop();
-                    lblMessage.FontSize = _baseMessageFontSize;
-                };
-            }
-
-            // An empty/cleared message shouldn't leave the bar enlarged - revert immediately.
-            if (string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
-            {
-                _messageEmphasisTimer.Stop();
-                lblMessage.FontSize = _baseMessageFontSize;
+            if (msgFlashBorder == null || string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
                 return;
-            }
 
-            lblMessage.FontSize = _baseMessageFontSize * 2.0;
-            _messageEmphasisTimer.Stop();                  // restart the 10 s window on every new message
-            _messageEmphasisTimer.Start();
+            var color = isError ? FlashColorError : FlashColorNormal;
+            var brush = new SolidColorBrush(color);
+            msgFlashBorder.Background = brush;
+
+            var anim = new ColorAnimation
+            {
+                From = color,
+                To = Colors.Transparent,
+                Duration = TimeSpan.FromSeconds(5),
+                FillBehavior = FillBehavior.Stop   // Completed below sets the real final value
+            };
+            anim.Completed += (s, e) => msgFlashBorder.Background = Brushes.Transparent;
+            brush.BeginAnimation(SolidColorBrush.ColorProperty, anim);
         }
 
         // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----

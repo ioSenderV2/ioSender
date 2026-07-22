@@ -97,19 +97,26 @@
             </StatusBarItem>
             <Separator Grid.Column="1" />
             <StatusBarItem Grid.Column="2">
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Uid="btn_copyMessage" x:Name="btnCopyMessage" Click="CopyMessage_Click" Cursor="Hand"
-                            ToolTip="Copy the full status message to the clipboard" Focusable="False"
-                            Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,5,0" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="#FF555555"/>
-                    </Button>
-                    <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
-                               VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
-                        <TextBlock.ToolTip>
-                            <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap" MaxWidth="540"/>
-                        </TextBlock.ToolTip>
-                    </TextBlock>
-                </StackPanel>
+                <!-- msgFlashBorder: a new Message briefly flashes this background light green (normal) or
+                     light red (error, GrblViewModel.IsMessageError) for 5s - see MainWindow.xaml.cs's
+                     FlashMessage - instead of the old enlarge/shrink-font animation, which shifted the whole
+                     window layout up/down every time a message arrived. lblMessage's font is now permanently
+                     large (doubled once at startup, see MainWindow_Loaded) rather than only during that window. -->
+                <Border x:Name="msgFlashBorder" Background="Transparent" Padding="2,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Uid="btn_copyMessage" x:Name="btnCopyMessage" Click="CopyMessage_Click" Cursor="Hand"
+                                ToolTip="Copy the full status message to the clipboard" Focusable="False"
+                                Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,5,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="#FF555555"/>
+                        </Button>
+                        <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
+                                   VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
+                            <TextBlock.ToolTip>
+                                <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap" MaxWidth="540"/>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
             </StatusBarItem>
             <Separator Grid.Column="3" />
             <StatusBarItem Grid.Column="4">
