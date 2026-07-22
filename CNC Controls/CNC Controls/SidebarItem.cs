@@ -45,7 +45,6 @@ namespace CNC.Controls
 {
     public class SidebarItem : Button
     {
-        private static double top = 0;
         private UserControl view { get; }
         private static UserControl last = null;
 
@@ -78,8 +77,19 @@ namespace CNC.Controls
             if (this.view != null)
                 this.view.MinHeight = Width;
 
-            Canvas.SetTop(this.view, top + gap / 2);
-            top += Width + gap;
+            // Align the flyout's Canvas.Top with THIS tab's own rendered position, once both are in the
+            // visual tree and laid out - replaces a `static double top` running counter that accumulated
+            // across the WHOLE app session in item-REGISTRATION order (every sidebar item ever constructed,
+            // never reset), unrelated to which flyouts are actually pinned/visible. A late-registered
+            // flyout (e.g. a newly added named fixture) inherited whatever the counter happened to be at
+            // that moment, with no relation to its neighbors in the vertical label list - it could land
+            // anywhere, including overlapping unrelated UI like the main tab strip. This button and its
+            // flyout share sidebarCanvas as a common ancestor (the flyout is added there directly by the
+            // caller before this constructor runs; this button reaches it via the ItemsControl it's placed
+            // in), so TranslatePoint against that shared ancestor gives the correct offset regardless of
+            // how many other sidebar items exist or what order they were created in.
+            Loaded += (s, e) => AlignFlyoutToTab();
+            SizeChanged += (s, e) => AlignFlyoutToTab();
 
             try
             {
@@ -95,6 +105,27 @@ namespace CNC.Controls
         public void PerformClick()
         {
             button_Click(this, null);
+        }
+
+        // Walks up from the flyout to its nearest Canvas ancestor (sidebarCanvas, in practice) and sets
+        // the flyout's Canvas.Top to match this tab's own position relative to that same Canvas - see the
+        // constructor's comment for why this replaced a static accumulator. No-op until both this button
+        // and the flyout are actually in the visual tree (guards IsLoaded and a null ancestor defensively;
+        // SizeChanged can fire before Loaded in some layout sequences).
+        private void AlignFlyoutToTab()
+        {
+            if (view == null || !IsLoaded)
+                return;
+
+            DependencyObject d = view;
+            while (d != null && !(d is Canvas))
+                d = VisualTreeHelper.GetParent(d);
+
+            if (d is Canvas canvas)
+            {
+                Point pos = TranslatePoint(new Point(0, 0), canvas);
+                Canvas.SetTop(view, pos.Y);
+            }
         }
 
         // Rendered length of the (un-rotated) label text - becomes the tab's on-screen height once rotated.
