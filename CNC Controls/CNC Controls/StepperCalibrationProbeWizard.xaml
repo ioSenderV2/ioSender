@@ -22,24 +22,51 @@
             </Grid.RowDefinitions>
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Vertical" Margin="5,5,0,0">
-                    <TextBlock x:Uid="txt_scpFixture" Text="Fixture (Corner fence, validated position):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+                    <TextBlock x:Uid="txt_scpAxisHdr" Text="Calibrate:" TextWrapping="Wrap" Margin="5,0,5,4"/>
                     <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
-                        <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="200" MinHeight="22" VerticalAlignment="Center"
-                                  DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
-                                  ToolTip="A validated Corner Fence fixture (Machine Setup &gt; Fixture definitions) to probe the reference block against."/>
+                        <RadioButton x:Uid="rb_scpAxisXY" x:Name="rbAxisXY" Content="XY steppers" GroupName="CalAxis" VerticalAlignment="Center" Checked="CalAxis_Checked"/>
+                        <RadioButton x:Uid="rb_scpAxisZ" x:Name="rbAxisZ" Content="Z stepper (1-2-3 block)" GroupName="CalAxis" VerticalAlignment="Center" Margin="14,0,0,0" Checked="CalAxis_Checked"/>
                     </StackPanel>
-                    <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="5,0,5,4" FontSize="11" Visibility="Collapsed"
-                               Text="No validated Corner Fence fixture available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
                     <Separator Margin="5,6"/>
-                    <TextBlock x:Uid="txt_scpTrueHdr" TextWrapping="Wrap" Margin="5,0,5,4"
-                               Text="Enter the reference block's own KNOWN true size (a precision square/rectangle, e.g. verified with a precision ruler) - larger is better, it amplifies a scaling error more than a small block would."/>
-                    <local:NumericField x:Uid="fld_scpTrueW" x:Name="fldTrueWidth" Label="True width (X):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
-                        Value="{Binding TrueWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                    <local:NumericField x:Uid="fld_scpTrueH" x:Name="fldTrueHeight" Label="True height (Y):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
-                        Value="{Binding TrueHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                    <local:NumericField x:Uid="fld_scpCornerMargin" x:Name="fldCornerMargin" Label="Safe Z delta:" ColonAt="150" Format="##0.0##" Unit="mm" Margin="0,2"
-                        Value="{Binding CornerTravelMarginMm, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
-                        ToolTip="Corners 2/3 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
+                    <StackPanel x:Name="pnlXY">
+                        <TextBlock x:Uid="txt_scpFixture" Text="Fixture (Corner fence, validated position):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+                        <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                            <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="200" MinHeight="22" VerticalAlignment="Center"
+                                      DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
+                                      ToolTip="A validated Corner Fence fixture (Machine Setup &gt; Fixture definitions) to probe the reference block against."/>
+                        </StackPanel>
+                        <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="5,0,5,4" FontSize="11" Visibility="Collapsed"
+                                   Text="No validated Corner Fence fixture available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
+                        <Separator Margin="5,6"/>
+                        <TextBlock x:Uid="txt_scpTrueHdr" TextWrapping="Wrap" Margin="5,0,5,4"
+                                   Text="Enter the reference block's own KNOWN true size (a precision square/rectangle, e.g. verified with a precision ruler) - larger is better, it amplifies a scaling error more than a small block would."/>
+                        <local:NumericField x:Uid="fld_scpTrueW" x:Name="fldTrueWidth" Label="True width (X):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
+                            Value="{Binding TrueWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        <local:NumericField x:Uid="fld_scpTrueH" x:Name="fldTrueHeight" Label="True height (Y):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
+                            Value="{Binding TrueHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        <local:NumericField x:Uid="fld_scpCornerMargin" x:Name="fldCornerMargin" Label="Safe Z delta:" ColonAt="150" Format="##0.0##" Unit="mm" Margin="0,2"
+                            Value="{Binding CornerTravelMarginMm, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                            ToolTip="Corners 2/3 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
+                    </StackPanel>
+                    <StackPanel x:Name="pnlZ" Visibility="Collapsed">
+                        <TextBlock x:Uid="txt_scpGaugeHdr" TextWrapping="Wrap" Margin="5,0,5,4"
+                                   Text="Enter the 1-2-3 block's own KNOWN true dimensions, smallest to largest. The generated program probes the spoilboard once, then the block's top in each of its three orientations in turn (prompting when to reposition it), and fits a new Z steps/mm from all three measurements."/>
+                        <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                            <RadioButton x:Uid="rb_scpGaugeMm" x:Name="rbGaugeMm" Content="mm" GroupName="GaugeUnits" VerticalAlignment="Center" Checked="GaugeUnits_Checked"/>
+                            <RadioButton x:Uid="rb_scpGaugeIn" x:Name="rbGaugeIn" Content="in" GroupName="GaugeUnits" VerticalAlignment="Center" Margin="14,0,0,0" Checked="GaugeUnits_Checked"/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlGaugeInputs">
+                            <local:NumericField x:Uid="fld_scpGauge1" x:Name="fldGauge1" Label="Gauge size 1 (small):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
+                                Value="{Binding GaugeSize1, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <local:NumericField x:Uid="fld_scpGauge2" x:Name="fldGauge2" Label="Gauge size 2 (middle):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
+                                Value="{Binding GaugeSize2, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <local:NumericField x:Uid="fld_scpGauge3" x:Name="fldGauge3" Label="Gauge size 3 (large):" ColonAt="150" Format="####0.0##" Unit="mm" Margin="0,2"
+                                Value="{Binding GaugeSize3, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                        </StackPanel>
+                        <CheckBox x:Uid="chk_scpReuseStart" x:Name="chkReuseStart" Content="Reuse last saved starting position" Margin="5,6,5,4"
+                                  Checked="ReuseStartPos_Changed" Unchecked="ReuseStartPos_Changed"
+                                  ToolTip="Skips the manual jog prompt and rapids straight to the spoilboard-probe starting position saved by the last run. Every run saves its own starting position regardless of this setting, so it's always available once you've run at least once - falls back to the manual jog prompt until then."/>
+                    </StackPanel>
                     <Separator Margin="5,6"/>
                     <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,4" Text="Measured:  X = -   Y = -"/>
                     <TextBlock x:Name="txtSummary" TextWrapping="Wrap" Margin="5,4,5,4"/>
@@ -50,16 +77,15 @@
                 <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <Button x:Uid="btn_scpSave" x:Name="btnSave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="90" MinHeight="26" Margin="0,0,8,0" Click="Button_Click" IsEnabled="False"
-                            ToolTip="Write the corrected steps/mm ($100/$101) to the controller."/>
+                            ToolTip="Write the corrected steps/mm ($100/$101 for XY, $102 for Z) to the controller."/>
                     <Button x:Uid="btn_scpUndo" x:Name="btnUndo" Content="Undo" Tag="undo" Focusable="False" MinWidth="70" MinHeight="26" Click="Button_Click" IsEnabled="False"
                             ToolTip="Revert steps/mm to what it was right before the last Save - use if a correction made the measured error worse instead of better."/>
                 </StackPanel>
             </StackPanel>
         </Grid>
-        <!-- Right: how-to. -->
+        <!-- Right: how-to, swapped per axis mode by CalAxis_Checked. -->
         <Grid Grid.Column="2" Margin="8,5,5,5">
-            <TextBlock VerticalAlignment="Top" TextWrapping="Wrap" Foreground="#24292F"
-                       Text="1. Clamp/register the reference block against the Corner Fence, front-left origin, like a real Start Job.  2. Enter its true (already known) width/height.  3. Generate, then Run - it parks at G30 to confirm the probe, then probes corner 1, then the X and Y neighbours, straight to the tight 5mm-inset anchor (same as Start Job's own corner-1 optimization).  4. Compare Measured to True (left) and check the new-steps/mm calculation, then Save steps/mm to write the correction."/>
+            <TextBlock x:Name="txtHowTo" VerticalAlignment="Top" TextWrapping="Wrap" Foreground="#24292F"/>
         </Grid>
     </Grid>
 </local:ConfigPanel>

@@ -1152,3 +1152,17 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startModeCheck:System.Win
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateLabel:System.String.$Content,None,True,True,,Generate
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateTipDisabled:System.String.$Content,None,True,True,,"Set the required inputs on this tab first, then Generate becomes available. (Alt+R)"
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_generateTipReady:System.String.$Content,None,True,True,,Build the program from this tab's current inputs. (Alt+R)
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,txt_scpAxisHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,Calibrate:
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,rb_scpAxisXY:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,XY steppers
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,rb_scpAxisZ:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Z stepper (1-2-3 block)
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,txt_scpGaugeHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Enter the 1-2-3 block's own KNOWN true dimensions, smallest to largest. The generated program probes the spoilboard once, then the block's top in each of its three orientations in turn (prompting when to reposition it), and fits a new Z steps/mm from all three measurements."
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,rb_scpGaugeMm:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,mm
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,rb_scpGaugeIn:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,in
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge1:CNC.Controls.NumericField.Label,None,False,True,,Gauge size 1 (small):
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge1:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge2:CNC.Controls.NumericField.Label,None,False,True,,Gauge size 2 (middle):
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge2:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge3:CNC.Controls.NumericField.Label,None,False,True,,Gauge size 3 (large):
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge3:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,chk_scpReuseStart:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Reuse last saved starting position
+CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,chk_scpReuseStart:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Skips the manual jog prompt and rapids straight to the spoilboard-probe starting position saved by the last run. Every run saves its own starting position regardless of this setting, so it's always available once you've run at least once - falls back to the manual jog prompt until then."

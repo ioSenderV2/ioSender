@@ -248,6 +248,8 @@ namespace CNC.Controls
                     if (Body(raw, "PROMPT").Trim().Length == 0)
                     {
                         Flush(model, buffer, true);
+                        if (AbortedByAlarm(model, name))
+                            return false;
                         if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
                                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                             return false;
@@ -258,6 +260,14 @@ namespace CNC.Controls
                 if (IsDirective(raw, "MBOX"))
                 {
                     Flush(model, buffer, true);
+                    // A burst just flushed above may have alarmed (e.g. a probe search that never triggered)
+                    // without WaitForIdle in the picture at all - Flush only waits for the burst to reach SOME
+                    // terminal StreamingState, it doesn't check WHICH one. Without this, the macro sailed
+                    // straight on to the next (MBOX) as if nothing had gone wrong (confirmed on real hardware
+                    // 2026-07-21: a failed spoilboard probe alarmed, then the very next prompt still popped up
+                    // asking to position the gauge block, with the controller sitting in Alarm the whole time).
+                    if (AbortedByAlarm(model, name))
+                        return false;
                     if (!ShowMBox(name, raw))
                         return false;   // Cancel / No - stop here
                     continue;
@@ -450,6 +460,20 @@ namespace CNC.Controls
 
             DebugLog.Write("macro", string.Format("StreamProgram: wait loop exited (wait={0}), StreamingState={1} GrblState={2}",
                 wait, model.StreamingState, model.GrblState.State));
+        }
+
+        // Checked right after every Flush(wait:true) that precedes a (MBOX)/(PROMPT) dialog - a burst that
+        // just alarmed (e.g. a probe search that never triggered) or lost the connection must stop the
+        // macro here, not sail on to the next prompt as if the burst had succeeded. Same Alarm/Unknown check
+        // WaitForIdle already uses for the same reason, just reached from a different gate (WAITIDLE isn't
+        // the only place a burst's outcome needs checking - any MBOX/PROMPT right after G-code content does).
+        private static bool AbortedByAlarm(GrblViewModel model, string name)
+        {
+            if (model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
+                return false;
+            ShowMessage(string.Format("Macro \"{0}\" aborted: the controller alarmed (or the connection was lost) mid-run.", name),
+                "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true;
         }
 
         // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -

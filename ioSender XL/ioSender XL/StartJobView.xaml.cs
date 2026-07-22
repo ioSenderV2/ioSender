@@ -491,6 +491,12 @@ namespace GCode_Sender
                 MacroProcessor.SupportsGenerateMode = false;
                 MacroProcessor.ActiveGenerate = null;
                 MacroProcessor.DiscardGenerated = null;
+                // Discard the generated program on tab-leave too (not just after a run finishes - see
+                // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
+                // focused. Not routed through InvalidateProgram() itself: its isActiveTab guard would block
+                // the MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false
+                // at the top of this same Activate() call - but this IS the moment that write belongs.
+                program = string.Empty;
                 programView?.Disconnect();                     // active program follows the focused tab
                 // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
                 // the corners populate and the results popup is raised even if the tab is left mid-run. The
