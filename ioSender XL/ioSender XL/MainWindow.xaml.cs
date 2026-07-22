@@ -1307,8 +1307,7 @@ namespace GCode_Sender
         {
             if (BuildInfo.Version == "dev")
             {
-                AppDialogs.Show("This is a local development build with no embedded version, so it can't be compared against a release.\n\nRun install.ps1 to install the latest published build.",
-                    "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                await CheckForUpdatesDevBuild();
                 return;
             }
 
@@ -1377,6 +1376,136 @@ namespace GCode_Sender
                 AppDialogs.Show("An error occurred while checking for updates:\n" + ex.Message,
                     "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        // "Check for Updates" on a local dev build (BuildInfo.Version == "dev", not stamped by the
+        // release workflow): there's no embedded version to compare against "latest", so instead of
+        // just refusing, list every published release that has an installable ioSender.zip asset and
+        // let the operator pick one to install OVER this dev build's own bin folder (not the normal
+        // %LocalAppData% install - see install.ps1's -InstallDir) for quick comparison against a real
+        // published build.
+        private async Task CheckForUpdatesDevBuild()
+        {
+            List<ReleaseListEntry> releases;
+            string error;
+            try
+            {
+                releases = await FetchReleaseList();
+                error = null;
+            }
+            catch (Exception ex)
+            {
+                releases = null;
+                error = ex.Message;
+            }
+
+            if (error != null)
+            {
+                AppDialogs.Show("Could not fetch the release list:\n" + error, "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (releases == null || releases.Count == 0)
+            {
+                AppDialogs.Show("No published releases with an installable ioSender.zip were found.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var tags = releases.Select(r => r.Tag).ToList();
+            var labels = releases.Select(r => r.PublishedAt == null ? r.Tag : string.Format("{0} - {1}", r.Tag, r.PublishedAt)).ToList();
+
+            string chosenTag = ReleasePickerDialog.Show(this,
+                "This is a local development build with no embedded version to compare against a release.\n\nPick a published release to install over this dev build:",
+                "Check for Updates", tags, labels);
+            if (chosenTag == null)
+                return;
+
+            string devDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+            LaunchInstaller(string.Format("-Tag {0} -InstallDir \"{1}\"", chosenTag, devDir));
+            Close();
+        }
+
+        private class ReleaseListEntry
+        {
+            public string Tag;
+            public string PublishedAt;
+        }
+
+        // Fetch every published release for ioSenderV2/ioSender that carries an installable
+        // ioSender.zip asset (newest first, GitHub's own array order).
+        private static async Task<List<ReleaseListEntry>> FetchReleaseList()
+        {
+            const string releasesUrl = "https://api.github.com/repos/ioSenderV2/ioSender/releases?per_page=30";
+
+            try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; } catch { }
+
+            using (var client = new System.Net.Http.HttpClient())
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("ioSender/" + Version);
+                client.Timeout = TimeSpan.FromSeconds(15);
+
+                var httpResponse = await client.GetAsync(releasesUrl);
+                if (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    return new List<ReleaseListEntry>();
+                httpResponse.EnsureSuccessStatusCode();
+                var response = await httpResponse.Content.ReadAsStringAsync();
+                return ParseReleaseList(response);
+            }
+        }
+
+        // Parse a GitHub "list releases" JSON array response, keeping only releases that publish an
+        // "ioSender.zip" asset (installable) and aren't drafts - same minimal hand-scanned parsing
+        // idiom as ParseGitHubReleaseTag (no JSON library dependency). Segments the array by
+        // successive "tag_name" occurrences: each release's own fields/assets are always emitted
+        // between its tag_name and the next release's tag_name (confirmed against a real GitHub
+        // releases-list response - assets always follow tag_name within the same object).
+        private static List<ReleaseListEntry> ParseReleaseList(string json)
+        {
+            var result = new List<ReleaseListEntry>();
+            const string tagKey = "\"tag_name\"";
+
+            int idx = json.IndexOf(tagKey, StringComparison.Ordinal);
+            while (idx >= 0)
+            {
+                int nextIdx = json.IndexOf(tagKey, idx + tagKey.Length, StringComparison.Ordinal);
+                string segment = json.Substring(idx, (nextIdx >= 0 ? nextIdx : json.Length) - idx);
+
+                string tag = ExtractJsonStringValue(segment, tagKey);
+                if (!string.IsNullOrEmpty(tag))
+                {
+                    bool isDraft = segment.Contains("\"draft\":true");
+                    bool hasZip = segment.Contains("\"name\":\"ioSender.zip\"");
+                    if (!isDraft && hasZip)
+                    {
+                        result.Add(new ReleaseListEntry
+                        {
+                            Tag = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag.Substring(1) : tag,
+                            PublishedAt = ExtractJsonStringValue(segment, "\"published_at\"")
+                        });
+                    }
+                }
+
+                idx = nextIdx;
+            }
+
+            return result;
+        }
+
+        // Extract the string value of a top-level "key":"value" pair from a JSON fragment.
+        private static string ExtractJsonStringValue(string json, string key)
+        {
+            int idx = json.IndexOf(key, StringComparison.Ordinal);
+            if (idx < 0)
+                return null;
+            idx = json.IndexOf(':', idx + key.Length);
+            if (idx < 0)
+                return null;
+            int start = json.IndexOf('"', idx + 1);
+            if (start < 0)
+                return null;
+            int end = json.IndexOf('"', start + 1);
+            if (end < 0)
+                return null;
+            return json.Substring(start + 1, end - start - 1);
         }
 
         // Roll back to the build install.ps1 saved under ioSender\previous (the last update, one

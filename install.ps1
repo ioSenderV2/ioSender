@@ -15,6 +15,17 @@
     row is a no-op flip back to whatever "current" was, so it only ever
     goes back one version.
 
+.PARAMETER Tag
+    Install a specific released version (e.g. "2.20") instead of the
+    latest. Used by ioSender's own "Check for Updates" when running a
+    local dev build, to install a picked release over it for comparison.
+
+.PARAMETER InstallDir
+    Install into this directory instead of the default
+    %LocalAppData%\Programs\ioSender - e.g. a dev build's own bin folder.
+    No desktop shortcut is created when this is set (it would be a
+    dev-only, throwaway location).
+
 .EXAMPLE
     From PowerShell:
     irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex
@@ -28,14 +39,16 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$Rollback
+    [switch]$Rollback,
+    [string]$Tag,
+    [string]$InstallDir
 )
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 $repo = 'ioSenderV2/ioSender'
-$installDir = Join-Path $env:LocalAppData 'Programs\ioSender'
+$installDir = if ($InstallDir) { $InstallDir } else { Join-Path $env:LocalAppData 'Programs\ioSender' }
 $previousDir = Join-Path $installDir 'previous'
 $exePath = Join-Path $installDir 'ioSender.exe'
 $tempZip = Join-Path $env:TEMP 'ioSender-install.zip'
@@ -64,17 +77,24 @@ if ($Rollback) {
     Get-ChildItem $swapDir -Force | Move-Item -Destination $installDir -Force  # swap contents -> installDir (now "current")
     Remove-Item $swapDir -Recurse -Force
 
-    New-DesktopShortcut
+    if (-not $InstallDir) { New-DesktopShortcut }
     Write-Host "==> Launching rolled-back ioSender ..." -ForegroundColor Green
     Start-Process $exePath
     return
 }
 
-Write-Host "==> Fetching latest ioSender release info ..." -ForegroundColor Cyan
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'ioSender-installer' }
+if ($Tag) {
+    $tagName = if ($Tag.StartsWith('v')) { $Tag } else { "v$Tag" }
+    Write-Host "==> Fetching release info for $tagName ..." -ForegroundColor Cyan
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tagName" -Headers @{ 'User-Agent' = 'ioSender-installer' }
+}
+else {
+    Write-Host "==> Fetching latest ioSender release info ..." -ForegroundColor Cyan
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'ioSender-installer' }
+}
 $asset = $release.assets | Where-Object { $_.name -eq 'ioSender.zip' } | Select-Object -First 1
-if (-not $asset) { throw "No ioSender.zip asset found on the latest release ($($release.tag_name)) of $repo." }
-Write-Host "==> Latest published version: $($release.tag_name)" -ForegroundColor Cyan
+if (-not $asset) { throw "No ioSender.zip asset found on release ($($release.tag_name)) of $repo." }
+Write-Host "==> Installing version: $($release.tag_name)" -ForegroundColor Cyan
 
 Write-Host "==> Downloading $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB) ..." -ForegroundColor Cyan
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempZip -UseBasicParsing
@@ -97,7 +117,7 @@ Write-Host "==> Installing to $installDir ..." -ForegroundColor Cyan
 Expand-Archive -Path $tempZip -DestinationPath $installDir -Force
 Remove-Item $tempZip -Force
 
-New-DesktopShortcut
+if (-not $InstallDir) { New-DesktopShortcut }
 
 Write-Host "==> Launching ioSender ..." -ForegroundColor Green
 Start-Process $exePath

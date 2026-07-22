@@ -185,6 +185,9 @@
     <Compile Include="ScenarioNameDialog.xaml.cs">
       <DependentUpon>ScenarioNameDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ReleasePickerDialog.xaml.cs">
+      <DependentUpon>ReleasePickerDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CoordValueSetControl.xaml.cs">
       <DependentUpon>CoordValueSetControl.xaml</DependentUpon>
     </Compile>
@@ -481,6 +484,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ScenarioNameDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ReleasePickerDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
