@@ -302,9 +302,12 @@ namespace CNC.Controls
         // Last macro-status query (cached so tab colouring doesn't re-hit the controller filesystem).
         private System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
 
-        // Colour the six graded step tabs from their current state (step 6/Fixtures is optional, not graded,
-        // so its header stays uncoloured like Overview). Cheap (no filesystem query) - step 7 uses the
-        // cached macro status, so it can be called freely (e.g. on every Setup edit).
+        // Colour every graded step tab from its current state. Fixtures (6) and Build simulator (8) are
+        // optional/non-gating - they can never block setup completion - so they're always coloured green
+        // ("passed its gate" because there IS no gate) rather than left uncoloured like Overview. Leaving
+        // them blank read as an unexplained inconsistency (every OTHER step has a colour) rather than the
+        // intended "this step doesn't block you" signal. Cheap (no filesystem query) - step 7 uses the
+        // cached macro status, so this can be called freely (e.g. on every Setup edit).
         private void RefreshStepColors()
         {
             SetStepColor(hdrMachine, StepStatusOf(1));
@@ -312,7 +315,9 @@ namespace CNC.Controls
             SetStepColor(hdrAxis, StepStatusOf(3));
             SetStepColor(hdrHoming, StepStatusOf(4));
             SetStepColor(hdrProbes, StepStatusOf(5));
+            SetStepColor(hdrFixtures, StepState.Complete);
             SetStepColor(hdrMacros, StepStatusOf(7));
+            SetStepColor(hdrSimulator, StepState.Complete);
         }
 
         // Colour only the tab's header text (not the tab body, which would make the descriptive text
