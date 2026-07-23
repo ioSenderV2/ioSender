@@ -833,6 +833,14 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("G53 G0 X{0} Y{1}", startX.ToInvariantString("0.0##"), startY.ToInvariantString("0.0##")));
                 b.AppendLine("(MBOX, OKCANCEL, Rapided to the saved starting position (XY only - Z is still at machine top). Confirm it's clear of any obstruction, then click OK to descend and probe. Cancel aborts.)");
                 b.AppendLine(string.Format("G53 G0 Z{0}", startZ.ToInvariantString("0.0##")));
+                // Unlike the manual-jog branch (where the operator's own click-through absorbs the settle time),
+                // this Z descend is immediately followed by an automated relative G38.2 search with NO human
+                // gate in between - so the exact "burst's trailing motion" race already found and fixed for the
+                // G30 park move (WaitForIdle, MacroProcessor.cs, commit c0d0896 - confirmed on real hardware for
+                // THIS wizard among others) applies here too: without this, the relative search could start
+                // arming before the descend has genuinely finished, effectively searching from wherever the
+                // rapid still was (up near machine top) instead of from the saved Z.
+                b.AppendLine("(WAITIDLE)");
             }
             else
                 b.AppendLine("(MBOX, OKCANCEL, Manually jog the probe to within 10mm of the spoilboard - clear of any obstructions - then click OK. Cancel aborts.)");

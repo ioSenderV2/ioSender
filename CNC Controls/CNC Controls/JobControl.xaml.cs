@@ -241,6 +241,18 @@ namespace CNC.Controls
             set { SetValue(IsActiveProgramReadyProperty, value); }
         }
 
+        // Same green "press me" cue, but for the button while it still reads "Generate" (a Generate-first tab
+        // focused, not yet generated). Deliberately a SEPARATE flag from IsActiveProgramReady: that one also
+        // drives the "<name> ready - press Run to run." status line (SetActiveProgramReady), which must stay
+        // quiet until the program has actually been generated - see IsGenerateModeBlocking's own comment. This
+        // one only paints the button; set alongside IsRunActionEnabled in UpdateRunButtonLabel.
+        public static readonly DependencyProperty IsGenerateActionReadyProperty = DependencyProperty.Register(nameof(IsGenerateActionReady), typeof(bool), typeof(JobControl));
+        public bool IsGenerateActionReady
+        {
+            get { return (bool)GetValue(IsGenerateActionReadyProperty); }
+            set { SetValue(IsGenerateActionReadyProperty, value); }
+        }
+
         // Set the "ready to run the active program" cue. On the false->true edge, also drop a one-time status-line
         // prompt ("<name> ready - press Run to run."); the markers/scroll otherwise behave as on the job.
         private void SetActiveProgramReady(bool ready)
@@ -723,6 +735,7 @@ namespace CNC.Controls
                 bool generated = MacroProcessor.IsProgramGenerated;
                 btnStart.Content = generated ? FindResource("StartModeNormal") : FindResource("GenerateLabel");
                 IsRunActionEnabled = IsRunEnabled && (generated || MacroProcessor.IsGenerateReady);
+                IsGenerateActionReady = !generated && IsRunActionEnabled;
                 btnStart.ToolTip = generated ? FindResource("StartTipNormal")
                                   : IsRunActionEnabled ? FindResource("GenerateTipReady")
                                   : FindResource("GenerateTipDisabled");
@@ -733,6 +746,7 @@ namespace CNC.Controls
             if (btnStartMode != null)
                 btnStartMode.Visibility = Visibility.Visible;
             IsRunActionEnabled = IsRunEnabled;
+            IsGenerateActionReady = false;
 
             // Neither mode is ever saved to config (IsDryRunMode is a plain in-memory GrblViewModel field,
             // always false on a fresh instance; IsCheckMode is a live read of GrblState.State - see their own
