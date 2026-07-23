@@ -55,7 +55,7 @@ namespace CNC.Controls.Lathe
         {
             InitializeComponent();
 
-            data.TextChanged += Data_TextChanged;
+            ((TextBox)data.Field).TextChanged += Data_TextChanged;
             chkTaper.Checked += ChkTaper_Checked;
             chkTaper.Unchecked += ChkTaper_Checked;
         }

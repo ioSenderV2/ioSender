@@ -97,7 +97,7 @@ namespace CNC.Controls
         public string SpindleCWCommand { get { return (string)rbSpindleCW.Tag; } set { rbSpindleCW.Tag = value; } }
         public string SpindleCCWCommand { get { return (string)rbSpindleCCW.Tag; } set { rbSpindleCCW.Tag = value; } }
 
-        public new bool IsFocused { get { return cvRPM.IsFocused; } }
+        public new bool IsFocused { get { return cvRPM.Field.IsFocused; } }
         public bool SPOr { get { return !(DataContext as GrblViewModel).IsJobRunning || (DataContext as GrblViewModel).GrblState.State == GrblStates.Hold; } }
 
         private void txtPos_KeyPress(object sender, KeyEventArgs e)
