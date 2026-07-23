@@ -169,6 +169,7 @@ namespace GCode_Sender
 
             CNC.Core.ConsoleLog.Init();
             CNC.Controls.AppMessageBox.Register();
+            CNC.Controls.ButtonClickSound.Init();
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.

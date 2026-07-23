@@ -288,6 +288,7 @@
     <Compile Include="GrblFilesystems.cs" />
     <Compile Include="TearableTab.cs" />
     <Compile Include="PipeServer.cs" />
+    <Compile Include="ButtonClickSound.cs" />
     <Compile Include="PortDialog.xaml.cs">
       <DependentUpon>PortDialog.xaml</DependentUpon>
     </Compile>
