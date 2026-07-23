@@ -479,7 +479,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Stepper calibration", program, true);
+            MacroProcessor.Run(model, "Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, true);
         }
 
         private void Generate()
@@ -497,7 +497,7 @@ namespace CNC.Controls
 
             // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.PublishGenerated("Stepper calibration", program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
         }

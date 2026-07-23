@@ -562,7 +562,7 @@ namespace CNC.Controls
             ShowResult();
 
             program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm);
-            MacroProcessor.PublishGenerated("Stepper calibration (probe)", program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Stepper calibration (probe) XY", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
         }
@@ -597,7 +597,7 @@ namespace CNC.Controls
             ShowResult();
 
             program = BuildProgramZ(p, g1, g2, g3, reuseStartPos && hasStartPos, startPosX, startPosY, startPosZ);
-            MacroProcessor.PublishGenerated("Stepper calibration (probe)", program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Stepper calibration (probe) Z", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
         }
@@ -611,7 +611,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Stepper calibration (probe)", program, true);
+            MacroProcessor.Run(model, "Stepper calibration (probe) " + (rbAxisZ.IsChecked == true ? "Z" : "XY"), program, true);
         }
 
         private void Save()

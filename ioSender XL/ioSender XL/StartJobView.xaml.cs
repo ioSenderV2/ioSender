@@ -1260,7 +1260,7 @@ namespace GCode_Sender
             MacroProcessor.ActiveProgramName = "Start Job";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             // Start Job owns its ProgramView; the overlay hosts it and it titles itself
-            MacroProcessor.PublishGenerated("Start Job", program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Start Job " + fx.Name, program, EnsureProgramView, () => programView);
             // Flips the Run bar from "Generate" to "Run" (see isActiveTab's own comment on why this is gated).
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;
@@ -1349,7 +1349,7 @@ namespace GCode_Sender
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
             // confirmation. confirm:true gives the operator a final "run?" before any motion.
-            MacroProcessor.Run(model, "Start Job", program, true);
+            MacroProcessor.Run(model, "Start Job " + (SelectedFixture?.Name ?? string.Empty), program, true);
         }
 
         // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained

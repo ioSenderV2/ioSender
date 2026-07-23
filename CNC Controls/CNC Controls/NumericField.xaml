@@ -16,7 +16,11 @@
                  as a minimum width. SharedSizeGroup aligns labels within any container that sets
                  Grid.IsSharedSizeScope="True"; ignored where no scope is present. -->
             <ColumnDefinition Width="Auto" MinWidth="70" SharedSizeGroup="NumericFieldLabel"/>
-            <ColumnDefinition Width="Auto"/>
+            <!-- Everything after the label is one star column, filled edge-to-edge by the field below. With
+                 IsSharedSizeScope="True" set on the containing panel (each tool tab's root), every row's label
+                 column becomes the width of the LONGEST label in that scope - so labels colon-align (right-
+                 aligned within a shared column) and the field starts right after that shared colon, growing
+                 to the row's right edge, instead of hugging each row's own (possibly short) label. -->
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Label x:Name="label" x:Uid="lbl_NumField" Content="{Binding Path=Label, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Column="0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -26,7 +30,7 @@
              double-render a second box inside this one. Every OTHER bare NumericTextBox usage in the app
              (Spindle, PortDialog, Feed, Lathe controls, ...) is untouched and keeps its own standalone
              recessed-field look from the app-wide style. -->
-        <Border x:Name="fieldSurface" Grid.Column="1" Grid.ColumnSpan="2" CornerRadius="8" BorderThickness="1" BorderBrush="#FFD5D9DE" SnapsToDevicePixels="True" MinWidth="64">
+        <Border x:Name="fieldSurface" Grid.Column="1" CornerRadius="8" BorderThickness="1" BorderBrush="#FFD5D9DE" SnapsToDevicePixels="True" MinWidth="64">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                     <GradientStop Color="#FFF2F3F5" Offset="0"/>

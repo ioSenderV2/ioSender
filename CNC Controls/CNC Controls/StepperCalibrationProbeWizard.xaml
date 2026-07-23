@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
              d:DesignHeight="480" d:DesignWidth="980">
-    <Grid VerticalAlignment="Stretch">
+    <Grid VerticalAlignment="Stretch" Grid.IsSharedSizeScope="True">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1*" MinWidth="400"/>
             <ColumnDefinition Width="5"/>
