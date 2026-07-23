@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>170 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>172 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -218,6 +218,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Clicking Machine Setup while the machine was moving (e.g. right after a G30) could freeze that tab for the rest of the session.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr144">144</a></td></tr>
 <tr><td>Settings > Restart now actually relaunches ioSender instead of just closing it; the unused AppLaunch.exe relaunch supervisor is gone</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr148">148</a></td></tr>
 <tr><td>Title bar silently checks GitHub for a newer release and appends "(update available)"; Settings &gt; Simulator's up-to-date status now updates live as options are toggled, not just on tab-show.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr169">169</a></td></tr>
+<tr><td>Offsets tab rebuilt as an inline-editable grid (Clr/Get MPos columns, orange/blue unsaved-vs-saved coloring, restore-to-startup) with corrected G28/G30/G92 commit behavior</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr171">171</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -359,6 +360,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Release notes' install one-liner is now wrapped as powershell "irm ... | iex" so it runs from cmd.exe as well as PowerShell; the main window's title bar showed a stale hardcoded "2.0.1" instead of the actual published release version</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr157">157</a></td></tr>
 <tr><td>Check for Updates on a local dev build (no embedded version to compare against "latest") now lists every published release with an installable ioSender.zip and lets you pick one to install over the dev build's own bin folder, for quick comparison against a real published build.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr165">165</a></td></tr>
 <tr><td>New color-by-function design system (AppleStyles.xaml) applied app-wide - one primary button per screen, pill-style nav tabs, colored panel-title dots.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr166">166</a></td></tr>
+<tr><td>App-wide oval checkbox style, NumericField read-only styling + one-time alternate-unit peek, tab-header-drag no longer leaves sibling flyouts/content repainting, two stale status-message fixes</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr172">172</a></td></tr>
 </table>
 </div>
 
@@ -552,7 +554,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">168</td><td><a href="#pr168">SD Card tab no longer shows "No card" while mount status is still resolving</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+7</span> <span class="del">-3</span></td></tr>
 <tr><td class="n">169</td><td><a href="#pr169">Silent update check in the title bar + live rebuild-status on Settings &gt; Simulator</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+60</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">170</td><td><a href="#pr170">Sidebar flyout panels no longer overlap the main-nav tab strip</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+76</span> <span class="del">-10</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (170 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1410</span> <span class="del">21</span> <span class="add">+169</span><br><span class="k">Lines:</span> <span class="add">+56709</span> <span class="del">-10752</span></td></tr>
+<tr><td class="n">171</td><td><a href="#pr171">Offsets tab rework: inline-editable grid with change tracking, correct G28/G30/G92 semantics</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+433</span> <span class="del">-181</span></td></tr>
+<tr><td class="n">172</td><td><a href="#pr172">UI polish: oval checkboxes, unit-toggle peek, tab-drag/flyout fixes, stale status messages</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+601</span> <span class="del">-204</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (172 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1432</span> <span class="del">21</span> <span class="add">+170</span><br><span class="k">Lines:</span> <span class="add">+57743</span> <span class="del">-11137</span></td></tr>
 </table>
 </div>
 
@@ -3417,6 +3421,40 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/SidebarItem.cs</td><td class="num add">34</td><td class="num del">3</td></tr>
 </table>
 <div class="desc"><p>The sidebar's flyout panels are positioned two ways that both needed fixing: each flyout's own vertical slot was previously driven by a <code>static</code> running counter that accumulated across the whole app session in item-registration order, unrelated to the actual on-screen tab order - replaced with a <code>TranslatePoint</code> alignment against each flyout's own tab. The container's top margin (clearing the main-nav tab strip) was a hardcoded pixel guess that had to be re-tuned by hand every time the tab strip's rendered height changed (font, DPI, the Apple-HIG pill redesign's <code>MinHeight</code> bump) - two such guesses both proved wrong on live testing. It's now measured from the tab control's real <code>TabPanel</code> template part and kept in sync via <code>SizeChanged</code>, so it self-corrects if the template ever changes again.</p></div>
+</div>
+<!-- ===== #171 ===== -->
+<div class="pr">
+<h2 id="pr171"><span class="badge">#171</span>Offsets tab rework: inline-editable grid with change tracking, correct G28/G30/G92 semantics</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml</td><td class="num add">153</td><td class="num del">72</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml.cs</td><td class="num add">197</td><td class="num del">108</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">83</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The Offsets tab's old side-panel editor is gone - X/Y/Z are now inline <code>NumericField</code> grid cells, with a Clr (zero + commit) and Get MPos (stage current machine position) column per row. A row commits when focus leaves it (or the tab is switched away from); G54-G59.3 save silently, while G28, G30 and G92 confirm first.</p><ul><li><strong>Correct G28/G30/G92 semantics.</strong> G28.1/G30.1 capture wherever the machine physically is right now - no app-driven rapid move to a typed target any more. G92 has no equivalent "capture current position" primitive - it only knows how to declare "the machine's current position is this work coordinate", so re-declaring the row's own Get-MPos snapshot was silently collapsing the offset toward zero. Row-leave on G92 now always sends the conventional "zero the work origin here" (<code>G92 X0 Y0 Z0</code>), which is what actually leaves the controller reporting back the captured position.</li><li><strong>Change tracking.</strong> Each row carries the same orange (unsaved edit) / blue (saved, different from session startup) convention as the Grbl settings tree, plus a right-click "Restore to value at startup". A write now waits for the controller's "ok" before marking a row committed, and the modified-value comparison tolerance was widened to absorb normal machine settling jitter between a Get MPos snapshot and the value echoed back by the next status query - both were previously showing a just-saved row as still edited for one extra tab round-trip.</li><li><strong>Sign-constrained X/Y/Z</strong> per this machine's home-corner convention (X&nbsp;&ge;&nbsp;0, Y/Z&nbsp;&le;&nbsp;0), with inline validation.</li></ul><p class="foot">Verified interactively against real hardware, including the G92/G28/G30 write-and-reread round trip.</p></div>
+</div>
+<!-- ===== #172 ===== -->
+<div class="pr">
+<h2 id="pr172"><span class="badge">#172</span>UI polish: oval checkboxes, unit-toggle peek, tab-drag/flyout fixes, stale status messages</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppleStyles.xaml</td><td class="num add">41</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml</td><td class="num add">17</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/NumericField.xaml.cs</td><td class="num add">55</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UnitToggleMenu.cs</td><td class="num add">107</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SharedStyles.xaml</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">12</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ConfigControl.xaml</td><td class="num add">11</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StretchTabControl.cs</td><td class="num add">51</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TabKeyBinder.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">24</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">20</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">6</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">104</td><td class="num del">75</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">111</td><td class="num del">91</td></tr>
+<tr><td class="mono">Machine Position/Limits/Spindle/Lathe DRO fields (unit-toggle + minor)</td><td class="num add">21</td><td class="num del">10</td></tr>
+</table>
+<div class="desc"><p>A grab-bag of visual and small-behavior polish that came out of hands-on testing this session.</p><ul><li><strong>Oval checkboxes app-wide.</strong> The stock square+tick was reported nearly invisible at normal viewing distance - replaced with a small oval indicator (outlined at rest, solid accent blue with a check glyph when checked) via one keyless style in AppleStyles.xaml.</li><li><strong>NumericField:</strong> read-only fields get muted styling instead of looking editable; a new <code>ShowUnit</code> flag hides a redundant unit label (e.g. Limits' Min/Max pair) without opting the field out of unit conversion; and a new right-click "Show in inches/millimeters" gives a one-time tooltip peek at the value in the other unit, without a persistent per-field toggle that could drift out of sync with the app-wide metric/imperial setting.</li><li><strong>Tab-header drag no longer leaves debris.</strong> MainWindow's pinned sidebar flyout icons (docked as a sibling of the tab strip, outside what StretchTabControl can Clip) now hide for the duration of a drag instead of repainting alongside the clipped tab content; fixed a null-ref when a live reorder's own SelectionChanged re-entrantly cleared the dragged-tab field mid-drag. TabKeyBinder's "Bind to Key" context menu is now scoped to the tab header element, not the whole tab body.</li><li><strong>Two stale-message fixes:</strong> JobControl's "&lt;name&gt; ready - press Run to run" line no longer appears before Generate has actually been pressed on a Generate-first tab, or lingers on screen after a run has started; FixtureEditDialog's "home first" warning now shows in a visible dialog instead of a status message hidden behind the modal that triggered it.</li></ul></div>
 </div>
 </section>
 
