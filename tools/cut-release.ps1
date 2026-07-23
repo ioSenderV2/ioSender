@@ -56,8 +56,16 @@ if (-not $DryRun) {
         # box does, and a 403 there previously got silently swallowed as "no previous release",
         # seeding version 2.1 and colliding with the real (long-published) v2.1 tag at publish time
         # (422 already_exists) - confirmed in CI 2026-07-23. An authenticated call gets 5000/hr.
+        # Strip to visible-ASCII (0x21-0x7E) before use: a first attempt building "Bearer $env:GH_TOKEN"
+        # verbatim tripped .NET's "Request headers must contain only ASCII characters" in CI's pwsh 7
+        # even though the identical pattern works fine locally in Windows PowerShell - something in how
+        # the secret round-trips through the workflow's env: block apparently isn't pure ASCII, and this
+        # sidesteps needing to know exactly what without exposing the secret to find out.
         $headers = @{ 'User-Agent' = 'ioSender-cut-release' }
-        if ($env:GH_TOKEN) { $headers['Authorization'] = "Bearer $($env:GH_TOKEN)" }
+        if ($env:GH_TOKEN) {
+            $cleanToken = [regex]::Replace($env:GH_TOKEN, '[^\x21-\x7E]', '')
+            $headers['Authorization'] = "Bearer $cleanToken"
+        }
         $prev = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
         $tag = $prev.tag_name -replace '^v', ''
         # Only trust it as a real version if it's "major.minor" - guards against the old
