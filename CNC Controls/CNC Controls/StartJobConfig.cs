@@ -41,6 +41,10 @@ namespace CNC.Controls
         // program that runs after. Opt in only on firmware with the rotation transform fixed.
         public bool ApplyRotation = false;   // set the WCS rotation from the measured skew (G10 L2 R)
         public bool SetTloRef = false;        // reference the puck TLO after corner 1 (Load Stock == start_job)
+        // Off: the generated program probes/measures as usual but skips the G10 L2 X/Y/Z origin commit (and,
+        // in BuildProgram, the WCS rotation write too - rotating an origin this run doesn't touch would be
+        // meaningless) - lets Measure/Verify-style runs report numbers without moving the selected WCS.
+        public bool SetOrigin = true;
         // A touch plate probes by electrical continuity with the stock, so it only works on conductive
         // material (metal). Gates the Probe selection below - unchecked forces "ThreeDProbe".
         public bool StockConductive = false;

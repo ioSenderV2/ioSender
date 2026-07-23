@@ -8,9 +8,11 @@
              d:DesignHeight="26" d:DesignWidth="200">
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="200">
         <Label x:Name="axis" MinWidth="24" HorizontalContentAlignment="Right" Content="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
-        <local:NumericTextBox x:Name="cvMin" Format="{Binding Path=Format, Mode=OneWay}" Value="{Binding Path=MinValue, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True" Focusable="False" Background="#FFF8F8F8"/>
+        <!-- Min: a REAL mm/in length field (same Unit as Max) with just its unit LABEL hidden - shown once,
+             on Max, instead of duplicated on both ends of the range. ShowUnit="False", not Unit="" - the
+             latter would also opt it out of IsImperial conversion and the panel unit-toggle menu. -->
+        <local:NumericField x:Name="cvMin" Label="" ShowUnit="False" ColonAt="0" Format="{Binding Path=Format, Mode=OneWay}" Value="{Binding Path=MinValue, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Unit="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True"/>
         <Label Content="-"/>
-        <local:NumericTextBox x:Name="cVMax" Format="{Binding Path=Format, Mode=OneWay}" Value="{Binding Path=MaxValue, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True" Focusable="False" Background="#FFF8F8F8"/>
-        <Label x:Name="unit" Content="{Binding Path=Unit, Mode=OneWay}"/>
+        <local:NumericField x:Name="cVMax" Label="" ColonAt="0" Format="{Binding Path=Format, Mode=OneWay}" Value="{Binding Path=MaxValue, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Unit="{Binding Path=Unit, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsReadOnly="True"/>
     </StackPanel>
 </UserControl>

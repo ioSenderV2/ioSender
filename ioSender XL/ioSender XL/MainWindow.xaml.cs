@@ -1884,8 +1884,12 @@ namespace GCode_Sender
 
             // The sidebar flyouts only act on the Job tab, so only show them when it's selected (done
             // regardless of IsReady so it tracks tab changes before a controller is connected too).
+            // Skipped mid tab-reorder-drag: a live drag sets IsSelected on the dragged tab every tick, which
+            // fires this handler repeatedly - without the guard this line clobbers the drag's own
+            // Hidden (see tabMode.ReorderDragging in BuildTabs) back to Visible on the very next tick.
             bool onJob = nextView != null && nextView.ViewType == ViewType.GRBL;
-            sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
+            if (!tabReorderDragging)
+                sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
 
             if ((DataContext as GrblViewModel).IsReady &&
                 UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
@@ -2110,7 +2114,26 @@ namespace GCode_Sender
                         order.Add(key);
                 AppConfig.Settings.ReorderTopLevelTabs(order);
             };
+
+            // The pinned sidebar flyout icons (G28/G30/Set-position etc.) are docked as a SIBLING of tabMode
+            // in this window's own layout, not inside it - a Clip on tabMode itself (see StretchTabControl's
+            // tab-drag handling) can never reach them, so they kept live-repainting through a tab drag
+            // alongside the (now-hidden) tab content. Hide/restore them directly here instead.
+            // tabReorderDragging also gates TabMode_SelectionChanged (see there) - a LIVE reorder drag sets
+            // IsSelected on the dragged tab every tick, which fires SelectionChanged repeatedly mid-drag;
+            // that handler's own "show sidebar when the Job tab is selected" logic was clobbering this
+            // Hidden right back to Visible on the very next tick (confirmed on real hardware - the sidebar
+            // never actually stayed hidden despite this line running first).
+            tabMode.ReorderDragging += (s, dragging) =>
+            {
+                tabReorderDragging = dragging;
+                if (sidebarCanvas != null)
+                    sidebarCanvas.Visibility = dragging ? Visibility.Hidden : Visibility.Visible;
+            };
         }
+
+        // See tabMode.ReorderDragging's own comment (BuildTabs) for why this exists.
+        private bool tabReorderDragging;
 
         // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main
         // Page" Tabs editor can list them. Ordering/visibility is now driven by the layout tree (BuildTabs),

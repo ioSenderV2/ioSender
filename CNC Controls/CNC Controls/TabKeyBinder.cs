@@ -59,7 +59,16 @@ namespace CNC.Controls
                 bind.Header = cur == null ? "Bind to Key…" : "Change Key (" + cur + ")…";
                 clear.IsEnabled = cur != null;
             };
-            tab.ContextMenu = menu;
+
+            // Set on the HEADER element, not the TabItem itself: a TabItem's Content is logically parented
+            // under the TabItem (same tree quirk noted in the style guide's TabItem-style scoping fix), so a
+            // ContextMenu set on the TabItem is found by WPF's ancestor lookup from anywhere inside the tab
+            // body, not just its header - every caller already assigns tab.Header (a TabHeaderControl) before
+            // calling this, so scoping it there confines the menu to an actual right-click on the tab label.
+            if (tab.Header is FrameworkElement header)
+                header.ContextMenu = menu;
+            else
+                tab.ContextMenu = menu;
         }
 
         // Friendly name for a tab id (from the editor catalog), for dialog prompts.

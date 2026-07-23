@@ -947,15 +947,27 @@ namespace CNC.Core
         public double W { get { return Values[8]; } set { Values[8] = value; } }
     }
 
+    // Change-tracking for the Offsets tab (OffsetView): mirrors GrblSettingDetails' own IsEdited/
+    // IsSavedModified/IsModified convention (same colors/semantics - orange = unsaved edit, blue = saved
+    // but different from startup) so a work-offset row reads the same way a changed Grbl setting does.
+    // _startup is captured once (first Activate) as the session baseline; _lastCommitted tracks what's
+    // actually on the controller right now, so "edited" means "differs from what's committed", not "differs
+    // from startup" (that's IsSavedModified's job).
     public class CoordinateSystem : Position
     {
         string _code = string.Empty;
+        double[] _startup;
+        double[] _lastCommitted;
 
         public CoordinateSystem() : base()
-        { }
+        {
+            PropertyChanged += CoordinateSystem_PropertyChanged;
+        }
 
         public CoordinateSystem(string code, string data) : base(data)
         {
+            PropertyChanged += CoordinateSystem_PropertyChanged;
+
             Code = code;
 
             if (code.StartsWith("G5"))
@@ -973,6 +985,76 @@ namespace CNC.Core
         public double Rotation { get; set; }
 
         public string Code { get { return _code; } set { _code = value; OnPropertyChanged(); } }
+
+        // Re-raise the 3 Is* notifications whenever an axis value (or Code) changes live - Position's own
+        // Values_PropertyChanged already forwards X/Y/Z/etc changes to THIS object's PropertyChanged, so
+        // self-subscribing here is the only hook needed; the name-exclusion guards against the infinite
+        // loop that would otherwise come from re-raising inside a PropertyChanged handler for those exact
+        // names.
+        private void CoordinateSystem_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(IsEdited) || e.PropertyName == nameof(IsSavedModified) || e.PropertyName == nameof(IsModified))
+                return;
+            OnPropertyChanged(nameof(IsEdited));
+            OnPropertyChanged(nameof(IsSavedModified));
+            OnPropertyChanged(nameof(IsModified));
+        }
+
+        private static bool ValuesEqual(double[] a, double[] b)
+        {
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (double.IsNaN(a[i]) != double.IsNaN(b[i]))
+                    return false;
+                // Tolerance wider than the display precision (3 decimals) - a G92 row-leave commits the
+                // exact Get-MPos snapshot, but the value $# echoes back after the write actually lands can
+                // be a couple thousandths off from normal machine settling/backlash (confirmed on real
+                // hardware via -debuglog=offsets: committed 427.002 vs echoed-back 427.000), which used to
+                // read as "still edited" (orange) for one extra tab round-trip until the numbers happened
+                // to land on the same value.
+                if (!double.IsNaN(a[i]) && Math.Abs(a[i] - b[i]) > 0.005)
+                    return false;
+            }
+            return true;
+        }
+
+        // Orange (takes precedence): fields differ from what's actually committed on the controller.
+        public bool IsEdited { get { return _lastCommitted != null && !ValuesEqual(_lastCommitted, Values.Array); } }
+        // Blue: committed, but still different from the session-startup baseline.
+        public bool IsSavedModified { get { return !IsEdited && _startup != null && !ValuesEqual(_startup, Values.Array); } }
+        // Drives the "Restore to value at startup" context-menu item's enabled state.
+        public bool IsModified { get { return _startup != null && !ValuesEqual(_startup, Values.Array); } }
+
+        // Called once per session (OffsetView.Activate, first time only) to set the "changed since startup" baseline.
+        public void CaptureStartup()
+        {
+            _startup = (double[])Values.Array.Clone();
+            _lastCommitted = (double[])Values.Array.Clone();
+            OnPropertyChanged(nameof(IsEdited));
+            OnPropertyChanged(nameof(IsSavedModified));
+            OnPropertyChanged(nameof(IsModified));
+        }
+
+        // Called right after a successful write to the controller (saveOffset) - clears IsEdited; may leave
+        // IsSavedModified true if the committed value still differs from the startup baseline.
+        public void MarkCommitted()
+        {
+            _lastCommitted = (double[])Values.Array.Clone();
+            OnPropertyChanged(nameof(IsEdited));
+            OnPropertyChanged(nameof(IsSavedModified));
+            OnPropertyChanged(nameof(IsModified));
+        }
+
+        // "Restore to value at startup" - resets the displayed/staged fields only, does NOT write to the
+        // controller (same as GrblSettingDetails' own revert - the operator reviews, then the normal
+        // row-leave commit path takes it from there if they want it applied).
+        public void RestoreStartup()
+        {
+            if (_startup == null)
+                return;
+            for (var i = 0; i < Values.Length; i++)
+                Values[i] = _startup[i];
+        }
     }
 
     public class Probe

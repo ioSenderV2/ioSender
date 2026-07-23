@@ -55,6 +55,7 @@ namespace CNC.Controls
             InitializeComponent();
             Loaded += (s, e) => Refresh();
             DataContextChanged += (s, e) => { HookLimits(); Refresh(); };
+            UnitToggleMenu.Attach(grpLimits);
         }
 
         // Re-evaluate whenever the program bounding box changes, so the title flips to "Program limits"

@@ -38,8 +38,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
 using CNC.Core;
 using CNC.GCode;
 using System.Threading;
@@ -51,10 +55,17 @@ namespace CNC.Controls
     /// </summary>
     public partial class OffsetView : UserControl, ICNCView
     {
-        CoordinateSystem selectedOffset = null;
         private GrblViewModel parameters = new GrblViewModel();
         private volatile bool awaitCoord = false;
         private Action<string> GotPosition;
+        // Which row a pending "Get MPos" click is for - each row now edits/acts on itself directly (no
+        // separate staging panel to the grid's right), so the async wait-for-status result has to land back
+        // on the SPECIFIC row that asked for it rather than one shared field.
+        private CoordinateSystem getPosTargetRow;
+        // "Startup" baseline (CoordinateSystem.CaptureStartup) is captured once per app session on the
+        // FIRST Activate, not every time this tab is revisited - this view instance lives for the app's
+        // lifetime (built once by TabRegistry), so this flag is safe as a plain field.
+        private bool startupCaptured;
 
         public OffsetView()
         {
@@ -66,21 +77,6 @@ namespace CNC.Controls
         }
 
         public AxisFlags AxisEnabledFlags { get { return GrblInfo.AxisFlags; } }
-        public CoordinateSystem Offset { get; private set; } = new CoordinateSystem();
-
-        public static readonly DependencyProperty CanEditProperty = DependencyProperty.Register(nameof(CanEdit), typeof(bool), typeof(OffsetView), new PropertyMetadata(false));
-        public bool CanEdit
-        {
-            get { return (bool)GetValue(CanEditProperty); }
-            set { SetValue(CanEditProperty, value); }
-        }
-
-        public static readonly DependencyProperty IsPredefinedProperty = DependencyProperty.Register(nameof(IsPredefined), typeof(bool), typeof(OffsetView), new PropertyMetadata(false));
-        public bool IsPredefined
-        {
-            get { return (bool)GetValue(IsPredefinedProperty); }
-            set { SetValue(IsPredefinedProperty, value); }
-        }
 
         #region Methods and properties required by CNCView interface
 
@@ -98,13 +94,51 @@ namespace CNC.Controls
                 parameters.AxisEnabledFlags = GrblInfo.AxisFlags;
 
                 dgrOffsets.ItemsSource = GrblWorkParameters.CoordinateSystems;
-                dgrOffsets.SelectedIndex = 0;
+
+                if (!startupCaptured)
+                {
+                    startupCaptured = true;
+                    foreach (var row in GrblWorkParameters.CoordinateSystems)
+                        row.CaptureStartup();
+                }
             }
             else
             {
+                // Belt-and-suspenders for switching to a DIFFERENT main tab: the interactive commit path
+                // (NumericField_LostFocus) is entirely LostFocus-driven, and a tab switch doesn't reliably
+                // give its deferred (Dispatcher.BeginInvoke) check a chance to run before this Deactivate
+                // path clears ItemsSource below - confirmed on real hardware as a staged-but-never-committed
+                // Get MPos edit silently surviving in memory but never reaching the controller. Flush any
+                // still-pending row here, synchronously, before the grid detaches.
+                FlushPendingEdits();
+
                 Comms.com.DataReceived -= parameters.DataReceived;
                 Comms.com.PurgeQueue();
                 dgrOffsets.ItemsSource = null;
+            }
+        }
+
+        // Commits every row with an unsaved edit (row.IsEdited). Used as a reliable fallback when leaving
+        // the tab entirely (see Activate above) - the interactive per-row LostFocus path stays for the
+        // common case (moving between rows without switching tabs), this is just insurance against that not
+        // completing. Deliberately NO confirmation dialog here, unlike the interactive row-leave case:
+        // AppDialogs.Show is modal/blocking, and showing it synchronously inside Activate(false) (itself
+        // called from TabControl.SelectionChanged) pumps a nested message loop mid-tab-switch - confirmed on
+        // real hardware to corrupt GrblWorkParameters.CoordinateSystems while background status/data
+        // processing kept running underneath the blocked dialog (values reset to 0, rows vanished from the
+        // grid except the one row involved). Leaving the tab is treated as an implicit "yes, save it" -
+        // the interactive confirm (still shown for a same-tab row-to-row move) remains the real safety net.
+        private void FlushPendingEdits()
+        {
+            if (dgrOffsets.ItemsSource == null)
+                return;
+
+            foreach (CoordinateSystem row in GrblWorkParameters.CoordinateSystems)
+            {
+                if (!row.IsEdited)
+                    continue;
+
+                saveOffset(row, "All");
             }
         }
 
@@ -125,7 +159,7 @@ namespace CNC.Controls
                 case nameof(GrblViewModel.MachinePosition):
                     if (!(awaitCoord = double.IsNaN(parameters.MachinePosition.Values[0])))
                     {
-                        Offset.Set(parameters.MachinePosition);
+                        getPosTargetRow?.Set(parameters.MachinePosition);
                         parameters.SuspendPositionNotifications = true;
                         parameters.Clear();
                         parameters.MachinePosition.Clear();
@@ -143,34 +177,7 @@ namespace CNC.Controls
         void OffsetControl_Load(object sender, EventArgs e)
         {
             if (GrblInfo.LatheModeEnabled)
-            {
                 dgrOffsets.Columns[1].Header = string.Format("X offset ({0})", GrblWorkParameters.LatheMode == LatheMode.Radius ? "R" : "D");
-                cvXOffset.Label = dgrOffsets.Columns[1].Header + ":";
-            }
-        }
-
-        private void dgrOffsets_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.AddedItems.Count == 1)
-            {
-                selectedOffset = (CoordinateSystem)e.AddedItems[0];
-                IsPredefined = selectedOffset.Code == "G28" || selectedOffset.Code == "G30";
-
-                for (var i = 0; i < Offset.Values.Length; i++)
-                {
-                    if (double.IsNaN(Offset.Values[i])) Offset.Values[i] = 120; // workaround for binding not propagating
-
-                    Offset.Values[i] = selectedOffset.Values[i];
-                }
-                Offset.Code = selectedOffset.Code;
-
-                if (IsPredefined)
-                    btnCurrPos_Click(null, null);   // seed the fields with the current machine position
-
-                CanEdit = true;   // G28/G30 are now editable too - Set rapids to the edited target, then stores it
-            }
-            else
-                selectedOffset = null;
         }
 
         // G10 L1 P- axes <R- I- J- Q-> Set Tool Table
@@ -178,105 +185,178 @@ namespace CNC.Controls
         // L11 - ref g59.3 only
         // Q: 1 - 8: 1: 135, 2: 45, 3: 315, 4: 225, 5: 180, 6: 90, 7: 0, 8: 270
 
-        void saveOffset(string axis)
+        // row IS the target now (its own X/Y/Z/etc are whatever's currently in the grid's editable fields -
+        // typed, staged via Get MPos, or zeroed via Clear) - no separate staging object to read from anymore.
+        // axis is always "All" or "ClearAll" - the old per-axis Set button is gone along with the staging
+        // panel; the row-action columns / row-leave commit act on the whole row.
+        void saveOffset(CoordinateSystem row, string axis)
         {
             bool mChanged;
             string cmd = string.Empty;
+            bool isPredefined = row.Code == "G28" || row.Code == "G30";
+            var grbl = DataContext as GrblViewModel;
 
-            Position newpos = new Position(Offset);
+            Position newpos = new Position(row);
 
-            newpos.X = GrblWorkParameters.ConvertX(GrblWorkParameters.LatheMode, GrblParserState.LatheMode, selectedOffset.X);
+            newpos.X = GrblWorkParameters.ConvertX(GrblWorkParameters.LatheMode, GrblParserState.LatheMode, row.X);
 
             GrblParserState.Get();
-            if ((mChanged = GrblParserState.IsMetric != (DataContext as GrblViewModel).IsMetric))
-                cmd = (DataContext as GrblViewModel).IsMetric ? "G21" : "G20";
+            if ((mChanged = GrblParserState.IsMetric != grbl.IsMetric))
+                cmd = grbl.IsMetric ? "G21" : "G20";
 
-            (DataContext as GrblViewModel).Message = String.Empty;
+            grbl.Message = String.Empty;
 
-            // G28/G30 can only be stored from the CURRENT machine position (G28.1/G30.1). To honour an edited
-            // target value, rapid there first (G53 G0) then store - but only when the target actually differs
-            // from where the machine already is. When it matches (the common "store where I am now" case, same as
-            // the flyout Set), store directly: no rapid, no confirmation. Only an edited target that moves the
-            // machine warrants the popup.
-            if (IsPredefined && axis != "ClearAll")
+            // G28.1/G30.1 capture WHEREVER THE MACHINE PHYSICALLY IS RIGHT NOW - they take no coordinate
+            // parameters, so there is no "rapid to the typed target first" step any more (there used to be,
+            // via G53 G0 - removed on request: the intended workflow is jog there by hand, click Get to
+            // reflect it in the row, THEN leave the row/confirm - never an app-driven move).
+            if (isPredefined && axis != "ClearAll")
             {
-                var grbl = DataContext as GrblViewModel;
-                var flags = axis == "All" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis);
-
-                bool needsMove = false;
-                for (int i = 0; i < GrblInfo.NumAxes; i++)
-                    if (flags.HasFlag(GrblInfo.AxisIndexToFlag(i)) &&
-                        Math.Abs(newpos.Values[i] - grbl.MachinePosition.Values[i]) > 0.001)
-                        needsMove = true;
-
-                if (needsMove)
-                {
-                    string axes = newpos.ToString(flags);
-                    if (AppDialogs.Show(
-                            string.Format("This will rapid the machine to {0} (G53 G0) and store that as {1}.\n\nProceed?", axes, selectedOffset.Code),
-                            "Set " + selectedOffset.Code, MessageBoxButton.YesNo, MessageBoxImage.Warning, id: "offset.setPredefined") != MessageBoxResult.Yes)
-                        return;
-                    if (mChanged)
-                        Comms.com.WriteCommand(cmd);
-                    Comms.com.WriteCommand("G53G0" + axes);
-                }
-                else if (mChanged)
-                    Comms.com.WriteCommand(cmd);
-
-                Comms.com.WriteCommand(selectedOffset.Code + ".1");
+                WriteCommandAndWait(row.Code + ".1");
                 if (mChanged)
-                    Comms.com.WriteCommand(grbl.IsMetric ? "G20" : "G21");
+                    WriteCommandAndWait(grbl.IsMetric ? "G20" : "G21");
+                row.MarkCommitted();
                 return;
             }
 
-            if (selectedOffset.Id == 0)
+            // G92 has no "capture current position as a stored reference" primitive like G28.1/G30.1 - it
+            // only knows how to declare "the machine's current physical position IS this work coordinate".
+            // What $# reports back for G92 is the resulting OFFSET (MPos - the value you gave G92), not the
+            // value you gave it - the same way G54-G59.3's stored value is an offset, not a work position.
+            // So "G92 X<row's captured MPos>" (re-declaring wherever we already are) drives the offset to
+            // ~0 (confirmed via -debuglog=offsets), while "G92 X0 Y0 Z0" - the conventional "zero the work
+            // origin here" - makes the offset equal to MPos, which is what the row is showing after Get.
+            // That's the one that actually leaves $# reporting back (approximately) what the row displays.
+            // Row-leave/save on G92 therefore always sends "G92 X0 Y0 Z0" regardless of the row's typed/
+            // Get-MPos values; the row itself is left alone (not forced to 0) since the real committed
+            // offset the controller will echo back on the next $# is close to whatever MPos was at save time.
+            if (row.Code == "G92" && axis != "ClearAll")
             {
-                string code = selectedOffset.Code == "G28" || selectedOffset.Code == "G30" ? selectedOffset.Code + ".1" : selectedOffset.Code;
+                WriteCommandAndWait("G92X0Y0Z0");
+                if (mChanged)
+                    WriteCommandAndWait(grbl.IsMetric ? "G20" : "G21");
+                row.MarkCommitted();
+                return;
+            }
 
-                if (axis == "ClearAll" || IsPredefined)
-                    cmd += selectedOffset.Code == "G43.1" ? "G49" : selectedOffset.Code + ".1";
+            if (row.Id == 0)
+            {
+                string code = row.Code == "G28" || row.Code == "G30" ? row.Code + ".1" : row.Code;
+
+                if (axis == "ClearAll" || isPredefined)
+                    cmd += row.Code == "G43.1" ? "G49" : row.Code + ".1";
                 else
                     cmd += string.Format("G90{0}{1}", code, newpos.ToString(axis == "All" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis)));
             } else
-                cmd += string.Format("G90G10L2P{0}{1}", selectedOffset.Id, newpos.ToString(axis == "All" || axis == "ClearAll" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis)));
+                cmd += string.Format("G90G10L2P{0}{1}", row.Id, newpos.ToString(axis == "All" || axis == "ClearAll" ? GrblInfo.AxisFlags : GrblInfo.AxisLetterToFlag(axis)));
 
-            Comms.com.WriteCommand(cmd);
+            WriteCommandAndWait(cmd);
             if(mChanged)
-                Comms.com.WriteCommand((DataContext as GrblViewModel).IsMetric ? "G20" : "G21");
+                WriteCommandAndWait(grbl.IsMetric ? "G20" : "G21");
+            row.MarkCommitted();
         }
 
-        private void cvOffset_Click(object sender, RoutedEventArgs e)
+        // Comms.com.WriteCommand only ENQUEUES the send - it returns immediately, before the controller has
+        // actually processed the line. Block (same Thread+DoEvents pump idiom as GrblWorkParameters.Get and
+        // btnRowGetMPos_Click, both already in this file) until the controller actually acknowledges with
+        // "ok" before letting the caller proceed to MarkCommitted() or a subsequent re-query - otherwise a
+        // later re-query (e.g. GrblWorkParameters.Get on the next Activate(true) after switching tabs away
+        // and back) could race ahead of a write that hadn't reached the controller yet.
+        private bool WriteCommandAndWait(string cmd)
         {
-            if (selectedOffset != null)
-            {
-                string axisletter = (string)((CoordValueSetControl)sender).Tag;
-                int axis = GrblInfo.AxisLetterToIndex(axisletter);
+            bool? res = null;
+            CancellationToken cancellationToken = new CancellationToken();
 
-                selectedOffset.Values[axis] = Offset.Values[axis];
-                saveOffset(axisletter);
-            }
+            new Thread(() =>
+            {
+                res = WaitFor.AckResponse<string>(
+                    cancellationToken,
+                    null,
+                    a => parameters.OnResponseReceived += a,
+                    a => parameters.OnResponseReceived -= a,
+                    1500, () => Comms.com.WriteCommand(cmd));
+            }).Start();
+
+            while (res == null)
+                EventUtils.DoEvents();
+
+            return res == true;
         }
 
-        void btnSetAll_Click(object sender, EventArgs e)
+        private static CoordinateSystem RowOf(object sender)
         {
-            if (selectedOffset != null)
-            {
-                for (var i = 0; i < Offset.Values.Length; i++)
-                    selectedOffset.Values[i] = Offset.Values[i];
-
-                saveOffset("All");
-            }
+            return (sender as FrameworkElement)?.DataContext as CoordinateSystem;
         }
 
-        private void btnClearAll_Click(object sender, RoutedEventArgs e)
+        // Walks up from a hit/focused visual to the DataGridRow's own item (a CoordinateSystem) - used to
+        // tell "moved to another field in the SAME row" (X -> Y, no commit yet) apart from "actually left
+        // the row" (commit now), since NumericField's own LostFocus fires on every such move, not just the
+        // ones that matter.
+        private static CoordinateSystem RowOfVisual(DependencyObject d)
         {
-            if (selectedOffset != null)
+            while (d != null)
             {
-                for (var i = 0; i < Offset.Values.Length; i++)
-                    Offset.Values[i] = selectedOffset.Values[i] = 0d;
-
-                saveOffset("ClearAll");
+                if (d is FrameworkElement fe && fe.DataContext is CoordinateSystem cs)
+                    return cs;
+                d = (d is Visual || d is System.Windows.Media.Media3D.Visual3D) ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
             }
+            return null;
+        }
+
+        // G28/G30/G92 always confirm before committing (never auto-silent) - saveOffset no longer issues any
+        // motion command for these (see its own comment), but they're still important reference positions,
+        // so an accidental edit shouldn't commit silently just because focus happened to move on.
+        private static readonly HashSet<string> ConfirmBeforeCommitCodes = new HashSet<string> { "G28", "G30", "G92" };
+
+        // Fires on every X/Y/Z field's LostFocus, but only actually commits once focus has left the ROW
+        // entirely (not just moved from X to Y within it) AND something in the row actually changed
+        // (row.IsEdited) - re-checked one dispatcher tick later so Keyboard.FocusedElement reflects where
+        // focus actually landed, not where it's leaving from.
+        private void NumericField_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var row = RowOf(sender);
+            if (row == null)
+                return;
+
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                if (!row.IsEdited)
+                    return;   // nothing changed, or already committed by a sibling field's own LostFocus this tick
+
+                var focused = Keyboard.FocusedElement as DependencyObject;
+                if (focused != null && RowOfVisual(focused) == row)
+                    return;   // still within the same row - not a row-leave yet
+
+                if (ConfirmBeforeCommitCodes.Contains(row.Code))
+                {
+                    if (AppDialogs.Show(
+                            string.Format("Save the current fields as {0}?", row.Code),
+                            "Set " + row.Code, MessageBoxButton.YesNo, MessageBoxImage.Question, id: "offset.confirmRowLeave") != MessageBoxResult.Yes)
+                        return;
+                }
+
+                saveOffset(row, "All");
+            }), DispatcherPriority.Input);
+        }
+
+        // "Restore to value at startup" (row context menu) - resets the displayed/staged fields only, same
+        // as the Grbl settings tree's own revert; the normal row-leave commit takes it from there.
+        private void offsetRestoreStartup_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.DataContext is CoordinateSystem row)
+                row.RestoreStartup();
+        }
+
+        // Zeroes this row's fields and commits immediately - same "Clear" semantics as before (an immediate
+        // write, not just a display reset).
+        private void btnRowClear_Click(object sender, RoutedEventArgs e)
+        {
+            var row = RowOf(sender);
+            if (row == null)
+                return;
+            for (var i = 0; i < row.Values.Length; i++)
+                row.Values[i] = 0d;
+            saveOffset(row, "ClearAll");
         }
 
         private void RequestStatus ()
@@ -286,8 +366,16 @@ namespace CNC.Controls
                 Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT_ALL));
         }
 
-        void btnCurrPos_Click(object sender, RoutedEventArgs e)
+        // Stages this row's fields from the live machine position - NOT written to the controller (that's
+        // what the row's own Set position button is for).
+        private void btnRowGetMPos_Click(object sender, RoutedEventArgs e)
         {
+            var row = RowOf(sender);
+            if (row == null)
+                return;
+
+            getPosTargetRow = row;
+
             bool? res = null;
             CancellationToken cancellationToken = new CancellationToken();
 
@@ -309,6 +397,7 @@ namespace CNC.Controls
                 EventUtils.DoEvents();
 
             parameters.OnRealtimeStatusProcessed -= DataReceived;
+            getPosTargetRow = null;
         }
 
         #endregion

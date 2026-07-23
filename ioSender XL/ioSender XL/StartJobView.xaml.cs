@@ -76,16 +76,26 @@ namespace GCode_Sender
         // GrblState/Message event on this tab after leaving it could stomp the NEW active tab's IsGenerateReady.
         private bool isActiveTab = false;
 
-        // Unit toggle for the Stock size fields (rbUnitsMm/rbUnitsIn). NumericField.Value is ALWAYS
-        // canonical mm now (NumericField/NumericTextBox's own mm<->in conversion, driven by the inherited
-        // NumericField.IsImperial attached property set on pnlInputs in Units_Checked/LoadInputs) - every
-        // consumer (BuildProgram, persistence, CheckStockAgainstProgram) reads/writes fldWidth.Value etc.
-        // directly, no ToMm/FromMm wrapping needed there anymore. isImperial + ToMm/FromMm are kept ONLY
-        // for the free-standing mm-in/text-out formatting helpers below (AddDimLabel, FormatLen) that
-        // format an arbitrary mm value for display without going through a NumericField at all.
+        // Unit toggle for the Stock size fields, via the Stock panel's right-click header menu
+        // (UnitToggleMenu, wired in WireInputs). NumericField.Value is ALWAYS canonical mm now
+        // (NumericField/NumericTextBox's own mm<->in conversion, driven by the inherited
+        // NumericField.IsImperial attached property set on grpStock) - every consumer (BuildProgram,
+        // persistence, CheckStockAgainstProgram) reads/writes fldWidth.Value etc. directly, no ToMm/FromMm
+        // wrapping needed there anymore. isImperial + ToMm/FromMm are kept ONLY for the free-standing
+        // mm-in/text-out formatting helpers below (AddDimLabel, FormatLen) that format an arbitrary mm
+        // value for display without going through a NumericField at all.
         private bool isImperial = false;
         private double ToMm(double displayValue) { return isImperial ? displayValue * 25.4d : displayValue; }
         private double FromMm(double mm) { return isImperial ? mm / 25.4d : mm; }
+
+        // Probe type is a ComboBox now (cbxProbeType: index 0 = 3D Probe, 1 = Touch Plate), not a radio pair -
+        // this is the single read/write point every other call site goes through instead of touching
+        // SelectedIndex directly.
+        private bool IsTouchPlate
+        {
+            get { return cbxProbeType.SelectedIndex == 1; }
+            set { cbxProbeType.SelectedIndex = value ? 1 : 0; }
+        }
 
         // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Start Job", connected
         // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
@@ -100,10 +110,6 @@ namespace GCode_Sender
         public StartJobView()
         {
             InitializeComponent();
-            // rbUnitsMm's initial checked state is set HERE, not via IsChecked="True" in XAML - setting it in
-            // XAML fires Units_Checked mid-BAML-parse, before rbUnitsIn (declared later in the tree) has been
-            // assigned to its field, null-refing on rbUnitsIn.IsChecked and crashing the app on every launch.
-            rbUnitsMm.IsChecked = true;
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             WireInputs();
         }
@@ -113,6 +119,8 @@ namespace GCode_Sender
         private void WireInputs()
         {
             cbxWcs.SelectionChanged += (s, e) => InputChanged();
+            chkSetOrigin.Checked += (s, e) => InputChanged();
+            chkSetOrigin.Unchecked += (s, e) => InputChanged();
             chkMeasure.Checked += (s, e) => { UpdateSizeHint(); InputChanged(); };
             chkMeasure.Unchecked += (s, e) => { UpdateSizeHint(); InputChanged(); };
             chkExactSize.Checked += (s, e) => { UpdateSizeHint(); InputChanged(); };
@@ -125,40 +133,36 @@ namespace GCode_Sender
             chkStockConductive.Unchecked += (s, e) => { UpdateMeasureAvailability(); InputChanged(); };
             // Switching probe type changes which ProbeDefinition Generate needs (and whether it's defined) -
             // re-gate immediately rather than waiting for the next Activate/capability refresh.
-            rbProbe3d.Checked += (s, e) => { UpdateProbeWarning(); InputChanged(); };
-            rbProbeTouch.Checked += (s, e) => { UpdateProbeWarning(); InputChanged(); };
+            cbxProbeType.SelectionChanged += (s, e) => { UpdateProbeWarning(); InputChanged(); };
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); UpdateThicknessWarning(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldSpacer, (s, e) => InputChanged());
+
+            // Stock panel's right-click header menu (UnitToggleMenu) replaces the old rbUnitsMm/rbUnitsIn
+            // radio pair - it sets NumericField.IsImperial on grpStock directly. Mirror that back into the
+            // local isImperial field (used by ToMm/FromMm's free-standing formatting helpers below, which
+            // don't go through a NumericField) whenever it changes, same as Units_Checked used to.
+            CNC.Controls.UnitToggleMenu.Attach(grpStock);
+            DependencyPropertyDescriptor.FromProperty(NumericField.IsImperialProperty, typeof(NumericField)).AddValueChanged(grpStock, (s, e) =>
+            {
+                if (loadingInputs)
+                    return;
+
+                bool newImperial = NumericField.GetIsImperial(grpStock);
+                if (newImperial == isImperial)
+                    return;
+
+                isImperial = newImperial;
+                UpdateThicknessWarning();
+                ShowResult();   // re-format the bottom-left readout (X=/Y=/etc, FormatLen) too, not just the drawing - it was left stale on a unit toggle
+            });
         }
 
         private void MarkSizeFieldsTouched()
         {
             if (!loadingInputs)
                 sizeFieldsTouched = true;
-        }
-
-        // rbUnitsMm/rbUnitsIn toggle: setting NumericField.IsImperial on pnlInputs (the container all 5
-        // Stock size fields live under - see StartJobView.xaml) is the ENTIRE unit switch - every
-        // NumericField underneath re-displays its already-canonical-mm Value in the new unit automatically
-        // (NumericTextBox.OnUnitChanged), no manual per-field conversion needed anymore. Suppressed while
-        // LoadInputs is bulk-assigning (it sets isImperial + the radio buttons directly, in the
-        // already-correct order - this handler firing on top would be redundant, not harmful, but skip it
-        // for the same reason the old code did).
-        private void Units_Checked(object sender, RoutedEventArgs e)
-        {
-            if (loadingInputs)
-                return;
-
-            bool newImperial = rbUnitsIn.IsChecked == true;
-            if (newImperial == isImperial)
-                return;
-
-            isImperial = newImperial;
-            NumericField.SetIsImperial(pnlInputs, isImperial);
-            UpdateThicknessWarning();
-            ShowResult();   // re-format the bottom-left readout (X=/Y=/etc, FormatLen) too, not just the drawing - it was left stale on a unit toggle
         }
 
         // Width/Height/Thickness are the operator's own entered numbers for THIS stock - Start Job must never
@@ -298,19 +302,23 @@ namespace GCode_Sender
         // The probe definition Generate should actually use, per the Probe: radio selection.
         private ProbeDefinition ActiveProbe()
         {
-            return rbProbeTouch.IsChecked == true ? TouchPlateProbe() : ThreeDProbe();
+            return IsTouchPlate ? TouchPlateProbe() : ThreeDProbe();
         }
 
         // Touch Plate is only selectable when a touch-plate probe is actually defined (same rule the 3D probe
         // already follows) - fall back to 3D Probe if the definition disappears (library edited) while it was
-        // selected, rather than leave a disabled-but-checked radio button. Enable Generate only when the
+        // selected, rather than leave a disabled-but-selected combo item. Enable Generate only when the
         // CURRENTLY SELECTED probe type is defined; otherwise show the "define a probe" hint.
         private void UpdateProbeWarning()
         {
             bool touchAvailable = TouchPlateProbe() != null;
-            rbProbeTouch.IsEnabled = touchAvailable;
-            if (!touchAvailable && rbProbeTouch.IsChecked == true)
-                rbProbe3d.IsChecked = true;
+            cbiProbeTouch.IsEnabled = touchAvailable;
+            if (!touchAvailable && IsTouchPlate)
+                IsTouchPlate = false;
+
+            // The conductive checkbox only matters for Touch Plate probing - mirrors what the old
+            // rbProbeTouch.IsChecked ElementName binding on chkStockConductive.IsEnabled did.
+            chkStockConductive.IsEnabled = IsTouchPlate;
 
             bool ok = ActiveProbe() != null;
             if (isActiveTab)
@@ -327,7 +335,7 @@ namespace GCode_Sender
         // tooltip rather than silently vanishing.
         private void UpdateMeasureAvailability()
         {
-            bool touchNonConductive = rbProbeTouch.IsChecked == true && chkStockConductive.IsChecked != true;
+            bool touchNonConductive = IsTouchPlate && chkStockConductive.IsChecked != true;
             chkMeasure.IsEnabled = !touchNonConductive;
             if (touchNonConductive && chkMeasure.IsChecked == true)
                 chkMeasure.IsChecked = false;
@@ -403,14 +411,16 @@ namespace GCode_Sender
 
             // Every field below (size, units, probe type, set-origin WCS, measure/rotate/exact-size/TLO-ref,
             // Safe Z delta) describes something meaningless before a fixture is even chosen - its saved
-            // reference is what the generated program probes from. Gated as ONE block (pnlInputs, see the
-            // XAML) rather than field-by-field: individually gating only size/units/spacer used to leave the
-            // rest (Probe type, Set origin, Measure, Rotate, TLO ref, Safe Z delta) fully interactive with no
-            // fixture selected - confusing (some fields greyed, some not, for no visible reason) and easy to
-            // forget when adding a new field. A disabled ancestor overrides each control's own IsEnabled/
-            // binding (e.g. Rotate's own chkMeasure-driven binding), so this doesn't fight them.
+            // reference is what the generated program probes from. Gated as ONE block per panel
+            // (pnlSetupGated/pnlStock/pnlActions, see the XAML - split across the Setup/Stock/Actions
+            // groupboxes now, so the 3 panel roots are set together here instead of 1) rather than
+            // field-by-field: individually gating only size/units/spacer used to leave the rest (Probe type,
+            // Set origin, Measure, Rotate, TLO ref, Safe Z delta) fully interactive with no fixture selected -
+            // confusing (some fields greyed, some not, for no visible reason) and easy to forget when adding
+            // a new field. A disabled ancestor overrides each control's own IsEnabled/binding (e.g. Rotate's
+            // own chkMeasure-driven binding), so this doesn't fight them.
             bool fixtureChosen = fx != null;
-            pnlInputs.IsEnabled = fixtureChosen;
+            pnlSetupGated.IsEnabled = pnlStock.IsEnabled = pnlActions.IsEnabled = fixtureChosen;
             fldSpacer.Visibility = fixtureChosen ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateDrawing();   // origin-corner marker (+ jaws for a vise) tracks the selected fixture's kind
@@ -996,7 +1006,7 @@ namespace GCode_Sender
         }
 
         // All internal state (measuredX/Y, corner*, spoilZ) is mm - format through this so the readout follows
-        // whichever unit is currently selected (rbUnitsMm/rbUnitsIn), same as the input fields.
+        // whichever unit is currently selected (the Stock panel's right-click toggle), same as the input fields.
         private string FormatLen(double mm)
         {
             return FromMm(mm).ToString("0.###", CultureInfo.InvariantCulture) + (isImperial ? " in" : " mm");
@@ -1129,7 +1139,7 @@ namespace GCode_Sender
                     "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            bool touchPlate = rbProbeTouch.IsChecked == true;
+            bool touchPlate = IsTouchPlate;
             bool stockConductive = chkStockConductive.IsChecked == true;
 
             var fx = SelectedFixture;
@@ -1219,6 +1229,7 @@ namespace GCode_Sender
             bool applyRotation = measure && chkRotate.IsChecked == true && GrblInfo.RotationSupported;
             bool setTloRef = chkSetTloRef.IsChecked == true && GrblInfo.HasATC;
             bool exactSize = measure && chkExactSize.IsChecked == true;
+            bool setOrigin = chkSetOrigin.IsChecked == true;
 
             // Safe Z delta only matters once corners 2-4 are actually crossed (measure) - it's the height ABOVE
             // corner 1's own measured top that corner-to-corner travel and each corner's pre-top-probe descent
@@ -1239,8 +1250,8 @@ namespace GCode_Sender
 
             program = FixtureKinds.ProbesEdges(fx.Kind)
                 ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
-                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value, thicknessMm, touchPlate, stockConductive, fldCornerMargin.Value, exactSize)
-                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p));
+                               cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value, thicknessMm, touchPlate, stockConductive, fldCornerMargin.Value, exactSize, setOrigin)
+                : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p), setOrigin);
             ResetResults();
             SaveInputs();
 
@@ -1266,22 +1277,20 @@ namespace GCode_Sender
                 if (s == null)
                     return;
                 isImperial = s.IsImperial;
-                rbUnitsIn.IsChecked = isImperial;
-                rbUnitsMm.IsChecked = !isImperial;
-                NumericField.SetIsImperial(pnlInputs, isImperial);
+                NumericField.SetIsImperial(grpStock, isImperial);
                 fldWidth.Value = s.Width;
                 fldHeight.Value = s.Height;
                 fldThickness.Value = s.Thickness;
                 fldSpacer.Value = s.SpacerThickness;
                 fldCornerMargin.Value = s.CornerTravelMarginMm;
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
+                chkSetOrigin.IsChecked = s.SetOrigin;
                 chkMeasure.IsChecked = s.Measure;
                 chkRotate.IsChecked = s.ApplyRotation;
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 chkStockConductive.IsChecked = s.StockConductive;
-                rbProbeTouch.IsChecked = s.Probe == "TouchPlate";
-                rbProbe3d.IsChecked = rbProbeTouch.IsChecked != true;
+                IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
                 UpdateThicknessWarning();
@@ -1308,12 +1317,13 @@ namespace GCode_Sender
                     IsImperial = isImperial,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
+                    SetOrigin = chkSetOrigin.IsChecked == true,
                     Measure = chkMeasure.IsChecked == true,
                     ApplyRotation = chkRotate.IsChecked == true,
                     ExactSize = chkExactSize.IsChecked == true,
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,
-                    Probe = rbProbeTouch.IsChecked == true ? "TouchPlate" : "ThreeDProbe",
+                    Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                     Fixture = SelectedFixture?.Name ?? string.Empty
                 };
                 AppConfig.Settings.Save();
@@ -1475,7 +1485,7 @@ namespace GCode_Sender
         // edge-probing here. That gets its own generator, BuildViseProgram (below), not this one -
         // Generate_Click branches on ProbesEdges to pick between them. BuildViseProgram has its OWN partial
         // Measure (2 of 4 corners, no skew) via the same pcorner.macro this function calls.
-        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize)
+        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize, bool setOrigin)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius (3D probe) / bit radius (touch plate) -> edge comp
             // Touch plate against non-conductive stock needs a real physical plate, whose known PlateThickness
@@ -1767,30 +1777,36 @@ namespace GCode_Sender
             L("(--- park at G30 (before the origin - keeps all G53 moves at WCO=0) ---)");
             EmitGotoG30(L);
 
-            L(string.Format("(--- set work origin at the {0} corner ---)", cornerName));
-            // Origin ONLY here - never the rotation R word (that goes in the separate block below). The R word
-            // (incl. R0) only exists on ROTATION_ENABLE firmware; without it ANY "G10 L2 ... R..." errors:20 and
-            // HALTS the program. This block stays bulletproof on every controller.
-            L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
-            L(wcs + "  (activate the coordinate system)");
-
-            // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
-            // G10 L2 R<deg> stores the rotation in the WCS (grblHAL ROTATION_ENABLE), so every later program run in
-            // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
-            // Emitted only when the user asked for it; positioned last so that if the firmware lacks ROTATION_ENABLE
-            // (error:20) the worst case is "no rotation" - the origin is already set and the machine already parked.
-            // Only emit the rotation when the controller actually supports it (reports WCSROT in $I): on firmware
-            // without ROTATION_ENABLE the G10 L2 R word errors:20, so gating it here means the R line is never sent
-            // to a controller that would reject it - Load Stock always completes, with rotation when available.
-            if (measure && applyRotation && GrblInfo.RotationSupported)
+            // setOrigin off: probing/measuring above still ran (and still reports/prints its numbers) - just
+            // skip committing anything to the WCS. Rotation is gated on setOrigin too - writing a rotation to
+            // a WCS this run never touched the origin of would be meaningless.
+            if (setOrigin)
             {
-                // NOTE the leading negation: grblHAL's G10 L2 R rotates the coordinate frame in the opposite
-                // sense to the raw front-edge angle, so the rotation that ALIGNS the work frame to the stock is
-                // -atan2(dy,dx). Without the negation the far edge lands off by ~2*width*sin(angle) (the Verify
-                // skew check showed the right-hand corners a couple of mm short in Y).
-                L("#<rot> = 0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
-                L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
-                L("(PRINT, LS_ROT=#<rot>)");
+                L(string.Format("(--- set work origin at the {0} corner ---)", cornerName));
+                // Origin ONLY here - never the rotation R word (that goes in the separate block below). The R word
+                // (incl. R0) only exists on ROTATION_ENABLE firmware; without it ANY "G10 L2 ... R..." errors:20 and
+                // HALTS the program. This block stays bulletproof on every controller.
+                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
+                L(wcs + "  (activate the coordinate system)");
+
+                // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
+                // G10 L2 R<deg> stores the rotation in the WCS (grblHAL ROTATION_ENABLE), so every later program run in
+                // this WCS - file, folder, Height Map, wizard - is cut aligned to the stock. ATAN returns degrees.
+                // Emitted only when the user asked for it; positioned last so that if the firmware lacks ROTATION_ENABLE
+                // (error:20) the worst case is "no rotation" - the origin is already set and the machine already parked.
+                // Only emit the rotation when the controller actually supports it (reports WCSROT in $I): on firmware
+                // without ROTATION_ENABLE the G10 L2 R word errors:20, so gating it here means the R line is never sent
+                // to a controller that would reject it - Load Stock always completes, with rotation when available.
+                if (measure && applyRotation && GrblInfo.RotationSupported)
+                {
+                    // NOTE the leading negation: grblHAL's G10 L2 R rotates the coordinate frame in the opposite
+                    // sense to the raw front-edge angle, so the rotation that ALIGNS the work frame to the stock is
+                    // -atan2(dy,dx). Without the negation the far edge lands off by ~2*width*sin(angle) (the Verify
+                    // skew check showed the right-hand corners a couple of mm short in Y).
+                    L("#<rot> = 0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
+                    L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
+                    L("(PRINT, LS_ROT=#<rot>)");
+                }
             }
             L("M2");
 
@@ -1901,7 +1917,7 @@ namespace GCode_Sender
         // the jaw is assumed machine-aligned (square to the axes), so skew is never computed here, only
         // width/height/flatness.
         // UNVERIFIED on hardware - this is a first cut (see the file header note).
-        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm)
+        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm, bool setOrigin)
         {
             var fxPos = new Position(fx.Coords);
             // Same touch-plate/conductive-stock rule as BuildProgram - see its comment. The vise's XY origin
@@ -2126,14 +2142,18 @@ namespace GCode_Sender
             L("(--- park at G30 (before the origin - keeps all G53 moves at WCO=0) ---)");
             EmitGotoG30(L);
 
-            // Origin: when Measure ran, corner 3's own probed X/Z (the jaw-origin corner itself) replace the
-            // fixed fxPos.X and the centre-footprint Z probe - a real measurement of the origin instead of an
-            // assumption. Without Measure, fall back to the always-available fxPos.X/_stock_z as before.
-            string originX = measure ? "[#<c3x>]" : N(fxPos.X);
-            string originZ = measure ? "[#<c3z>]" : "[#<_stock_z>]";
-            L("(--- set work origin: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
-            L(string.Format("G10 L2 {0} X{1} Y{2} Z{3}", pCode(wcsP), originX, N(fxPos.Y), originZ));
-            L(wcs + "  (activate the coordinate system)");
+            // setOrigin off: the probe/measure above still ran - just skip committing it to the WCS.
+            if (setOrigin)
+            {
+                // Origin: when Measure ran, corner 3's own probed X/Z (the jaw-origin corner itself) replace the
+                // fixed fxPos.X and the centre-footprint Z probe - a real measurement of the origin instead of an
+                // assumption. Without Measure, fall back to the always-available fxPos.X/_stock_z as before.
+                string originX = measure ? "[#<c3x>]" : N(fxPos.X);
+                string originZ = measure ? "[#<c3z>]" : "[#<_stock_z>]";
+                L("(--- set work origin: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
+                L(string.Format("G10 L2 {0} X{1} Y{2} Z{3}", pCode(wcsP), originX, N(fxPos.Y), originZ));
+                L(wcs + "  (activate the coordinate system)");
+            }
             L("M2");
 
             return b.ToString();

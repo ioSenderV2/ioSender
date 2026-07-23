@@ -18,21 +18,108 @@
             </ResourceDictionary.MergedDictionaries>
             <system:String x:Uid="lbl_axis" x:Key="AxisLabel">{0} axis:</system:String>
             <local:LogicalNotConverter x:Key="IsNotPredefined" />
+            <!-- Same "orange = unsaved edit, blue = saved but different from startup" convention as the
+                 Grbl settings tree (GrblConfigControl.ModifiedTextStyle/SettingRowMenu) - CoordinateSystem
+                 now carries the same IsEdited/IsSavedModified/IsModified trio, so this is a direct copy of
+                 that pattern, not a new one. -->
+            <ContextMenu x:Key="OffsetRowMenu">
+                <MenuItem x:Uid="mnu_offsetRevertStartup" Header="Restore to value at startup" IsEnabled="{Binding IsModified}" Click="offsetRestoreStartup_Click"/>
+            </ContextMenu>
+            <!-- X/Y/Z field style: sign-validation error tooltip (NumericRangeRule, same idiom
+                 GrblConfigControl's NumericErrorStyle uses) PLUS the modified-state color, set HERE directly
+                 on the NumericField rather than relying on inheriting Foreground down from DataGrid.RowStyle
+                 - confirmed on real hardware that FontWeight inherited through DataGridCell/DataGridRow into
+                 NumericField's inner text fine, but Foreground did not (something in that chain outranks
+                 plain inheritance for just that one property) - setting it as a genuine local/Style value
+                 directly on NumericField itself sidesteps the question of why, rather than chasing it. The
+                 row-level triggers stay too (still colors the plain-text Offset/Code column correctly). -->
+            <Style x:Key="OffsetFieldStyle" TargetType="local:NumericField">
+                <Style.Triggers>
+                    <Trigger Property="Validation.HasError" Value="true">
+                        <Setter Property="ToolTip" Value="{Binding RelativeSource={x:Static RelativeSource.Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsSavedModified}" Value="True">
+                        <Setter Property="Foreground" Value="#1565C0"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsEdited}" Value="True">
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Setter Property="Foreground" Value="#E07B00"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid Background="Transparent">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
         <ContentControl Visibility="Collapsed" Content="{StaticResource ProxyElement}"/>
+        <StackPanel Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top">
         <DataGrid x:Uid="dgrOffsets" x:Name="dgrOffsets" Grid.Row="0" ItemsSource="{Binding}" Width="Auto" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"
-                            CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False" SelectionChanged="dgrOffsets_SelectionChanged">
+                            CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False">
+            <DataGrid.Resources>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                </Style>
+            </DataGrid.Resources>
+            <!-- Row-level: ContextMenu (Restore to value at startup) + the orange/blue modified-state
+                 coloring - both set here, not per-column, so they reach every cell in the row (including
+                 X/Y/Z's NumericField, via ordinary Foreground inheritance) the same way GrblConfigControl's
+                 own settings-grid RowStyle does. -->
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="ContextMenu" Value="{StaticResource OffsetRowMenu}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSavedModified}" Value="True">
+                            <Setter Property="Foreground" Value="#1565C0"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsEdited}" Value="True">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="#E07B00"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn x:Uid="hdr_offset" Header="Offset" Binding="{Binding Code}" Width="50"/>
-                <DataGridTextColumn Header="X" Binding="{Binding X}" Width="70"/>
-                <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="70">
-                    <DataGridTextColumn.Visibility>
+                <DataGridTextColumn x:Uid="hdr_offset" Header="Offset" Binding="{Binding Code}" Width="Auto"/>
+                <!-- X/Y/Z are editable NumericField cells now (no separate staging panel to their right -
+                     each row edits and acts on ITSELF directly). No Label/Unit on the field itself - the
+                     column header is the label, and these are bare numbers same as the old Text columns
+                     showed (no "mm" suffix). LostFocus auto-commits once focus actually LEAVES THE ROW (not
+                     just moves between X/Y/Z within it - see NumericField_LostFocus), silently for plain
+                     G54-G59.3 rows; G28/G30/G92 confirm first and never issue a rapid move (see saveOffset -
+                     G28.1/G30.1/G92 all capture/apply from the CURRENT machine position, no G53 G0 preamble
+                     any more - the intended workflow is jog there manually, click Get, then leave the row).
+                     Sign-constrained per THIS machine's home-corner convention (X >= 0, Y/Z <= 0) via
+                     NumericRangeRule - a different machine's homing setup would need different signs; not
+                     something this app can infer, so it's hardcoded here rather than half-heartedly guessed. -->
+                <DataGridTemplateColumn Header="X" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <local:NumericField Label="" Unit="" ColonAt="0" Margin="2,0" Style="{StaticResource OffsetFieldStyle}" LostFocus="NumericField_LostFocus">
+                                <local:NumericField.Value>
+                                    <Binding Path="X" Mode="TwoWay">
+                                        <Binding.ValidationRules>
+                                            <local:NumericRangeRule Min="0"/>
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </local:NumericField.Value>
+                            </local:NumericField>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Y" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <local:NumericField Label="" Unit="" ColonAt="0" Margin="2,0" Style="{StaticResource OffsetFieldStyle}" LostFocus="NumericField_LostFocus">
+                                <local:NumericField.Value>
+                                    <Binding Path="Y" Mode="TwoWay">
+                                        <Binding.ValidationRules>
+                                            <local:NumericRangeRule Max="0"/>
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </local:NumericField.Value>
+                            </local:NumericField>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.Visibility>
                         <MultiBinding Converter="{StaticResource IsAxisVisibleConverter}">
                             <Binding Source="{StaticResource ProxyElement}" Path="DataContext.AxisEnabledFlags" />
                             <Binding>
@@ -41,10 +128,23 @@
                                 </Binding.Source>
                             </Binding>
                         </MultiBinding>
-                    </DataGridTextColumn.Visibility>
-                </DataGridTextColumn>
-                <DataGridTextColumn Header="Z" Binding="{Binding Z}" Width="70">
-                    <DataGridTextColumn.Visibility>
+                    </DataGridTemplateColumn.Visibility>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Z" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <local:NumericField Label="" Unit="" ColonAt="0" Margin="2,0" Style="{StaticResource OffsetFieldStyle}" LostFocus="NumericField_LostFocus">
+                                <local:NumericField.Value>
+                                    <Binding Path="Z" Mode="TwoWay">
+                                        <Binding.ValidationRules>
+                                            <local:NumericRangeRule Max="0"/>
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </local:NumericField.Value>
+                            </local:NumericField>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.Visibility>
                         <MultiBinding Converter="{StaticResource IsAxisVisibleConverter}">
                             <Binding Source="{StaticResource ProxyElement}" Path="DataContext.AxisEnabledFlags" />
                             <Binding>
@@ -53,9 +153,29 @@
                                 </Binding.Source>
                             </Binding>
                         </MultiBinding>
-                    </DataGridTextColumn.Visibility>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding A}" Width="70">
+                    </DataGridTemplateColumn.Visibility>
+                </DataGridTemplateColumn>
+                <!-- Per-row actions - replace the old single staging panel to the grid's right entirely.
+                     Get MPos stages this row's fields from the live machine position (not written to the
+                     controller yet); Clear zeroes and commits immediately. No Set column any more - every
+                     row now commits itself when focus leaves it (see NumericField_LostFocus); repeating a
+                     "Set position" button identically on all 13 rows added no signal, since nothing
+                     distinguished any one row's Set from another's. See the usage steps below the grid. -->
+                <DataGridTemplateColumn Header="Clear" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Clr" Padding="6,0" Margin="6,0" Click="btnRowClear_Click" ToolTip="Clear this work offset (set every axis to 0) on the controller."/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Get MPos" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Get" Padding="6,0" Margin="6,0" Click="btnRowGetMPos_Click" ToolTip="Copy the current machine position into this row's fields (not written to the controller yet)."/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Binding="{Binding A}" Width="Auto">
                     <DataGridTextColumn.HeaderTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DataContext.AxisLetter.A, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"/>
@@ -72,7 +192,7 @@
                         </MultiBinding>
                     </DataGridTextColumn.Visibility>
                 </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding B}" Width="70">
+                <DataGridTextColumn Binding="{Binding B}" Width="Auto">
                     <DataGridTextColumn.HeaderTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DataContext.AxisLetter.B, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"/>
@@ -89,7 +209,7 @@
                         </MultiBinding>
                     </DataGridTextColumn.Visibility>
                 </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding C}" Width="70">
+                <DataGridTextColumn Binding="{Binding C}" Width="Auto">
                     <DataGridTextColumn.HeaderTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DataContext.AxisLetter.C, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"/>
@@ -106,7 +226,7 @@
                         </MultiBinding>
                     </DataGridTextColumn.Visibility>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="U" Binding="{Binding U}" Width="70">
+                <DataGridTextColumn Header="U" Binding="{Binding U}" Width="Auto">
                     <DataGridTextColumn.Visibility>
                         <MultiBinding Converter="{StaticResource IsAxisVisibleConverter}">
                             <Binding Source="{StaticResource ProxyElement}" Path="DataContext.AxisEnabledFlags" />
@@ -118,7 +238,7 @@
                         </MultiBinding>
                     </DataGridTextColumn.Visibility>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="V" Binding="{Binding V}" Width="70">
+                <DataGridTextColumn Header="V" Binding="{Binding V}" Width="Auto">
                     <DataGridTextColumn.Visibility>
                         <MultiBinding Converter="{StaticResource IsAxisVisibleConverter}">
                             <Binding Source="{StaticResource ProxyElement}" Path="DataContext.AxisEnabledFlags" />
@@ -130,7 +250,7 @@
                         </MultiBinding>
                     </DataGridTextColumn.Visibility>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="W" Binding="{Binding W}" Width="70">
+                <DataGridTextColumn Header="W" Binding="{Binding W}" Width="Auto">
                     <DataGridTextColumn.Visibility>
                         <MultiBinding Converter="{StaticResource IsAxisVisibleConverter}">
                             <Binding Source="{StaticResource ProxyElement}" Path="DataContext.AxisEnabledFlags" />
@@ -144,57 +264,18 @@
                 </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
-        <StackPanel Grid.Column="1" HorizontalAlignment="Left" Margin="20,15,0,0" VerticalAlignment="Top">
-            <StackPanel Orientation="Horizontal">
-                <Label x:Uid="lbl_offset" Content="Offset:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Margin="29,0,0,0" VerticalAlignment="Top"/>
-                <TextBox Text="{Binding Path=Offset.Code, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Left" TextWrapping="NoWrap" VerticalAlignment="Top" MinWidth="40" IsReadOnly="True"/>
-            </StackPanel>
-            <local:CoordValueSetControl x:Name="cvXOffset" Label="{Binding Path=AxisLetter.X, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="X" Click="cvOffset_Click"
-                Value="{Binding Path=Offset.X, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvYOffset" Label="{Binding Path=AxisLetter.Y, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="Y" Style="{StaticResource YAxisVisibleStyle}" Click="cvOffset_Click"
-                Value="{Binding Path=Offset.Y, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvZOffset" Label="{Binding Path=AxisLetter.Z, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="Z"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.Z, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvAOffset" Label="{Binding Path=AxisLetter.A, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.A, Mode=OneWay}" Style="{StaticResource AAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.A, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvBOffset" Label="{Binding Path=AxisLetter.B, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.B, Mode=OneWay}" Style="{StaticResource BAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.B, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvCOffset" Label="{Binding Path=AxisLetter.C, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.C, Mode=OneWay}" Style="{StaticResource CAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.C, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvUOffset" Label="{Binding Path=AxisLetter.U, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.U, Mode=OneWay}" Style="{StaticResource UAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.U, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvVOffset" Label="{Binding Path=AxisLetter.V, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.V, Mode=OneWay}" Style="{StaticResource VAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.U, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <local:CoordValueSetControl x:Name="cvWOffset" Label="{Binding Path=AxisLetter.V, StringFormat={StaticResource AxisLabel}, Mode=OneWay}" Tag="{Binding Path=AxisLetter.W, Mode=OneWay}" Style="{StaticResource WAxisVisibleStyle}"  Click="cvOffset_Click"
-                Value="{Binding Path=Offset.W, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
-                IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
-            />
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <Button x:Uid="btn_currPos" x:Name="btnCurrPos" Content="Get current position" Padding="5,0" IsEnabled="{Binding Path=IsPredefined, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource IsNotPredefined}}" Margin="3,0" Click="btnCurrPos_Click"
-                        ToolTip="Copy the current machine position into the fields above (not written to the controller yet)."/>
-                <Button x:Uid="btn_clear" x:Name="btnClear" Content="Clear all" Padding="5,0" IsEnabled="{Binding Path=CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}" Click="btnClearAll_Click"
-                        ToolTip="Clear this work offset (set every axis to 0) on the controller."/>
-                <!-- The one primary action on this screen: commits the edited fields to the controller
-                     for the selected work offset - same role as ProgramPanel's Load File / MacroManagerDialog's Create. -->
-                <Button x:Uid="btn_setAll" x:Name="btnSetAll" Content="Set all" Padding="5,0" Margin="3,0" Click="btnSetAll_Click" Style="{StaticResource PrimaryButtonStyle}"
-                        ToolTip="Write all axis fields above to this work offset on the controller."/>
-            </StackPanel>
+        <StackPanel Orientation="Vertical" Margin="10,10,10,10">
+            <TextBlock FontWeight="SemiBold" Text="How to edit a work offset:"/>
+            <TextBlock Margin="8,4,0,0" Text="1. Manually jog to the point you want to save."/>
+            <TextBlock Margin="8,2,0,0" Text="2. Select the offset row you want to edit."/>
+            <TextBlock Margin="8,2,0,0" Text="3. Either click Clr to erase it,"/>
+            <TextBlock Margin="8,2,0,0" Text="   or type the X, Y, Z values you want,"/>
+            <TextBlock Margin="8,2,0,0" Text="   or click Get to fill them in with the current machine position."/>
+            <TextBlock Margin="8,2,0,0" Text="4. Click elsewhere to leave the row. G54-G59.3 save automatically; G28, G30, and G92 ask for confirmation first (they store wherever the machine is right now, not a rapid move to a typed target)."/>
+            <TextBlock FontWeight="SemiBold" Margin="0,14,0,0" Text="G30 and G59.3 convention on this machine:"/>
+            <TextBlock Margin="8,4,0,0" TextWrapping="Wrap" MaxWidth="820" Text="G30 holds a park location suitable for tool changes. G59.3 holds the position to start TLO probes over the toolsetter probe."/>
+            <TextBlock Margin="8,10,0,0" TextWrapping="Wrap" MaxWidth="820" Text="G92 is different: it always zeroes the work origin at wherever the machine currently is (the standard 'zero here' use of G92), so what it stores is really just today's machine position - use Get, then leave the row, to record it."/>
+        </StackPanel>
         </StackPanel>
     </Grid>
 </UserControl>

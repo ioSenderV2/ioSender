@@ -43,7 +43,9 @@ using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Threading;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -103,6 +105,19 @@ namespace CNC.Controls
         {
             get { return (string)GetValue(UnitProperty); }
             set { SetValue(UnitProperty, value); }
+        }
+
+        // Hides the trailing unit-suffix Label without touching Unit itself - a field can be a REAL mm/in
+        // length value (participates fully in IsImperial conversion and the panel-level unit-toggle menu's
+        // enumeration) while a neighboring field in the same row displays the unit for both of them (e.g.
+        // Machine Limits' Min/Max pair - unit shown once, on Max). Setting Unit="" instead of using this
+        // was the earlier, wrong way to suppress the label: it also silently opted the field out of being a
+        // length field at all (EffectiveUnit stays blank -> never converts, invisible to the toggle menu).
+        public static readonly DependencyProperty ShowUnitProperty = DependencyProperty.Register(nameof(ShowUnit), typeof(bool), typeof(NumericField), new PropertyMetadata(true));
+        public bool ShowUnit
+        {
+            get { return (bool)GetValue(ShowUnitProperty); }
+            set { SetValue(ShowUnitProperty, value); }
         }
 
         // Inheritable (FrameworkPropertyMetadataOptions.Inherits) - set ONCE on a container (a tab's root
@@ -212,6 +227,14 @@ namespace CNC.Controls
         {
             // Only offer "Reset to default" for fields backed by a Config setting.
             miReset.IsEnabled = !IsReadOnly && GetDefaultValue() != null;
+
+            // "Show in alternate unit" only makes sense for an mm/in length field with a real value -
+            // every other Unit (deg, rpm, %, blank, ...) has no metric/imperial counterpart to convert to.
+            // Left visible-but-disabled (not collapsed) so the menu's shape doesn't jump around field to field.
+            bool isLength = NumericProperties.IsLengthUnit(EffectiveUnit);
+            miAltUnit.IsEnabled = isLength && !double.IsNaN(Value);
+            string altUnit = EffectiveUnit == "mm" ? "in" : "mm";
+            miAltUnit.Header = altUnit == "in" ? "Show in inches" : "Show in millimeters";
         }
 
         private void ResetToDefault_Click(object sender, RoutedEventArgs e)
@@ -219,6 +242,38 @@ namespace CNC.Controls
             var def = GetDefaultValue();
             if (def != null)
                 Value = Convert.ToDouble(def);
+        }
+
+        // One-time peek at the value in the other length unit - deliberately NOT a persistent per-field
+        // toggle, so it can't drift out of sync with (or be confused for) the app-wide metric/imperial
+        // setting (NumericField.IsImperial, inherited from a container) that every field already respects.
+        private void ShowAlternateUnit_Click(object sender, RoutedEventArgs e)
+        {
+            if (!NumericProperties.IsLengthUnit(EffectiveUnit) || double.IsNaN(Value))
+                return;
+
+            string altUnit = EffectiveUnit == "mm" ? "in" : "mm";
+            double altValue = NumericProperties.FromCanonicalMm(Value, altUnit);
+            string format = altUnit == "in" ? GrblConstants.FORMAT_IMPERIAL : GrblConstants.FORMAT_METRIC;
+            int precision = altUnit == "in" ? 4 : 3;
+            string text = Math.Round(altValue, precision).ToString(format, CultureInfo.InvariantCulture) + " " + altUnit;
+
+            var tip = new ToolTip
+            {
+                Content = text,
+                PlacementTarget = data,
+                Placement = PlacementMode.Top,
+                IsOpen = true,
+                StaysOpen = true
+            };
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+            timer.Tick += (s, args) =>
+            {
+                tip.IsOpen = false;
+                timer.Stop();
+            };
+            timer.Start();
         }
     }
 

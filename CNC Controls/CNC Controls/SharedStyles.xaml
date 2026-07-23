@@ -3,6 +3,17 @@
                     xmlns:gcode="clr-namespace:CNC.GCode;assembly=CNC.Core"
                     xmlns:local="clr-namespace:CNC.Controls">
     <local:IsAxisVisibleConverter x:Key="IsAxisVisibleConverter" />
+    <!-- Wrap long checkbox/label text (its string content renders through a TextBlock) so it flows to a
+         second line instead of clipping at the column edge - was duplicated identically in
+         BasicConfigControl.xaml and CNC Controls Probing/ConfigControl.xaml; consolidated here. BasedOn the
+         app-wide oval CheckBox style (AppleStyles.xaml) so a keyless local override doesn't shadow it. -->
+    <Style x:Key="WrappingCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+    <Style x:Key="WrappingTextBlockStyle" TargetType="TextBlock">
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
     <Style x:Key="SmallXButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Template">

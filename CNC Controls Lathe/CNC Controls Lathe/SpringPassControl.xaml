@@ -15,6 +15,6 @@
         <CheckBox x:Uid="chkSpringPasses" x:Name="chkSpringPasses" Content="Spring passes:" IsChecked="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
         <!-- The checkbox above is the field's real (localized) label, so NumericField's own Label is
              suppressed (empty + ColonAt 0). -->
-        <cncontrols:NumericField x:Name="data" Label="" ColonAt="0" Format="#0" IsEnabled="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Center"/>
+        <cncontrols:NumericField x:Name="data" Label="" Unit="" ColonAt="0" Format="#0" IsEnabled="{Binding Path=IsPassesEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="{Binding Path=Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Center"/>
     </Grid>
 </UserControl>

@@ -99,7 +99,7 @@
                     <GroupBox Header="Dimensions" Margin="0,6,0,0">
                         <StackPanel Margin="0,2,0,0">
                             <Controls:NumericField Name="cvLead" Label="Lead:" ColonAt="70" Value="{Binding Path=Thread.Lead, Mode=TwoWay}" Format="{Binding Path=Thread.Format, Mode=OneWay}" Unit="{Binding Path=Thread.Unit, Mode=OneWay}" IsReadOnly="{Binding Path=Inch.IsMetricInputReadonly}" Style="{StaticResource ErrorStyle}"/>
-                            <Controls:NumericField x:Name="cvStarts" Label="Starts:" ColonAt="70" Format="0" Value="{Binding Path=Thread.Starts, Mode=TwoWay}" IsReadOnly="{Binding Path=Thread.OneLead, Mode=TwoWay}"/>
+                            <Controls:NumericField x:Name="cvStarts" Label="Starts:" Unit="" ColonAt="70" Format="0" Value="{Binding Path=Thread.Starts, Mode=TwoWay}" IsReadOnly="{Binding Path=Thread.OneLead, Mode=TwoWay}"/>
                             <Controls:NumericField Name="cvSize" Label="Size:" ColonAt="70" Value="{Binding Path=Thread.DiameterNominal, Mode=TwoWay}" Format="{Binding Path=Thread.Format, Mode=OneWay}" Unit="{Binding Path=Thread.Unit, Mode=OneWay}" IsReadOnly="{Binding Path=Inch.IsMetricInputReadonly}"/>
                             <!-- TPI + imperial fraction (shown for imperial threads) -->
                             <Controls:NumericField x:Name="cvTPI" Label="TPI:" ColonAt="70" Value="{Binding Path=Thread.TPI, Mode=TwoWay}" IsReadOnly="{Binding Path=Inch.IsReadonly}" Format="{Binding Path=Thread.TpiFormat}" Unit="{Binding Path=Thread.TpiLabel}"/>
@@ -263,8 +263,8 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Controls:NumericField x:Name="cvRetract" Label="Retract:" ColonAt="70" Value="{Binding Path=Thread.RetractDegrees, Mode=TwoWay}" Unit="deg" Grid.ColumnSpan="2" MinWidth="184" Style="{StaticResource ErrorStyle}"/>
-                                <Controls:NumericField x:Name="cvPasses" Label="Passes:" ColonAt="70" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,2,0,0" MinWidth="184"/>
-                                <Controls:NumericField x:Name="cvPassesExecuted" Label="executed:" ColonAt="70" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0" MinWidth="184"/>
+                                <Controls:NumericField x:Name="cvPasses" Label="Passes:" Unit="" ColonAt="70" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,2,0,0" MinWidth="184"/>
+                                <Controls:NumericField x:Name="cvPassesExecuted" Label="executed:" Unit="" ColonAt="70" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,2,0,0" MinWidth="184"/>
                             </Grid>
                         </GroupBox>
                     </Grid>

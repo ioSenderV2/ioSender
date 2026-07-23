@@ -72,9 +72,9 @@
                      fields below, so there's no long value left to wrap and the buttons fit inline. -->
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Label x:Uid="fxd_position" Content="Position:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                    <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set" Padding="8,0" MinHeight="22" Margin="8,0,0,0" Click="btnSetPosition_Click"
+                    <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set" Padding="12,0" MinHeight="22" MinWidth="60" Margin="8,0,0,0" Click="btnSetPosition_Click"
                             ToolTip="Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: clear of both faces (within the schematic's circle) AND within ~10 mm above the spoilboard - the spoilboard probe searches only 12 mm down from here. Not written to firmware G28 - kept only in this fixture's own definition."/>
-                    <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test" Padding="8,0" MinHeight="22" Margin="6,0,0,0" Click="btnTestPosition_Click"
+                    <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test" Padding="12,0" MinHeight="22" MinWidth="60" Margin="12,0,0,0" Click="btnTestPosition_Click"
                             ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
                     <!-- Checkmark (Segoe MDL2 Assets E73E) - bright green + bold when fx.PositionValidated, gray
                          otherwise; Collapsed entirely when there's no position yet. Set in UpdatePositionDisplay.

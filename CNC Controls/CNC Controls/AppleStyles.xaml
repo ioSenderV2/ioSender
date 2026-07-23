@@ -149,6 +149,47 @@
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
+    <!-- CheckBox: the stock WPF square+tick was reported nearly invisible at normal viewing distance (too
+         small, too little contrast at rest). Replaced with a small oval indicator - outlined/empty at rest,
+         solid accent blue with a white check glyph when checked - so checked-vs-unchecked reads at a glance
+         without needing a close look. Keyless (TargetType only) so it applies app-wide once merged into
+         App.xaml, same as Button/NumericTextBox. -->
+    <Style TargetType="CheckBox">
+        <Setter Property="Foreground" Value="#FF2B2A27"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="6,0,0,0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" SnapsToDevicePixels="True">
+                        <Grid Width="24" Height="16" VerticalAlignment="Center">
+                            <Border x:Name="indicator" CornerRadius="8" BorderThickness="1.5" BorderBrush="#FFAFAFAF" Background="White"/>
+                            <Path x:Name="checkGlyph" Data="M2,8 L6.2,12.2 L14,3" Stroke="White" StrokeThickness="2.2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Stretch="Uniform" Margin="4,3" Opacity="0"/>
+                        </Grid>
+                        <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="indicator" Property="Background" Value="{StaticResource AppleAccentBrush}"/>
+                            <Setter TargetName="indicator" Property="BorderBrush" Value="{StaticResource AppleAccentBrush}"/>
+                            <Setter TargetName="checkGlyph" Property="Opacity" Value="1"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="indicator" Property="BorderBrush" Value="{StaticResource AppleAccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="indicator" Property="Background" Value="{StaticResource ButtonDisabledBrush}"/>
+                            <Setter TargetName="indicator" Property="BorderBrush" Value="{StaticResource ButtonNeutralBorderBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource ButtonDisabledInkBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- NumericTextBox: recessed rounded field with a focus glow. Every bare usage (Spindle, PortDialog,
          Feed, GrblConfig, Lathe controls) gets this on its own; NumericField.xaml additionally strips its
          inner instance's own chrome to transparent so the unit label can share ONE merged surface with it

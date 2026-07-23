@@ -32,84 +32,113 @@
             </Grid.RowDefinitions>
 
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <GroupBox x:Uid="ls_grpSetup" Header="Start Job setup" Margin="0,0,8,0">
-                    <StackPanel Margin="6">
-                        <!-- Corner is always the front-left (TFL); the tip radius + feeds come
-                             straight from the configured 3D probe definition, so no probe picker. Fixtures -
-                             including their saved position - are defined in Machine Setup > Fixture
-                             definitions; here you only pick one with a VALIDATED (Test position) result. -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                            <Label x:Uid="ls_lblFixture" Content="Fixture:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="160" MinHeight="22" VerticalAlignment="Center"
-                                      DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
-                                      ToolTip="Fixture to reference for this job (defined in Machine Setup Wizard &gt; Fixture definitions)."/>
+                <StackPanel Margin="0,0,8,0">
+                    <GroupBox x:Uid="ls_grpSetup" Header="Setup">
+                        <StackPanel Margin="6">
+                            <!-- Corner is always the front-left (TFL); the tip radius + feeds come
+                                 straight from the configured 3D probe definition. Fixtures - including their
+                                 saved position - are defined in Machine Setup > Fixture definitions; here you
+                                 only pick one with a VALIDATED (Test position) result. Probe type sits on the
+                                 same row (it's global, not fixture-specific, so it doesn't need fixture-gating).
+                                 DockPanel (not a plain horizontal StackPanel) so Fixture stays glued to its own
+                                 dropdown on the left while Probe pins flush to the panel's right edge - both
+                                 labels still start at the same left-hand x as "Safe Z delta:" below, since
+                                 that's just a matter of both rows sharing the same left origin, not a shared
+                                 fixed-width label column. -->
+                            <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <Label x:Uid="ls_lblFixture" Content="Fixture:" Padding="0" VerticalAlignment="Center"/>
+                                    <ComboBox x:Uid="cbxFixture" x:Name="cbxFixture" MinWidth="140" MinHeight="22" Margin="4,0,0,0" VerticalAlignment="Center"
+                                              DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
+                                              ToolTip="Fixture to reference for this job (defined in Machine Setup Wizard &gt; Fixture definitions)."/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                    <Label x:Uid="ls_lblProbe" Content="Probe:" Padding="0" VerticalAlignment="Center"/>
+                                    <ComboBox x:Uid="cbxProbeType" x:Name="cbxProbeType" MinWidth="120" MinHeight="22" Margin="4,0,0,0" VerticalAlignment="Center" SelectedIndex="0">
+                                        <ComboBoxItem x:Uid="cbiProbe3d" x:Name="cbiProbe3d" Content="3D Probe"/>
+                                        <ComboBoxItem x:Uid="cbiProbeTouch" x:Name="cbiProbeTouch" Content="Touch Plate"
+                                                      ToolTip="Probes by electrical continuity - works on conductive stock directly, or on non-conductive stock via a separate metal touch plate (see 'Stock conductive' below)."/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                       Text="No fixture with a validated position available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
+                            <TextBlock x:Name="txtFixtureWarning" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                       Text="This fixture type isn't supported yet."/>
+                            <Separator Margin="0,4"/>
+                            <!-- Everything below needs a fixture picked first (its saved reference/probe geometry is
+                                 what every field here means something in terms of) - disabled as ONE block per
+                                 panel (pnlSetupGated/pnlStock/pnlActions.IsEnabled, set together in
+                                 UpdateFixtureWarning) rather than field-by-field, so disabling a fixture-dependent
+                                 field can never be forgotten, and a disabled ANCESTOR overrides each control's own
+                                 IsEnabled/binding (e.g. Rotate's own chkMeasure-driven binding) without fighting
+                                 it - standard WPF subtree-disable behavior. Split across 3 panels now (Setup/
+                                 Stock/Actions groupboxes), so the 3 panel roots are gated together in code
+                                 instead of 1. Now just Safe Z delta (Probe moved up onto the Fixture row, above,
+                                 ungated - it isn't fixture-specific). -->
+                            <StackPanel x:Name="pnlSetupGated">
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,2">
+                                    <Label x:Uid="ls_cornermargin" Content="Safe Z delta:" Width="190" HorizontalContentAlignment="Left" VerticalAlignment="Center"/>
+                                    <cnccontrols:NumericField x:Name="fldCornerMargin" Label="" ColonAt="0" Unit="mm" Format="##0.0##" Value="10"
+                                                              IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                                              ToolTip="Corners 2-4 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                        <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
-                                   Text="No fixture with a validated position available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
-                        <TextBlock x:Name="txtFixtureWarning" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
-                                   Text="This fixture type isn't supported yet."/>
-                        <Separator Margin="0,4"/>
-                        <!-- Everything below needs a fixture picked first (its saved reference/probe geometry is
-                             what every field here means something in terms of) - disabled as ONE block
-                             (pnlInputs.IsEnabled, set in UpdateFixtureWarning) rather than field-by-field, so
-                             disabling a fixture-dependent field can never be forgotten, and a disabled ANCESTOR
-                             overrides each control's own IsEnabled/binding (e.g. Rotate's own chkMeasure-driven
-                             binding) without fighting it - standard WPF subtree-disable behavior. -->
-                        <StackPanel x:Name="pnlInputs">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                            <Label x:Uid="ls_lblUnits" Content="Stock size units:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <RadioButton x:Uid="rbUnitsMm" x:Name="rbUnitsMm" Content="mm" GroupName="StockSizeUnits" VerticalAlignment="Center" Margin="4,0,0,0" Checked="Units_Checked"/>
-                            <RadioButton x:Uid="rbUnitsIn" x:Name="rbUnitsIn" Content="in" GroupName="StockSizeUnits" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Units_Checked"/>
+                    </GroupBox>
+
+                    <!-- Right-click this panel's header for a Show in inches/millimeters toggle (UnitToggleMenu,
+                         attached in code-behind) - replaces the old rbUnitsMm/rbUnitsIn radio pair. -->
+                    <GroupBox x:Uid="ls_grpStock" x:Name="grpStock" Header="Stock" Margin="0,8,0,0">
+                        <StackPanel x:Name="pnlStock" Margin="6" Grid.IsSharedSizeScope="True">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <CheckBox x:Uid="ls_exactsize" x:Name="chkExactSize" Content="Stock size is exact" IsChecked="False" VerticalAlignment="Center"
+                                          IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                          ToolTip="Off (default): width/height above are a conservative ESTIMATE - a few mm larger than actual - so far-corner references land safely outside the stock. On: they are treated as exact, and corners 2-4 probe close to their computed true position instead (corner 2 assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2). Faster and tighter, but a wrong entered size can miss the stock - only enable if you trust the numbers."/>
+                                <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="16,0,0,0" VerticalAlignment="Center"
+                                          ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
+                            </StackPanel>
+                            <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,6,0,2"/>
+                            <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
+                            <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>
+                            <cnccontrols:NumericField x:Name="fldSpacer"    x:Uid="ls_spacer"    Label="Spacer/backer (Z):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="0"   Margin="0,2"
+                                                      ToolTip="Sacrificial board thickness under the stock (same footprint), e.g. 1/4 in MDF a thin sheet is taped to. 0 = none. The metal top is probed for Z0; this keeps the side probe on the material, not the backer."/>
+                            <TextBlock x:Name="txtThickWarn" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
+                                       Text="Stock over 1 in (25.4 mm) thick - the probe macros assume 1 in or less and will miss the top of taller stock."/>
+                            <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="22"
+                                       Text="Actual stock size."/>
+                            <Button x:Name="btnCopyFromStock" x:Uid="ls_copyFromStock" Content="Copy from loaded program's STOCK" HorizontalAlignment="Left"
+                                    Margin="4,2,0,2" Padding="6,2" FontSize="11" Visibility="Collapsed" Click="CopyFromStock_Click"
+                                    ToolTip="The loaded program's own (STOCK X=.. Y=.. Z=..) comment differs from the values above - click to copy it in."/>
                         </StackPanel>
-                        <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                        <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
-                        <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>
-                        <cnccontrols:NumericField x:Name="fldSpacer"    x:Uid="ls_spacer"    Label="Spacer/backer (Z):"  ColonAt="120" Unit="mm" Format="####0.0##" Value="0"   Margin="0,2"
-                                                  ToolTip="Sacrificial board thickness under the stock (same footprint), e.g. 1/4 in MDF a thin sheet is taped to. 0 = none. The metal top is probed for Z0; this keeps the side probe on the material, not the backer."/>
-                        <TextBlock x:Name="txtThickWarn" Foreground="#C0392B" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11" Visibility="Collapsed"
-                                   Text="Stock over 1 in (25.4 mm) thick - the probe macros assume 1 in or less and will miss the top of taller stock."/>
-                        <TextBlock x:Name="txtSizeHint" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="4,0,0,2" FontSize="11"
-                                   Text="Actual stock size."/>
-                        <Button x:Name="btnCopyFromStock" x:Uid="ls_copyFromStock" Content="Copy from loaded program's STOCK" HorizontalAlignment="Left"
-                                Margin="4,2,0,2" Padding="6,2" FontSize="11" Visibility="Collapsed" Click="CopyFromStock_Click"
-                                ToolTip="The loaded program's own (STOCK X=.. Y=.. Z=..) comment differs from the values above - click to copy it in."/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
-                            <Label x:Uid="ls_lblProbe" Content="Probe:" Padding="0" VerticalAlignment="Center"/>
-                            <RadioButton x:Uid="rbProbe3d" x:Name="rbProbe3d" Content="3D Probe" GroupName="StartJobProbeType" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                            <RadioButton x:Uid="rbProbeTouch" x:Name="rbProbeTouch" Content="Touch Plate" GroupName="StartJobProbeType" VerticalAlignment="Center" Margin="14,0,0,0"
-                                         ToolTip="Probes by electrical continuity - works on conductive stock directly, or on non-conductive stock via a separate metal touch plate (see 'Stock conductive' below)."/>
+                    </GroupBox>
+
+                    <GroupBox x:Uid="ls_grpActions" Header="Actions" Margin="0,8,0,0">
+                        <StackPanel x:Name="pnlActions" Margin="6">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <CheckBox x:Uid="ls_setorigin" x:Name="chkSetOrigin" Content="Set origin in:" IsChecked="True" VerticalAlignment="Center"
+                                          ToolTip="On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on). Off: still probes/measures and reports the numbers, but leaves the selected WCS untouched."/>
+                                <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" Margin="6,0,0,0" VerticalAlignment="Center" SelectedIndex="0"
+                                          IsEnabled="{Binding ElementName=chkSetOrigin, Path=IsChecked}"
+                                          ToolTip="Work coordinate system (G54-G59) to set this job's origin in.">
+                                    <ComboBoxItem Content="G54"/>
+                                    <ComboBoxItem Content="G55"/>
+                                    <ComboBoxItem Content="G56"/>
+                                    <ComboBoxItem Content="G57"/>
+                                    <ComboBoxItem Content="G58"/>
+                                    <ComboBoxItem Content="G59"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference" IsChecked="True" Margin="0,2,0,2" VerticalAlignment="Center"
+                                      ToolTip="Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."/>
+                            <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe all 4 corners)" IsChecked="False" Margin="0,6,0,2" VerticalAlignment="Center"
+                                      ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
+                            <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
+                                      IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                      ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
                         </StackPanel>
-                        <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="0,2,0,2" VerticalAlignment="Center"
-                                  IsEnabled="{Binding ElementName=rbProbeTouch, Path=IsChecked}"
-                                  ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
-                            <Label x:Uid="ls_lblWcs" Content="Set origin in:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0"
-                                      ToolTip="Work coordinate system (G54-G59) to set this job's origin in.">
-                                <ComboBoxItem Content="G54"/>
-                                <ComboBoxItem Content="G55"/>
-                                <ComboBoxItem Content="G56"/>
-                                <ComboBoxItem Content="G57"/>
-                                <ComboBoxItem Content="G58"/>
-                                <ComboBoxItem Content="G59"/>
-                            </ComboBox>
-                        </StackPanel>
-                        <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe all 4 corners)" IsChecked="False" Margin="0,6,0,2" VerticalAlignment="Center"
-                                  ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
-                        <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
-                                  IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                  ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
-                        <CheckBox x:Uid="ls_exactsize" x:Name="chkExactSize" Content="Stock size is exact" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
-                                  IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                  ToolTip="Off (default): width/height above are a conservative ESTIMATE - a few mm larger than actual - so far-corner references land safely outside the stock. On: they are treated as exact, and corners 2-4 probe close to their computed true position instead (corner 2 assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2). Faster and tighter, but a wrong entered size can miss the stock - only enable if you trust the numbers."/>
-                        <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference" IsChecked="True" Margin="0,2,0,2" VerticalAlignment="Center"
-                                  ToolTip="Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."/>
-                        <cnccontrols:NumericField x:Name="fldCornerMargin" x:Uid="ls_cornermargin" Label="Safe Z delta:" ColonAt="160" Unit="mm" Format="##0.0##" Value="10"
-                                                  Margin="0,4,0,2" IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                                  ToolTip="Corners 2-4 travel at corner 1's own measured stock top plus this delta, instead of retracting fully to machine top between corners. Must clear any fence/clamp hardware between corners on this fixture."/>
-                        </StackPanel>
-                    </StackPanel>
-                </GroupBox>
+                    </GroupBox>
+                </StackPanel>
             </ScrollViewer>
 
             <!-- Warning + result + Generate/Run pinned at the bottom-left of the input column -->

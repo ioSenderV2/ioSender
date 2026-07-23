@@ -14,9 +14,9 @@
             <local:PositionSumConverter x:Key="MachinePos"/>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_machinePos" Header="Machine Position" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
+    <GroupBox x:Uid="grp_machinePos" x:Name="grpMachinePos" Header="Machine Position" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="210">
         <StackPanel Margin="3,2,0,2">
-            <local:NumericField Label="X:" Unit="" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <local:NumericField Label="X:" Unit="mm" ShowUnit="False" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <local:NumericField.Value>
                     <MultiBinding Converter="{StaticResource MachinePos}" Mode="OneWay">
                         <Binding Path="Position.X" Mode="OneWay"/>
@@ -24,7 +24,7 @@
                     </MultiBinding>
                 </local:NumericField.Value>
             </local:NumericField>
-            <local:NumericField Label="Y:" Unit="" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource YAxisVisibleStyle}">
+            <local:NumericField Label="Y:" Unit="mm" ShowUnit="False" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource YAxisVisibleStyle}">
                 <local:NumericField.Value>
                     <MultiBinding Converter="{StaticResource MachinePos}" Mode="OneWay">
                         <Binding Path="Position.Y" Mode="OneWay"/>
@@ -32,7 +32,7 @@
                     </MultiBinding>
                 </local:NumericField.Value>
             </local:NumericField>
-            <local:NumericField Label="Z:" Unit="" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ZAxisVisibleStyle}">
+            <local:NumericField Label="Z:" Unit="mm" ShowUnit="False" ColonAt="20" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" VerticalAlignment="Top" Style="{StaticResource ZAxisVisibleStyle}">
                 <local:NumericField.Value>
                     <MultiBinding Converter="{StaticResource MachinePos}" Mode="OneWay">
                         <Binding Path="Position.Z" Mode="OneWay"/>

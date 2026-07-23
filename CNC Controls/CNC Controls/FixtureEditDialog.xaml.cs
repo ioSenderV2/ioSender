@@ -178,8 +178,12 @@ namespace CNC.Controls
             string coords = Fixtures.CurrentCoordsCsv(model);
             if (coords == null)
             {
-                if (model != null)
-                    model.Message = "Machine position unknown - home first to save a fixture position.";
+                // model.Message only reaches MainWindow's own status label, which sits BEHIND this modal
+                // dialog - invisible while it's open, so a click here looked like it silently did nothing.
+                // AppDialogs.Show is guaranteed visible regardless of what's behind it (same idiom the vise
+                // "is it empty?" confirmation below already uses).
+                AppDialogs.Show("Machine position unknown - home first (or jog once a position is known) before setting a fixture position.",
+                    "Set position", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

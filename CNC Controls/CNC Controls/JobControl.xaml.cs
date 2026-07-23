@@ -180,7 +180,7 @@ namespace CNC.Controls
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
             {
                 IsRunEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
-                SetActiveProgramReady(HasActiveProgram && IsRunEnabled);
+                SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
             }
             else
                 SetActiveProgramReady(false);
@@ -199,6 +199,14 @@ namespace CNC.Controls
         // button, not this state-machine flag. Both coexist during the ProgramView migration; ProgramView.Active
         // is null until a view connects, so this is inert for tools still on ActiveRun.
         private static bool HasActiveProgram { get { return MacroProcessor.ActiveRun != null || MacroProcessor.ActiveGenerate != null || ProgramView.Active != null; } }
+
+        // A Generate-first tab (Start Job etc.) registers MacroProcessor.ActiveGenerate as soon as it's
+        // focused - well before the operator has actually pressed Generate - so HasActiveProgram alone goes
+        // true too early for "ready to press Run" purposes. The "<name> ready - press Run to run." status
+        // line means what it says - actually RUNNING - so it must stay quiet the whole time the button still
+        // reads "Generate" (UpdateRunButtonLabel), even once IsGenerateReady is true: pressing it in that
+        // state only generates, it does not run.
+        private static bool IsGenerateModeBlocking { get { return MacroProcessor.SupportsGenerateMode && !MacroProcessor.IsProgramGenerated; } }
 
         // PropertyChangedCallback (not a manual call at every one of this DP's many "IsRunEnabled = ..."
         // assignment sites throughout this file) keeps btnStart's disabled-state tooltip in sync regardless of
@@ -240,8 +248,17 @@ namespace CNC.Controls
             if (ready == IsActiveProgramReady)
                 return;
             IsActiveProgramReady = ready;
-            if (ready && model != null)
+            if (model == null)
+                return;
+            if (ready)
                 model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program");
+            else
+                // Drop the prompt along with the cue itself - previously only the (invisible) boolean flipped
+                // here, leaving the "<name> ready - press Run to run." TEXT stale on screen through an entire
+                // normal run (only Check/DryRun overwrite model.Message at run-start - see StreamingState.Send
+                // just below this call site - a plain run never did), confirmed on real hardware as still
+                // reading "ready to run" well after Run had already been pressed and the job was streaming.
+                model.Message = string.Empty;
         }
 
         public static readonly DependencyProperty IsFeedHoldEnabledProperty = DependencyProperty.Register(nameof(IsFeedHoldEnabled), typeof(bool), typeof(JobControl));
@@ -1431,7 +1448,7 @@ namespace CNC.Controls
                         IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
                         IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
-                        SetActiveProgramReady(HasActiveProgram && IsRunEnabled);
+                        SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
                         break;
 
                     case StreamingState.Send:

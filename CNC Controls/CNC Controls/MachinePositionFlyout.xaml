@@ -24,9 +24,12 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <StackPanel Orientation="Horizontal" Grid.Row="1">
-                <local:NumericField Label="X:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.X, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Top"/>
-                <local:NumericField Label="Y:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.Y, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="-10,0,0,0" VerticalAlignment="Top" Style="{StaticResource YAxisVisibleStyle}"/>
-                <local:NumericField Label="Z:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.Z, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="-10,0,0,0" VerticalAlignment="Top" Style="{StaticResource ZAxisVisibleStyle}"/>
+                <!-- X/Y/Z are real mm length values - ShowUnit="False" hides the label without opting them
+                     out of unit conversion (A/B/C stay Unit="" below: conventionally rotary/degrees in
+                     grbl, and this app has no per-machine linear/rotary flag to check at runtime). -->
+                <local:NumericField Label="X:" Unit="mm" ShowUnit="False" ColonAt="20" Value="{Binding Path=MachinePosition.X, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Top"/>
+                <local:NumericField Label="Y:" Unit="mm" ShowUnit="False" ColonAt="20" Value="{Binding Path=MachinePosition.Y, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="-10,0,0,0" VerticalAlignment="Top" Style="{StaticResource YAxisVisibleStyle}"/>
+                <local:NumericField Label="Z:" Unit="mm" ShowUnit="False" ColonAt="20" Value="{Binding Path=MachinePosition.Z, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="-10,0,0,0" VerticalAlignment="Top" Style="{StaticResource ZAxisVisibleStyle}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Grid.Row="2">
                 <local:NumericField Label="A:" Unit="" ColonAt="20" Value="{Binding Path=MachinePosition.A, Mode=OneWay}" Format="{Binding Path=FormatSigned}" IsReadOnly="True" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Top" Style="{StaticResource AAxisVisibleStyle}" />

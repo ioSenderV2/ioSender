@@ -16,6 +16,7 @@ namespace CNC.Controls
         public MachinePositionControl()
         {
             InitializeComponent();
+            UnitToggleMenu.Attach(grpMachinePos);
         }
     }
 }

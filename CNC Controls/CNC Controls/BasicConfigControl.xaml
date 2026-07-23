@@ -9,15 +9,19 @@
     <GroupBox x:Uid="grb_mainConfig" x:Name="grpBasic" Header="Main" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310">
         <StackPanel HorizontalAlignment="Stretch">
             <!-- Wrap long checkbox labels (their string content renders through a TextBlock) so they flow to a
-                 second line instead of clipping at the column edge. -->
+                 second line instead of clipping at the column edge. The actual Setters live ONCE in
+                 SharedStyles.xaml (WrappingCheckBoxStyle/WrappingTextBlockStyle - was duplicated identically
+                 here and in CNC Controls Probing/ConfigControl.xaml); these are thin keyless wrappers so every
+                 CheckBox/TextBlock in this panel keeps picking it up implicitly, with no per-control Style=
+                 needed on any of the ~12 checkboxes below. -->
             <StackPanel.Resources>
-                <Style TargetType="CheckBox">
-                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                </Style>
-                <Style TargetType="TextBlock">
-                    <Setter Property="TextWrapping" Value="Wrap"/>
-                </Style>
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="SharedStyles.xaml"/>
+                    </ResourceDictionary.MergedDictionaries>
+                    <Style TargetType="CheckBox" BasedOn="{StaticResource WrappingCheckBoxStyle}"/>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource WrappingTextBlockStyle}"/>
+                </ResourceDictionary>
             </StackPanel.Resources>
             <Grid x:Name="grid">
                 <Grid.ColumnDefinitions>

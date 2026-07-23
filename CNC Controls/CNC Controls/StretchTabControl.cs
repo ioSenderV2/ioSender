@@ -23,6 +23,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -84,6 +85,13 @@ namespace CNC.Controls
         // Raised after a drag-reorder that actually changed the tab order. Hosts whose order lives in another
         // store (main bar, Tools) subscribe to persist the new Items order there.
         public event EventHandler TabsReordered;
+
+        // Raised true when a header drag starts, false when it ends. This control can only Clip its OWN
+        // visual subtree (see the Clip in OnReorderMouseMove) - it has no way to reach a SIBLING element
+        // elsewhere in the host window, e.g. MainWindow's pinned sidebar flyout icons docked next to the
+        // main tab strip. Hosts with anything like that subscribe here to hide/restore it for the drag,
+        // rather than this control needing to know about a specific host's layout.
+        public event EventHandler<bool> ReorderDragging;
 
         public StretchTabControl()
         {
@@ -216,7 +224,12 @@ namespace CNC.Controls
 
         private void OnReorderMouseMove(object sender, MouseEventArgs e)
         {
-            if (draggedTab == null || e.LeftButton != MouseButtonState.Pressed)
+            // Captured into a local, not read back off the field again below: Items.Remove/Insert fires
+            // SelectionChanged synchronously, which re-enters this control's own handling and can clear the
+            // draggedTab FIELD mid-method - confirmed on real hardware as a NullReferenceException on
+            // draggedTab.IsSelected below despite an equivalent guard already having checked it non-null.
+            var dragged = draggedTab;
+            if (dragged == null || e.LeftButton != MouseButtonState.Pressed)
                 return;
 
             var pos = e.GetPosition(this);
@@ -227,20 +240,31 @@ namespace CNC.Controls
                     return;
                 dragging = true;
                 Mouse.OverrideCursor = Cursors.SizeWE;
+                // Live header reorder is what's wanted here (tabs visibly swap position as you drag over
+                // them) - the actual complaint was the CONTENT pane repainting/flickering along with it each
+                // tick (Items.Remove/Insert momentarily unseats the selected TabItem, which the default
+                // template's ContentPresenter reacts to). Rather than fight that, hide the consequence: clip
+                // this whole control down to just the header row's own rectangle for the duration of the drag,
+                // so only the tab strip is visibly live - the content area is fully invisible (not merely
+                // static) until drop, when the clip lifts and the settled page reappears once, clean.
+                double headerHeight = FindTabPanel(this)?.ActualHeight ?? dragged.ActualHeight;
+                if (headerHeight > 0d)
+                    Clip = new RectangleGeometry(new Rect(0, 0, ActualWidth, headerHeight));
+                ReorderDragging?.Invoke(this, true);
             }
 
             // Tab header under the pointer (null over content or empty strip -> no move this tick).
             var over = FindTabItem(VisualTreeHelper.HitTest(this, pos)?.VisualHit);
-            if (over == null || over == draggedTab)
+            if (over == null || over == dragged)
                 return;
 
             int to = Items.IndexOf(over);
-            if (to < 0 || Items.IndexOf(draggedTab) < 0)
+            if (to < 0 || Items.IndexOf(dragged) < 0)
                 return;
 
-            Items.Remove(draggedTab);
-            Items.Insert(to, draggedTab);
-            draggedTab.IsSelected = true;
+            Items.Remove(dragged);
+            Items.Insert(to, dragged);
+            dragged.IsSelected = true;
             movedThisDrag = true;
             QueueUpdate();
         }
@@ -248,7 +272,11 @@ namespace CNC.Controls
         private void EndReorder()
         {
             if (dragging)
+            {
                 Mouse.OverrideCursor = null;
+                Clip = null;   // reveal the settled content pane again - see OnReorderMouseMove's own comment
+                ReorderDragging?.Invoke(this, false);
+            }
             if (movedThisDrag)
             {
                 // Self-persist when we own the order; otherwise let the host store it (main bar / Tools).
@@ -266,6 +294,23 @@ namespace CNC.Controls
             draggedTab = null;
             dragging = false;
             movedThisDrag = false;
+        }
+
+        // The header row - always a TabPanel regardless of theme/template (that's the WPF-mandated
+        // IsItemsHost part for TabControl) - so this is more reliable than hunting for a theme-specific
+        // template part name.
+        private static TabPanel FindTabPanel(DependencyObject root)
+        {
+            if (root is TabPanel tp)
+                return tp;
+            int n = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < n; i++)
+            {
+                var found = FindTabPanel(VisualTreeHelper.GetChild(root, i));
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
 
         // Walk the tree from a hit visual up to the enclosing TabItem, if any (visual parents, with a logical

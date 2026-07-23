@@ -37,7 +37,7 @@
                         <!-- Label kept as its own localized control (x:Uid); NumericField's own Label is
                              suppressed (empty + ColonAt 0) so it contributes only the recessed-surface/
                              focus-glow chrome, not a second copy of the caption. -->
-                        <local:NumericField x:Name="cvRPM" Label="" ColonAt="0" Value="{Binding Path=RPM, Mode=TwoWay}" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource LogicalNotConverter}}" Format="####0" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Center"/>
+                        <local:NumericField x:Name="cvRPM" Label="" Unit="" ColonAt="0" Value="{Binding Path=RPM, Mode=TwoWay}" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource LogicalNotConverter}}" Format="####0" HorizontalAlignment="Left" Margin="2,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" IsEnabled="{Binding Path=IsSpindleStateEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Orientation="Vertical" Margin="10,2,0,0">

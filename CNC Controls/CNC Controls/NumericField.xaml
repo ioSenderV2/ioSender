@@ -7,6 +7,9 @@
              mc:Ignorable="d" 
              d:DesignHeight="28" d:DesignWidth="175"
              x:Name="numericField">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid x:Name="grid">
         <Grid.ColumnDefinitions>
             <!-- Label column: Auto so it grows with the font (no truncation at high DPI), with ColonAt
@@ -33,6 +36,13 @@
             <Border.Style>
                 <Style TargetType="Border">
                     <Style.Triggers>
+                        <!-- Read-only: flat muted fill instead of the editable gradient, and the focus-glow
+                             trigger below never applies (a read-only field can't take keyboard focus) - a
+                             read-only field should read as "informational" at a glance, not inviting a click. -->
+                        <DataTrigger Binding="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                            <Setter Property="Background" Value="#FFF2F1ED"/>
+                            <Setter Property="BorderBrush" Value="#FFE2DFD6"/>
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=data}" Value="True">
                             <Setter Property="BorderBrush" Value="#0A84FF"/>
                             <Setter Property="BorderThickness" Value="2"/>
@@ -62,10 +72,17 @@
                             <MenuItem Command="Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                             <Separator/>
                             <MenuItem x:Name="miReset" x:Uid="mnu_reset" Header="Reset to default" Click="ResetToDefault_Click"/>
+                            <!-- Header/enabled state set in Data_ContextMenuOpening (needs the field's live
+                                 EffectiveUnit/Value) - only meaningful for an mm/in length field, hidden via
+                                 IsEnabled=False otherwise rather than removed, so the menu shape stays stable. -->
+                            <MenuItem x:Name="miAltUnit" Click="ShowAlternateUnit_Click"/>
                         </ContextMenu>
                     </local:NumericTextBox.ContextMenu>
                 </local:NumericTextBox>
+                <!-- Visibility only - EffectiveUnit/Unit are untouched by ShowUnit, so a hidden-label field
+                     still fully participates in IsImperial conversion and the panel unit-toggle menu. -->
                 <Label x:Name="unit" x:Uid="lbl_NumFieldUnit" Content="{Binding Path=EffectiveUnit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                       Visibility="{Binding Path=ShowUnit, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"
                        Padding="3,0,0,0" Foreground="#FF8E8E93" HorizontalAlignment="Left" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
