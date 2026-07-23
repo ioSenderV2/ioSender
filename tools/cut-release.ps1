@@ -51,7 +51,14 @@ $previousThrough = 0
 if (-not $DryRun) {
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
     try {
-        $prev = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'ioSender-cut-release' }
+        # Authenticated when GH_TOKEN is set (always true in the CI workflow) - an unauthenticated
+        # call shares the runner IP's public 60/hr rate limit with everything else GitHub-side that
+        # box does, and a 403 there previously got silently swallowed as "no previous release",
+        # seeding version 2.1 and colliding with the real (long-published) v2.1 tag at publish time
+        # (422 already_exists) - confirmed in CI 2026-07-23. An authenticated call gets 5000/hr.
+        $headers = @{ 'User-Agent' = 'ioSender-cut-release' }
+        if ($env:GH_TOKEN) { $headers['Authorization'] = "Bearer $($env:GH_TOKEN)" }
+        $prev = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
         $tag = $prev.tag_name -replace '^v', ''
         # Only trust it as a real version if it's "major.minor" - guards against the old
         # unversioned rolling "latest" release (tag literally "latest") still being the
@@ -65,10 +72,14 @@ if (-not $DryRun) {
         }
     } catch {
         # A 404 (no releases yet) is an expected outcome, not a bug - the very first run hits this.
+        # Anything else (rate limit, timeout, ...) must NOT be treated as "no previous release" -
+        # silently guessing here seeds a version that can collide with (or worse, silently
+        # UNDERCOUNT below) real release history. Fail loudly instead; the workflow step just
+        # reruns cleanly on the next push.
         if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) {
             Write-Host "No previous release found (expected on the very first run)." -ForegroundColor Yellow
         } else {
-            Write-Host "WARN: releases/latest lookup failed unexpectedly: $($_.Exception.Message) - treating as no previous release." -ForegroundColor Yellow
+            Fail "releases/latest lookup failed unexpectedly: $($_.Exception.Message) - refusing to guess a version. Rerun."
         }
     }
 }
