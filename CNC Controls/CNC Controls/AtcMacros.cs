@@ -431,7 +431,11 @@ namespace CNC.Controls
                     ct,
                     response => {
                         rawResponses.Add(response);
-                        if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("["))
+                        // Realtime status reports ("<Idle|...>") keep arriving during this read - the poll
+                        // thread isn't paused by SuspendProcessing, only rerouted here - and must be filtered
+                        // out same as "ok"/error/"[...", or a poll landing mid-dump corrupts the checksum text
+                        // and false-trips the Outdated gate (confirmed root cause of the Alarm-state repro).
+                        if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[") && !response.StartsWith("<"))
                             sb.AppendLine(response);
                     },
                     a => model.OnResponseReceived += a,

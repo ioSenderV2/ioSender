@@ -34,21 +34,21 @@
             <!-- MDI / Signals / Status moved to the fixed main-window run-control bar (Phase 2c). -->
             <TextBlock Text="{Binding Path=ParserState}" Visibility="{Binding Path=IsParserStateLive, Converter={StaticResource IsVisibleConverter}}" TextWrapping="NoWrap" Margin="5,0,0,2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"/>
         </StackPanel>
-        <!-- Left sidebar / center workspace (Program-3D View-Console tabs) / right sidebar, now a Grid with
-             draggable GridSplitters between each pair instead of a DockPanel's fixed Left/fill/Right docking -
-             a DockPanel gives no way for the user to resize a docked region against its neighbour. Left/right
-             columns stay Auto (size-to-content, same as the DockPanel.Dock behavior they replace) with their
-             original MinWidth floors; dragging a splitter overrides Auto with an explicit pixel width, the
-             normal WPF idiom for a resizable Auto column. rhGrid's OWN internal mainSlotsLeft/mainSlotsRight
-             split keeps its existing MaxWidth=260 cap on the right one - not made draggable here, that width
-             was deliberately tuned to protect the center workspace, not the same kind of thing as these three
-             top-level regions. -->
+        <!-- Left sidebar / center workspace (Program-3D View-Console tabs) / right sidebar. Left and right
+             columns are plain Auto (size to whichever configured panel is widest) with MinWidth floors; the
+             center workspace is "*" and absorbs whatever's left. Tried draggable GridSplitters between each
+             pair here instead (2026-07-23) but abandoned it: Auto+GridSplitter only behaves the way a splitter
+             needs to (drag directly maps to a boundary that tracks the visible content) when the column's
+             content actually stretches to fill it; jogControl/mainSlotsLeft/mainSlotsRight don't, so dragging
+             just opened dead whitespace between the visible controls and the splitter instead of resizing
+             anything - confirmed by direct drag testing, not just visual guesswork. Back to fixed-to-content
+             Auto columns; rhGrid's own internal mainSlotsLeft/mainSlotsRight split keeps its MaxWidth=260 cap
+             on the right one for the same reason it always had it - protecting the center workspace from a
+             wide main-panel's own natural content width (Outline's unwrapped warning text in particular). -->
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" MinWidth="220"/>
-                <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
@@ -60,17 +60,11 @@
                 </ScrollViewer>
             </DockPanel>
 
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                          Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
-
             <!-- Center workspace (program list / 3D view / console) - extracted to JobWorkspace (Phase 2a).
                  Run controls (JobControl) now live in the fixed main-window bottom bar (Phase 2c). -->
-            <local:JobWorkspace x:Name="workspace" Grid.Column="2"/>
+            <local:JobWorkspace x:Name="workspace" Grid.Column="1"/>
 
-            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                          Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
-
-            <Grid x:Name="rhGrid" Grid.Column="4">
+            <Grid x:Name="rhGrid" Grid.Column="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>

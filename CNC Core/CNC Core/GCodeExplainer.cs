@@ -3,9 +3,9 @@
  *
  * Turns parsed g-code (the GCodeParser's semantic tokens) into plain-language explanations, so a novice
  * hovering a line in the program view sees what it does ("Cutting move to X 125.4, Y 0; feed 800 mm/min")
- * instead of raw g-code. Works off the tokens the loader already produced (keyed to a block by LineNumber),
- * so it inherits the parser's modal state - a bare "X10 Y0" continuation line still reads correctly as a
- * rapid or a cut.
+ * instead of raw g-code. Works off the tokens the loader already produced for that exact line (GCodeBlock.
+ * Tokens), so it inherits the parser's modal state - a bare "X10 Y0" continuation line still reads correctly
+ * as a rapid or a cut.
  *
  * English only for now, but every phrase is produced here (not scattered), so it can be localized later
  * (LibStrings) without touching the call sites.
@@ -118,12 +118,25 @@ namespace CNC.Core
                 return lines;
             }
 
+            // The parser emits tokens in a fixed, per-modal-group order (distance mode, then feed-rate mode,
+            // etc.) - NOT the order their words actually appear in the line, since that order is semantically
+            // meaningless to the controller. But it reads oddly to a person hovering "G90G94" and seeing the
+            // G94 bullet listed first - so re-sort the bullets to match where each token's own word (e.g.
+            // "G90") is actually found in the raw text. A token whose word can't be found as-is (rare - e.g.
+            // a plain comment, whose Command is Undefined) keeps its original relative position, at the end.
+            string lineText = block.Data ?? string.Empty;
+            // OrderBy is a stable sort, so ties (both -1/not-found, or a genuine coincidence) keep their
+            // original relative order without needing an explicit tiebreaker field.
+            var phrases = new List<KeyValuePair<int, string>>();
             foreach (var t in lineTokens)
             {
                 string phrase = ExplainToken(t);
-                if (!string.IsNullOrEmpty(phrase))
-                    lines.Add(phrase);
+                if (string.IsNullOrEmpty(phrase))
+                    continue;
+                int pos = lineText.IndexOf(t.ToString(), System.StringComparison.OrdinalIgnoreCase);
+                phrases.Add(new KeyValuePair<int, string>(pos < 0 ? int.MaxValue : pos, phrase));
             }
+            lines.AddRange(phrases.OrderBy(p => p.Key).Select(p => p.Value));
 
             return lines;
         }

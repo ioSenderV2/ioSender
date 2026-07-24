@@ -146,6 +146,19 @@ namespace CNC.Core
         // file loads (the Program list then renders flat, ungrouped).
         public string Section { get; set; }
         public bool IsSectionStart { get; set; }
+
+        // The parser's own tokens for exactly this line, captured at parse time (see GCodeJob.ParseFileLines/
+        // AddBlock, which slice Parser.Tokens[tokenStart..] right after parsing this block). Used by the
+        // program list's hover-explain feature (GCodeListControl.BuildExplanation) instead of matching tokens
+        // to a block via GCodeToken.LineNumber == LineNum - that match is unreliable whenever a file mixes
+        // explicit N-words with unnumbered lines (common: a post-processor injects N only around tool
+        // changes), because GCodeToken.LineNumber comes from the file's OWN (author-chosen, arbitrary)
+        // N-word, last-seen and persisting across unnumbered lines, while LineNum is ioSender's unrelated
+        // internal sequential count - the two numbering spaces can coincidentally collide anywhere in the
+        // file, which read as "the tooltip is off by one" but wasn't actually about line adjacency. Empty for
+        // blocks not built through GCodeJob (e.g. a wizard's own SetProgram(blocks)) - callers already treat
+        // an empty/no token list as "explain from raw text instead", so this is a safe default.
+        public List<GCodeToken> Tokens { get; set; } = new List<GCodeToken>();
     }
 
     public class GCodeJob
@@ -346,7 +359,7 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart) });
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -432,7 +445,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart) });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();

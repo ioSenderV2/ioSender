@@ -34,6 +34,13 @@ namespace CNC.Controls
         {
             new ActionInfo { Id = "UiScaleUp",   Label = "Zoom in (UI scale)",  DefaultKey = Key.OemPlus,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "UiScaleDown", Label = "Zoom out (UI scale)", DefaultKey = Key.OemMinus, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+#if DEBUG
+            // Debug-only diagnostic (MainWindow.Screenshot_Action) - renders the main window to a PNG and
+            // prompts where to save it. Not something a released build should expose as a bindable action,
+            // so the whole row (catalog entry, handler registration, and thus the Keyboard & Controller UI
+            // for it) only exists in a Debug build.
+            new ActionInfo { Id = "Screenshot", Label = "Debug: Screenshot main window", DefaultKey = Key.F6, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+#endif
             // Demo-shoot RTSP camera control (RtspCamerasControl / ObsBridge.SetCameraRecording) - only
             // does anything with -demomarker's OBS bridge armed and that camera's hotkey names configured.
             new ActionInfo { Id = "ObsCamAStart", Label = "OBS: Front Left camera - Start recording", DefaultKey = Key.F9,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },

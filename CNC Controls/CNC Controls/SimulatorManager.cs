@@ -8,6 +8,17 @@ namespace CNC.Controls
     {
         private static Process started = null;
 
+        // Hooks into MainWindow's connection-switch machinery for the Job tab's Run dropdown "Simulate"
+        // mode (JobControl.xaml.cs) - CNC Controls cannot reference the app project directly (MainWindow
+        // lives there, and the dependency runs the other way), so MainWindow registers these once at
+        // startup, same pattern as AppConfig.DeviceEnumerator. SwitchToSimulatorForRun disconnects from
+        // whatever's currently live and connects to the bundled simulator, returning false (and leaving the
+        // connection as it found it) if the simulator isn't available; RestoreConnectionAfterSimulate
+        // reconnects to whatever was live before, called once the simulated run ends (finish, error, or
+        // abort - see JobControl.ResetRunModeAfterJob).
+        public static Func<bool> SwitchToSimulatorForRun { get; set; }
+        public static Action RestoreConnectionAfterSimulate { get; set; }
+
         // Locate a bundled executable (simulator or validator): looks in the app folder's "simulator"
         // subfolder first, then the app folder itself. Returns the full path, or null if not found.
         public static string FindExecutable(string exeName)

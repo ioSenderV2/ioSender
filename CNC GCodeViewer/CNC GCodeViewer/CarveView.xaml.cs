@@ -301,7 +301,7 @@ namespace CNC.Controls.Viewer
                 Length = Math.Max(sx, 1d),
                 Width = Math.Max(sy, 1d),
                 Height = h,
-                Fill = new SolidColorBrush(Color.FromArgb(90, 214, 184, 140))   // translucent tan stock
+                Fill = new SolidColorBrush(Color.FromArgb(90, 230, 193, 138))   // translucent tan stock - matches the carve mesh's new brighter top color
             });
         }
 
@@ -525,8 +525,13 @@ namespace CNC.Controls.Viewer
             var model = new GeometryModel3D
             {
                 Geometry = carveMesh,
-                Material = MaterialHelper.CreateMaterial(Color.FromRgb(214, 184, 140)),      // light tan stock (carve reads better)
-                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(178, 150, 110))
+                // Front/back were too close in value (214,184,140 / 178,150,110) - with only one light and no
+                // vertex colors, a carved pocket's near-vertical walls read almost the same tan as the flat
+                // top and the whole surface looked muddy. Pushed apart: a brighter, more saturated top and a
+                // markedly darker back so back-facing normals (pocket walls, the underside of an overhang)
+                // stand out clearly instead of blending in.
+                Material = MaterialHelper.CreateMaterial(Color.FromRgb(230, 193, 138)),
+                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(96, 74, 54))
             };
             carveVisual = new ModelVisual3D { Content = model };
         }

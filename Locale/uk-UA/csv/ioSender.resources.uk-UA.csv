@@ -158,3 +158,9 @@ ioSender.g.en-US.resources:heightmapview.baml,hm_load:System.Windows.FrameworkEl
 ioSender.g.en-US.resources:startjobview.baml,cbxFixture:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Fixture to reference for this job (defined in Machine Setup Wizard &gt; Fixture definitions).
 ioSender.g.en-US.resources:startjobview.baml,cbxWcs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Work coordinate system (G54-G59) to set this job's origin in.
 ioSender.g.en-US.resources:mainwindow.baml,btnAllRecord:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,OBS Control - All: click to start/stop every camera together
+ioSender.g.en-US.resources:startjobview.baml,cbiProbeTouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probes by electrical continuity - works on conductive stock directly, or on non-conductive stock via a separate metal touch plate (see 'Stock conductive' below)."
+ioSender.g.en-US.resources:startjobview.baml,ls_cornermargin:System.Windows.Controls.ContentControl.Content,Label,True,True,,Safe Z delta:
+ioSender.g.en-US.resources:startjobview.baml,ls_grpStock:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Stock
+ioSender.g.en-US.resources:startjobview.baml,ls_grpActions:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Actions
+ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Set origin in:
+ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on). Off: still probes/measures and reports the numbers, but leaves the selected WCS untouched."

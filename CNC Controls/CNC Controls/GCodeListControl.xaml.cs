@@ -144,6 +144,14 @@ namespace CNC.Controls
         // AND the balloon (the gap lets the pointer travel onto the balloon to click it).
         private System.Windows.Threading.DispatcherTimer _explainShow, _explainClose;
         private DataGridRow _hoverRow;
+        // Captured at MouseEnter, not re-read from _hoverRow.Item when the (450ms-delayed) show-timer fires -
+        // EnableRowVirtualization means the SAME DataGridRow container can be recycled onto a DIFFERENT
+        // GCodeBlock while the timer is pending (a scroll swaps a container's Item without a matching
+        // MouseLeave/MouseEnter pair, since the container itself never physically left the pointer), which
+        // was showing the explanation for whatever line the row got recycled to - usually adjacent to, not
+        // the line the pointer was actually still resting on. Pinning the block at the moment of entry means
+        // the explanation always matches what the user pointed at, not whatever the container recycled to.
+        private GCodeBlock _hoverBlock;
         private string _explainText = string.Empty;
 
         private void EnsureExplainTimers()
@@ -160,9 +168,10 @@ namespace CNC.Controls
         {
             EnsureExplainTimers();
             _hoverRow = sender as DataGridRow;
+            _hoverBlock = _hoverRow?.Item as GCodeBlock;
             _explainClose.Stop();
             _explainShow.Stop();
-            if (_hoverRow?.Item is GCodeBlock)
+            if (_hoverBlock != null)
                 _explainShow.Start();
         }
 
@@ -175,8 +184,8 @@ namespace CNC.Controls
 
         private void ShowExplain()
         {
-            var block = _hoverRow?.Item as GCodeBlock;
-            if (block == null || !_hoverRow.IsMouseOver)
+            var block = _hoverBlock;
+            if (block == null || _hoverRow == null || !_hoverRow.IsMouseOver)
                 return;
             _explainText = BuildExplanation(block);
             explainText.Text = _explainText;
@@ -209,54 +218,27 @@ namespace CNC.Controls
 
         private string BuildExplanation(GCodeBlock block)
         {
-            // A background load appends to GCode.File.Tokens on a worker thread - don't enumerate it mid-load
-            // (the parse is still running, or its tail ComputeLimits) or the read races the writer.
+            // A background load is still appending blocks on a worker thread - not wrong to explain a block
+            // that's already in the grid (its own Tokens are set at construction, before it's ever added -
+            // see GCodeJob.ParseFileLines/AddBlock), just politely say so rather than explain a half-loaded
+            // program that's still visibly changing under the pointer.
             if ((DataContext as GrblViewModel)?.IsLoading == true)
                 return "Program is still loading…";
 
-            try
+            var selected = grdGCode.SelectedItems;
+
+            // Multi-row selection that includes the hovered row -> line-by-line breakdown of the selection.
+            if (selected != null && selected.Count > 1 && selected.Contains(block))
             {
-                // Only the loaded-job view (_program == null) matches GCode.File.Tokens by line number; a view
-                // showing its OWN program (a wizard's, via SetProgram(blocks)) must NOT borrow the job's tokens -
-                // its LineNums would collide with unrelated job lines. Pass null -> explain from the raw text.
-                var tokens = _program == null ? GCode.File.Tokens : null;
-                var selected = grdGCode.SelectedItems;
-
-                // Multi-row selection that includes the hovered row -> line-by-line breakdown of the selection.
-                if (selected != null && selected.Count > 1 && selected.Contains(block))
-                {
-                    var blocks = selected.OfType<GCodeBlock>().ToList();
-                    blocks.Sort((a, b) => a.LineNum.CompareTo(b.LineNum));   // program order, not click order
-                    return GCodeExplainer.ExplainSelection(blocks, TokenMapFor(tokens, blocks));
-                }
-
-                var lineTokens = tokens?.Where(t => t.LineNumber == block.LineNum).ToList();
-                return GCodeExplainer.ExplainBlock(block, lineTokens);
+                var blocks = selected.OfType<GCodeBlock>().ToList();
+                blocks.Sort((a, b) => a.LineNum.CompareTo(b.LineNum));   // program order, not click order
+                return GCodeExplainer.ExplainSelection(blocks, blocks.ToDictionary(b => b.LineNum, b => b.Tokens));
             }
-            catch (System.InvalidOperationException)
-            {
-                // Tokens changed under us (a load raced the hover) - explain from the raw text, never throw.
-                return GCodeExplainer.ExplainBlock(block, null);
-            }
-        }
 
-        // Group the program's tokens by LineNumber, but only for the lines we need (the selection).
-        private static Dictionary<uint, List<GCodeToken>> TokenMapFor(List<GCodeToken> tokens, List<GCodeBlock> blocks)
-        {
-            var map = new Dictionary<uint, List<GCodeToken>>();
-            if (tokens == null)
-                return map;
-
-            var wanted = new HashSet<uint>(blocks.Select(b => b.LineNum));
-            foreach (var t in tokens)
-                if (wanted.Contains(t.LineNumber))
-                {
-                    if (!map.TryGetValue(t.LineNumber, out var list))
-                        map[t.LineNumber] = list = new List<GCodeToken>();
-                    list.Add(t);
-                }
-
-            return map;
+            // Each block carries exactly the tokens the parser generated FOR IT (set at construction time -
+            // see GCodeBlock.Tokens) - no line-number matching against a global token list needed, and so no
+            // risk of a coincidental match against an unrelated line's explicit N-word (see Tokens' comment).
+            return GCodeExplainer.ExplainBlock(block, block.Tokens);
         }
 
         private void grdGCode_Drag(object sender, DragEventArgs e)
@@ -279,6 +261,21 @@ namespace CNC.Controls
                 ApplyGrouping(_program == null && (DataContext as GrblViewModel).HasOutline);
             }
             RefreshSourceHighlight();
+            RefreshDataColumnWidth();
+        }
+
+        // Known WPF DataGrid quirk: a Width="*" column (the Data column here) can compute far narrower than
+        // its actual share on a layout pass with no/few realized rows - especially combined with row
+        // virtualization - and only corrects itself once something forces a star-width recalculation (e.g.
+        // the user dragging a column splitter). Toggling the width off Star and back forces that
+        // recalculation. Called on control Loaded AND every time a file finishes loading (IsLoading ->
+        // false below) - at UserControl_Loaded time the grid is still empty (no file loaded yet), so that
+        // alone isn't enough; the recalculation has to run again once real rows exist to measure against.
+        private void RefreshDataColumnWidth()
+        {
+            var dataColumn = grdGCode.Columns[2];
+            dataColumn.Width = new DataGridLength(0);
+            dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -323,6 +320,8 @@ namespace CNC.Controls
                     bool loading = ((GrblViewModel)sender).IsLoading;
                     Cursor = loading ? System.Windows.Input.Cursors.Wait : null;
                     ForceCursor = loading;
+                    if (!loading)
+                        RefreshDataColumnWidth();   // real rows exist now - see RefreshDataColumnWidth's own comment
                     break;
             }
         }

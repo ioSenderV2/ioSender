@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>174 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>177 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -270,6 +270,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Machine Setup's two optional wizard steps now color green instead of staying blank, and share the same macro-status query the SD/ATC gate uses.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr167">167</a></td></tr>
 <tr><td>The shared Run bar's green "press me" highlight came back for the "Generate" label, not just "Run"; Stepper Calibration's Z-gauge reuse-saved-position path now waits for the descend move to genuinely finish before probing.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr173">173</a></td></tr>
 <tr><td>All 5 Tools tabs' labeled inputs now colon-align on a shared column instead of each field's box hugging its own (possibly short) label; each tab's generated .macro file is now named for its own top-level selection (axis/fixture) so switching modes and generating no longer silently overwrites the other mode's saved copy.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr174">174</a></td></tr>
+<tr><td>Run &gt; Simulate switches the live connection to the bundled simulator for one job, then reconnects to the real controller automatically when it ends.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr176">176</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -281,6 +282,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>On an ATC controller the setup gate could dump you at step 6 even though the macros were installed and turned green a moment later</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr88">88</a></td></tr>
 <tr><td>The Machine Setup ATC-macro check now catches a 0-byte or truncated tc/pcorner/pvisecorner.macro on the controller - it used to read as Installed since only the file NAME was checked, not its size, so M6 T8 silently ran the firmware's default tool change instead of the macro.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr123">123</a></td></tr>
 <tr><td>SD Card tab queries its own mount status on activate instead of bailing out to "No card" before the controller has actually reported one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr168">168</a></td></tr>
+<tr><td>Machine Setup's macro-provisioning gate no longer false-trips when a realtime status report interleaves with the checksum read.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr175">175</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -299,6 +301,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Double-click any Job-view center tab's header (Program, 3D View, Console) to pop it into its own borderless window, resizable and Ctrl+Alt+=/- zoomable; double-click that window's title bar to dock it back. Replaces the old Console-only popout special case.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr116">116</a></td></tr>
 <tr><td>ioSenderBatchPost now remaps Fusion's Air/Mist coolant setting to Flood before posting - grbl.cps has no code for Air/Mist and raised "Unsupported 'air' coolant", failing every operation using it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr122">122</a></td></tr>
 <tr><td>Feed rate/Spindle/Outline could stretch wide enough (Outline's wrapped warning text especially) to squeeze the Program/3D View/Console workspace.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr145">145</a></td></tr>
+<tr><td>Hovering a program-list line now reliably explains THAT line (was matching an unrelated line's tokens); Machine/Program limits read as one compact interval per axis instead of two full-width fields.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr177">177</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -562,7 +565,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.25</td></tr>
 <tr><td class="n">173</td><td><a href="#pr173">Generate button green cue restored; Z-gauge reuse WAITIDLE</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+27</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">174</td><td><a href="#pr174">Tools-tab colon alignment; disambiguated .macro filenames</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+20</span> <span class="del">-16</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (174 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1445</span> <span class="del">21</span> <span class="add">+170</span><br><span class="k">Lines:</span> <span class="add">+57790</span> <span class="del">-11153</span></td></tr>
+<tr><td class="n">175</td><td><a href="#pr175">ATC macro gate false-&ldquo;Outdated&rdquo; trip fixed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+9</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">176</td><td><a href="#pr176">Run dropdown: new Simulate mode</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+170</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">177</td><td><a href="#pr177">Program-list explain fix; compact limits display</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">26</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+348</span> <span class="del">-105</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (177 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1478</span> <span class="del">21</span> <span class="add">+170</span><br><span class="k">Lines:</span> <span class="add">+58317</span> <span class="del">-11260</span></td></tr>
 </table>
 </div>
 
@@ -3485,6 +3491,50 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">2</td><td class="num del">2</td></tr>
 </table>
 <div class="desc"><p>Two related cleanups to the 5 Tools tabs (Start Job, Stepper Calibration Probe/Scratch, Auto Square, Surface Spoilboard):</p><ul><li><strong>Colon-aligned inputs</strong> &mdash; each row's value box used to stretch from right-after-its-own-label all the way to the tab's right edge, so a short label (&ldquo;Feed rate:&rdquo;) sat next to a huge empty-looking box while a long one (&ldquo;Gauge size 2 (middle):&rdquo;) sat right against it &mdash; and labels of different lengths didn't line up. <code>Grid.IsSharedSizeScope="True"</code> on each tab's root now makes every row's label column match the tab's longest label, so labels right-align on a shared colon and each box grows to fill the space after it.</li><li><strong>Disambiguated generated filenames</strong> &mdash; the diagnostic copy every Generate/Run writes to <code>%AppData%\ioSender\Generated\*.macro</code> was named only for the tool (e.g. <code>stepper_calibration__probe_.macro</code>), so Stepper Cal Probe's XY vs Z modes, Scratch/Auto Square's per-axis runs, and Start Job's per-fixture programs all landed on one shared file &ndash; whichever ran last silently overwrote the others. The distinguishing top-level selection (axis, or fixture name) is now folded into the name passed to both the Generate-time save and Run's own internal save. Surface Spoilboard has no such variant and is unchanged.</li></ul><p class="foot">Builds clean Debug. User-verified the colon alignment visually on Stepper Calibration (Probe) Z mode.</p></div>
+</div>
+<!-- ===== #175 ===== -->
+<div class="pr">
+<h2 id="pr175"><span class="badge">#175</span>ATC macro gate false-trips &ldquo;Outdated&rdquo; when a poll response lands mid-checksum-read</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Reproduced and fixed a long-standing intermittent bug: the Machine Setup wizard's ATC-macro-provisioning gate would sometimes report a freshly-uploaded macro as &ldquo;Outdated&rdquo; and re-trip step 7, even though the controller's filesystem held the exact right bytes.</p><ul><li><strong>Root cause</strong> &mdash; not a race condition as first suspected, but a response-filtering bug: <code>AtcMacros.ReadControllerFile</code> and <code>SDCardView.ReadFileContent</code> both read a controller file via <code>$F&lt;=</code> (dump) while <code>GrblViewModel.SuspendProcessing</code> is set, which reroutes every incoming serial line to the caller unfiltered &mdash; but the poll thread keeps running and sending <code>?</code> the whole time. Neither dump reader excluded realtime status lines (<code>&lt;Idle|...&gt;</code>) from the captured text, so a poll reply landing mid-read got appended straight into the checksum, corrupting it against the freshly-computed embedded checksum.</li><li><strong>Fix</strong> &mdash; both readers now exclude lines starting with <code>&lt;</code>, same as they already excluded <code>ok</code>/<code>error</code>/<code>[</code>.</li></ul><p class="foot">User-verified: launching with the controller already in an unhomed Alarm state &mdash; the condition that most reliably surfaced the race &mdash; no longer trips the gate.</p></div>
+</div>
+<!-- ===== #176 ===== -->
+<div class="pr">
+<h2 id="pr176"><span class="badge">#176</span>Job tab Run dropdown gains a fourth mode: Simulate</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">63</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs (Simulate switch/restore)</td><td class="num add">63</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">29</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml</td><td class="num add">4</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Alongside Run / Dry Run / Check Run, the Job tab's Run dropdown now offers <strong>Simulate</strong>: picking it and pressing Run disconnects from whatever's currently live, connects to the bundled <code>%AppData%\Simulator</code> simulator, streams the loaded job there, and automatically reconnects to the original target once the job finishes, errors, or is aborted.</p><ul><li><strong>AppConfig.ConnectToSimulator</strong> &mdash; connects straight to the bundled simulator without showing the Connect dialog and without persisting it as the new saved startup target (session-only, unlike the existing Connect/ConnectTo paths).</li><li><strong>MainWindow.SwitchToSimulatorForRun / RestoreConnectionAfterSimulate</strong> &mdash; remembers the pre-Simulate target and restores it; a failed restore is left as the normal &ldquo;Not connected&rdquo; state rather than a popup.</li><li><strong>Cross-project hook</strong> &mdash; <code>CNC Controls</code> (where the Run button lives) can't reference <code>MainWindow</code> directly, so the switch/restore functions are wired through two new <code>SimulatorManager</code> static hooks (<code>SwitchToSimulatorForRun</code>/<code>RestoreConnectionAfterSimulate</code>), the same pattern already used for <code>AppConfig.DeviceEnumerator</code>.</li><li>Precondition: only works once a simulator has been built via Settings &gt; Simulator &mdash; Run just shows a message and leaves the connection untouched otherwise.</li></ul><p class="foot">User-verified end to end against a real controller.</p></div>
+</div>
+<!-- ===== #177 ===== -->
+<div class="pr">
+<h2 id="pr177"><span class="badge">#177</span>Program-list hover explanations were matching the wrong line; Machine/Program limits compacted to one line per axis</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">15</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeExplainer.cs</td><td class="num add">18</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">43</td><td class="num del">44</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LimitsBaseControl.xaml.cs</td><td class="num add">62</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LimitsBaseControl.xaml</td><td class="num add">16</td><td class="num del">13</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LimitsControl.xaml</td><td class="num add">5</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml</td><td class="num add">18</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml.cs</td><td class="num add">8</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs (debug screenshot hotkey)</td><td class="num add">84</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">13</td><td class="num del">19</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">58</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A grab-bag of program-view and layout fixes from the same session:</p><ul><li><strong>Hover-explain was matching the wrong line</strong> &mdash; the popup matched a hovered block's tokens via <code>GCodeToken.LineNumber == block.LineNum</code>, but those are two unrelated numbering schemes: <code>LineNum</code> is ioSender's own sequential count, while a token's <code>LineNumber</code> comes from the file's own (author-chosen, often sparse) <code>N</code>-word and just carries over from the last line that had one. The two spaces can coincidentally collide anywhere in a file that mixes explicit and unnumbered lines. <code>GCodeBlock</code> now carries its own <code>Tokens</code> list, sliced directly from the exact range the parser generated for that line &mdash; no line-number matching left at all.</li><li><strong>Explanation bullets now follow source word order</strong> &mdash; the parser emits tokens in a fixed per-modal-group order, not text order, so &ldquo;G90G94&rdquo; was explaining G94 before G90; bullets are now sorted by where each token's own word is actually found in the line.</li><li><strong>Program-list Data column</strong> no longer starts collapsed on file load (a WPF <code>DataGrid</code> quirk where a <code>Width="*"</code> column can under-compute on a layout pass with few realized rows) and no longer has an artificial <code>MinWidth</code> floor cutting off long lines.</li><li><strong>Machine/Program limits</strong> (<code>LimitsBaseControl</code>) &mdash; one line per axis, e.g. <code>X: [0 .. 860) mm</code>, instead of two full-precision fields; trailing zeros dropped; bracket convention is closed at the home/zero end (always exactly reachable), open at the far/travel end (a soft-limit boundary). Also fixed a pre-existing bug where <code>MaxValue</code>'s getter read <code>MinValueProperty</code> by mistake. <code>UnitToggleMenu</code> extended to recognize the new no-<code>NumericField</code> control directly.</li><li><strong>Offsets tab</strong> gains a draggable splitter between the grid and the usage-notes panel.</li><li><strong>Carve (3D) view</strong> &mdash; front/back material contrast increased; the near-flat single-tone stock made pocket walls hard to read.</li><li><strong>Debug-only screenshot hotkey</strong> (Keyboard &amp; Controller &gt; UI zoom group, Debug builds only) &mdash; renders the main window to a PNG and prompts to save it under <code>~/Downloads/ioSenderV2/Screenshots</code>, filename defaulted from the active tab.</li><li>An experimental Job-tab splitter (jog pad vs. the right-hand panel column) was tried and reverted back to the simpler Auto-sized layout after it fought the panels' own content sizing.</li></ul></div>
 </div>
 </section>
 

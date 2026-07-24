@@ -1604,6 +1604,35 @@ namespace CNC.Controls
             return InitConnectedController(appname, model, 0);
         }
 
+        // Connect straight to the bundled %AppData%\Simulator simulator, without showing the dialog - the
+        // Job tab Run dropdown's "Simulate" mode (see MainWindow.SwitchToSimulatorForRun). Same -simulator
+        // startup port-reuse logic as LoadConfig's own simulator branch. Deliberately does NOT Save() - a
+        // Simulate run is session-only and must never silently become the app's saved startup target; the
+        // caller is expected to reconnect to the real target afterward (RestoreConnectionAfterSimulate).
+        // Returns 2 (matching the dialog-cancelled convention) if no simulator has been built yet.
+        public int ConnectToSimulator(string appname, GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
+        {
+            if (!SimulatorManager.AppDataSimulatorPresent())
+                return 2;
+
+            int simPort = 23;
+            if (Base.StartSimulator && !string.IsNullOrEmpty(Base.PortParams))
+            {
+                var parts = Base.PortParams.Split(':');
+                int existing;
+                if (parts.Length == 2 && int.TryParse(parts[1], out existing))
+                    simPort = existing;
+            }
+
+            Base.StartSimulator = true;
+            Base.SimulatorExe = SimulatorManager.AppDataSimulatorExePath();
+            Base.SimulatorArgs = "-p " + simPort;
+            setPort("127.0.0.1:" + simPort, string.Empty);
+            OpenStreamFor(model, dispatcher);
+
+            return InitConnectedController(appname, model, 0);
+        }
+
         // Run the controller handshake (MPG detection, status reporting) once the stream is open.
         private int InitConnectedController(string appname, GrblViewModel model, int status)
         {

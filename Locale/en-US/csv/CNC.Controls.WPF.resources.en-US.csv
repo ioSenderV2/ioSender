@@ -241,10 +241,12 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_dryrun:System.String.$Con
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startModeNormal:System.String.$Content,None,True,True,,Run
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startModeDryRun:System.String.$Content,None,True,True,,Dry Run
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startModeCheck:System.String.$Content,None,True,True,,Check Run
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startModeSimulate:System.String.$Content,None,True,True,,Simulate
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startTipDisabled:System.String.$Content,None,True,True,,Nothing to run yet - load a file (Job tab &gt; Program area) or generate/select a program from a tool tab, then Run becomes available.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startTipNormal:System.String.$Content,None,True,True,,Start the loaded program. (Alt+R)
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startTipDryRun:System.String.$Content,None,True,True,,Start the loaded program in Dry Run: Z offset clear of stock, spindle/coolant forced off, tool changes skipped - watch the toolpath without cutting, spinning, or pausing for a tool swap. (Alt+R)
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startTipCheck:System.String.$Content,None,True,True,,Start grbl check mode ($C): the controller parses the program without moving, to validate it before a real run. (Alt+R)
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_startTipSimulate:System.String.$Content,None,True,True,,Switch to the bundled simulator, run the loaded program there, then reconnect to the real controller once it finishes or is aborted. (Alt+R)
 CNC.Controls.WPF.g.en-US.resources:statuscontrol.baml,str_clearEStop:System.String.$Content,None,True,True,,Clear E-Stop before &lt;Reset&gt;&gt;
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_convBlockOfBlocks:System.String.$Content,None,True,True,,Block: {0}/{1}
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_convNumBlocks:System.String.$Content,None,True,True,,Blocks: {1}
@@ -1166,3 +1168,5 @@ CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGau
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,fld_scpGauge3:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,chk_scpReuseStart:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Reuse last saved starting position
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationprobewizard.baml,chk_scpReuseStart:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Skips the manual jog prompt and rapids straight to the spoilboard-probe starting position saved by the last run. Every run saves its own starting position regardless of this setting, so it's always available once you've run at least once - falls back to the manual jog prompt until then."
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_startModeSimulate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."
+CNC.Controls.WPF.g.en-US.resources:offsetview.baml,mnu_offsetRevertStartup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Restore to value at startup

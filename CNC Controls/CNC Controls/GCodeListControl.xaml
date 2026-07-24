@@ -36,7 +36,7 @@
         <DataGrid.Columns>
             <DataGridTextColumn x:Uid="hdr_block" Header="Block" Binding="{Binding BlockDisplay}" Width="60" MinWidth="60" MaxWidth="70"/>
             <DataGridTextColumn Header="" Binding="{Binding Sent}" Width="*" MinWidth="30" MaxWidth="60"/>
-            <DataGridTextColumn x:Uid="hdr_data" Header="Data" Binding="{Binding DataDisplay}" Width="*" MinWidth="280"/>
+            <DataGridTextColumn x:Uid="hdr_data" Header="Data" Binding="{Binding DataDisplay}" Width="*"/>
         </DataGrid.Columns>
         <DataGrid.ContextMenu>
             <ContextMenu x:Name="ctxMenu" Opened="ctxMenu_Opened">

@@ -51,8 +51,13 @@
     </UserControl.Resources>
     <Grid Background="Transparent">
         <ContentControl Visibility="Collapsed" Content="{StaticResource ProxyElement}"/>
-        <StackPanel Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top">
-        <DataGrid x:Uid="dgrOffsets" x:Name="dgrOffsets" Grid.Row="0" ItemsSource="{Binding}" Width="Auto" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"
+        <Grid Margin="10,10,10,10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="*" MinWidth="150"/>
+        </Grid.ColumnDefinitions>
+        <DataGrid x:Uid="dgrOffsets" x:Name="dgrOffsets" Grid.Column="0" ItemsSource="{Binding}" Width="Auto" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False" HorizontalAlignment="Left" VerticalAlignment="Top"
                             CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False" CanUserSortColumns="False">
             <DataGrid.Resources>
                 <Style TargetType="DataGridCell">
@@ -264,18 +269,19 @@
                 </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
-        <StackPanel Orientation="Vertical" Margin="10,10,10,10">
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" Background="#FFBCBCBC"/>
+        <StackPanel Grid.Column="2" Orientation="Vertical" Margin="10,0,0,0">
             <TextBlock FontWeight="SemiBold" Text="How to edit a work offset:"/>
-            <TextBlock Margin="8,4,0,0" Text="1. Manually jog to the point you want to save."/>
-            <TextBlock Margin="8,2,0,0" Text="2. Select the offset row you want to edit."/>
-            <TextBlock Margin="8,2,0,0" Text="3. Either click Clr to erase it,"/>
-            <TextBlock Margin="8,2,0,0" Text="   or type the X, Y, Z values you want,"/>
-            <TextBlock Margin="8,2,0,0" Text="   or click Get to fill them in with the current machine position."/>
-            <TextBlock Margin="8,2,0,0" Text="4. Click elsewhere to leave the row. G54-G59.3 save automatically; G28, G30, and G92 ask for confirmation first (they store wherever the machine is right now, not a rapid move to a typed target)."/>
+            <TextBlock Margin="8,4,0,0" TextWrapping="Wrap" Text="1. Manually jog to the point you want to save."/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="2. Select the offset row you want to edit."/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="3. Either click Clr to erase it,"/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="   or type the X, Y, Z values you want,"/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="   or click Get to fill them in with the current machine position."/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="4. Click elsewhere to leave the row. G54-G59.3 save automatically; G28, G30, and G92 ask for confirmation first (they store wherever the machine is right now, not a rapid move to a typed target)."/>
             <TextBlock FontWeight="SemiBold" Margin="0,14,0,0" Text="G30 and G59.3 convention on this machine:"/>
-            <TextBlock Margin="8,4,0,0" TextWrapping="Wrap" MaxWidth="820" Text="G30 holds a park location suitable for tool changes. G59.3 holds the position to start TLO probes over the toolsetter probe."/>
-            <TextBlock Margin="8,10,0,0" TextWrapping="Wrap" MaxWidth="820" Text="G92 is different: it always zeroes the work origin at wherever the machine currently is (the standard 'zero here' use of G92), so what it stores is really just today's machine position - use Get, then leave the row, to record it."/>
+            <TextBlock Margin="8,4,0,0" TextWrapping="Wrap" Text="G30 holds a park location suitable for tool changes. G59.3 holds the position to start TLO probes over the toolsetter probe."/>
+            <TextBlock Margin="8,10,0,0" TextWrapping="Wrap" Text="G92 is different: it always zeroes the work origin at wherever the machine currently is (the standard 'zero here' use of G92), so what it stores is really just today's machine position - use Get, then leave the row, to record it."/>
         </StackPanel>
-        </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

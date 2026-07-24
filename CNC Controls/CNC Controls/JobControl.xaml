@@ -20,6 +20,7 @@
         <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Run</system:String>
         <system:String x:Uid="str_startModeDryRun" x:Key="StartModeDryRun">Dry Run</system:String>
         <system:String x:Uid="str_startModeCheck" x:Key="StartModeCheck">Check Run</system:String>
+        <system:String x:Uid="str_startModeSimulate" x:Key="StartModeSimulate">Simulate</system:String>
         <!-- Shown instead of Run/Dry Run/Check Run while a "Generate first" tool tab (Start Job, Stepper
              Calibration, Auto Square, Surface Spoilboard) is focused and hasn't built its program yet - see
              MacroProcessor.SupportsGenerateMode/IsProgramGenerated and UpdateRunButtonLabel. -->
@@ -31,6 +32,7 @@
         <system:String x:Uid="str_startTipNormal" x:Key="StartTipNormal">Start the loaded program. (Alt+R)</system:String>
         <system:String x:Uid="str_startTipDryRun" x:Key="StartTipDryRun">Start the loaded program in Dry Run: Z offset clear of stock, spindle/coolant forced off, tool changes skipped - watch the toolpath without cutting, spinning, or pausing for a tool swap. (Alt+R)</system:String>
         <system:String x:Uid="str_startTipCheck" x:Key="StartTipCheck">Start grbl check mode ($C): the controller parses the program without moving, to validate it before a real run. (Alt+R)</system:String>
+        <system:String x:Uid="str_startTipSimulate" x:Key="StartTipSimulate">Switch to the bundled simulator, run the loaded program there, then reconnect to the real controller once it finishes or is aborted. (Alt+R)</system:String>
         <system:String x:Uid="str_generateTipDisabled" x:Key="GenerateTipDisabled">Set the required inputs on this tab first, then Generate becomes available. (Alt+R)</system:String>
         <system:String x:Uid="str_generateTipReady" x:Key="GenerateTipReady">Build the program from this tab's current inputs. (Alt+R)</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
@@ -136,6 +138,8 @@
                             ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
                     <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
                             ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
+                    <Button x:Uid="btn_startModeSimulate" Content="{StaticResource StartModeSimulate}" Tag="simulate" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                            ToolTip="Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."/>
                 </StackPanel>
             </Border>
         </Popup>

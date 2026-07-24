@@ -375,7 +375,10 @@ namespace CNC.Controls
                 {
                     res = WaitFor.AckResponse<string>(
                         ct,
-                        response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[")) sb.AppendLine(response); },
+                        // Filter realtime status reports too - see AtcMacros.ReadControllerFile for why (poll
+                        // thread keeps running during SuspendProcessing and a "<...>" reply landing mid-dump
+                        // corrupts the read content).
+                        response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[") && !response.StartsWith("<")) sb.AppendLine(response); },
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(row)));

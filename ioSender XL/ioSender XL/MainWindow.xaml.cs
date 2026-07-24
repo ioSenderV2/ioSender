@@ -88,6 +88,12 @@ namespace GCode_Sender
             InitializeComponent();
 
             ui = this;
+
+            // Job tab Run dropdown "Simulate" mode (JobControl.xaml.cs) - CNC Controls can't reference
+            // MainWindow directly (see SimulatorManager's own comment on these hooks), so wire them here,
+            // same pattern as CameraConfig.DeviceEnumerator below.
+            SimulatorManager.SwitchToSimulatorForRun = SwitchToSimulatorForRun;
+            SimulatorManager.RestoreConnectionAfterSimulate = RestoreConnectionAfterSimulate;
 //            GCodeViewer = viewer;
             Title = string.Format(Title, Version);
             BaseWindowTitle = Title;
@@ -881,6 +887,10 @@ namespace GCode_Sender
             ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Core.ObsBridge.SetCameraRecording(1, false); return true; });
             ActionKeyBinder.Register("ObsAppStart", k => { CNC.Core.ObsBridge.SetCameraRecording(2, true); return true; });
             ActionKeyBinder.Register("ObsAppStop", k => { CNC.Core.ObsBridge.SetCameraRecording(2, false); return true; });
+
+#if DEBUG
+            ActionKeyBinder.Register("Screenshot", Screenshot_Action);
+#endif
 
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
@@ -1713,6 +1723,143 @@ namespace GCode_Sender
 
             UpdateSimulatorTint();
         }
+
+        // Job tab Run dropdown "Simulate" support (registered onto SimulatorManager's hooks - see the
+        // constructor). Remembers what was connected before switching to the simulator, so
+        // RestoreConnectionAfterSimulate can put it back once the simulated run ends. Null (nothing to
+        // restore) covers both "wasn't connected to anything real" and "already on the simulator, nothing
+        // to switch" - both leave this unset.
+        private string _preSimulateTarget = null;
+
+        // Switches the live connection to the bundled simulator, remembering the current real-controller
+        // target first. Blocking (launches/connects synchronously), same cost every other connect path here
+        // already pays. Returns false - and leaves the connection exactly as it found it, i.e. still
+        // disconnected if it had to drop the prior one first - if no simulator has been built yet.
+        private bool SwitchToSimulatorForRun()
+        {
+            _preSimulateTarget = (Comms.com != null && Comms.com.IsOpen) ? AppConfig.Settings.Base.PortParams : null;
+
+            if (Comms.com != null && Comms.com.IsOpen)
+                Disconnect();
+
+            var model = (GrblViewModel)DataContext;
+            int res = AppConfig.Settings.ConnectToSimulator(Title, model, App.Current.Dispatcher);
+            bool ok = res == 0 && Comms.com != null && Comms.com.IsOpen;
+            if (ok)
+            {
+                Comms.com.PurgeQueue();
+                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
+                    grbl.Activate(true, ViewType.Startup);
+            }
+            UpdateSimulatorTint();
+            return ok;
+        }
+
+        // Reconnects to whatever was live before SwitchToSimulatorForRun, once the simulated run ends
+        // (finish, error, or abort - see JobControl.ResetRunModeAfterJob). A failed reconnect is left as the
+        // normal disconnected state (status bar reads "Not connected") rather than a popup - per design, the
+        // operator is already looking at the screen right as the job just ended either way.
+        private void RestoreConnectionAfterSimulate()
+        {
+            string target = _preSimulateTarget;
+            _preSimulateTarget = null;
+
+            if (Comms.com != null && Comms.com.IsOpen)
+                Disconnect();
+
+            if (string.IsNullOrEmpty(target))
+                return;   // wasn't connected to anything real before Simulate - stay disconnected
+
+            var model = (GrblViewModel)DataContext;
+            int res = AppConfig.Settings.ConnectTo(Title, model, App.Current.Dispatcher, target);
+            if (res == 0 && Comms.com != null && Comms.com.IsOpen)
+            {
+                Comms.com.PurgeQueue();
+                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
+                    grbl.Activate(true, ViewType.Startup);
+                ForceMachineSetupIfNeeded();
+            }
+            UpdateSimulatorTint();
+        }
+
+#if DEBUG
+        // Debug-only diagnostic hotkey (registered onto ActionKeyBinder above, assignable in Keyboard &
+        // Controller > UI zoom group). Captures the window via RenderTargetBitmap - an in-memory render of
+        // the Visual, not a screen grab, same technique WpfUiTestServer's own /screenshot uses (see
+        // RevealMainWindow's comment) - BEFORE showing the save dialog, so the dialog itself never ends up
+        // in the image. Filename defaults to "app_<current tab>.png" (e.g. app_start_job.png).
+        private bool Screenshot_Action(Key key)
+        {
+            byte[] png;
+            try
+            {
+                double dpiX = 96.0, dpiY = 96.0;
+                var src = PresentationSource.FromVisual(this);
+                if (src?.CompositionTarget != null)
+                {
+                    dpiX *= src.CompositionTarget.TransformToDevice.M11;
+                    dpiY *= src.CompositionTarget.TransformToDevice.M22;
+                }
+                int w = Math.Max(1, (int)Math.Round(ActualWidth * dpiX / 96.0));
+                int h = Math.Max(1, (int)Math.Round(ActualHeight * dpiY / 96.0));
+                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, dpiX, dpiY, System.Windows.Media.PixelFormats.Pbgra32);
+                rtb.Render(this);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+                using (var ms = new System.IO.MemoryStream())
+                {
+                    encoder.Save(ms);
+                    png = ms.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("Screenshot failed: " + ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return true;
+            }
+
+            string tabName = "tab";
+            var d = TabRegistry.DescriptorByName(UIViewModel.CurrentView?.ViewType.ToString());
+            if (d != null && !string.IsNullOrWhiteSpace(d.Label))
+                tabName = SanitizeForFilename(d.Label);
+
+            string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "ioSenderV2", "Screenshots");
+            try { System.IO.Directory.CreateDirectory(dir); } catch { }
+
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                InitialDirectory = dir,
+                FileName = "app_" + tabName + ".png",
+                Filter = "PNG image|*.png",
+                DefaultExt = ".png",
+                AddExtension = true
+            };
+            if (dlg.ShowDialog(this) == true)
+            {
+                try { System.IO.File.WriteAllBytes(dlg.FileName, png); }
+                catch (Exception ex) { AppDialogs.Show("Could not save screenshot: " + ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Exclamation); }
+            }
+
+            return true;
+        }
+
+        // "Start Job" -> "start_job"; strips anything that isn't a letter/digit, collapsing runs of
+        // whitespace/punctuation into a single underscore.
+        private static string SanitizeForFilename(string label)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in label.Trim().ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(c))
+                    sb.Append(c);
+                else if (sb.Length > 0 && sb[sb.Length - 1] != '_')
+                    sb.Append('_');
+            }
+            while (sb.Length > 0 && sb[sb.Length - 1] == '_')
+                sb.Length--;
+            return sb.Length > 0 ? sb.ToString() : "tab";
+        }
+#endif
 
         // "Prefer network connection": after a serial/USB connection whose $I reported an IP, probe <ip>:23 and,
         // if it answers, switch the live connection from serial to the network. Called from JobView once the

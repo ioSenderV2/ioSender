@@ -59,6 +59,19 @@ namespace CNC.Controls
                     anyMm = true;
             }
 
+            // LimitsBaseControl (Machine/Program limits) has no NumericField of its own any more - it builds
+            // its "[min .. max] unit" text by hand from the inherited IsImperial flag instead - so it needs
+            // its own enumeration here to still be found by this menu.
+            foreach (var limits in UIUtils.FindLogicalChildren<LimitsBaseControl>(box))
+            {
+                if (!NumericProperties.IsLengthUnit(limits.Unit))
+                    continue;
+                if (NumericField.GetIsImperial(limits))
+                    anyIn = true;
+                else
+                    anyMm = true;
+            }
+
             if (!anyMm && !anyIn)
                 return;   // nothing convertible in this panel - no menu to show
 

@@ -4,12 +4,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
-             mc:Ignorable="d" 
-             d:DesignWidth="216">
+             mc:Ignorable="d"
+             d:DesignWidth="160">
     <UserControl.Resources>
         <ResourceDictionary Source="SharedStyles.xaml"/>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_programLimits" x:Name="grpLimits" Header="Program limits" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216">
+    <!-- MinWidth was 216, tuned for the old two-field-per-axis layout - the new single-interval display
+         (LimitsBaseControl) is much narrower, so this is dropped in favor of Auto sizing to content. -->
+    <GroupBox x:Uid="grp_programLimits" x:Name="grpLimits" Header="Program limits" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Center" VerticalAlignment="Top">
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,5,0,5">
             <local:LimitsBaseControl x:Name="axisX" Label="X"/>
             <local:LimitsBaseControl x:Name="axisY" Label="Y" Style="{StaticResource YAxisVisibleStyle}"/>

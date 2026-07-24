@@ -20,83 +20,60 @@ Downloads the latest build, installs it to `%LocalAppData%\Programs\ioSender`, a
 
 ---
 
-## ioSender — a gcode sender for grblHAL and Grbl controllers
+## Highlights
 
-Please check out the [Wiki](https://github.com/terjeio/Grbl-GCode-Sender/wiki) for further details.
+- **All-in-one Job tab** — DRO, jogging (on-screen + keyboard, up to 9 axes), program list, live 3D toolpath/carve view, and console in one resizable layout, with a fixed run-control bar (Home/Unlock/Reset/Run/Feed Hold/Stop) always visible at the bottom.
+- **Run, Dry Run, Check Run, or Simulate** — a single Run button whose dropdown picks the mode: dry-run watches the toolpath with spindle/coolant forced off and Z clear of stock, Check Run validates via grblHAL's `$C`, and Simulate switches the connection to a bundled grblHAL simulator for the run and switches back automatically when it ends.
+- **Guided Start Job / Stepper Calibration / Auto Square / Surface Spoilboard wizards** — each builds and runs its own program from on-screen inputs, no hand-written g-code required.
+- **Machine Setup wizard** — walks a fresh or newly-flashed controller through homing, ATC macro provisioning, and first-run checks.
+- **Advanced settings editor** — grbl/grblHAL `$`-settings presented with on-screen documentation, dynamically generated from data files and/or the controller's own reported settings.
+- **Offsets, Tools, Probing, Height Map, SD Card** tabs, each covered in the online manual.
+- **Lathe mode**, including conversational threading on a grblHAL controller with spindle-sync support.
+- **Bundled/matched simulator support** — a grblHAL simulator built to match your connected controller's options, launched from Settings, `-simulator`, or the Run dropdown's Simulate mode, with no manual download/build step.
+- **ioSender XL** — an alternate main window with fully configurable, drag-to-place panels (a "main page editor") and pinnable flyouts, for a layout tuned to your machine and workflow.
+- Localized into 7 languages (see [`Locale/`](Locale)) via `x:Uid`-driven LocBaml resources.
 
-8-bit Arduino controllers needs _Toggle DTR_ selected in order to reset the controller on connect. Behaviour may be erratic if not set.
+See [`Overview.html`](Overview.html) (or the [online version](https://iosenderv2.github.io/ioSender/overview.html)) for the complete, versioned changelog — every feature and fix, with a description.
 
-![Toggle DTR](Media/Sender8.png)
+#### Testing without hardware
 
-#### Edge pre-releases
+No board yet? Settings → Simulator builds a grblHAL simulator matched to whichever controller options you want to test against — no separate download or manual build required. You can also launch straight into it with `ioSender.exe -simulator`, or pick **Simulate** from the Job tab's Run dropdown to run just one job against the simulator and automatically reconnect to your real controller afterward. Jogging, running programs, and settings all work; g-codes that need real input (e.g. probing) don't.
 
-Edge pre-releases can be [downloaded from here](https://www.io-engineering.com/downloads), they contains changes yet to be incorporated in a main release and might be buggy and even break existing functionality.  
-Use with care and please [post feedback](https://github.com/terjeio/ioSender/discussions/436) on any issues encountered!
+#### Releases
 
-No prereleases yet for v2.0.48.
-
-#### General
-
-If you want to test ioSender with grblHAL but do not have a board yet you can use the [grblHAL simulator](https://github.com/grblHAL/Simulator).
-Build it with the [Web Builder](https://svn.io-engineering.com:8443/?driver=Simulator&board=Windows), unpack the .exe-files in the downloaded .zip somewhere and
-open a command window (cmd or PowerShell) in the folder by \<Shift\>+Right clicking in it, select _Open PowerShell window here_ or
-_Open command window here_ from the popup menu to open it.
-Then find your computers IP address by typing `ipconfig` - the IP address can be found in the report generated.  
-Run the simulator by typing `./grblHAL_sim -p 23` - 23 is the default Telnet port number and you may have to change it if a Telnet server is already running on the machine.
-Leave the window open.  
-Now start ioSender and select the _Network_ tab in the sender connection dialog, change the port number if you run the simulator with a different port,
-type in your computers IP address and click _Ok_ to connect.  
-You can run gcode programs, jog, access settings etc. but _not_ use gcodes that needs input - e.g. probing.  
-The simulator can be stopped by typing \<Ctrl\>+C in the command window or by closing it.
-
-If you ship ioSender with a prebuilt simulator for convenience, include the simulator executable (named `simulator.exe` or equivalent) in the installer .zip so it is placed next to the ioSender executable. The connection dialog has a new "Simulator" tab which can optionally start a local simulator and connect to `127.0.0.1:<port>` (default port 23).
+Stable builds are published as versioned GitHub Releases — see the [Releases page](https://github.com/ioSenderV2/ioSender/releases) or use the [Quick install](#-quick-install-windows-no-build-tools-needed) script above, which always grabs the latest. Dev builds (unreleased, built straight off `master`) are for testing only.
 
 ---
 
-See the [Quick install](#-quick-install-windows-no-build-tools-needed) section above to install V2, and [`Overview.html`](Overview.html) for the full changelog.
+## Some UI examples
+
+![Job tab — main run screen](Media/job-main.png)
+
+Job tab: DRO, jogging, program list, and run controls together, with the fixed run-control bar always visible at the bottom.
+<br><br>
+
+![3D toolpath / carve view](Media/3d-carve-view.png)
+
+3D view: live toolpath and material-removal (carve) preview, tool marker updates as the job runs.
+<br><br>
+
+![ioSender XL — configurable panel layout](Media/xl-panel-layout.png)
+
+ioSender XL: the same controller functionality in a fully configurable, drag-to-place panel layout — pick which panels appear where, and pin flyouts (Offsets, Machine Position, ...) open.
+<br><br>
+
+![Machine Setup wizard](Media/machine-setup-wizard.png)
+
+Machine Setup wizard: guides a fresh or newly-flashed controller through homing and ATC macro provisioning.
+<br><br>
+
+![Advanced grbl/grblHAL settings editor](Media/settings-editor.png)
+
+Advanced settings editor, with on-screen documentation. The UI is generated dynamically from data files and/or the controller's own reported settings.
+<br><br>
+
+![Probing options](Media/probing.png)
+
+Probing tab.
 
 ---
-
-Some UI examples:
-
-![Sender](Media/Sender.png)
-
-Main screen.
-<br><br>
-
-![3D view](Media/Sender2.png)
-
-3D view of program, with live update of tool marker.
-<br><br>
-
-![3D view](Media/Sender2_XL.png)
-
-XL version, German translation.
-<br><br>
-
-![Jog flyout](Media/Sender7.png)
-
-Jogging flyout, supports up to 9 axes. The sender also supports keyboard jogging with \<Shift\> \(speed\) and \<Ctrl\> \(distance\) modifiers.
-<br><br>
-
-![Easy configuration](Media/Sender3.png)
-
-Advanced grbl configuration with on-screen documentation. UI is dynamically generated from data in a file and/or from the controller.
-<br><br>
-
-![Probing options](Media/Sender4.png)
-
-Probing options.
-<br><br>
-
-![Easy configuration](Media/Sender5.png)
-
-Lathe mode.
-<br><br>
-
-![Easy configuration](Media/Sender6.png)
-
-Conversational programming for Lathe Mode. Threading requires [grblHAL](https://github.com/grblHAL) controller with driver that has spindle sync support.
-
----
-2026-04-29
