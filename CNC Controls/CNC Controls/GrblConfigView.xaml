@@ -88,17 +88,44 @@
             </TabItem>
             <TabItem x:Uid="tab_appConfig" x:Name="tabApp" Header="App" ToolTip="ioSender application settings.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <WrapPanel x:Name="pnlApp" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="300"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="Auto" MinWidth="200"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="pnlAppLeft" Grid.Column="0" Orientation="Vertical"/>
+                        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" Background="#FFBCBCBC"/>
+                        <StackPanel x:Name="pnlAppRight" Grid.Column="2" Orientation="Vertical"/>
+                    </Grid>
                 </ScrollViewer>
             </TabItem>
             <TabItem x:Uid="tab_joggingConfig" x:Name="tabJogging" Header="Jogging" ToolTip="Configure jog speeds, distances, and keyboard/controller jogging behavior.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <WrapPanel x:Name="pnlJogging" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="300"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="Auto" MinWidth="200"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="pnlJoggingLeft" Grid.Column="0" Orientation="Vertical"/>
+                        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" Background="#FFBCBCBC"/>
+                        <StackPanel x:Name="pnlJoggingRight" Grid.Column="2" Orientation="Vertical"/>
+                    </Grid>
                 </ScrollViewer>
             </TabItem>
             <TabItem x:Uid="tab_gcodeConfig" x:Name="tabGCode" Header="G Code" ToolTip="G-code interpreter and program-handling settings.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <WrapPanel x:Name="pnlGCode" Orientation="Horizontal" ItemWidth="394" Margin="5"/>
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="300"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="Auto" MinWidth="200"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="pnlGCodeLeft" Grid.Column="0" Orientation="Vertical"/>
+                        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" Background="#FFBCBCBC"/>
+                        <StackPanel x:Name="pnlGCodeRight" Grid.Column="2" Orientation="Vertical"/>
+                    </Grid>
                 </ScrollViewer>
             </TabItem>
             <TabItem x:Uid="tab_keysConfig" x:Name="tabKeys" Header="Keyboard &amp; Controller" ToolTip="Map keyboard shortcuts and game controller/joystick buttons."/>

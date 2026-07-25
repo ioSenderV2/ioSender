@@ -134,10 +134,10 @@ namespace CNC.Controls
             txtPath.Text = SimulatorManager.AppDataSimulatorExePath();
 
             string sig;
-            SimulatorManager.BuildManualOptionSymbols(CurrentOptions(), out sig);
-            txtStatus.Text = sig == SimulatorManager.AppDataActiveSignature()
-                ? "Up to date with the options below."
-                : "Installed, but built for different options - click Build to update.";
+            string flags = SimulatorManager.BuildManualOptionSymbols(CurrentOptions(), out sig);
+            txtStatus.Text = (sig == SimulatorManager.AppDataActiveSignature()
+                ? "Up to date with the following build options: "
+                : "Will build with the following options (click Build to update): ") + flags;
         }
 
         private void btnBuild_Click(object sender, RoutedEventArgs e)

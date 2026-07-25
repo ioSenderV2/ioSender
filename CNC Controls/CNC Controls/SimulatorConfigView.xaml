@@ -6,7 +6,22 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="500">
-    <StackPanel Margin="12" MaxWidth="440" HorizontalAlignment="Left">
+    <StackPanel Margin="12">
+        <!-- This tab's Labels/CheckBoxes/TextBlocks/ComboBox never had an explicit FontSize, so they sat at
+             WPF's small default instead of matching the rest of the app's readable sizing - bumped here
+             rather than per-control. txtPath keeps its own smaller explicit FontSize="11" (intentionally
+             de-emphasized secondary info), which still wins over this implicit style.
+             BasedOn the app-wide implicit style (AppleStyles.xaml) is required here - a plain
+             TargetType-only Style with no BasedOn REPLACES the implicit default outright instead of
+             extending it, which is what silently strips the oval/pill CheckBox look (and similar chrome
+             on the other types) back to stock WPF controls. Same pitfall already documented on
+             JobControl.xaml's JobButtonStyle - don't repeat it. -->
+        <StackPanel.Resources>
+            <Style TargetType="Label" BasedOn="{StaticResource {x:Type Label}}"><Setter Property="FontSize" Value="16"/></Style>
+            <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"><Setter Property="FontSize" Value="16"/></Style>
+            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Setter Property="FontSize" Value="16"/></Style>
+            <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}"><Setter Property="FontSize" Value="16"/></Style>
+        </StackPanel.Resources>
         <TextBlock x:Uid="lbl_simIntro" TextWrapping="Wrap" Margin="0,0,0,10" Opacity="0.8"
                    Text="Build a grblHAL simulator the Connect dialog's Simulator tab can launch. Pick the options below and click Build - this dispatches a build on GitHub Actions (a few minutes) and installs the result here."/>
 
@@ -70,13 +85,19 @@
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <!-- The one primary action on this screen: dispatches the build, everything else (Open folder) is secondary. -->
-            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" Style="{StaticResource PrimaryButtonStyle}" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"
+            <Button x:Uid="btn_simBuild" x:Name="btnBuild" Content="Build" Style="{StaticResource PrimaryButtonStyle}" FontSize="20" MinWidth="90" MinHeight="23" Padding="8,2" Click="btnBuild_Click"
                     ToolTip="Dispatch a GitHub Actions build of the simulator with the options above and install the result."/>
-            <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click"
+            <Button x:Uid="btn_simOpenFolder" x:Name="btnOpenFolder" Content="Open folder" FontSize="20" MinWidth="90" MinHeight="23" Padding="8,2" Margin="8,0,0,0" Click="btnOpenFolder_Click"
                     ToolTip="Open the folder containing the installed simulator executable."/>
+            <!-- The installed exe's path - read-only, next to the button that opens its folder, so the two
+                 naturally read together instead of the path sitting as its own small line further down. -->
+            <TextBox x:Uid="txt_simPath" x:Name="txtPath" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                     VerticalAlignment="Center" VerticalContentAlignment="Center" Margin="8,0,0,0" MinWidth="260"
+                     Background="Transparent" BorderThickness="0" Opacity="0.7" FontSize="20"/>
         </StackPanel>
 
-        <TextBlock x:Uid="txt_simStatus" x:Name="txtStatus" TextWrapping="Wrap" Margin="0,10,0,0" Opacity="0.85"/>
-        <TextBlock x:Uid="txt_simPath" x:Name="txtPath" TextWrapping="Wrap" Margin="0,4,0,0" Opacity="0.6" FontSize="11"/>
+        <!-- One readable line: status + the actual build-option flags, so the reader never has to go back
+             and squint at the checkbox list above to know what's selected. -->
+        <TextBlock x:Uid="txt_simStatus" x:Name="txtStatus" TextWrapping="Wrap" Margin="0,18,0,0" Opacity="0.85" FontSize="18"/>
     </StackPanel>
 </UserControl>

@@ -184,7 +184,9 @@ namespace CNC.Controls
             _camProbeColumn = new StackPanel { Orientation = Orientation.Vertical };
 
             // App-config panels bind to the Config object.
-            pnlApp.DataContext = pnlJogging.DataContext = pnlGCode.DataContext = profile.Base;
+            pnlAppLeft.DataContext = pnlAppRight.DataContext = profile.Base;
+            pnlJoggingLeft.DataContext = pnlJoggingRight.DataContext = profile.Base;
+            pnlGCodeLeft.DataContext = pnlGCodeRight.DataContext = profile.Base;
 
             // Build the built-in panels, then drain any feature-contributed panels registered via the registry.
             // Feature panels (Camera/Probing/Viewer/Lathe) also self-add to model.ConfigControls from their own
@@ -243,9 +245,9 @@ namespace CNC.Controls
             if (panel == null)
                 return;
 
-            // Place the shared Camera/Probing column into the App tab the first time it's needed.
-            if (ReferenceEquals(panel, _camProbeColumn) && !pnlApp.Children.Contains(_camProbeColumn))
-                pnlApp.Children.Add(_camProbeColumn);
+            // Place the shared Camera/Probing column into the App tab's right column the first time it's needed.
+            if (ReferenceEquals(panel, _camProbeColumn) && !pnlAppRight.Children.Contains(_camProbeColumn))
+                pnlAppRight.Children.Add(_camProbeColumn);
 
             if (c.Parent is Panel prev && !ReferenceEquals(prev, panel))
                 prev.Children.Remove(c);
@@ -257,24 +259,26 @@ namespace CNC.Controls
         private Panel TargetPanel(UserControl c)
         {
             if (c is BasicConfigControl)
-                return pnlApp;
-            if (c is JogUiConfigControl || c is JogConfigControl)
-                return pnlJogging;
+                return pnlAppLeft;
+            if (c is JogUiConfigControl)
+                return pnlJoggingLeft;
+            if (c is JogConfigControl)
+                return pnlJoggingRight;
             if (c is StripGCodeConfigControl)
-                return pnlGCode;
+                return pnlGCodeLeft;
 
             switch (c.GetType().FullName)
             {
                 case "CNC.Controls.Viewer.ConfigControl":
-                    return pnlGCode;
+                    return pnlGCodeRight;
                 case "CNC.Controls.Camera.ConfigControl":
                 case "CNC.Controls.Probing.ConfigControl":
-                    return _camProbeColumn;   // Camera + Probing share one column
+                    return _camProbeColumn;   // Camera + Probing share one column, docked into pnlAppRight
                 case "CNC.Controls.Lathe.ConfigControl":
-                    return pnlApp;
+                    return pnlAppLeft;
             }
 
-            return pnlApp;
+            return pnlAppLeft;
         }
 
         // Central runtime visibility (mirrors the old AppConfigView.Activate): hide keyboard-jog config when the
