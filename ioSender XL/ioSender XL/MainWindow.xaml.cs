@@ -1248,53 +1248,60 @@ namespace GCode_Sender
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (CNC.Core.Grbl.GrblViewModel.IsSDCardJob || !(e.Cancel = !menuMain.IsEnabled))
+            if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled)
             {
-                // Remember window placement for next launch (size is also tracked live in Window_SizeChanged;
-                // position has no live handler, so capture it here). Use RestoreBounds when maximized so we
-                // store the un-maximized rectangle, and re-maximize via WindowWidth == -1.
-                if (saveWinSize)
-                {
-                    bool maximized = WindowState == WindowState.Maximized;
-                    Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
-                    AppConfig.Settings.Base.WindowLeft = b.Left;
-                    AppConfig.Settings.Base.WindowTop = b.Top;
-                    if (!maximized)
-                    {
-                        AppConfig.Settings.Base.WindowWidth = b.Width;
-                        AppConfig.Settings.Base.WindowHeight = b.Height;
-                    }
-                    AppConfig.Settings.Save();
-                }
+                // JobRunning (menuMain disabled) blocks exit while a job is running/paused (e.g. HOLD) -
+                // used to just silently refuse the close with no explanation.
+                e.Cancel = true;
+                AppDialogs.Show("Cannot exit while a job is running or paused (e.g. in Hold).\n\nStop or finish the job first, then close ioSender.",
+                    "Exit blocked", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-                UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
-
-                if (UIViewModel.Console != null)
+            // Remember window placement for next launch (size is also tracked live in Window_SizeChanged;
+            // position has no live handler, so capture it here). Use RestoreBounds when maximized so we
+            // store the un-maximized rectangle, and re-maximize via WindowWidth == -1.
+            if (saveWinSize)
+            {
+                bool maximized = WindowState == WindowState.Maximized;
+                Rect b = maximized ? RestoreBounds : new Rect(Left, Top, ActualWidth, ActualHeight);
+                AppConfig.Settings.Base.WindowLeft = b.Left;
+                AppConfig.Settings.Base.WindowTop = b.Top;
+                if (!maximized)
                 {
-                    // Don't let the shutdown close overwrite the preserved open state
-                    UIViewModel.Console.IsVisibleChanged -= Console_IsVisibleChanged;
-                    UIViewModel.Console.Close();
+                    AppConfig.Settings.Base.WindowWidth = b.Width;
+                    AppConfig.Settings.Base.WindowHeight = b.Height;
                 }
+                AppConfig.Settings.Save();
+            }
+
+            UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
+
+            if (UIViewModel.Console != null)
+            {
+                // Don't let the shutdown close overwrite the preserved open state
+                UIViewModel.Console.IsVisibleChanged -= Console_IsVisibleChanged;
+                UIViewModel.Console.Close();
+            }
 #if ADD_CAMERA
-                if (UIViewModel.Camera != null)
-                {
-                    UIViewModel.Camera.CloseCamera();
-                    UIViewModel.Camera.Close();
-                }
+            if (UIViewModel.Camera != null)
+            {
+                UIViewModel.Camera.CloseCamera();
+                UIViewModel.Camera.Close();
+            }
 #endif
-                Comms.com.DataReceived -= (DataContext as GrblViewModel).DataReceived;
+            Comms.com.DataReceived -= (DataContext as GrblViewModel).DataReceived;
 
-                if (CNC.Core.Grbl.GrblViewModel.AutoReportInterval > 0)
-                {
-                    Comms.com.WriteByte(GrblConstants.CMD_AUTO_REPORTING_TOGGLE);
-                    System.Threading.Thread.Sleep(50);
-                }
+            if (CNC.Core.Grbl.GrblViewModel.AutoReportInterval > 0)
+            {
+                Comms.com.WriteByte(GrblConstants.CMD_AUTO_REPORTING_TOGGLE);
+                System.Threading.Thread.Sleep(50);
+            }
 
-                using (new UIUtils.WaitCursor())
-                {
-                    Comms.com.Close(); // disconnecting from websocket may take some time...
-                    AppConfig.Settings.Shutdown();
-                }
+            using (new UIUtils.WaitCursor())
+            {
+                Comms.com.Close(); // disconnecting from websocket may take some time...
+                AppConfig.Settings.Shutdown();
             }
         }
 
@@ -1689,7 +1696,15 @@ namespace GCode_Sender
             }
             catch (Exception ex)
             {
-                AppDialogs.Show("An error occurred while checking for updates:\n" + ex.Message,
+                // Surface the exception TYPE (and HResult/inner exception, if any) alongside the message -
+                // a bare "Access is denied" with no other context (seen 2026-07-25, likely Windows
+                // Firewall/AV silently blocking a freshly-installed, unsigned exe's first outbound
+                // connection - install.ps1 unzips rather than using a signed installer that would register
+                // a firewall exception) is otherwise nearly undiagnosable after the fact.
+                string detail = ex.GetType().Name + " (0x" + ex.HResult.ToString("X8") + "): " + ex.Message;
+                if (ex.InnerException != null)
+                    detail += "\nInner: " + ex.InnerException.GetType().Name + ": " + ex.InnerException.Message;
+                AppDialogs.Show("An error occurred while checking for updates:\n" + detail,
                     "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -1712,7 +1727,11 @@ namespace GCode_Sender
             catch (Exception ex)
             {
                 releases = null;
-                error = ex.Message;
+                // Same rationale as checkForUpdates_Click's catch: a bare Message (e.g. "Access is
+                // denied") is nearly undiagnosable without the exception type/HResult alongside it.
+                error = ex.GetType().Name + " (0x" + ex.HResult.ToString("X8") + "): " + ex.Message;
+                if (ex.InnerException != null)
+                    error += "\nInner: " + ex.InnerException.GetType().Name + ": " + ex.InnerException.Message;
             }
 
             if (error != null)

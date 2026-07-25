@@ -52,6 +52,15 @@
             <CheckBox x:Uid="lbl_autoSaveGrblSettings" Content="Auto-save grbl settings on leave" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveGrblSettings, Mode=TwoWay}" ToolTip="When leaving the Grbl settings tab with unsaved changes, write them to the controller automatically instead of prompting. Off by default - these are controller ($) settings that change machine behaviour."/>
             <CheckBox x:Uid="lbl_promptOnGrblSave" Content="Prompt before auto-saving" Margin="25,0,0,0" IsChecked="{Binding Path=PromptOnGrblSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveGrblSettings}" ToolTip="Ask before writing changed grbl ($) settings to the controller when leaving the tab, instead of writing them silently."/>
             <CheckBox x:Uid="lbl_safeGotoZ" Content='Safe Z on Go To' Margin="5,0,0,0" IsChecked="{Binding Path=SafeGotoZ, Mode=TwoWay}" ToolTip="When going to a work-coordinate origin (G54-G59.3), G28 or G30, first lift Z to machine top, then move X/Y, then descend - so the move clears any fixtures or stock standing up in Z. Requires homing and soft limits ($20) on; otherwise a single move is used."/>
+
+            <!-- AI review key (Feeds & Speeds tab's "Ask AI to review") - registry-backed via
+                 CNC.Core.SecretStore, was an ANTHROPIC_API_KEY env var. Never displays the stored value;
+                 the button's own label (Set/Update) is the only "is one configured" indicator. -->
+            <StackPanel Orientation="Horizontal" Margin="5,10,0,0">
+                <TextBlock x:Uid="lbl_aiKey" Text="AI Review Key:" VerticalAlignment="Center" Margin="0,0,8,0"
+                           ToolTip="Anthropic API key for Feeds &amp; Speeds' optional 'Ask AI to review' second-opinion pass. Stored in the registry, never shown once set."/>
+                <Button x:Uid="btn_aiKey" x:Name="btnAiKey" Content="Set AI key" Padding="8,2" Click="btnAiKey_Click"/>
+            </StackPanel>
         </StackPanel>
     </GroupBox>
 </UserControl>

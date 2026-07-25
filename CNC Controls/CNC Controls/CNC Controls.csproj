@@ -149,6 +149,9 @@
     <Compile Include="AppMessageBox.xaml.cs">
       <DependentUpon>AppMessageBox.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SecretPromptDialog.xaml.cs">
+      <DependentUpon>SecretPromptDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="FixtureEditDialog.xaml.cs">
       <DependentUpon>FixtureEditDialog.xaml</DependentUpon>
     </Compile>
@@ -493,6 +496,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="AppMessageBox.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SecretPromptDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
@@ -53,7 +54,25 @@ namespace CNC.Controls.Camera
         {
             InitializeComponent();
 
-            Loaded += (s, e) => RefreshBindUi();
+            Loaded += (s, e) => { RefreshBindUi(); RefreshObsPassword(); };
+        }
+
+        // PasswordBox.Password can't be data-bound directly (WPF deliberately keeps it out of the normal
+        // binding/undo/dependency-property machinery so a plaintext password is never left sitting in a
+        // binding trace) - so it's synced by hand both ways instead of via the usual {Binding ...} the
+        // rest of this panel uses.
+        private void RefreshObsPassword()
+        {
+            var cfg = Cfg;
+            if (cfg != null)
+                pwdObsPassword.Password = cfg.ObsPassword ?? string.Empty;
+        }
+
+        private void pwdObsPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            var cfg = Cfg;
+            if (cfg != null)
+                cfg.ObsPassword = pwdObsPassword.Password;
         }
 
         private CameraConfig Cfg { get { return (DataContext as Config)?.Camera; } }
@@ -102,6 +121,99 @@ namespace CNC.Controls.Camera
 
             ((Config)DataContext).Camera.XOffset = -model.Position.X;
             ((Config)DataContext).Camera.YOffset = -model.Position.Y;
+        }
+
+        // Opens the real demo-recording setup doc (Source Record plugin, per-source filter names, Record
+        // Mode) in whatever the user's default .md handler is, rather than duplicating those instructions
+        // here where they'd silently drift out of sync with the actual recipe. Dev-checkout only (walks up
+        // from the exe looking for docs/demo-videos/README.md) - this whole panel only matters for a
+        // -demomarker shoot anyway, which is a dev/demo-recording workflow, not an end-user one.
+        private void btnObsInstructions_Click(object sender, RoutedEventArgs e)
+        {
+            string dir = AppDomain.CurrentDomain.BaseDirectory;
+            string found = null;
+            for (int i = 0; i < 8 && dir != null; i++)
+            {
+                string candidate = System.IO.Path.Combine(dir, "docs", "demo-videos", "README.md");
+                if (System.IO.File.Exists(candidate))
+                {
+                    found = candidate;
+                    break;
+                }
+                dir = System.IO.Path.GetDirectoryName(dir.TrimEnd('\\', '/'));
+            }
+
+            if (found == null)
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Couldn't find docs\\demo-videos\\README.md - this only works from a repo checkout, not an installed build.",
+                    "OBS setup instructions", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found) { UseShellExecute = true }); }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Could not open the instructions: " + ex.Message,
+                    "OBS setup instructions", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // Connects to OBS right now with whatever's currently typed (not necessarily saved yet) and checks
+        // each configured source name is actually present, so a typo in a source name is caught here rather
+        // than discovered mid-shoot when recording silently never starts.
+        private void btnObsValidate_Click(object sender, RoutedEventArgs e)
+        {
+            var cfg = Cfg;
+            if (cfg == null)
+                return;
+
+            string error;
+            System.Collections.Generic.List<string> sources;
+            using (new UIUtils.WaitCursor())
+            {
+                ObsBridge.ValidateConnection(cfg.ObsHost, cfg.ObsPort, cfg.ObsPassword, out error, out sources);
+            }
+
+            if (error != null)
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Could not validate the OBS connection:\n\n" + error,
+                    "Validate OBS connection", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            bool anyMissing = false;
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine(string.Format("Connected to OBS - found {0} source(s).", sources.Count));
+            sb.AppendLine();
+            AppendSourceCheck(sb, sources, "Front Left", cfg.ObsCamASource, ref anyMissing);
+            AppendSourceCheck(sb, sources, "Front Right", cfg.ObsCamBSource, ref anyMissing);
+            AppendSourceCheck(sb, sources, "App (screen)", cfg.ObsAppSource, ref anyMissing);
+
+            AppDialogs.Show(Window.GetWindow(this), sb.ToString().TrimEnd(),
+                "Validate OBS connection", MessageBoxButton.OK, anyMissing ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
+        private static void AppendSourceCheck(System.Text.StringBuilder sb, System.Collections.Generic.List<string> sources, string label, string name, ref bool anyMissing)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                sb.AppendLine(label + ": (not set)");
+                return;
+            }
+
+            // Case/whitespace-insensitive match - the field is free text the user typed by hand to match
+            // whatever they named the source in OBS, so a harmless casing difference shouldn't read as a
+            // real "this source doesn't exist" failure.
+            string trimmed = name.Trim();
+            bool found = sources.Any(s => string.Equals(s.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+            if (found)
+                sb.AppendLine(label + ": \"" + name + "\" - found");
+            else
+            {
+                sb.AppendLine(label + ": \"" + name + "\" - NOT FOUND in OBS");
+                anyMissing = true;
+            }
         }
     }
 }

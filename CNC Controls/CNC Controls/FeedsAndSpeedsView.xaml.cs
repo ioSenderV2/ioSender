@@ -6,8 +6,8 @@
  * material chip-load/RPM table cross-checked against the CONNECTED controller's actual
  * grblHAL limits) over every operation, and writes a companion <docName>-apply.json the
  * Fusion add-in's Apply action reads back. An optional "Ask AI to review" pass (only shown
- * when ANTHROPIC_API_KEY is set) shows a second opinion in the status box before anything
- * is written - it never silently overrides the table.
+ * when an AI review key is set - Settings > App) shows a second opinion in the status box
+ * before anything is written - it never silently overrides the table.
  */
 
 using System;
@@ -333,6 +333,11 @@ namespace CNC.Controls
         // from their normal behavior (Ctrl+C = copy) during that narrow window.
         private System.Threading.CancellationTokenSource _aiCts;
 
+        // Shared with PreviewKeyDown so a cancel keypress can log "Cancelling..." immediately - an in-
+        // flight Anthropic call can take 20-30s, and without this line there was no visible sign the
+        // keypress had even registered until it eventually finished.
+        private StringBuilder _aiLog;
+
         // Tolerance for "is the AI's number basically the same as this other value" - a bit looser than
         // the grid's own F1 display rounding (0.05) since the AI's number arrives as raw JSON, not
         // rounded to our display precision.
@@ -388,8 +393,8 @@ namespace CNC.Controls
 
             // txtStatus becomes a running transcript of this whole run (not just the latest line) - built
             // up in this StringBuilder and re-rendered + scrolled to the bottom after every event.
-            var log = new StringBuilder();
-            void Log(string line) { log.AppendLine(line); txtStatus.Text = log.ToString(); txtStatus.ScrollToEnd(); }
+            _aiLog = new StringBuilder();
+            void Log(string line) { _aiLog.AppendLine(line); txtStatus.Text = _aiLog.ToString(); txtStatus.ScrollToEnd(); }
 
             Log($"Asking {model} to review {toReview.Count} operation(s) - Esc or Ctrl+C to cancel...");
 
@@ -409,7 +414,7 @@ namespace CNC.Controls
                     AiReviewResult result;
                     try
                     {
-                        result = await Task.Run(() => FeedsSpeedsAiReview.Review(op, rec, material, model), token);
+                        result = await Task.Run(() => FeedsSpeedsAiReview.Review(op, rec, material, model, token), token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -506,6 +511,12 @@ namespace CNC.Controls
                           (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control;
             if (isEscape || isCtrlC)
             {
+                if (!_aiCts.IsCancellationRequested && _aiLog != null)
+                {
+                    _aiLog.AppendLine("Cancelling...");
+                    txtStatus.Text = _aiLog.ToString();
+                    txtStatus.ScrollToEnd();
+                }
                 _aiCts.Cancel();
                 e.Handled = true;
             }

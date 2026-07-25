@@ -2,8 +2,9 @@
  * FeedsSpeedsAiReview.cs - part of CNC Core library
  *
  * Optional second-opinion pass over FeedsSpeedsAdvisor's table-driven verdicts, only
- * offered when an API key is configured (env var, see ApiKeyEnvVar) - no key means this
- * is simply absent, no setup nagging. The table already encodes the domain expert's
+ * offered when an API key is configured (Settings > App, registry-backed via SecretStore
+ * - see ApiKeySecretName) - no key means this is simply absent, no setup nagging. The
+ * table already encodes the domain expert's
  * chip-load math (an LLM has no special physics insight beyond the same chart), so this
  * exists for qualitative judgment the table can't express - e.g. "this axial-over-max
  * flag is fine, it's an adaptive roughing pass" - not to re-derive the arithmetic. Its
@@ -44,7 +45,10 @@ namespace CNC.Core
 
     public static class FeedsSpeedsAiReview
     {
-        public const string ApiKeyEnvVar = "ANTHROPIC_API_KEY";
+        // Registry key name under SecretStore (Settings > App > "AI Review Key" sets this) - was the
+        // ANTHROPIC_API_KEY env var; kept as a public const since some call sites/comments still refer to
+        // it by that name.
+        public const string ApiKeySecretName = "AnthropicApiKey";
         private const string ApiUrl = "https://api.anthropic.com/v1/messages";
 
         // Default model + the picker list a caller (FeedsAndSpeedsView's model dropdown) can offer.
@@ -75,20 +79,11 @@ namespace CNC.Core
             return inputTokens / 1_000_000.0 * price.In + outputTokens / 1_000_000.0 * price.Out;
         }
 
-        // Same process-then-user-scope lookup SimulatorManager.GitHubToken() uses.
+        // Registry-backed via SecretStore (Settings > App's "AI Review Key" row sets this) - was an
+        // ANTHROPIC_API_KEY env var lookup.
         public static string GetApiKey()
         {
-            foreach (var scope in new[] { EnvironmentVariableTarget.Process, EnvironmentVariableTarget.User })
-            {
-                try
-                {
-                    string v = Environment.GetEnvironmentVariable(ApiKeyEnvVar, scope);
-                    if (!string.IsNullOrWhiteSpace(v))
-                        return v.Trim();
-                }
-                catch { }
-            }
-            return null;
+            return SecretStore.Get(ApiKeySecretName);
         }
 
         public static bool IsAvailable => !string.IsNullOrEmpty(GetApiKey());
@@ -104,11 +99,11 @@ namespace CNC.Core
         /// response that isn't valid JSON) so the caller can show the error inline rather than pretend a
         /// review happened.
         /// </summary>
-        public static AiReviewResult Review(FeedsSpeedsOperation op, OperationRecommendation tableResult, string material, string model = DefaultModel)
+        public static AiReviewResult Review(FeedsSpeedsOperation op, OperationRecommendation tableResult, string material, string model = DefaultModel, System.Threading.CancellationToken cancellationToken = default)
         {
             string apiKey = GetApiKey();
             if (string.IsNullOrEmpty(apiKey))
-                throw new InvalidOperationException($"{ApiKeyEnvVar} is not set - AI review is unavailable.");
+                throw new InvalidOperationException("No AI review key set - add one in Settings > App, or AI review is unavailable.");
 
             string prompt = BuildPrompt(op, tableResult, material);
 
@@ -134,31 +129,53 @@ namespace CNC.Core
             req.Headers.Add("anthropic-version", "2023-06-01");
             req.Timeout = req.ReadWriteTimeout = 60 * 1000;
 
-            var bodyBytes = Encoding.UTF8.GetBytes(requestBody);
-            using (var stream = req.GetRequestStream())
-                stream.Write(bodyBytes, 0, bodyBytes.Length);
-
-            string responseJson;
-            try
+            // HttpWebRequest has no CancellationToken overload - Abort() is the only way to actually
+            // interrupt an in-flight GetRequestStream/GetResponse call. Without this, cancelling only
+            // stopped the NEXT operation in a multi-op batch from starting; a review already in flight
+            // (a real ~20-30s Anthropic call) ran to completion regardless of Esc/Ctrl+C, with no sign
+            // anything had registered until it finally finished.
+            using (cancellationToken.Register(() => { try { req.Abort(); } catch { } }))
             {
-                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
-                using (var reader = new System.IO.StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    responseJson = reader.ReadToEnd();
-            }
-            catch (System.Net.WebException wex) when (wex.Response != null)
-            {
-                // HttpWebRequest throws on any non-2xx before the caller ever sees the body, but
-                // Anthropic's error responses have a real JSON body explaining what went wrong (bad
-                // model name, invalid key, rate limit, ...) - surface that instead of just the generic
-                // "(400) Bad Request" WebException message, which tells you nothing actionable.
-                using (var errStream = wex.Response.GetResponseStream())
-                using (var reader = new System.IO.StreamReader(errStream, Encoding.UTF8))
+                var bodyBytes = Encoding.UTF8.GetBytes(requestBody);
+                try
                 {
-                    string body = reader.ReadToEnd();
-                    throw new InvalidOperationException($"Anthropic API error: {wex.Message}\n{body}", wex);
+                    using (var stream = req.GetRequestStream())
+                        stream.Write(bodyBytes, 0, bodyBytes.Length);
+
+                    string responseJson;
+                    try
+                    {
+                        using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                        using (var reader = new System.IO.StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                            responseJson = reader.ReadToEnd();
+                    }
+                    catch (System.Net.WebException wex) when (wex.Response != null)
+                    {
+                        // HttpWebRequest throws on any non-2xx before the caller ever sees the body, but
+                        // Anthropic's error responses have a real JSON body explaining what went wrong (bad
+                        // model name, invalid key, rate limit, ...) - surface that instead of just the generic
+                        // "(400) Bad Request" WebException message, which tells you nothing actionable.
+                        using (var errStream = wex.Response.GetResponseStream())
+                        using (var reader = new System.IO.StreamReader(errStream, Encoding.UTF8))
+                        {
+                            string body = reader.ReadToEnd();
+                            throw new InvalidOperationException($"Anthropic API error: {wex.Message}\n{body}", wex);
+                        }
+                    }
+
+                    return ParseResponse(responseJson, model);
+                }
+                catch (System.Net.WebException wex) when (cancellationToken.IsCancellationRequested)
+                {
+                    // req.Abort() surfaces as a WebException (RequestCanceled), not the framework's own
+                    // OperationCanceledException - translate it so callers can catch cancellation uniformly.
+                    throw new OperationCanceledException("AI review cancelled.", wex, cancellationToken);
                 }
             }
+        }
 
+        private static AiReviewResult ParseResponse(string responseJson, string model)
+        {
             JsonDocument doc;
             try { doc = JsonDocument.Parse(responseJson); }
             catch (JsonException jex)

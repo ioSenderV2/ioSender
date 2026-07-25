@@ -731,22 +731,18 @@ namespace CNC.Controls
             return Activate(CachedSimPath(sig), sig, out error);
         }
 
-        // Token used ONLY to dispatch the build workflow (downloads are public). Read from the GH_TOKEN /
-        // GITHUB_TOKEN environment variable (process first, then the persisted User scope); null if unset.
+        // Token used ONLY to dispatch the build workflow (downloads are public) - a fine-grained PAT scoped
+        // to ONLY "Actions: write" on ioSenderV2/Simulator (no code/repo-admin access), so shipping it
+        // compiled into the app is a deliberately bounded risk: worst case if someone decompiles and
+        // extracts it, they can spam-trigger CI builds on that one repo, nothing more. Was a GH_TOKEN/
+        // GITHUB_TOKEN env-var lookup - replaced so a fresh install works out of the box with no user setup.
+        // No expiration set - if it ever needs rotating, revoke/regenerate at
+        // https://github.com/settings/personal-access-tokens and paste the replacement here.
+        private const string BakedInBuildToken = "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";
+
         public static string GitHubToken()
         {
-            foreach (var name in new[] { "GH_TOKEN", "GITHUB_TOKEN" })
-                foreach (var scope in new[] { EnvironmentVariableTarget.Process, EnvironmentVariableTarget.User })
-                {
-                    try
-                    {
-                        string v = Environment.GetEnvironmentVariable(name, scope);
-                        if (!string.IsNullOrWhiteSpace(v))
-                            return v.Trim();
-                    }
-                    catch { }
-                }
-            return null;
+            return string.IsNullOrWhiteSpace(BakedInBuildToken) ? null : BakedInBuildToken;
         }
 
         private static string JsonEscape(string s)

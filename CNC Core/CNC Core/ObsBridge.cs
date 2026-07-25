@@ -7,8 +7,9 @@
  * program ends - no need to touch OBS during the take. See docs/demo-videos.
  *
  * obs-websocket is OBS's built-in WebSocket server (Tools -> WebSocket Server
- * Settings). Auth is optional; if enabled, the password comes from the
- * IOSENDER_OBSWS_PASSWORD env var. Host/port default to localhost:4455.
+ * Settings). Auth is optional; if enabled, the password/host/port/camera source
+ * names all come from Settings > App > Camera > "Demo recording (OBS)" (pushed
+ * in via Init/ConfigureCameras at startup - this class itself reads no env vars).
  *
  * Everything here is best-effort and never throws: if OBS isn't running, the
  * server isn't enabled, or the password is wrong, the bridge simply no-ops.
@@ -16,9 +17,11 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using WebSocketSharp;
 
 namespace CNC.Core
@@ -103,8 +106,10 @@ namespace CNC.Core
         /// SetSourceFilterEnabled, NOT by hotkey: Source Record registers the SAME hotkey name
         /// ("source_record.enable"/".disable") for every filter instance, so triggering by name would
         /// fire all three cameras at once - proven live via "-debuglog=obs" 2026-07-18, not a guess.
-        /// SourceName/FilterName come from IOSENDER_OBS_{CAMA,CAMB,APP}_{SOURCE,FILTER} env vars
-        /// (FILTER defaults to "Source Record", OBS's own default filter name, if unset); an entry with
+        /// SourceName/FilterName come from AppConfig.Settings.Base.Camera's Obs* fields (Settings > App >
+        /// Camera > "Demo recording (OBS)") via <see cref="ConfigureCameras"/> - CNC Core can't reference
+        /// AppConfig directly (CNC Controls sits above it), so App.xaml.cs reads the settings and pushes
+        /// them in during startup, the same pattern Init's host/port/password already use. An entry with
         /// no configured source name is still listed (so the panel row exists) but toggling it is a no-op.
         /// Each filter's Record Mode must be "Always" for enable/disable to mean anything independent of
         /// the main Record button.
@@ -116,12 +121,25 @@ namespace CNC.Core
             public string FilterName;
         }
 
-        public static readonly CameraInfo[] Cameras = new CameraInfo[]
+        public static CameraInfo[] Cameras { get; private set; } = new CameraInfo[]
         {
-            new CameraInfo { Label = "Front Left", SourceName = Environment.GetEnvironmentVariable("IOSENDER_OBS_CAMA_SOURCE"), FilterName = Environment.GetEnvironmentVariable("IOSENDER_OBS_CAMA_FILTER") ?? "Source Record" },
-            new CameraInfo { Label = "Front Right", SourceName = Environment.GetEnvironmentVariable("IOSENDER_OBS_CAMB_SOURCE"), FilterName = Environment.GetEnvironmentVariable("IOSENDER_OBS_CAMB_FILTER") ?? "Source Record" },
-            new CameraInfo { Label = "App (screen)", SourceName = Environment.GetEnvironmentVariable("IOSENDER_OBS_APP_SOURCE"), FilterName = Environment.GetEnvironmentVariable("IOSENDER_OBS_APP_FILTER") ?? "Source Record" },
+            new CameraInfo { Label = "Front Left" },
+            new CameraInfo { Label = "Front Right" },
+            new CameraInfo { Label = "App (screen)" },
         };
+
+        /// <summary>Populate the three cameras' source/filter names - call once during startup before any
+        /// UI reads <see cref="Cameras"/>. Never throws; a null/empty source just leaves that camera
+        /// inert (existing behavior, matches the old unset-env-var case).</summary>
+        public static void ConfigureCameras(string camASource, string camAFilter, string camBSource, string camBFilter, string appSource, string appFilter)
+        {
+            Cameras = new CameraInfo[]
+            {
+                new CameraInfo { Label = "Front Left", SourceName = camASource, FilterName = string.IsNullOrEmpty(camAFilter) ? "Source Record" : camAFilter },
+                new CameraInfo { Label = "Front Right", SourceName = camBSource, FilterName = string.IsNullOrEmpty(camBFilter) ? "Source Record" : camBFilter },
+                new CameraInfo { Label = "App (screen)", SourceName = appSource, FilterName = string.IsNullOrEmpty(appFilter) ? "Source Record" : appFilter },
+            };
+        }
 
         private static readonly bool[] _cameraRecording = new bool[Cameras.Length];
 
@@ -155,6 +173,125 @@ namespace CNC.Core
         private static string JsonEscape(string s)
         {
             return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        /// <summary>
+        /// Synchronous, one-shot connectivity check for the Settings > App > Camera panel's "Validate"
+        /// button - opens its own short-lived connection (does NOT touch the shared <see cref="Init"/>
+        /// connection, so validating doesn't disturb an already-armed demo-recording bridge), authenticates
+        /// if a password is given, and asks OBS for both its current source (input) list AND its scene
+        /// list - "App (screen)" is commonly a whole Scene (containing the window/display capture), not a
+        /// plain input, and a Source Record filter can be applied to either, so both name spaces need to be
+        /// checked or a scene-based App capture always reports "NOT FOUND". Blocks the calling thread up to
+        /// ~4s per step; callers should wrap this in a WaitCursor.
+        /// </summary>
+        public static bool ValidateConnection(string host, int port, string password, out string error, out List<string> sourceNames)
+        {
+            var names = new List<string>();
+            string localError = null;
+            bool inputsOk = false;
+            string inputsReqId = Guid.NewGuid().ToString("N");
+            string scenesReqId = Guid.NewGuid().ToString("N");
+            var identified = new ManualResetEventSlim(false);
+            var gotInputs = new ManualResetEventSlim(false);
+            var gotScenes = new ManualResetEventSlim(false);
+            WebSocket ws = null;
+
+            try
+            {
+                ws = new WebSocket(string.Format("ws://{0}:{1}", host, port));
+                ws.OnMessage += (s, e) =>
+                {
+                    if (!e.IsText)
+                        return;
+                    try
+                    {
+                        string msg = e.Data;
+                        int op = ExtractInt(msg, "op");
+                        if (op == 0)
+                        {
+                            string challenge = ExtractString(msg, "challenge");
+                            string salt = ExtractString(msg, "salt");
+                            string identify;
+                            if (!string.IsNullOrEmpty(challenge) && !string.IsNullOrEmpty(salt))
+                            {
+                                string auth = ComputeAuth(password ?? string.Empty, salt, challenge);
+                                identify = "{\"op\":1,\"d\":{\"rpcVersion\":1,\"eventSubscriptions\":0,\"authentication\":\"" + auth + "\"}}";
+                            }
+                            else
+                                identify = "{\"op\":1,\"d\":{\"rpcVersion\":1,\"eventSubscriptions\":0}}";
+                            ws.Send(identify);
+                        }
+                        else if (op == 2)
+                        {
+                            identified.Set();
+                            ws.Send("{\"op\":6,\"d\":{\"requestType\":\"GetInputList\",\"requestId\":\"" + inputsReqId + "\"}}");
+                        }
+                        else if (op == 7)
+                        {
+                            string rid = ExtractString(msg, "requestId");
+                            if (rid == inputsReqId)
+                            {
+                                var resultMatch = Regex.Match(msg, "\"result\"\\s*:\\s*(true|false)");
+                                inputsOk = resultMatch.Success && resultMatch.Groups[1].Value == "true";
+                                if (inputsOk)
+                                {
+                                    foreach (Match m in Regex.Matches(msg, "\"inputName\"\\s*:\\s*\"([^\"]*)\""))
+                                        names.Add(m.Groups[1].Value);
+                                }
+                                else
+                                    localError = ExtractString(msg, "comment") ?? "OBS rejected the request.";
+                                gotInputs.Set();
+                                // Ask for scenes too, regardless of whether the inputs request succeeded -
+                                // best-effort, doesn't gate overall success/failure on its own.
+                                ws.Send("{\"op\":6,\"d\":{\"requestType\":\"GetSceneList\",\"requestId\":\"" + scenesReqId + "\"}}");
+                            }
+                            else if (rid == scenesReqId)
+                            {
+                                foreach (Match m in Regex.Matches(msg, "\"sceneName\"\\s*:\\s*\"([^\"]*)\""))
+                                {
+                                    if (!names.Contains(m.Groups[1].Value))
+                                        names.Add(m.Groups[1].Value);
+                                }
+                                gotScenes.Set();
+                            }
+                        }
+                    }
+                    catch { /* leave localError/inputsOk at their current values */ }
+                };
+                ws.OnError += (s, e) => { localError = localError ?? e.Message; identified.Set(); gotInputs.Set(); gotScenes.Set(); };
+                ws.OnClose += (s, e) => { identified.Set(); gotInputs.Set(); gotScenes.Set(); };
+
+                ws.Connect();   // blocking - throws on refused/unreachable connection
+
+                if (!identified.Wait(4000))
+                {
+                    error = localError ?? string.Format("Could not connect/authenticate to OBS at ws://{0}:{1} within 4s - check the WebSocket server is running and the password (if any) is correct.", host, port);
+                    sourceNames = names;
+                    return false;
+                }
+                if (!gotInputs.Wait(4000) || !inputsOk)
+                {
+                    error = localError ?? "Connected, but OBS did not return its source list in time.";
+                    sourceNames = names;
+                    return false;
+                }
+                gotScenes.Wait(4000);   // best-effort - a missed/slow scene list still leaves the input names we already have
+
+                error = null;
+                sourceNames = names;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                sourceNames = names;
+                return false;
+            }
+            finally
+            {
+                try { ws?.Close(); } catch { /* best-effort teardown of a one-shot validation socket */ }
+            }
         }
 
         // ---- obs-websocket v5 protocol ----

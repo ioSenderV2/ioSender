@@ -23,7 +23,7 @@
     Test-server port (implies -TestServer). Default 0 = use the app default (8760).
 
 .PARAMETER Headless
-    Set IOSENDER_HEADLESS=1 so a crash dumps to the log + exits 0xFA11 instead of
+    Pass -headless so a crash dumps to the log + exits 0xFA11 instead of
     blocking on a modal dialog. Omit for interactive testing.
 
 .PARAMETER KillOnly
@@ -115,12 +115,11 @@ if ($TestServer -or $Port -gt 0) {
 }
 if ($AppArgs) { $launchArgs += $AppArgs }
 
-if ($Headless) { $env:IOSENDER_HEADLESS = '1' }
-else { Remove-Item Env:\IOSENDER_HEADLESS -ErrorAction SilentlyContinue }
+# -headless is a real CLI flag now (2026-07-25) - ioSender itself reads no env vars anymore.
+if ($Headless -and -not ($launchArgs -contains '-headless')) { $launchArgs += '-headless' }
 
-$argMsg = ''
-if ($launchArgs) { $argMsg = " $($launchArgs -join ' ')" }
-Write-Host "==> launching $Configuration ioSender$argMsg ..." -ForegroundColor Cyan
+$cmdLine = if ($launchArgs) { "$exe $($launchArgs -join ' ')" } else { $exe }
+Write-Host "==> launching: $cmdLine" -ForegroundColor Cyan
 if ($launchArgs) { Start-Process $exe -ArgumentList $launchArgs } else { Start-Process $exe }
 
 # poll up to ~5s for it to come up

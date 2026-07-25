@@ -38,7 +38,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Windows;
 using System.Windows.Controls;
+using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -52,6 +54,8 @@ namespace CNC.Controls
         public BasicConfigControl()
         {
             InitializeComponent();
+
+            RefreshAiKeyButton();
 
             // Max buffer size (streamer flow-control window) is latched once at job-view init, and reset delay is
             // captured into the serial stream at connect - both only take effect at startup, so a change needs a
@@ -107,6 +111,37 @@ namespace CNC.Controls
             var dc = DataContext;
             DataContext = null;
             DataContext = dc;
+        }
+
+        // The button's own label is the only "is a key configured" indicator - the value itself is never
+        // shown once set (SecretPromptDialog is write/clear-only, no read-back).
+        private void RefreshAiKeyButton()
+        {
+            btnAiKey.Content = FeedsSpeedsAiReview.IsAvailable ? "Update AI key" : "Set AI key";
+        }
+
+        private void btnAiKey_Click(object sender, RoutedEventArgs e)
+        {
+            bool haveKey = FeedsSpeedsAiReview.IsAvailable;
+            string prompt = haveKey
+                ? "Enter a new Anthropic API key to replace the one on file, or Clear to remove it."
+                : "Enter an Anthropic API key to enable Feeds & Speeds' optional AI review pass.";
+
+            string value;
+            var result = SecretPromptDialog.Show(Window.GetWindow(this), prompt, out value);
+            switch (result)
+            {
+                case SecretPromptResult.Set:
+                    SecretStore.Set(FeedsSpeedsAiReview.ApiKeySecretName, value);
+                    break;
+                case SecretPromptResult.Clear:
+                    SecretStore.Set(FeedsSpeedsAiReview.ApiKeySecretName, null);
+                    break;
+                case SecretPromptResult.Cancel:
+                default:
+                    return;
+            }
+            RefreshAiKeyButton();
         }
     }
 }

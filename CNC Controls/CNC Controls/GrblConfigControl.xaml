@@ -104,7 +104,15 @@
                      inside a Border that also holds the count, so they read as a single field. -->
                 <Border BorderBrush="#FFABADB3" BorderThickness="1" Background="White" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
+                        <!-- UndoLimit=0: typing fast enough here hit a real WPF framework bug -
+                             "Cannot Reopen undo unit while another unit is already open"
+                             (MS.Internal.Documents.UndoManager.Reopen), a reentrancy issue in WPF's own
+                             undo stack when TextChanged does synchronous work (ApplySearch re-filters the
+                             settings tree on every keystroke) and a new keystroke arrives before that
+                             settles. Undo/redo was never meaningful for a search box anyway - disabling it
+                             entirely sidesteps the buggy code path rather than trying to debounce typing. -->
                         <TextBox x:Uid="fld_searchSetting" x:Name="searchBox" Width="300" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"
+                                 UndoLimit="0"
                                  TextChanged="searchBox_TextChanged" KeyDown="searchBox_KeyDown"
                                  ToolTip="Search settings: $53 jumps to a setting; $5? expands all of $50-$59; text like Jog (or a bare number like 10) highlights every setting whose name or value contains it. Enter / F3 = next match, F4 = previous."/>
                         <TextBlock x:Name="txtMatchCount" VerticalAlignment="Center" Margin="6,0,8,0" Foreground="#FF606060" MinWidth="56"/>

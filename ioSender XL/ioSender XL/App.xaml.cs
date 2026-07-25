@@ -66,6 +66,10 @@ namespace GCode_Sender
         // (no one is watching that window interactively). Set by OnStartup below, read by MainWindow.RevealMainWindow.
         public static string StartupMessage = null;
 
+        // -headless - suppresses the modal crash dialog (HandleFatal below). Was IOSENDER_HEADLESS env var;
+        // set by OnStartup's arg parse, read from here since HandleFatal can fire from any thread/method.
+        public static bool Headless = false;
+
         public App()
         {
             // Pin the resource assembly to this exe BEFORE InitializeComponent loads App.xaml (the first
@@ -90,6 +94,8 @@ namespace GCode_Sender
             string debugCategories = null;
             bool demoMarker = false;
             bool crashTest = false;
+            bool headless = false;
+            bool selfRelaunch = false;
             while (p < args.GetLength(0))
             {
                 string arg = args[p++];
@@ -111,6 +117,20 @@ namespace GCode_Sender
                     // the crash -> minidump -> report-on-next-launch pipeline. Diagnostic only.
                     case "-crashtest":
                         crashTest = true;
+                        break;
+
+                    // -headless  suppress the modal crash dialog (log + exit code only) - for unattended
+                    // runs (build.ps1 -Headless). Was IOSENDER_HEADLESS env var.
+                    case "-headless":
+                        headless = true;
+                        break;
+
+                    // -self-relaunch  set by the app on ITSELF (GrblConfigView.DoRestart) when relaunching
+                    // after a restart-only settings change - tells the new instance to skip the single-
+                    // instance-forward check since the old instance may still be mid-teardown. Was
+                    // IOSENDER_SELF_RELAUNCH=1 env var; not meant to be passed by a human.
+                    case "-self-relaunch":
+                        selfRelaunch = true;
                         break;
 
                     default:
@@ -138,27 +158,7 @@ namespace GCode_Sender
                 }
             }
 
-            // Also honour an env var (mirrors IOSENDER_HEADLESS) so unattended/headless launches can turn it on.
-            // Value may be "1"/"true" (all categories) or a category allow-list ("settings,comms").
-            string debugEnv = Environment.GetEnvironmentVariable("IOSENDER_DEBUGLOG");
-            if (!string.IsNullOrEmpty(debugEnv))
-            {
-                debugLog = true;
-                if (!(debugEnv == "1" || string.Equals(debugEnv, "true", StringComparison.OrdinalIgnoreCase)))
-                    debugCategories = debugEnv;
-            }
-
-            // UI test server env mirror (matches the IOSENDER_* pattern). "1"/"true" = default port; a numeric
-            // value = that port. A command-line -testserver flag takes precedence if already set.
-            if (TestServerPort < 0)
-            {
-                string tsEnv = Environment.GetEnvironmentVariable("IOSENDER_TESTSERVER");
-                if (!string.IsNullOrEmpty(tsEnv))
-                {
-                    int tp;
-                    TestServerPort = int.TryParse(tsEnv, out tp) ? tp : 0;
-                }
-            }
+            Headless = headless;
 
             // Clear any stale test-server exit-status file so it reflects only this run's exit.
             if (TestServerPort >= 0)
@@ -185,7 +185,6 @@ namespace GCode_Sender
             // Framework, so the old listener can't be relied on to have closed by the time we probe it) -
             // without this we'd detect it, forward into a process that's about to disappear, and exit
             // ourselves, so "Restart" would just close the app instead of relaunching it.
-            bool selfRelaunch = Environment.GetEnvironmentVariable("IOSENDER_SELF_RELAUNCH") == "1";
             if (!selfRelaunch && TestServerPort < 0 && CNC.Controls.PipeServer.TryForwardToRunningInstance(FindFileArg(args)))
             {
                 CNC.Core.DebugLog.Write("app", "another instance is running - forwarded and exiting");
@@ -193,27 +192,9 @@ namespace GCode_Sender
                 return;
             }
 
-            // Demo-video sync markers (mirrors the -debuglog flag + IOSENDER_* env pattern).
-            if (!demoMarker)
-            {
-                string demoEnv = Environment.GetEnvironmentVariable("IOSENDER_DEMOMARKER");
-                demoMarker = demoEnv == "1" || string.Equals(demoEnv, "true", StringComparison.OrdinalIgnoreCase);
-            }
             CNC.Core.DemoMarker.Init(demoMarker);
-
-            // With demo markers on, also arm the OBS bridge so a shoot auto-records (program load ->
-            // StartRecord, program end -> StopRecord). No-op unless an OBS WebSocket server is reachable.
-            // Auth password (if OBS auth is on) comes from IOSENDER_OBSWS_PASSWORD; host/port default localhost:4455.
-            if (demoMarker)
-            {
-                string obsHost = Environment.GetEnvironmentVariable("IOSENDER_OBSWS_HOST");
-                if (string.IsNullOrWhiteSpace(obsHost))
-                    obsHost = "localhost";
-                int obsPort;
-                if (!int.TryParse(Environment.GetEnvironmentVariable("IOSENDER_OBSWS_PORT"), out obsPort))
-                    obsPort = 4455;
-                CNC.Core.ObsBridge.Init(true, obsHost, obsPort, Environment.GetEnvironmentVariable("IOSENDER_OBSWS_PASSWORD"));
-            }
+            // OBS bridge arming (needs Settings > App > Camera's Obs* fields) is deferred until after
+            // AppConfig loads - see the demoMarker block right after `var main = new MainWindow();` below.
 
             if (lng > 0)
             {
@@ -241,6 +222,19 @@ namespace GCode_Sender
 
             var main = new MainWindow();
             Current.MainWindow = main;
+
+            // With demo markers on, also arm the OBS bridge so a shoot auto-records (program load ->
+            // StartRecord, program end -> StopRecord). No-op unless an OBS WebSocket server is reachable.
+            // Host/port/password/camera source names come from Settings > App > Camera > "Demo recording
+            // (OBS)" (AppConfig.Settings.Base.Camera, loaded synchronously inside the MainWindow ctor
+            // above) - was IOSENDER_OBSWS_*/IOSENDER_OBS_* env vars.
+            if (demoMarker)
+            {
+                var cam = CNC.Controls.AppConfig.Settings.Base.Camera;
+                CNC.Core.ObsBridge.Init(true, cam.ObsHost, cam.ObsPort, cam.ObsPassword);
+                CNC.Core.ObsBridge.ConfigureCameras(cam.ObsCamASource, cam.ObsCamAFilter, cam.ObsCamBSource, cam.ObsCamBFilter, cam.ObsAppSource, cam.ObsAppFilter);
+            }
+
             main.AttachSplash(splash);
             main.Show();   // shown with Opacity 0 / not in taskbar; Window_Load -> CompleteStartup runs unseen
 
@@ -334,9 +328,9 @@ namespace GCode_Sender
             string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
             CrashReporter.Capture(source, ex, utcStamp);
 
-            // Skip the modal dialog for unattended runs (build.ps1 -Headless sets IOSENDER_HEADLESS) so a crash
+            // Skip the modal dialog for unattended runs (build.ps1 -Headless -> -headless) so a crash
             // can't hang the process on an un-clicked message box; the log + exit code carry the signal.
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("IOSENDER_HEADLESS")))
+            if (!Headless)
             {
                 try
                 {

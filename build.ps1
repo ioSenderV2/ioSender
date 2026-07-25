@@ -23,10 +23,16 @@
     Skip killing a running ioSender.exe first.
 
 .PARAMETER Headless
-    Launch with IOSENDER_HEADLESS=1 so an unhandled exception dumps to
-    %AppData%\ioSender\ioSender.crash.log and exits with 0xFA11 (64017)
-    instead of blocking on a modal error dialog. Use for unattended runs;
-    omit for interactive testing so you still see the crash dialog.
+    Launch with -headless forwarded to ioSender.exe, so an unhandled exception dumps to
+    %AppData%\ioSender\ioSender.crash.log and exits with 0xFA11 (64017) instead of blocking
+    on a modal error dialog. Use for unattended runs; omit for interactive testing so you
+    still see the crash dialog.
+
+.DESCRIPTION (no env vars)
+    ioSender itself reads NO environment variables (2026-07-25) - every launch-time behavior
+    is a real CLI flag, and every persistent setting (OBS demo-recording config, AI review
+    key, etc.) lives in Settings > App or the registry instead of hidden env state. The exact
+    command line being launched is always printed.
 
 .EXAMPLE
     .\build.ps1 -Launch
@@ -110,10 +116,13 @@ if ($Launch) {
     else {
         $exe = Join-Path $root ($exeRel -f $Configuration)
         if (Test-Path $exe) {
-            $argMsg = if ($AppArgs) { " $($AppArgs -join ' ')" } else { '' }
-            Write-Host "==> Launching $Configuration ioSender$argMsg ..." -ForegroundColor Cyan
-            if ($Headless) { $env:IOSENDER_HEADLESS = '1' } else { Remove-Item Env:\IOSENDER_HEADLESS -ErrorAction SilentlyContinue }
-            if ($AppArgs) { Start-Process $exe -ArgumentList $AppArgs } else { Start-Process $exe }
+            $finalArgs = @($AppArgs)
+            if ($Headless -and -not ($finalArgs -contains '-headless')) { $finalArgs += '-headless' }
+
+            $cmdLine = if ($finalArgs) { "$exe $($finalArgs -join ' ')" } else { $exe }
+            Write-Host "==> Launching: $cmdLine" -ForegroundColor Cyan
+
+            if ($finalArgs) { Start-Process $exe -ArgumentList $finalArgs } else { Start-Process $exe }
         }
         else {
             Write-Host "==> Built exe not found: $exe" -ForegroundColor Red

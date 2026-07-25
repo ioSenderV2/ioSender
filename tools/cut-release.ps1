@@ -129,11 +129,20 @@ foreach ($m in [regex]::Matches($content, $glanceRe)) {
 $newEntries = @($entries.Values | Where-Object { $_.N -gt $previousThrough } | Sort-Object N)
 
 # --- 4. Release notes --------------------------------------------------------
+# The install command is pinned to THIS release's own tag (-Tag $newVersion), not a bare
+# "install latest" - a release's own notes page should stay reproducible even after newer
+# versions ship, not silently start installing something else. Was a generic "irm | iex" one-
+# liner with no way to specify a version at all (confirmed via a user report 2026-07-25 trying
+# to install 2.26 from its own release page) - also fixed the syntax while at it: "iex -Tag ..."
+# binds -Tag to Invoke-Expression itself (which has no such parameter) and throws, confirmed by
+# testing both forms locally; the scriptblock-invocation form is the one that actually forwards
+# parameters into the piped script (matches what MainWindow.xaml.cs's own LaunchInstaller already
+# uses internally for Check for Updates/Roll back).
 $lines = @("## ioSender $newVersion", "")
 $lines += "### Install / update"
 $lines += "Run from CMD or PowerShell:"
 $lines += '```'
-$lines += "powershell `"irm https://raw.githubusercontent.com/$Repo/master/install.ps1 | iex`""
+$lines += "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag `"$newVersion`""
 $lines += '```'
 $lines += ""
 if ($newEntries.Count -eq 0) {

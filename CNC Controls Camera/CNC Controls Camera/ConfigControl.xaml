@@ -7,7 +7,7 @@
              xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF" x:Class="CNC.Controls.Camera.ConfigControl"
              mc:Ignorable="d" 
              d:DesignHeight="160" d:DesignWidth="310">
-    <GroupBox x:Uid="grp_camera" x:Name="grpCamera" Header="Camera" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310">
+    <GroupBox x:Uid="grp_camera" x:Name="grpCamera" Header="Camera" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310" Grid.IsSharedSizeScope="True">
         <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <!-- Camera device bind (menu overhaul): pick a local webcam and Connect to enable the Camera menu.
                  Bound device is remembered; Disconnect (or no device) hides the menu. Wired in code-behind. -->
@@ -36,6 +36,89 @@
                 <ComboBox x:Uid="comboBox" x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80"/>
             </Grid>
             <Button x:Uid="btn_getPosition" x:Name="getPosition" Content="Get current position" MinWidth="150" Margin="0,4,0,0" Click="getPosition_Click"/>
+
+            <!-- Demo recording (OBS) - only matters on a -demomarker launch, harmless otherwise. Was
+                 IOSENDER_OBS*/IOSENDER_OBSWS_* env vars (hidden, dev-machine-only state); moved here so
+                 it's a real, visible, per-profile setting instead. -->
+            <DockPanel Margin="0,10,0,2" LastChildFill="False">
+                <TextBlock x:Uid="lbl_obsSection" DockPanel.Dock="Left" Text="Demo recording (OBS)" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button x:Uid="btn_obsInstructions" DockPanel.Dock="Right" Content="Instructions…" Padding="6,0" Click="btnObsInstructions_Click"
+                        ToolTip="How to set up a named, remote-controllable source in OBS."/>
+                <Button x:Uid="btn_obsValidate" DockPanel.Dock="Right" Content="Validate" Padding="6,0" Margin="0,0,6,0" Click="btnObsValidate_Click"
+                        ToolTip="Connect to OBS now and check that the WS Host/Port/Password work and each configured source name actually exists."/>
+            </DockPanel>
+            <!-- All six rows below share one label-column size group ("obslbl") so every colon lines up and
+                 every value field starts at the same X, regardless of each label's own text length ("WS
+                 Port:" vs "WS Password:" vs "App (screen):"). WS Port uses a Grid+Label wrapper instead of
+                 NumericField's own built-in Label/ColonAt so it can join the same shared group - a
+                 NumericField's internal ColonAt is a fixed pixel offset local to that control, which can't
+                 participate in a Grid SharedSizeGroup. -->
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Content="WS Port:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <Controls:NumericField x:Uid="fld_obsPort" x:Name="obsPort" Grid.Column="1" Label="" Unit="" ColonAt="0" Format="#####" Value="{Binding Path=Camera.ObsPort, Mode=TwoWay}"
+                                        ToolTip="OBS's WebSocket server port - Tools &gt; WebSocket Server Settings in OBS. Default 4455."/>
+            </Grid>
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label x:Uid="lbl_obsHost" Content="WS Host:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <TextBox x:Uid="txt_obsHost" Grid.Column="1" Text="{Binding Path=Camera.ObsHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                         ToolTip="Where OBS's WebSocket server is running - 'localhost' if OBS is on this same PC (the normal case)."/>
+            </Grid>
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label x:Uid="lbl_obsPassword" Content="WS Password:" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <PasswordBox x:Uid="pwd_obsPassword" x:Name="pwdObsPassword" Grid.Column="1" VerticalAlignment="Center" PasswordChanged="pwdObsPassword_PasswordChanged"
+                             ToolTip="Only needed if OBS's WebSocket server has 'Enable Authentication' checked (Tools &gt; WebSocket Server Settings). Leave blank if it's off."/>
+            </Grid>
+            <Grid Margin="0,4,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Content="Front Left:" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="A camera/scene source in OBS to remote-control record for. See Instructions above."/>
+                <TextBox x:Uid="txt_obsCamASource" Grid.Column="1" Text="{Binding Path=Camera.ObsCamASource, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Exact OBS source name (Sources panel), e.g. a video capture device for this camera."/>
+                <TextBox x:Uid="txt_obsCamAFilter" Grid.Column="3" Text="{Binding Path=Camera.ObsCamAFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one)."/>
+            </Grid>
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Content="Front Right:" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="A camera/scene source in OBS to remote-control record for. See Instructions above."/>
+                <TextBox x:Uid="txt_obsCamBSource" Grid.Column="1" Text="{Binding Path=Camera.ObsCamBSource, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Exact OBS source name (Sources panel), e.g. a video capture device for this camera."/>
+                <TextBox x:Uid="txt_obsCamBFilter" Grid.Column="3" Text="{Binding Path=Camera.ObsCamBFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one)."/>
+            </Grid>
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="obslbl"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Content="App (screen):" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="ioSender's own window, captured as a Display/Window Capture source in OBS. See Instructions above."/>
+                <TextBox x:Uid="txt_obsAppSource" Grid.Column="1" Text="{Binding Path=Camera.ObsAppSource, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Exact OBS source name (Sources panel) for the Display/Window Capture of ioSender's window."/>
+                <TextBox x:Uid="txt_obsAppFilter" Grid.Column="3" Text="{Binding Path=Camera.ObsAppFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one)."/>
+            </Grid>
         </StackPanel>
     </GroupBox>
 </UserControl>

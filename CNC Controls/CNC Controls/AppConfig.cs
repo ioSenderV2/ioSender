@@ -135,6 +135,17 @@ namespace CNC.Controls
         private bool _moveToSpindle = false, _confirmMove = false;
         private CameraMoveMode _moveMode = CameraMoveMode.BothAxes;
 
+        // Demo-recording (OBS) settings - was IOSENDER_OBS*/IOSENDER_OBSWS_* env vars, moved here so a
+        // -demomarker launch has somewhere real to read them from instead of hidden env state (see
+        // ObsBridge.ConfigureCameras / App.xaml.cs's demoMarker branch). Only meaningful while demo
+        // markers are on (-demomarker); harmless if unset otherwise.
+        private string _obsHost = "localhost";
+        private int _obsPort = 4455;
+        private string _obsPassword = string.Empty;
+        private string _obsCamASource = string.Empty, _obsCamAFilter = "Source Record";
+        private string _obsCamBSource = string.Empty, _obsCamBFilter = "Source Record";
+        private string _obsAppSource = string.Empty, _obsAppFilter = "Source Record";
+
         [XmlIgnore]
         internal bool IsDirty { get; set; } = false;
 
@@ -166,6 +177,16 @@ namespace CNC.Controls
         public bool InitialMoveToSpindle { get { return _moveToSpindle; } set { _moveToSpindle = value; IsDirty = true; OnPropertyChanged(); } }
         public bool ConfirmMove { get { return _confirmMove; } set { _confirmMove = value; IsDirty = true; OnPropertyChanged(); } }
         public CameraMoveMode MoveMode { get { return _moveMode; } set { _moveMode = value; OnPropertyChanged(); } }
+
+        public string ObsHost { get { return _obsHost; } set { _obsHost = value; IsDirty = true; OnPropertyChanged(); } }
+        public int ObsPort { get { return _obsPort; } set { _obsPort = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsPassword { get { return _obsPassword; } set { _obsPassword = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsCamASource { get { return _obsCamASource; } set { _obsCamASource = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsCamAFilter { get { return _obsCamAFilter; } set { _obsCamAFilter = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsCamBSource { get { return _obsCamBSource; } set { _obsCamBSource = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsCamBFilter { get { return _obsCamBFilter; } set { _obsCamBFilter = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsAppSource { get { return _obsAppSource; } set { _obsAppSource = value; IsDirty = true; OnPropertyChanged(); } }
+        public string ObsAppFilter { get { return _obsAppFilter; } set { _obsAppFilter = value; IsDirty = true; OnPropertyChanged(); } }
     }
 
     [Serializable]

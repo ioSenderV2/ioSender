@@ -555,10 +555,9 @@ namespace CNC.Controls
 
             AppConfig.Settings.Save();
 
-            // Relaunch ourselves in-process. The new process is told IOSENDER_SELF_RELAUNCH=1 (env var, not a
-            // CLI arg - simplest way to pass a flag through Process.Start that can't collide with real argv)
-            // so its own single-instance probe (App.xaml.cs OnStartup) skips checking for a running instance:
-            // this instance is still mid-teardown at that point and may still be listening on the singleton
+            // Relaunch ourselves in-process. The new process is passed -self-relaunch (CLI arg) so its own
+            // single-instance probe (App.xaml.cs OnStartup) skips checking for a running instance: this
+            // instance is still mid-teardown at that point and may still be listening on the singleton
             // pipe for a moment (NamedPipeServerStream.WaitForConnection() isn't reliably cancelable via
             // Dispose on .NET Framework, so there's no reliable way to force-close our own listener first) -
             // without the skip, the new process would detect us, fold into us, and exit, so "Restart" would
@@ -568,9 +567,12 @@ namespace CNC.Controls
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName,
+                    // ProcessStartInfo.ArgumentList isn't available on net462 (added in later .NET
+                    // Framework versions) - plain Arguments string instead. "-self-relaunch" needs no
+                    // quoting/escaping so this is safe as a literal.
+                    Arguments = "-self-relaunch",
                     UseShellExecute = false
                 };
-                psi.EnvironmentVariables["IOSENDER_SELF_RELAUNCH"] = "1";
                 System.Diagnostics.Process.Start(psi);
                 Application.Current.Shutdown();
             }
