@@ -301,7 +301,7 @@ namespace CNC.Controls.Viewer
                 Length = Math.Max(sx, 1d),
                 Width = Math.Max(sy, 1d),
                 Height = h,
-                Fill = new SolidColorBrush(Color.FromArgb(90, 230, 193, 138))   // translucent tan stock - matches the carve mesh's new brighter top color
+                Fill = new SolidColorBrush(Color.FromArgb(90, 237, 205, 176))   // translucent cherry stock - matches the carve mesh's top color
             });
         }
 
@@ -375,7 +375,7 @@ namespace CNC.Controls.Viewer
                     }
                 }
 
-                cutLines = new LinesVisual3D { Color = Color.FromRgb(20, 90, 210), Thickness = 1.4d, Points = cut };    // blue carve trails
+                cutLines = new LinesVisual3D { Color = Color.FromRgb(0, 174, 239), Thickness = 1.4d, Points = cut };    // bright azure carve trails
                 rapidLines = new LinesVisual3D { Color = Color.FromRgb(160, 160, 160), Thickness = 0.6d, Points = rapid };
 
                 InitHeightmap();   // fresh stock surface sized to the new program
@@ -529,9 +529,11 @@ namespace CNC.Controls.Viewer
                 // vertex colors, a carved pocket's near-vertical walls read almost the same tan as the flat
                 // top and the whole surface looked muddy. Pushed apart: a brighter, more saturated top and a
                 // markedly darker back so back-facing normals (pocket walls, the underside of an overhang)
-                // stand out clearly instead of blending in.
-                Material = MaterialHelper.CreateMaterial(Color.FromRgb(230, 193, 138)),
-                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(96, 74, 54))
+                // stand out clearly instead of blending in. Light cherry/tan tone, genuinely brighter than the
+                // original (230,193,138)/(96,74,54) pair - not just more saturated - so the carve trail color
+                // reads clearly against it instead of both going muddy-dark together.
+                Material = MaterialHelper.CreateMaterial(Color.FromRgb(237, 205, 176)),
+                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(196, 155, 122))
             };
             carveVisual = new ModelVisual3D { Content = model };
         }
@@ -688,7 +690,12 @@ namespace CNC.Controls.Viewer
             if (segs.Count == 0)
                 return;
             playing = true;
-            SetToolpathVisible(false);   // hide the blue toolpath while simulating - just show the cut
+            // Toolpath trail stays visible during playback now - it used to hide here, but the trail's
+            // points sit at the actual cut Z (below the stock top), so while the stock starts flat/uncut
+            // the trail is buried inside it and invisible either way; the only moment it's actually exposed
+            // is exactly where/when the heightmap carve reveals it, which is DURING playback - hiding it here
+            // meant the colored trail was never visible in any state. Leaving it visible lets it poke through
+            // as the carve progresses instead.
             if (timer == null)
             {
                 timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(TickSeconds * 1000d) };
