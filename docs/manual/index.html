@@ -561,6 +561,13 @@
       <img src="img/connect-dialog.png" alt="The ioSender connection dialog with Serial, Network and Simulator tabs">
       <figcaption>The connection dialog. Pick the transport that matches how your controller is wired.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Serial / Network / Simulator tabs</strong> — pick whichever matches how your controller is wired; only one is used at a time.</li>
+      <li><strong>Port</strong> — the COM port your controller shows up as (Windows assigns these; check Device Manager if you're not sure which one).</li>
+      <li><strong>Baud rate</strong> — the serial speed; must match your controller firmware's own setting (115200 is the near-universal grblHAL default).</li>
+      <li><strong>On connect</strong> — an optional action to run automatically the instant the link opens; "No action" just connects and stops there.</li>
+    </ul>
 
     <table class="reftab">
       <tr><th>Tab</th><th>Use when…</th><th>You enter</th></tr>
@@ -787,6 +794,18 @@
       <img src="img/job-runscreen.png" alt="The Job screen: DRO, g-code program list, jog pad and the run bar">
       <figcaption>The Job screen with a program loaded: g-code list, live 3D view and the run bar.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>DRO</strong> (top left) — the live X/Y/Z position, with a per-axis zero button; see <a href="#jogging">Jogging &amp; the DRO</a>.</li>
+      <li><strong>Machine Position</strong> — the same position in fixed machine coordinates rather than your work origin.</li>
+      <li><strong>Program limits</strong> — the loaded program's own footprint (min/max per axis), so you can sanity-check it fits your stock before running.</li>
+      <li><strong>Coolant</strong> — manual Flood/Mist toggles, independent of whatever the running program itself commands.</li>
+      <li><strong>The g-code list</strong> (centre) — the loaded program, line by line, with the current line highlighted as it runs. Hover any line for a plain-English tooltip explaining exactly what it does (shown here for <code>T1M6</code> — "Select tool 1", then "Tool change (M6)", in the same left-to-right order the words appear in the line) — click the tooltip to copy the line.</li>
+      <li><strong>Jogging / UI Jogging / Keyboard jogging</strong> (right) — the on-screen jog pad plus the distance/feed presets each jog step uses.</li>
+      <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle RPM/direction/override controls.</li>
+      <li><strong>The fixture panel</strong> (far right, vertical) — quick-jump buttons to named machine positions like G28/G30/G54.</li>
+      <li><strong>The run bar</strong> (bottom) — Home/Unlock/Reset, the Run button and its mode dropdown, Feed Hold/Stop/Rewind, and the feed/rapids override sliders — see below.</li>
+    </ul>
     <p>The <strong>Job</strong> screen is where you load g-code, watch it, and run it. It's the home base
     you return to for every job.</p>
 
@@ -870,6 +889,16 @@
       <img src="img/start-job-panel.png" alt="The Start Job setup panel">
       <figcaption>The Start Job setup panel.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Setup</strong> — pick the physical Fixture you clamped the stock against and which Probe to use; Safe Z delta sets how high the probe retracts between touches.</li>
+      <li><strong>Stock</strong> — the nominal Width/Height/Thickness you already know (from your CAM file or a tape measure); tick <strong>Stock size is exact</strong> only if you trust those numbers precisely, since it changes how aggressively the probe searches for the real edge.</li>
+      <li><strong>Actions</strong> — <strong>Set origin in</strong> picks which work-coordinate slot (G54, etc.) receives the new origin; <strong>Set tool-length reference</strong> also probes the current tool's length while it's at it.</li>
+      <li><strong>Measured stock / Flatness / Squareness</strong> — filled in once you've run a probe: the real measured size, how flat the top is, and how far off-square (skewed) the stock actually sits.</li>
+      <li><strong>The Stock diagram</strong> (right) — a live schematic of the four probed corners, with each corner's angle and Z height plus the diagonal measurements, so you can see at a glance how square and flat the material really is.</li>
+      <li><strong>Copy size / Verify skew</strong> — copy the measured size back into the nominal fields, or re-touch two corners to double-check the computed rotation.</li>
+      <li>The green <strong>Generate</strong>/Run button at the bottom of the window builds (then runs) the job once you're happy with the setup.</li>
+    </ul>
 
     <h3>The steps</h3>
     <ol>
@@ -906,6 +935,15 @@
       <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the eight steps">
       <figcaption>The Machine Setup overview and its eight guided steps.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The row of numbered tabs across the top (1–8, plus Overview) is the guided sequence — work left to right; nothing is sent to the controller until you press Apply.</li>
+      <li><strong>Start from your machine</strong> — three dropdowns let you pick a known manufacturer/product/model (or Generic/custom) so the later steps start from sensible defaults instead of blank fields.</li>
+      <li><strong>Firmware / Build</strong> — shows what's actually running on the connected controller right now; <strong>Check for Updates</strong> compares it against the latest published grblHAL build.</li>
+      <li><strong>Firmware update available</strong> (popup shown here) — appears when a newer build exists; <strong>Flash Firmware</strong> reprograms the board (this disconnects ioSender and needs the board's own RESET/PROGRAM button pressed within the time shown).</li>
+      <li><strong>Firmware information</strong> (popup shown here) — a read-only dump of the controller's reported firmware, version, build, axis count and enabled options — handy when reporting a problem.</li>
+      <li><strong>Forget machine / Reload / Preview / Apply</strong> (bottom right) — Apply is the only button that actually writes settings to the controller; Preview lets you review the resulting <code>$</code> settings first.</li>
+    </ul>
     <p><strong>Machine Setup</strong> is a guided wizard that walks you through the settings a new machine
     needs before it can safely home and run — in plain-English steps instead of a wall of <code>$</code>
     numbers. Do it <strong>once</strong> when you first connect a controller (and again after a firmware
@@ -959,6 +997,15 @@
       <img src="img/probing-tabs.png" alt="The Probing tab and its routine sub-tabs">
       <figcaption>The Probing routines, with the probe selector at the top.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The <strong>Probe:</strong> selector (top) — choose which physical probe you're using; the routine's own parameters (feeds, travel, tip size) follow automatically from that probe's Machine Setup definition.</li>
+      <li>The sub-tabs (Tool length offset, Edge finder external/internal, Center finder) are separate routines — pick the one that matches what you're trying to measure.</li>
+      <li><strong>Probe fixture @ G59.3</strong> / <strong>Establish reference offset</strong> — the two ways to run a tool-length probe: against a fixed toolsetter location, or to record the master-tool baseline other tools compare against.</li>
+      <li><strong>Also set work origin</strong> — tick this to additionally zero the work Z from this same touch-off, choosing which coordinate system (G54, etc.) or a raw G92 offset receives it.</li>
+      <li>The live X/Y/Z readout (right) shows the probe's last recorded position once a routine completes.</li>
+      <li><strong>Start / Stop</strong> (bottom left) run and abort the selected routine.</li>
+    </ul>
     <p><strong>Probing</strong> is how the machine <em>touches</em> the work to measure position precisely,
     instead of you lining it up by eye (see <a href="#intro-to-cnc">Intro → probes</a>). The Probing tab
     gathers the individual routines, each on its own sub-tab:</p>
@@ -994,6 +1041,16 @@
       <img src="img/tools-tab.png" alt="The Tools tab">
       <figcaption>The Tools tab gathers the machine utilities (Stepper calibration (probe) shown).</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The five sub-tabs across the top are separate utilities — this shot shows <strong>Stepper calibration (probe)</strong>; the others cover Squareness, Surface spoilboard flattening, and two other stepper-calibration methods.</li>
+      <li><strong>Calibrate</strong> — choose whether you're calibrating the XY steppers or the Z stepper (against a 1-2-3 gauge block).</li>
+      <li><strong>Fixture</strong> — pick the validated fixture (here a Corner Fence named "Serving Platter") the probe will measure against.</li>
+      <li><strong>True width/height</strong> — the reference block's own precisely-known size; the probe compares its measured size against this to work out the real steps/mm.</li>
+      <li><strong>Measured / error / new-steps/mm</strong> — filled in after a probe run: what was actually measured, how far off it was from "true", and the corrected steps/mm value ready to save.</li>
+      <li><strong>Save steps/mm</strong> writes the corrected value to the controller (<code>$100</code>/<code>$101</code> for XY, <code>$102</code> for Z); <strong>Undo</strong> reverts it.</li>
+      <li>The numbered instructions (right) walk the exact physical steps for this fixture.</li>
+    </ul>
     <p>The <strong>Tools</strong> tab gathers the machine utilities — the jobs you do <em>to</em> the machine
     rather than <em>with</em> it. Each sub-tab carries its own "About…" guidance in the app.</p>
     <table class="reftab">
@@ -1023,6 +1080,14 @@
       <img src="img/offsets-table.png" alt="The work-offset table (G54 to G59.3)">
       <figcaption>The work-offset table (G54–G59.3).</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>Each row is one work-coordinate system (<code>G54</code>–<code>G59.3</code>) or a system offset (<code>G28</code>, <code>G30</code>, <code>G92</code>) — your program runs in whichever one is currently active.</li>
+      <li><strong>X / Y / Z</strong> columns are directly editable — type a value, then click elsewhere to leave the row and commit a plain <code>G54</code>–<code>G59.3</code> change automatically.</li>
+      <li><strong>Clr</strong> clears that one offset to zero immediately; <strong>Get</strong> copies the current machine position into the row's fields (still needs you to click away to commit it).</li>
+      <li><code>G28</code>/<code>G30</code>/<code>G92</code> rows ask for confirmation before saving, since they store wherever the machine physically is right now rather than a typed number.</li>
+      <li>The explanatory panel (right) documents this machine's own convention for what <code>G30</code>/<code>G59.3</code> are used for — worth reading, since these are just storage slots without a fixed meaning of their own.</li>
+    </ul>
     <p>A <strong>work offset</strong> is the stored gap between the machine's home and a work origin (see the
     <a href="#intro-to-cnc">Intro diagram</a>). grbl keeps several of them so you can have more than one setup
     ready at once — the <strong>work coordinate systems</strong> <code>G54</code> through <code>G59.3</code>.
@@ -1070,6 +1135,13 @@
       <img src="img/settings-grbl.png" alt="The Grbl settings tab with the search box">
       <figcaption>The Grbl settings tab — searchable, with changed settings highlighted.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The <strong>Search</strong> box (top) filters the tree live — a wildcard like <code>$39*</code> or free text like "jog" both work, with next/previous match arrows.</li>
+      <li>The tree (left) lists every <code>$</code> setting grouped by category; a setting whose value has changed since the app started is <strong>highlighted</strong> (shown here in orange/yellow) so you can spot what's different at a glance.</li>
+      <li>Selecting a setting shows its live control and a plain-English description on the right — no need to memorize what each numbered <code>$</code> setting means.</li>
+      <li><strong>Reload / Backup / Restore / Copy to simulator / Reset to Default</strong> (bottom) — Backup/Restore let you snapshot and roll back a whole settings set; Copy to simulator pushes the same settings into the bundled offline simulator so it matches your real machine.</li>
+    </ul>
     <p><strong>Settings</strong> is one flat strip of tabs — the controller's settings plus ioSender's own
     preferences, in one place:</p>
     <table class="reftab">
@@ -1110,9 +1182,17 @@
     <h2>Feeds &amp; Speeds (Fusion 360 Addin) <a class="anchor" href="#feeds-and-speeds">#</a></h2>
     <div class="tags"><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/feeds-and-speeds.png" alt="The Feeds & Speeds tab's Load/Import sub-tab">
-      <figcaption>The Feeds &amp; Speeds tab's Load/Import sub-tab, ready to read the newest Fusion export.</figcaption>
+      <img src="img/feeds-and-speeds.png" alt="The Feeds & Speeds tab's Results sub-tab, mid AI review">
+      <figcaption>The Feeds &amp; Speeds tab's Results sub-tab — a chip-load table for a real job, with an AI review in progress.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Ask AI to review</strong> / model dropdown — sends every operation to the picked AI model for a second opinion; nothing is applied automatically.</li>
+      <li>The grid — one row per operation and parameter (RPM, feeds, step-overs); <strong>Current</strong> is what Fusion exported, <strong>Recommended</strong> is the table's own chip-load-based number, <strong>Machine limit</strong> is your connected controller's actual ceiling, and <strong>Verdict</strong> flags whether it's fine (Ok), worth a small correction (Nudge), or should Change.</li>
+      <li><strong>AI Says</strong> / <strong>Prefer AI</strong> — once a review runs, the AI's own opinion appears per row; tick Prefer AI (or "for all") to use its number instead of the table's.</li>
+      <li><strong>Write apply file</strong> — saves only the flagged rows to a companion file Fusion reads back in.</li>
+      <li>The status log (bottom) is a running transcript of the review — including cost/token counts. This particular capture shows a review being cancelled partway through (<kbd>Esc</kbd>/<kbd>Ctrl</kbd>+<kbd>C</kbd>), which is why it reads "Cancelling…" / "AI review cancelled".</li>
+    </ul>
     <p>The <strong>ioSenderV2 Fusion Addin</strong> adds an "ioSenderV2" panel to Fusion 360's Manufacture
     workspace with <strong>Feeds and Speeds</strong> and <strong>Batch Post Process</strong> commands. The
     matching <strong>Feeds &amp; Speeds</strong> tab in ioSender reviews what Fusion exports against a
@@ -1175,6 +1255,13 @@
       <img src="img/sdcard.png" alt="The SD Card tab listing controller files">
       <figcaption>Files stored on the controller's SD card.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The file list shows what's actually stored on the controller's own SD card / flash (not your PC) — <strong>Size</strong> and <strong>Location</strong> (e.g. FatFs vs littlefs) columns show where each file physically lives on the controller.</li>
+      <li><strong>List CNC files only</strong> filters out non-g-code files (like the <code>.macro</code> files shown here) from the view.</li>
+      <li><strong>Upload</strong> copies a file from your PC onto the card; <strong>Install ATC macros</strong> pushes the controller-side macro set (the same one Machine Setup step 7 installs).</li>
+      <li>Selecting a file (not shown open here) offers Load and run / Edit / View / Delete / Move / Copy.</li>
+    </ul>
     <p>Many controllers have an <strong>SD card</strong> (or onboard flash) that stores g-code files on the
     controller itself. The SD Card tab manages those files and can run them directly.</p>
     <ul>
@@ -1197,8 +1284,15 @@
     <div class="tags"><span class="tag int">Intermediate</span></div>
     <figure>
       <img src="img/gcode-viewer.png" alt="The 3D toolpath viewer and its toolbar">
-      <figcaption>The 3D toolpath viewer and its view toolbar.</figcaption>
+      <figcaption>The Job screen with the 3D View sub-tab open, mid-program.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>The 3D pane itself sits between the DRO panel and the jogging controls on the Job screen (see <a href="#job">The Job screen</a>) — this shot shows it mid-program, with the toolpath already carved into the stock model.</li>
+      <li><strong>Play / Pause / Stop</strong> and the speed dropdown (<strong>1x</strong>) play back the toolpath animation at the chosen speed without actually running the machine.</li>
+      <li><strong>Reset view</strong> snaps the camera back to fit the whole scene; the small cube gizmo in the bottom-right corner (the ViewCube) can be clicked to snap to a specific face.</li>
+      <li>The orange cylinder is the cutting tool's current position; the brown block is the stock, shown at its real probed size.</li>
+    </ul>
     <p>The 3D viewer sits beside the g-code list on the <a href="#job">Job</a> screen and draws the entire
     toolpath before you cut — so you can sanity-check a program, see where it sits on your stock, and watch
     progress as it runs.</p>
@@ -1237,6 +1331,14 @@
       <img src="img/heightmap.png" alt="The Height map view with area and grid controls">
       <figcaption>Building a height map over the probed area.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Area to probe</strong> — either "From program" (matched to your loaded job's footprint via Set from program limits) or "Full table" (the whole machine bed); X/Y/W/H can be fine-tuned by hand.</li>
+      <li><strong>Grid size</strong> — how many probe points to take across that area; a smaller spacing (denser grid) is slower but captures more surface detail — Lock keeps X and Y spacing equal.</li>
+      <li><strong>Probe depth / feed</strong> — how far down to search for the surface and how gently to approach it.</li>
+      <li><strong>Start</strong> begins probing the grid point-by-point; the result draws into the <strong>Surface</strong> panel (right) once it finishes.</li>
+      <li><strong>Apply</strong> rewrites your loaded program's Z moves to follow the measured surface; <strong>Save</strong>/<strong>Load</strong> let you reuse a captured map later without re-probing.</li>
+    </ul>
     <p>A <strong>height map</strong> compensates for a surface that isn't perfectly flat. The machine probes a
     grid of points across your stock, learns the real Z at each, then <em>shifts Z as it cuts</em> to follow
     the actual surface. The classic use is <strong>PCB isolation milling</strong> or engraving a slightly
@@ -1266,6 +1368,14 @@
       <img src="img/lathe-wizard.png" alt="A lathe wizard">
       <figcaption>A lathe turning wizard.</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Profile</strong> — a saved set of defaults for this wizard (bit geometry, preferred depths) so you don't re-enter them every time.</li>
+      <li><strong>Start Z / Length / Diameter</strong> (Current/Target/Clearance) — the geometry of the cut: where it begins, how far along Z it runs, and the diameter it starts and ends at.</li>
+      <li><strong>Cut depths and feed rates</strong> — per-pass depth and feed for the roughing passes, plus a separate, lighter <strong>Last pass</strong> for the final finish pass.</li>
+      <li><strong>CSS</strong> (Constant Surface Speed) — holds a constant cutting speed at the tool tip by varying spindle RPM as the diameter changes, instead of a fixed RPM.</li>
+      <li><strong>Calculate</strong> generates the actual turning program from these numbers, ready to load and run like any other g-code.</li>
+    </ul>
     <p>ioSender also drives <strong>lathes</strong>. Turn on lathe mode under
     <a href="#settings">Settings → App → Main</a> and the interface switches to a lathe layout — X becomes the
     diameter/radius axis and Z runs along the spindle.</p>
@@ -1291,6 +1401,12 @@
       <img src="img/errors-dialog.png" alt="The Error and alarm codes dialog">
       <figcaption>The built-in Error and alarm codes reference (Help menu).</figcaption>
     </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li>Two tabs — <strong>Error codes</strong> and <strong>Alarm codes</strong> — each a plain-English lookup table for every numbered code the controller can report.</li>
+      <li>Find the code shown on your Job screen's status line in this list to see exactly what it means (and, for alarms, what usually causes it).</li>
+      <li>This reference opens from the <strong>Help</strong> menu any time, even without a job running — handy to have open the first few times you hit an alarm.</li>
+    </ul>
     <p>Sooner or later the machine stops and shows a code. Don't panic — grbl is just telling you what
     happened. There are two kinds, and they mean very different things.</p>
 

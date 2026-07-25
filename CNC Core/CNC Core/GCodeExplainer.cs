@@ -133,7 +133,16 @@ namespace CNC.Core
                 string phrase = ExplainToken(t);
                 if (string.IsNullOrEmpty(phrase))
                     continue;
-                int pos = lineText.IndexOf(t.ToString(), System.StringComparison.OrdinalIgnoreCase);
+                // Every GCodeToken subclass declares its own ToString() with "new", not "override" - so
+                // calling t.ToString() here (t statically typed as the base GCodeToken) always resolves to
+                // the BASE class's ToString(), never the derived one, regardless of t's actual runtime type.
+                // That's harmless for token types whose Command enum name happens to match its raw g-code
+                // word (e.g. G1), but GCToolSelect's Command is the generic marker Commands.ToolSelect, whose
+                // base ToString() renders "ToolSelect" - never found in "T1M6" - so a tool-select token always
+                // sorted last regardless of where "T1" actually appears. dynamic dispatch resolves to the
+                // token's real most-derived ToString() (its "T1"), fixing the search string.
+                string word = ((dynamic)t).ToString();
+                int pos = lineText.IndexOf(word, System.StringComparison.OrdinalIgnoreCase);
                 phrases.Add(new KeyValuePair<int, string>(pos < 0 ? int.MaxValue : pos, phrase));
             }
             lines.AddRange(phrases.OrderBy(p => p.Key).Select(p => p.Value));
