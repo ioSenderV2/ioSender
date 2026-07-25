@@ -145,5 +145,21 @@ Remove-Item $tempZip -Force
 
 if (-not $InstallDir) { New-DesktopShortcut }
 
+# Best-effort: each release is a distinct, unsigned binary with no reputation of its own, so Defender
+# can flag/quarantine it on heuristics alone. Adding a folder exclusion needs local admin, which this
+# script deliberately doesn't require/request - try it, and if it's denied, just tell the user how to
+# do it themselves instead of failing the install over it.
+try {
+    Add-MpPreference -ExclusionPath $installDir -ErrorAction Stop
+    Write-Host "==> Added a Windows Defender exclusion for $installDir" -ForegroundColor Cyan
+    Start-Sleep -Seconds 2   # the real-time filter driver doesn't enforce a new exclusion instantaneously -
+                              # launching this binary's first-ever execution right on top of Add-MpPreference
+                              # can still race an on-access scan even though the exclusion call already returned.
+}
+catch {
+    Write-Host "==> Could not add a Windows Defender exclusion (needs an elevated/admin PowerShell): $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "==> If Defender quarantines ioSender.exe, add an exclusion yourself: Windows Security > Virus & threat protection > Manage settings > Exclusions > Add folder > $installDir" -ForegroundColor Yellow
+}
+
 Write-Host "==> Launching ioSender ..." -ForegroundColor Green
 Start-Process $exePath
