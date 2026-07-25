@@ -640,7 +640,7 @@
            data-track="novice:0,intermediate:1,machinist:0">
     <h2>Getting clean, repeatable results <a class="anchor" href="#clean-results">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span></div>
-    <p>You can load a file and press Cycle Start — now you want parts that come out <em>clean</em> and the
+    <p>You can load a file and press Run — now you want parts that come out <em>clean</em> and the
     <em>same every time</em>. The gap between a rough, torn, or failed cut and a crisp one is almost never the
     machine; it's a handful of fundamentals. This page is the checklist that separates "it moved" from "it
     worked." The <strong>Intermediate</strong> track then walks the reference pages in the order you'd use them
@@ -808,10 +808,21 @@
     viewer</a>, which draws the whole toolpath and highlights progress as it runs.</p>
 
     <h3>The run bar</h3>
+    <p>The main button is labelled <strong>Run</strong>, with a small dropdown beside it that picks which
+    mode the next press starts in. Whichever mode you last picked becomes the button's own label, so the
+    button always reads exactly what it's about to do:</p>
+    <table class="reftab">
+      <tr><th>Mode</th><th>Does</th></tr>
+      <tr><td><strong>Run</strong></td><td>Start the loaded program for real — or resume after a feed hold.</td></tr>
+      <tr><td><strong>Dry Run</strong></td><td>Rehearse the program: Z stays offset clear of the stock, spindle/coolant are forced off, and tool changes are skipped — watch the whole toolpath run without cutting, spinning, or pausing for a tool swap.</td></tr>
+      <tr><td><strong>Check Run</strong></td><td>Starts the controller's own check mode (<code>$C</code>), which parses the program without moving anything, to validate it before a real run. <code>$C</code> isn't armed until you actually press Run — picking Check Run alone doesn't send anything.</td></tr>
+      <tr><td><strong>Simulate</strong></td><td>Temporarily switches to the bundled grblHAL simulator, runs the program there, then reconnects to your real controller once it finishes or is aborted — a way to preview a job with nothing connected, or with the machine unavailable.</td></tr>
+    </table>
+    <p>Whichever mode you ran reverts back to plain <strong>Run</strong> once the job ends, so the button
+    never gets stuck offering to repeat a Dry Run/Check Run/Simulate pass by accident.</p>
     <table class="reftab">
       <tr><th>Control</th><th>Does</th></tr>
-      <tr><td><strong>Cycle Start</strong></td><td>Begin the program — or resume after a feed hold.</td></tr>
-      <tr><td><strong>Feed Hold</strong></td><td>Pause: the machine decelerates smoothly and holds position (spindle keeps running). Cycle Start resumes.</td></tr>
+      <tr><td><strong>Feed Hold</strong></td><td>Pause: the machine decelerates smoothly and holds position (spindle keeps running). Run resumes.</td></tr>
       <tr><td><strong>Stop</strong></td><td>End the run.</td></tr>
       <tr><td><strong>Reset</strong></td><td>Soft-reset the controller — stops motion, clears an <a href="#errors-alarms">alarm</a>, and returns to a known idle state.</td></tr>
       <tr><td><strong>Optional stop</strong></td><td>Honour <code>M1</code> optional-stop pauses in the program.</td></tr>
@@ -870,7 +881,8 @@
       dial the material in by hand.</li>
       <li><strong>Set tool-length reference</strong> — probes the tool so Z is referenced correctly.</li>
       <li><strong>Set origin in</strong> — choose which corner (or centre) of the stock the g-code origin
-      sits at, then <strong>Generate</strong>.</li>
+      sits at, then press <strong>Generate</strong> on the run bar at the bottom of the window (the shared
+      Run button reads "Generate" while this tab is focused and nothing's built yet).</li>
     </ol>
 
     <div class="callout note"><span class="k">Verify skew</span><br>
@@ -980,7 +992,7 @@
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
     <figure>
       <img src="img/tools-tab.png" alt="The Tools tab">
-      <figcaption>The Tools tab gathers the machine utilities (Surface Spoilboard shown).</figcaption>
+      <figcaption>The Tools tab gathers the machine utilities (Stepper calibration (probe) shown).</figcaption>
     </figure>
     <p>The <strong>Tools</strong> tab gathers the machine utilities — the jobs you do <em>to</em> the machine
     rather than <em>with</em> it. Each sub-tab carries its own "About…" guidance in the app.</p>
@@ -989,13 +1001,16 @@
       <tr><td><strong>Tool table</strong></td><td>Define your tools (number, diameter, length) so tool changes and offsets know each bit.</td></tr>
       <tr><td><strong>Surface Spoilboard</strong></td><td>Generate a facing program to flatten the spoilboard (or stock) dead flat to the machine — the reference every job sits on.</td></tr>
       <tr><td><strong>Auto Square</strong></td><td>Square a ganged (dual-motor) axis using a Phil&nbsp;Barrett offset (<code>$170+</code>). Only the ganged axis is writable; the offset is a fine trim.</td></tr>
-      <tr><td><strong>Stepper calibration / scratch</strong></td><td>Dial in steps/mm accurately over a long span (the scratch-line trick). Feeds <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</td></tr>
+      <tr><td><strong>Stepper calibration (Manual)</strong></td><td>Dial in steps/mm by hand against a known move distance.</td></tr>
+      <tr><td><strong>Stepper calibration (scratch)</strong></td><td>Dial in steps/mm accurately over a long span (the scratch-line trick). Feeds <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</td></tr>
+      <tr><td><strong>Stepper calibration (probe)</strong></td><td>Calibrate an axis without any manual measuring: for X/Y it probes a validated Corner Fence fixture; for Z it probes a 1-2-3 gauge block's top in each of its three known orientations and least-squares fits a new Z steps/mm from all three readings. Parks at G30 between passes, with a settable Safe Z delta.</td></tr>
       <tr><td><strong>Trinamic</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard) if your controller has them.</td></tr>
       <tr><td><strong>PID</strong></td><td>Tune closed-loop / spindle PID where applicable.</td></tr>
     </table>
     <div class="callout note"><span class="k">Big programs run for real</span><br>
       Generators like Surface Spoilboard can emit thousands of lines; ioSender routes those through the actual
-      job streamer, so surfacing runs smoothly instead of freezing the UI.</div>
+      job streamer, so surfacing runs smoothly instead of freezing the UI — each of these tools shares the same
+      Generate/Run button on the run bar at the bottom of the window rather than having its own.</div>
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a> · <a href="#intro-to-cnc">Intro → bits</a></div>
   </section>
 
@@ -1014,13 +1029,24 @@
     Your program runs in whichever one is active (<code>G54</code> by default).</p>
 
     <h3>The Offsets tab</h3>
-    <p>It shows the table of WCS offsets (plus the tool-length and other system offsets). For each you can:</p>
+    <p>It's an inline-editable grid, one row per offset (<code>G54</code>–<code>G59.3</code> plus the system
+    offsets <code>G28</code>, <code>G30</code> and <code>G92</code>). Every row edits and acts on itself —
+    there's no separate staging panel:</p>
     <ul>
-      <li><strong>Get current position</strong> — capture where the machine is now into that offset (a manual
-      alternative to probing).</li>
-      <li>Type values directly, then <strong>Set all</strong> to apply.</li>
-      <li><strong>Clear all</strong> — zero an offset out.</li>
+      <li>Type directly into a row's <strong>X/Y/Z</strong> fields, then click elsewhere to leave the row —
+      a plain <code>G54</code>–<code>G59.3</code> row saves automatically the moment focus leaves it.</li>
+      <li><strong>Get</strong> — copy the current machine position into that row's fields (not written to the
+      controller yet — still click away to commit it).</li>
+      <li><strong>Clr</strong> — clear that one offset (every axis to 0) immediately.</li>
     </ul>
+    <p>A changed-but-uncommitted value shows <span style="color:#E07B00;font-weight:700">bold orange</span>;
+    a value that differs from what it was at startup shows <span style="color:#1565C0">blue</span> — the same
+    change-tracking convention as the <a href="#settings">Grbl settings tree</a>. Right-click a row for
+    <strong>Restore to value at startup</strong>.</p>
+    <div class="callout note"><span class="k">G28/G30/G92 confirm first</span><br>
+      Because these three store <em>wherever the machine currently is</em> rather than a typed target
+      (no rapid move is ever issued), editing their row asks for confirmation before committing — click
+      <strong>Get</strong>, then leave the row, to record today's position into one of them.</div>
     <p>Most of the time you don't edit these by hand: <a href="#probing">Probing</a> and
     <a href="#start-job">Start Job</a> populate the <em>active</em> WCS for you when you zero on your stock.
     The Offsets tab is for reviewing them, nudging a value, or setting up a second fixture.</p>
@@ -1066,7 +1092,78 @@
     <div class="callout note"><span class="k">Camera is opt-in</span><br>
       The Camera menu only appears once a device is bound: go to <strong>Settings → App → Camera</strong>,
       pick a device from the dropdown and <strong>Connect</strong>.</div>
+
+    <h3>Keeping ioSender up to date</h3>
+    <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
+    walks you through installing it (on a dev build, it instead offers a dropdown of every published release
+    to switch to). If an update is found in the background, the window's title bar quietly appends
+    "(update available)" as a hint, without interrupting anything. <strong>Roll back to previous version...</strong>
+    swaps back to the build installed before your last update — it only remembers one step back, so it won't
+    work if you haven't updated at least once yet.</p>
+
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#jogging">Jogging</a> · <a href="#lathe">Lathe</a></div>
+  </section>
+
+  <!-- ===================== FEEDS & SPEEDS ===================== -->
+  <section class="topic" id="feeds-and-speeds" data-title="Feeds &amp; Speeds (Fusion 360 Addin)" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:8">
+    <h2>Feeds &amp; Speeds (Fusion 360 Addin) <a class="anchor" href="#feeds-and-speeds">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <figure>
+      <img src="img/feeds-and-speeds.png" alt="The Feeds & Speeds tab's Load/Import sub-tab">
+      <figcaption>The Feeds &amp; Speeds tab's Load/Import sub-tab, ready to read the newest Fusion export.</figcaption>
+    </figure>
+    <p>The <strong>ioSenderV2 Fusion Addin</strong> adds an "ioSenderV2" panel to Fusion 360's Manufacture
+    workspace with <strong>Feeds and Speeds</strong> and <strong>Batch Post Process</strong> commands. The
+    matching <strong>Feeds &amp; Speeds</strong> tab in ioSender reviews what Fusion exports against a
+    material chip-load/surface-speed table and your connected controller's actual machine limits, before
+    you post any g-code — no controller connection required, it works entirely offline against the export
+    file.</p>
+    <h3>First-time setup</h3>
+    <ol>
+      <li>In ioSender: <strong>Help → Support → Install ioSenderV2 Fusion Addin...</strong> (only shown when
+      Fusion 360 is installed for this user) — symlinks the add-in into Fusion's AddIns folder, so future
+      ioSenderV2 updates need no reinstall.</li>
+      <li>In Fusion: <strong>Utilities → ADD-INS → Scripts and Add-Ins → Add-Ins tab</strong>, select
+      <strong>ioSenderV2</strong>, click <strong>Run</strong> (tick <strong>Run on Startup</strong> so it's
+      always available).</li>
+    </ol>
+    <h3>Workflow</h3>
+    <ol>
+      <li>In Fusion's <strong>Manufacture</strong> workspace, run the ioSenderV2 panel's
+      <strong>Feeds and Speeds</strong> command — it exports the current setups/operations automatically
+      (to <code>~/Downloads/ioSenderV2/&lt;docName&gt;.json</code>) and leaves its dialog open.</li>
+      <li>Switch to ioSender's <strong>Feeds &amp; Speeds</strong> tab, <strong>Load / Import</strong>
+      sub-tab, click <strong>Load latest export</strong>. Pick a <strong>Material</strong> — the default,
+      <em>Derived</em>, reads each setup's own material from its name (a prefix like <code>MDF_...</code> or
+      <code>Maple_...</code>); choosing a specific material instead overrides every operation to that one
+      material regardless of setup name.</li>
+      <li>A successful load jumps straight to the <strong>Results</strong> tab: one row per operation and
+      parameter (RPM, cutting feed, plunge feed, axial step, radial step), each showing <strong>Current</strong>,
+      <strong>Recommended</strong>, <strong>Machine limit</strong> (cross-checked against the connected
+      controller's <code>$30</code> max RPM and <code>$110</code>-<code>$112</code> max feed rates) and a
+      <strong>Verdict</strong> (Change / Nudge / Ok).</li>
+      <li>Optional: <strong>Ask AI to review</strong> (only shown when an <code>ANTHROPIC_API_KEY</code>
+      environment variable is set) sends every operation to the selected model for a second opinion, filling
+      in an <strong>AI Says</strong> column and a running cost/token estimate. It never applies anything by
+      itself — tick <strong>Prefer AI</strong> on a row (or <strong>Prefer AI for all</strong>) to use its
+      number instead of the table's when you write the apply file.</li>
+      <li>Click <strong>Write apply file</strong> — writes a companion <code>-apply.json</code> next to the
+      export containing only the rows flagged Change (or explicitly Prefer-AI-overridden), and archives a
+      copy of both files under the app's logs folder (Fusion deletes its own copies once its dialog closes,
+      so this is the only lasting record of what changed).</li>
+      <li>Back in Fusion — with the Feeds and Speeds dialog still open — choose <strong>Action → Apply</strong>
+      (or press OK) to pull the changes into your operations.</li>
+      <li>Use the ioSenderV2 panel's <strong>Batch Post Process</strong> command to post multiple
+      setups/operations to g-code files in one action — handy after duplicating a setup for a second
+      material (e.g. a <code>Maple_</code> setup copied to <code>MDF_</code>) once its feeds and speeds have
+      been recalculated.</li>
+    </ol>
+    <div class="callout tip"><span class="k">Recommendations are table-driven</span><br>
+      Chip-load and surface-speed reference values per material come from published carbide bit charts
+      (Onsrud/Amana/Vortex-style starting points), then clamped to what your connected controller can
+      actually do. The optional AI pass is a second opinion for you to read, not a replacement for the table.</div>
+    <div class="xref">Related: <a href="#settings">Settings</a> · <a href="#tools">Tools</a></div>
   </section>
 
   <!-- ===================== SD CARD ===================== -->
