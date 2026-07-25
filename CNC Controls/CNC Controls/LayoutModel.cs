@@ -85,23 +85,23 @@ namespace CNC.Controls
         {
             return new LayoutNode(LayoutKeys.Root,
                 new LayoutSlot(LayoutKeys.SlotTabs,
-                    // Start Job (StartJob) is first: the flow is Start Job (set origin / TLO / measure) then Job (run).
+                    new LayoutNode(LayoutKeys.Settings),
+                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
+                    // Start Job (StartJob) then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
                     new LayoutNode(LayoutKeys.StartJob),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
                     new LayoutNode(LayoutKeys.Offsets),
-                    new LayoutNode(LayoutKeys.Settings),
-                    new LayoutNode(LayoutKeys.Probing),
-                    new LayoutNode(LayoutKeys.HeightMap),
                     new LayoutNode(LayoutKeys.SDCard),
-                    new LayoutNode(LayoutKeys.LatheWizards),
+                    new LayoutNode(LayoutKeys.Probing),
                     new LayoutNode(LayoutKeys.Tools,
                         new LayoutSlot(LayoutKeys.SlotTools, new[] {
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
                     new LayoutNode(LayoutKeys.MachineSetup),
-                    new LayoutNode(LayoutKeys.FeedsAndSpeeds)));
+                    new LayoutNode(LayoutKeys.HeightMap),
+                    new LayoutNode(LayoutKeys.LatheWizards)));
         }
     }
 
