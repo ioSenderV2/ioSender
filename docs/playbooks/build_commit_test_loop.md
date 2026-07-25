@@ -1,5 +1,10 @@
 # Build / commit / test loop
 
+> **Superseded by `turn_workflow_loop.md`** on commit timing only (waits for the user's explicit
+> go-ahead, not just a clean Release build). The debug-build-then-`-Launch` mechanics below are
+> unchanged: build+launch with `-Launch` every time there's a change that needs testing, committed
+> or not. Read `turn_workflow_loop.md` first; this one still governs the kill-before-build mechanics.
+
 **When:** every set of ioSender edits. The user follows along and tests as you go.
 **Memory context:** `iosender-build-commit-workflow.md`.
 

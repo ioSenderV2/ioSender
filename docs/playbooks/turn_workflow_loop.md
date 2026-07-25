@@ -19,14 +19,15 @@ a per-turn thing).
    mid-turn (they surface as a `<system-reminder>` alongside the next tool result, not a fresh
    conversational turn) - address them as they arrive rather than plowing through a stale plan.
 3. **Once implementation + EN-US loc scaffolding is done** (every new control gets an inline `x:Uid`
-   as you create it - cheap insurance, see `localization_pass.md`'s own rule), do the **first Debug
-   build with `-Launch` and a `-message=` describing what to test**, so the user's window opens
-   straight into the right context:
+   as you create it - cheap insurance, see `localization_pass.md`'s own rule): **any time there's a
+   change that needs testing, build with `-Launch`.** No exceptions, no "first build of a batch"
+   judgment call, doesn't matter whether anything's committed yet - if the change needs eyes on it,
+   build+launch:
    ```powershell
-   .\build.ps1 -Launch '-message=<what to test this run>'
+   .\build.ps1 -Launch
    ```
-   Add `-simulator` (optionally `-simulator <port>`) if the change should be smoke-tested against the
-   bundled simulator before the user touches real hardware - see step 5.
+   Corrected 2026-07-25 (twice) - simplify to this one rule; stop trying to guess whether a relaunch
+   would be disruptive.
 4. **While the user tests, do the non-English locale `.csv` work** - `tools/locadd.py` derives ALL 7
    locales (en-US + the 6 translate-me placeholders) in one pass from the x:Uid's already in the XAML,
    so this is just running the tool now rather than earlier:
@@ -53,10 +54,8 @@ a per-turn thing).
 ## Ready commands
 
 ```powershell
-# Step 3: build + launch with a testing message
-.\build.ps1 -Launch '-message=<goal>'
-# ...optionally against the simulator first:
-.\build.ps1 -Launch -simulator '-message=<goal>'
+# Step 3: any change that needs testing - build + launch, every time
+.\build.ps1 -Launch
 
 # Step 4: non-English locale pass (run once implementation/EN-US strings have settled)
 python tools/locadd.py
@@ -72,3 +71,6 @@ git commit -m "..."
   step specifically - commit now waits for the user's explicit go-ahead, not just a clean Release
   build. The kill/debug-build/launch mechanics in that playbook are unchanged and still apply.
 - Push/release stays entirely out of this loop - see `end_of_session_wrapup.md`.
+- 2026-07-25: went back and forth on when `-Launch` is warranted (never / first-build-of-a-batch-only)
+  before landing on the simple rule in step 3 - any change that needs testing gets built with
+  `-Launch`, full stop. Don't re-litigate this.
