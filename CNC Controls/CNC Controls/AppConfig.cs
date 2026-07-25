@@ -288,7 +288,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
-        private bool _preferNetwork = false;
+        private bool _preferNetwork = true;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
