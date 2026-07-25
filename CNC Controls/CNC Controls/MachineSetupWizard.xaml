@@ -100,17 +100,18 @@
                         <TextBlock x:Uid="txt_pickHint" Foreground="Gray" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."/>
 
-                        <!-- Firmware version + update check (grblHAL only). -->
+                        <!-- Firmware version + update check (grblHAL only). Check runs in the background and
+                             reports its result (up to date / error / update available) in a message box
+                             rather than growing inline text here - see CheckFwUpdate_Click. -->
                         <Border x:Name="brdFirmwareUpdate" BorderBrush="#FFCCCCCC" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,10,0,0">
                             <StackPanel Orientation="Vertical">
                                 <TextBlock x:Uid="txt_fwVersion" x:Name="txtFwVersion" TextWrapping="Wrap" Text="Not connected."/>
-                                <DockPanel LastChildFill="False" Margin="0,6,0,0">
-                                    <Button x:Name="btnCheckFwUpdate" x:Uid="btn_checkFwUpdate" Content="Check for firmware update" MinWidth="160" MinHeight="22"
-                                            DockPanel.Dock="Left" Click="CheckFwUpdate_Click"/>
-                                    <Button x:Name="btnUpdateFirmware" x:Uid="btn_updateFirmware" Content="Update firmware…" MinWidth="130" MinHeight="22" Margin="8,0,0,0"
-                                            DockPanel.Dock="Left" Click="UpdateFirmware_Click" Visibility="Collapsed"/>
-                                </DockPanel>
-                                <TextBlock x:Uid="txt_fwUpdateStatus" x:Name="txtFwUpdateStatus" TextWrapping="Wrap" Foreground="Gray" Margin="0,4,0,0" Text=""/>
+                                <Button x:Name="btnCheckFwUpdate" x:Uid="btn_checkFwUpdate" Content="Check for Updates" MinWidth="140" MinHeight="22"
+                                        HorizontalAlignment="Left" Margin="0,10,0,0" Click="CheckFwUpdate_Click"/>
+                                <!-- Only appears while an actual flash is in progress (download/waiting-for-
+                                     button/result) - the check itself reports through a message box, not here. -->
+                                <TextBlock x:Uid="txt_fwFlashStatus" x:Name="txtFwFlashStatus" TextWrapping="Wrap"
+                                           Foreground="Gray" Margin="0,6,0,0" Text="" Visibility="Collapsed"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

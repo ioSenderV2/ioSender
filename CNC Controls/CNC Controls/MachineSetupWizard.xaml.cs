@@ -1322,7 +1322,8 @@ namespace CNC.Controls
 
         // Show what's connected and reset the update-check state - called on Activate and after a check.
         // Update checking only makes sense for a grblHAL board that emits the SRW fork's [BUILD:...] stamp
-        // (GrblInfo.DriverSha) - stock grblHAL / classic grbl boards get an explanatory message instead.
+        // (GrblInfo.DriverSha) - stock grblHAL / classic grbl boards get an explanatory tooltip instead of
+        // a permanently-visible text block, keeping the steady-state UI to just the two info lines + button.
         private void RefreshFirmwareVersion()
         {
             if (txtFwVersion == null)
@@ -1330,14 +1331,14 @@ namespace CNC.Controls
 
             _lastFirmwareKey = GrblInfo.Version + "|" + GrblInfo.DriverSha;
             _pendingFwRelease = null;
-            btnUpdateFirmware.Visibility = Visibility.Collapsed;
-            btnUpdateFirmware.IsEnabled = true;
-            txtFwUpdateStatus.Text = string.Empty;
+            txtFwFlashStatus.Visibility = Visibility.Collapsed;
+            txtFwFlashStatus.Text = string.Empty;
 
             if (string.IsNullOrEmpty(GrblInfo.Version))
             {
                 txtFwVersion.Text = "Not connected.";
                 btnCheckFwUpdate.IsEnabled = false;
+                btnCheckFwUpdate.ToolTip = null;
                 return;
             }
 
@@ -1348,22 +1349,21 @@ namespace CNC.Controls
 
             bool canCheck = GrblInfo.IsGrblHAL && !string.IsNullOrEmpty(GrblInfo.DriverSha);
             btnCheckFwUpdate.IsEnabled = canCheck;
-            if (!canCheck)
-                txtFwUpdateStatus.Text = GrblInfo.IsGrblHAL
-                    ? "This build doesn't report a driver build stamp - update checking isn't available."
-                    : "Update checking is only available for grblHAL.";
+            btnCheckFwUpdate.ToolTip = canCheck ? null : (GrblInfo.IsGrblHAL
+                ? "This build doesn't report a driver build stamp - update checking isn't available."
+                : "Update checking is only available for grblHAL.");
         }
 
         // Query the fw-latest release (background thread - network I/O) and compare its driver sha against
-        // the connected board's own. Same Dispatcher.BeginInvoke pattern as BuildSimWizard_Click.
+        // the connected board's own; report the result in a message box rather than inline text. An update
+        // available folds the former separate confirm-before-flash step into the same box: Yes ("Flash
+        // Firmware") goes straight into StartFlashFirmware, No/Cancel/closing leaves nothing pending.
         private void CheckFwUpdate_Click(object sender, RoutedEventArgs e)
         {
             if (!GrblInfo.IsGrblHAL || string.IsNullOrEmpty(GrblInfo.DriverSha))
                 return;
 
             btnCheckFwUpdate.IsEnabled = false;
-            btnUpdateFirmware.Visibility = Visibility.Collapsed;
-            txtFwUpdateStatus.Text = "Checking for a firmware update...";
             string currentSha = GrblInfo.DriverSha;
 
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
@@ -1374,31 +1374,51 @@ namespace CNC.Controls
                 Dispatcher.BeginInvoke((System.Action)(() =>
                 {
                     btnCheckFwUpdate.IsEnabled = true;
+                    var owner = Window.GetWindow(this);
 
                     if (release == null)
                     {
-                        txtFwUpdateStatus.Text = "Could not check for updates: " + error;
+                        AppDialogs.Show(owner, "Could not check for updates: " + error, "Check for updates",
+                            MessageBoxButton.OK, MessageBoxImage.Warning, id: "machinesetup.checkfwupdate.error");
                         return;
                     }
 
                     if (string.IsNullOrEmpty(release.DriverSha))
                     {
-                        txtFwUpdateStatus.Text = "Latest release found, but its build stamp could not be read.";
+                        AppDialogs.Show(owner, "Latest release found, but its build stamp could not be read.",
+                            "Check for updates", MessageBoxButton.OK, MessageBoxImage.Warning, id: "machinesetup.checkfwupdate.nostamp");
                         return;
                     }
 
                     if (string.Equals(release.DriverSha, currentSha, StringComparison.OrdinalIgnoreCase))
                     {
-                        txtFwUpdateStatus.Text = "Up to date (build " + currentSha + ").";
+                        AppDialogs.Show(owner, "Up to date (build " + currentSha + ").", "Check for updates",
+                            MessageBoxButton.OK, MessageBoxImage.Information, id: "machinesetup.checkfwupdate.uptodate");
+                        return;
+                    }
+
+                    string header = string.Format("Update available: {0} (you have {1}).", release.DriverSha, currentSha);
+                    string changelog = string.IsNullOrEmpty(release.Changelog) ? "" : "\n\n" + release.Changelog;
+
+                    if (FirmwareUpdateManager.FindTeensyLoaderCli() == null)
+                    {
+                        AppDialogs.Show(owner, header + changelog + "\n\nteensy_loader_cli.exe not found - cannot flash automatically.",
+                            "Check for updates", MessageBoxButton.OK, MessageBoxImage.Warning, id: "machinesetup.checkfwupdate.notoolcli");
                         return;
                     }
 
                     _pendingFwRelease = release;
-                    txtFwUpdateStatus.Text = string.Format("Update available: {0} (you have {1}).", release.DriverSha, currentSha);
-                    btnUpdateFirmware.Visibility = FirmwareUpdateManager.FindTeensyLoaderCli() != null
-                        ? Visibility.Visible : Visibility.Collapsed;
-                    if (FirmwareUpdateManager.FindTeensyLoaderCli() == null)
-                        txtFwUpdateStatus.Text += "\nteensy_loader_cli.exe not found - cannot flash automatically.";
+                    string prompt = header + changelog + string.Format(
+                        "\n\nFlashing disconnects ioSender. Windows can't auto-reboot the board into its " +
+                        "programming mode, so once it says \"Waiting for Teensy device...\" you must press " +
+                        "the RESET/PROGRAM button ON THE BOARD ITSELF within {0} seconds.", FlashWaitSeconds);
+                    var choice = AppDialogs.Show(owner, prompt, "Firmware update available",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No,
+                        id: "machinesetup.flashfirmware", yesText: "Flash Firmware", noText: "Cancel");
+                    if (choice == MessageBoxResult.Yes)
+                        StartFlashFirmware(release);
+                    else
+                        _pendingFwRelease = null;
                 }));
             });
         }
@@ -1406,41 +1426,28 @@ namespace CNC.Controls
         // Wait for the bootloader after ioSender disconnects: teensy_loader_cli does NOT support an
         // automatic/soft reboot on Windows (confirmed via its own "Soft reboot is not implemented for
         // Win32" message), so the user must press the board's physical RESET/PROGRAM button - this needs
-        // to be long enough to walk over and do that, not just cover upload time.
+        // to be long enough to walk over and do that, not just cover upload time. Also shown in the
+        // Flash Firmware confirmation prompt above.
         private const int FlashWaitSeconds = 180;
 
-        // Download the pending release's hex and flash it via the bundled teensy_loader_cli. Disconnects
+        // Download the release's hex and flash it via the bundled teensy_loader_cli, once the user has
+        // already confirmed via the "Flash Firmware" choice in CheckFwUpdate_Click's dialog. Disconnects
         // ioSender's own connection first (frees the port, though flashing itself only needs the board's
         // HID bootloader interface) and does NOT reconnect afterward - the board reboots into the new
-        // firmware, so the user reconnects once it's back. Confirms with the user first since flashing a
-        // running board is not reversible, and tells them up front that they'll need to press reset.
-        private void UpdateFirmware_Click(object sender, RoutedEventArgs e)
+        // firmware, so the user reconnects once it's back.
+        private void StartFlashFirmware(FirmwareUpdateManager.ReleaseInfo release)
         {
-            var release = _pendingFwRelease;
-            if (release == null)
-                return;
-
             string exe = FirmwareUpdateManager.FindTeensyLoaderCli();
             if (exe == null)
             {
+                // Defensive only - CheckFwUpdate_Click already gates the Flash Firmware choice on this.
                 AppDialogs.Show("teensy_loader_cli.exe was not found alongside ioSender - cannot flash automatically.",
                     "Update firmware", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var confirm = AppDialogs.Show(Window.GetWindow(this),
-                string.Format("This will download firmware build {0} and flash it to the connected board.\n\n" +
-                              "ioSender will disconnect first. Windows can't auto-reboot the board into its " +
-                              "programming mode, so once it says \"Waiting for Teensy device...\" you must " +
-                              "press the RESET/PROGRAM button ON THE BOARD ITSELF within {1} seconds - it " +
-                              "will then flash automatically and reboot into the new firmware. Reconnect once " +
-                              "it's back.\n\nContinue?", release.DriverSha, FlashWaitSeconds),
-                "Update firmware", MessageBoxButton.YesNo, MessageBoxImage.Warning, id: "machinesetup.flashfirmware");
-            if (confirm != MessageBoxResult.Yes)
-                return;
-
-            btnUpdateFirmware.IsEnabled = btnCheckFwUpdate.IsEnabled = false;
-            txtFwUpdateStatus.Text = "Downloading firmware...";
+            btnCheckFwUpdate.IsEnabled = false;
+            SetFwFlashStatus("Downloading firmware...");
 
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -1448,48 +1455,50 @@ namespace CNC.Controls
                 byte[] bytes = FirmwareUpdateManager.DownloadHex(release.HexAssetUrl, out error);
                 if (bytes == null)
                 {
-                    SetFwUpdateResult(false, "Download failed: " + error);
+                    SetFwFlashResult(false, "Download failed: " + error);
                     return;
                 }
 
                 string hexPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
                     "iosender-fw-" + release.DriverSha + ".hex");
                 try { System.IO.File.WriteAllBytes(hexPath, bytes); }
-                catch (Exception ex) { SetFwUpdateResult(false, "Could not save the download: " + ex.Message); return; }
+                catch (Exception ex) { SetFwFlashResult(false, "Could not save the download: " + ex.Message); return; }
 
-                SetFwUpdateStatus("Disconnecting...");
+                SetFwFlashStatus("Disconnecting...");
                 try { Comms.com.Close(); } catch { }
                 System.Threading.Thread.Sleep(500);   // let the port fully release before the loader opens it
 
-                SetFwUpdateStatus("Waiting for you to press RESET/PROGRAM on the board (build " + release.DriverSha + ")...");
+                SetFwFlashStatus("Waiting for you to press RESET/PROGRAM on the board (build " + release.DriverSha + ")...");
                 string log;
                 bool ok = FirmwareUpdateManager.FlashHex(exe, hexPath, FlashWaitSeconds, out log, out error);
-                SetFwUpdateResult(ok, ok
+                SetFwFlashResult(ok, ok
                     ? "Flashed build " + release.DriverSha + ". Reconnect once the board finishes rebooting."
                     : "Flash failed: " + error + (string.IsNullOrEmpty(log) ? "" : "\n" + log));
             });
         }
 
-        private void SetFwUpdateStatus(string text)
-        {
-            try { Dispatcher.BeginInvoke((System.Action)(() => txtFwUpdateStatus.Text = text)); }
-            catch { }
-        }
-
-        private void SetFwUpdateResult(bool ok, string text)
+        private void SetFwFlashStatus(string text)
         {
             try
             {
                 Dispatcher.BeginInvoke((System.Action)(() =>
                 {
-                    txtFwUpdateStatus.Text = text;
+                    txtFwFlashStatus.Visibility = Visibility.Visible;
+                    txtFwFlashStatus.Text = text;
+                }));
+            }
+            catch { }
+        }
+
+        private void SetFwFlashResult(bool ok, string text)
+        {
+            try
+            {
+                Dispatcher.BeginInvoke((System.Action)(() =>
+                {
+                    txtFwFlashStatus.Visibility = Visibility.Visible;
+                    txtFwFlashStatus.Text = text;
                     btnCheckFwUpdate.IsEnabled = true;
-                    // Collapsed either way (a fresh Check re-evaluates whether it should reappear); always
-                    // re-enable here too, else a later Check that shows it again would leave it stuck grey
-                    // from this click's IsEnabled=false (the bug seen 2026-07-15 - "Update firmware..."
-                    // shown but disabled after a successful flash followed by another Check).
-                    btnUpdateFirmware.Visibility = Visibility.Collapsed;
-                    btnUpdateFirmware.IsEnabled = true;
                     if (ok)
                         _pendingFwRelease = null;
                 }));

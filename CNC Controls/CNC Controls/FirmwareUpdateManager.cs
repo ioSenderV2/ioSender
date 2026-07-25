@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 
 namespace CNC.Controls
 {
@@ -22,6 +23,11 @@ namespace CNC.Controls
             public string DriverSha;
             public string HexAssetUrl;
             public string HexAssetName;
+            // Everything in the release body AFTER the "drv:..." line (the "Changes since the last
+            // published build:" list firmware.yml's "Compute changelog" step generates) - null/empty for
+            // an older release published before that step existed, or a first-ever release with nothing
+            // to diff against.
+            public string Changelog;
         }
 
         // Query the fw-latest release (public, no token) and parse out its driver ref + hex asset URL.
@@ -49,17 +55,11 @@ namespace CNC.Controls
 
                 string body = JsonStringField(json, "\"body\"");
                 string driverRef = null, driverSha = null;
-                if (!string.IsNullOrEmpty(body))
+                var drvMatch = DriverRefPattern.Match(body ?? "");
+                if (drvMatch.Success)
                 {
-                    foreach (var field in body.Split(' '))
-                    {
-                        if (!field.StartsWith("drv:"))
-                            continue;
-                        driverRef = field.Substring(4);
-                        int at = driverRef.LastIndexOf('@');
-                        driverSha = at >= 0 ? driverRef.Substring(at + 1) : null;
-                        break;
-                    }
+                    driverRef = drvMatch.Groups["ref"].Value;
+                    driverSha = drvMatch.Groups["sha"].Value;
                 }
 
                 string assetUrl = FindHexAssetUrl(json);
@@ -74,7 +74,8 @@ namespace CNC.Controls
                     DriverRef = driverRef,
                     DriverSha = driverSha,
                     HexAssetUrl = assetUrl,
-                    HexAssetName = System.IO.Path.GetFileName(new Uri(assetUrl).LocalPath)
+                    HexAssetName = System.IO.Path.GetFileName(new Uri(assetUrl).LocalPath),
+                    Changelog = ExtractChangelog(body)
                 };
             }
             catch (System.Net.WebException wex)
@@ -185,6 +186,30 @@ namespace CNC.Controls
                 }
             }
             catch (Exception ex) { error = ex.Message; return false; }
+        }
+
+        // "drv:<branch>@<short-sha>" - the driver-ref token firmware.yml stamps as the first line of the
+        // release body (also mirrored into the firmware's own [BUILD:...] line via touch_build_stamp.py,
+        // so GrblInfo.DriverRef/DriverSha use the identical shape and compare directly against this).
+        private static readonly Regex DriverRefPattern =
+            new Regex(@"drv:(?<ref>\S*@(?<sha>[0-9a-fA-F]{4,40}))", RegexOptions.Compiled);
+
+        // Everything after the "drv:..." line (and any blank line right after it) is the changelog
+        // firmware.yml's "Compute changelog" step wrote. RegexOptions.Singleline so "." spans newlines,
+        // letting the changelog capture run to the end of the body in one match.
+        private static readonly Regex ChangelogPattern =
+            new Regex(@"drv:\S+[ \t]*\r?\n[ \t]*\r?\n?(?<changelog>.*)", RegexOptions.Singleline | RegexOptions.Compiled);
+
+        // Returns null if there's nothing beyond the drv: line (older release, or nothing to diff against).
+        private static string ExtractChangelog(string body)
+        {
+            if (string.IsNullOrEmpty(body))
+                return null;
+            var m = ChangelogPattern.Match(body);
+            if (!m.Success)
+                return null;
+            string changelog = m.Groups["changelog"].Value.Trim();
+            return changelog.Length > 0 ? changelog : null;
         }
 
         // Find the first "browser_download_url" ending in ".hex" in a GitHub release JSON payload.

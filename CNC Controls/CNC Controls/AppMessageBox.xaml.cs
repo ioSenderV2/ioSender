@@ -24,7 +24,8 @@ namespace CNC.Controls
     {
         private MessageBoxResult result = MessageBoxResult.None;
 
-        public AppMessageBox(string message, string caption, MessageBoxButton buttons, MessageBoxImage icon, MessageBoxResult defaultResult)
+        public AppMessageBox(string message, string caption, MessageBoxButton buttons, MessageBoxImage icon,
+            MessageBoxResult defaultResult, string yesText = null, string noText = null)
         {
             InitializeComponent();
             DialogScaling.Apply(this);
@@ -34,27 +35,27 @@ namespace CNC.Controls
             imgIcon.Source = IconFor(icon);
             imgIcon.Visibility = imgIcon.Source == null ? Visibility.Collapsed : Visibility.Visible;
 
-            ConfigureButtons(buttons, defaultResult);
+            ConfigureButtons(buttons, defaultResult, yesText, noText);
         }
 
         public static void Register()
         {
-            AppDialogs.CustomMessageBox = (owner, message, caption, buttons, icon, defaultResult) =>
-                Show(owner, message, caption, buttons, icon, defaultResult);
+            AppDialogs.CustomMessageBox = (owner, message, caption, buttons, icon, defaultResult, yesText, noText) =>
+                Show(owner, message, caption, buttons, icon, defaultResult, yesText, noText);
         }
 
         public static MessageBoxResult Show(string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
-            MessageBoxResult defaultResult = MessageBoxResult.None)
+            MessageBoxResult defaultResult = MessageBoxResult.None, string yesText = null, string noText = null)
         {
-            return Show(null, message, caption, buttons, icon, defaultResult);
+            return Show(null, message, caption, buttons, icon, defaultResult, yesText, noText);
         }
 
         public static MessageBoxResult Show(Window owner, string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
-            MessageBoxResult defaultResult = MessageBoxResult.None)
+            MessageBoxResult defaultResult = MessageBoxResult.None, string yesText = null, string noText = null)
         {
-            var box = new AppMessageBox(message, caption, buttons, icon, defaultResult);
+            var box = new AppMessageBox(message, caption, buttons, icon, defaultResult, yesText, noText);
             if (owner != null && owner.IsLoaded)
                 box.Owner = owner;
             else
@@ -63,12 +64,25 @@ namespace CNC.Controls
             return box.result;
         }
 
-        private void ConfigureButtons(MessageBoxButton buttons, MessageBoxResult defaultResult)
+        // yesText/noText override the VISIBLE label only (e.g. "Flash Firmware"/"Cancel" instead of
+        // "Yes"/"No") - the underlying MessageBoxResult (and what the UI test server sees/answers with,
+        // via AppDialogs' own generic "Yes"/"No" protocol) is unchanged, so callers still just check
+        // Yes/No as normal. Each button's logical result is carried on Tag, not parsed back out of
+        // Content, specifically so Content can say anything without breaking Button_Click.
+        private void ConfigureButtons(MessageBoxButton buttons, MessageBoxResult defaultResult, string yesText, string noText)
         {
             btnYes.Visibility = Visibility.Collapsed;
             btnNo.Visibility = Visibility.Collapsed;
             btnOk.Visibility = Visibility.Collapsed;
             btnCancel.Visibility = Visibility.Collapsed;
+
+            btnYes.Tag = MessageBoxResult.Yes;
+            btnNo.Tag = MessageBoxResult.No;
+            btnOk.Tag = MessageBoxResult.OK;
+            btnCancel.Tag = MessageBoxResult.Cancel;
+
+            if (!string.IsNullOrEmpty(yesText)) btnYes.Content = yesText;
+            if (!string.IsNullOrEmpty(noText)) btnNo.Content = noText;
 
             switch (buttons)
             {
@@ -101,7 +115,7 @@ namespace CNC.Controls
             {
                 if (btn.Visibility != Visibility.Visible)
                     continue;
-                var r = (MessageBoxResult)Enum.Parse(typeof(MessageBoxResult), (string)btn.Content);
+                var r = (MessageBoxResult)btn.Tag;
                 btn.IsDefault = r == defaultResult;
                 btn.IsCancel = r == MessageBoxResult.Cancel || (buttons == MessageBoxButton.YesNo && r == MessageBoxResult.No);
             }
@@ -109,7 +123,7 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            result = (MessageBoxResult)Enum.Parse(typeof(MessageBoxResult), (string)((System.Windows.Controls.Button)sender).Content);
+            result = (MessageBoxResult)((System.Windows.Controls.Button)sender).Tag;
             DialogResult = true;
             Close();
         }
