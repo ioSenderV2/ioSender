@@ -363,6 +363,9 @@ namespace CNC.Controls
         public double ConsoleFontSize { get { return _consoleFontSize; } set { if (_consoleFontSize != value) { _consoleFontSize = Math.Max(6d, Math.Min(32d, value)); OnPropertyChanged(); } } }
         // Last machine picked in the Machine Setup Wizard ("Manufacturer|Product|Model"), restored next run.
         public string LastMachine { get; set; } = string.Empty;
+        // One-shot "have they seen it" flag for the Feeds & Speeds tab's Intro sub-tab (FeedsAndSpeedsView) -
+        // shown once ever per profile, then that tab defaults to Load / Import from then on.
+        public bool FeedsAndSpeedsIntroShown { get; set; } = false;
         public double ConsoleWindowLeft { get; set; } = double.NaN;
         public double ConsoleWindowTop { get; set; } = double.NaN;
         public double ConsoleWindowWidth { get; set; } = double.NaN;
@@ -1011,6 +1014,33 @@ namespace CNC.Controls
                 if (!toolsSlot.Items.Select(n => n.Component).SequenceEqual(reordered.Select(n => n.Component)))
                     toolsSlot.Items = reordered;
             }
+
+            // 2026-07-24: LayoutKeys.FeedsAndSpeeds (new top-level tab) was added to DefaultLayout.Build(),
+            // but same story as StepperCalProbe above - only seeds a FRESH profile. EnsureEssentials won't
+            // add it either (it's not in LayoutKeys.Essential - this tab isn't required for recovery, just
+            // new). Append it directly to the root tabs slot if an already-persisted tree doesn't have it -
+            // AND to the legacy flat Base.Tabs list (SetTabPresent's own dual-update pattern): TabOrder.Apply
+            // (called later, from a non-empty Base.Tabs) rebuilds the tree's tabs slot to contain EXACTLY
+            // Base.Tabs' entries, so a tree-only fix here would get silently dropped right back out the
+            // moment that runs - confirmed missing from both the main tab bar AND the Edit Main Page Tabs
+            // editor's available list on a real saved profile before this fix.
+            var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot != null && !LayoutTree.Contains(layoutSection.Root, LayoutKeys.FeedsAndSpeeds))
+                tabsSlot.Items.Add(new LayoutNode(LayoutKeys.FeedsAndSpeeds));
+            if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.FeedsAndSpeeds))
+                Base.Tabs.Add(LayoutKeys.FeedsAndSpeeds);
+
+            // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly
+            // lived as a loose FeedsAndSpeedsIntroShown.txt marker file in the config folder before moving
+            // into Config.FeedsAndSpeedsIntroShown (this file, above) - clean up that now-unused stray file
+            // from any profile that ran during the brief window it existed.
+            try
+            {
+                string staleMarker = Path.Combine(CNC.Core.Resources.ConfigPath ?? "", "FeedsAndSpeedsIntroShown.txt");
+                if (File.Exists(staleMarker))
+                    File.Delete(staleMarker);
+            }
+            catch { }
         }
 
         public void Shutdown()

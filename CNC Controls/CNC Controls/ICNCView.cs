@@ -58,7 +58,8 @@ namespace CNC.Controls
         LatheWizards,
         StartJob,
         HeightMap,
-        MachineSetup
+        MachineSetup,
+        FeedsAndSpeeds
     }
 
     public interface ICNCView

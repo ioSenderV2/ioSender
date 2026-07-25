@@ -70,6 +70,10 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <!-- FeedsAndSpeedsView.xaml.cs deserializes the Feeds & Speeds export/apply JSON directly. -->
+    <PackageReference Include="System.Text.Json" Version="6.0.10" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="About.xaml.cs">
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
@@ -105,6 +109,9 @@
     </Compile>
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="FeedsAndSpeedsView.xaml.cs">
+      <DependentUpon>FeedsAndSpeedsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="ConsoleWindow.xaml.cs">
       <DependentUpon>ConsoleWindow.xaml</DependentUpon>
@@ -402,6 +409,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ToolsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="FeedsAndSpeedsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

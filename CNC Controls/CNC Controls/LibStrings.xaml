@@ -62,6 +62,7 @@
     <system:String x:Uid="str_tabLatheWizards" x:Key="TabLatheWizards">Lathe Tools</system:String>
     <system:String x:Uid="str_tabTools" x:Key="TabTools">Tools</system:String>
     <system:String x:Uid="str_tabMachineSetup" x:Key="TabMachineSetup">Machine Setup</system:String>
+    <system:String x:Uid="str_tabFeedsSpeeds" x:Key="TabFeedsSpeeds">Feeds &amp; Speeds</system:String>
     <!-- Tools container sub-tab labels (built in code by ToolsView.RegisterTools). -->
     <system:String x:Uid="str_tabToolTable" x:Key="TabToolTable">Tool table</system:String>
     <system:String x:Uid="str_tabStepperCal" x:Key="TabStepperCal">Stepper calibration (Manual)</system:String>

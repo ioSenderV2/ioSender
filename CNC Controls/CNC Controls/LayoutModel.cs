@@ -60,7 +60,7 @@ namespace CNC.Controls
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
                             LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
-                            HeightMap = "HeightMap";
+                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds";
 
         // Grbl tab's center container (JobWorkspace) + slot
         public const string SlotCenter = "center";
@@ -100,7 +100,8 @@ namespace CNC.Controls
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
-                    new LayoutNode(LayoutKeys.MachineSetup)));
+                    new LayoutNode(LayoutKeys.MachineSetup),
+                    new LayoutNode(LayoutKeys.FeedsAndSpeeds)));
         }
     }
 

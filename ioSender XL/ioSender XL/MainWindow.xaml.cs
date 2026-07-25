@@ -89,6 +89,9 @@ namespace GCode_Sender
 
             ui = this;
 
+            UpdateFusionAddinMenu();
+            CheckFusionAddinUpdated();
+
             // Job tab Run dropdown "Simulate" mode (JobControl.xaml.cs) - CNC Controls can't reference
             // MainWindow directly (see SimulatorManager's own comment on these hooks), so wire them here,
             // same pattern as CameraConfig.DeviceEnumerator below.
@@ -1324,6 +1327,226 @@ namespace GCode_Sender
             }
         }
 
+        // Fusion's per-user AddIns folder - created by Fusion itself on first run, regardless of whether any
+        // add-ins are installed yet, so its existence is a simple, good-enough "is Fusion 360 installed for
+        // this user" check (no registry/process probing needed).
+        private static string FusionAddInsFolder =>
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                   "Autodesk", "Autodesk Fusion 360", "API", "AddIns");
+
+        // Called once at startup (see constructor) - only show the install item when Fusion 360 is actually
+        // installed for this user; Fusion's install state won't change mid-session, so no need to re-check.
+        private void UpdateFusionAddinMenu()
+        {
+            bool detected = System.IO.Directory.Exists(FusionAddInsFolder);
+            menuInstallFusionAddin.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Per-user marker recording the last Fusion Addin\ioSenderV2 fingerprint the user was told about -
+        // deliberately OUTSIDE the app's own install dir (which CopyFusionAddin wholesale-replaces on every
+        // ioSenderV2 update) so it survives updates and still means something the next time we check.
+        private static string FusionAddinFingerprintMarker =>
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                   "ioSender", "FusionAddinFingerprint.txt");
+
+        // SHA256 over every *.py file's content under Fusion Addin\ioSenderV2 (sorted by name for a stable
+        // order) - this is a handful of small text files, so hashing full content (not just size/mtime,
+        // which a git checkout or CI build can reset without the content actually changing) is cheap and
+        // precise. Returns null if the folder is missing (caller already checked it exists via
+        // installFusionAddin_Click's own guard, but this can run standalone at startup too).
+        private static string ComputeFusionAddinFingerprint()
+        {
+            string dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fusion Addin", "ioSenderV2");
+            if (!System.IO.Directory.Exists(dir))
+                return null;
+            try
+            {
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                using (var combined = new System.IO.MemoryStream())
+                {
+                    foreach (var file in System.IO.Directory.GetFiles(dir, "*.py").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                    {
+                        byte[] bytes = System.IO.File.ReadAllBytes(file);
+                        combined.Write(bytes, 0, bytes.Length);
+                    }
+                    combined.Position = 0;
+                    return Convert.ToBase64String(sha.ComputeHash(combined));
+                }
+            }
+            catch { return null; }
+        }
+
+        // Called once at startup, right after UpdateFusionAddinMenu - only meaningful when the add-in is
+        // actually installed via OUR symlink (a manual copy-based install via install-windows.ps1 isn't
+        // something we can diff without extra bookkeeping, so this only fires for the in-app install path).
+        // Warns (once per actual change) that the Fusion-side code changed and Fusion needs a reload to pick
+        // it up - otherwise a user who updated ioSenderV2 has no way to know the add-in silently changed
+        // underneath their existing Fusion session (the whole point of the symlink is that no reinstall step
+        // exists anymore to naturally remind them).
+        private void CheckFusionAddinUpdated()
+        {
+            string link = System.IO.Path.Combine(FusionAddInsFolder, "ioSenderV2");
+            string target = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fusion Addin", "ioSenderV2");
+            if (!IsSymlinkTo(link, target))
+                return;   // not installed via our symlink - nothing to compare against
+
+            string current = ComputeFusionAddinFingerprint();
+            if (current == null)
+                return;
+
+            string markerPath = FusionAddinFingerprintMarker;
+            string previous = null;
+            try
+            {
+                if (System.IO.File.Exists(markerPath))
+                    previous = System.IO.File.ReadAllText(markerPath).Trim();
+            }
+            catch { }
+
+            if (previous != null && previous != current)
+            {
+                AppDialogs.Show(
+                    "The ioSenderV2 Fusion Addin's code has changed since Fusion 360 last loaded it.\n\n" +
+                    "In Fusion 360: Utilities > ADD-INS > Scripts and Add-Ins (Shift+S) > Add-Ins tab > " +
+                    "select 'ioSenderV2' > Stop, then Run again (or just restart Fusion) to pick up the update.",
+                    "ioSenderV2 Fusion Addin updated");
+            }
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(markerPath));
+                System.IO.File.WriteAllText(markerPath, current);
+            }
+            catch { }
+        }
+
+        // Symlinks Fusion's AddIns\ioSenderV2 to <this app's own dir>\Fusion Addin\ioSenderV2 (the folder
+        // CopyFusionAddin in ioSender XL.csproj guarantees ships alongside ioSender.exe) instead of copying it,
+        // so a future ioSenderV2 update alone refreshes the add-in's code in place - the user only has to
+        // reload the add-in (or restart Fusion), never re-run this. mklink /D needs either Windows Developer
+        // Mode or admin rights (SeCreateSymbolicLinkPrivilege); try plain first, retry elevated (just this one
+        // command, not the whole app) on access-denied.
+        private void installFusionAddin_Click(object sender, RoutedEventArgs e)
+        {
+            string target = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fusion Addin", "ioSenderV2");
+            string link = System.IO.Path.Combine(FusionAddInsFolder, "ioSenderV2");
+
+            if (!System.IO.Directory.Exists(target))
+            {
+                AppDialogs.Show("The Fusion Addin\\ioSenderV2 folder was not found next to ioSender.exe:\n" + target +
+                                "\n\nThis build may predate the bundled add-in - update ioSenderV2 and try again.",
+                                "Install ioSenderV2 Fusion Addin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (IsSymlinkTo(link, target))
+            {
+                AppDialogs.Show("Already installed:\n" + link + "\n\nIn Fusion 360, Utilities > ADD-INS > " +
+                                "Scripts and Add-Ins > Add-Ins tab > select 'ioSenderV2' > Run (tick 'Run on Startup').",
+                                "Install ioSenderV2 Fusion Addin");
+                return;
+            }
+            if (System.IO.Directory.Exists(link) || System.IO.File.Exists(link))
+            {
+                AppDialogs.Show("Something else already exists at:\n" + link +
+                                "\n\nRemove it first (it may be an older copy-based install), then try again.",
+                                "Install ioSenderV2 Fusion Addin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // First-time install (not already symlinked, nothing else in the way) - explain what the two
+            // commands actually do before creating anything, since the user has no other way to find out
+            // until they've already installed and opened Fusion.
+            var confirm = AppDialogs.Show(
+                "This adds an \"ioSenderV2\" panel to Fusion 360's Manufacture workspace, with two commands:\n\n" +
+                "Batch Post Process - works around Fusion Personal Edition's CAM limitations: posts every " +
+                "operation in every setup in one go and combines them into a single .nc file (Personal " +
+                "Edition normally posts one operation at a time), and restores the rapid (G0) moves that " +
+                "Fusion Personal Edition's post-processor downgrades to feed-rate (G1) moves in its output.\n\n" +
+                "Feeds and Speeds - exports every operation's current feeds, speeds, tool, and geometry data " +
+                "to JSON; ioSenderV2 analyzes it (a table-driven material engine cross-checked against your " +
+                "connected controller's actual machine limits, plus an optional AI review) and writes back " +
+                "recommended adjustments, which this command then applies to the operations.\n\n" +
+                "Continue installing?",
+                "Install ioSenderV2 Fusion Addin", MessageBoxButton.OKCancel, MessageBoxImage.Information);
+            if (confirm != MessageBoxResult.OK)
+                return;
+
+            string error = TryCreateDirectorySymlink(link, target, elevate: false);
+            if (error != null)
+                error = TryCreateDirectorySymlink(link, target, elevate: true);
+
+            if (error == null)
+            {
+                AppDialogs.Show("Installed:\n" + link + " -> " + target +
+                                "\n\nNow open Fusion 360 and enable it once:\n" +
+                                "Utilities > ADD-INS > Scripts and Add-Ins (Shift+S) > Add-Ins tab > " +
+                                "select 'ioSenderV2' > Run (tick 'Run on Startup').\n\n" +
+                                "Future ioSenderV2 updates need no reinstall - just reload the add-in.",
+                                "Install ioSenderV2 Fusion Addin");
+            }
+            else
+            {
+                AppDialogs.Show("Could not create the symlink:\n" + error +
+                                "\n\nThis usually means Windows Developer Mode isn't enabled (Settings > " +
+                                "Privacy & security > For developers) and elevation was declined. Enable " +
+                                "Developer Mode, or approve the elevation prompt, then try again.",
+                                "Install ioSenderV2 Fusion Addin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+        }
+
+        // True if <link> is a directory reparse point (symlink/junction) - not merely a same-named real
+        // folder - so re-running Install is a safe no-op only when we actually made the link ourselves.
+        private static bool IsSymlinkTo(string link, string target)
+        {
+            try
+            {
+                var info = new System.IO.DirectoryInfo(link);
+                return info.Exists && info.Attributes.HasFlag(System.IO.FileAttributes.ReparsePoint);
+            }
+            catch { return false; }
+        }
+
+        // net462 has no Directory.CreateSymbolicLink (that's .NET 6+) - shell out to mklink /D. Returns null
+        // on success, else an error string (stderr, or the exception message).
+        private static string TryCreateDirectorySymlink(string link, string target, bool elevate)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c mklink /D \"" + link + "\" \"" + target + "\"",
+                    UseShellExecute = elevate,   // UseShellExecute is required for Verb="runas" to work
+                    CreateNoWindow = !elevate,
+                };
+                if (elevate)
+                    psi.Verb = "runas";
+                else
+                {
+                    psi.RedirectStandardError = true;
+                    psi.RedirectStandardOutput = true;
+                }
+
+                using (var proc = System.Diagnostics.Process.Start(psi))
+                {
+                    proc.WaitForExit();
+                    if (proc.ExitCode == 0)
+                        return null;
+                    return elevate ? "mklink exited with code " + proc.ExitCode
+                                  : proc.StandardError.ReadToEnd().Trim();
+                }
+            }
+            catch (System.ComponentModel.Win32Exception) when (elevate)
+            {
+                return "elevation was declined";   // UAC prompt cancelled
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
         void aboutWikiItem_Click(object sender, EventArgs e)
         {
             System.Diagnostics.Process.Start("https://github.com/terjeio/ioSender/wiki");
@@ -2192,6 +2415,7 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds & Speeds"), () => new FeedsAndSpeedsView(), 95, enabledWhenDisconnected: true));
         }
 
         // Localized tab label via LibStrings, falling back to the English literal if the resource is missing

@@ -1,0 +1,105 @@
+<UserControl x:Class="CNC.Controls.FeedsAndSpeedsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="800"
+             Focusable="True"
+             PreviewKeyDown="FeedsAndSpeedsView_PreviewKeyDown">
+    <Grid Margin="8">
+        <TabControl x:Name="tabFeedsSpeeds">
+            <TabItem x:Name="tabIntro" x:Uid="tab_fsIntro" Header="Intro">
+                <Border Background="#11000000" BorderBrush="#33000000" BorderThickness="1" Padding="8" Margin="8">
+                    <TextBlock x:Uid="txt_fsIntro" TextWrapping="Wrap" FontSize="22" Text="The ioSenderV2 Fusion Addin adds an &quot;ioSenderV2&quot; panel to Fusion 360's Manufacture workspace, with Feeds and Speeds and Batch Post Process commands. First-time setup: in ioSender, use Help &gt; Support &gt; Install ioSenderV2 Fusion Addin..., then in Fusion enable it once under Utilities &gt; ADD-INS &gt; Scripts and Add-Ins &gt; Add-Ins tab &gt; select 'ioSenderV2' &gt; Run (tick Run on Startup).&#10;&#10;Workflow: in Fusion's Manufacture workspace, run the Feeds and Speeds command (it exports automatically) - then come back here, on the Load / Import tab click Load latest export - a successful load switches you to the Results tab, where you review the verdicts and click Write apply file - then switch back to Fusion (leave the Feeds and Speeds dialog open after exporting) and press OK on it to apply the changes.&#10;&#10;Recommendations are table-driven: chip-load and surface-speed reference values per material (starting points from published Onsrud/Amana/Vortex carbide bit charts), cross-checked against your connected controller's actual machine limits ($30 max RPM, $110-$112 max feed rates). If an ANTHROPIC_API_KEY environment variable is set, an 'Ask AI to review' option also appears on the Results tab, offering a second-opinion review of the table's verdicts for you to read - it is never applied automatically."/>
+                </Border>
+            </TabItem>
+
+            <TabItem x:Name="tabLoad" x:Uid="tab_fsLoad" Header="Load / Import">
+                <StackPanel Margin="12">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock x:Uid="lbl_fsExportFile" Text="Export file:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="txtExportPath" Text="(none loaded)" VerticalAlignment="Center" MinWidth="260"
+                                   FontStyle="Italic" Margin="0,0,12,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Uid="btn_fsLoadLatest" Content="Load latest export" Click="btnLoadLatest_Click" Padding="10,4" Margin="0,0,12,0"/>
+                        <TextBlock x:Uid="lbl_fsMaterial" Text="Material:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <ComboBox x:Name="cbxMaterial" Width="120" SelectionChanged="cbxMaterial_SelectionChanged"/>
+                    </StackPanel>
+                    <TextBox x:Name="txtLoadStatus" IsReadOnly="True" TextWrapping="Wrap" Height="80"
+                             VerticalScrollBarVisibility="Auto" AcceptsReturn="True"
+                             Text="Click Load latest export to read the newest export from Fusion."/>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem x:Name="tabResults" x:Uid="tab_fsResults" Header="Results">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Uid="btn_fsAskAi" x:Name="btnAskAi" Content="Ask AI to review" Click="btnAskAi_Click" Padding="6,2" Margin="0,0,8,0"
+                                Visibility="Collapsed"/>
+                        <ComboBox x:Name="cbxAiModel" Width="110" Margin="0,0,8,0" Visibility="Collapsed"/>
+                        <Button x:Uid="btn_fsSelectAllAi" x:Name="btnSelectAllAi" Content="Prefer AI for all" Click="btnSelectAllAi_Click" Padding="6,2" Margin="0,0,8,0"/>
+                        <Button x:Uid="btn_fsWriteApply" Content="Write apply file" Click="btnWriteApply_Click" Padding="6,2"/>
+                    </StackPanel>
+
+                    <!-- IsReadOnly is False at the grid level (needed for the Prefer AI checkbox column to
+                         be checkable) with every OTHER column marked IsReadOnly individually - the
+                         effective read-only state of a cell is (grid.IsReadOnly OR column.IsReadOnly), so
+                         this is the only way to make just one column editable. HorizontalScrollBarVisibility
+                         is explicit since every column (including Notes) is Auto-width, sized to its widest
+                         content rather than squeezed to fit - a long note runs the row past the visible
+                         width, so this is what lets you scroll right to see the rest of it. -->
+                    <DataGrid x:Name="dgrResults" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" AlternatingRowBackground="#11000000"
+                              HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <!-- Auto sizes each column to its widest current value (re-measured live as rows
+                                 change) rather than splitting space proportionally. -->
+                            <DataGridTextColumn x:Uid="col_fsOperation" Header="Operation" Binding="{Binding Operation}" Width="Auto" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Uid="col_fsParameter" Header="Parameter" Binding="{Binding Parameter}" Width="Auto" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Uid="col_fsCurrent" Header="Current" Binding="{Binding Current}" Width="Auto" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Uid="col_fsRecommended" Header="Recommended" Binding="{Binding Recommended}" Width="Auto" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Uid="col_fsMachineLimit" Header="Machine limit" Binding="{Binding MachineLimit}" Width="Auto" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Uid="col_fsVerdict" Header="Verdict" Binding="{Binding Verdict}" Width="Auto" IsReadOnly="True"/>
+                            <!-- These two stay hidden until Ask AI to review actually runs once (see
+                                 btnAskAi_Click) - no point showing an AI column before there's anything in
+                                 it. DataGridColumn.Visibility (not a FrameworkElement, but still a real
+                                 settable property) is what lets a column be shown/hidden independent of its
+                                 row data. -->
+                            <DataGridTextColumn x:Name="colAiRecommended" x:Uid="col_fsAiRecommended" Header="AI Says" Binding="{Binding AiRecommended}" Width="Auto" IsReadOnly="True" Visibility="Collapsed"/>
+                            <DataGridCheckBoxColumn x:Name="colPreferAi" x:Uid="col_fsPreferAi" Header="Prefer AI" Binding="{Binding PreferAi, Mode=TwoWay}" Width="Auto" IsReadOnly="False" Visibility="Collapsed"/>
+                            <!-- Back in the grid (not a separate detail pane) - a multiline ToolTip carries
+                                 the full text for whenever a note runs off past the visible/scrolled area,
+                                 without needing to widen the column itself to something unreasonable. -->
+                            <DataGridTextColumn x:Uid="col_fsNotes" Header="Notes" Binding="{Binding Notes}" Width="Auto" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="ToolTip">
+                                            <Setter.Value>
+                                                <ToolTip MaxWidth="400">
+                                                    <TextBlock Text="{Binding Notes}" TextWrapping="Wrap"/>
+                                                </ToolTip>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBox x:Name="txtStatus" Grid.Row="2" Margin="0,8,0,0" IsReadOnly="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" AcceptsReturn="True"
+                             Text="Load an export file to begin."/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

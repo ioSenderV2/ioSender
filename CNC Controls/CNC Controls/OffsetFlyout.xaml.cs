@@ -20,6 +20,7 @@ namespace CNC.Controls
     public partial class OffsetFlyout : UserControl, ISidebarControl, IPinnableFlyout
     {
         private readonly string code;
+        private CoordinateSystem subscribedCs;
 
         public OffsetFlyout(string code)
         {
@@ -55,6 +56,13 @@ namespace CNC.Controls
                 cbxFixture.ItemsSource = view;
             }
 
+            // Values for this code can arrive (or get updated by a Set) at any time, independent of
+            // Visibility - subscribe to the live source instead of only refreshing on show/hide, otherwise
+            // a flyout that's already visible when data lands (e.g. pinned open before connect) keeps
+            // showing the stale "(not available)" tooltip until it's hidden and reshown.
+            GrblWorkParameters.CoordinateSystems.CollectionChanged += CoordinateSystems_CollectionChanged;
+            TrySubscribeCs();
+
             IsVisibleChanged += OffsetFlyout_IsVisibleChanged;
         }
 
@@ -80,7 +88,33 @@ namespace CNC.Controls
         private void OffsetFlyout_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible)
+            {
+                TrySubscribeCs();
                 btnGo.ToolTip = CoordsTooltip();    // refresh - offset values may have changed
+            }
+        }
+
+        private void CoordinateSystems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            TrySubscribeCs();
+            btnGo.ToolTip = CoordsTooltip();
+        }
+
+        private void Cs_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            btnGo.ToolTip = CoordsTooltip();
+        }
+
+        // CoordinateSystems entries are created once (AddOrUpdateCS) and updated in place thereafter, so
+        // the instance for this code, once found, never changes - only one subscription is ever needed.
+        private void TrySubscribeCs()
+        {
+            var cs = Cs;
+            if (cs != null && cs != subscribedCs)
+            {
+                subscribedCs = cs;
+                cs.PropertyChanged += Cs_PropertyChanged;
+            }
         }
 
         private string CoordsTooltip()
@@ -89,13 +123,17 @@ namespace CNC.Controls
             if (cs == null)
                 return code + " (not available)";
 
+            bool isSet = false;
             var sb = new StringBuilder("Go to " + code);
             for (int i = 0; i < cs.Values.Length; i++)
             {
                 if (!double.IsNaN(cs.Values[i]))
+                {
+                    isSet |= cs.Values[i] != 0d;
                     sb.Append(string.Format("   {0}: {1}", GrblInfo.AxisIndexToLetter(i), cs.Values[i].ToInvariantString("F3")));
+                }
             }
-            return sb.ToString();
+            return isSet ? sb.ToString() : (code + " not set");
         }
 
         private void btnGo_Click(object sender, RoutedEventArgs e)

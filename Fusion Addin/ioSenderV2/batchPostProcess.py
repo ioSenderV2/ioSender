@@ -1,5 +1,5 @@
 """
-ioSenderBatchPost - Fusion 360 add-in
+batchPostProcess.py - "Batch Post Process" command, part of the ioSenderV2 Fusion add-in.
 
 Posts every operation in every Setup of the active Manufacture document, then
 combines them into a single <folder-name>.nc in the chosen folder - the only file
@@ -22,7 +22,10 @@ setup" resizes that setup's CAM stock to the pasted Load-Stock size (fixed box),
 regenerating its toolpaths against it.
 
 This is a standalone extract of the post-processing half of the SRWCommands
-"Batch Post Process" command, with none of the SRWCommands framework.
+"Batch Post Process" command, with none of the SRWCommands framework. This
+module only builds a CommandDefinition (create_command_definition/cleanup,
+called by ioSenderV2.py's run()/stop()) - it owns no toolbar/panel/dropdown
+placement of its own.
 """
 
 import adsk.core
@@ -34,6 +37,7 @@ import math
 import shutil
 import tempfile
 import traceback
+from collections import OrderedDict
 
 # Keep event handlers alive for the lifetime of the add-in.
 _handlers = []
@@ -42,16 +46,16 @@ _handlers = []
 # Rebuilt each time the command dialog is opened.
 _post_processors = {}
 
-CMD_ID = 'ioSenderBatchPostCmd'
-CMD_NAME = 'Batch Post (ioSender)'
+CMD_ID = 'ioSenderV2BatchPostCmd'
+CMD_NAME = 'Batch Post Process'
 CMD_DESC = ('Post every operation in every setup to its own '
             '<seq>_<name>_T<tool>.nc file in a folder, for ioSender\'s '
             'File > Load Folder command.')
 
-# Toolbar panel the button is added to. CAMActionPanel is the Manufacture
-# workspace "Actions" panel (where the stock Post Process button lives). If the
-# button does not appear in your Fusion version, change this id.
-PANEL_ID = 'CAMActionPanel'
+# Material dropdown item that switches on split-by-material posting (see _setup_material/_post_all).
+# Default stays plain "Combined" so an existing user's workflow is unchanged unless they opt in.
+_MATERIAL_COMBINED = 'Combined (single file)'
+_MATERIAL_DERIVED = 'Derived (split by setup name)'
 
 # Emitted as a (TOOL ...) comment's L= value whenever a tool's actual length can't be read from Fusion
 # (see _tool_geometry) - a plausible generic stickout, not a measured value. Matches
@@ -257,13 +261,26 @@ def _read_stock_dims(setup):
     return None
 
 
-def _stock_dims_mm(cam):
-    """Stock (x, y, z) mm from the first setup with readable box stock, else None."""
-    for i in range(cam.setups.count):
-        dims = _read_stock_dims(cam.setups.item(i))
+def _stock_dims_mm(setups):
+    """Stock (x, y, z) mm from the first setup IN THE GIVEN LIST with readable box stock, else None.
+    Takes a plain list (not cam.setups) so a material group's stock can be computed from just its own
+    setups when split-by-material is on."""
+    for setup in setups:
+        dims = _read_stock_dims(setup)
         if dims:
             return dims
     return None
+
+
+def _setup_material(setup_name):
+    """Grouping key for split-by-material posting: the first '_'-terminated token of the setup name
+    (e.g. 'MDF_BottomSetup' -> 'MDF'). A setup with no '_' falls back to its whole name, so it just
+    becomes its own group/file. Ported from SRWCommands' postProcess/entry.py (commit 17cb2b9) - same
+    convention as feedsAndSpeeds' Setup names on the ioSenderV2 side, so a design tagged for split
+    posting resolves to the same grouping there."""
+    if setup_name and '_' in setup_name:
+        return setup_name.split('_', 1)[0].strip() or setup_name
+    return setup_name or 'Setup'
 
 
 def _format_tool_diameter(d_mm):
@@ -498,10 +515,12 @@ def _sanitize_comment_parens(s):
     return s[:open_i + 1] + inner + s[close_i:]
 
 
-def _combine_nc(folder, op_files, tool_table_lines):
+def _combine_nc(folder, op_files, tool_table_lines, output_name):
     """Stitch the per-op files into one program (same rules as ioSender Load Folder): one prolog +
     tool-table comments, each toolpath body preceded by G53 G0 Z0 + M6 T<n> (unless it already has an
-    M6), rapids restored, one program footer. Writes <foldername>.nc. Returns (path, rapids_restored).
+    M6), rapids restored, one program footer. Writes <output_name>.nc (already-sanitized, no extension -
+    the whole folder name when posting single-combined, or a material group name when split-by-material).
+    Returns (path, rapids_restored).
 
     Section markers ((--- name ---)) match ioSender Load Folder's own section names ("Program start",
     "Tool table", "Program end") so a combined file's outline looks identical whichever way it was loaded."""
@@ -527,8 +546,7 @@ def _combine_nc(folder, op_files, tool_table_lines):
 
     out += ['', '(--- Program end ---)', 'M5', 'G53 G0 Z0', 'M30']
 
-    name = _safe_filename(os.path.basename(os.path.normpath(folder))) + '.nc'
-    path = os.path.join(folder, name)
+    path = os.path.join(folder, output_name + '.nc')
     with open(path, 'w', newline='\n') as f:
         f.write('\n'.join(out) + '\n')
     return path, restored
@@ -566,17 +584,24 @@ def _default_output_folder(app):
         return os.path.expanduser('~/Downloads')
 
 
-def _post_all(folder, post_file, stock_override=None, apply_stock=False):
-    """Post every operation to <folder> with <post_file>, then combine them into a single <foldername>.nc
-    (STOCK/TOOL header + per-op section markers + M6 Tn between sections) - the only output left in <folder>
-    once posting completes; the per-op files Fusion's postProcess API requires as an intermediate step, and
-    the tool-table lines, are written to a temp folder and cleaned up after combining.
+def _post_all(folder, post_file, stock_override=None, apply_stock=False, split_by_material=False):
+    """Post every operation to <folder> with <post_file>, then combine them into one <foldername>.nc (STOCK/
+    TOOL header + per-op section markers + M6 Tn between sections) - the only output left in <folder> once
+    posting completes; the per-op files Fusion's postProcess API requires as an intermediate step, and the
+    tool-table lines, are written to a temp folder and cleaned up after combining.
+
+    When split_by_material is set, operations are grouped by _setup_material() (the first '_'-terminated
+    token of each setup's name, e.g. "MDF_BottomSetup" -> "MDF") and ONE combined .nc is written PER GROUP
+    (named <material>.nc), each with its own stock/tool-table header computed from just that group's own
+    setups. Off (the default - unchanged from before this option existed) keeps everything in one
+    <foldername>.nc regardless of setup names.
 
     stock_override (x, y, z mm; z may be None) replaces the setup stock for the (STOCK) line; when
     apply_stock is set it is ALSO applied to the first setup's CAM stock (which regenerates toolpaths).
 
-    Returns (posted, total, failures, combined_info, stock_apply_status) where combined_info is None only
-    when there were zero successfully-posted operations to combine.
+    Returns (posted, total, failures, combined_infos, stock_apply_status) where combined_infos is a list
+    of {'path', 'ops', 'rapids', 'material'} dicts (material is None when not split_by_material) - empty
+    only when there were zero successfully-posted operations to combine.
     """
     app = adsk.core.Application.get()
 
@@ -655,28 +680,66 @@ def _post_all(folder, post_file, stock_override=None, apply_stock=False):
                 outnc = os.path.join(temp_dir, program + '.nc')
                 nbytes = os.path.getsize(outnc) if os.path.exists(outnc) else -1
                 log.append('OK   %s -> %s.nc (%d bytes)' % (display_name, program, nbytes))
-                op_files.append({'seq': total, 'name': display_name,
-                                 'tool': tool_number, 'path': outnc})
+                op_files.append({'seq': total, 'name': display_name, 'tool': tool_number,
+                                 'path': outnc, 'material': _setup_material(setup.name)})
 
     # Combine the per-op files (posted to a temp dir - Fusion's postProcess API only posts one operation at a
-    # time, so this is an unavoidable intermediate step) into the single <foldername>.nc this add-in now
-    # always produces, embedding the same (STOCK)/(TOOL) comments a standalone tool table would have carried.
-    combined_info = None
+    # time, so this is an unavoidable intermediate step) into either one <foldername>.nc, or one <material>.nc
+    # per material group when split_by_material is set - embedding the same (STOCK)/(TOOL) comments a
+    # standalone tool table would have carried.
+    combined_infos = []
     if op_files:
-        # Measured-stock override (pasted from ioSender Load Stock) wins for the (STOCK) line; else read the
-        # setup's stock box. We DO NOT change Fusion's CAM stock - resizing it forces a toolpath regenerate
-        # against the new box and can post operations with no motion (tool changes only).
-        stock = _stock_dims_mm(cam)
-        if stock_override:
-            ox, oy, oz = stock_override
-            if oz is None:
-                oz = stock[2] if stock else 0
-            stock = (ox, oy, oz)
-        tt_lines = _tool_table_lines(stock, tools)
-        combined_path, restored = _combine_nc(folder, op_files, tt_lines)
-        combined_info = {'path': combined_path, 'ops': len(op_files), 'rapids': restored}
-        log.append('combined %d ops -> %s (%d rapids restored)'
-                   % (len(op_files), os.path.basename(combined_path), restored))
+        all_setups = [cam.setups.item(i) for i in range(cam.setups.count)]
+
+        if split_by_material:
+            # Group posted ops - and separately, ALL setups - by material, preserving first-occurrence
+            # order, so each group's stock/tool-table reflects only ITS OWN setups/tools, not the whole
+            # document's.
+            groups = OrderedDict()
+            for of in op_files:
+                groups.setdefault(of['material'], []).append(of)
+            group_setups = OrderedDict()
+            for setup in all_setups:
+                group_setups.setdefault(_setup_material(setup.name), []).append(setup)
+
+            log.append('split by material: %d program(s) -> %s' % (len(groups), ', '.join(groups.keys())))
+            for material, group_files in groups.items():
+                g_tool_nums = []
+                for of in group_files:
+                    if of['tool'] not in g_tool_nums:
+                        g_tool_nums.append(of['tool'])
+                g_tools = {n: tools[n] for n in g_tool_nums if n in tools}
+
+                stock = _stock_dims_mm(group_setups.get(material, all_setups))
+                if stock_override:
+                    ox, oy, oz = stock_override
+                    if oz is None:
+                        oz = stock[2] if stock else 0
+                    stock = (ox, oy, oz)
+                tt_lines = _tool_table_lines(stock, g_tools)
+                combined_path, restored = _combine_nc(folder, group_files, tt_lines, _safe_filename(material))
+                combined_infos.append({'path': combined_path, 'ops': len(group_files),
+                                       'rapids': restored, 'material': material})
+                log.append('combined %d ops (%s) -> %s (%d rapids restored)'
+                           % (len(group_files), material, os.path.basename(combined_path), restored))
+        else:
+            # Measured-stock override (pasted from ioSender Load Stock) wins for the (STOCK) line; else
+            # read the setup's stock box. We DO NOT change Fusion's CAM stock - resizing it forces a
+            # toolpath regenerate against the new box and can post operations with no motion (tool
+            # changes only).
+            stock = _stock_dims_mm(all_setups)
+            if stock_override:
+                ox, oy, oz = stock_override
+                if oz is None:
+                    oz = stock[2] if stock else 0
+                stock = (ox, oy, oz)
+            tt_lines = _tool_table_lines(stock, tools)
+            output_name = _safe_filename(os.path.basename(os.path.normpath(folder)))
+            combined_path, restored = _combine_nc(folder, op_files, tt_lines, output_name)
+            combined_infos.append({'path': combined_path, 'ops': len(op_files),
+                                   'rapids': restored, 'material': None})
+            log.append('combined %d ops -> %s (%d rapids restored)'
+                       % (len(op_files), os.path.basename(combined_path), restored))
 
     try:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -690,7 +753,7 @@ def _post_all(folder, post_file, stock_override=None, apply_stock=False):
     except Exception:
         pass
 
-    return total - len(failures), total, failures, combined_info, stock_apply_status
+    return total - len(failures), total, failures, combined_infos, stock_apply_status
 
 
 # ---------------------------------------------------------------------------
@@ -715,6 +778,10 @@ class ExecuteHandler(adsk.core.CommandEventHandler):
                 ui.messageBox('No post processor selected, or the file was not found.', CMD_NAME)
                 return
 
+            material_dd = inputs.itemById('material')
+            split_by_material = bool(material_dd and material_dd.selectedItem and
+                                     material_dd.selectedItem.name == _MATERIAL_DERIVED)
+
             apply_stock = bool(inputs.itemById('applyStock').value) if inputs.itemById('applyStock') else False
 
             # Optional measured stock (pasted from ioSender Load Stock, "X Y [Z]"). Always used for the (STOCK)
@@ -736,17 +803,24 @@ class ExecuteHandler(adsk.core.CommandEventHandler):
                               'Enter X Y [Z] (mm) or untick that option.', CMD_NAME)
                 return
 
-            posted, total, failures, combined_info, stock_status = _post_all(
-                folder, post_file, stock_override, apply_stock)
+            posted, total, failures, combined_infos, stock_status = _post_all(
+                folder, post_file, stock_override, apply_stock, split_by_material)
 
             msg = 'Posted %d of %d operation(s) to:\n%s' % (posted, total, folder)
             if stock_status:
                 msg += '\n\nApplied stock to the first setup:\n  %s' % stock_status
-            if combined_info:
-                msg += '\n\nWrote %s (%d op(s)%s).' % (
-                    os.path.basename(combined_info['path']), combined_info['ops'],
-                    ', %d rapids restored' % combined_info['rapids'] if combined_info['rapids'] else '')
-                msg += '\nLoad it with File > Load.'
+            if combined_infos:
+                if split_by_material:
+                    msg += '\n\nPrograms by material:'
+                    for ci in combined_infos:
+                        rapids = ', %d rapids restored' % ci['rapids'] if ci['rapids'] else ''
+                        msg += '\n  %s: %s (%d op(s)%s)' % (
+                            ci['material'], os.path.basename(ci['path']), ci['ops'], rapids)
+                else:
+                    ci = combined_infos[0]
+                    rapids = ', %d rapids restored' % ci['rapids'] if ci['rapids'] else ''
+                    msg += '\n\nWrote %s (%d op(s)%s).' % (os.path.basename(ci['path']), ci['ops'], rapids)
+                msg += '\nLoad with File > Load (pick one file at a time if split by material).'
             if failures:
                 msg += '\n\nFailed:\n  ' + '\n  '.join(failures)
             ui.messageBox(msg, CMD_NAME)
@@ -763,6 +837,18 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             inputs = cmd.commandInputs
 
             inputs.addStringValueInput('outputFolder', 'Output folder', _default_output_folder(app))
+
+            # "Derived" groups operations by the first '_'-terminated token of each setup's name (e.g.
+            # "MDF_BottomSetup" -> MDF) and writes one combined .nc PER material instead of one file for
+            # the whole document - matches the naming convention SRWCommands' Fusion side now uses.
+            # "Combined" (default) is the original, unchanged single-file behavior.
+            material_dd = inputs.addDropDownCommandInput(
+                'material', 'Material', adsk.core.DropDownStyles.TextListDropDownStyle)
+            material_dd.listItems.add(_MATERIAL_COMBINED, True, '')
+            material_dd.listItems.add(_MATERIAL_DERIVED, False, '')
+            material_dd.tooltip = ('Combined: one .nc for the whole document (unchanged default). '
+                                   'Derived: one .nc per material, grouped by the first \'_\'-terminated '
+                                   'token of each setup\'s name (e.g. "MDF_BottomSetup" -> MDF).')
 
             # Paste ioSender Load Stock's measured size here ("X Y" or "X Y Z" mm - use its Copy size button).
             # When set, it is written to the (STOCK ...) line in 0_ToolTable.nc (the grblHAL simulator's block)
@@ -793,12 +879,13 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
                 'info', '',
                 'Every operation is posted, then combined into one &lt;folder-name&gt;.nc in this folder '
                 '(STOCK/TOOL header, tool changes inserted, rapids restored) - load it directly with '
-                'File &gt; Load. No other files are left behind.<br/><br/>'
+                'File &gt; Load. No other files are left behind (or one &lt;material&gt;.nc per material '
+                'with Derived - see the Material dropdown above).<br/><br/>'
                 'Measured stock: paste the size from ioSender Load Stock (its Copy size button). It always sets '
                 'the (STOCK ...) line for the grblHAL simulator. Tick "Apply measured stock to the first setup" '
                 'to ALSO resize that setup\'s CAM stock to this size (fixed box) - this changes the document and '
                 'regenerates that setup\'s toolpaths.',
-                6, True)
+                7, True)
 
             onExecute = ExecuteHandler()
             cmd.execute.add(onExecute)
@@ -807,49 +894,30 @@ class CommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()), CMD_NAME)
 
 
-def run(context):
-    app = adsk.core.Application.get()
-    ui = app.userInterface
-    try:
-        cmd_defs = ui.commandDefinitions
+def create_command_definition(ui):
+    """Create (or recreate) this command's CommandDefinition. Called by
+    ioSenderV2.py's run() once at add-in startup; does not touch any
+    panel/dropdown placement - the caller adds the returned def to its own
+    toolbar control."""
+    cmd_defs = ui.commandDefinitions
 
-        cmd_def = cmd_defs.itemById(CMD_ID)
-        if cmd_def:
-            cmd_def.deleteMe()
-        cmd_def = cmd_defs.addButtonDefinition(CMD_ID, CMD_NAME, CMD_DESC)
+    cmd_def = cmd_defs.itemById(CMD_ID)
+    if cmd_def:
+        cmd_def.deleteMe()
+    cmd_def = cmd_defs.addButtonDefinition(CMD_ID, CMD_NAME, CMD_DESC)
 
-        on_created = CommandCreatedHandler()
-        cmd_def.commandCreated.add(on_created)
-        _handlers.append(on_created)
+    on_created = CommandCreatedHandler()
+    cmd_def.commandCreated.add(on_created)
+    _handlers.append(on_created)
 
-        panel = ui.allToolbarPanels.itemById(PANEL_ID)
-        if panel:
-            existing = panel.controls.itemById(CMD_ID)
-            if existing:
-                existing.deleteMe()
-            panel.controls.addCommand(cmd_def)
-        else:
-            ui.messageBox('ioSenderBatchPost: toolbar panel "%s" not found. The command is '
-                          'registered but has no button; edit PANEL_ID in the add-in to place it.' % PANEL_ID,
-                          CMD_NAME)
-    except Exception:
-        if ui:
-            ui.messageBox('ioSenderBatchPost failed to start:\n{}'.format(traceback.format_exc()))
+    return cmd_def
 
 
-def stop(context):
-    app = adsk.core.Application.get()
-    ui = app.userInterface
-    try:
-        panel = ui.allToolbarPanels.itemById(PANEL_ID)
-        if panel:
-            ctrl = panel.controls.itemById(CMD_ID)
-            if ctrl:
-                ctrl.deleteMe()
-
-        cmd_def = ui.commandDefinitions.itemById(CMD_ID)
-        if cmd_def:
-            cmd_def.deleteMe()
-    except Exception:
-        if ui:
-            ui.messageBox('ioSenderBatchPost failed to stop:\n{}'.format(traceback.format_exc()))
+def cleanup(ui):
+    """Delete this command's CommandDefinition. Called by ioSenderV2.py's
+    stop(); the caller is responsible for removing any toolbar control that
+    referenced it first."""
+    cmd_def = ui.commandDefinitions.itemById(CMD_ID)
+    if cmd_def:
+        cmd_def.deleteMe()
+    _handlers.clear()

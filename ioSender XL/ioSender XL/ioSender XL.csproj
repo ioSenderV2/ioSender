@@ -259,4 +259,16 @@
     </ItemGroup>
     <Copy SourceFiles="@(FirmwareToolsFiles)" DestinationFolder="$(OutDir)firmware-tools\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
+  <!-- Copy the ioSenderV2 Fusion add-in into <output>\Fusion Addin\ so Help > Support > Install ioSenderV2
+       Fusion Addin... (MainWindow.xaml.cs) has a real "Fusion Addin\ioSenderV2" folder next to ioSender.exe
+       to symlink to - both in a dev build and in the CI-zipped release (release.yml just zips everything
+       under this OutDir, so no separate packaging step is needed once it's copied here). Mirrors
+       CopySimulator/CopyFirmwareTools above. Excludes __pycache__: stale bytecode from a previous Fusion
+       run, not source. -->
+  <Target Name="CopyFusionAddin" AfterTargets="Build">
+    <ItemGroup>
+      <FusionAddinFiles Include="$(ProjectDir)..\..\Fusion Addin\**\*" Exclude="$(ProjectDir)..\..\Fusion Addin\**\__pycache__\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FusionAddinFiles)" DestinationFolder="$(OutDir)Fusion Addin\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

@@ -1,0 +1,11 @@
+{
+    "autodeskProduct": "Fusion360",
+    "type": "addin",
+    "id": "ioSenderV2",
+    "author": "Io Engineering",
+    "description": { "": "Adds an ioSenderV2 dropdown to the Manufacture workspace with two commands: Batch Post Process (post every operation in every setup and combine into one .nc for ioSender's File > Load) and Feeds and Speeds (export CAM feeds/speeds/tool/geometry data to JSON for ioSenderV2 to analyze, then apply its recommended adjustments back)." },
+    "version": "2.0.0",
+    "runOnStartup": true,
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}
