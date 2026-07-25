@@ -35,7 +35,14 @@
     powershell "irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex"
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1 | iex -Rollback
+    Passing a parameter (-Rollback, -Tag, -InstallDir) through a piped download needs the
+    scriptblock form below, NOT "| iex -Rollback" - that pipes -Rollback to Invoke-Expression
+    ITSELF (which has no such parameter) and throws "A parameter cannot be found that matches
+    parameter name 'Rollback'", not to the downloaded script. Confirmed by testing both forms.
+    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1))) -Rollback
+
+.EXAMPLE
+    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ioSenderV2/ioSender/master/install.ps1))) -Tag "2.26"
 #>
 [CmdletBinding()]
 param(
@@ -100,14 +107,33 @@ Write-Host "==> Downloading $($asset.name) ($([math]::Round($asset.size / 1MB, 1
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempZip -UseBasicParsing
 
 Get-Process ioSender -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Milliseconds 500   # Stop-Process returns before Windows finishes releasing file handles -
+                                 # give it a beat before touching the folder, or the move below can hit
+                                 # "used by another process" even though the process is already gone.
 
 if (Test-Path $installDir) {
     Write-Host "==> Moving current install to previous\ (one-version rollback) ..." -ForegroundColor Cyan
     $swapDir = Join-Path $env:TEMP 'ioSender-swap'
     if (Test-Path $swapDir) { Remove-Item $swapDir -Recurse -Force }
-    Move-Item $installDir $swapDir                # free up the ioSender\ name
-    New-Item -ItemType Directory -Path $installDir -Force | Out-Null
-    Move-Item $swapDir (Join-Path $installDir 'previous')
+    # Best-effort: a stuck file handle (another process, AV scan, Explorer preview, or a handle Windows
+    # hasn't released yet) shouldn't hard-abort the whole install - warn and fall back to installing over
+    # the existing folder in place (no "previous\" rollback available this run) rather than failing outright.
+    try {
+        Move-Item $installDir $swapDir -ErrorAction Stop   # free up the ioSender\ name
+        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+        Move-Item $swapDir (Join-Path $installDir 'previous') -ErrorAction Stop
+    }
+    catch {
+        Write-Host "==> Could not back up the current install for rollback (a file may still be in use): $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "==> Continuing - installing over the existing files instead. -Rollback won't be available for this update." -ForegroundColor Yellow
+        if (Test-Path $swapDir) {
+            # Best-effort recovery: if the first move succeeded but the second didn't, don't strand the
+            # backup in %TEMP% - try to put it back where it came from so the retry below sees $installDir
+            # populated as if the swap never started (falls through to the plain Expand-Archive -Force).
+            try { Move-Item $swapDir $installDir -ErrorAction Stop } catch { Remove-Item $swapDir -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+        if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
+    }
 }
 else {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
