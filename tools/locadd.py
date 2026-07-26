@@ -93,6 +93,7 @@ TARGETS = [
     ('CNC Controls Probing/CNC Controls Probing/ProbingView.xaml', 'CNC.Controls.Probing'),
     ('CNC Controls Probing/CNC Controls Probing/EdgeFinderControl.xaml', 'CNC.Controls.Probing'),
     ('CNC Controls Probing/CNC Controls Probing/EdgeFinderIntControl.xaml', 'CNC.Controls.Probing'),
+    ('CNC Controls Probing/CNC Controls Probing/CenterFinderControl.xaml', 'CNC.Controls.Probing'),
     ('CNC Controls Probing/CNC Controls Probing/RotationControl.xaml', 'CNC.Controls.Probing'),
     ('CNC Controls Probing/CNC Controls Probing/ToolLengthControl.xaml', 'CNC.Controls.Probing'),
 

@@ -92,6 +92,7 @@
                     <!-- Corner offset: how far along each edge from the corner to touch (corner probes only). All
                          other parameters (clearance, depth, diameter, XY offsets, plate thickness) come from the
                          selected probe definition. -->
+                    <Controls:NumericField x:Uid="fld_probeDistance" Label="Max search distance:" ColonAt="150" ToolTip="Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel." Unit="mm" Format="#####0.0##" Value="{Binding Path=ProbeDistance, Mode=TwoWay}" Margin="0,0,0,4" HorizontalAlignment="Left"/>
                     <Controls:NumericField x:Uid="fld_offset" Label="Corner offset:" ColonAt="95" ToolTip="Distance from the corner along each edge to probe" Value="{Binding Path=Offset, Mode=TwoWay}" Visibility="{Binding Path=OffsetEnable, Converter={StaticResource ToVisibleConverter}}" Margin="0,0,0,4"/>
                     <Grid x:Uid="grd_action" ToolTip="Click edge, corner or center to select probing action." Width="180" Height="180" Margin="0,4,0,4" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <Grid.RowDefinitions>

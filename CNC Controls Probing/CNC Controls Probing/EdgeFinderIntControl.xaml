@@ -72,6 +72,7 @@
                         <CheckBox x:Uid="lbl_probeZ" Content="Probe Z" VerticalAlignment="Center" IsChecked="{Binding Path=ProbeZ}" IsEnabled="{Binding ElementName=probez, Path=IsChecked, Converter={StaticResource IsNotRunningConverter}}"/>
                         <CheckBox x:Uid="lbl_preview" Content="Preview" Margin="15,0,0,0" VerticalAlignment="Center" IsChecked="{Binding Path=PreviewEnable}"/>
                     </StackPanel>
+                    <Controls:NumericField x:Uid="fld_probeDistance" Label="Max search distance:" ColonAt="150" ToolTip="Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel." Unit="mm" Format="#####0.0##" Value="{Binding Path=ProbeDistance, Mode=TwoWay}" Margin="0,0,0,4" HorizontalAlignment="Left"/>
                     <!-- Corner offset (corner probes only); all other parameters come from the selected probe definition. -->
                     <Controls:NumericField x:Uid="fld_offset" Label="Corner offset:" ColonAt="95" ToolTip="Distance from the corner along each edge to probe" Value="{Binding Path=Offset, Mode=TwoWay}" Visibility="{Binding Path=OffsetEnable, Converter={StaticResource ToVisibleConverter}}" Margin="0,0,0,4"/>
                     <Grid x:Uid="grd_action" ToolTip="Click edge, corner or center to select probing action." Width="180" Height="180" Margin="0,4,0,4" HorizontalAlignment="Left" VerticalAlignment="Top">

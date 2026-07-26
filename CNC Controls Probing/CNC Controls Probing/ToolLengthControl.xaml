@@ -37,6 +37,7 @@
             </Grid.RowDefinitions>
             <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Vertical" Margin="5,0,5,0">
+                    <Controls:NumericField x:Uid="fld_probeDistance" Label="Max search distance:" ColonAt="150" ToolTip="Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel." Unit="mm" Format="#####0.0##" Value="{Binding Path=ProbeDistance, Mode=TwoWay}" Margin="0,6,0,0" HorizontalAlignment="Left"/>
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <CheckBox x:Uid="lbl_probeFixture" Content="Probe fixture @ G59.3" IsEnabled="{Binding Path=HasCoordinateSystem9}" IsChecked="{Binding Path=ProbeFixture, Mode=TwoWay}" VerticalAlignment="Center"/>
                         <Label x:Uid="lbl_withTool" Content="with tool:"/>

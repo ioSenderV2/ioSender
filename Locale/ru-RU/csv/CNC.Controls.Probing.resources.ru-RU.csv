@@ -219,3 +219,15 @@ CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_workpieceOffse
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,grp_fixtureAction:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Fixture
 CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,probez:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Resources/edgeZ.png
 CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,probez:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Resources/edgeZ.png
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:edgefindercontrol.baml,fld_probeDistance:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel.
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,fld_probeDistance:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel.
+CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
+CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,fld_probeDistance:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel.
+CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
+CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,fld_probeDistance:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,fld_probeDistance:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface. Reduce this to protect a fragile or ungrounded probe from overtravel.
