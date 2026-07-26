@@ -367,6 +367,16 @@ namespace GCode_Sender
 
         private void FlashMessage(bool isError)
         {
+            // GrblViewModel.Message can be set from a background thread (e.g. ProbingViewModel.WaitForResponse's
+            // worker thread calling Grbl.ExecuteCommand -> SetGrblError -> Message), and PropertyChanged fires
+            // synchronously on whatever thread made the change - touching msgFlashBorder off the UI thread throws
+            // "the calling thread cannot access this object" (issue #7). Hop to the dispatcher first.
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new System.Action(() => FlashMessage(isError)));
+                return;
+            }
+
             if (msgFlashBorder == null || string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
                 return;
 

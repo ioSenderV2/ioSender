@@ -52,9 +52,21 @@ namespace CNC.Core
         //    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         //}
 
+        // A handful of call sites raise property changes from a background thread (e.g. Grbl.WaitForResponse /
+        // ProbingViewModel.WaitForResponse spin a worker Thread and call GrblViewModel.ExecuteCommand directly
+        // from it, off the normal SerialStream Dispatcher.BeginInvoke-marshaled path - StreamPump's job-streaming
+        // thread does the same setting BlockExecuting/ScrollPosition). Any manually-wired (non-XAML-binding)
+        // PropertyChanged subscriber that touches a DependencyObject directly then throws "the calling thread
+        // cannot access this object" - see issue #7 (MainWindow.FlashMessage). Hopping here, once, covers every
+        // subscriber instead of guarding each one individually. Cheap when already on the UI thread (the
+        // overwhelming common case): CheckAccess is a simple thread-id compare.
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+                dispatcher.Invoke(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+            else
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         #region INotifyDataErrorInfo members
