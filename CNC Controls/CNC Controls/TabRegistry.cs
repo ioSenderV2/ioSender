@@ -96,6 +96,16 @@ namespace CNC.Controls
             return _descriptors.FirstOrDefault(d => d.Name == name);
         }
 
+        // Every registered tab as a TabInfo (name/label only), independent of what happens to be BUILT this
+        // session - the "Edit Main Page" Tabs editor's candidate list. Available (below) is NOT a substitute
+        // for this: it's only the tabs actually built (post layout-tree filtering), so a hidden tab drops out
+        // of it and the editor could no longer offer it back - a one-way ratchet. Use this wherever the
+        // editor needs "every possible tab", and Available only for "what's on screen right now".
+        public static List<TabInfo> AllTabs
+        {
+            get { return Descriptors.Select(d => new TabInfo(d.Name, d.Label)).ToList(); }
+        }
+
         // ---- publish layer: the lighter list the editor reads (unchanged behaviour) ----
 
         // All tabs present in the host window (in their built-in order), published by the host at startup.

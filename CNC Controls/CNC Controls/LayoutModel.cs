@@ -93,14 +93,16 @@ namespace CNC.Controls
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
                     new LayoutNode(LayoutKeys.Offsets),
                     new LayoutNode(LayoutKeys.SDCard),
-                    new LayoutNode(LayoutKeys.Probing),
+                    // Probing and Height Map are DEREGISTERED FROM THE DEFAULT LAYOUT ONLY (2026-07-26,
+                    // Start Job "Dynamic" mode folds their functionality in - see issue #10) - NOT removed from
+                    // TabRegistry, so they still show in Settings > Main Page > Tabs' Available column and can
+                    // be dragged back onto the main page by anyone who still wants the standalone tabs.
                     new LayoutNode(LayoutKeys.Tools,
                         new LayoutSlot(LayoutKeys.SlotTools, new[] {
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
                     new LayoutNode(LayoutKeys.MachineSetup),
-                    new LayoutNode(LayoutKeys.HeightMap),
                     new LayoutNode(LayoutKeys.LatheWizards)));
         }
     }

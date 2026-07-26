@@ -5,6 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              mc:Ignorable="d" d:DesignHeight="560" d:DesignWidth="720">
+    <UserControl.Resources>
+        <cnccontrols:BoolToVisibleConverter x:Key="ToVisibleConverter"/>
+    </UserControl.Resources>
     <Grid Margin="10" Grid.IsSharedSizeScope="True">
         <Grid.ColumnDefinitions>
             <!-- Proportional (min 1/3 of the window), not a hardcoded pixel width - a fixed Width="360" here
@@ -87,6 +90,111 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <!-- Geometry panel: visible only when the "Dynamic" fixture (the synthetic no-saved-
+                         position entry, see G28Fixture) is selected. External/Internal + Is Circle choose
+                         which of the real Probing-tab pickers to embed below - the SAME clickable grids
+                         EdgeFinderControl/EdgeFinderIntControl use (Resources/*.png, Style/converters
+                         duplicated here since those are UserControl-local resources, not a shared dictionary),
+                         driven by geometryVm (a plain ProbingViewModel instance, code-behind-assigned as this
+                         panel's DataContext - see EnsureGeometryVm) so clicking a cell sets its real ProbeEdge
+                         property, same as on those tabs. Is Circle shows a plain reference picture instead
+                         (External/Internal alone already says solid-boss vs hole - nothing further to click). -->
+                    <GroupBox x:Uid="ls_grpGeometry" x:Name="grpGeometry" Header="Geometry" Margin="0,8,0,0" Visibility="Collapsed">
+                        <StackPanel Margin="6">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <RadioButton x:Uid="ls_geomExternal" x:Name="rbGeomExternal" Content="External" GroupName="geomInOut" IsChecked="True" Margin="0,0,12,0"/>
+                                <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut"/>
+                                <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle" Margin="24,0,0,0"/>
+                            </StackPanel>
+
+                            <Grid x:Name="pnlEdgePickerExt" Width="180" Height="180" HorizontalAlignment="Left">
+                                <Grid.Resources>
+                                    <cnccontrols:EnumValueToBooleanConverter x:Key="EnumToEdgeConverter"/>
+                                    <Style x:Key="GeomFlag" TargetType="RadioButton">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsChecked" Value="False">
+                                                <Setter Property="Opacity" Value="0.5"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                        <Setter Property="Focusable" Value="False"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Width" Value="60"/>
+                                        <Setter Property="Height" Value="60"/>
+                                        <Setter Property="GroupName" Value="geomEdgeExt"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="RadioButton">
+                                                    <Border Background="Transparent">
+                                                        <Image Source="{Binding Path=Content, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="60"/><RowDefinition Height="60"/><RowDefinition Height="60"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60"/><ColumnDefinition Width="60"/><ColumnDefinition Width="60"/>
+                                </Grid.ColumnDefinitions>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerD.png" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=D}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeCD.png" Grid.Column="1" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=CD}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerC.png" Grid.Column="2" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=C}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeAD.png" Grid.Row="1" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=AD}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeBC.png" Grid.Row="1" Grid.Column="2" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=CB}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerA.png" Grid.Row="2" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=A}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeAB.png" Grid.Row="2" Grid.Column="1" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=AB}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerB.png" Grid.Row="2" Grid.Column="2" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=B}"/>
+                            </Grid>
+
+                            <Grid x:Name="pnlEdgePickerInt" Width="180" Height="180" HorizontalAlignment="Left" Visibility="Collapsed">
+                                <Grid.Resources>
+                                    <cnccontrols:EnumValueToBooleanConverter x:Key="EnumToEdgeConverter"/>
+                                    <Style x:Key="GeomFlagInt" TargetType="RadioButton">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsChecked" Value="False">
+                                                <Setter Property="Opacity" Value="0.5"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                        <Setter Property="Focusable" Value="False"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Width" Value="60"/>
+                                        <Setter Property="Height" Value="60"/>
+                                        <Setter Property="GroupName" Value="geomEdgeInt"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="RadioButton">
+                                                    <Border Background="Transparent">
+                                                        <Image Source="{Binding Path=Content, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="60"/><RowDefinition Height="60"/><RowDefinition Height="60"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60"/><ColumnDefinition Width="60"/><ColumnDefinition Width="60"/>
+                                </Grid.ColumnDefinitions>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerID.png" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=D}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeICD.png" Grid.Column="1" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=CD}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerIC.png" Grid.Column="2" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=C}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeIAD.png" Grid.Row="1" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=AD}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeIBC.png" Grid.Row="1" Grid.Column="2" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=CB}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerIA.png" Grid.Row="2" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=A}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/edgeIAB.png" Grid.Row="2" Grid.Column="1" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=AB}"/>
+                                <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerIB.png" Grid.Row="2" Grid.Column="2" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=B}"/>
+                            </Grid>
+
+                            <Image x:Name="imgCenterPreview" Width="120" Height="120" HorizontalAlignment="Left" Stretch="Uniform" Visibility="Collapsed"/>
+                            <cnccontrols:NumericField x:Name="fldCenterPasses" x:Uid="ls_centerPasses" Label="Passes:" ColonAt="55" Unit="" Format="0" Value="1" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Collapsed"
+                                                      ToolTip="Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."/>
+                        </StackPanel>
+                    </GroupBox>
+
                     <!-- Right-click this panel's header for a Show in inches/millimeters toggle (UnitToggleMenu,
                          attached in code-behind) - replaces the old rbUnitsMm/rbUnitsIn radio pair. -->
                     <GroupBox x:Uid="ls_grpStock" x:Name="grpStock" Header="Stock" Margin="0,8,0,0">
@@ -116,26 +224,57 @@
                     <GroupBox x:Uid="ls_grpActions" Header="Actions" Margin="0,8,0,0">
                         <StackPanel x:Name="pnlActions" Margin="6">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                <CheckBox x:Uid="ls_setorigin" x:Name="chkSetOrigin" Content="Set origin in:" IsChecked="True" VerticalAlignment="Center"
-                                          ToolTip="On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on). Off: still probes/measures and reports the numbers, but leaves the selected WCS untouched."/>
+                                <CheckBox x:Uid="ls_setorigin" x:Name="chkSetOrigin" Content="Set origin or offset:" IsChecked="True" VerticalAlignment="Center"
+                                          ToolTip="On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on), or as a G92 temporary offset if G92 is selected. Off: still probes/measures and reports the numbers, but leaves the selected WCS/offset untouched."/>
                                 <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" Margin="6,0,0,0" VerticalAlignment="Center" SelectedIndex="0"
                                           IsEnabled="{Binding ElementName=chkSetOrigin, Path=IsChecked}"
-                                          ToolTip="Work coordinate system (G54-G59) to set this job's origin in.">
+                                          ToolTip="Work coordinate system (G54-G59) to set this job's origin in, or G92 for a temporary offset instead of a persistent WCS origin.">
                                     <ComboBoxItem Content="G54"/>
                                     <ComboBoxItem Content="G55"/>
                                     <ComboBoxItem Content="G56"/>
                                     <ComboBoxItem Content="G57"/>
                                     <ComboBoxItem Content="G58"/>
                                     <ComboBoxItem Content="G59"/>
+                                    <ComboBoxItem x:Name="cbiG92" Content="G92"/>
                                 </ComboBox>
                             </StackPanel>
                             <CheckBox x:Uid="ls_tloref" x:Name="chkSetTloRef" Content="Set tool-length reference" IsChecked="True" Margin="0,2,0,2" VerticalAlignment="Center"
                                       ToolTip="Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."/>
                             <CheckBox x:Uid="ls_measure" x:Name="chkMeasure" Content="Measure stock size (probe all 4 corners)" IsChecked="False" Margin="0,6,0,2" VerticalAlignment="Center"
                                       ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
+                            <CheckBox x:Uid="ls_heightmap" x:Name="chkHeightMap" Content="Probe height map" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
+                                      IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
+                                      ToolTip="After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."/>
+                            <StackPanel Orientation="Horizontal" Margin="36,2,0,2" Visibility="{Binding ElementName=chkHeightMap, Path=IsChecked, Converter={StaticResource ToVisibleConverter}}">
+                                <cnccontrols:NumericField x:Name="fldHeightMapGridX" x:Uid="ls_hmGridX" Label="Grid X:" ColonAt="55" Unit="mm" Format="###0.0#" Value="25" Margin="0,0,10,0"
+                                                          ToolTip="Grid spacing along X for the height-map probe (mm between probed points)."/>
+                                <cnccontrols:NumericField x:Name="fldHeightMapGridY" x:Uid="ls_hmGridY" Label="Grid Y:" ColonAt="55" Unit="mm" Format="###0.0#" Value="25"
+                                                          ToolTip="Grid spacing along Y for the height-map probe (mm between probed points)."/>
+                            </StackPanel>
                             <CheckBox x:Uid="ls_rotate" x:Name="chkRotate" Content="Set work rotation from skew" IsChecked="True" Margin="18,2,0,2" VerticalAlignment="Center"
                                       IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                      ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE."/>
+                                      ToolTip="Store the measured stock skew as the work coordinate system's rotation (G10 L2 R), so any program run against this stock is cut aligned to it. Requires firmware with ROTATION_ENABLE. Not available when Set origin or offset is on G92 (a temporary offset has no rotation)."/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Dynamic probe-point panel: visible only when the "Dynamic" fixture (the synthetic
+                         no-saved-position entry, see G28Fixture) is selected. The dot diagram itself is drawn
+                         onto the existing Stock canvas (right column, drawingHost) rather than a second copy
+                         here - this panel holds the instructions text and (for the center dot) the solid/hole
+                         and round/not-round picks, same pattern as the old Probing tabs' left-column controls. -->
+                    <GroupBox x:Uid="ls_grpDynamic" x:Name="grpDynamic" Header="Dynamic probe point" Margin="0,8,0,0" Visibility="Collapsed">
+                        <StackPanel Margin="6">
+                            <TextBlock x:Name="txtDynamicInstructions" TextWrapping="Wrap" Margin="0,0,0,4"
+                                       Text="Click a green dot on the Stock drawing to pick what to probe, jog the probe over it, then Generate."/>
+                            <StackPanel x:Name="pnlCenterMode" Orientation="Horizontal" Visibility="Collapsed" Margin="0,2,0,2">
+                                <RadioButton x:Uid="ls_centerSolid" x:Name="rbCenterSolid" Content="Solid boss" GroupName="centerMode" IsChecked="True" Margin="0,0,12,0"/>
+                                <RadioButton x:Uid="ls_centerHole" x:Name="rbCenterHole" Content="Hole" GroupName="centerMode"/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlHoleShape" Orientation="Horizontal" Visibility="Collapsed" Margin="14,2,0,2">
+                                <RadioButton x:Uid="ls_holeRound" x:Name="rbHoleRound" Content="Round" GroupName="holeShape" IsChecked="True" Margin="0,0,12,0"/>
+                                <RadioButton x:Uid="ls_holeNotRound" x:Name="rbHoleNotRound" Content="Not round" GroupName="holeShape" IsEnabled="False"
+                                             ToolTip="Not implemented in this prototype - non-round hole probing needs more probe points than the round case handles today."/>
+                            </StackPanel>
                         </StackPanel>
                     </GroupBox>
                 </StackPanel>

@@ -61,7 +61,18 @@
 ;                       of #<_ls_maxz> (only trusted WITHIN the footprint), without losing the trusted height
 ;                       for the rest of this corner's own probe sequence. SENTINEL IS 9999 ("unset", not 0) -
 ;                       unlike #<_ls_maxz>, Z0 (machine top) is itself a legitimate override value here, so
-;                       0 can't double as "no override". >= 9000 = ignored, use #<_ls_maxz> instead.
+;                       0 can't double as "no override".
+;   #<_ls_inside> = 0 (default) = OUTSIDE corner/edge - approach from outside the stock, probing inward to
+;                       find each face (the original/only behavior). 1 = INSIDE corner/edge - probe FROM
+;                       inside a pocket/step OUTWARD to find each face instead (Start Job's "Dynamic" mode
+;                       inside-corner/inside-edge picks). Implemented as a single sign flip on sx/sy right
+;                       after they're derived from the corner id - every other line in this macro is already
+;                       written purely in terms of sx/sy, so nothing else needs to change.
+;   #<_ls_faces>  = 0 (default) = probe BOTH faces (a full corner - the original/only behavior). 1 = X face
+;                       ONLY (an edge midpoint on an X-normal face - Start Job's "Dynamic" edge-midpoint
+;                       picks use this to skip the other axis). 2 = Y face ONLY. The skipped axis's output
+;                       (#<_corner_x> or #<_corner_y>) falls back to the un-probed top-probe anchor - callers
+;                       doing a single-face pick must not treat that axis as a real touch result. >= 9000 = ignored, use #<_ls_maxz> instead.
 ;
 ; Outputs (GLOBAL named params, survive the SUB):
 ;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
@@ -85,6 +96,8 @@ O<pcorner> SUB
   #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
   #<maxz>   = #<_ls_maxz>        ; known-safe travel height (machine Z), 0/unset = no prior stock-top knowledge (see file header)
   #<appz>   = #<_ls_appz>        ; approach-only override for the FIRST height change below (see file header) - 0/unset = use #<maxz> same as every other height decision this call
+  #<inside> = #<_ls_inside>      ; 0 = outside corner/edge (default), 1 = inside (see file header)
+  #<faces>  = #<_ls_faces>       ; 0 = both faces (default), 1 = X face only, 2 = Y face only (see file header)
 
   ; Clear G54 AND cancel any active G92 offset (AND TLO, belt-and-suspenders) so the absolute Z probes
   ; below run in TRUE machine coordinates. WCO = G5x offset + G92 offset + TLO (grblHAL gc_get_offset,
@@ -109,7 +122,14 @@ O<pcorner> SUB
   o11 ELSE
     #<sy> = -1
   o11 ENDIF
-  (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in>)
+  ; Inside corner/edge (Dynamic mode): flip both signs so the approach comes FROM inside a pocket/step
+  ; OUTWARD to each face, instead of from outside the stock inward. Everything below this point is already
+  ; written purely in terms of sx/sy, so this single flip is the whole difference.
+  o12 IF [#<inside> EQ 1]
+    #<sx> = 0 - #<sx>
+    #<sy> = 0 - #<sy>
+  o12 ENDIF
+  (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in> inside=#<inside> faces=#<faces>)
 
   ; ================= safety rise to machine top (first corner / DISCOVER only, BOTH modes) =================
   ; Regardless of probe mode, always rise to Z0 (machine top, always clear) and travel to the reference
@@ -263,7 +283,14 @@ O<pcorner> SUB
   o32 ENDIF
   (PRINT, PC start_z=#<_start_z>)
 
-  ; ================= X face probe =================
+  ; Fallback outputs for a face this call skips (faces=1/2, Dynamic mode edge-midpoint picks) - the
+  ; un-probed axis reports the top-probe anchor, NOT a real touch. Overwritten below when that face's
+  ; block actually runs.
+  #<_corner_x> = #<_topx>
+  #<_corner_y> = #<_topy>
+
+  ; ================= X face probe (skipped when #<faces> EQ 2 - Y face only) =================
+  o90 IF [#<faces> NE 2]
   ; From the top-probe position (over solid stock, verified above) move ONLY X back out to the reference
   ; (the face) - Y unchanged, so the pre-seek position is anchored to a point already known to be over
   ; material rather than a separately estimated offset. Descend to start_z, then seek toward the face.
@@ -281,8 +308,11 @@ O<pcorner> SUB
   G1 X[#<x_trig> - [10 * #<sx>]] F1000
   G90
   (PRINT, PC x_trig=#<x_trig>)
+  #<_corner_x> = [#<x_trig> + [#<rad> * #<sx>]]
+  o90 ENDIF
 
-  ; ================= Y face probe =================
+  ; ================= Y face probe (skipped when #<faces> EQ 1 - X face only) =================
+  o91 IF [#<faces> NE 1]
   ; Retract to a trusted safe height first - the X face probe left the tip near start_z (probing depth), so
   ; crossing at that depth would drag the tip across the stock top. Once at that height, go straight (X AND Y
   ; together) to the Y-face-start position (topx, ry) - no need to detour via the top-probe XY (topx, topy)
@@ -304,10 +334,10 @@ O<pcorner> SUB
   G1 Y[#<y_trig> - [10 * #<sy>]] F1000
   G90
   (PRINT, PC y_trig=#<y_trig>)
-
-  ; ================= outputs (radius compensated) =================
-  #<_corner_x> = [#<x_trig> + [#<rad> * #<sx>]]
   #<_corner_y> = [#<y_trig> + [#<rad> * #<sy>]]
+  o91 ENDIF
+
+  ; ================= outputs =================
   #<_corner_z> = [#<_z_top> - #<_ls_plateoffset>]   ; 0 for the 3D probe and touch-plate-on-conductive-stock (no-op)
   (PRINT, PC OUT c=#<corner> x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
 

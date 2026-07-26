@@ -206,7 +206,10 @@ namespace CNC.Controls
         // Populate the Tabs editor from the host-published tab set and the saved order (Config.Tabs).
         private void LoadTabs(CNC.Controls.Config cfg)
         {
-            var avail = TabRegistry.Available;
+            // Every REGISTERED tab (TabRegistry.AllTabs), not just whatever got built last session
+            // (TabRegistry.Available) - otherwise a tab hidden once can never be shown again, since a hidden
+            // tab is never built and so never re-appears in Available (see AllTabs's own comment).
+            var avail = TabRegistry.AllTabs;
             var byName = avail.GroupBy(t => t.Name).ToDictionary(g => g.Key, g => g.First());
 
             if (cfg.Tabs != null && cfg.Tabs.Count > 0)
@@ -276,8 +279,8 @@ namespace CNC.Controls
             {
                 var tabs = TabsShown.Select(t => t.Name).ToList();
                 if (tabs.Count == 0)                                   // never hide everything
-                    tabs = TabRegistry.Available.Select(t => t.Name).ToList();
-                else if (!tabs.Contains(ProtectedTab) && TabRegistry.Available.Any(t => t.Name == ProtectedTab))
+                    tabs = TabRegistry.AllTabs.Select(t => t.Name).ToList();
+                else if (!tabs.Contains(ProtectedTab) && TabRegistry.AllTabs.Any(t => t.Name == ProtectedTab))
                     tabs.Add(ProtectedTab);                            // keep Settings:App reachable
                 cfg.Tabs = tabs;
             }

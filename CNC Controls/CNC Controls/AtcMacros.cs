@@ -26,7 +26,7 @@ namespace CNC.Controls
         // ActiveRun, not from a controller-side or disk-based macro file. pvisecorner.macro is only ever
         // CALLed from FixtureEditDialog's vise Set position, not from a Start Job program, but it needs the
         // same on-controller presence as pcorner.macro for that O-word CALL to resolve.
-        static readonly string[] Required = { "tc.macro", "pcorner.macro", "pvisecorner.macro" };
+        static readonly string[] Required = { "tc.macro", "pcorner.macro", "pvisecorner.macro", "pcenter.macro" };
 
         // Re-entrancy guard. EnsureProvisioned pumps the WPF dispatcher (controller file reads via DoEvents, the
         // YModem upload), so a queued UI event can re-enter it before it returns - mutually recursing with the SD
