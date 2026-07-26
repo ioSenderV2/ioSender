@@ -10,8 +10,11 @@ namespace CNC.Controls
     public static class FirmwareUpdateManager
     {
         public const string FirmwareRepo = "stevenrwood/iMXRT1062";
-        private const string ReleaseTag = "fw-latest";
-        public const string ReleasePageUrl = "https://github.com/" + FirmwareRepo + "/releases/tag/" + ReleaseTag;
+        // Each build publishes its own immutable release (tag fw-<short-sha>) - GitHub's own "latest
+        // release" resolution (excludes prereleases/drafts) picks the newest one, the same pattern
+        // ioSender's own app releases already use (see MainWindow.checkForUpdates_Click). No shared,
+        // overwritten-in-place tag to race or accumulate stale assets on.
+        public const string ReleasePageUrl = "https://github.com/" + FirmwareRepo + "/releases/latest";
         private const string TeensyLoaderExeName = "teensy_loader_cli.exe";
         private const string TeensyMcu = "TEENSY41";   // the only board this fork builds for (BOARD_T41U5XBB)
 
@@ -30,12 +33,12 @@ namespace CNC.Controls
             public string Changelog;
         }
 
-        // Query the fw-latest release (public, no token) and parse out its driver ref + hex asset URL.
-        // Blocking network I/O - call from a background thread.
+        // Query the latest published release (public, no token) and parse out its driver ref + hex asset
+        // URL. Blocking network I/O - call from a background thread.
         public static ReleaseInfo GetLatestRelease(out string error)
         {
             error = null;
-            string url = "https://api.github.com/repos/" + FirmwareRepo + "/releases/tags/" + ReleaseTag;
+            string url = "https://api.github.com/repos/" + FirmwareRepo + "/releases/latest";
             try
             {
                 // GitHub requires TLS 1.2; .NET Framework 4.6.2 does not enable it by default.
@@ -82,7 +85,7 @@ namespace CNC.Controls
             {
                 var resp = wex.Response as System.Net.HttpWebResponse;
                 error = resp != null && resp.StatusCode == System.Net.HttpStatusCode.NotFound
-                    ? "no fw-latest release found - the firmware CI may not have run yet."
+                    ? "no published firmware release found - the firmware CI may not have run yet."
                     : "could not reach GitHub: " + wex.Message;
                 return null;
             }
