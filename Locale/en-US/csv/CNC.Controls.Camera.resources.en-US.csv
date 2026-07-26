@@ -12,3 +12,19 @@ CNC.Controls.Camera.g.en-US.resources:cameracontrol.baml,str_moveCameraTo:System
 CNC.Controls.Camera.g.en-US.resources:cameracontrol.baml,str_moveSpindleTo:System.String.$Content,None,True,True,,Move spindle to camera position?
 CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_cameraDevice:System.Windows.Controls.ContentControl.Content,Label,True,True,,Device:
 CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_cameraConnect:System.Windows.Controls.ContentControl.Content,Button,True,True,,Connect
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_obsSection:System.Windows.Controls.TextBlock.Text,Text,True,True,,Demo recording (OBS)
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_obsInstructions:System.Windows.Controls.ContentControl.Content,Button,True,True,,Instructions…
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_obsInstructions:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How to set up a named, remote-controllable source in OBS."
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_obsValidate:System.Windows.Controls.ContentControl.Content,Button,True,True,,Validate
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,btn_obsValidate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Connect to OBS now and check that the WS Host/Port/Password work and each configured source name actually exists.
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,fld_obsPort:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,OBS's WebSocket server port - Tools &gt; WebSocket Server Settings in OBS. Default 4455.
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_obsHost:System.Windows.Controls.ContentControl.Content,Label,True,True,,WS Host:
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsHost:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Where OBS's WebSocket server is running - 'localhost' if OBS is on this same PC (the normal case).
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,lbl_obsPassword:System.Windows.Controls.ContentControl.Content,Label,True,True,,WS Password:
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,pwd_obsPassword:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Only needed if OBS's WebSocket server has 'Enable Authentication' checked (Tools &gt; WebSocket Server Settings). Leave blank if it's off.
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsCamASource:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Exact OBS source name (Sources panel), e.g. a video capture device for this camera."
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsCamAFilter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one).
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsCamBSource:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Exact OBS source name (Sources panel), e.g. a video capture device for this camera."
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsCamBFilter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one).
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsAppSource:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Exact OBS source name (Sources panel) for the Display/Window Capture of ioSender's window.
+CNC.Controls.Camera.g.en-US.resources:configcontrol.baml,txt_obsAppFilter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Name of the Source Record filter added to that source (default 'Source Record' - only rename it if you added more than one).

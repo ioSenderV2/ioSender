@@ -1182,3 +1182,6 @@ CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,tab_fsIntro:System.Wi
 CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,tab_fsLoad:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Load / Import
 CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,tab_fsResults:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Results
 CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,lbl_fsNotesDetail:System.Windows.Controls.TextBlock.Text,Text,True,True,,Notes for selected row:
+CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_aiKey:System.Windows.Controls.TextBlock.Text,Text,True,True,,AI Review Key:
+CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_aiKey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Anthropic API key for Feeds &amp; Speeds' optional 'Ask AI to review' second-opinion pass. Stored in the registry, never shown once set."
+CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,btn_aiKey:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set AI key
