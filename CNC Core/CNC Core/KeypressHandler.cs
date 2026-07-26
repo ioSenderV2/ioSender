@@ -356,6 +356,9 @@ namespace CNC.Core
 
             foreach (var newmap in keymappings)
             {
+                if (newmap?.method == null)
+                    continue;
+
                 if (newmap.method.StartsWith("Jogkey.")) {
                     int k = GrblInfo.AxisLetterToIndex(newmap.method.Substring(7, 1));
                     if(k >= 0 && newmap.method.Substring(8) == "plus" || newmap.method.Substring(8) == "minus")
