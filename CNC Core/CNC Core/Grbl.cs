@@ -480,7 +480,10 @@ namespace CNC.Core
             if (GrblViewModel == null)
                 return false;
 
-            if (GrblViewModel.ResponseLogVerbose)
+            // Respect Silent for this echo too - a caller doing internal housekeeping (e.g. SDCardView's
+            // $CWD navigation while checking/provisioning ATC macros) sets Silent around the call
+            // specifically so this doesn't show even with Verbose on.
+            if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
             var t = new Thread(() =>
@@ -507,7 +510,10 @@ namespace CNC.Core
             if (GrblViewModel == null)
                 return false;
 
-            if (GrblViewModel.ResponseLogVerbose)
+            // Respect Silent for this echo too - a caller doing internal housekeeping (e.g. SDCardView's
+            // $CWD navigation while checking/provisioning ATC macros) sets Silent around the call
+            // specifically so this doesn't show even with Verbose on.
+            if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
             new Thread(() =>
@@ -1349,7 +1355,9 @@ namespace CNC.Core
             PollGrbl.Suspend();
             SystemInfo.Clear();
 
-            model.Silent = true;
+            // Not Silent: the $I/$IE response is the controller's initial "who am I" reply at connect -
+            // show it in the console rather than hiding it as boilerplate (was model.Silent = true; see
+            // the [MSG:...] special-case comment below this method's call site for the prior rationale).
             Firmware = model.Firmware;
             dispatcher = Dispatcher.CurrentDispatcher;
             dataReceived += Process;
@@ -1367,7 +1375,6 @@ namespace CNC.Core
             while (res == null)
                 EventUtils.DoEvents();
 
-            model.Silent = false;
             dataReceived -= Process;
 
             PollGrbl.Resume();

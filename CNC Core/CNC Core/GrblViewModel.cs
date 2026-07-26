@@ -301,6 +301,12 @@ namespace CNC.Core
                     CommandLog.Add(command);
                     ResponseLog.Add(command);
                 }
+                // A user-typed $ command (e.g. $$, $?, $pins) is a deliberate request for its reply,
+                // so let its response through the console even with Verbose off - see DataReceived's
+                // use of _mdiQueryPending. Programmatic $ commands (ExecuteCommand, e.g. macro-issued
+                // G49/$TLR) don't set this - only what was actually typed at the prompt.
+                if (command.TrimStart().StartsWith("$"))
+                    _mdiQueryPending = true;
             }
         }
 
@@ -348,6 +354,10 @@ namespace CNC.Core
         public bool ResponseLogFilterRT { get; set; } = false;
         public bool ResponseLogFilterOk { get; set; } = false;
         public bool ResponseLogShowRTAll { get; set; } = false;
+
+        // Set by ExecuteMDI when the user types a $ command; cleared in DataReceived once the reply
+        // completes (ok / error:). Lets that one reply bypass ResponseLogVerbose - see DataReceived.
+        private bool _mdiQueryPending = false;
 
         public bool IsReady { get; set; } = false;
         public bool IsGrblHAL { get { return GrblInfo.IsGrblHAL; } }
@@ -1536,11 +1546,18 @@ namespace CNC.Core
                 }
             }
 
+            bool mdiQueryReply = _mdiQueryPending;
+            // The controller's reset/boot banner ("Grbl 1.1f ..." / "GrblHAL ...") always gets through,
+            // even mid-handshake with Silent set (e.g. the $I query in Grbl.Get) - it's genuinely useful
+            // and its suppression there was an unintended side effect of gating the $I chatter, not the
+            // point of that gate (see the 4ffe669 commit that added the Silent check here).
+            bool isBootBanner = data.ToLower().StartsWith("grbl");
+
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
                 SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
             }
-            else if (!Silent && (ResponseLogVerbose || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))
+            else if ((!Silent || isBootBanner) && (ResponseLogVerbose || mdiQueryReply || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))
             {
                 if (!(data.First() == '<' && ResponseLogFilterRT))
                 {
@@ -1556,6 +1573,11 @@ namespace CNC.Core
                         ResponseLog.RemoveAt(0);
                 }
             }
+
+            // The $ command's reply is done once "ok"/"error:" comes back - go quiet again for
+            // whatever gets typed or streamed next.
+            if (mdiQueryReply && (data == "ok" || data.StartsWith("error:")))
+                _mdiQueryPending = false;
 
             OnResponseReceived?.Invoke(data);
         }

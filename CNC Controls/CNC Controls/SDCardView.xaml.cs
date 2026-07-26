@@ -583,7 +583,11 @@ namespace CNC.Controls
             // $CWD makes both the FTP path (re-queried via PWD below) and the YModem write land on the chosen
             // filesystem; the caller's ReloadFiles restores the root afterwards.
             if (!string.IsNullOrEmpty(destPath))
+            {
+                model.Silent = true;
                 Grbl.WaitForResponse("$CWD=" + (destPath.Length > 1 ? destPath.TrimEnd('/') : destPath));   // "/" -> $CWD=/ (root), so an unselected Upload lands on the root volume, not a stale $CWD
+                model.Silent = false;
+            }
 
             if (GrblInfo.UploadProtocol == "FTP")
             {
@@ -832,7 +836,9 @@ namespace CNC.Controls
                     // not found) when the root filesystem isn't mounted - e.g. SD enabled but no card inserted, with
                     // littlefs at /littlefs - so only use "/" when a mount actually lives there.
                     string cwd = mounts.Exists(m => m.Path == "/") ? "/" : mounts[0].Path;
+                    model.Silent = true;
                     Grbl.WaitForResponse("$CWD=" + (cwd.Length > 1 ? cwd.TrimEnd('/') : cwd));
+                    model.Silent = false;
                 }
                 else
                     LegacyLoad(model, ViewAll);
@@ -881,6 +887,7 @@ namespace CNC.Controls
         // is tagged with its Location/Path so run/delete/download can target the right filesystem.
         private static void ListMount(GrblViewModel model, string location, string path, bool ViewAll)
         {
+            model.Silent = true;
             Grbl.WaitForResponse("$CWD=" + (path.Length > 1 ? path.TrimEnd('/') : path));
 
             bool? res = null;
@@ -889,7 +896,6 @@ namespace CNC.Controls
             Comms.com.PurgeQueue();
             curLocation = location;
             curPath = path;
-            model.Silent = true;
 
             new Thread(() =>
             {
