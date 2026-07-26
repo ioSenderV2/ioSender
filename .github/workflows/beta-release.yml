@@ -34,13 +34,19 @@ jobs:
       - name: Zip build output
         shell: pwsh
         run: |
+          # Asset MUST be named ioSender.zip - install.ps1 hardcodes that filename when it looks up a
+          # release's asset (each release has its own namespaced assets, so there's no collision risk
+          # reusing the same name every release, beta or not).
           $src = "ioSender XL\ioSender XL\bin\Release"
-          Compress-Archive -Path "$src\*" -DestinationPath "ioSender-beta-pr${{ github.event.pull_request.number }}.zip" -Force
+          Compress-Archive -Path "$src\*" -DestinationPath "ioSender.zip" -Force
 
-      - name: Publish beta-pr${{ github.event.pull_request.number }}
+      - name: Publish vbeta-pr${{ github.event.pull_request.number }}
         uses: ncipollo/release-action@v1
         with:
-          tag: beta-pr${{ github.event.pull_request.number }}
+          # install.ps1's -Tag always prepends "v" unless already present (see its own comment) - the tag
+          # here is "v" + "beta-pr<N>" so `-Tag "beta-pr<N>"` in the install command below resolves to
+          # this exact tag, matching every real vN.N release's own convention instead of a special case.
+          tag: vbeta-pr${{ github.event.pull_request.number }}
           name: "ioSender beta - PR #${{ github.event.pull_request.number }} (${{ github.event.pull_request.head.ref }} @ ${{ github.event.pull_request.head.sha }})"
           body: |
             Beta build of PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}
@@ -48,14 +54,19 @@ jobs:
             Branch: `${{ github.event.pull_request.head.ref }}`
             Commit: ${{ github.event.pull_request.head.sha }}
 
-            **Test build only, not a release.** Unzip and run ioSender.exe. This release is replaced on
-            every push to the PR and deleted automatically when the PR closes or the "beta" label is
-            removed.
+            ### Install / update
+            Run from CMD or PowerShell:
+            ```
+            & ([scriptblock]::Create((irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1))) -Tag "beta-pr${{ github.event.pull_request.number }}"
+            ```
+
+            **Test build only, not a release.** This release is replaced on every push to the PR and
+            deleted automatically when the PR closes or the "beta" label is removed.
           prerelease: true
           makeLatest: false
           allowUpdates: true
           removeArtifacts: true
-          artifacts: ioSender-beta-pr${{ github.event.pull_request.number }}.zip
+          artifacts: ioSender.zip
           # Same PAT release.yml uses - default GITHUB_TOKEN can't create releases in this repo (org
           # policy locks default workflow permissions to read-only).
           token: ${{ secrets.RELEASE_TOKEN }}
@@ -64,12 +75,12 @@ jobs:
     if: ${{ github.event.action == 'closed' || (github.event.action == 'unlabeled' && github.event.label.name == 'beta') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Delete beta-pr${{ github.event.pull_request.number }} release + tag
+      - name: Delete vbeta-pr${{ github.event.pull_request.number }} release + tag
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          $tag = "beta-pr${{ github.event.pull_request.number }}"
+          $tag = "vbeta-pr${{ github.event.pull_request.number }}"
           gh release delete $tag --repo ${{ github.repository }} --yes --cleanup-tag
           if ($LASTEXITCODE -ne 0) {
             Write-Host "No beta release found for $tag - nothing to clean up."
