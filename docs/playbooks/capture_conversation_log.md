@@ -36,6 +36,13 @@ once it prints `OK  clean + pushed`.
 powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
 ```
 
+Immediately followed by regenerating the session index (`ClaudeConv\index.html` — elapsed/kbd time/turns/
+tokens/TOC#/release per session, linking to each saved conversation):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\effort\build-session-index.ps1
+```
+
 ## Why this script (not convo-logger.ps1)
 
 `convo-logger.ps1` maps one *transcript file* → one `<guid>.html` (the CLI's own session boundaries).

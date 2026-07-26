@@ -32,7 +32,11 @@ always `/clear`.
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
-6. **THEN capture the conversation log** — the `-Once` call, → [capture_conversation_log.md](capture_conversation_log.md).
+6. **THEN capture the conversation log** — the `-Once` call, → [capture_conversation_log.md](capture_conversation_log.md) —
+   **immediately followed by regenerating the session index** (`tools\effort\build-session-index.ps1`),
+   so `ClaudeConv\index.html` (elapsed/kbd time/turns/tokens/TOC#/release per session, linking to each
+   saved conversation) stays current. Takes ~2 min (re-parses every transcript) - run it, don't skip it
+   for time.
 
 ## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
 
@@ -56,6 +60,7 @@ powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
+powershell -ExecutionPolicy Bypass -File tools\effort\build-session-index.ps1
 ```
 
 ## Notes
