@@ -50,6 +50,9 @@ namespace GCode_Sender
         // ProbeEdge selection (their real Content-bound RadioButtons need a ProbingViewModel DataContext) -
         // not used for any actual probing (BuildDynamicProbeProgram generates its own NGC text separately).
         private ProbingViewModel geometryVm;
+        // Saved ProbeEdge (see StartJobSettings.GeomProbeEdge), applied once geometryVm is created - LoadInputs
+        // runs before any fixture is selected, so geometryVm doesn't exist yet at that point.
+        private string pendingGeomProbeEdge;
 
         private GrblViewModel model = null;
         private bool subscribed = false;
@@ -504,6 +507,13 @@ namespace GCode_Sender
             {
                 geometryVm = new ProbingViewModel(model);
                 pnlEdgePickerExt.DataContext = pnlEdgePickerInt.DataContext = geometryVm;
+                if (pendingGeomProbeEdge != null)
+                {
+                    Edge edge;
+                    if (Enum.TryParse(pendingGeomProbeEdge, out edge))
+                        geometryVm.ProbeEdge = edge;
+                    pendingGeomProbeEdge = null;
+                }
             }
         }
 
@@ -519,6 +529,7 @@ namespace GCode_Sender
             pnlEdgePickerExt.Visibility = !isCircle && !internalMode ? Visibility.Visible : Visibility.Collapsed;
             pnlEdgePickerInt.Visibility = !isCircle && internalMode ? Visibility.Visible : Visibility.Collapsed;
             imgCenterPreview.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
+            xmarkCenter.Visibility = imgCenterPreview.Visibility;
             fldCenterPasses.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
             if (isCircle)
                 imgCenterPreview.Source = new BitmapImage(new Uri(
@@ -1453,6 +1464,18 @@ namespace GCode_Sender
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
                 UpdateThicknessWarning();
+
+                // Geometry panel (Dynamic fixture only) + height map options. ProbeEdge itself can't be applied
+                // yet - geometryVm doesn't exist until the Dynamic fixture is actually selected (EnsureGeometryVm) -
+                // so stash it and apply once that vm is created.
+                rbGeomInternal.IsChecked = s.GeomInternal;
+                rbGeomExternal.IsChecked = !s.GeomInternal;
+                chkIsCircle.IsChecked = s.GeomIsCircle;
+                fldCenterPasses.Value = s.GeomCenterPasses;
+                pendingGeomProbeEdge = s.GeomProbeEdge;
+                chkHeightMap.IsChecked = s.HeightMap;
+                fldHeightMapGridX.Value = s.HeightMapGridX;
+                fldHeightMapGridY.Value = s.HeightMapGridY;
             }
             catch { /* start with defaults */ }
             finally
@@ -1483,7 +1506,14 @@ namespace GCode_Sender
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,
                     Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
-                    Fixture = SelectedFixture?.Name ?? string.Empty
+                    Fixture = SelectedFixture?.Name ?? string.Empty,
+                    GeomInternal = rbGeomInternal.IsChecked == true,
+                    GeomIsCircle = chkIsCircle.IsChecked == true,
+                    GeomProbeEdge = (geometryVm?.ProbeEdge ?? Edge.None).ToString(),
+                    GeomCenterPasses = Math.Max(1, (int)fldCenterPasses.Value),
+                    HeightMap = chkHeightMap.IsChecked == true,
+                    HeightMapGridX = fldHeightMapGridX.Value,
+                    HeightMapGridY = fldHeightMapGridY.Value
                 };
                 AppConfig.Settings.Save();
             }

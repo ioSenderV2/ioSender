@@ -50,6 +50,16 @@ namespace CNC.Controls
         public bool StockConductive = false;
         public string Probe = "ThreeDProbe";   // "ThreeDProbe" or "TouchPlate" (UI selection only - not yet wired into BuildProgram)
         public string Fixture = string.Empty;   // selected fixture's Name (Machine Setup > Fixture definitions)
+        // Dynamic fixture's Geometry panel (External/Internal + Is Circle + picked corner/edge) and the
+        // "Probe height map" run options - saved so the picker doesn't reset to the front-left/External
+        // default every time the Dynamic fixture is reselected.
+        public bool GeomInternal = false;
+        public bool GeomIsCircle = false;
+        public string GeomProbeEdge = "None";   // CNC.Controls.Probing.Edge name - "None" = front-left default
+        public int GeomCenterPasses = 1;
+        public bool HeightMap = false;
+        public double HeightMapGridX = 25d;
+        public double HeightMapGridY = 25d;
         // Display-only preference: Width/Height/Thickness/SpacerThickness above are ALWAYS persisted in mm
         // (everything downstream - BuildProgram, the drawing, warnings - assumes mm) regardless of this flag;
         // it only controls which unit the Stock size fields show/accept on screen (StartJobView's mm/in toggle).
