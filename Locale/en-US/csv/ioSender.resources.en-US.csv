@@ -114,16 +114,16 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.F
 ioSender.g.en-US.resources:mainwindow.baml,btn_copyMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the full status message to the clipboard
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load Folder...
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a folder of per-operation g-code files as one combined program.
-ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load File...
-ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.
+ioSender.g.en-US.resources:programpanel.baml,txt_noProgramHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,No program loaded - use Load File in the menu.
 ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#x2715;
 ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close the loaded program.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_connect:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Co_nnect...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Load File...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Application _data folder
 ioSender.g.en-US.resources:mainwindow.baml,mnu_support:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Support
 ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Check for updates...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check if a newer version of ioSender is available on GitHub.
-ioSender.g.en-US.resources:mainwindow.baml,btnProgramView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show/hide the program view over the work area.
 ioSender.g.en-US.resources:mainwindow.baml,btnTimeLapse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Run if you don't; auto-OFF at job end."
 ioSender.g.en-US.resources:startjobview.baml,ls_lblFixture:System.Windows.Controls.ContentControl.Content,Label,True,True,,Fixture:
 ioSender.g.en-US.resources:startjobview.baml,txtFxInstanceName:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Type a name and Set to save the current machine position as a fixture instance.

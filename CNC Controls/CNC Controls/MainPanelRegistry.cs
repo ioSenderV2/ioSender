@@ -45,7 +45,10 @@ namespace CNC.Controls
             CanBeFlyout = canBeFlyout;
         }
 
-        public bool CanBeMainPanel { get { return Kind == PanelKind.Panel; } }
+        // Normally Panel-kind only; a Special item (e.g. Macros) can opt in too by supplying its own
+        // CreateMainPanel factory - its flyout instantiation still goes through the Kind==Special path
+        // in MainWindow.xaml.cs, this only governs the main-page/left-column slots.
+        public bool CanBeMainPanel { get { return Kind == PanelKind.Panel || (Kind == PanelKind.Special && CreateMainPanel != null); } }
 
         // Control to host in a sidebar flyout - the flyout-specific variant if provided, else the main one.
         public UserControl CreateFlyout() { return (CreateFlyoutPanel ?? CreateMainPanel)?.Invoke(); }
@@ -80,7 +83,10 @@ namespace CNC.Controls
         // Special flyout-only items (flyout instances are supplied by the host window).
         public static readonly List<AssignableItem> Specials = new List<AssignableItem>
         {
-            new AssignableItem("Macros", "Macros", PanelKind.Special)
+            // Flyout form is the always-present MacroExecuteControl singleton (see MainWindow.xaml.cs's
+            // Kind==Special case), so CreateMainPanel here only supplies the main-page/left-column form -
+            // a compact pinned shortlist (MacroPinnedListControl), not the flyout's own factory.
+            new AssignableItem("Macros", "Macros", PanelKind.Special, () => new MacroPinnedListControl())
         };
 
         // Coordinate-system offsets (flyout only); shown via OffsetFlyout(code).

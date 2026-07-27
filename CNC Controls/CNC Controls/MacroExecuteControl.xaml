@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <system:String x:Uid="str_macrosFlyout" x:Key="MenuLabel">_Macros</system:String>
         <system:String x:Uid="str_runMacro" x:Key="RunMacro">Run {0} macro?</system:String>
-        <system:String x:Uid="str_noMacros" x:Key="NoMacrosMessage">No macros defined. Add them on the Settings: App page.</system:String>
+        <system:String x:Uid="str_noMacros" x:Key="NoMacrosMessage">No macros defined. Go to Settings: Macros to define.</system:String>
         <Style x:Key="SmallXButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Template">
@@ -77,7 +77,7 @@
                 <StackPanel>
                     <!-- Empty state message -->
                     <TextBlock x:Uid="lbl_noMacrosDefined" Text="{StaticResource NoMacrosMessage}"
-                               TextWrapping="Wrap"
+                               TextWrapping="Wrap" MaxWidth="180"
                                Visibility="{Binding Path=IsMessageVisible, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Margin="8,16" TextAlignment="Center" Foreground="#FF666666"/>

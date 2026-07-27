@@ -573,12 +573,6 @@ namespace GCode_Sender
             }), DispatcherPriority.Input);
         }
 
-        private void ProgramView_Toggled(object sender, RoutedEventArgs e)
-        {
-            _programOverlay = btnProgramView.IsChecked == true;
-            UpdateOverlay();
-        }
-
         // Program view and console log share one overlay over the work area, side by side. Each column is
         // shown (and given equal width) only when its trigger is active; the host collapses when neither is.
         private void UpdateOverlay()
@@ -638,15 +632,14 @@ namespace GCode_Sender
         // Host the connected ProgramView in the popup ONLY when it's genuinely transient (AutoShow - a wizard's
         // Generate output, or a plain macro run). The loaded job's own view (jobProgramView, AutoShow=false)
         // already has a persistent home in the docked Job-tab panel (ProgramPanel), so this popup must never
-        // show it a second time - the "Program" button is disabled whenever there's nothing showable here.
+        // show it a second time. No manual toggle any more - it shows/hides purely by AutoShow, since the
+        // wizard's Generate output resets on tab-leave and program-exit anyway.
         private void OnOverlayActiveChanged()
         {
             var active = CNC.Controls.ProgramView.Active;
             bool showable = active != null && active.AutoShow;
 
             overlayActiveHost.Content = showable ? active : null;
-            btnProgramView.IsEnabled = showable;
-            btnProgramView.IsChecked = showable;   // AutoShow pops the popup open as Generate feedback
             _programOverlay = showable;
 
             ApplyOverlayCompact();
@@ -853,6 +846,8 @@ namespace GCode_Sender
                 };
                 showPinned.Start();
             }
+
+            BuildMacroMenuItems();
 
             // Set the initial connection-gated tab state (Start Job etc. disabled until connect).
             UpdateConnectionGatedTabs();
@@ -1221,6 +1216,28 @@ namespace GCode_Sender
         }
 
         // Persist a flyout's pin state so it reopens (pinned) on next launch.
+        // "Add to menu" macros (Settings: Macros > Create dialog's "Add to main menu" checkbox): each
+        // becomes its own top-level menu item, appended after Help. Built once at startup, same as
+        // FlyoutItems/MainPanels - a newly ticked/unticked macro takes effect on next launch.
+        private void BuildMacroMenuItems()
+        {
+            int insertAt = menuMain.Items.IndexOf(menuHelp) + 1;
+            foreach (var macro in AppConfig.Settings.Macros)
+            {
+                if (!macro.AddToMenu)
+                    continue;
+
+                var item = new MenuItem { Header = (macro.Name ?? string.Empty).Replace("_", "__"), Tag = macro };
+                item.Click += (s, e) =>
+                {
+                    var m = (CNC.GCode.Macro)((MenuItem)s).Tag;
+                    if (MacroProcessor.Run(DataContext as GrblViewModel, m.Name, m.Code, m.ConfirmOnExecute))
+                        AppConfig.Settings.RecordMacroRun(m.Id);
+                };
+                menuMain.Items.Insert(insertAt++, item);
+            }
+        }
+
         private void MainPanelFlyout_PinnedChanged(IPinnableFlyout flyout)
         {
             var pinned = AppConfig.Settings.Base.PinnedFlyouts;
@@ -1930,6 +1947,11 @@ namespace GCode_Sender
         {
             bool connected = Comms.com != null && Comms.com.IsOpen;
             menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
+        }
+
+        private void LoadFile_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.Open();
         }
 
         private void connectMenuItem_Click(object sender, RoutedEventArgs e)

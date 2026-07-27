@@ -11,19 +11,18 @@
         <TabControl x:Name="tabFeedsSpeeds">
             <TabItem x:Name="tabIntro" x:Uid="tab_fsIntro" Header="Intro">
                 <Border Background="#11000000" BorderBrush="#33000000" BorderThickness="1" Padding="8" Margin="8">
-                    <TextBlock x:Uid="txt_fsIntro" TextWrapping="Wrap" FontSize="22" Text="The ioSenderV2 Fusion Addin adds an &quot;ioSenderV2&quot; panel to Fusion 360's Manufacture workspace, with Feeds and Speeds and Batch Post Process commands. First-time setup: in ioSender, use Help &gt; Support &gt; Install ioSenderV2 Fusion Addin..., then in Fusion enable it once under Utilities &gt; ADD-INS &gt; Scripts and Add-Ins &gt; Add-Ins tab &gt; select 'ioSenderV2' &gt; Run (tick Run on Startup).&#10;&#10;Workflow: in Fusion's Manufacture workspace, run the Feeds and Speeds command (it exports automatically) - then come back here, on the Load / Import tab click Load latest export - a successful load switches you to the Results tab, where you review the verdicts and click Write apply file - then switch back to Fusion (leave the Feeds and Speeds dialog open after exporting) and press OK on it to apply the changes.&#10;&#10;Recommendations are table-driven: chip-load and surface-speed reference values per material (starting points from published Onsrud/Amana/Vortex carbide bit charts), cross-checked against your connected controller's actual machine limits ($30 max RPM, $110-$112 max feed rates). If an ANTHROPIC_API_KEY environment variable is set, an 'Ask AI to review' option also appears on the Results tab, offering a second-opinion review of the table's verdicts for you to read - it is never applied automatically."/>
+                    <TextBlock x:Uid="txt_fsIntro" TextWrapping="Wrap" FontSize="22" Text="The ioSenderV2 Fusion Addin adds an &quot;ioSenderV2&quot; panel to Fusion 360's Manufacture workspace, with Feeds and Speeds and Batch Post Process commands. First-time setup: in ioSender, use Help &gt; Support &gt; Install ioSenderV2 Fusion Addin..., then in Fusion enable it once under Utilities &gt; ADD-INS &gt; Scripts and Add-Ins &gt; Add-Ins tab &gt; select 'ioSenderV2' &gt; Run (tick Run on Startup).&#10;&#10;Workflow: in Fusion's Manufacture workspace, run the Feeds and Speeds command (it exports automatically) - then come back here, on the Load / Import tab click Load - a successful load switches you to the Results tab, where you review the verdicts and click Apply - then switch back to Fusion (leave the Feeds and Speeds dialog open after exporting) and press OK on it to apply the changes.&#10;&#10;Recommendations are table-driven: chip-load and surface-speed reference values per material (starting points from published Onsrud/Amana/Vortex carbide bit charts), cross-checked against your connected controller's actual machine limits ($30 max RPM, $110-$112 max feed rates). If an ANTHROPIC_API_KEY environment variable is set, an 'Ask AI' option also appears on the Results tab, offering a second-opinion review of the table's verdicts for you to read - it is never applied automatically."/>
                 </Border>
             </TabItem>
 
             <TabItem x:Name="tabLoad" x:Uid="tab_fsLoad" Header="Load / Import">
                 <StackPanel Margin="12">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Uid="btn_fsLoadLatest" Content="Load" Click="btnLoadLatest_Click" Padding="10,4" MinWidth="90" Margin="0,0,12,0"
+                                ToolTip="Load latest export"/>
                         <TextBlock x:Uid="lbl_fsExportFile" Text="Export file:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBlock x:Name="txtExportPath" Text="(none loaded)" VerticalAlignment="Center" MinWidth="260"
                                    FontStyle="Italic" Margin="0,0,12,0"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button x:Uid="btn_fsLoadLatest" Content="Load latest export" Click="btnLoadLatest_Click" Padding="10,4" Margin="0,0,12,0"/>
                         <TextBlock x:Uid="lbl_fsMaterial" Text="Material:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <ComboBox x:Name="cbxMaterial" Width="120" SelectionChanged="cbxMaterial_SelectionChanged"/>
                     </StackPanel>
@@ -42,11 +41,13 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button x:Uid="btn_fsAskAi" x:Name="btnAskAi" Content="Ask AI to review" Click="btnAskAi_Click" Padding="6,2" Margin="0,0,8,0"
-                                Visibility="Collapsed"/>
-                        <ComboBox x:Name="cbxAiModel" Width="110" Margin="0,0,8,0" Visibility="Collapsed"/>
-                        <Button x:Uid="btn_fsSelectAllAi" x:Name="btnSelectAllAi" Content="Prefer AI for all" Click="btnSelectAllAi_Click" Padding="6,2" Margin="0,0,8,0"/>
-                        <Button x:Uid="btn_fsWriteApply" Content="Write apply file" Click="btnWriteApply_Click" Padding="6,2"/>
+                        <Button x:Uid="btn_fsWriteApply" Content="Apply" Click="btnWriteApply_Click" Padding="10,4" MinWidth="90" Margin="0,0,12,0"
+                                ToolTip="Write apply file"/>
+                        <Button x:Uid="btn_fsAskAi" x:Name="btnAskAi" Content="Ask AI" Click="btnAskAi_Click" Padding="10,4" MinWidth="90" Margin="0,0,8,0"
+                                ToolTip="Ask AI to review" Visibility="Collapsed"/>
+                        <ComboBox x:Name="cbxAiModel" Width="110" Margin="0,0,12,0" Visibility="Collapsed"/>
+                        <Button x:Uid="btn_fsSelectAllAi" x:Name="btnSelectAllAi" Content="Prefer AI" Click="btnSelectAllAi_Click" Padding="10,4" MinWidth="90"
+                                ToolTip="Prefer AI for all"/>
                     </StackPanel>
 
                     <!-- IsReadOnly is False at the grid level (needed for the Prefer AI checkbox column to

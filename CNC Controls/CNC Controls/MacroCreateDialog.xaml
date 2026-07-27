@@ -1,0 +1,37 @@
+<Window x:Class="CNC.Controls.MacroCreateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        d:DesignHeight="420" d:DesignWidth="420"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Macro" Icon="App.ico">
+    <StackPanel Margin="14">
+        <TextBlock x:Uid="mc_name" Text="Name:" Margin="0,0,0,2"/>
+        <TextBox x:Name="txtName" x:Uid="mc_txtName" MinWidth="260" Margin="0,0,0,10"/>
+
+        <CheckBox x:Name="chkPrompt" x:Uid="mc_prompt" Content="Prompt before running" Margin="0,0,0,6"
+                  ToolTip="Ask for confirmation before running this macro."/>
+        <CheckBox x:Name="chkAddToMenu" x:Uid="mc_addToMenu" Content="Add to main menu" Margin="0,0,0,10"
+                  ToolTip="Add a top-level menu item for this macro, appended after Help. Applies on next launch."/>
+
+        <TextBlock x:Uid="mc_key" Text="Key assignment:" Margin="0,0,0,2"/>
+        <ComboBox x:Name="cboKey" x:Uid="mc_cboKey" ItemsSource="{Binding FKeyOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                  SelectedValuePath="Value" DisplayMemberPath="Label" MinWidth="80" HorizontalAlignment="Left" Margin="0,0,0,10"
+                  ToolTip="Function key that runs this macro when no job is running (- for none). Same list as the grid's Key column."/>
+
+        <TextBlock x:Uid="mc_code" TextWrapping="Wrap" Margin="0,0,0,2"
+                   Text="G-code, or a single @&lt;path&gt; line to reference an external file (re-read on every run):"/>
+        <TextBox x:Name="txtCode" x:Uid="mc_txtCode" AcceptsReturn="True" AcceptsTab="True"
+                 FontFamily="Consolas" MinHeight="140" MaxHeight="280"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                 LostFocus="txtCode_LostFocus"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="btnOK" x:Uid="mc_ok" Content="OK" IsDefault="True" MinWidth="80" MinHeight="24" Margin="0,0,6,0" Click="btnOK_Click"/>
+            <Button x:Name="btnCancel" x:Uid="mc_cancel" Content="Cancel" IsCancel="True" MinWidth="80" MinHeight="24" Click="btnCancel_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

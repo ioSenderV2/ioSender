@@ -169,14 +169,14 @@
                 <DataGridTemplateColumn Header="Clear" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Clr" Padding="6,0" Margin="6,0" Click="btnRowClear_Click" ToolTip="Clear this work offset (set every axis to 0) on the controller."/>
+                            <Button Content="Clear" Padding="6,0" MinWidth="90" Margin="6,0" Click="btnRowClear_Click" ToolTip="Clear this work offset (set every axis to 0) on the controller."/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Get MPos" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Get" Padding="6,0" Margin="6,0" Click="btnRowGetMPos_Click" ToolTip="Copy the current machine position into this row's fields (not written to the controller yet)."/>
+                            <Button Content="Get" Padding="6,0" MinWidth="90" Margin="6,0" Click="btnRowGetMPos_Click" ToolTip="Copy the current machine position into this row's fields (not written to the controller yet)."/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -274,7 +274,7 @@
             <TextBlock FontWeight="SemiBold" Text="How to edit a work offset:"/>
             <TextBlock Margin="8,4,0,0" TextWrapping="Wrap" Text="1. Manually jog to the point you want to save."/>
             <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="2. Select the offset row you want to edit."/>
-            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="3. Either click Clr to erase it,"/>
+            <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="3. Either click Clear to erase it,"/>
             <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="   or type the X, Y, Z values you want,"/>
             <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="   or click Get to fill them in with the current machine position."/>
             <TextBlock Margin="8,2,0,0" TextWrapping="Wrap" Text="4. Click elsewhere to leave the row. G54-G59.3 save automatically; G28, G30, and G92 ask for confirmation first (they store wherever the machine is right now, not a rapid move to a typed target)."/>
