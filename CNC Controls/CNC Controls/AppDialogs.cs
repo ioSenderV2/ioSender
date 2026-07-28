@@ -10,17 +10,79 @@
  * so migrating a call is just MessageBox.Show(...) -> AppDialogs.Show(...). For a real user nothing changes:
  * Prompt returns null when the server isn't running, so the real MessageBox is shown as before.
  *
- * Lives in CNC Core (not CNC Controls) because CNC Core itself shows message boxes and cannot reference the
- * higher layer. Every project already references CNC Core, so one WpfUiTestServer reference here covers all.
+ * Moved here from CNC Core. It used to live there because "CNC Core itself shows message boxes and cannot
+ * reference the higher layer" - Core now raises CNC.Core.UserPrompt instead, and Register() below points that
+ * at this class. That is what let CNC.Core drop its WpfUiTestServer package reference (whose nuspec declares
+ * WPF frameworkAssemblies that NuGet injects into every consumer) on the way to a .NET 8 target.
  */
 
 using System;
 using System.Windows;
+using CNC.Core;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     public static class AppDialogs
     {
+        /// <summary>
+        /// Route CNC.Core's portable prompts (CNC.Core.UserPrompt) through this class, so a prompt raised
+        /// from inside Core looks and behaves exactly like one raised from the UI - same test-server hook,
+        /// same UiScale-aware window. Called from AppMessageBox.Register() at startup.
+        /// </summary>
+        public static void RegisterCorePrompts()
+        {
+            UserPrompt.Handler = (message, caption, buttons, icon, defaultResult, id) =>
+                ToPromptResult(Show(message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
+                                    ToMessageBoxResult(defaultResult), id));
+        }
+
+        private static MessageBoxButton ToMessageBoxButton(PromptButtons b)
+        {
+            switch (b)
+            {
+                case PromptButtons.OKCancel: return MessageBoxButton.OKCancel;
+                case PromptButtons.YesNo: return MessageBoxButton.YesNo;
+                case PromptButtons.YesNoCancel: return MessageBoxButton.YesNoCancel;
+                default: return MessageBoxButton.OK;
+            }
+        }
+
+        private static MessageBoxImage ToMessageBoxImage(PromptIcon i)
+        {
+            switch (i)
+            {
+                case PromptIcon.Information: return MessageBoxImage.Information;
+                case PromptIcon.Question: return MessageBoxImage.Question;
+                case PromptIcon.Warning: return MessageBoxImage.Warning;
+                case PromptIcon.Error: return MessageBoxImage.Error;
+                default: return MessageBoxImage.None;
+            }
+        }
+
+        private static MessageBoxResult ToMessageBoxResult(PromptResult r)
+        {
+            switch (r)
+            {
+                case PromptResult.OK: return MessageBoxResult.OK;
+                case PromptResult.Cancel: return MessageBoxResult.Cancel;
+                case PromptResult.Yes: return MessageBoxResult.Yes;
+                case PromptResult.No: return MessageBoxResult.No;
+                default: return MessageBoxResult.None;
+            }
+        }
+
+        private static PromptResult ToPromptResult(MessageBoxResult r)
+        {
+            switch (r)
+            {
+                case MessageBoxResult.OK: return PromptResult.OK;
+                case MessageBoxResult.Cancel: return PromptResult.Cancel;
+                case MessageBoxResult.Yes: return PromptResult.Yes;
+                case MessageBoxResult.No: return PromptResult.No;
+                default: return PromptResult.None;
+            }
+        }
+
         // Set by CNC.Controls.AppMessageBox.Register() at startup so the real (non-test-server) fallback is
         // our own UiScale-aware window instead of the native, DPI/zoom-oblivious System.Windows.MessageBox.
         // Signature mirrors MessageBox.Show(owner, message, caption, buttons, icon, defaultResult) plus a

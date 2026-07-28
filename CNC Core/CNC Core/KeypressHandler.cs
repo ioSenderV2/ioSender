@@ -295,7 +295,7 @@ namespace CNC.Core
             }
             catch (Exception e)
             {
-                AppDialogs.Show(e.Message, "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Exclamation);
+                UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
                 return false;
             }
         }
@@ -343,7 +343,7 @@ namespace CNC.Core
             }
             catch
             {
-                AppDialogs.Show("keymap file is corrupt!", "ioSender", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                UserPrompt.Show("keymap file is corrupt!", "ioSender", PromptButtons.OK, PromptIcon.Error);
                 return false;
             }
         }

@@ -380,7 +380,7 @@ namespace CNC.GCode
             bool strip = state == CommandIgnoreState.Strip;
 
             if (!strip && state != CommandIgnoreState.No)
-                strip = AppDialogs.Show(string.Format(LibStrings.FindResource("ParserStrip"), code), LibStrings.FindResource("ParserStripHdr"), MessageBoxButton.YesNo) == MessageBoxResult.Yes;
+                strip = UserPrompt.Show(string.Format(LibStrings.FindResource("ParserStrip"), code), LibStrings.FindResource("ParserStripHdr"), PromptButtons.YesNo) == PromptResult.Yes;
 
             return strip;
         }
@@ -1225,7 +1225,7 @@ namespace CNC.GCode
                 Tokens.Add(new GCToolSelect(Commands.ToolSelect, gcValues.N, gcValues.T, blockDelete));
 
                 if (!quiet && ToolChanged != null && !ToolChanged(gcValues.T))
-                    AppDialogs.Show(string.Format(LibStrings.FindResource("ParserToolProfile"), gcValues.T.ToString()), "GCode parser", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    UserPrompt.Show(string.Format(LibStrings.FindResource("ParserToolProfile"), gcValues.T.ToString()), "GCode parser", PromptButtons.OK, PromptIcon.Warning);
             }
 
             if (modalGroups != ModalGroups.G1)

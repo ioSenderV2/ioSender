@@ -72,11 +72,17 @@
   <ItemGroup>
     <!-- FeedsAndSpeedsView.xaml.cs deserializes the Feeds & Speeds export/apply JSON directly. -->
     <PackageReference Include="System.Text.Json" Version="6.0.10" />
+    <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
+         answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. Was referenced by
+         CNC Core (and reached here transitively) until AppDialogs moved here - Core had to drop it because the
+         package's nuspec declares WPF <frameworkAssemblies>, which NuGet injects into every consumer. -->
+    <PackageReference Include="WpfUiTestServer" Version="1.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="About.xaml.cs">
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AppDialogs.cs" />
     <Compile Include="AppConfig.cs" />
     <Compile Include="DialogScaling.cs" />
     <Compile Include="ComponentAvailability.cs" />

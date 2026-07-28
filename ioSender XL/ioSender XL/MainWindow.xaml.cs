@@ -284,7 +284,7 @@ namespace GCode_Sender
             {
                 string msg = App.StartupMessage;
                 Dispatcher.BeginInvoke(new System.Action(() =>
-                    CNC.Core.AppDialogs.Show(this, msg, "Startup message", MessageBoxButton.OK, MessageBoxImage.None)),
+                    CNC.Controls.AppDialogs.Show(this, msg, "Startup message", MessageBoxButton.OK, MessageBoxImage.None)),
                     System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
         }

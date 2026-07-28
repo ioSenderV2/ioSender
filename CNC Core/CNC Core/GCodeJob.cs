@@ -373,7 +373,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    if ((ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", MessageBoxButton.YesNo) == MessageBoxResult.Yes))
+                    if ((ok = UserPrompt.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", PromptButtons.YesNo) == PromptResult.Yes))
                         block = sr.ReadLine();
                     else
                         block = null;

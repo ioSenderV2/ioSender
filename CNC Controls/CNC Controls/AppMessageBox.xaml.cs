@@ -42,6 +42,10 @@ namespace CNC.Controls
         {
             AppDialogs.CustomMessageBox = (owner, message, caption, buttons, icon, defaultResult, yesText, noText) =>
                 Show(owner, message, caption, buttons, icon, defaultResult, yesText, noText);
+
+            // Prompts raised from inside CNC.Core (portable CNC.Core.UserPrompt) come back through
+            // AppDialogs too, so they get this window and the test-server hook like any other.
+            AppDialogs.RegisterCorePrompts();
         }
 
         public static MessageBoxResult Show(string message, string caption = "",

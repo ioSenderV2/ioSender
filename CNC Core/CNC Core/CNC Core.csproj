@@ -64,7 +64,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
-    <Compile Include="AppDialogs.cs" />
     <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
     <Compile Include="DemoMarker.cs" />
@@ -94,6 +93,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerialStream.cs" />
     <Compile Include="ShortcutKey.cs" />
+    <Compile Include="UserPrompt.cs" />
     <Compile Include="TelnetStream.cs" />
     <Compile Include="WebsocketStream.cs" />
     <Compile Include="XInput.cs" />
@@ -103,9 +103,6 @@
     <Compile Include="HelperClasses.cs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
-         answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. -->
-    <PackageReference Include="WpfUiTestServer" Version="1.3.0" />
     <!-- Feeds & Speeds export/apply JSON (FeedsSpeedsExport.cs) - no JSON library existed in the solution
          before this; net462 needs the package (it's not part of the base framework there). -->
     <PackageReference Include="System.Text.Json" Version="6.0.10" />

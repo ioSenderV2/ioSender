@@ -87,7 +87,7 @@ namespace CNC.Core
 
             if (parameter.Count() < 4)
             {
-                AppDialogs.Show("Unable to open serial port: " + PortParams, "ioSender");
+                UserPrompt.Show("Unable to open serial port: " + PortParams, "ioSender");
                 System.Environment.Exit(2);
             }
 
@@ -97,7 +97,7 @@ namespace CNC.Core
             }
             catch
             {
-                AppDialogs.Show("Failed to load serial port driver.", "ioSender");
+                UserPrompt.Show("Failed to load serial port driver.", "ioSender");
                 System.Environment.Exit(1);
             }
 
@@ -157,7 +157,7 @@ namespace CNC.Core
                     log = new StreamWriter(Resources.DebugFile);
                 } catch
                 {
-                    AppDialogs.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
+                    UserPrompt.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
 #endif
             }

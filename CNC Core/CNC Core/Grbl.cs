@@ -2469,7 +2469,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
                 }
 
             return ok;
@@ -3751,7 +3751,7 @@ namespace CNC.Core
             }
             catch (Exception e)
             {
-                AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
             }
 
             return ok;
