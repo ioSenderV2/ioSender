@@ -11,7 +11,6 @@
     <AssemblyName>CNC.Core</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -87,6 +86,7 @@
     <Compile Include="GCodeJob.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="KeypressHandler.cs" />
+    <Compile Include="LibStrings.cs" />
     <Compile Include="Machine.cs" />
     <Compile Include="MeasureViewModel.cs" />
     <Compile Include="NetworkScanner.cs" />
@@ -111,10 +111,12 @@
     <PackageReference Include="System.Text.Json" Version="6.0.10" />
   </ItemGroup>
   <ItemGroup>
-    <Page Include="LibStrings.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
+    <!-- Parsed at runtime by LibStrings.cs (System.Xml.Linq), NOT markup-compiled. Keeping this as a
+         <Page> is what forced CNC.Core to be a WPF project (ProjectTypeGuids + Microsoft.WinFx.targets,
+         which silently re-injects PresentationCore/PresentationFramework/WindowsBase/System.Xaml) and
+         so blocked a .NET 8 target. The x:Uid/x:Key pairs are unchanged, so the
+         Locale/<loc>/csv/CNC.Core.resources.*.csv rows and tools/locadd.py still apply. -->
+    <EmbeddedResource Include="LibStrings.xaml" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

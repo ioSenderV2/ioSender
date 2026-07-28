@@ -23,24 +23,8 @@ using System.IO;
 
 namespace CNC.Core
 {
-    public class LibStrings
-    {
-        static ResourceDictionary resource = new ResourceDictionary();
+    // LibStrings moved to LibStrings.cs - it is now a portable (non-WPF) embedded-resource lookup.
 
-        public static string FindResource(string key)
-        {
-            if (resource.Source == null)
-                try
-                {
-                    resource.Source = new Uri("pack://application:,,,/CNC.Core;Component/LibStrings.xaml", UriKind.Absolute);
-                }
-                catch
-                {
-                }
-
-            return resource.Source == null || !resource.Contains(key) ? string.Empty : (string)resource[key];
-        }
-    }
     public class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorInfo
     {
         private readonly Dictionary<string, ICollection<string>> _validationErrors = new Dictionary<string, ICollection<string>>();
