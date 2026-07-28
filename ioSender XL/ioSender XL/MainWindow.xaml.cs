@@ -708,6 +708,13 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
+            // Odd Jobs' "Setup" sub-tab is a second, constrained StartJobView instance (always G59, Measure
+            // + TLO ref forced on - see StartJobView's constrainedToOddJobs). OddJobsView (CNC Controls
+            // library) can't reference StartJobView (ioSender XL) itself, so this is the one place - it can
+            // see both - that registers the component; OddJobsView just looks it up by key like any other.
+            // Must run before BuildTabs() (which constructs OddJobsView, which reads this registry).
+            CNC.Controls.ComponentRegistry.Register(CNC.Controls.LayoutKeys.OddJobsSetup, "Setup", () => new StartJobView(constrainedToOddJobs: true));
+
             // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
             // before anything that resolves a tab via getTab()/getView() below.
             RegisterBuiltinTabs();
@@ -1081,6 +1088,7 @@ namespace GCode_Sender
         private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
         {
             bool started = false;
+            bool jobFinished = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
             {
@@ -1091,6 +1099,15 @@ namespace GCode_Sender
                     st, started, m.GrblState.State));
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
+                // JobFinished is only ever raised on a genuine program end (M30/M2, see JobControl's
+                // StreamingHandler.Call(StreamingState.JobFinished, ...) call sites) - a Feed Hold + Stop
+                // instead routes through StreamingState.Stop on its way back to Idle. Both eventually land on
+                // the SAME terminal Idle/NoFile state below, so without this distinction a Feed Hold + Stop
+                // was indistinguishable from a clean finish and wrongly discarded the generated program
+                // (Run bar reverted to "Generate" mid-job with no way to resume) - confirmed on real
+                // hardware 2026-07-27 on the Odd Jobs Pocket tool.
+                if (st == StreamingState.JobFinished)
+                    jobFinished = true;
                 // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
                 // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
                 // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
@@ -1139,10 +1156,10 @@ namespace GCode_Sender
                         // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
                         // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
                         // the operator re-generates for the next job rather than re-running a stale program.
-                        // Left alone on error/halt (same condition as the program-view dismiss above) so the
-                        // operator can still inspect/re-run the SAME generated program after fixing whatever
-                        // interrupted it, without redoing Generate.
-                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode)
+                        // Left alone on error/halt (same condition as the program-view dismiss above), AND on
+                        // a Feed Hold + Stop (jobFinished false - see its own comment above) so the operator
+                        // can still inspect/RESUME the SAME generated program, without redoing Generate.
+                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode && jobFinished)
                             CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
                     }
                     // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
@@ -2442,6 +2459,7 @@ namespace GCode_Sender
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.OddJobs, TabLabel("TabOddJobs", "Odd Jobs"), () => new OddJobsView(), 85, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 110, enabledWhenDisconnected: false));
@@ -2666,12 +2684,14 @@ namespace GCode_Sender
         private static readonly Dictionary<string, ViewType> tabViewIds = new Dictionary<string, ViewType>
         {
             { "Tab.Settings",     ViewType.GRBLConfig },
+            { "Tab.FeedsSpeeds",  ViewType.FeedsAndSpeeds },
             { "Tab.StartJob",     ViewType.StartJob },
             { "Tab.Job",          ViewType.GRBL },
             { "Tab.Offsets",      ViewType.Offsets },
             { "Tab.SDCard",       ViewType.SDCard },
             { "Tab.Probing",      ViewType.Probing },
             { "Tab.Tools",        ViewType.Tools },
+            { "Tab.OddJobs",      ViewType.OddJobs },
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },

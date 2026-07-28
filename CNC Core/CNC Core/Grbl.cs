@@ -429,6 +429,10 @@ namespace CNC.Core
         // not a history; the streamed program itself is never saved to disk otherwise.
         public static string GeneratedFolder { get { return System.IO.Path.Combine(ConfigPath, "Generated"); } }
 
+        // Odd Jobs work orders saved by name (Save.../Load... on the Work Order tab). Distinct from the single
+        // live work order kept in App.config, which is just "what the tab was left showing".
+        public static string WorkOrdersFolder { get { return System.IO.Path.Combine(ConfigPath, "WorkOrders"); } }
+
         // Best-effort day-based retention shared by the App.config and Grbl settings backups.
         public static void PruneBackups(int days = 10)
         {

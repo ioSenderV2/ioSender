@@ -1310,6 +1310,14 @@ namespace CNC.Core
                     break;
 
                 case "TLR":
+                    // Instrumented 2026-07-27 to chase a real-hardware report: TLR read back false right
+                    // before running Contour, moments after Setup's own run had just set it. Logs every
+                    // TLR report (not just changes) so a repro shows exactly when/how often the controller
+                    // itself reports this, without needing a debugger attached. Enable via -debuglog=tlo
+                    // (or IOSENDER_DEBUGLOG=1 + categories) and check %AppData%\ioSender\ioSender.debug.log.
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("tlo", string.Format("TLR report: value=\"{0}\" -> IsTloReferenceSet {1} -> {2}",
+                            value, IsTloReferenceSet, value != "0"));
                     IsTloReferenceSet = value != "0";
                     break;
 

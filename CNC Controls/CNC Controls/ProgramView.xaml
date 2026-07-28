@@ -11,15 +11,23 @@
     <DockPanel>
         <!-- Click anywhere on the title bar to toggle between the full program and the compact 3-line run view
              (previous / current / next line). Cursor + hint make it discoverable. -->
+        <!-- The tooltip lists the program's remaining (TOOLPATH ..) sections, the executing one first - see
+             UpdateTitleTooltip. Kept open long enough to actually read a dozen lines of it. -->
         <Border x:Name="titleBar" DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC"
                 BorderThickness="0,0,0,1" Padding="6,3" Visibility="Collapsed" Cursor="Hand"
-                MouseLeftButtonUp="TitleBar_Click" ToolTip="Click to collapse to a 3-line run view / expand">
+                MouseLeftButtonUp="TitleBar_Click" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
             <DockPanel>
                 <TextBlock x:Name="txtTitleHint" DockPanel.Dock="Right" Foreground="#FF888888" FontSize="11"
                            VerticalAlignment="Center" Margin="8,0,0,0"/>
                 <TextBlock x:Name="txtTitle" FontWeight="SemiBold"/>
             </DockPanel>
         </Border>
+        <!-- Live "what's running right now" status: the nearest (TOOL T=..) / (TOOLPATH ..) comment AT OR
+             BEFORE the currently executing line - see ProgramView.xaml.cs UpdateRunStatus. Sticky (does not
+             scroll away with the compact 3-line view below it), only shown while a run is actually in
+             progress. -->
+        <TextBlock x:Name="txtRunStatus" DockPanel.Dock="Top" Background="#FFF5F5F5" Foreground="#FF444444"
+                   FontSize="11" Padding="6,3" TextWrapping="Wrap" Visibility="Collapsed"/>
         <local:GCodeListControl x:Name="gcodeList"/>
     </DockPanel>
 </UserControl>

@@ -16,6 +16,46 @@
     <SolidColorBrush x:Key="AppleAccentBrush" Color="#0A84FF"/>       <!-- Primary action - the ONE loud button per screen -->
     <SolidColorBrush x:Key="AppleAccentLightBrush" Color="#78BBFF"/>  <!-- ramp "light" tier (base 55% + white 45%) - selected-tab fill, deliberately NOT the same blue as the primary button so nav selection and "click me" read as different things; base blue is used as the text color on top of it -->
 
+    <!-- EXPERIMENTAL (2026-07-27): second-level tab strips (Settings/Tools/Machine Setup/Odd Jobs' own
+         sub-tabs) default to the OS theme's plain white selected-tab background - this recolors the
+         selected sub-tab with the SAME accent-light fill + accent-blue text the main nav's pill uses for
+         its selected tab (MainWindow.xaml's MainNavTabItemStyle), so the two selection levels read as one
+         consistent system instead of two different looks. Flat/bordered rather than a floating pill (unlike
+         the main nav) - these sit directly above their own content, not a separate general nav bar. A plain
+         Style Setter on Background does NOT reliably repaint a themed TabItem's selected state (the default
+         template's chrome ignores it) - same reason MainNavTabItemStyle needed a full ControlTemplate below
+         instead of just a trigger/setter. Keyed, not implicit: an implicit TargetType-only style here would
+         leak into every OTHER nested TabControl's TabItems (this is a globally-merged dictionary) - each
+         second-level TabControl opts in via ItemContainerStyle. -->
+    <Style x:Key="SubNavTabItemStyle" TargetType="{x:Type TabItem}">
+        <Setter Property="Padding" Value="10,5"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TabItem}">
+                    <Border x:Name="border" BorderBrush="#FFACACAC" BorderThickness="1,1,1,0" Margin="0,0,-1,0"
+                            Padding="{TemplateBinding Padding}" Background="Transparent" SnapsToDevicePixels="True">
+                        <ContentPresenter x:Name="header" ContentSource="Header" HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" TextElement.Foreground="#FF48484A"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppleAccentLightBrush}"/>
+                            <Setter TargetName="header" Property="TextElement.Foreground" Value="{StaticResource AppleAccentBrush}"/>
+                            <Setter TargetName="border" Property="Panel.ZIndex" Value="1"/>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsSelected" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="border" Property="Background" Value="#14000000"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 
     <SolidColorBrush x:Key="PositionBaseBrush" Color="#1E8F86"/>      <!-- Position & DRO -->
     <SolidColorBrush x:Key="PositionFillBrush" Color="#C7E3E1"/>

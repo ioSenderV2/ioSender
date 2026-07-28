@@ -62,6 +62,34 @@ namespace GCode_Sender
         private readonly double?[] cornerX = new double?[5], cornerY = new double?[5], cornerZ = new double?[5];
         private bool measureRun = false;
 
+        // Guards Model_PropertyChanged's PRINT-line parsing (corners/measured size/etc.) to whichever
+        // StartJobView instance most recently triggered a run. Subscribe() deliberately never unsubscribes on
+        // deactivate (see its own comment - a run started here must still get its results parsed even after
+        // the tab is left) - but with 2 separate StartJobView instances alive at once (the real Start Job tab
+        // AND Odd Jobs' constrained Setup, both reading/writing the SAME shared GrblViewModel.Message), that
+        // means BOTH stay permanently subscribed to every PRINT line either one ever triggers, for the rest of
+        // the session, the moment each has been activated once. Confirmed on real hardware: running Setup's
+        // probe popped its OWN correct "measured size differs" warning AND the real Start Job tab's (dormant,
+        // stale entered width/height from an earlier, unrelated job) - same messages, same regexes, 2
+        // independent instances each reacting to the one physical probe run.
+        //
+        // A simple "am I waiting" bool - set before Run(), cleared after it returns - does NOT work: Run()'s
+        // FINAL burst is always fire-and-forget (see MacroProcessor.Run's own comment on Flush's 'wait'
+        // parameter - "so a Run click doesn't block until the physical job completes"), so Run() returns
+        // almost immediately once that trailing burst is just QUEUED, well before the actual corner probes
+        // (which live in that same trailing burst) have even started - tried that, it cut parsing off after
+        // just the first corner. Watching StreamingState return to Idle doesn't work either: Run() flushes
+        // EARLIER content (anything before an (MBOX)/(WAITIDLE)) as its own separate, individually-awaited
+        // burst, and StreamingState bounces back to Idle between THOSE too, not just once at the very end.
+        //
+        // Instead: a static pointer to whichever instance's Run_Click most recently fired - set right before
+        // calling MacroProcessor.Run, persists for however many bursts/however long that run actually takes
+        // (no timing assumption needed at all), and is naturally superseded the next time EITHER instance
+        // starts a new run. MacroProcessor's own single-streamer design already assumes only one run is ever
+        // truly in flight at a time (see StreamProgram's "shares one RunControl.Source field" comment), so
+        // this matches the app's existing one-active-run-ever model.
+        private static StartJobView _activeRunner;
+
         // Whether Width/Height/Thickness have been explicitly set THIS session - either hand-edited, or (once
         // that exists) auto-filled from a loaded program's stock size. LoadInputs restores last session's
         // saved numbers silently on tab activation; those are leftovers, not necessarily right for THIS stock -
@@ -107,11 +135,66 @@ namespace GCode_Sender
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
-        public StartJobView()
+        // True for the Odd Jobs tab's own "Setup" sub-tab instance: a second, independent Start Job that
+        // always targets G59 with Measure/TLO ref forced on, so it never touches the real Start Job tab's
+        // own WCS/settings (StartJobConfig.Section) - see OddJobsSetupConfig. The WCS/Measure/TLO-ref
+        // controls are collapsed entirely (not just disabled) since they aren't a choice made here - frees
+        // the real estate they'd otherwise take in this already-busy layout.
+        private readonly bool constrainedToOddJobs;
+
+        // The persisted settings section this instance reads/writes - the real Start Job tab's own section,
+        // or (constrained) the Odd Jobs tab's dedicated one. Every LoadInputs/SaveInputs call site below goes
+        // through this instead of touching StartJobConfig.Section directly.
+        private CNC.Controls.StartJobSettings Section
         {
+            get { return constrainedToOddJobs ? CNC.Controls.OddJobsSetupConfig.Section : CNC.Controls.StartJobConfig.Section; }
+            set { if (constrainedToOddJobs) CNC.Controls.OddJobsSetupConfig.Section = value; else CNC.Controls.StartJobConfig.Section = value; }
+        }
+
+        public StartJobView(bool constrainedToOddJobs = false)
+        {
+            this.constrainedToOddJobs = constrainedToOddJobs;
             InitializeComponent();
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             WireInputs();
+
+            // Perimeter keep-out (typically clamps/screws around the stock's edge): general to both this and
+            // the real Start Job tab, not Odd-Jobs-specific - shown on the drawing either way, and read by the
+            // Odd Jobs job wizards' own toolpaths via OddJobsSetupConfig when this is the constrained instance.
+            DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField))
+                .AddValueChanged(fldKeepOutInset, (s, e) => InputChanged());
+
+            if (constrainedToOddJobs)
+            {
+                // Force G59 + TLO ref (ATC only) and hide the controls that would otherwise let the operator
+                // change them - not a choice this instance offers. Measure is different: with the corner-1
+                // origin/TLO-ref job done either way, the ONLY thing Measure adds here is validating the
+                // entered width/height against the probed size (see CheckSizeAgainstEntered) - nothing
+                // downstream actually consumes the MEASURED size (every Odd Jobs wizard reads the ENTERED
+                // Width/Height back off Section, not a measured value) - so it's a real choice, exposed and
+                // off by default rather than forced on.
+                cbxWcs.SelectedIndex = 5;   // G59
+                chkSetTloRef.IsChecked = GrblInfo.HasATC;
+                chkSetTloRef.Visibility = Visibility.Collapsed;
+                // Never rotate the WCS from measured skew here - Odd Jobs' simple shapes assume an
+                // unrotated G59, and the WCS-rotation firmware bug (see StartJobSettings.ApplyRotation's own
+                // comment) makes this a real hazard, not just an unwanted default.
+                chkRotate.IsChecked = false;
+                chkRotate.Visibility = Visibility.Collapsed;
+                // "Set origin in:" + its G54-G59 dropdown - Setup always commits to G59 (chkSetOrigin's own
+                // default is already true in XAML, never touched otherwise), so the whole row is forced/hidden.
+                pnlSetOriginRow.Visibility = Visibility.Collapsed;
+                // The Actions group ITSELF stays visible now - Measure lives in it and is a real, exposed
+                // choice here (see the constructor comment above chkMeasure.IsChecked). Copy size/Verify skew
+                // are still not meaningful for a quick Odd Jobs setup - hide those buttons only.
+                pnlCopyVerifyButtons.Visibility = Visibility.Collapsed;
+
+                // Material feeds the job wizards' Feeds and Speeds recommendation (FeedsSpeedsAdvisor) -
+                // not needed/shown on the real Start Job tab, which has no such downstream consumer.
+                pnlMaterial.Visibility = Visibility.Visible;
+                foreach (var material in CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(m => m))
+                    cbxMaterial.Items.Add(material);
+            }
         }
 
         // Any input edit redraws the stock outline AND invalidates a previously generated program (so Run is
@@ -157,6 +240,11 @@ namespace GCode_Sender
                 UpdateThicknessWarning();
                 ShowResult();   // re-format the bottom-left readout (X=/Y=/etc, FormatLen) too, not just the drawing - it was left stale on a unit toggle
             });
+        }
+
+        private void cbxMaterial_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            InputChanged();
         }
 
         private void MarkSizeFieldsTouched()
@@ -328,19 +416,15 @@ namespace GCode_Sender
             UpdateMeasureAvailability();
         }
 
-        // A separate touch plate against non-conductive stock only closes the circuit at the plate itself -
-        // the stock's own edges never trigger it, so the edge probing Measure depends on can't work. Disable
-        // (and force off, so a stale checked-but-disabled state can't sneak into Generate) rather than just
-        // hide, since the reason ("switch to 3D Probe, or check Stock conductive") is worth surfacing via the
-        // tooltip rather than silently vanishing.
+        // A separate touch plate against non-conductive stock only closes the circuit at the plate itself, in
+        // theory - the stock's own edges never trigger it, so the edge probing Measure depends on shouldn't
+        // work. Left EXPOSED rather than disabled/forced off (2026-07-27, user request) to actually try it on
+        // real hardware and see how it behaves, rather than assume the theoretical limitation in software.
         private void UpdateMeasureAvailability()
         {
             bool touchNonConductive = IsTouchPlate && chkStockConductive.IsChecked != true;
-            chkMeasure.IsEnabled = !touchNonConductive;
-            if (touchNonConductive && chkMeasure.IsChecked == true)
-                chkMeasure.IsChecked = false;
             chkMeasure.ToolTip = touchNonConductive
-                ? "Not available with Touch Plate probing on non-conductive stock: the plate closes the circuit itself, so the stock's edges never trigger it and can't be measured. Switch to 3D Probe, or check 'Stock conductive' if the stock is touched directly."
+                ? "Touch Plate probing on non-conductive stock: in theory the plate closes the circuit itself, so the stock's edges may never trigger it - try it and see. Switch to 3D Probe, or check 'Stock conductive' if the stock is touched directly, if it doesn't work."
                 : "Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set.";
         }
 
@@ -372,7 +456,11 @@ namespace GCode_Sender
         {
             string current = SelectedFixture?.Name;
             if (string.IsNullOrEmpty(current))
-                current = StartJobConfig.Section?.Fixture;
+                current = Section?.Fixture;
+            // Odd Jobs' Setup instance defaults to the synthetic G28 (loose probe) fixture - no fence/vise
+            // setup needed for a quick auxiliary job - unless a real fixture was already picked/persisted.
+            if (string.IsNullOrEmpty(current) && constrainedToOddJobs)
+                current = G28Fixture.Name;
             var items = Fixtures.Items.Where(f => f.PositionValidated).ToList();
             items.Add(G28Fixture);   // always available - synthetic, not a saved/validated fixture (see its own comment)
             cbxFixture.ItemsSource = items;
@@ -450,6 +538,11 @@ namespace GCode_Sender
             program = string.Empty;
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = false;
+            // The Run bar reverting to "Generate" (above) isn't enough on its own - the overlay's own
+            // ProgramView was still showing the now-stale g-code text (Activate(false), leaving the tab
+            // entirely, was the only path that ever disconnected it). Confirmed on real hardware: editing an
+            // input after Generate correctly flipped the button back, but the displayed program never changed.
+            programView?.Disconnect();
         }
 
         private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -492,6 +585,11 @@ namespace GCode_Sender
                 MacroProcessor.ActiveGenerate = () => Generate_Click(null, null);
                 MacroProcessor.DiscardGenerated = InvalidateProgram;
                 MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
+                // "Generate and Run" mode-dropdown entry (see MacroProcessor's own comment) - Start Job's own
+                // routine confirms (the "carried over" size dialog) plus the generated program's (MBOX)
+                // probe-install prompts otherwise add up to 3 clicks every single run.
+                MacroProcessor.SupportsGenerateAndRun = true;
+                MacroProcessor.ActiveGenerateAndRun = GenerateAndRun;
                 UpdateFixtureWarning();   // also (re)establishes MacroProcessor.IsGenerateReady for the bar
             }
             else
@@ -501,6 +599,8 @@ namespace GCode_Sender
                 MacroProcessor.SupportsGenerateMode = false;
                 MacroProcessor.ActiveGenerate = null;
                 MacroProcessor.DiscardGenerated = null;
+                MacroProcessor.SupportsGenerateAndRun = false;
+                MacroProcessor.ActiveGenerateAndRun = null;
                 // Discard the generated program on tab-leave too (not just after a run finishes - see
                 // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
                 // focused. Not routed through InvalidateProgram() itself: its isActiveTab guard would block
@@ -541,6 +641,9 @@ namespace GCode_Sender
                 UpdateFixtureWarning();
 
             if (e.PropertyName != nameof(GrblViewModel.Message))
+                return;
+
+            if (!ReferenceEquals(_activeRunner, this))
                 return;
 
             string msg = model.Message;
@@ -750,6 +853,9 @@ namespace GCode_Sender
             double maxX = Math.Max(Math.Max(mx[1], mx[2]), Math.Max(mx[3], mx[4]));
             double minY = Math.Min(Math.Min(my[1], my[2]), Math.Min(my[3], my[4]));
             double maxY = Math.Max(Math.Max(my[1], my[2]), Math.Max(my[3], my[4]));
+            // The STOCK's own bounding box, captured before the vise-jaw-footprint widening just below -
+            // the keep-out inset is relative to the stock's edges, never the jaw's.
+            double stockMinX = minX, stockMaxX = maxX, stockMinY = minY, stockMaxY = maxY;
             if (isVise)
             {
                 // Widen the bounding box to the jaw's own footprint too - it can extend past the stock in X
@@ -779,6 +885,24 @@ namespace GCode_Sender
             foreach (int c in new[] { 1, 2, 4, 3 })
                 poly.Points.Add(P(c));
             canvas.Children.Add(poly);
+
+            // Keep-out inset: a dotted red rectangle inset from the STOCK's own bounding box on all 4 sides -
+            // an axis-aligned approximation even against a measured/skewed quad (an exact inward offset of an
+            // arbitrary quadrilateral isn't worth the complexity here - this is a visual clamp/screw-clearance
+            // reference, not a toolpath boundary on this tab).
+            double keepOut = fldKeepOutInset.Value;
+            if (keepOut > 0d && stockMaxX - stockMinX > 2d * keepOut && stockMaxY - stockMinY > 2d * keepOut)
+            {
+                Point k0 = P2(stockMinX + keepOut, stockMinY + keepOut), k1 = P2(stockMaxX - keepOut, stockMaxY - keepOut);
+                var keepOutRect = new System.Windows.Shapes.Rectangle
+                {
+                    Width = Math.Abs(k1.X - k0.X), Height = Math.Abs(k1.Y - k0.Y),
+                    Stroke = Brushes.Red, StrokeThickness = 1.5, StrokeDashArray = { 1, 2 }, StrokeDashCap = PenLineCap.Round
+                };
+                Canvas.SetLeft(keepOutRect, Math.Min(k0.X, k1.X));
+                Canvas.SetTop(keepOutRect, Math.Min(k0.Y, k1.Y));
+                canvas.Children.Add(keepOutRect);
+            }
 
             // dimensions: X along the front edge (FL->FR), Y along the left edge (FL->BL)
             double dimX = measured && measuredX.HasValue ? measuredX.Value : Math.Max(fldWidth.Value, 0d);
@@ -1124,7 +1248,11 @@ namespace GCode_Sender
             UpdateProbeWarning();
             UpdateFixtureWarning();   // also drives chkRotate visibility (gated on RotationSupported AND the fixture type probing edges)
             UpdateExpressionWarning();
-            chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
+            // Constrained (Odd Jobs' Setup) instance keeps this permanently collapsed - see the constructor.
+            chkSetTloRef.Visibility = constrainedToOddJobs ? Visibility.Collapsed
+                : (GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed);
+            if (constrainedToOddJobs)
+                chkSetTloRef.IsChecked = GrblInfo.HasATC;   // re-force in case ATC capability arrived after construction
         }
 
         // Start Job always references the front-left (TFL) corner.
@@ -1193,7 +1321,10 @@ namespace GCode_Sender
             // already marks this touched when the loaded program declares its own STOCK size).
             if (!sizeFieldsTouched)
             {
-                if (AppDialogs.Show("Est. width/height/thickness haven't been set for this job - they're carried over from last time. Generate anyway?",
+                // "Generate and Run" (unattended) skips this one - it's routine (re-running with the same
+                // carried-over size is the normal case), not a safety gate like the ones below it that still
+                // prompt even here (out-of-travel size, low Safe Z delta).
+                if (!unattended && AppDialogs.Show("Est. width/height/thickness haven't been set for this job - they're carried over from last time. Generate anyway?",
                         "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                     return;
                 sizeFieldsTouched = true;   // confirmed once - don't nag again this session unless the fields change
@@ -1273,7 +1404,7 @@ namespace GCode_Sender
             loadingInputs = true;
             try
             {
-                var s = StartJobConfig.Section;
+                var s = Section;
                 if (s == null)
                     return;
                 isImperial = s.IsImperial;
@@ -1283,6 +1414,7 @@ namespace GCode_Sender
                 fldThickness.Value = s.Thickness;
                 fldSpacer.Value = s.SpacerThickness;
                 fldCornerMargin.Value = s.CornerTravelMarginMm;
+                fldKeepOutInset.Value = s.KeepOutInset;
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkSetOrigin.IsChecked = s.SetOrigin;
                 chkMeasure.IsChecked = s.Measure;
@@ -1290,6 +1422,8 @@ namespace GCode_Sender
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 chkStockConductive.IsChecked = s.StockConductive;
+                if (constrainedToOddJobs)
+                    cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
                 IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
@@ -1307,13 +1441,14 @@ namespace GCode_Sender
         {
             try
             {
-                StartJobConfig.Section = new StartJobSettings
+                Section = new StartJobSettings
                 {
                     Width = fldWidth.Value,
                     Height = fldHeight.Value,
                     Thickness = fldThickness.Value,
                     SpacerThickness = fldSpacer.Value,
                     CornerTravelMarginMm = fldCornerMargin.Value,
+                    KeepOutInset = fldKeepOutInset.Value,
                     IsImperial = isImperial,
                     Corner = SelectedCorner.ToString(),
                     Wcs = cbxWcs.SelectedIndex + 1,
@@ -1324,7 +1459,9 @@ namespace GCode_Sender
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,
                     Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
-                    Fixture = SelectedFixture?.Name ?? string.Empty
+                    Fixture = SelectedFixture?.Name ?? string.Empty,
+                    Material = constrainedToOddJobs ? (cbxMaterial.SelectedItem as string ?? string.Empty) : string.Empty,
+                    SafeZ = 20d
                 };
                 AppConfig.Settings.Save();
             }
@@ -1348,8 +1485,33 @@ namespace GCode_Sender
             // visible (Phase 2c), so the run can be driven without leaving this tab - no floating panel needed.
 
             // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
-            // confirmation. confirm:true gives the operator a final "run?" before any motion.
-            MacroProcessor.Run(model, "Start Job " + (SelectedFixture?.Name ?? string.Empty), program, true);
+            // confirmation. confirm:true gives the operator a final "run?" before any motion (skipped when
+            // unattended - see GenerateAndRun). Claim result-parsing rights for THIS instance before kicking
+            // it off - see _activeRunner's own field comment for why this can't just be a start/stop bool
+            // around the call.
+            _activeRunner = this;
+            MacroProcessor.Run(model, "Start Job " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended);
+        }
+
+        // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -
+        // build the program and stream it in one step, skipping Generate_Click's own routine "carried over"
+        // confirmation and MacroProcessor.Run's routine run-confirmation/(MBOX) prompts. Genuine safety gates
+        // (out-of-travel size, low Safe Z delta, G28 not set) are NOT gated on 'unattended' at their own call
+        // sites and still prompt even here.
+        private bool unattended = false;
+        private void GenerateAndRun()
+        {
+            unattended = true;
+            try
+            {
+                Generate_Click(null, null);
+                if (!string.IsNullOrWhiteSpace(program))
+                    Run_Click(null, null);
+            }
+            finally
+            {
+                unattended = false;
+            }
         }
 
         // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained
@@ -1492,6 +1654,11 @@ namespace GCode_Sender
             // is subtracted from the probed Z (work Z0 = probed top - thickness). Conductive stock is touched
             // directly (no plate, no offset) - see pcorner.macro's _ls_plateoffset.
             double plateOffset = touchPlate && !stockConductive ? p.PlateThickness : 0d;
+            // Same gating as plateOffset - a plate that registers via a lip hooked over the corner probes its
+            // OWN wall, set back from the true stock edge by the lip's depth (ProbeDefinition.LipWidth); no
+            // plate at all (conductive stock, touched directly) means no lip either. See pcorner.macro's
+            // _ls_lipoffset.
+            double lipOffset = touchPlate && !stockConductive ? p.LipWidth : 0d;
             string cornerName = Name(corner);
             var fxPos = new Position(fx.Coords);
             string refX = N(fxPos.X), refY = N(fxPos.Y);        // the fixture's saved machine XY - replaces firmware G28 (#5161/#5162)
@@ -1515,7 +1682,9 @@ namespace GCode_Sender
                 s = SanitizeParens(s);   // grblHAL ends a comment at the FIRST ')', so neutralise interior parens
                 string t = s.TrimStart();
                 bool oword = t.Length > 1 && (t[0] == 'O' || t[0] == 'o') && t[1] == '<';
-                if (s.Length > 0 && s[0] != '(' && !oword)
+                // A leading N-word on a $-command (e.g. $TLR) is invalid - $ must be the line's first character.
+                bool dollar = t.Length > 0 && t[0] == '$';
+                if (s.Length > 0 && s[0] != '(' && !oword && !dollar)
                     b.Append('N').Append((lineNo += 10).ToString(CultureInfo.InvariantCulture)).Append(' ');
                 b.Append(s).Append('\n');
             }
@@ -1569,6 +1738,7 @@ namespace GCode_Sender
             // safety floor to the DISCOVER corner's own measured stock-top instead.
             L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
             L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
+            L(string.Format("#<_ls_lipoffset> = {0}", N(lipOffset)));
             // Probe-geometry offset (into the stock, from the fixture's reference) - derived from the SAME
             // probe definition doing the probing, not stored per-fixture: the fixture only captures the
             // single reference point (fx.Coords, "Set position"), which the Fixture edit dialog's schematic
@@ -1638,13 +1808,26 @@ namespace GCode_Sender
             L("#<c1x> = #<_corner_x>");
             L("#<c1y> = #<_corner_y>");
             L("#<c1z> = #<_corner_z>");
+            // Without a sync point here, an alarmed probe (e.g. Alarm:4, no contact) does NOT actually stop
+            // the run: the whole 4-corner sequence streams as one continuous burst (see the "No (WAITIDLE)
+            // between corners" note below), so the NEXT corner's g-code has typically already been pushed
+            // into the controller's own receive buffer by the time this one alarms - resetting/unlocking then
+            // just lets that already-queued code carry on, instead of the run actually stopping. (WAITIDLE)
+            // flushes what's queued on OUR side and genuinely waits for Idle, aborting the whole macro
+            // (MacroProcessor.Run's own WaitForIdle check) if the controller alarmed instead - confirmed on
+            // real hardware 2026-07-27: a corner-2 Alarm:4 silently continued into corner 3 after unlock.
+            L("(WAITIDLE)");
 
             // Known-safe travel height for corners 2-4 (see pcorner.macro's #<_ls_maxz>) - corner 1's own
             // measured stock top plus the operator-set travel margin, NOT hardcoded (adjustable in case a
             // given fence/clamp setup needs more clearance than the default). Computed as its own variable,
             // not inlined into the EmitCall args, so Br()'s "wrap in brackets if it contains a space" heuristic
             // doesn't double-bracket an already-bracketed expression - a bare variable reference has no spaces.
-            L(string.Format("#<c1_maxz> = [#<c1z> + {0}]", N(cornerTravelMarginMm)));
+            // #<c1z> is #<_corner_z>, which is ALREADY plate-thickness-corrected (true stock top, not the
+            // plate's own top surface - see pcorner.macro's #<_ls_plateoffset>) - so this margin must ALSO add
+            // plateOffset back on top when running a touch plate, or a margin smaller than the plate's own
+            // thickness would rapid the tool straight into the plate at the next corner instead of clearing it.
+            L(string.Format("#<c1_maxz> = [#<c1z> + {0}]", N(cornerTravelMarginMm + plateOffset)));
 
             // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == a plain Start Job
             // (origin + TLO ref). The 3D probe is already in the spindle (installed at the top), so this is the
@@ -1723,6 +1906,15 @@ namespace GCode_Sender
                 EmitCall(CornerId(xn), refX2, refY2, "#<_start_z>", maxz, setTloRef ? "0" : "9999");
                 L("#<c2x> = #<_corner_x>");
                 L("#<c2y> = #<_corner_y>");
+                L("(WAITIDLE)");   // abort the whole run on an alarmed probe here - see the same note after corner 1
+
+                // Touch plate is a handheld continuity block, not a fixed installed probe - it has to be
+                // physically moved to each new corner between calls (unlike the 3D probe, mounted in the
+                // spindle for the whole run). Pause here and again after corner 3 so there's time to move it;
+                // not needed after corner 1 (the initial placement happens before Run is even pressed) or
+                // after corner 4 (nothing left to probe).
+                if (touchPlate)
+                    L(string.Format("(MBOX, OK, Move the touch plate to the {0} corner, then click OK.)", Name(yn)));
 
                 string c3refx, c3refy, c4refx, c4refy;
                 if (exactSize)
@@ -1757,11 +1949,18 @@ namespace GCode_Sender
                 EmitCall(CornerId(yn), c3refx, c3refy, "#<_start_z>", maxz);
                 L("#<c3x> = #<_corner_x>");
                 L("#<c3y> = #<_corner_y>");
+                L("(WAITIDLE)");   // abort the whole run on an alarmed probe here - see the same note after corner 1
+
+                if (touchPlate)
+                    L(string.Format("(MBOX, OK, Move the touch plate to the {0} corner, then click OK.)", Name(dg)));
 
                 L(string.Format("(--- corner 4 = {0} (diagonal) ---)", Name(dg)));
                 EmitCall(CornerId(dg), c4refx, c4refy, "#<_start_z>", maxz);
                 L("#<c4x> = #<_corner_x>");
                 L("#<c4y> = #<_corner_y>");
+                // Corner 4 too - everything below (size, origin, rotation) trusts c1..c4 being real measured
+                // values, not stale/undefined ones from an alarmed call that was allowed to fall through.
+                L("(WAITIDLE)");
 
                 L("(--- size = mean of the two opposite spans ---)");
                 L(string.Format("#<size_x> = [{0} * [[#<c2x> - #<c1x>] + [#<c4x> - #<c3x>]] / 2]", sox));
@@ -1924,6 +2123,7 @@ namespace GCode_Sender
             // is already fixed from the fixture's Set position (never re-probed here); only the stock-top Z
             // probe below is affected.
             double plateOffset = touchPlate && !stockConductive ? p.PlateThickness : 0d;
+            double lipOffset = touchPlate && !stockConductive ? p.LipWidth : 0d;   // see BuildProgram's own comment / pcorner.macro's _ls_lipoffset
             string wcs = "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
 
             // Stock sits BETWEEN the jaws: from the jaw's probed front-left corner, it extends +X (rightward -
@@ -2040,6 +2240,7 @@ namespace GCode_Sender
                 L(string.Format("#<_ls_rad> = {0}", N(p.ProbeDiameter / 2d)));
                 L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
                 L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
+                L(string.Format("#<_ls_lipoffset> = {0}", N(lipOffset)));
                 L(string.Format("#<_ls_spacer> = {0}", N(0d)));
                 L(string.Format("#<_ls_thickness> = {0}", N(thickness)));   // face probe depth = top - thickness/2 (see pcorner.macro)
                 // Entered stock sizes are EXACT for the vise (precision machinist stock, not an estimate to
@@ -2317,6 +2518,16 @@ namespace GCode_Sender
                 L("G0 Z2");
                 L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
                 L("#<_probe_z> = #5063");
+                // $TLR - the REAL grblHAL system command that commits the tool length reference to the
+                // controller's own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's
+                // TLR: field) - same one the Probing tab's own Tool Length flow uses (ToolLengthControl.xaml.cs).
+                // #<_tlo_ref> below is a SEPARATE, older, script-only convention (tc.macro's own bookkeeping
+                // for its manual G43.1 apply-on-next-M6 logic) that never touched this native flag at all -
+                // confirmed on real hardware 2026-07-27: Setup's own TLO-ref step "succeeded" (no alarm) but
+                // IsTloReferenceSet stayed false the whole session, so every PREREQ gate checking "tlo"
+                // (Contour, etc.) could never pass. Sent here, machine still AT the touched Z, matching
+                // ToolLengthControl's own timing (right after the probe stops, before any retraction).
+                L("$TLR");
                 L("G0 Z10");
                 L("G90");
                 L("G65 P5 Q0");   // restore the main/default probe input
@@ -2329,6 +2540,8 @@ namespace GCode_Sender
             }
             else
             {
+                // M6 T8 runs tc.macro, which does its OWN probe of the puck and sends $TLR itself the very
+                // first time this session (see tc.macro's own o200 IF block) - nothing more needed here.
                 L("(3D probe already in spindle - M6 T8 selects the main probe input itself, see tc.macro)");
                 L("M6 T8");
             }
