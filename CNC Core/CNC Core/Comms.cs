@@ -46,6 +46,28 @@ namespace CNC.Core
 
     public class Comms
     {
+        /// <summary>
+        /// Marshal a received reply onto the host's context, asynchronously.
+        /// Replaces Dispatcher.BeginInvoke(DataReceived, reply) in the stream classes - see their call
+        /// sites for why this must stay async: a synchronous marshal blocks the read thread on a busy
+        /// host, stalling reads and therefore the stream acks. SynchronizationContext.Post is the
+        /// portable equivalent of BeginInvoke (on WPF the context IS the dispatcher's), and the reply
+        /// value is captured per call, so order and content are preserved exactly as before.
+        ///
+        /// A null context - a headless server with no marshalling requirement - invokes inline on the
+        /// read thread, which is correct there and keeps CNC.Core free of any UI-thread assumption.
+        /// </summary>
+        public static void PostTo(System.Threading.SynchronizationContext context, DataReceivedHandler handler, string reply)
+        {
+            if (handler == null)
+                return;
+
+            if (context == null)
+                handler(reply);
+            else
+                context.Post(state => handler((string)state), reply);
+        }
+
         public enum State
         {
             AwaitAck,

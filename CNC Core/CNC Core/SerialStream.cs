@@ -44,7 +44,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.IO.Ports;
 using System.Management;
-using System.Windows.Threading;
+using System.Threading;
 using System.Collections.ObjectModel;
 
 namespace CNC.Core
@@ -55,7 +55,7 @@ namespace CNC.Core
         private byte[] buffer = new byte[Comms.RXBUFFERSIZE];
         private StringBuilder input = new StringBuilder(Comms.RXBUFFERSIZE);
         private volatile Comms.State state = Comms.State.ACK;
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
 
         private readonly string portParams;
         private readonly string portName;
@@ -70,10 +70,10 @@ namespace CNC.Core
         // Raw serial log, enabled at runtime by the -debugfile <path> launch arg (Resources.DebugFile).
         // Written from the comms thread, so it survives a frozen UI - the only log available after a hang.
         StreamWriter log = null;
-        public SerialStream(string PortParams, int ResetDelay, Dispatcher dispatcher)
+        public SerialStream(string PortParams, int ResetDelay, SynchronizationContext syncContext)
         {
             Comms.com = this;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
             Reply = string.Empty;
 
             if (PortParams.IndexOf(":") < 0)
@@ -511,7 +511,7 @@ namespace CNC.Core
                             log.Flush();
                         }
                         if (Reply.Length != 0 && DataReceived != null)
-                            Dispatcher.BeginInvoke(DataReceived, Reply);
+                            Comms.PostTo(SyncContext, DataReceived, Reply);
                         //                            Dispatcher.Invoke(addEdge, Reply);
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);

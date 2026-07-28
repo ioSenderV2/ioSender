@@ -41,7 +41,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Net.Sockets;
-using System.Windows.Threading;
+using System.Threading;
 
 namespace CNC.Core
 {
@@ -52,7 +52,7 @@ namespace CNC.Core
         private byte[] buffer = new byte[512];
         private volatile Comms.State state = Comms.State.ACK;
         private StringBuilder input = new StringBuilder(1024);
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
 
         private readonly string hostParams;
         private readonly Reconnector reconnector;
@@ -63,11 +63,11 @@ namespace CNC.Core
         public Action<string> AckSink { get; set; }
         public bool BlockingWrites { get; set; }   // network writes are already synchronous; no-op here
 
-        public TelnetStream(string host, Dispatcher dispatcher)
+        public TelnetStream(string host, SynchronizationContext syncContext)
         {
             Comms.com = this;
             Reply = string.Empty;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
 
             if (!host.Contains(":"))
                 host += ":23";
@@ -395,7 +395,7 @@ namespace CNC.Core
                 // of UI load; the reply value is captured per call (strings are immutable) so order and
                 // content are preserved, and dispatching outside lock(input) keeps the no-deadlock fix.
                 if (reply.Length != 0 && DataReceived != null)
-                    Dispatcher.BeginInvoke(DataReceived, reply);
+                    Comms.PostTo(SyncContext, DataReceived, reply);
             }
 
             try

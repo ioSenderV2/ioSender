@@ -1539,21 +1539,26 @@ namespace CNC.Controls
         // target string (ws:// / COMx / host:port). Shared by startup and the Connect menu item.
         private void OpenStreamFor(GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
         {
+            // The stream classes take a portable SynchronizationContext, not a Dispatcher (CNC.Core is
+            // being made WPF-free for a .NET 8 server). DispatcherSynchronizationContext is exactly the
+            // dispatcher's own context, so replies still marshal to this UI thread as they always did.
+            var syncContext = new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher);
+
             EnsureSimulatorRunning();   // launch the bundled simulator first if the saved target is it
 #if USEWEBSOCKET
             if (Base.PortParams.ToLower().StartsWith("ws://"))
-                new WebsocketStream(Base.PortParams, dispatcher);
+                new WebsocketStream(Base.PortParams, syncContext);
             else
 #endif
             if (Base.PortParams.ToLower().StartsWith("com"))
-                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+                new SerialStream(Base.PortParams, Base.ResetDelay, syncContext);
             else if (Base.PortParams.Contains(":")) // host:port (IP or hostname)
-                new TelnetStream(Base.PortParams, dispatcher);
+                new TelnetStream(Base.PortParams, syncContext);
             else
 #if USEELTIMA
-                new EltimaStream(Config.PortParams, Config.ResetDelay, dispatcher);
+                new EltimaStream(Config.PortParams, Config.ResetDelay, syncContext);
 #else
-                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+                new SerialStream(Base.PortParams, Base.ResetDelay, syncContext);
 #endif
             // Report the target only once the link is actually open (drives the green/red target box).
             // "Simulator" instead of the raw 127.0.0.1:port when the target is the bundled sim - Base.StartSimulator

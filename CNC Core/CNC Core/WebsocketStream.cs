@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.IO;
 using System.Text;
-using System.Windows.Threading;
+using System.Threading;
 using WebSocketSharp;
 
 namespace CNC.Core
@@ -52,7 +52,7 @@ namespace CNC.Core
         private volatile bool _isOpen = false;
         private volatile Comms.State state = Comms.State.ACK;
         private StringBuilder input = new StringBuilder(1024);
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
 
         private readonly string hostUrl;
         private readonly Reconnector reconnector;
@@ -63,11 +63,11 @@ namespace CNC.Core
         public Action<string> AckSink { get; set; }
         public bool BlockingWrites { get; set; }   // websocket Send is already synchronous; no-op here
 
-        public WebsocketStream(string host, Dispatcher dispatcher)
+        public WebsocketStream(string host, SynchronizationContext syncContext)
         {
             Comms.com = this;
             Reply = string.Empty;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
 
             hostUrl = host;
 
@@ -314,7 +314,7 @@ namespace CNC.Core
                 // busy UI, stalling reads and acks. BeginInvoke keeps reads flowing; the per-call reply value
                 // is captured (strings are immutable) so order/content are preserved (see TelnetStream).
                 if (reply.Length != 0 && DataReceived != null)
-                    Dispatcher.BeginInvoke(DataReceived, reply);
+                    Comms.PostTo(SyncContext, DataReceived, reply);
             }
         }
     }
