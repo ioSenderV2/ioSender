@@ -121,6 +121,7 @@
                 <local:SignalControl x:Uid="lbl_signalEStop" Label="E" ToolTip="E-Stop" IsSet="{Binding Path=Signals[(core:Signals)EStop], Mode=OneWay}" Style="{StaticResource EStopVisibleStyle}"/>
                 <local:SignalControl x:Uid="lbl_signalSafetyDoor" Label="D" ToolTip="Safety door" IsSet="{Binding Path=Signals[(core:Signals)SafetyDoor], Mode=OneWay}" Style="{StaticResource DoorOpenVisibleStyle}"/>
                 <local:SignalControl x:Uid="lbl_signalProbe" Label="P" ToolTip="Probe" IsSet="{Binding Path=Signals[(core:Signals)Probe], Mode=OneWay}"/>
+                <local:SignalControl x:Uid="lbl_signalTloRef" Label="T" ToolTip="Tool length reference set" IsSet="{Binding Path=IsTloReferenceSet, Mode=OneWay}" SetColor="Green"/>
             </StackPanel>
         </DockPanel>
     </GroupBox>

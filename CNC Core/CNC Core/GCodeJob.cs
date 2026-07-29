@@ -421,7 +421,15 @@ namespace CNC.Core
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
-                bool passThrough = GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0);
+                // A bare $-command (e.g. $TLR, $X) isn't valid G-code syntax, so Parser.ParseBlock below fails
+                // on it - and unlike the O-word/#-expression case, that failure isn't gated on
+                // GrblInfo.ExpressionsSupported at all: $-commands are basic Grbl/grblHAL system commands
+                // supported on every build, expressions or not. Without this, the block was silently DROPPED
+                // (parsed=false, passThrough=false -> neither branch adds it, no error, nothing sent) -
+                // confirmed on real hardware 2026-07-27: a generated program's own "$TLR" line vanished
+                // entirely between the previous and next line in the actual wire transmission.
+                bool isSystemCommand = ts.Length > 0 && ts[0] == '$';
+                bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
 
                 int tokenStart = Parser.Tokens.Count;
                 bool parsed;
@@ -432,10 +440,11 @@ namespace CNC.Core
                 {
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
-                    // with error:25). Also never number an O-word or #-parameter line (see above).
+                    // with error:25). Also never number an O-word, #-parameter, or $-command line (see above -
+                    // a $-command specifically must have '$' as the line's very first character).
                     string nt = block.TrimStart();
                     bool alreadyNumbered = nt.Length > 1 && (nt[0] == 'N' || nt[0] == 'n') && char.IsDigit(nt[1]);
-                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !isParamLine && !alreadyNumbered)
+                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !isParamLine && !isSystemCommand && !alreadyNumbered)
                     {
                         LineNumber += 10;
                         block = "N" + LineNumber.ToString() + block;

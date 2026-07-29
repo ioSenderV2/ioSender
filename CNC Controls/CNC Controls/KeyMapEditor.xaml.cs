@@ -654,12 +654,14 @@ namespace CNC.Controls
         public static readonly TabTarget[] TabTargets = new[]
         {
             new TabTarget("Tab.Settings",     "Settings tab",      "Switch to the Settings tab."),
+            new TabTarget("Tab.FeedsSpeeds",  "Feeds & Speeds tab", "Switch to the Feeds & Speeds tab."),
             new TabTarget("Tab.StartJob",     "Start Job tab",     "Switch to the Start Job tab."),
             new TabTarget("Tab.Job",          "Job tab",           "Switch to the Job tab."),
             new TabTarget("Tab.Offsets",      "Offsets tab",       "Switch to the Offsets tab."),
             new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
             new TabTarget("Tab.Probing",      "Probing tab",       "Switch to the Probing tab."),
             new TabTarget("Tab.Tools",        "Tools tab",         "Switch to the Tools tab."),
+            new TabTarget("Tab.OddJobs",      "Odd Jobs tab",      "Switch to the Odd Jobs tab."),
             new TabTarget("Tab.MachineSetup", "Machine Setup tab", "Switch to the Machine Setup tab."),
             new TabTarget("Tab.HeightMap",    "Height Map tab",    "Switch to the Height Map tab."),
             new TabTarget("Tab.LatheWizard",  "Lathe Tools tab",   "Switch to the Lathe Tools tab."),
@@ -693,6 +695,13 @@ namespace CNC.Controls
             new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),
             new TabTarget("Tab.Tools.PID",               "Tools → PID Tuner",                    "Switch to Tools and show the PID Tuner tab."),
 
+            new TabTarget("Tab.OddJobs.Setup",        "Odd Jobs → Setup",        "Switch to Odd Jobs and show the Setup tab."),
+            new TabTarget("Tab.OddJobs.SurfaceStock", "Odd Jobs → Surface Stock", "Switch to Odd Jobs and show the Surface Stock tab."),
+            new TabTarget("Tab.OddJobs.DrillBore",    "Odd Jobs → Drill/Bore Hole", "Switch to Odd Jobs and show the Drill/Bore Hole tab."),
+            new TabTarget("Tab.OddJobs.Counterbore",  "Odd Jobs → Counterbore",  "Switch to Odd Jobs and show the Counterbore tab."),
+            new TabTarget("Tab.OddJobs.Pocket",       "Odd Jobs → Pocket",       "Switch to Odd Jobs and show the Pocket tab."),
+            new TabTarget("Tab.OddJobs.Contour",      "Odd Jobs → Contour/Slot", "Switch to Odd Jobs and show the Contour/Slot tab."),
+
             new TabTarget("Tab.LatheWizard.Turning",   "Lathe Tools → Turning",   "Switch to Lathe Tools and show the Turning tab."),
             new TabTarget("Tab.LatheWizard.Parting",   "Lathe Tools → Parting",   "Switch to Lathe Tools and show the Parting tab."),
             new TabTarget("Tab.LatheWizard.Facing",    "Lathe Tools → Facing",    "Switch to Lathe Tools and show the Facing tab."),
@@ -717,6 +726,7 @@ namespace CNC.Controls
                     case "MachineSetup": r.Set("Machine Setup tabs", 15); break;
                     case "Probing": r.Set("Probing tabs", 16); break;
                     case "Tools": r.Set("Tools tabs", 17); break;
+                    case "OddJobs": r.Set("Odd Jobs tabs", 19); break;
                     case "LatheWizard": r.Set("Lathe Tools tabs", 18); break;
                     default: r.Set("Settings tabs", 14); break;
                 }

@@ -587,6 +587,15 @@ namespace CNC.Controls
                 () => StepperCalibrationProbeWizard.SectionConfig, v => StepperCalibrationProbeWizard.SectionConfig = v, "StepperCalProbe.xml");
             RegisterFolded<StartJobSettings>("StartJob",
                 () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
+            // Odd Jobs' own dedicated Setup instance (always G59) - no legacy file, new section.
+            RegisterFolded<StartJobSettings>("OddJobsSetup",
+                () => OddJobsSetupConfig.Section, v => OddJobsSetupConfig.Section = v, "OddJobsSetup.xml");
+            // The composed work order (jobs -> operations) that replaced the five fixed job wizards, plus the
+            // per-(tool, diameter, material) feeds/speeds the operator dialed in themselves.
+            RegisterFolded<WorkOrder>("OddJobsWorkOrder",
+                () => WorkOrderView.SectionConfig, v => WorkOrderView.SectionConfig = v, "OddJobsWorkOrder.xml");
+            RegisterFolded<ToolMemoryList>("OddJobsToolMemory",
+                () => OddJobsToolMemory.SectionConfig, v => OddJobsToolMemory.SectionConfig = v, "OddJobsToolMemory.xml");
 
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
@@ -1048,6 +1057,39 @@ namespace CNC.Controls
                 tabsSlot.Items.Add(new LayoutNode(LayoutKeys.FeedsAndSpeeds));
             if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.FeedsAndSpeeds))
                 Base.Tabs.Add(LayoutKeys.FeedsAndSpeeds);
+
+            // 2026-07-26: same story again for LayoutKeys.OddJobs (new top-level tab) - append to both the
+            // tree's tabs slot and the legacy flat Base.Tabs list, same reasoning as FeedsAndSpeeds above.
+            if (tabsSlot != null && !LayoutTree.Contains(layoutSection.Root, LayoutKeys.OddJobs))
+                tabsSlot.Items.Add(new LayoutNode(LayoutKeys.OddJobs));
+            if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.OddJobs))
+                Base.Tabs.Add(LayoutKeys.OddJobs);
+
+            // 2026-07-26 (later still): LayoutKeys.OddJobs went from a leaf (the fixup just above, added
+            // earlier this session before the tab had sub-tabs) to a container with its own "oddjobs" slot -
+            // same SlotTools-merge story as StepperCalProbe above: an already-persisted OddJobs node (whether
+            // from the fixup just above or a fresh leaf some other way) never picks up a newly-introduced slot
+            // on its own.
+            // 2026-07-28: the five fixed job wizards (SurfaceStock/DrillBore/Counterbore/Pocket/Contour) were
+            // replaced by the single WorkOrder composer tab, so the slot is now Setup + WorkOrder. A profile
+            // saved with the old leaves would keep rendering tabs whose components no longer exist (silently
+            // skipped by BuildJobs, leaving stale entries in the tab-editor's list) - drop them and add the
+            // new one.
+            var oddJobsNode = LayoutTree.Flatten(layoutSection?.Root).FirstOrDefault(n => n.Component == LayoutKeys.OddJobs);
+            if (oddJobsNode != null)
+            {
+                var oddJobsSlot = oddJobsNode.Slot(LayoutKeys.SlotOddJobs);
+                if (oddJobsSlot == null)
+                {
+                    oddJobsSlot = new LayoutSlot(LayoutKeys.SlotOddJobs);
+                    oddJobsNode.Slots.Add(oddJobsSlot);
+                }
+                string[] retiredWizards = { "SurfaceStock", "DrillBore", "Counterbore", "Pocket", "Contour" };
+                oddJobsSlot.Items.RemoveAll(n => retiredWizards.Contains(n.Component));
+                foreach (var key in new[] { LayoutKeys.OddJobsSetup, LayoutKeys.OddJobsWorkOrder })
+                    if (!oddJobsSlot.Items.Any(n => n.Component == key))
+                        oddJobsSlot.Items.Add(new LayoutNode(key));
+            }
 
             // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly
             // lived as a loose FeedsAndSpeedsIntroShown.txt marker file in the config folder before moving

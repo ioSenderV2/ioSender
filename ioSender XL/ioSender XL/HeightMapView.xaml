@@ -127,7 +127,7 @@
             <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
                 <TextBlock x:Uid="hm_steps" Margin="8" TextWrapping="Wrap" LineHeight="18">
                     <Run FontWeight="Bold" Text="1. Set the work origin on the stock."/>
-                    <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Load stock tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
+                    <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Start Job tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
                     <LineBreak/>
                     <Run FontWeight="Bold" Text="2. Choose the area + grid."/>
                     <Run Text=" 'From program' covers the loaded job's footprint (load it, then 'Set from program limits'); 'Full travel' covers the machine bed. Edit X/Y/W/H to fine-tune. Smaller grid = denser and slower (a gently-curved spoilboard often needs only 3x3 or 4x4)."/>

@@ -741,31 +741,66 @@ namespace CNC.Controls
         // ToolTipService.ShowOnDisabled in XAML); enabled -> what THIS press will actually do, matching the
         // selected mode - a plain "Alt+R" static tip left an operator to discover Dry Run/Check Run's real
         // effect (Z offset, spindle/coolant forced off, etc.) only by reading the dropdown's own tooltips first.
+        // Shared by both Generate-first early-return branches in UpdateRunButtonLabel (pre- and post-generate) -
+        // a tab that opted in via MacroProcessor.SupportsGenerateAndRun gets the mode dropdown back just to
+        // offer that one entry, in either state (pressing it before Generate has run just means "build it,
+        // then run it" instead of the normal two clicks).
+        private void UpdateGenerateAndRunVisibility()
+        {
+            bool show = MacroProcessor.SupportsGenerateAndRun && MacroProcessor.ActiveGenerateAndRun != null;
+            if (btnStartMode != null)
+                btnStartMode.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (pnlNormalModes != null)
+                pnlNormalModes.Visibility = Visibility.Collapsed;
+            if (pnlGenerateAndRun != null)
+                pnlGenerateAndRun.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void GenerateAndRun_Click(object sender, RoutedEventArgs e)
+        {
+            startModePopup.IsOpen = false;
+            MacroProcessor.ActiveGenerateAndRun?.Invoke();
+        }
+
         private void UpdateRunButtonLabel()
         {
             if (model == null || btnStart == null)
                 return;
 
-            // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard) is
-            // focused: it owns no standalone Generate button of its own any more (see MacroProcessor's
-            // Generate-mode plumbing) - the Run bar itself reads "Generate" (gated on IsGenerateReady) until
-            // the tab has built its program, then flips to plain "Run". Dry Run/Check Run never apply to
-            // these tabs, so the mode dropdown is hidden outright for the whole time the tab is focused.
-            if (MacroProcessor.SupportsGenerateMode)
+            // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard,
+            // Odd Jobs' job wizards) is focused: it owns no standalone Generate button of its own any more
+            // (see MacroProcessor's Generate-mode plumbing) - the Run bar itself reads "Generate" (gated on
+            // IsGenerateReady) until the tab has built its program, then flips to plain "Run" (or, for a tab
+            // that opted in via AllowRunModesWhenGenerated, the normal mode dropdown - see below).
+            if (MacroProcessor.SupportsGenerateMode && !MacroProcessor.IsProgramGenerated)
             {
-                bool generated = MacroProcessor.IsProgramGenerated;
-                btnStart.Content = generated ? FindResource("StartModeNormal") : FindResource("GenerateLabel");
-                IsRunActionEnabled = IsRunEnabled && (generated || MacroProcessor.IsGenerateReady);
-                IsGenerateActionReady = !generated && IsRunActionEnabled;
-                btnStart.ToolTip = generated ? FindResource("StartTipNormal")
-                                  : IsRunActionEnabled ? FindResource("GenerateTipReady")
-                                  : FindResource("GenerateTipDisabled");
-                if (btnStartMode != null)
-                    btnStartMode.Visibility = Visibility.Collapsed;
+                btnStart.Content = FindResource("GenerateLabel");
+                IsRunActionEnabled = IsRunEnabled && MacroProcessor.IsGenerateReady;
+                IsGenerateActionReady = IsRunActionEnabled;
+                btnStart.ToolTip = IsRunActionEnabled ? FindResource("GenerateTipReady") : FindResource("GenerateTipDisabled");
+                UpdateGenerateAndRunVisibility();
+                return;
+            }
+            // Program's generated (or this isn't a Generate-first tab at all). Most Generate-first tabs are
+            // pure setup/probing macros where Dry Run/Check Run/Simulate don't mean anything, so they stay
+            // hidden even now - only a tab that explicitly opted in (Odd Jobs' cutting wizards - a generated
+            // program there IS real toolpath worth dry-running) falls through to the normal mode-dropdown
+            // logic below instead.
+            if (MacroProcessor.SupportsGenerateMode && !MacroProcessor.AllowRunModesWhenGenerated)
+            {
+                btnStart.Content = FindResource("StartModeNormal");
+                IsRunActionEnabled = IsRunEnabled;
+                IsGenerateActionReady = false;
+                btnStart.ToolTip = FindResource("StartTipNormal");
+                UpdateGenerateAndRunVisibility();
                 return;
             }
             if (btnStartMode != null)
                 btnStartMode.Visibility = Visibility.Visible;
+            if (pnlNormalModes != null)
+                pnlNormalModes.Visibility = Visibility.Visible;
+            if (pnlGenerateAndRun != null)
+                pnlGenerateAndRun.Visibility = Visibility.Collapsed;
             IsRunActionEnabled = IsRunEnabled;
             IsGenerateActionReady = false;
 

@@ -59,7 +59,8 @@ namespace CNC.Controls
         StartJob,
         HeightMap,
         MachineSetup,
-        FeedsAndSpeeds
+        FeedsAndSpeeds,
+        OddJobs
     }
 
     public interface ICNCView

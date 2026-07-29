@@ -30,15 +30,29 @@
              double-render a second box inside this one. Every OTHER bare NumericTextBox usage in the app
              (Spindle, PortDialog, Feed, Lathe controls, ...) is untouched and keeps its own standalone
              recessed-field look from the app-wide style. -->
-        <Border x:Name="fieldSurface" Grid.Column="1" CornerRadius="8" BorderThickness="1" BorderBrush="#FFD5D9DE" SnapsToDevicePixels="True" MinWidth="64">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#FFF2F3F5" Offset="0"/>
-                    <GradientStop Color="#FFFDFDFE" Offset="0.15"/>
-                </LinearGradientBrush>
-            </Border.Background>
+        <!-- ToolTip explicitly bound here too (not just relying on bubbling up from a hovered descendant to
+             the UserControl root) - a caller-set NumericField.ToolTip was only ever showing while hovering
+             the label, never the value/unit area itself, on real hardware 2026-07-27. -->
+        <Border x:Name="fieldSurface" Grid.Column="1" CornerRadius="8" BorderThickness="1" SnapsToDevicePixels="True" MinWidth="64"
+                ToolTip="{Binding ToolTip, RelativeSource={RelativeSource AncestorType=UserControl}}">
             <Border.Style>
+                <!-- Background/BorderBrush live ONLY as Style Setters here, never as a local value on the
+                     Border itself (they used to be - Background via a property-element, BorderBrush via a
+                     plain attribute) - a local value on an element ALWAYS wins over a Style Trigger's Setter
+                     for the same property, regardless of trigger order, so NONE of the 3 triggers below could
+                     ever actually repaint the field. Confirmed on real hardware 2026-07-27: the new
+                     HasRecommendation amber highlight silently never appeared. Moving both into the Style's
+                     own base Setters (below, before Triggers) lets the triggers override them correctly. -->
                 <Style TargetType="Border">
+                    <Setter Property="BorderBrush" Value="#FFD5D9DE"/>
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#FFF2F3F5" Offset="0"/>
+                                <GradientStop Color="#FFFDFDFE" Offset="0.15"/>
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
                     <Style.Triggers>
                         <!-- Read-only: flat muted fill instead of the editable gradient, and the focus-glow
                              trigger below never applies (a read-only field can't take keyboard focus) - a
@@ -50,6 +64,14 @@
                         <DataTrigger Binding="{Binding IsKeyboardFocused, ElementName=data}" Value="True">
                             <Setter Property="BorderBrush" Value="#0A84FF"/>
                             <Setter Property="BorderThickness" Value="2"/>
+                        </DataTrigger>
+                        <!-- Differs from an available recommendation (OddJobsFeedsSpeedsDialog) - amber, not
+                             red/blue, so it doesn't read as an error or steal the keyboard-focus color; a
+                             deliberate "worth a look" cue. Lower priority than focus above (focus still wins
+                             when both apply) since triggers apply in document order and later wins on tie. -->
+                        <DataTrigger Binding="{Binding HasRecommendation, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                            <Setter Property="Background" Value="#FFFCE9C0"/>
+                            <Setter Property="BorderBrush" Value="#FFB8860B"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

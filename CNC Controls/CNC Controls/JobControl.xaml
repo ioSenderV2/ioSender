@@ -133,14 +133,28 @@
                Opened="StartModePopup_Opened" StaysOpen="False" AllowsTransparency="True">
             <Border Background="White" BorderBrush="#FF999999" BorderThickness="1">
                 <StackPanel>
-                    <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Run normally."/>
-                    <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
-                    <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
-                    <Button x:Uid="btn_startModeSimulate" Content="{StaticResource StartModeSimulate}" Tag="simulate" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."/>
+                    <!-- Normal Run/Dry Run/Check Run/Simulate picker - hidden instead of pnlGenerateAndRun
+                         below while a Generate-first tab that opted into SupportsGenerateAndRun is focused
+                         (see UpdateGenerateAndRunVisibility). -->
+                    <StackPanel x:Name="pnlNormalModes">
+                        <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Run normally."/>
+                        <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
+                        <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
+                        <Button x:Uid="btn_startModeSimulate" Content="{StaticResource StartModeSimulate}" Tag="simulate" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."/>
+                    </StackPanel>
+                    <!-- Generate-first tab opted into MacroProcessor.SupportsGenerateAndRun (Start Job) - a
+                         one-click "build the program and run it" that skips that tab's own routine confirm
+                         dialogs and the generated program's (MBOX) prompts (MacroProcessor.Run's own
+                         unattended parameter) - genuine safety-gate prompts (out-of-travel size, G28 not
+                         set, ...) still show even here, only the "are you sure/ready" ones are skipped. -->
+                    <StackPanel x:Name="pnlGenerateAndRun" Visibility="Collapsed">
+                        <Button x:Uid="btn_generateAndRun" Content="Generate and Run" Style="{StaticResource StartModeItemStyle}" Click="GenerateAndRun_Click"
+                                ToolTip="Generate and run in one step, skipping the routine confirmation prompts (real safety warnings still show)."/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Popup>

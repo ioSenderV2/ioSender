@@ -47,7 +47,7 @@
         </Grid.RowDefinitions>
 
         <!-- Body: one tab per setup step -->
-        <local:StretchTabControl x:Name="tabSteps" Grid.Row="0" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
+        <local:StretchTabControl x:Name="tabSteps" Grid.Row="0" Background="Transparent" SelectionChanged="Steps_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
 
             <!-- Overview -->
             <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Read this first: what each setup step below configures.">
@@ -290,7 +290,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
+                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Start Job and the probing tabs."/>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"

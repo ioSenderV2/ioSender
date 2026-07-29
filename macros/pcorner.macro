@@ -15,10 +15,12 @@
 ;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
 ;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
 ;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
-;   #<_ls_thickness> = estimated stock thickness (mm). UNUSED by this macro as of 2026-07-20 (the X/Y face
-;                   probes now search at a FIXED 5mm below the measured top instead of the material
-;                   midpoint - see #<_start_z> below) - still accepted/passed by callers for now, kept here
-;                   in case it's wanted again.
+;   #<_ls_thickness> = estimated stock thickness (mm). The X/Y face probes themselves search at a FIXED
+;                   5mm below the measured top now, not the material midpoint (see #<_start_z> below) - but
+;                   this is used for the pre-probe APPROACH height (see #<_bottom> + this + #<_ls_plateoffset>
+;                   below), so the machine doesn't rapid down further than the caller's own best estimate of
+;                   where the top actually is. Revived 2026-07-27 - was genuinely unused between those two
+;                   dates (see git history), when the approach height was a blind "assume <= 1in" constant.
 ;   #<_ls_spoilx>, #<_ls_spoily> = offset (mm) from the reference, along this corner's stock-interior
 ;                   direction, to the spoilboard-probe XY (always 0,0 - AT the reference).
 ;   #<_ls_topx>, #<_ls_topy>     = offset (mm) from the reference, into the stock, to the stock-top probe
@@ -47,6 +49,13 @@
 ;                       0 for the 3D probe, and for a touch plate run directly against conductive stock
 ;                       (no plate, no offset). A separate metal touch plate against non-conductive stock
 ;                       sets this to the plate's own known thickness (ProbeDefinition.PlateThickness).
+;   #<_ls_lipoffset> = XY (mm) added, toward the stock interior, to the X/Y face probe results before they
+;                       are reported as this corner's X/Y. 0 for the 3D probe (it touches the real stock
+;                       edge directly). A touch plate that registers via a lip hooked over the corner (lip
+;                       resting on/against the stock, its own outer wall set back from the true edge by the
+;                       lip's depth) probes ITS OWN wall, not the stock's - this shifts the result back to
+;                       the true edge by that depth (ProbeDefinition.LipWidth). Applied the same direction,
+;                       and folded into the same radius-compensation term, as #<rad> below.
 ;   #<_ls_maxz>   = OPTIONAL machine Z of a known-safe travel height, already trusted by the caller (e.g.
 ;                       the vise's own centre-of-stock probe, run before any corner calls). When > 0, this
 ;                       replaces BOTH the REUSE-corner full retract to machine Z0 (o40 below - normally
@@ -162,9 +171,17 @@ O<pcorner> SUB
   ; Move the fixture type's top-probe offset (#<_ls_topx>/#<_ls_topy>) into the stock interior (sign per
   ; corner) and probe the top, so each corner reports its own Z - the spread across the four corners is
   ; the stock/spoilboard flatness. #<_topx>/#<_topy> persist as the edge probes' anchor below.
+  ; Pre-probe approach clearance above the floor (#<_bottom>): the caller's own best estimate of stock
+  ; thickness plus, when running a touch plate, the plate's own thickness sitting on top of the stock - so
+  ; this scales with what's ACTUALLY there instead of blindly assuming worst-case 1in (25.4mm) material
+  ; regardless of real thickness. +10 is a fixed safety margin against estimate error (same spirit as the
+  ; entered-width/height "estimate should be a few mm larger than actual" guidance elsewhere). Confirmed on
+  ; real hardware 2026-07-27: with a 3/4in stock + 1/4in spacer + 12mm touch plate, the OLD blind "+30"
+  ; barely cleared the stock and did not clear the touch plate at all - a real collision risk.
+  #<_approach_z> = [#<_bottom> + #<_ls_thickness> + #<_ls_plateoffset> + 10]
   G90
   o40 IF [#<sz_in> GE 9000]
-    G53 G0 Z[#<_bottom> + 30]        ; rapid - first corner: assume material <= 1in (25.4mm) ABOVE the floor (spoilboard+spacer), a COMPUTED safe clearance (floor known from the DISCOVER probe above), travel just above the tallest possible top
+    G53 G0 Z[#<_approach_z>]         ; rapid - first corner: travel just above the estimated top (stock + plate, if any)
   o40 ELSE
     ; NE 0, not GT 0 (2026-07 bug, confirmed on real hardware on both this path and o43 below): #<maxz> is a
     ; MACHINE Z coordinate, and on a machine that homes Z to the top (Z0) with the whole work envelope below
@@ -200,11 +217,13 @@ O<pcorner> SUB
     ; safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale height would drive
     ; straight into solid stock with nothing to catch it. If the caller already knows a trusted height
     ; (#<maxz>, e.g. the vise's own centre probe) use that directly; otherwise fall back to the same
-    ; conservative floor+30 estimate the DISCOVER corner uses above (same reasoning as o40 above).
+    ; thickness/plate-aware #<_approach_z> the DISCOVER corner uses above (same reasoning as o40 above) -
+    ; this is the branch a Corner Fence's OWN corner 1 actually takes (it has no #<c1_maxz> yet - that's
+    ; only computed AFTER corner 1 finishes, for corners 2-4 to use), so this is exactly what needed fixing.
     o43 IF [#<maxz> NE 0]
       G53 G0 Z[#<maxz>]
     o43 ELSE
-      G53 G0 Z[#<_bottom> + 30]
+      G53 G0 Z[#<_approach_z>]
     o43 ENDIF
   o41 ENDIF
   ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
@@ -267,8 +286,14 @@ O<pcorner> SUB
   ; From the top-probe position (over solid stock, verified above) move ONLY X back out to the reference
   ; (the face) - Y unchanged, so the pre-seek position is anchored to a point already known to be over
   ; material rather than a separately estimated offset. Descend to start_z, then seek toward the face.
+  ; #<rx> alone (the fixture's saved reference) was calibrated to clear a 3D probe's BODY diameter - a touch
+  ; plate's lip sticks out #<_ls_lipoffset> mm FURTHER than that, so the vertical descent right below needs
+  ; the SAME extra outward push, or it can land right at (or on top of) the plate's own wall instead of in
+  ; clear air. Subtracting lipoffset*sx moves it outward (opposite sx's interior-pointing convention); 0 for
+  ; the 3D probe, so this is a no-op there. The later G38.2 target is untouched (still an absolute #<rx> +
+  ; 35*sx) - starting further out just means it travels a bit further to reach the same target.
   G53 G0 Z[#<_retreat_z>]           ; rapid - the trusted known-safe height when the caller has one, else just above this corner's own top (VERIFIED by the probe just run)
-  G53 G0 X[#<rx>] Y[#<_topy>]       ; rapid - travelling AT the verified safe height
+  G53 G0 X[#<rx> - [#<_ls_lipoffset> * #<sx>]] Y[#<_topy>]       ; rapid - travelling AT the verified safe height
   G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (just probed) - controlled feed only takes over for the final approach
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (not G91): a G91 move right after a G53 mis-computes on a $23-inverted axis
@@ -291,8 +316,9 @@ O<pcorner> SUB
   ; is either that same _safe_z or the caller's own trusted height - both are clear of the stock everywhere in
   ; the vicinity, not just directly above the last probed point, so a diagonal move at that height is exactly
   ; as safe as the old axis-at-a-time routing, just one move instead of two.
+  ; Same lip-clearance push as the X face start above - see its comment.
   G53 G0 Z[#<_retreat_z>]           ; rapid - verified/trusted safe height (see X face above)
-  G53 G0 X[#<_topx>] Y[#<ry>]       ; rapid - diagonal, straight to the Y-face-start position, AT that height
+  G53 G0 X[#<_topx>] Y[#<ry> - [#<_ls_lipoffset> * #<sy>]]       ; rapid - diagonal, straight to the Y-face-start position, AT that height
   G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (see X face above)
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
@@ -305,9 +331,12 @@ O<pcorner> SUB
   G90
   (PRINT, PC y_trig=#<y_trig>)
 
-  ; ================= outputs (radius compensated) =================
-  #<_corner_x> = [#<x_trig> + [#<rad> * #<sx>]]
-  #<_corner_y> = [#<y_trig> + [#<rad> * #<sy>]]
+  ; ================= outputs (radius + lip compensated) =================
+  ; #<_ls_lipoffset> folds into the SAME term as the probe tip radius - both push the reported edge back
+  ; toward the interior by a fixed amount, for the same reason (the probed surface isn't the true edge
+  ; itself); 0 for the 3D probe, so this is a no-op there.
+  #<_corner_x> = [#<x_trig> + [[#<rad> + #<_ls_lipoffset>] * #<sx>]]
+  #<_corner_y> = [#<y_trig> + [[#<rad> + #<_ls_lipoffset>] * #<sy>]]
   #<_corner_z> = [#<_z_top> - #<_ls_plateoffset>]   ; 0 for the 3D probe and touch-plate-on-conductive-stock (no-op)
   (PRINT, PC OUT c=#<corner> x=#<_corner_x> y=#<_corner_y> z=#<_corner_z>)
 

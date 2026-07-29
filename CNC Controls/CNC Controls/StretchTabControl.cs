@@ -374,6 +374,26 @@ namespace CNC.Controls
         protected override void OnItemsChanged(NotifyCollectionChangedEventArgs e)
         {
             base.OnItemsChanged(e);
+            // A tab hidden/shown later (e.g. Tools' capability-gated sub-tabs) changes
+            // how much width is available to spread across the REST of the strip, but neither Add/Remove here
+            // nor this control's own SizeChanged fires just from a child's Visibility flipping - confirmed on
+            // real hardware: newly-revealed tabs kept whatever stale Width they'd last been assigned (often 0,
+            // from before they ever had visible content to measure), wrapping the strip onto 2 rows instead of
+            // spreading evenly. Track each tab's IsVisibleChanged directly so a pure visibility change queues
+            // the same recompute an Add/Remove/resize would.
+            if (e.OldItems != null)
+                foreach (var item in e.OldItems)
+                    if (item is TabItem ti)
+                        ti.IsVisibleChanged -= TabItem_IsVisibleChanged;
+            if (e.NewItems != null)
+                foreach (var item in e.NewItems)
+                    if (item is TabItem ti)
+                        ti.IsVisibleChanged += TabItem_IsVisibleChanged;
+            QueueUpdate();
+        }
+
+        private void TabItem_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
             QueueUpdate();
         }
 

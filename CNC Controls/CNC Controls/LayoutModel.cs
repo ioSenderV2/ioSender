@@ -60,7 +60,7 @@ namespace CNC.Controls
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
                             LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
-                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds";
+                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", OddJobs = "OddJobs";
 
         // Grbl tab's center container (JobWorkspace) + slot
         public const string SlotCenter = "center";
@@ -72,6 +72,10 @@ namespace CNC.Controls
                             StepperCalProbe = "StepperCalProbe",
                             SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness",
                             Trinamic = "Trinamic", PID = "PID";
+
+        // Odd Jobs container slot + job components
+        public const string SlotOddJobs = "oddjobs";
+        public const string OddJobsSetup = "Setup", OddJobsWorkOrder = "WorkOrder";
 
         // Components that must always remain reachable (recovery invariant).
         public static readonly string[] Essential = { Grbl, Settings, MachineSetup };
@@ -99,6 +103,9 @@ namespace CNC.Controls
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
+                    new LayoutNode(LayoutKeys.OddJobs,
+                        new LayoutSlot(LayoutKeys.SlotOddJobs, new[] {
+                            LayoutKeys.OddJobsSetup, LayoutKeys.OddJobsWorkOrder })),
                     new LayoutNode(LayoutKeys.MachineSetup),
                     new LayoutNode(LayoutKeys.HeightMap),
                     new LayoutNode(LayoutKeys.LatheWizards)));

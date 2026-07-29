@@ -164,6 +164,16 @@ namespace CNC.Controls
             set { SetValue(IsReadOnlyProperty, value); }
         }
 
+        // Opt-in "this field differs from an available recommendation" highlight (amber, see the fieldSurface
+        // trigger in the XAML) - used by OddJobsFeedsSpeedsDialog instead of a separate recommendation-text
+        // readout: the field itself flags when it's worth a look, the caller's own ToolTip carries the why.
+        public static readonly DependencyProperty HasRecommendationProperty = DependencyProperty.Register(nameof(HasRecommendation), typeof(bool), typeof(NumericField), new PropertyMetadata());
+        public bool HasRecommendation
+        {
+            get { return (bool)GetValue(HasRecommendationProperty); }
+            set { SetValue(HasRecommendationProperty, value); }
+        }
+
         public static readonly DependencyProperty ColonAtProperty = DependencyProperty.Register(nameof(ColonAt), typeof(double), typeof(NumericField), new PropertyMetadata(70.0d, new PropertyChangedCallback(OnColonAtChanged)));
         public double ColonAt
         {
