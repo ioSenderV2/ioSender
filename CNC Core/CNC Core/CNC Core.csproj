@@ -79,7 +79,6 @@
     <Compile Include="ConfigStore.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
     <Compile Include="FeedsSpeedsAdvisor.cs" />
-    <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="GCodeJob.cs" />
     <Compile Include="Geometry.cs" />
     <Compile Include="Threading.cs" />

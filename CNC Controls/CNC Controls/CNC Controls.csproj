@@ -197,6 +197,7 @@
     <Compile Include="UiTimer.cs" />
     <Compile Include="GamepadInput.cs" />
     <Compile Include="SerialPortDescriptions.cs" />
+    <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="LegacySecrets.cs" />
     <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />

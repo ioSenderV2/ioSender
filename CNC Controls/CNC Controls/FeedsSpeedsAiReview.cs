@@ -1,8 +1,8 @@
 /*
- * FeedsSpeedsAiReview.cs - part of CNC Core library
+ * FeedsSpeedsAiReview.cs - part of CNC Controls library
  *
  * Optional second-opinion pass over FeedsSpeedsAdvisor's table-driven verdicts, only
- * offered when an API key is configured (Settings > App, registry-backed via SecretStore
+ * offered when an API key is configured (Settings > App, via SecretStore
  * - see ApiKeySecretName) - no key means this is simply absent, no setup nagging. The
  * table already encodes the domain expert's
  * chip-load math (an LLM has no special physics insight beyond the same chart), so this
@@ -20,8 +20,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using CNC.Core;   // SecretStore, FeedsSpeedsOperation / OperationRecommendation (the table engine stays in Core)
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     // One parameter's AI opinion: Recommend is null when the AI has nothing to add (agrees with the
     // table, or the parameter isn't applicable) - Comment still carries why, if it said anything.
@@ -45,7 +46,7 @@ namespace CNC.Core
 
     public static class FeedsSpeedsAiReview
     {
-        // Registry key name under SecretStore (Settings > App > "AI Review Key" sets this) - was the
+        // Key name under SecretStore (Settings > App > "AI Review Key" sets this) - was the
         // ANTHROPIC_API_KEY env var; kept as a public const since some call sites/comments still refer to
         // it by that name.
         public const string ApiKeySecretName = "AnthropicApiKey";
@@ -79,7 +80,7 @@ namespace CNC.Core
             return inputTokens / 1_000_000.0 * price.In + outputTokens / 1_000_000.0 * price.Out;
         }
 
-        // Registry-backed via SecretStore (Settings > App's "AI Review Key" row sets this) - was an
+        // Stored via SecretStore (Settings > App's "AI Review Key" row sets this) - was an
         // ANTHROPIC_API_KEY env var lookup.
         public static string GetApiKey()
         {
