@@ -1,5 +1,5 @@
 /*
- * ConfigStore.cs - part of CNC Controls library
+ * ConfigStore.cs - part of CNC Core library
  *
  * Registration-based application config (Phase 0 of the registration architecture refactor,
  * see docs/Architecture-Registration-Refactor.md).
@@ -10,7 +10,12 @@
  * absent section can pull its values from a legacy standalone file via a one-time importer.
  *
  * This file is intentionally free of WPF / app dependencies so the compose/parse/migrate
- * logic can be exercised in isolation.
+ * logic can be exercised in isolation - which is what let it move here from CNC.Controls unchanged
+ * (pr/portable-core). It is plain XDocument + XmlSerializer, NOT System.Configuration, so it already
+ * worked on .NET 8; it was only ever in the WPF assembly by accident of history.
+ *
+ * Note the on-disk format is deliberately untouched by that move: App.config holds real user data
+ * (profiles, layout, keymaps, probe definitions, fixtures, wizard params) on installs that are not ours.
  */
 
 using System;
@@ -19,7 +24,7 @@ using System.Linq;
 using System.Xml.Linq;
 using System.Xml.Serialization;
 
-namespace CNC.Controls
+namespace CNC.Core
 {
     // One registrable unit of configuration. Write() returns the serialized payload element
     // (e.g. <JogConfig>...); the store wraps it in <section key="...">. Read() receives that
@@ -254,7 +259,10 @@ namespace CNC.Controls
 
         // ---- serialization helpers (object <-> XElement, no xsi/xsd namespace noise) ----
 
-        internal static XElement ToElement(XmlSerializer serializer, object o)
+        // public, not internal: IConfigSection is an extension point implemented outside this assembly
+        // (CNC.Controls' LayoutSection, CNC.Controls.Lathe's WizardConfig), and those implementors need
+        // these helpers to produce/consume their payload element.
+        public static XElement ToElement(XmlSerializer serializer, object o)
         {
             if (o == null)
                 return null;
@@ -267,7 +275,7 @@ namespace CNC.Controls
             return tmp.Root;
         }
 
-        internal static object FromElement(XmlSerializer serializer, XElement el)
+        public static object FromElement(XmlSerializer serializer, XElement el)
         {
             if (el == null)
                 return null;

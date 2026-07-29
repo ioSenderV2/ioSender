@@ -77,6 +77,7 @@
     <Compile Include="GCodeExplainer.cs" />
     <Compile Include="Grbl.cs" />
     <Compile Include="Comms.cs" />
+    <Compile Include="ConfigStore.cs" />
     <Compile Include="ControllerService.cs" />
     <Compile Include="ControllerMapper.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
