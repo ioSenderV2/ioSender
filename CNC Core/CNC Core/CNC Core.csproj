@@ -83,6 +83,7 @@
     <Compile Include="FeedsSpeedsAdvisor.cs" />
     <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="GCodeJob.cs" />
+    <Compile Include="Geometry.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="JogController.cs" />
     <Compile Include="LibStrings.cs" />

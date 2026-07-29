@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Xml.Serialization;
 using System.Collections.Generic;
-using System.Windows.Media.Media3D;
 using CNC.Core;
 
 namespace CNC.GCode

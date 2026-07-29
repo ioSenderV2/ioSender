@@ -23,6 +23,10 @@ using System.Windows.Threading;
 using HelixToolkit.Wpf;
 using CNC.Core;
 using CNC.GCode;
+using CNC.Controls;   // GeometryInterop.ToMedia3D
+// As in Renderer.xaml.cs: bare "Point3D" here is the WPF one (Vector3D arithmetic, Point3DCollection);
+// machine geometry arrives as CNC.Core.Point3D and converts via ToMedia3D().
+using Point3D = System.Windows.Media.Media3D.Point3D;
 
 namespace CNC.Controls.Viewer
 {
@@ -332,7 +336,7 @@ namespace CNC.Controls.Viewer
                 if (tokens != null)
                 {
                     var emu = new GCodeEmulator(true);   // translate canned cycles / G28 / G30 into moves
-                    emu.SetStartPosition(new Point3D(0d, 0d, 0d));
+                    emu.SetStartPosition(new CNC.Core.Point3D(0d, 0d, 0d));
 
                     foreach (var a in emu.Execute(tokens))
                     {
@@ -352,10 +356,10 @@ namespace CNC.Controls.Viewer
                                 }
                                 break;
                             case Commands.G0:
-                                AddSeg(a.Start, a.End, true, curRad, curShp, curAng, cut, rapid);
+                                AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), true, curRad, curShp, curAng, cut, rapid);
                                 break;
                             case Commands.G1:
-                                AddSeg(a.Start, a.End, false, curRad, curShp, curAng, cut, rapid);
+                                AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -363,13 +367,13 @@ namespace CNC.Controls.Viewer
                                 var p = a.Start;
                                 foreach (var q in pts)
                                 {
-                                    AddSeg(p, q, false, curRad, curShp, curAng, cut, rapid);
+                                    AddSeg(p.ToMedia3D(), q.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
                                     p = q;
                                 }
                                 break;
                             default:
                                 if (!a.End.Equals(a.Start))
-                                    AddSeg(a.Start, a.End, a.IsRetract, curRad, curShp, curAng, cut, rapid);
+                                    AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), a.IsRetract, curRad, curShp, curAng, cut, rapid);
                                 break;
                         }
                     }

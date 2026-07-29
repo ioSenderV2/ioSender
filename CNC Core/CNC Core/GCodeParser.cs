@@ -42,7 +42,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using System.Xml.Serialization;
 using CNC.Core;
 using System.Text;
@@ -2857,12 +2856,12 @@ namespace CNC.GCode
 
     static public class GCSpline
     {
-        public static List<Point3D> GeneratePoints(double[] start, Point first, Point second, double[] end, double arcResolution, bool isRelative = false)
+        public static List<Point3D> GeneratePoints(double[] start, Point2D first, Point2D second, double[] end, double arcResolution, bool isRelative = false)
         {
             const double min_step = 0.002d, max_step = 0.1d, sigma = 0.1d;
 
             double t = 0d, step = max_step;
-            Point bez_target = new Point(start[0], start[1]);
+            Point2D bez_target = new Point2D(start[0], start[1]);
             List<Point3D> segments = new List<Point3D>();
 
             while (t < 1d)
@@ -2999,7 +2998,7 @@ namespace CNC.GCode
 
         public List<Point3D> GeneratePoints(double[] start, double arcResolution, bool isRelative = false)
         {
-            return GCSpline.GeneratePoints(start, new Point(start[0] + I, start[1] + J), new Point(X + P, Y + Q), Values, arcResolution);
+            return GCSpline.GeneratePoints(start, new Point2D(start[0] + I, start[1] + J), new Point2D(X + P, Y + Q), Values, arcResolution);
         }
     }
 
@@ -3045,8 +3044,8 @@ namespace CNC.GCode
 
         public List<Point3D> GeneratePoints(double[] start, double arcResolution, bool isRelative = false)
         {
-            Point first = new Point(start[0] + (I * 2d) / 3d, start[1] + (J * 2d) / 3d);
-            Point second = new Point(X + ((start[0] + I - X) *2d / 3d), Y + ((start[1] + J - Y) * 2d / 3d));
+            Point2D first = new Point2D(start[0] + (I * 2d) / 3d, start[1] + (J * 2d) / 3d);
+            Point2D second = new Point2D(X + ((start[0] + I - X) *2d / 3d), Y + ((start[1] + J - Y) * 2d / 3d));
 
             return GCSpline.GeneratePoints(start, first, second, Values, arcResolution);
         }

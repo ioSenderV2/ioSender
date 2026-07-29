@@ -226,7 +226,9 @@ namespace CNC.Controls
         public Color HighlightColor { get { return _highlight; } set { _highlight = value; OnPropertyChanged(); } }
         public int ViewMode { get; set; } = -1;
         public int ToolVisualizer { get; set; } = 1;
-        public Point3D CameraPosition { get; set; }
+        // Renderer camera state, persisted in App.config - deliberately the WPF Media3D types (this is
+        // view state, not machine geometry), so it must be qualified now that CNC.Core has its own Point3D.
+        public System.Windows.Media.Media3D.Point3D CameraPosition { get; set; }
         public Vector3D CameraLookDirection { get; set; }
         public Vector3D CameraUpDirection { get; set; }
     }
