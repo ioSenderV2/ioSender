@@ -120,6 +120,19 @@ namespace CNC.Core
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 
+        // A P/Invoke declaration is harmless on any platform - it only fails when CALLED - so the call is
+        // gated on actually being on Windows rather than the declaration being conditionally compiled.
+        // PlatformID is used rather than RuntimeInformation.IsOSPlatform because this file has to compile
+        // for net462, where that API is not available.
+        private static bool IsWindows
+        {
+            get
+            {
+                var p = Environment.OSVersion.Platform;
+                return p == PlatformID.Win32NT || p == PlatformID.Win32Windows || p == PlatformID.Win32S || p == PlatformID.WinCE;
+            }
+        }
+
         // A hard link (not a symlink) is used deliberately: creating an NTFS symlink needs
         // SeCreateSymbolicLinkPrivilege (admin, or Developer Mode enabled) - a hard link needs neither,
         // works for any user on the same volume, and since it's the SAME underlying file (not a copy),
@@ -132,7 +145,15 @@ namespace CNC.Core
             {
                 string latest = System.IO.Path.Combine(dir, linkName);
                 try { File.Delete(latest); } catch { }
-                if (!CreateHardLink(latest, path, IntPtr.Zero))
+
+                bool linked = false;
+                if (IsWindows) try
+                {
+                    linked = CreateHardLink(latest, path, IntPtr.Zero);
+                }
+                catch { }   // DllNotFoundException/EntryPointNotFound - fall through to the copy
+
+                if (!linked)
                     File.Copy(path, latest, true);
             }
             catch { /* best-effort - a missing convenience link must never block logging itself */ }

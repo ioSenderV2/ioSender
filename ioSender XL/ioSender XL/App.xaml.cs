@@ -171,6 +171,7 @@ namespace GCode_Sender
             // CNC.Core marshals to the UI thread and pumps messages through this instead of
             // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
             CNC.Controls.UiPump.Register();
+            CNC.Controls.SerialPortDescriptions.Register();   // WMI friendly names for the port picker
             CNC.Controls.AppMessageBox.Register();
             // GrblViewModel.Keyboard is the portable JogController by default; point it at the WPF
             // keypress handler before the first model is built (MainWindow.xaml instantiates one).

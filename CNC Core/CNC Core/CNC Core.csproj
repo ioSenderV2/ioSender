@@ -48,7 +48,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
-    <Reference Include="System.Management" />
+    <!-- System.Management dropped: the WMI COM-port description lookup moved to
+         CNC.Controls.SerialPortDescriptions (WMI compiles anywhere but is Windows-only at runtime).
+         Port ENUMERATION stays here - it must run where the hardware is. -->
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />

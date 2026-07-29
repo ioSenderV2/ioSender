@@ -50,6 +50,7 @@
     <Reference Include="System" />
     <Reference Include="UIAutomationProvider" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Management" />   <!-- WMI: serial port friendly names -->
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
@@ -195,6 +196,7 @@
     <Compile Include="XInput.cs" />
     <Compile Include="UiTimer.cs" />
     <Compile Include="GamepadInput.cs" />
+    <Compile Include="SerialPortDescriptions.cs" />
     <Compile Include="LegacySecrets.cs" />
     <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />

@@ -42,8 +42,8 @@ using System.Linq;
 using System.Text;
 using System.IO;
 using System.IO.Ports;
-using System.Management;
 using System.Threading;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace CNC.Core
@@ -612,6 +612,16 @@ namespace CNC.Core
             SelectedMode = ConnectModes[0];
         }
 
+        /// <summary>
+        /// Host-supplied friendly names for serial ports, keyed by port name ("COM3" -> "USB Serial Device").
+        /// Enumerating the ports themselves stays here - it has to run where the hardware is, which in a
+        /// client/server split is the server. Only the DESCRIPTION is host-specific: it used to come from a
+        /// WMI query (Win32_PnPEntity), which compiles anywhere but is Windows-only at runtime. The WPF app
+        /// installs that via CNC.Controls.SerialPortDescriptions; a host that installs nothing simply gets
+        /// bare port names.
+        /// </summary>
+        public static Func<IEnumerable<string>, IDictionary<string, string>> DescriptionProvider;
+
         public void Refresh ()
         {
             var _portnames = SerialPort.GetPortNames();
@@ -628,31 +638,28 @@ namespace CNC.Core
                     _portnames = pn.ToArray();
                 }
 
-                using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Caption like '%(COM%'")) try
+                IDictionary<string, string> descriptions = null;
+                try
                 {
-                    var ports = searcher.Get().Cast<ManagementBaseObject>().ToList().Select(p => p["Caption"].ToString());
-                    var portList = _portnames.Select(n => ports.FirstOrDefault(s => s.Contains('(' + n + ')'))).ToList();
-                    foreach (var fullname in portList)
-                    {
-                        var name = fullname.Substring(fullname.IndexOf("(COM") + 1).Trim().TrimEnd(')');
-                        var port = new ComPort(name);
-
-                        port.FullName = name + " - " + fullname.Replace('(' + name + ')', string.Empty).Trim();
-
-                        Ports.Add(port);
-                    }
+                    if (DescriptionProvider != null)
+                        descriptions = DescriptionProvider(_portnames);
                 }
-                catch
-                {
-                }
+                catch { }
 
-                if (Ports.Count != _portnames.Length)
+                // Straight pass over the sorted names, description where one is known. The previous version
+                // built the described list first and appended undescribed ports afterwards - and threw a NRE
+                // mid-loop for any port WMI had no caption for, aborting the whole block into the same
+                // fallback. Every port still appears, described where possible; the order is now simply the
+                // sorted one in all cases.
+                foreach (var name in _portnames)
                 {
-                    foreach (var port in _portnames)
-                    {
-                        if (port.StartsWith("COM") && Ports.Where(n => n.Name == port).FirstOrDefault() == null)
-                            Ports.Add(new ComPort(port));
-                    }
+                    var port = new ComPort(name);
+
+                    string description;
+                    if (descriptions != null && descriptions.TryGetValue(name, out description) && !string.IsNullOrWhiteSpace(description))
+                        port.FullName = name + " - " + description.Trim();
+
+                    Ports.Add(port);
                 }
 
                 if (Ports.Count > 0)
