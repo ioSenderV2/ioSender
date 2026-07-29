@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>189 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>191 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -325,6 +325,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Console tab now mirrors to a durable, timestamped log file per run - survives a UI freeze or a firmware debug flood that used to leave no record behind.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr111">111</a></td></tr>
 <tr><td>Console shows a controller restart-after-hang notice (with a report-it dialog) and a firmware-change notice, right on reconnect.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr126">126</a></td></tr>
 <tr><td>OBS Control panel + F7-F12 hotkeys start/stop the 2 Tapo RTSP cameras and the app screen-capture source individually, filing each take into a named subfolder.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr142">142</a></td></tr>
+<tr><td>Macros get a pinned main-panel list and a proper Create/Edit dialog; buttons line up; tooltips work on disabled controls.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr190">190</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -378,6 +379,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Closing the window while a job is running/paused now explains why instead of silently refusing; a WPF crash typing fast in the Grbl settings search is fixed; hover tooltips for a line like T1M6 now read in the same order the words appear.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr185">185</a></td></tr>
 <tr><td>Every real screenshot in the User Manual gets a novice-friendly bullet breakdown of its visible UI regions; new tools for a multi-shot reshoot round-trip.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr186">186</a></td></tr>
 <tr><td>A saved keymap entry missing its Method no longer crashes startup; a probing-triggered status message can no longer crash the app from a background thread; the console shows the controller's $I response and typed $ commands again, while internal $CWD housekeeping traffic stays quiet.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr189">189</a></td></tr>
+<tr><td>Dragging a tab header no longer crashes the app or strands it with an invisible page and a stuck cursor.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr191">191</a></td></tr>
 </table>
 </div>
 
@@ -597,7 +599,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.30</td></tr>
 <tr><td class="n">188</td><td><a href="#pr188">Configurable probe search distance on all 4 Probing tabs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+88</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">189</td><td><a href="#pr189">Crash fixes: null keymap load, cross-thread UI crash; console visibility restored at connect</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+67</span> <span class="del">-7</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (189 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1559</span> <span class="del">21</span> <span class="add">+183</span><br><span class="k">Lines:</span> <span class="add">+62984</span> <span class="del">-11685</span></td></tr>
+<tr><td class="n">190</td><td><a href="#pr190">UI feedback pass: Macros panel, button widths, tooltips</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+600</span> <span class="del">-152</span></td></tr>
+<tr><td class="n">191</td><td><a href="#pr191">Fix: tab drag could crash or freeze the window</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+44</span> <span class="del">-4</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (191 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1582</span> <span class="del">21</span> <span class="add">+187</span><br><span class="k">Lines:</span> <span class="add">+63628</span> <span class="del">-11841</span></td></tr>
 </table>
 </div>
 
@@ -3733,6 +3737,46 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><ul><li><strong>Null keymap crash on startup</strong> (<a href="https://github.com/ioSenderV2/ioSender/issues/12">GitHub #12</a>) &mdash; a saved <code>KeyMap</code> config entry (App.config or legacy <code>KeyMap0.xml</code>) missing its <code>Method</code> element deserializes with a null <code>method</code> field; <code>KeypressHandler.ImportMappings</code> called <code>.StartsWith()</code> on it with no null check, crashing every startup for an install with a stale/hand-edited keymap. Guarded.</li><li><strong>Cross-thread UI crash</strong> (<a href="https://github.com/ioSenderV2/ioSender/issues/7">GitHub #7</a>) &mdash; <code>ProbingViewModel.WaitForResponse</code> (and similar helpers, plus <code>StreamPump.Run</code>'s job-streaming thread) call into <code>GrblViewModel</code> directly from a worker thread, bypassing the normal <code>Dispatcher</code>-marshaled response path. A manually-wired UI subscriber touching a <code>DependencyObject</code> in response then throws <code>"the calling thread cannot access this object"</code> - originally reported against a since-renamed method (<code>EmphasizeMessage</code> &rarr; <code>FlashMessage</code>), same live bug either way. Fixed at the single choke point every property-change notification funnels through: <code>ViewModelBase.OnPropertyChanged</code> now marshals onto the UI thread when raised off it, a no-op for the normal case already on that thread.</li><li><strong>Console showed nothing from the controller</strong> (<a href="https://github.com/ioSenderV2/ioSender/issues/9">GitHub #9</a>) &mdash; four related console-visibility gaps: a typed <code>$$</code>/<code>$?</code>/<code>$pins</code> command's reply was silently dropped unless "Verbose" was checked, even though typing it is an explicit request to see it; the controller's reset/boot banner could be swallowed by an internal "quiet" handshake window; the <code>$I</code> "who am I" response at connect was deliberately hidden as boilerplate in an earlier change, removing the only visible confirmation a connection came up correctly; and, in the opposite direction, internal <code>$CWD</code> directory-navigation traffic (checking/provisioning ATC macros against littlefs) was leaking into the console as noise whenever Verbose was on. All four addressed without reintroducing the others.</li></ul><p class="foot">All three fixes user-verified interactively: keymap crash confirmed closed via code inspection (exact stack-trace line unchanged since v2.0.1); cross-thread fix verified via the original Probing-tab repro plus a normal job run; console fixes verified via $?/$$/$pins/$1 replies and $CWD noise gone during an ATC macro check.</p></div>
+</div>
+<!-- ===== #190 ===== -->
+<div class="pr">
+<h2 id="pr190"><span class="badge">#190</span>UI feedback pass: Macros panel, consistent button widths, tooltips on disabled controls</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/MacroPinnedListControl.xaml</td><td class="num add">82</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MacroPinnedListControl.xaml.cs</td><td class="num add">141</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MacroCreateDialog.xaml</td><td class="num add">37</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MacroCreateDialog.xaml.cs</td><td class="num add">148</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MacroManagerDialog.xaml.cs</td><td class="num add">81</td><td class="num del">76</td></tr>
+<tr><td class="mono">CNC Controls/MacroExecuteControl.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/MacroProcessor.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/MainPanelRegistry.cs</td><td class="num add">8</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/AppleStyles.xaml</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">4</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/FeedsAndSpeedsView.xaml</td><td class="num add">10</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml</td><td class="num add">6</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml</td><td class="num add">3</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/OffsetView.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/MDIControl.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/StatusControl.xaml</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GCode.cs</td><td class="num add">5</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml + .xaml.cs</td><td class="num add">33</td><td class="num del">12</td></tr>
+<tr><td class="mono">ioSender XL/ProgramPanel.xaml + .xaml.cs</td><td class="num add">8</td><td class="num del">17</td></tr>
+<tr><td class="mono">Locale/en-US/csv (2 files)</td><td class="num add">8</td><td class="num del">8</td></tr>
+</table>
+<div class="desc"><p>A pass over the points raised in first-time-user feedback &mdash; mostly small things that add up to the app feeling less hand-made.</p><ul><li><strong>Macros panel rebuilt.</strong> Macros now show as a compact pinned list in the main panel instead of a toolbar-only affair, with a proper <em>Create/Edit</em> dialog: name, prompt text, add-to-menu, an F-key assignment dropdown, and the macro body &mdash; including an <code>@&lt;path&gt;</code> file reference so a macro can live in its own <code>.macro</code> file rather than inline.</li><li><strong>Buttons line up.</strong> Fixed widths applied across the Job tab run bar, MDI <em>Send</em>, the Offsets <em>Clr</em>/<em>Get</em> pair and Feeds &amp; Speeds, so controls in a row are the same size instead of each sizing to its own caption.</li><li><strong>Tooltips work on disabled controls, app-wide.</strong> Previously a disabled button explained nothing &mdash; exactly when you most want to know why it is disabled.</li><li><strong>Load File moved to the main menu</strong>, and the Job tab's redundant <em>Program</em> toggle removed.</li><li><strong>Machine Setup</strong> Overview text repositioned so it no longer competes with the step list.</li></ul></div>
+</div>
+<!-- ===== #191 ===== -->
+<div class="pr">
+<h2 id="pr191"><span class="badge">#191</span>Fix: dragging a tab could crash ioSender or leave the window unusable</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/StretchTabControl.cs</td><td class="num add">26</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SDCardView.xaml.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Tabs can be dragged to reorder them. Doing so could either crash ioSender outright or leave the window looking frozen &mdash; page contents gone, the cursor stuck as a horizontal arrow, and no apparent response to input until the app was closed and restarted. Reported as <a href="https://github.com/ioSenderV2/ioSender/issues/17">issue #17</a>, present since the drag-to-reorder feature was added.</p><p>Both faults came from the same thing: the reorder rearranged the live tab list while the drag was still in progress.</p><ul><li><strong>The crash.</strong> Moving a tab in the list makes the app select a different one <em>immediately</em>, while the dragged tab is momentarily detached &mdash; and a detached tab has no data behind it. Whichever page was activated at that instant then read data that was not there. The page shown is now left alone until the drag finishes, at which point the settled selection activates normally.</li><li><strong>The stuck window.</strong> The tab strip never claimed the mouse for the duration of the drag, so releasing the button anywhere except back over the tab strip &mdash; over the page, another panel, or outside the window &mdash; meant the drag never formally ended. The two things the drag switches on, an application-wide cursor override and the clipping that hides the page while tabs shuffle, were left switched on permanently. The app was never actually hung; it was clipped down to its tab strip. The drag now claims the mouse, and both effects are cleared unconditionally when it ends.</li></ul><p>Ordinary clicking to change tabs is unaffected: the mouse is only claimed once a drag has genuinely started.</p></div>
 </div>
 </section>
 

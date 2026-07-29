@@ -1,16 +1,12 @@
 /*
  * MacroManagerDialog.xaml.cs - part of CNC Controls library
  *
- * Macro manager presented as a DataGrid (one row per macro: Name, Prompt-before-run,
- * and the F-key that runs it). Name and Prompt are edited in-line. Edit opens the macro's
- * stored definition (inline G-code, or the "@<path>" reference line) in the default .txt
- * editor and reads it back; View opens what it points to - the referenced file for an
- * "@<path>" macro (created if missing), otherwise the code (no read-back). Opened from the
- * Settings:App page; the caller persists on close.
- *
- * The F-key that runs each macro is selectable per row (editable F1-F12 dropdown,
- * kept unique); legacy macros without one migrate from their Id (Id n -> Fn) on load.
- *
+ * Macro manager presented as a DataGrid (one row per macro: Name, File reference if any,
+ * Prompt-before-run, and the F-key that runs it). Name and Prompt are editable in-line; the F-key
+ * dropdown (F1-F12 or "-" for none, kept unique across macros) is also editable in-line. Create and
+ * Edit both open MacroCreateDialog (Name/Prompt/Add-to-menu/Key/Code, commit-on-OK only). View opens
+ * what the macro points to - the referenced file for an "@<path>" macro (created if missing),
+ * otherwise the code (no read-back). Opened from the Settings:Macros tab; the caller persists on close.
  */
 
 using System;
@@ -18,6 +14,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -29,13 +26,18 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for MacroManagerDialog.xaml
     /// </summary>
-    public partial class MacroManagerDialog : UserControl, ISettingsEditorTab
+    public partial class MacroManagerDialog : UserControl, ISettingsEditorTab, IRestartRequired
     {
         private readonly ObservableCollection<CNC.GCode.Macro> macros;
         private readonly List<string> tempFiles = new List<string>();
+        private Dictionary<int, bool> baselineAddToMenu;
 
         /// <summary>F-key choices for the Key column dropdown (— / F1..F12). Bound from XAML.</summary>
         public List<FKeyOption> FKeyOptions { get; } = FKeyOption.All();
+
+        // The menu items built from "Add to menu" macros are only built once at startup (MainWindow's
+        // BuildMacroMenuItems) - there's no live rebuild, so any change needs a restart to take effect.
+        public event EventHandler<RestartRequiredEventArgs> RestartRequired;
 
         public MacroManagerDialog(ObservableCollection<CNC.GCode.Macro> macros)
         {
@@ -47,15 +49,37 @@ namespace CNC.Controls
             if (macros != null && macros.Count > 0)
                 grdMacros.SelectedIndex = 0;
 
+            baselineAddToMenu = SnapshotAddToMenu();
+
             UpdateButtons();
             Unloaded += MacroManagerDialog_Unloaded;
         }
 
+        private Dictionary<int, bool> SnapshotAddToMenu()
+        {
+            var snapshot = new Dictionary<int, bool>();
+            foreach (var m in macros)
+                snapshot[m.Id] = m.AddToMenu;
+            return snapshot;
+        }
+
         // Save-on-leave: edits mutate the shared macros collection live, so persistence is all that's needed
-        // when the Macros tab is left. Called by the settings host on tab-switch / view-leave.
+        // when the Macros tab is left. Called by the settings host on tab-switch / view-leave. If any
+        // macro's "Add to menu" changed (including a new/deleted macro that had it set), signal the host
+        // to surface its Restart button - the main menu can't be rebuilt live.
         public void Commit()
         {
+            var current = SnapshotAddToMenu();
+            bool changed = current.Count != baselineAddToMenu.Count
+                || current.Any(kv => !baselineAddToMenu.TryGetValue(kv.Key, out var was) || was != kv.Value);
+
             AppConfig.Settings.Save();
+
+            if (changed)
+            {
+                RestartRequired?.Invoke(this, new RestartRequiredEventArgs("Restart required to apply Macros \"Add to menu\" changes."));
+                baselineAddToMenu = current;
+            }
         }
 
         private CNC.GCode.Macro Selected { get { return grdMacros.SelectedItem as CNC.GCode.Macro; } }
@@ -83,20 +107,6 @@ namespace CNC.Controls
                     m.FKey = 0;
         }
 
-        private int FirstFreeFKey()
-        {
-            var used = new HashSet<int>();
-            foreach (var m in macros)
-                if (m.FKey >= 1 && m.FKey <= 12)
-                    used.Add(m.FKey);
-
-            for (int i = 1; i <= 12; i++)
-                if (!used.Contains(i))
-                    return i;
-
-            return 0;   // all twelve taken
-        }
-
         // Keep names non-empty (they label the row, the run prompt and the macro flyout button).
         private void grdMacros_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
@@ -112,14 +122,16 @@ namespace CNC.Controls
                 id = Math.Max(id, m.Id);
             id++;
 
-            var macro = new CNC.GCode.Macro { Id = id, Name = "Macro " + id, ConfirmOnExecute = true, Code = string.Empty, FKey = FirstFreeFKey() };
+            var macro = new CNC.GCode.Macro { Id = id, Name = "Macro " + id, ConfirmOnExecute = true, Code = string.Empty, FKey = 0 };
+
+            var dlg = new MacroCreateDialog(macro, macros) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() != true)
+                return;
+
             macros.Add(macro);
 
             grdMacros.SelectedItem = macro;
             grdMacros.ScrollIntoView(macro);
-            grdMacros.Focus();
-            grdMacros.CurrentCell = new DataGridCellInfo(macro, grdMacros.Columns[0]);
-            grdMacros.BeginEdit();   // let the user name it straight away
         }
 
         // View: open what the macro points to. For an "@<path>" reference that's the referenced
@@ -151,33 +163,16 @@ namespace CNC.Controls
                 LaunchEditor(WriteTempMacro(macro));
         }
 
-        // Edit: edit the macro's stored definition - the inline G-code, or the "@<path>" reference
-        // line itself (so the path can be changed, repointed, or converted back to inline). Read back.
+        // Edit: reopens the same Name/Prompt/Add-to-menu/Key/Code dialog used by Create, pre-filled from
+        // the selected macro. If its body is an "@<path>" reference, the dialog offers to jump straight
+        // to editing the real file in a text editor before showing the fields.
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
             var macro = Selected;
             if (macro == null)
                 return;
 
-            string path = WriteTempMacro(macro);
-            if (!LaunchEditor(path))
-                return;
-
-            var result = AppDialogs.Show(
-                string.Format("Editing \"{0}\" in your text editor.\r\n\r\nSave your changes there, then click OK to apply them to the macro.\r\nClick Cancel to discard.", macro.Name),
-                "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Information);
-
-            if (result == MessageBoxResult.OK)
-            {
-                try
-                {
-                    macro.Code = File.ReadAllText(path).TrimEnd('\r', '\n');
-                }
-                catch (Exception ex)
-                {
-                    AppDialogs.Show("Could not read the edited macro back:\r\n\r\n" + ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            }
+            new MacroCreateDialog(macro, macros) { Owner = Window.GetWindow(this) }.ShowDialog();
         }
 
         private void btnDelete_Click(object sender, RoutedEventArgs e)
@@ -191,10 +186,37 @@ namespace CNC.Controls
                 macros.Remove(macro);
         }
 
-        // If the macro is an "@<path>" reference, return the resolved file path (relative paths
-        // against the config folder); otherwise null. Mirrors MacroProcessor's run-time resolver.
-        private static string GetReferencedFilePath(string code)
+        // If 'code' is a single "@<path>" line and <path> has no extension, appends the default
+        // ".macro" extension to the path portion - so what's typed/stored/displayed is unambiguous
+        // rather than relying on resolve-time defaulting alone (MacroProcessor.ResolveFileReference
+        // does the same, as a safety net for references normalized before this existed).
+        internal static string NormalizeMacroReference(string code)
         {
+            if (string.IsNullOrEmpty(code))
+                return code;
+
+            string trimmed = code.TrimStart();
+            if (!trimmed.StartsWith("@"))
+                return code;
+
+            string rest = trimmed.Substring(1);
+            int nl = rest.IndexOfAny(new[] { '\r', '\n' });
+            string path = (nl >= 0 ? rest.Substring(0, nl) : rest).Trim();
+            string tail = nl >= 0 ? rest.Substring(nl) : string.Empty;
+
+            if (path.Length == 0 || Path.HasExtension(path))
+                return code;
+
+            return "@" + path + ".macro" + tail;
+        }
+
+        // If the macro is an "@<path>" reference, return the resolved file path (relative paths
+        // against the config folder; extensionless paths default to ".macro" - see
+        // NormalizeMacroReference); otherwise null. Mirrors MacroProcessor's run-time resolver.
+        internal static string GetReferencedFilePath(string code)
+        {
+            code = NormalizeMacroReference(code);
+
             if (string.IsNullOrEmpty(code))
                 return null;
 
@@ -269,32 +291,12 @@ namespace CNC.Controls
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            string code = value as string;
-            if (string.IsNullOrEmpty(code))
-                return null;
-
-            string trimmed = code.TrimStart();
-            if (!trimmed.StartsWith("@"))
-                return null;
-
-            string path = trimmed.Substring(1);
-            int nl = path.IndexOfAny(new[] { '\r', '\n' });
-            if (nl >= 0)
-                path = path.Substring(0, nl);
-            path = path.Trim();
-            if (path.Length == 0)
+            string path = MacroManagerDialog.GetReferencedFilePath(value as string);
+            if (path == null)
                 return null;
 
             if ((parameter as string) == "path")
-            {
-                try
-                {
-                    if (!Path.IsPathRooted(path))
-                        path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
-                }
-                catch { /* not a valid filesystem path - show it as typed */ }
                 return "References: " + path;
-            }
 
             try { return Path.GetFileName(path); } catch { return path; }
         }
@@ -311,11 +313,14 @@ namespace CNC.Controls
         public int Value { get; set; }
         public string Label { get; set; }
 
+        // F1 listed last - it's already the app's global Help hotkey (MainWindow's PreviewKeyDown),
+        // so it's still selectable but not the first thing offered.
         public static List<FKeyOption> All()
         {
             var list = new List<FKeyOption> { new FKeyOption { Value = 0, Label = "—" } };
-            for (int i = 1; i <= 12; i++)
+            for (int i = 2; i <= 12; i++)
                 list.Add(new FKeyOption { Value = i, Label = "F" + i });
+            list.Add(new FKeyOption { Value = 1, Label = "F1" });
             return list;
         }
     }

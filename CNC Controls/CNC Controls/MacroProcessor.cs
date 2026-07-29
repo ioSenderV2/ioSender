@@ -520,6 +520,10 @@ namespace CNC.Controls
         // Returns false (after a message) if the file cannot be read.
         private static bool ResolveFileReference(ref string code, string name)
         {
+            // Extensionless @<path> defaults to ".macro" - normally already baked into the stored text
+            // by MacroCreateDialog, this is a safety net for references normalized before that existed.
+            code = MacroManagerDialog.NormalizeMacroReference(code);
+
             string trimmed = code.TrimStart();
             if (!trimmed.StartsWith("@"))
                 return true;
