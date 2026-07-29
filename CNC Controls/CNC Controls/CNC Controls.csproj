@@ -184,6 +184,7 @@
       <DependentUpon>GrblAlarmList.xaml</DependentUpon>
     </Compile>
     <Compile Include="GeometryInterop.cs" />
+    <Compile Include="UiPump.cs" />
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="ShortcutKey.cs" />
     <Compile Include="KeyMapEditor.xaml.cs">

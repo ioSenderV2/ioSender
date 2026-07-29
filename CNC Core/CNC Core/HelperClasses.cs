@@ -46,9 +46,8 @@ namespace CNC.Core
         // overwhelming common case): CheckAccess is a simple thread-id compare.
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-                dispatcher.Invoke(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+            if (!UiContext.IsCurrent)
+                UiContext.Send(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
             else
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

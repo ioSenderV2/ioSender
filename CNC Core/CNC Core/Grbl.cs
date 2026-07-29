@@ -50,7 +50,6 @@ using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading;
-using System.Windows.Threading;
 using System.Windows;
 using CNC.GCode;
 using System.Collections.Concurrent;
@@ -1145,7 +1144,7 @@ namespace CNC.Core
     {
         #region Attributes
 
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         private static bool _probeProtect = false, _latheUVWMode = false;
         private static int _numAxes;
         private static string _axisLetters = GrblConstants.AXISLETTERS;
@@ -1359,7 +1358,7 @@ namespace CNC.Core
             // show it in the console rather than hiding it as boilerplate (was model.Silent = true; see
             // the [MSG:...] special-case comment below this method's call site for the prior rationale).
             Firmware = model.Firmware;
-            dispatcher = Dispatcher.CurrentDispatcher;
+            target = SyncTarget.Capture();
             dataReceived += Process;
 
             new Thread(() =>
@@ -1598,9 +1597,9 @@ namespace CNC.Core
 
         private static void Process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            if (!target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => dataReceived(data));
                 return;
             }
 
@@ -2168,7 +2167,7 @@ namespace CNC.Core
 
     public class GrblWorkParameters
     {
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         public static bool IsLoaded { get { return CoordinateSystems.Count > 0; } }
         public static LatheMode LatheMode { get; private set; }
         public static double ToolLengthOffsetReference { get; private set; } = double.NaN;
@@ -2213,7 +2212,7 @@ namespace CNC.Core
             if (!GrblParserState.IsLoaded)
                 GrblParserState.Get(model);
 
-            dispatcher = Dispatcher.CurrentDispatcher;
+            target = SyncTarget.Capture();
             dataReceived += process;
             LatheMode = GrblParserState.LatheMode;
             HomedMask = -1;     // fail-closed: only a fresh [HOME:...] line sets it
@@ -2317,9 +2316,9 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            if (!target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => dataReceived(data));
                 return;
             }
 
@@ -2536,7 +2535,7 @@ namespace CNC.Core
 
     public static class GrblSpindles
     {
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         public static ObservableCollection<Spindle> Spindles { get; private set; } = new ObservableCollection<Spindle>();
 
         private static Action<string> dataReceived;
@@ -2552,7 +2551,7 @@ namespace CNC.Core
 
             if (GrblInfo.IsGrblHAL && GrblInfo.Build >= 20240307 && Spindles.Count == 0)
             {
-                dispatcher = Dispatcher.CurrentDispatcher;
+                target = SyncTarget.Capture();
                 dataReceived += process;
 
                 PollGrbl.Suspend();
@@ -2592,9 +2591,9 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            if (!target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => dataReceived(data));
                 return;
             }
 
@@ -3876,9 +3875,12 @@ namespace CNC.Core
 
                     if (setting == null)
                     {
-                        Action<GrblSettingDetails> addMethod = Settings.Add;
                         setting = new GrblSettingDetails(id.ToString() + "|0||||||");
-                        Application.Current.Dispatcher.BeginInvoke(addMethod, setting);
+                        var added = setting;
+                        // Queued, not inline, even when already on the UI thread: the caller configures
+                        // `setting` immediately below, and the original BeginInvoke meant the collection
+                        // (and anything bound to it) saw a fully populated entry.
+                        UiContext.Post(() => Settings.Add(added));
                     }
 
                     setting.Value = valuepair[1];

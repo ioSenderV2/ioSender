@@ -8,7 +8,6 @@
  */
 
 using System;
-using System.Windows.Threading;
 
 namespace CNC.Core
 {
@@ -20,12 +19,12 @@ namespace CNC.Core
 
     public class ControllerService
     {
-        private readonly DispatcherTimer timer;
+        private readonly UiTimer timer;
         private int activeIndex = -1;   // XInput slot currently in use, -1 while searching
         private bool connected = false;
         private ushort prevButtons = 0;
         private XInputGamepad pad;
-        private DispatcherTimer rumbleTimer;
+        private UiTimer rumbleTimer;
 
         public event EventHandler<ControllerButtonEventArgs> ButtonPressed;
         public event EventHandler<ControllerButtonEventArgs> ButtonReleased;
@@ -42,7 +41,7 @@ namespace CNC.Core
 
         public ControllerService(int pollHz = 60)
         {
-            timer = new DispatcherTimer(DispatcherPriority.Input)
+            timer = new UiTimer
             {
                 Interval = TimeSpan.FromMilliseconds(1000.0 / Math.Max(15, pollHz))
             };
@@ -142,7 +141,7 @@ namespace CNC.Core
 
             if (rumbleTimer == null)
             {
-                rumbleTimer = new DispatcherTimer(DispatcherPriority.Background);
+                rumbleTimer = new UiTimer();
                 rumbleTimer.Tick += (s, e) => StopRumble();
             }
             rumbleTimer.Stop();

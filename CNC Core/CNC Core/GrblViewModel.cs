@@ -427,11 +427,7 @@ namespace CNC.Core
 
         private static void RunOnUIThread(System.Action action)
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher == null || dispatcher.CheckAccess())
-                action();
-            else
-                dispatcher.BeginInvoke(action);
+            UiContext.Run(action);
         }
         public bool SuspendProcessing { get; set; } = false;
         public bool IgnoreNextCycleStart { get; set; } = false;

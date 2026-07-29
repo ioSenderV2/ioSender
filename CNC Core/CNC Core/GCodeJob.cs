@@ -42,7 +42,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using CNC.GCode;

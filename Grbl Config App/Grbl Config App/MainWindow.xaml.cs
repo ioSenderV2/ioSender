@@ -58,6 +58,10 @@ namespace Grbl_Config_App
         public MainWindow()
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
+            // Before InitializeComponent: MainWindow.xaml instantiates a GrblViewModel, and CNC.Core
+            // marshals to the UI thread through this instead of Application.Current.Dispatcher.
+            CNC.Core.UiContext.Register();
+            CNC.Controls.UiPump.Register();   // EventUtils.DoEvents - must be installed with the context above
 
             InitializeComponent();
             Title = string.Format(Title, version);

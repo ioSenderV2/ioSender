@@ -38,7 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
-using System.Windows.Threading;
 
 namespace CNC.Core
 {
@@ -209,20 +208,24 @@ namespace CNC.Core
         }
     }
 
+    /// <summary>
+    /// Nested message pump, used by the blocking controller handshakes (connect, settings read, macro
+    /// execution) to keep the host responsive while they wait for replies. ~70 call sites.
+    ///
+    /// The WPF implementation (DispatcherFrame + Dispatcher.PushFrame) cannot live in CNC.Core, so the
+    /// host installs it - see CNC.Controls.UiPump.Register, called from the same startup line as
+    /// UiContext.Register so the two cannot get out of step. A host with no message loop (a headless
+    /// server) leaves it null, where doing nothing is correct: there is no UI to keep alive.
+    /// </summary>
     public static class EventUtils
     {
+        public static System.Action Pump;
+
         public static void DoEvents()
         {
-            DispatcherFrame frame = new DispatcherFrame();
-            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new DispatcherOperationCallback(ExitFrame), frame);
-            Dispatcher.PushFrame(frame);
-        }
-
-        public static object ExitFrame(object f)
-        {
-            ((DispatcherFrame)f).Continue = false;
-
-            return null;
+            var pump = Pump;
+            if (pump != null)
+                pump();
         }
     }
 }
