@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Proves CNC.Core RUNS on .NET 8, not just that it compiles. Console host, no UI, no hooks registered -
+    exactly the position a headless server would be in.
+
+    It is deliberately READ-ONLY against the controller: it opens the port, asks for a status report ('?')
+    and the build info ('$I'), and prints what comes back. It sends nothing that can move a machine.
+
+    dotnet run (project tools/net8-smoke) COM6
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>net8smoke</AssemblyName>
+    <RootNamespace>Net8Smoke</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+  </ItemGroup>
+
+</Project>

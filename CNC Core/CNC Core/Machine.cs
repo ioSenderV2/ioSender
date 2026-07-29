@@ -108,7 +108,12 @@ namespace CNC.Core
             Feedrate = val == null ? 0d : double.Parse(val, CultureInfo.InvariantCulture);
             val = GrblParserState.IsActive("S");
             _rpm = val == null ? 0d : double.Parse(val, CultureInfo.InvariantCulture);
-            _tool = GrblParserState.Tool == GrblConstants.NO_TOOL ? 0 : int.Parse(GrblParserState.Tool);
+            // TryParse, not Parse: the sentinel is "None", but before any parser state has been received
+            // Tool is simply EMPTY - and int.Parse("") throws. The WPF app never hits this because a parser
+            // is only built after a connection has reported state; a headless host builds one immediately
+            // (found by actually running CNC.Core on .NET, which no amount of compiling would have shown).
+            int toolnum;
+            _tool = int.TryParse(GrblParserState.Tool, out toolnum) ? toolnum : 0;
             SelectedTool = null;
             RetractOldZ = GrblParserState.IsActive("G99") == null;
             SpindleRpmMode = GrblParserState.IsActive("G96") == null;
