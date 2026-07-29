@@ -42,26 +42,21 @@
 
     <Grid Margin="10" d:DataContext="{d:DesignInstance Type=local:MachineSetupWizard}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,8">
-            <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
-            <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray"
-                       Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
-            <Separator Margin="0,4"/>
-        </StackPanel>
-
         <!-- Body: one tab per setup step -->
-        <local:StretchTabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+        <local:StretchTabControl x:Name="tabSteps" Grid.Row="0" Background="Transparent" SelectionChanged="Steps_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
 
             <!-- Overview -->
             <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Read this first: what each setup step below configures.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
+                        <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0"
+                                   Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
+                        <Separator Margin="0,8,0,4"/>
                         <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
                         <TextBlock x:Uid="ov_body" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:"/>
@@ -419,7 +414,7 @@
         </local:StretchTabControl>
 
         <!-- Footer -->
-        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+        <DockPanel Grid.Row="1" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnForget" x:Uid="btn_forget" Content="Forget machine" Padding="14,0" Margin="0,0,6,0" Click="Forget_Click"

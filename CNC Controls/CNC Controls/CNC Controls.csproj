@@ -277,6 +277,12 @@
     <Compile Include="MacroExecuteControl.xaml.cs">
       <DependentUpon>MacroExecuteControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MacroPinnedListControl.xaml.cs">
+      <DependentUpon>MacroPinnedListControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MacroCreateDialog.xaml.cs">
+      <DependentUpon>MacroCreateDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MacroToolbarControl.xaml.cs">
       <DependentUpon>MacroToolbarControl.xaml</DependentUpon>
     </Compile>
@@ -610,6 +616,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MacroExecuteControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroPinnedListControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroCreateDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

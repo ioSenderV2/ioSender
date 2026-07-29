@@ -478,6 +478,10 @@ namespace CNC.Controls
 
         // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)
         public List<string> PinnedFlyouts { get; set; } = new List<string>();
+        // Macro.Id of up to 4 macros pinned to the quick-access shortlist shown by the Macros main-page panel
+        // (MacroPinnedListControl) - index 0 is the top slot. Newly pinned macros go in slot 0, pushing the
+        // rest down; whatever falls off slot 3 loses its pinned status.
+        public List<int> PinnedMacros { get; set; } = new List<int>();
         // Settings:App autosave on tab-leave / close (opt-in); PromptOnSave shows a confirm/discard list of changes.
         public bool AutoSaveSettings { get { return _autoSaveSettings; } set { _autoSaveSettings = value; OnPropertyChanged(); } }
         public bool PromptOnSave { get { return _promptOnSave; } set { _promptOnSave = value; OnPropertyChanged(); } }
@@ -973,12 +977,6 @@ namespace CNC.Controls
                     foreach (var macro in new List<CNC.GCode.Macro>(Base.Macros))
                         if (macro.IsSession)
                             Base.Macros.Remove(macro);
-
-                    // Migrate legacy macros (saved before the FKey element existed) to an explicit
-                    // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
-                    foreach (var macro in Base.Macros)
-                        if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
-                            macro.FKey = macro.Id;
 
                     ApplyOneTimeFixups();
 

@@ -6,9 +6,9 @@
              xmlns:cnccontrols="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
              mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="300">
     <!-- The loaded-program list with a title bar that doubles as the file toolbar (menu-overhaul):
-         with no program loaded it offers Load File; once loaded it shows the program source (file
-         path / folder / tool name) and a close (X) button. Inherits the GrblViewModel DataContext
-         from its host so FileName/ProgramPath/IsFileLoaded bind through. -->
+         with no program loaded it hints at the main menu's Load File item; once loaded it shows the
+         program source (file path / folder / tool name) and a close (X) button. Inherits the
+         GrblViewModel DataContext from its host so FileName/ProgramPath/IsFileLoaded bind through. -->
     <UserControl.Resources>
         <cnccontrols:BoolToVisibleConverter x:Key="BoolToVisible"/>
         <cnccontrols:NotBoolToVisibleConverter x:Key="NotBoolToVisible"/>
@@ -16,11 +16,9 @@
     <DockPanel>
         <Border DockPanel.Dock="Top" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1" Padding="6,3" MinHeight="26">
             <Grid>
-                <!-- No program loaded: Load File. -->
-                <DockPanel Visibility="{Binding Path=IsFileLoaded, Converter={StaticResource NotBoolToVisible}}">
-                    <Button x:Uid="btn_loadFileHdr" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left" Content="Load File..." Padding="8,1" Click="LoadFile_Click"
-                            ToolTip="Load a single g-code file."/>
-                </DockPanel>
+                <!-- No program loaded: point at the main menu's Load File item (moved off this header). -->
+                <TextBlock x:Uid="txt_noProgramHdr" Visibility="{Binding Path=IsFileLoaded, Converter={StaticResource NotBoolToVisible}}"
+                           Text="No program loaded - use Load File in the menu." Foreground="Gray" VerticalAlignment="Center"/>
                 <!-- Program loaded: source label (left) + close (right). -->
                 <DockPanel Visibility="{Binding Path=IsFileLoaded, Converter={StaticResource BoolToVisible}}">
                     <Button x:Uid="btn_closeFileHdr" DockPanel.Dock="Right" Content="&#x2715;" Width="20" Padding="0" FontSize="12"
