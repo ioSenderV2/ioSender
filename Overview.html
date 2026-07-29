@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>191 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>192 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -279,6 +279,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Fusion 360 add-in (renamed ioSenderV2, one panel/two commands) exports CAM feeds/speeds to JSON; a new Feeds &amp; Speeds tab analyzes it (material table + machine limits + optional AI review) and writes an apply file back; Help &gt; Support gets a one-click add-in installer.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr178">178</a></td></tr>
 <tr><td>Esc/Ctrl+C during Ask AI to review now aborts the in-flight ~20-30s request immediately, with a Cancelling... line logged the instant the key is pressed.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr184">184</a></td></tr>
 <tr><td>Probing's "Max search distance" (G38.2 travel limit) is now editable right on Tool length offset, Edge finder (external/internal) and Center finder, instead of only via Machine Setup &gt; Probe definitions.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr188">188</a></td></tr>
+<tr><td>Odd Jobs &mdash; describe a small job as toolpaths (line/circle/oval/square/rect) with operations under them (pocket, contour, drill, bore, chamfer, finishing) and it compiles to one program with a sane tool order</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr192">192</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -602,7 +603,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.31</td></tr>
 <tr><td class="n">190</td><td><a href="#pr190">Phil Barrett&rsquo;s UI feedback pass</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">20</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+600</span> <span class="del">-152</span></td></tr>
 <tr><td class="n">191</td><td><a href="#pr191">Fix: tab drag could crash or freeze the window</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+44</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (191 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1582</span> <span class="del">21</span> <span class="add">+187</span><br><span class="k">Lines:</span> <span class="add">+63628</span> <span class="del">-11841</span></td></tr>
+<tr><td class="n">192</td><td><a href="#pr192">Odd Jobs tab &mdash; Setup + Work Order builder</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">48</span> <span class="del">0</span> <span class="add">+11</span><br><span class="k">Lines:</span> <span class="add">+6404</span> <span class="del">-125</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (192 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1630</span> <span class="del">21</span> <span class="add">+198</span><br><span class="k">Lines:</span> <span class="add">+70032</span> <span class="del">-11966</span></td></tr>
 </table>
 </div>
 
@@ -3778,6 +3780,47 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/SDCardView.xaml.cs</td><td class="num add">7</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Tabs can be dragged to reorder them. Doing so could either crash ioSender outright or leave the window looking frozen &mdash; page contents gone, the cursor stuck as a horizontal arrow, and no apparent response to input until the app was closed and restarted. Reported as <a href="https://github.com/ioSenderV2/ioSender/issues/17">issue #17</a>, present since the drag-to-reorder feature was added.</p><p>Both faults came from the same thing: the reorder rearranged the live tab list while the drag was still in progress.</p><ul><li><strong>The crash.</strong> Moving a tab in the list makes the app select a different one <em>immediately</em>, while the dragged tab is momentarily detached &mdash; and a detached tab has no data behind it. Whichever page was activated at that instant then read data that was not there. The page shown is now left alone until the drag finishes, at which point the settled selection activates normally.</li><li><strong>The stuck window.</strong> The tab strip never claimed the mouse for the duration of the drag, so releasing the button anywhere except back over the tab strip &mdash; over the page, another panel, or outside the window &mdash; meant the drag never formally ended. The two things the drag switches on, an application-wide cursor override and the clipping that hides the page while tabs shuffle, were left switched on permanently. The app was never actually hung; it was clipped down to its tab strip. The drag now claims the mouse, and both effects are cleared unconditionally when it ends.</li></ul><p>Ordinary clicking to change tabs is unaffected: the mouse is only claimed once a drag has genuinely started.</p></div>
+</div>
+<!-- ===== #192 ===== -->
+<div class="pr">
+<h2 id="pr192"><span class="badge">#192</span>Odd Jobs &mdash; a Work Order builder for jobs that don&rsquo;t deserve a CAM round-trip</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">1336</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/WorkOrderCompiler.cs</td><td class="num add">805</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/WorkOrderModel.cs</td><td class="num add">466</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/WorkOrderView.xaml</td><td class="num add">208</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OddJobsFeedsSpeedsDialog.xaml + .xaml.cs</td><td class="num add">391</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OddJobsView.xaml + .xaml.cs</td><td class="num add">166</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OddJobsGeometry.cs</td><td class="num add">153</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OddJobsStockCanvas.cs</td><td class="num add">139</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/OddJobsToolMemory.cs</td><td class="num add">82</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/StartJobView.xaml + .xaml.cs</td><td class="num add">243</td><td class="num del">23</td></tr>
+<tr><td class="mono">CNC Controls/ProgramView.xaml + .xaml.cs</td><td class="num add">122</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">103</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml + .xaml.cs</td><td class="num add">72</td><td class="num del">23</td></tr>
+<tr><td class="mono">macros/tc.macro</td><td class="num add">56</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/StartJobConfig.cs</td><td class="num add">53</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">42</td><td class="num">0</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">41</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/AppleStyles.xaml</td><td class="num add">40</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/NumericField.xaml + .xaml.cs</td><td class="num add">39</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/MacroProcessor.cs</td><td class="num add">34</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/TabKeyBinder.cs</td><td class="num add">34</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">24</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/StretchTabControl.cs</td><td class="num add">20</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GCodeJob.cs</td><td class="num add">12</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/SignalControl.xaml.cs</td><td class="num add">12</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GrblViewModel.cs + Grbl.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/LayoutModel.cs</td><td class="num add">8</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/StepperCalibrationProbeWizard.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/ICNCView.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
+<tr><td class="mono">XAML x:Uid / style touch-ups (7 files)</td><td class="num add">8</td><td class="num del">7</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales, 2 files each)</td><td class="num add">1659</td><td class="num del">28</td></tr>
+</table>
+<div class="desc"><p>The idea came from Phil Barrett, who said in passing that ioSender could use a <em>workbench</em> tab &mdash; somewhere to machine a hole or a pocket without going out to CAD/CAM and back for a job that takes two minutes at the machine. This is that tab.</p><p>Odd Jobs has two sub-tabs. <strong>Setup</strong> is the familiar Start Job flow, constrained to the <code>G59</code> fixture, so the stock is measured and the origin and tool length reference are established the usual way. <strong>Work Order</strong> is where the job is described.</p><ul><li><strong>Geometry belongs to the toolpath; operations act on it.</strong> Add a toolpath &mdash; line, circle, oval, square or rectangle &mdash; then add operations under it: pocket, contour, drill, bore, side finish, bottom finish, chamfer. That split is why nothing needs a special case: a counterbore is one circle carrying a shallow bore, a through drill and a chamfer, all on one centreline, and the compiler knows the recess is already open so the drill rapids through it.</li><li><strong>One program, not a pile of them.</strong> <em>Generate</em> compiles every enabled row into a single g-code program, with per-row enable checkboxes for partial runs (ticking a toolpath cascades to its operations, and back).</li><li><strong>Tool order is chosen, not stumbled into.</strong> Ordering the work by tree position stranded a tool &mdash; a drill wedged between two chamfers meant loading the chamfer tool twice. Each candidate is now scored by simulating it to completion and counting the operations that would still need it, preferring a tool that won&rsquo;t have to be revisited.</li><li><strong>No redundant tool changes.</strong> The compiler tracks what is already in the spindle, so a job with fifteen sections and five real tool changes now does five &mdash; not fifteen park/prompt/re-probe cycles.</li><li><strong>Feeds and speeds are advised, not invented.</strong> A dialog proposes chipload-based numbers per tool and material, and the tab remembers what was actually used.</li></ul><p>There is no completion gate. An earlier build made you certify the setup before generating, its own watches false-positived, and it was simply annoying &mdash; it is replaced by one Yes/No at <em>Generate</em>: this is built on the cached G59 origin and tool length reference, proceed?</p><p class="foot">Tool numbers are preassigned from the Feeds &amp; Speeds list position, and <strong>T8 is reserved</strong> &mdash; <code>tc.macro</code> uses it as the &ldquo;3D probe already fitted&rdquo; sentinel, so the numbering runs T1&ndash;T7, T9, T10. This machine runs grblHAL with <code>N_TOOLS 0</code>, i.e. no controller-side tool table, so a T-number means only what the macros make it mean. Cut so far in plywood and MDF only; feeds for other materials are untested advisor numbers. Hardware verification of bore clearing, counterbore&rarr;through-drill on one centreline, tabs on the last op to depth and patterned bolt circles is still in progress.</p></div>
 </div>
 </section>
 
