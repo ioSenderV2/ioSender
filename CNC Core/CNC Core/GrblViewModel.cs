@@ -74,7 +74,6 @@ namespace CNC.Core
         private StreamingState _streamingState;
         public SpindleState _spindleStatePrev = GCode.SpindleState.Off;
 
-        private Thread pollThread = null;
 
         public Action<string> OnCommandResponseReceived;
         public Action<string> OnResponseReceived;
@@ -106,8 +105,10 @@ namespace CNC.Core
             MDICommand = new ActionCommand<string>(ExecuteMDI);
             StartFromBlock = new ActionCommand<int>(ExecuteStartFromBlock, canExecuteStartFromBlock);
 
-            pollThread = new Thread(new ThreadStart(Poller.Run));
-            pollThread.Start();
+            // Poller.Run() only constructs the System.Timers.Timer and wires its Elapsed handler - it does
+            // not loop, so it was running on a dedicated Thread that exited within microseconds of starting.
+            // Polling itself happens on timer threadpool threads.
+            Poller.Run();
 
             _grblState.LastAlarm = 0;
 
@@ -152,10 +153,11 @@ namespace CNC.Core
                 OnPropertyChanged(nameof(WorkPositionOffset));
         }
 
-        ~GrblViewModel()
-        {
-            pollThread.Abort();
-        }
+        // No finalizer. It called pollThread.Abort() on a thread that had already terminated - a no-op
+        // in practice, and Thread.Abort throws PlatformNotSupportedException on .NET 5+, so it was also a
+        // hard blocker for running CNC.Core on .NET 8. Polling is stopped deterministically instead, via
+        // Poller.SetState(0) on disconnect/shutdown; the timer's threads are background, so an unstopped
+        // timer cannot hold the process open either.
 
         private void ToolOffset_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
