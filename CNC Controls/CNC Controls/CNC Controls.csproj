@@ -185,6 +185,7 @@
     <Compile Include="GeometryInterop.cs" />
     <Compile Include="UiPump.cs" />
     <Compile Include="UiState.cs" />
+    <Compile Include="LegacySecrets.cs" />
     <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="ShortcutKey.cs" />

@@ -1003,6 +1003,11 @@ namespace CNC.Controls
         // change needs one, remove it again once testing on real saved App.config files is done.
         private void ApplyOneTimeFixups()
         {
+            // 2026-07-29: SecretStore moved off the Windows registry to a portable file in the config
+            // directory (CNC.Core is platform-free now). Adopt anything still in HKCU so an existing
+            // user's API key survives. Guarded on "nothing stored yet", so it is a no-op from then on.
+            LegacySecrets.MigrateAll();
+
             // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
             // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
             // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
