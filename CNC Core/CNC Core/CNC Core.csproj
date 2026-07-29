@@ -41,12 +41,10 @@
          (pr/portable-core). CNC.Core is the portable half - if you find yourself adding one of these back,
          the type you want belongs in CNC.Controls behind a hook instead (see UserPrompt, UiContext,
          EventUtils.Pump, GrblViewModel.KeyboardFactory for the established pattern). -->
-    <Reference Include="RP.Math">
-      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.dll</HintPath>
-    </Reference>
-    <Reference Include="RP.Math.Vector3">
-      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.Vector3.dll</HintPath>
-    </Reference>
+    <!-- RP.Math dropped: its only use here was three lines of WCS rotation in GCodeEmulator, now
+         Point3D.RotateZ (verified numerically identical against the assembly over 3100 rotations).
+         It was an external net462-only DLL whose source is no longer present on this machine - the
+         build only still resolved it from a stale copy in bin\. The WPF projects still use it. -->
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />

@@ -41,7 +41,9 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
-using WebSocketSharp;
+#if USEWEBSOCKET
+using WebSocketSharp;   // inside the guard: outside it, this tied CNC.Core to a net462-only binary
+#endif                  // for code that is not even compiled
 
 namespace CNC.Core
 {

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PORTABILITY PROBE - not part of ioSender XL.sln and never shipped.
+
+    Compiles exactly the same CNC.Core sources against net8.0, so "CNC.Core is portable" is a fact the
+    compiler asserts rather than something inferred from having removed the WPF references. The shipping
+    net462 project (CNC Core.csproj, same folder) is deliberately left alone: converting it to SDK-style
+    and multi-targeting is a change to how the whole app builds, and that should only happen once this
+    proves there is something worth converting for.
+
+    Build it with:  dotnet build "CNC Core/CNC Core/CNC.Core.net8.csproj"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>CNC.Core.net8</AssemblyName>
+    <RootNamespace>CNC.Core</RootNamespace>
+    <LangVersion>7.3</LangVersion>              <!-- match what the net462 compiler accepts -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseOutputPath>bin\net8probe\</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0067</NoWarn>   <!-- pre-existing unused-variable noise -->
+    <!-- USEWEBSOCKET intentionally NOT defined for the first pass: websocket-sharp is a net462 binary and
+         would drown out every other finding. Added back once the rest is clean. -->
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ObsBridge is excluded, not portable: it uses websocket-sharp (an unmaintained net462-only
+         binary) UNCONDITIONALLY, unlike WebsocketStream which is behind #if USEWEBSOCKET. Excluding it
+         here answers "is anything else non-portable hiding behind that one dependency?". Making OBS
+         support portable means swapping websocket-sharp for System.Net.WebSockets.ClientWebSocket,
+         which is its own change against a live feature. -->
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs;ObsBridge.cs" />
+    <EmbeddedResource Include="LibStrings.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

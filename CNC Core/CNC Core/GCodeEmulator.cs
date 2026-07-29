@@ -42,7 +42,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using CNC.GCode;
-using RP.Math;
 
 namespace CNC.Core
 {
@@ -227,7 +226,7 @@ namespace CNC.Core
                             if (coordinateSystem.Rotation != 0d)
                             {
                                 var move = new GCLinearMotion(motion.Command, motion.LineNumber, motion.Values.ToArray(), motion.AxisFlags, motion.BlockDelete);
-                                var target = new Vector3(move.X + coordinateSystem.X, move.Y + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
+                                var target = new Point3D(move.X + coordinateSystem.X, move.Y + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
                                 move.X = target.X;
                                 move.Y = target.Y;
                                 move.AxisFlags |= AxisFlags.XY;
@@ -247,12 +246,12 @@ namespace CNC.Core
                             {
                                 var move = arc.Values.ToArray();
                                 var ijk = arc.IJKvalues.ToArray();
-                                var target = new Vector3(move[0] + coordinateSystem.X, move[1] + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
+                                var target = new Point3D(move[0] + coordinateSystem.X, move[1] + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
                                 move[0] = target.X;
                                 move[1] = target.Y;
                                 if (arc.IjkFlags != IJKFlags.None)
                                 {
-                                    target = new Vector3(ijk[0], ijk[1], 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
+                                    target = new Point3D(ijk[0], ijk[1], 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
                                     ijk[0] = target.X;
                                     ijk[1] = target.Y;
                                 }

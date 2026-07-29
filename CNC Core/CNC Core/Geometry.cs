@@ -50,6 +50,25 @@ namespace CNC.Core
             return new double[] { X, Y, Z };
         }
 
+        /// <summary>
+        /// Rotate about the Z axis through the pivot (xOff, yOff). Angle in RADIANS, counter-clockwise.
+        /// Z is unchanged.
+        ///
+        /// Replaces RP.Math.Vector3.RotateZ(xOff, yOff, rad) - same signature and convention, verified
+        /// numerically against that assembly before it was dropped. RP.Math was an external net462-only
+        /// DLL whose source is no longer present on this machine (the build only still resolved it from a
+        /// stale copy in bin\), used for exactly these three lines of WCS-rotation maths.
+        /// </summary>
+        public Point3D RotateZ(double xOff, double yOff, double rad)
+        {
+            double dx = X - xOff, dy = Y - yOff;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            return new Point3D(xOff + dx * cos - dy * sin,
+                               yOff + dx * sin + dy * cos,
+                               Z);
+        }
+
         // Equality must compare with double ==, exactly as the WPF Point3D did. The compiler-generated
         // ValueType.Equals for an all-double struct compares BITWISE, which differs in two ways that
         // matter to callers like CarveView's "!a.End.Equals(a.Start)" zero-length-move test:
