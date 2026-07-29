@@ -182,7 +182,7 @@ namespace CNC.Controls
                     if (softLimits)
                         (DataContext as GrblViewModel).PropertyChanged += Model_PropertyChanged;
 
-                    keyboard = (DataContext as GrblViewModel).Keyboard;
+                    keyboard = (DataContext as GrblViewModel).Keyboard as KeypressHandler;
 
                     keyboardMappingsOk = true;
 
@@ -986,9 +986,11 @@ namespace CNC.Controls
     // Bare value (the feed rate) is shown; the unit lives in the header and follows the UI jog panel.
     public class KeyboardJogViewModel : ViewModelBase
     {
-        private readonly KeypressHandler keyboard;
+        // Only DefaultSpeedFast is touched here, which is portable jog config - so this takes the base
+        // JogController and does not care whether a keyboard handler is installed.
+        private readonly JogController keyboard;
 
-        public KeyboardJogViewModel(KeypressHandler keyboard)
+        public KeyboardJogViewModel(JogController keyboard)
         {
             this.keyboard = keyboard;
 

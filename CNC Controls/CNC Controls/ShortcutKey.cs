@@ -1,5 +1,5 @@
 /*
- * ShortcutKey.cs - part of CNC Core library for Grbl
+ * ShortcutKey.cs - part of CNC Controls library for Grbl
  *
  * Shared parsing / formatting of keyboard shortcut strings, so the configurable
  * console shortcut (App.config) and the in-app Key Mappings editor agree on one
@@ -11,7 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Input;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     public static class ShortcutKey
     {

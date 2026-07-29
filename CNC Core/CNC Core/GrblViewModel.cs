@@ -94,7 +94,7 @@ namespace CNC.Core
 
             Clear();
 
-            Keyboard = new KeypressHandler(this);
+            Keyboard = KeyboardFactory != null ? KeyboardFactory(this) : new JogController(this);
 
             try
             {
@@ -337,7 +337,20 @@ namespace CNC.Core
                 StartFromBlockNum = block;
         }
 
-        public KeypressHandler Keyboard { get; private set; }
+        /// <summary>
+        /// Jog configuration and execution for this model. Typed as the portable <see cref="JogController"/>;
+        /// a keyboard-capable host (the WPF client) supplies a <see cref="KeyboardFactory"/> that returns its
+        /// own subclass (CNC.Controls.KeypressHandler) so key dispatch stays out of CNC.Core. A headless host
+        /// leaves the factory null and gets plain jog control - the property is never null.
+        /// </summary>
+        public JogController Keyboard { get; private set; }
+
+        /// <summary>
+        /// Set by the host before any GrblViewModel is constructed (see CNC.Controls.KeypressHandler.Register,
+        /// called from App.OnStartup alongside AppMessageBox.Register).
+        /// </summary>
+        public static Func<GrblViewModel, JogController> KeyboardFactory;
+
         public ControllerService Controller { get; private set; }
         public ControllerMapper ControllerMapper { get; private set; }
 

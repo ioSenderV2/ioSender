@@ -124,10 +124,10 @@ namespace CNC.Controls.Viewer
         {
             textOverlay.Visibility = AppConfig.Settings.GCodeViewer.ShowTextOverlay ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
 
-            if (!keyboardMappingsOk && DataContext is GrblViewModel)
+            // Keyboard is the portable JogController unless the host registered the WPF handler
+            // (see CNC.Controls.KeypressHandler.Register) - no handler, no view shortcuts to bind.
+            if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is CNC.Controls.KeypressHandler keyboard)
             {
-                KeypressHandler keyboard = (DataContext as GrblViewModel).Keyboard;
-
                 keyboardMappingsOk = true;
 
                 keyboard.AddHandler(Key.V, ModifierKeys.Control, ResetView);

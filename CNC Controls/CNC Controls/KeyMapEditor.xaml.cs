@@ -46,7 +46,7 @@ namespace CNC.Controls
             InitializeComponent();
 
             this.model = model;
-            keyboard = model.Keyboard;
+            keyboard = model.Keyboard as KeypressHandler;
             DataContext = this;
             groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 

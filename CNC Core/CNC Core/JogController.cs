@@ -72,7 +72,7 @@ namespace CNC.Core
 
     public class JogController
     {
-        private readonly GrblViewModel grbl;
+        protected readonly GrblViewModel grbl;
         private JogMode jogMode = JogMode.None;
         private JogMode notifiedJogMode = JogMode.None;
         private string[] axisCommands = new string[18];   // per axis, [i*2] = plus, [i*2+1] = minus
@@ -88,7 +88,7 @@ namespace CNC.Core
         // ---- machine configuration (was KeypressHandler.Configure) ---------------------------------
         // Axis letters and lathe orientation are machine properties, so the format templates live here
         // rather than on the key bindings.
-        public void Configure(int numAxes, string axisLetters, bool lathe)
+        public virtual void Configure(int numAxes, string axisLetters, bool lathe)
         {
             N_AXIS = numAxes;
             axisLetters = axisLetters.Replace("-", "");

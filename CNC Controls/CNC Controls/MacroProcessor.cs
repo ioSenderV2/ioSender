@@ -943,7 +943,7 @@ namespace CNC.Controls
             // it owns keyboard focus and the main window's jog forwarding never sees these keys (and the macro
             // may have been launched from a non-Job tab anyway, where that forwarding is disabled). Forward
             // jog-relevant keys straight to the keypress handler; leave Enter/Esc/Tab/Space for the buttons.
-            var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard;
+            var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard as KeypressHandler;
             Window mainForJog = Application.Current?.MainWindow;
             System.Windows.Input.KeyEventHandler forwardJog = null;
             if (kbd != null)

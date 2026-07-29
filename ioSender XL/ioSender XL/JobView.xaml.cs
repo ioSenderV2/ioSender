@@ -542,7 +542,7 @@ namespace GCode_Sender
 
             // Key mappings now live in the App.config "KeyMap" section (loaded at config-load); apply them now
             // that the handlers are registered.
-            model.Keyboard.LoadMappings();
+            (model.Keyboard as KeypressHandler)?.LoadMappings();
 
             if (GrblInfo.NumAxes > 3)
                 GCode.File.AddTransformer(typeof(GCodeWrapViewModel), "Wrap to rotary (WIP)", MainWindow.UIViewModel.TransformMenuItems);
@@ -733,7 +733,11 @@ namespace GCode_Sender
         {
             // MDI now lives in the fixed bottom run-control bar (Phase 2c) - check its focus there.
             bool mdiFocused = MainWindow.ui.MdiControl?.IsFocused ?? false;
-            return model.Keyboard.ProcessKeypress(e, !(mdiFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
+
+            if (!(model.Keyboard is KeypressHandler keyboard))
+                return false;
+
+            return keyboard.ProcessKeypress(e, !(mdiFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
 
 #endregion

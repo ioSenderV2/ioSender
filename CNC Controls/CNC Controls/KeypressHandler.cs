@@ -1,8 +1,17 @@
 ﻿/*
- * KeypressHandler.xaml.cs - part of CNC Controls library
+ * KeypressHandler.cs - part of CNC Controls library
  *
  * v0.47 / 2026-03-23 / Io Engineering (Terje Io)
  *
+ * Lives in CNC.Controls, not CNC.Core: everything here is WPF keyboard input (Key, ModifierKeys,
+ * KeyEventArgs, UserControl contexts, Keyboard.FocusedElement). It derives from the portable
+ * CNC.Core.JogController, which owns the jog state and execution this class used to duplicate
+ * alongside it - so there is now one JogDistances/JogFeedrates/jog-mode, not two.
+ *
+ * The class NAME is load-bearing: saved key mappings persist their action identity as
+ * "<ReflectedType.Name>.<MethodName>" (e.g. "KeypressHandler.FeedOverrideFinePlus") in the App.config
+ * "KeyMap" section, so renaming this class - or moving the override functions below off it - silently
+ * orphans every existing user's overrides. The namespace is not part of that string and is free to move.
  */
 
 /*
@@ -44,17 +53,15 @@ using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Xml.Serialization;
+using CNC.Core;
 using CNC.GCode;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
-    public class KeypressHandler
+    public class KeypressHandler : JogController
     {
         private int N_AXIS = 3;
-        private bool preCancel = false, allowJog = true;
-        private JogMode jogMode = JogMode.None;
-        private JogMode _notifiedJogMode = JogMode.None;
-        private GrblViewModel grbl;
+        private bool preCancel = false;
         private List<KeypressHandlerFn> handlers = new List<KeypressHandlerFn>();
         private List<HandlerFn> functions = new List<HandlerFn>();
         private AxisJog[] axisjog = new AxisJog[9];
@@ -79,15 +86,17 @@ namespace CNC.Core
             new JogKey(8)
         };
 
-        /// <summary>Portable jog execution (clamping, "$J=" rendering, transport). This handler only
-        /// decides intent and hands it a JogCommand.</summary>
-        public JogController Jog { get; private set; }
-
-        public KeypressHandler(GrblViewModel model)
+        /// <summary>
+        /// Install this class as the keyboard-capable jog controller for every GrblViewModel.
+        /// Called from App.OnStartup, alongside AppMessageBox.Register(), before the first model is built.
+        /// </summary>
+        public static void Register()
         {
-            grbl = model;
-            Jog = new JogController(model);
+            GrblViewModel.KeyboardFactory = model => new KeypressHandler(model);
+        }
 
+        public KeypressHandler(GrblViewModel model) : base(model)
+        {
             for (int i = 0; i < axisjog.Length; i++)
                 axisjog[i] = new AxisJog();
 
@@ -112,9 +121,9 @@ namespace CNC.Core
             AddFunction(SingleBlockToggle, null);
         }
 
-        public void Configure(int numAxes, string axisLetters, bool lathe)
+        public override void Configure(int numAxes, string axisLetters, bool lathe)
         {
-            Jog.Configure(numAxes, axisLetters, lathe);   // axis letters / lathe orientation are machine config
+            base.Configure(numAxes, axisLetters, lathe);   // axis letters / lathe orientation are machine config
 
             N_AXIS = numAxes;
             axisLetters = axisLetters.Replace("-", "");
@@ -228,33 +237,13 @@ namespace CNC.Core
             }
         }
 
-        public double[] JogDistances { get; set; } = new double[3] { 0.01, 500.0, 500.0 };
-        public double[] JogFeedrates { get; set; } = new double[3] { 100.0, 200.0, 500.0 };
-        public double JogStepDistance { get { return JogDistances[(int)JogMode.Step]; } set { grbl.JogStep = JogDistances[(int)JogMode.Step] = value; } }
-        // Forwarded so there is one source of truth: the JogController does the clamping that uses them.
-        public double LimitSwitchesClearance { get { return Jog.LimitSwitchesClearance; } set { Jog.LimitSwitchesClearance = value; } }
-        public bool SoftLimits { get { return Jog.SoftLimits; } set { Jog.SoftLimits = value; } }
-        public bool IsJoggingEnabled { get; set; } = true;
-        public bool IsContinuousJoggingEnabled { get; set; }
-        public bool IsRepeating { get; private set; } = false;
-        public bool CanJog2 { get { return grbl.GrblState.State == GrblStates.Idle || grbl.GrblState.State == GrblStates.Tool || grbl.GrblState.State == GrblStates.Jog; } }
-        public bool CanJog { get { return allowJog && (grbl.GrblState.State == GrblStates.Idle || grbl.GrblState.State == GrblStates.Tool || grbl.GrblState.State == GrblStates.Jog); } }
-        public bool IsJogging { get { return jogMode != JogMode.None || grbl.GrblState.State == GrblStates.Jog; } }
+        // Jog configuration and state (JogDistances, JogFeedrates, JogStepDistance, SoftLimits,
+        // LimitSwitchesClearance, IsJoggingEnabled, IsContinuousJoggingEnabled, DefaultSpeedFast,
+        // CanJog/CanJog2/IsJogging, CurrentJogMode, JogModeChanged) all come from the portable
+        // JogController base - this class used to keep a second, parallel copy of them.
 
-        // Active keyboard-jog mode (Step/Slow/Fast/None); the jog panel slider live-tracks this.
-        public JogMode CurrentJogMode { get { return jogMode; } }
-        // Default continuous-jog speed (set from Config.Jog.DefaultSpeedFast): false = Slow (Shift -> Fast),
-        // true = Fast (Shift -> Slow). Pushed in from the Controls layer since CNC.Core can't see AppConfig.
-        public bool DefaultSpeedFast { get; set; } = false;
-        public event System.Action JogModeChanged;
-        private void NotifyJogModeChanged()
-        {
-            if (_notifiedJogMode != jogMode)
-            {
-                _notifiedJogMode = jogMode;
-                JogModeChanged?.Invoke();
-            }
-        }
+        /// <summary>True while the current dispatch is a key autorepeat.</summary>
+        public bool IsRepeating { get; private set; } = false;
 
         // ---- persistence -----------------------------------------------------------------------
         //
@@ -544,14 +533,14 @@ namespace CNC.Core
 
                 isJogging &= allowJog;
 
-                if (cancel && !isJogging && jogMode != JogMode.Step)
+                if (cancel && !isJogging && CurrentJogMode != JogMode.Step)
                     JogCancel();
             }
 
             if (!isJogging && allowJog && Comms.com.OutCount != 0)
                 return true;
 
-            this.allowJog = allowJog;
+            AllowJog = allowJog;
 
             // Ctrl+Shift is allowed through here now (Ctrl+Shift+<jog key> = Slow tier below). It is no longer
             // excluded: the Ctrl+Shift letter jogs (J/H/K/L...) are not jog keys, so they still fall through to
@@ -599,14 +588,17 @@ namespace CNC.Core
 
                 if (isJogging)
                 {
+                    // Tier selection is the keyboard's business; the mode itself lives on the base, so
+                    // decide it locally and publish once via SetJogMode (which raises JogModeChanged).
+                    JogMode mode;
                     ModifierKeys jogmods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
                     if (jogmods == ModifierKeys.Control)   // Ctrl (alone) -> single step
                     {
                         for (int i = 0; i < N_AXIS; i++)
                             axisjog[i].Key = Key.None;
-                        preCancel = !(jogMode == JogMode.Step || jogMode == JogMode.None);
-                        jogMode = JogMode.Step;
-                        JogDistances[(int)jogMode] = grbl.JogStep;
+                        preCancel = !(CurrentJogMode == JogMode.Step || CurrentJogMode == JogMode.None);
+                        mode = JogMode.Step;
+                        JogDistances[(int)mode] = grbl.JogStep;
                     }
                     else if (IsContinuousJoggingEnabled)
                     {
@@ -614,41 +606,41 @@ namespace CNC.Core
                         // Absolute tiers, consistent with the UI jog panel / buttons: Shift = Fast, Ctrl+Shift =
                         // Slow, no modifier = the DefaultSpeedFast default speed.
                         if (jogmods == (ModifierKeys.Control | ModifierKeys.Shift))
-                            jogMode = JogMode.Slow;
+                            mode = JogMode.Slow;
                         else if (jogmods == ModifierKeys.Shift)
-                            jogMode = JogMode.Fast;
+                            mode = JogMode.Fast;
                         else
-                            jogMode = DefaultSpeedFast ? JogMode.Fast : JogMode.Slow;
+                            mode = DefaultSpeedFast ? JogMode.Fast : JogMode.Slow;
                     }
                     else
                     {
                         for (int i = 0; i < N_AXIS; i++)
                             axisjog[i].Key = Key.None;
-                        jogMode = JogMode.None;
+                        mode = JogMode.None;
                     }
 
-                    NotifyJogModeChanged();
+                    SetJogMode(mode);
 
-                    if (jogMode != JogMode.None)
+                    if (mode != JogMode.None)
                     {
                         // Intent only: which axes, which way, how far, how fast. The JogController does
                         // the soft-limit clamping, G91/G53 selection and "$J=" rendering - machine safety
                         // stays server-side rather than in a key handler.
                         var jog = new JogCommand(N_AXIS)
                         {
-                            Mode = jogMode,
-                            Distance = JogDistances[(int)jogMode],
-                            Feedrate = JogFeedrates[(int)jogMode],
+                            Mode = mode,
+                            Distance = JogDistances[(int)mode],
+                            Feedrate = JogFeedrates[(int)mode],
                             CancelFirst = preCancel
                         };
 
                         for (int i = 0; i < N_AXIS; i++)
                             jog.Directions[i] = axisjog[i].Distance;
 
-                        Jog.Execute(jog);
+                        Execute(jog);
                     }
 
-                    return jogMode != JogMode.None;
+                    return mode != JogMode.None;
                 } 
             }
 
@@ -696,17 +688,17 @@ namespace CNC.Core
             return jogkeyPressed;
         }
 
+        // Kept as named entry points for existing callers; the base does the work (Cancel already
+        // resets the jog mode and raises JogModeChanged).
         public void JogCancel()
         {
-            Jog.Cancel();
-            jogMode = JogMode.None;
-            NotifyJogModeChanged();
+            Cancel();
         }
 
         // Retained for callers that render their own jog block (ControllerMapper's gamepad jogging).
         public void SendJogCommand(string command)
         {
-            Jog.Send(command, preCancel);
+            Send(command, preCancel);
         }
 
         private bool FeedOverrideFinePlus(Key key)

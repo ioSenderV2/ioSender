@@ -305,10 +305,10 @@ namespace CNC.Controls
             {
                 AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
 
-                if (!keyboardMappingsOk && DataContext is GrblViewModel)
+                // Keyboard is the portable JogController unless the host registered the WPF handler
+                // (see KeypressHandler.Register) - no handler, no key bindings to register.
+                if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is KeypressHandler keyboard)
                 {
-                    KeypressHandler keyboard = (DataContext as GrblViewModel).Keyboard;
-
                     keyboardMappingsOk = true;
 
                     var parent = UIUtils.TryFindParent<UserControl>(this);

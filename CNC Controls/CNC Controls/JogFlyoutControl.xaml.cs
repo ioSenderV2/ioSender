@@ -96,7 +96,9 @@ namespace CNC.Controls
 
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            return (DataContext as GrblViewModel).Keyboard.ProcessKeypress(e, true, this);
+            var keyboard = (DataContext as GrblViewModel)?.Keyboard as KeypressHandler;
+
+            return keyboard != null && keyboard.ProcessKeypress(e, true, this);
         }
     }
 }

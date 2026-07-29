@@ -169,6 +169,9 @@ namespace GCode_Sender
 
             CNC.Core.ConsoleLog.Init();
             CNC.Controls.AppMessageBox.Register();
+            // GrblViewModel.Keyboard is the portable JogController by default; point it at the WPF
+            // keypress handler before the first model is built (MainWindow.xaml instantiates one).
+            CNC.Controls.KeypressHandler.Register();
             CNC.Controls.ButtonClickSound.Init();
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),

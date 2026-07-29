@@ -107,13 +107,17 @@ namespace CNC.Controls.Probing
             if (!keyboardMappingsOk && DataContext is GrblViewModel)
             {
                 grbl = (DataContext as GrblViewModel);
-                KeypressHandler keyboard = grbl.Keyboard;
 
                 keyboardMappingsOk = true;
 
-                keyboard.AddHandler(Key.R, ModifierKeys.Alt, StartProbe, this);
-                keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
-                keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
+                // Keyboard is the portable JogController unless the host registered the WPF handler
+                // (see KeypressHandler.Register); everything below this block runs either way.
+                if (grbl.Keyboard is KeypressHandler keyboard)
+                {
+                    keyboard.AddHandler(Key.R, ModifierKeys.Alt, StartProbe, this);
+                    keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
+                    keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
+                }
 
                 // Probing parameters come from the shared probe library (Settings: App > Edit Probe
                 // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
@@ -404,12 +408,12 @@ namespace CNC.Controls.Probing
         }
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            if (grbl.Keyboard == null)
+            if (!(grbl?.Keyboard is KeypressHandler keyboard))
                 return false;
 
             // Keyboard jogging is always available here; ProcessKeypress only jogs when focus is not in a
             // text box (so typing a value never jogs) - so no "activate jogging" gate/button is needed.
-            return grbl.Keyboard.ProcessKeypress(e, true, this);
+            return keyboard.ProcessKeypress(e, true, this);
         }
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
