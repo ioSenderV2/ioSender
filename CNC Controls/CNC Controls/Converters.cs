@@ -314,12 +314,49 @@ namespace CNC.Controls
 
     public class GrblStateToColorConverter : IValueConverter
     {
+        // Ported verbatim from GrblViewModel, where the colour used to be computed into GrblState.Color
+        // as the state was parsed. Which colour represents a machine state is presentation policy, so it
+        // belongs here rather than in the machine model - CNC.Core no longer references System.Windows.Media.
+        public static Color ForState(GrblState state)
+        {
+            switch (state.State)
+            {
+                case GrblStates.Run:
+                    return Colors.LightGreen;
+
+                case GrblStates.Alarm:
+                    return Colors.Red;
+
+                case GrblStates.Jog:
+                    return Colors.Yellow;
+
+                case GrblStates.Tool:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Hold:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Door:
+                    return state.Substate == 0 ? Colors.LightSalmon : (state.Substate == 1 ? Colors.Red : Colors.Beige);
+
+                case GrblStates.Home:
+                case GrblStates.Sleep:
+                    return Colors.LightSkyBlue;
+
+                case GrblStates.Check:
+                    return Colors.White;
+
+                default:
+                    return Colors.White;
+            }
+        }
+
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             Brush result = Brushes.White;
 
             if (value is GrblState)
-                result = new SolidColorBrush(((GrblState)value).Color);
+                result = new SolidColorBrush(ForState((GrblState)value));
 
             return result;
         }

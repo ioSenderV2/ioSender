@@ -46,7 +46,6 @@ using System.Globalization;
 using System.IO;
 using System.Data;
 using System.Diagnostics;
-using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading;
@@ -379,7 +378,6 @@ namespace CNC.Core
         public int Substate;
         public int LastAlarm;
         public int Error;
-        public Color Color;
         public bool MPG;
     }
 
@@ -3720,15 +3718,14 @@ namespace CNC.Core
             return exp;
         }
 
-        public static void CopyToClipboard()
+        /// <summary>
+        /// The exported settings as a single block of text, or null when there is nothing to export.
+        /// Was CopyToClipboard(), which wrote to the WPF clipboard - an OS/UI facility with no server
+        /// equivalent, so the caller now owns that step (see About.xaml.cs).
+        /// </summary>
+        public static string ExportText()
         {
-            if (Settings.Count > 0) try
-            {
-                Clipboard.SetText(string.Join("\r\n", Export().ToArray()));
-            }
-            catch
-            {
-            }
+            return Settings.Count > 0 ? string.Join("\r\n", Export().ToArray()) : null;
         }
 
         public static bool Backup(string filename)

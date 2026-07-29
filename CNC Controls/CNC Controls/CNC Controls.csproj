@@ -185,6 +185,7 @@
     </Compile>
     <Compile Include="GeometryInterop.cs" />
     <Compile Include="UiPump.cs" />
+    <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="ShortcutKey.cs" />
     <Compile Include="KeyMapEditor.xaml.cs">

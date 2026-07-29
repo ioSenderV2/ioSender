@@ -40,9 +40,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 using System.IO.Ports;
-using System.Windows.Threading;
+#if USEELTIMA
+using System.Windows.Forms;      // only the Eltima body below needs these; outside the #if they would
+using System.Windows.Threading;  // keep CNC.Core tied to WPF for code that is not even compiled
+#endif
 using System.IO;
 using System.Collections.ObjectModel;
 

@@ -9,10 +9,8 @@ using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Globalization;
-using System.Windows.Markup;
 using System.Collections;
 using System.Collections.Generic;
-using System.Windows;
 using System.Diagnostics.Contracts;
 using System.Threading;
 using System.Collections.Concurrent;
@@ -251,29 +249,6 @@ namespace CNC.Core
         }
     }
 
-    [ContentProperty("Parameters")]
-    public class PathConstructor : MarkupExtension
-    {
-        public string Path { get; set; }
-        public IList Parameters { get; set; }
-
-        public PathConstructor()
-        {
-            Parameters = new List<object>();
-        }
-
-        public PathConstructor(string b, object p0)
-        {
-            Path = b;
-            Parameters = new[] { p0 };
-        }
-
-        public override object ProvideValue(IServiceProvider serviceProvider)
-        {
-        //    return new PropertyPath(Path, Parameters.Cast<object>().ToArray());
-            return new PropertyPath(String.Format("{0}[{1}]", Path, StringEnumConversion.ConvertToEnum<SpindleState>(Parameters[0])));
-        }
-    }
 
     public class Copy
     {

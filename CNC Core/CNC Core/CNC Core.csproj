@@ -36,8 +36,11 @@
     <UICulture>en-US</UICulture>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
+    <!-- NO WPF REFERENCES HERE, deliberately: PresentationCore, PresentationFramework, WindowsBase,
+         System.Xaml and System.Windows.Forms were all removed once the last WPF usage left this project
+         (pr/portable-core). CNC.Core is the portable half - if you find yourself adding one of these back,
+         the type you want belongs in CNC.Controls behind a hook instead (see UserPrompt, UiContext,
+         EventUtils.Pump, GrblViewModel.KeyboardFactory for the established pattern). -->
     <Reference Include="RP.Math">
       <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.dll</HintPath>
     </Reference>
@@ -48,8 +51,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Management" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -60,7 +61,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
     </Reference>
-    <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />

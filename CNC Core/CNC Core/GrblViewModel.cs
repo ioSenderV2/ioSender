@@ -39,7 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Linq;
-using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Threading;
@@ -882,46 +881,8 @@ namespace CNC.Core
 
                 //                force = true;
 
-                switch (_grblState.State)
-                {
-
-                    case GrblStates.Run:
-                        _grblState.Color = Colors.LightGreen;
-                        break;
-
-                    case GrblStates.Alarm:
-                        _grblState.Color = Colors.Red;
-                        break;
-
-                    case GrblStates.Jog:
-                        _grblState.Color = Colors.Yellow;
-                        break;
-
-                    case GrblStates.Tool:
-                        _grblState.Color = Colors.LightSalmon;
-                        break;
-
-                    case GrblStates.Hold:
-                        _grblState.Color = Colors.LightSalmon;
-                        break;
-
-                    case GrblStates.Door:
-                        _grblState.Color = _grblState.Substate == 0 ? Colors.LightSalmon :(_grblState.Substate == 1 ? Colors.Red : Colors.Beige);
-                        break;
-
-                    case GrblStates.Home:
-                    case GrblStates.Sleep:
-                        _grblState.Color = Colors.LightSkyBlue;
-                        break;
-
-                    case GrblStates.Check:
-                        _grblState.Color = Colors.White;
-                        break;
-
-                    default:
-                        _grblState.Color = Colors.White;
-                        break;
-                }
+                // The state -> colour mapping moved to CNC.Controls' GrblStateToColorConverter: which colour
+                // represents a machine state is client presentation policy, not machine state itself.
 
                 OnPropertyChanged(nameof(GrblState));
 
