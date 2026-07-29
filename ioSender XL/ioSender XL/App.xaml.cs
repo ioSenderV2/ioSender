@@ -90,7 +90,13 @@ namespace GCode_Sender
             string[] args = Environment.GetCommandLineArgs();
 
             int p = 0, lng = 0;
+#if DEBUG
+            // Debug builds trace by default - no need to remember -debuglog on every launch while iterating.
+            // Release builds stay opt-in (the flag/parsing below still works the same in both configurations).
+            bool debugLog = true;
+#else
             bool debugLog = false;
+#endif
             string debugCategories = null;
             bool demoMarker = false;
             bool crashTest = false;

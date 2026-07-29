@@ -708,9 +708,14 @@ namespace CNC.Controls
 
             b.AppendLine(string.Format("#<_ls_rad> = {0}", r.ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_spacer> = 0");
-            b.AppendLine("#<_ls_thickness> = 0");   // unused by pcorner.macro since the fixed-5mm depth change - kept for the global's sake
+            // pcorner.macro uses this to size the pre-probe approach height (#<_bottom> + thickness +
+            // plateoffset + 10) - this wizard has no real known thickness for the reference block, so stay
+            // conservative (matching the approach height's own worst-case "assume <=1in" fallback) rather
+            // than 0, which would under-size the clearance now that the global is actually used again.
+            b.AppendLine("#<_ls_thickness> = 25.4");
             b.AppendLine("#<_ls_mode> = 0");
             b.AppendLine("#<_ls_plateoffset> = 0");
+            b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
             b.AppendLine("#<_ls_spoilx> = 0");
             b.AppendLine("#<_ls_spoily> = 0");
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));

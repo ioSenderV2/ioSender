@@ -82,6 +82,13 @@ namespace CNC.Controls
 
         public void Activate(bool activate, ViewType chgMode)
         {
+            // Defensive: a view can be activated while its TabItem is momentarily unparented (tab
+            // drag-reorder raises SelectionChanged synchronously mid-move), and an unparented TabItem has
+            // no inherited DataContext. Every dereference below assumed one. MainWindow now suppresses
+            // activation during a drag, but this method must not be one bad caller away from an NRE.
+            if (!(DataContext is GrblViewModel))
+                return;
+
             if (activate)
             {
                 if (Comms.com == null || !Comms.com.IsOpen)

@@ -1,4 +1,4 @@
-ioSender.g.en-US.resources:mainwindow.baml,lbl_jogStep:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,A billentyűzet léptetésének távolsága  (a &lt;CTRL&gt; módosítva).
+﻿ioSender.g.en-US.resources:mainwindow.baml,lbl_jogStep:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,A billentyűzet léptetésének távolsága  (a &lt;CTRL&gt; módosítva).
 ioSender.g.en-US.resources:mainwindow.baml,mnu_about:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Az IOSender
 ioSender.g.en-US.resources:mainwindow.baml,mnu_briefTour:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Rövid túra
 ioSender.g.en-US.resources:mainwindow.baml,mnu_camera:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Kamera
@@ -166,3 +166,11 @@ ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.Control
 ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on). Off: still probes/measures and reports the numbers, but leaves the selected WCS untouched."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_installFusionAddin:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Install ioSenderV2 Fusion Addin...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_installFusionAddin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Symlink the ioSenderV2 Fusion 360 add-in into Fusion's AddIns folder. Future ioSenderV2 updates need no reinstall - only shown when Fusion 360 is installed for this user.
+ioSender.g.en-US.resources:startjobview.baml,ls_material:System.Windows.Controls.ContentControl.Content,Label,True,True,,Material:
+ioSender.g.en-US.resources:startjobview.baml,cbxMaterial:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Stock material - used by the Odd Jobs job wizards' Feeds and Speeds recommendation.
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Shared safe retract height every Odd Jobs job wizard's program uses between passes/tool changes.
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Label,None,False,True,,Keep-out inset:
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Perimeter clearance to stay clear of - typically clamps/screws holding the stock down around its edge. Shown as a dotted red line on the drawing; used by the Odd Jobs job wizards' own toolpaths."

@@ -392,6 +392,7 @@ namespace CNC.Controls
                 if (AppConfig.Settings.Macros != null)
                 {
                     macrosTab = new MacroManagerDialog(AppConfig.Settings.Macros);
+                    macrosTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
                     tab.Content = macrosTab;
                 }
                 else

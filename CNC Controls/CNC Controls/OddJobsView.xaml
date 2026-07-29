@@ -1,0 +1,12 @@
+<UserControl x:Class="CNC.Controls.OddJobsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="515" d:DesignWidth="900">
+    <!-- Sub-tabs are built in code from the layout tree's OddJobs/"oddjobs" slot, same as ToolsView's
+         Tools/"tools" slot. See RegisterJobs()/BuildJobs() in OddJobsView.xaml.cs. -->
+    <local:StretchTabControl x:Name="tabOddJobs" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Width="Auto" Height="Auto" SelectionChanged="tab_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}"/>
+</UserControl>

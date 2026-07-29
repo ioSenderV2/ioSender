@@ -103,6 +103,23 @@ namespace CNC.Controls
             set { _supportsGenerateMode = value; ActiveProgramChanged?.Invoke(); }
         }
 
+        // Opt-in for a Generate-first tab whose generated program IS a real cutting program worth Dry
+        // Running/Check Running (Odd Jobs' job wizards - Pocket etc), as opposed to the setup/probing-macro
+        // tabs (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard) where those modes don't mean
+        // anything. False (dropdown stays hidden, same as before this existed) unless a tab sets it alongside
+        // SupportsGenerateMode. Only takes effect once IsProgramGenerated is true - see UpdateRunButtonLabel.
+        public static bool AllowRunModesWhenGenerated;
+
+        // Opt-in "Generate and Run" mode-dropdown entry for a Generate-first tab whose own Generate/Run
+        // steps are routine enough (re-run often with the same answers) to be worth a one-click unattended
+        // path - Start Job is the first (its own confirmation dialogs + the generated program's (MBOX) probe-
+        // install prompts add up to 3 clicks every single run). ActiveGenerateAndRun is the tab's own
+        // combined "build the program, then MacroProcessor.Run(..., unattended: true) it" action - the tab
+        // itself decides which of ITS OWN confirmations are routine-safe to skip (see StartJobView.
+        // GenerateAndRun) vs genuine safety gates that must still prompt even here.
+        public static bool SupportsGenerateAndRun;
+        public static System.Action ActiveGenerateAndRun;
+
         // Live "are this tab's current inputs enough to generate" gate - the tab re-sets this on every input
         // change (the same checks that used to drive its own Generate button's IsEnabled).
         private static bool _isGenerateReady;
@@ -152,7 +169,14 @@ namespace CNC.Controls
         private static string _streamName = "Macro";
 
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
+        /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
+        /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
+        /// auto-answered OK/Yes) and take an unanswered (PROMPT param, default, ...) input's own default
+        /// rather than asking. For a "Generate and Run" action that a tab offers explicitly (see
+        /// MacroProcessor.SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures and
+        /// alarm-abort checks still apply and still stop the run; this only skips prompts that exist purely
+        /// to ask "are you sure" / "ready?", not safety gates.</param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -225,7 +249,10 @@ namespace CNC.Controls
             // run" box would be redundant - only show that when there are no input prompts to gate on.
             if (fields.Count > 0)
             {
-                if (!ShowPromptDialog(name, fields))
+                // Unattended: no operator to ask - each field just keeps the macro's own declared default
+                // (PromptField.Value is already seeded with it by ParsePromptField) rather than showing the
+                // dialog.
+                if (!unattended && !ShowPromptDialog(name, fields))
                     return false;   // cancelled
 
                 // Assign the globals on the controller before the body runs (so $F=<file> jobs can read
@@ -233,7 +260,7 @@ namespace CNC.Controls
                 foreach (var field in fields)
                     buffer.Append(field.Param).Append('=').Append(field.Value).Append('\n');
             }
-            else if (confirm && !ConfirmRun(name))
+            else if (confirm && !unattended && !ConfirmRun(name))
                 return false;
 
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
@@ -245,7 +272,7 @@ namespace CNC.Controls
                 if (IsDirective(raw, "PROMPT"))
                 {
                     // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
-                    if (Body(raw, "PROMPT").Trim().Length == 0)
+                    if (Body(raw, "PROMPT").Trim().Length == 0 && !unattended)
                     {
                         Flush(model, buffer, true);
                         if (AbortedByAlarm(model, name))
@@ -266,9 +293,11 @@ namespace CNC.Controls
                     // straight on to the next (MBOX) as if nothing had gone wrong (confirmed on real hardware
                     // 2026-07-21: a failed spoilboard probe alarmed, then the very next prompt still popped up
                     // asking to position the gauge block, with the controller sitting in Alarm the whole time).
+                    // Alarm-abort is checked even when unattended - this only skips the "are you ready" hold,
+                    // never a real safety gate.
                     if (AbortedByAlarm(model, name))
                         return false;
-                    if (!ShowMBox(name, raw))
+                    if (!unattended && !ShowMBox(name, raw))
                         return false;   // Cancel / No - stop here
                     continue;
                 }
@@ -520,6 +549,10 @@ namespace CNC.Controls
         // Returns false (after a message) if the file cannot be read.
         private static bool ResolveFileReference(ref string code, string name)
         {
+            // Extensionless @<path> defaults to ".macro" - normally already baked into the stored text
+            // by MacroCreateDialog, this is a safety net for references normalized before that existed.
+            code = MacroManagerDialog.NormalizeMacroReference(code);
+
             string trimmed = code.TrimStart();
             if (!trimmed.StartsWith("@"))
                 return true;

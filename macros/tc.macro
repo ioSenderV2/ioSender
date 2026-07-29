@@ -34,6 +34,15 @@
 
 (PRINT, TC01 ENTER cur=#<_current_tool> sel=#<_selected_tool>)
 
+; Save the CALLER's active WCS before this macro touches it at all (selecting G59.3 below, over the puck) -
+; restored (not hardcoded to G54) right before returning, so a mid-program tool change under any other WCS
+; (Pocket etc under G59, say) comes back to the RIGHT origin afterward. #5220 = grblHAL's own "active
+; coordinate system" named parameter (1=G54 .. 6=G59, 7=G59.1, 8=G59.2, 9=G59.3 - ngc_params.c coord_system).
+; Confirmed on real hardware 2026-07-27: this used to hardcode G54 on return, which silently left Pocket's
+; finishing pass running under the wrong WCS after its own mid-program tool change - its first move
+; (computed in G59 coordinates, executed under G54) landed outside travel and hit a soft limit.
+#<_wcs> = #5220
+
 M5
 M9
 G53 G0 Z-5
@@ -45,7 +54,14 @@ o100 IF [#<_selected_tool> NE 8]
   ; #5181/#5182/#5183 = stored G30 machine position (ngc_params: g30_home).
   G53 G0 X#5181 Y#5182
   G53 G0 Z#5183
-  (MSG, Swap to T#<_selected_tool>, press cycle start)
+  ; (MSG,...) is grblHAL's own RS274NGC pending-M0-message mechanism - it does NOT run parameter
+  ; substitution (only (PRINT,...) and (DEBUG,...) do, see ngc_expr.c ngc_process_comment/
+  ; ngc_substitute_parameters) - a literal "#<_selected_tool>" was showing up unsubstituted in the
+  ; prompt, confirmed on real hardware 2026-07-27 ("Swap to T#<_selected_tool>, press cycle start" with
+  ; no actual number). (PRINT,...) DOES substitute, so it carries the real tool number instead; MSG is
+  ; kept (without the number) for the actual M0 pending-message field.
+  (PRINT, Swap to T#<_selected_tool>, press Run)
+  (MSG, Swap tool, press Run)
   M0
   G49                ; cancel old tool's TLO before probing the new one
 o100 ENDIF
@@ -79,14 +95,38 @@ o150 ELSE
 o150 ENDIF
 
 G91
-G38.2 Z-80 F500
+; -90mm (was -80mm): a short V-bit (chamfer) sits well above the puck at G59.3's park height, calibrated for
+; the LONGEST tool in use - confirmed on real hardware 2026-07-27, Alarm 5 (probe fail, no contact within
+; programmed travel) landing 5mm short of the puck for the V-bit specifically.
+G38.2 Z-90 F500
 G0 Z2
 G38.2 Z-5 F25
 #<_probe_z> = #5063
 G0 Z10
 G90
 G65 P5 Q0
-G54
+
+; Restore the caller's own WCS (saved as #<_wcs> at the top) - see that comment for why this must NOT be a
+; hardcoded G54.
+o120 IF [#<_wcs> EQ 1]
+  G54
+o120 ELSEIF [#<_wcs> EQ 2]
+  G55
+o120 ELSEIF [#<_wcs> EQ 3]
+  G56
+o120 ELSEIF [#<_wcs> EQ 4]
+  G57
+o120 ELSEIF [#<_wcs> EQ 5]
+  G58
+o120 ELSEIF [#<_wcs> EQ 6]
+  G59
+o120 ELSEIF [#<_wcs> EQ 7]
+  G59.1
+o120 ELSEIF [#<_wcs> EQ 8]
+  G59.2
+o120 ELSE
+  G59.3
+o120 ENDIF
 (PRINT, TC03 probe_z=#<_probe_z>)
 
 o200 IF [#<_tlo_ref> EQ 0]
@@ -96,6 +136,19 @@ o200 ELSE
   G43.1 Z[#<_probe_z> - #<_tlo_ref>]
   (PRINT, TC05 TLO APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])
 o200 ENDIF
+; $TLR - the REAL grblHAL system command that commits the tool length reference to the controller's own
+; native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's TLR: field) - same one the Probing
+; tab's own Tool Length flow uses (ToolLengthControl.xaml.cs). #<_tlo_ref> above is a SEPARATE, older,
+; script-only convention (this macro's own bookkeeping for the G43.1 apply-on-next-M6 logic) that never
+; touched the native flag at all - confirmed on real hardware 2026-07-27: every PREREQ gate checking "tlo"
+; (Contour, etc.) could never pass even after a successful M6 T8 reference.
+; Sent EVERY time (both branches above, first reference and every later apply), NOT just the first-ever
+; reference - G49 earlier in this macro (cancels the OLD tool's TLO before probing the new one) clears the
+; controller's native TLR flag as a side effect on every real tool swap, so a job with multiple M6 tool
+; changes (e.g. Odd Jobs' Pocket roughing -> finishing) would otherwise see TLR go false after the FIRST
+; swap and never come back true for the rest of the job/session - confirmed on real hardware 2026-07-27
+; ("every time a tool finishes its program, the setup gate reset").
+$TLR
 
 ; Safe-Z goto to G30 (Z lifted just above): traverse XY at the safe height, then
 ; move Z. See the matching note on the G30 swap move earlier in this macro.

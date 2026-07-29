@@ -45,6 +45,8 @@
              (both routed through Window_Closing) quit the app. -->
         <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
+            <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load File..." Click="LoadFile_Click"
+                      ToolTip="Load a single g-code file."/>
             <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">
                 <MenuItem x:Uid="mnu_open" Header="_Open" Click="CameraOpen_Click"/>
             </MenuItem>
@@ -191,12 +193,9 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
                             <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
-                            <ToggleButton x:Uid="btnProgramView" Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" IsEnabled="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right

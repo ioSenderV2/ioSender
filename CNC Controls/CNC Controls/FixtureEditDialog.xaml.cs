@@ -396,6 +396,14 @@ namespace CNC.Controls
             if (fx == null || !fx.HasPosition || model == null)
                 return;
 
+            RunTestPositionMacro(fx);
+        }
+
+        // The actual macro build-and-kickoff, split out from the button click so the auto-recovery path
+        // (RecoverFromFailedSpoilboardSearch/PromptRetryCloserToSpoilboard below) can re-run it from Coords'
+        // new value without going through the button.
+        private void RunTestPositionMacro(Fixture fx)
+        {
             var probe = FixtureActiveProbe();
             if (probe == null)
             {
@@ -451,7 +459,14 @@ namespace CNC.Controls
             if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented)
             {
                 double topClearance = probe.MinStandoff + 9d;   // same wide clearance Start Job's DISCOVER pass uses
-                const double thicknessAssumedMm = 6d;           // small on purpose - lands the face search near the top, safely inside any real stock
+                // pcorner.macro now ALSO uses #<_ls_thickness> to size the pre-probe approach height
+                // (#<_bottom> + thickness + plateoffset + 10 - see its own comment), not just the (now-dead)
+                // face-search-depth role this comment used to describe. Test position has no real per-job
+                // stock thickness to draw from (it may run before any stock is even placed), so this stays a
+                // conservative worst-case assumption (matching the approach height's old blind "assume <=1in"
+                // constant) rather than the old deliberately-small 6mm - that value would have UNDER-sized
+                // the approach clearance the moment #<_ls_thickness> stopped being inert.
+                const double thicknessAssumedMm = 25.4d;
                 b.AppendLine("(--- locate the true corner (edge-probing kinds only) ---)");
                 b.AppendLine("#<_ls_corner> = 1");   // FrontLeft - the only origin StartJobView.SelectedCorner ever uses
                 b.AppendLine(string.Format("#<_ls_refx> = {0}", x));
@@ -461,6 +476,7 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("#<_ls_thickness> = {0}", thicknessAssumedMm.ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_mode> = 0");
                 b.AppendLine("#<_ls_plateoffset> = 0");
+                b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here (see FixtureActiveProbe's own comment)
                 b.AppendLine("#<_ls_spoilx> = 0");
                 b.AppendLine("#<_ls_spoily> = 0");
                 b.AppendLine(string.Format("#<_ls_topx> = {0}", topClearance.ToInvariantString("0.0##")));
@@ -526,10 +542,17 @@ namespace CNC.Controls
             }
         }
 
+        // grblHAL alarm substates for a G38.2 probe search that ran its full commanded travel without ever
+        // contacting anything (as opposed to a hard/soft limit, comms loss, etc.) - see ProbingView's own
+        // (commented-out) handling of the same 2 substates.
+        private const int AlarmSubstateProbeFailInitial = 4;
+        private const int AlarmSubstateProbeFailContact = 5;
+
         // Runs once Test position's async streamed probe has genuinely finished.
         private void OnTestPositionDone(Fixture fx)
         {
-            fx.PositionValidated = model.GrblState.State != GrblStates.Alarm;
+            bool alarmed = model.GrblState.State == GrblStates.Alarm;
+            fx.PositionValidated = !alarmed;
             // Edge-probing kinds: the macro above parked the machine at the tight corner anchor as its very
             // last move, so the CURRENT machine position now IS that anchor - same "read back after the macro
             // parks there" idiom OnViseCornerProbeDone uses for Set position. Store it relative to Coords (the
@@ -545,6 +568,18 @@ namespace CNC.Controls
                     fx.SpoilboardZ = _capturedSpoilZ.Value;
             }
             UpdatePositionDisplay();
+
+            // The 12 mm-capped spoilboard search ran dry without contacting anything - the saved position was
+            // simply too far above the spoilboard for the capped search to reach, not a real fault. Recover
+            // automatically (unlock + retract to the saved Z) and offer to retry, rather than just reporting
+            // failure and leaving the operator to unlock/jog/retry by hand every time. Stays busy (no
+            // SetBusy(false) here) until that whole recovery flow settles - see RecoverFromFailedSpoilboardSearch.
+            if (alarmed && (model.GrblState.Substate == AlarmSubstateProbeFailInitial || model.GrblState.Substate == AlarmSubstateProbeFailContact))
+            {
+                RecoverFromFailedSpoilboardSearch(fx);
+                return;
+            }
+
             SetBusy(false);
             // The macro's own (PRINT, Test position OK - ...) message gets clobbered by JobControl's generic
             // "<Program> ready - press Run to run" banner (SetActiveProgramReady) - Test position reuses
@@ -552,6 +587,72 @@ namespace CNC.Controls
             // of the Idle transition, before this deferred callback runs. Re-assert a clear final message here,
             // same as OnViseCornerProbeDone already does for Set position.
             model.Message = fx.PositionValidated ? "Test position OK - validated." : "Test position failed or alarmed - not validated.";
+        }
+
+        // Unlock the probe-fail alarm ($X - no full reset needed, nothing actually faulted) and retract to the
+        // saved reference Z, then (once that retract genuinely finishes) prompt the operator to jog closer and
+        // retry. A short delay after $X lets the controller's Idle state actually land before the retract macro
+        // starts - same reasoning as JobControl.ResetAndUnlock's own post-unlock delay.
+        private void RecoverFromFailedSpoilboardSearch(Fixture fx)
+        {
+            double savedZ = new Position(fx.Coords).Z;
+            model.Message = "Test position failed - spoilboard search never made contact. Unlocking and retracting...";
+            model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+
+                var b = new StringBuilder();
+                b.AppendLine("(Test position recovery - retract to the saved Z after a failed spoilboard search)");
+                b.AppendLine("(PREREQ, connected, homed, noalarm)");
+                b.AppendLine("G21 G90");
+                b.AppendLine(string.Format("G53G0Z{0}", savedZ.ToInvariantString("0.0##")));
+
+                var started = new RunStarted();
+                var handler = WatchAsyncCompletion(() => PromptRetryCloserToSpoilboard(fx, savedZ), started);
+                bool ran = MacroProcessor.Run(model, "Test position recovery", b.ToString(), false);
+                if (ran)
+                    started.Value = true;
+                else
+                {
+                    model.PropertyChanged -= handler;
+                    SetBusy(false);
+                    model.Message = "Test position failed - could not retract automatically. Jog clear by hand.";
+                }
+            };
+            timer.Start();
+        }
+
+        // The machine is back at the saved Z and unlocked - explain why it failed and how to fix it, then (if
+        // the operator jogged CLOSER to the spoilboard - Z more negative - before clicking OK) update Coords to
+        // the new position and re-run Test position automatically. If Z didn't actually move closer, leave it
+        // there for them to jog and click Test position again themselves - guessing at a retry when nothing
+        // changed would just repeat the same failure.
+        private void PromptRetryCloserToSpoilboard(Fixture fx, double previousZ)
+        {
+            AppDialogs.Show(
+                "Test position failed - the 12 mm probe search never reached the spoilboard. The alarm has " +
+                "been cleared and the machine returned to the saved Z. Jog closer - within about 10 mm above " +
+                "the spoilboard - then click OK to retry automatically.",
+                "Test position", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            string coords = Fixtures.CurrentCoordsCsv(model);
+            double? newZ = coords == null ? (double?)null : new Position(coords).Z;
+
+            const double towardSpoilboardToleranceMm = 0.01d;   // guards against settle/read noise at an unchanged Z
+            if (newZ.HasValue && newZ.Value < previousZ - towardSpoilboardToleranceMm)
+            {
+                fx.Coords = coords;
+                UpdatePositionDisplay();
+                RunTestPositionMacro(fx);
+            }
+            else
+            {
+                SetBusy(false);
+                model.Message = "Test position not retried - jog closer to the spoilboard first, then click Test position.";
+            }
         }
 
         private void SelectKind(FixtureKind kind)

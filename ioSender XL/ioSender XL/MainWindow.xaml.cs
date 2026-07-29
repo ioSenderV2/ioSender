@@ -63,7 +63,7 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
-        private const string legacyVersion = "2.31";
+        private const string legacyVersion = "2.33";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
@@ -573,12 +573,6 @@ namespace GCode_Sender
             }), DispatcherPriority.Input);
         }
 
-        private void ProgramView_Toggled(object sender, RoutedEventArgs e)
-        {
-            _programOverlay = btnProgramView.IsChecked == true;
-            UpdateOverlay();
-        }
-
         // Program view and console log share one overlay over the work area, side by side. Each column is
         // shown (and given equal width) only when its trigger is active; the host collapses when neither is.
         private void UpdateOverlay()
@@ -638,15 +632,14 @@ namespace GCode_Sender
         // Host the connected ProgramView in the popup ONLY when it's genuinely transient (AutoShow - a wizard's
         // Generate output, or a plain macro run). The loaded job's own view (jobProgramView, AutoShow=false)
         // already has a persistent home in the docked Job-tab panel (ProgramPanel), so this popup must never
-        // show it a second time - the "Program" button is disabled whenever there's nothing showable here.
+        // show it a second time. No manual toggle any more - it shows/hides purely by AutoShow, since the
+        // wizard's Generate output resets on tab-leave and program-exit anyway.
         private void OnOverlayActiveChanged()
         {
             var active = CNC.Controls.ProgramView.Active;
             bool showable = active != null && active.AutoShow;
 
             overlayActiveHost.Content = showable ? active : null;
-            btnProgramView.IsEnabled = showable;
-            btnProgramView.IsChecked = showable;   // AutoShow pops the popup open as Generate feedback
             _programOverlay = showable;
 
             ApplyOverlayCompact();
@@ -708,6 +701,13 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
+            // Odd Jobs' "Setup" sub-tab is a second, constrained StartJobView instance (always G59, Measure
+            // + TLO ref forced on - see StartJobView's constrainedToOddJobs). OddJobsView (CNC Controls
+            // library) can't reference StartJobView (ioSender XL) itself, so this is the one place - it can
+            // see both - that registers the component; OddJobsView just looks it up by key like any other.
+            // Must run before BuildTabs() (which constructs OddJobsView, which reads this registry).
+            CNC.Controls.ComponentRegistry.Register(CNC.Controls.LayoutKeys.OddJobsSetup, "Setup", () => new StartJobView(constrainedToOddJobs: true));
+
             // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
             // before anything that resolves a tab via getTab()/getView() below.
             RegisterBuiltinTabs();
@@ -853,6 +853,8 @@ namespace GCode_Sender
                 };
                 showPinned.Start();
             }
+
+            BuildMacroMenuItems();
 
             // Set the initial connection-gated tab state (Start Job etc. disabled until connect).
             UpdateConnectionGatedTabs();
@@ -1081,6 +1083,7 @@ namespace GCode_Sender
         private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
         {
             bool started = false;
+            bool jobFinished = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
             {
@@ -1091,6 +1094,15 @@ namespace GCode_Sender
                     st, started, m.GrblState.State));
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
+                // JobFinished is only ever raised on a genuine program end (M30/M2, see JobControl's
+                // StreamingHandler.Call(StreamingState.JobFinished, ...) call sites) - a Feed Hold + Stop
+                // instead routes through StreamingState.Stop on its way back to Idle. Both eventually land on
+                // the SAME terminal Idle/NoFile state below, so without this distinction a Feed Hold + Stop
+                // was indistinguishable from a clean finish and wrongly discarded the generated program
+                // (Run bar reverted to "Generate" mid-job with no way to resume) - confirmed on real
+                // hardware 2026-07-27 on the Odd Jobs Pocket tool.
+                if (st == StreamingState.JobFinished)
+                    jobFinished = true;
                 // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
                 // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
                 // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
@@ -1139,10 +1151,10 @@ namespace GCode_Sender
                         // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
                         // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
                         // the operator re-generates for the next job rather than re-running a stale program.
-                        // Left alone on error/halt (same condition as the program-view dismiss above) so the
-                        // operator can still inspect/re-run the SAME generated program after fixing whatever
-                        // interrupted it, without redoing Generate.
-                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode)
+                        // Left alone on error/halt (same condition as the program-view dismiss above), AND on
+                        // a Feed Hold + Stop (jobFinished false - see its own comment above) so the operator
+                        // can still inspect/RESUME the SAME generated program, without redoing Generate.
+                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode && jobFinished)
                             CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
                     }
                     // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
@@ -1221,6 +1233,28 @@ namespace GCode_Sender
         }
 
         // Persist a flyout's pin state so it reopens (pinned) on next launch.
+        // "Add to menu" macros (Settings: Macros > Create dialog's "Add to main menu" checkbox): each
+        // becomes its own top-level menu item, appended after Help. Built once at startup, same as
+        // FlyoutItems/MainPanels - a newly ticked/unticked macro takes effect on next launch.
+        private void BuildMacroMenuItems()
+        {
+            int insertAt = menuMain.Items.IndexOf(menuHelp) + 1;
+            foreach (var macro in AppConfig.Settings.Macros)
+            {
+                if (!macro.AddToMenu)
+                    continue;
+
+                var item = new MenuItem { Header = (macro.Name ?? string.Empty).Replace("_", "__"), Tag = macro };
+                item.Click += (s, e) =>
+                {
+                    var m = (CNC.GCode.Macro)((MenuItem)s).Tag;
+                    if (MacroProcessor.Run(DataContext as GrblViewModel, m.Name, m.Code, m.ConfirmOnExecute))
+                        AppConfig.Settings.RecordMacroRun(m.Id);
+                };
+                menuMain.Items.Insert(insertAt++, item);
+            }
+        }
+
         private void MainPanelFlyout_PinnedChanged(IPinnableFlyout flyout)
         {
             var pinned = AppConfig.Settings.Base.PinnedFlyouts;
@@ -1932,6 +1966,11 @@ namespace GCode_Sender
             menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
         }
 
+        private void LoadFile_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.Open();
+        }
+
         private void connectMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
@@ -2290,6 +2329,17 @@ namespace GCode_Sender
             if (!tabReorderDragging)
                 sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
 
+            // Never activate/deactivate views mid-reorder-drag. Reordering does Items.Remove/Insert, which
+            // raises SelectionChanged SYNCHRONOUSLY while the moved TabItem is unparented - and an unparented
+            // TabItem has no inherited DataContext, so a view activated in that window sees DataContext == null.
+            // That crashed the app with a NullReferenceException in SDCardView.Activate (crash report
+            // 2026-07-29 14:47:29Z), and SDCardView is not special - any view whose Activate touches
+            // DataContext was exposed. The drag also fired this on EVERY tick, activating a different view
+            // each time, which is the real source of the repaint churn the drag-clip was introduced to mask.
+            // On drop, the settled selection raises this once more and the right view activates normally.
+            if ((sender as StretchTabControl)?.IsReordering == true)
+                return;
+
             if ((DataContext as GrblViewModel).IsReady &&
                 UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
             {
@@ -2442,6 +2492,7 @@ namespace GCode_Sender
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.OddJobs, TabLabel("TabOddJobs", "Odd Jobs"), () => new OddJobsView(), 85, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 110, enabledWhenDisconnected: false));
@@ -2666,12 +2717,14 @@ namespace GCode_Sender
         private static readonly Dictionary<string, ViewType> tabViewIds = new Dictionary<string, ViewType>
         {
             { "Tab.Settings",     ViewType.GRBLConfig },
+            { "Tab.FeedsSpeeds",  ViewType.FeedsAndSpeeds },
             { "Tab.StartJob",     ViewType.StartJob },
             { "Tab.Job",          ViewType.GRBL },
             { "Tab.Offsets",      ViewType.Offsets },
             { "Tab.SDCard",       ViewType.SDCard },
             { "Tab.Probing",      ViewType.Probing },
             { "Tab.Tools",        ViewType.Tools },
+            { "Tab.OddJobs",      ViewType.OddJobs },
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },

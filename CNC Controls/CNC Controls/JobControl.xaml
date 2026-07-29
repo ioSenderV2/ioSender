@@ -36,8 +36,8 @@
         <system:String x:Uid="str_generateTipDisabled" x:Key="GenerateTipDisabled">Set the required inputs on this tab first, then Generate becomes available. (Alt+R)</system:String>
         <system:String x:Uid="str_generateTipReady" x:Key="GenerateTipReady">Build the program from this tab's current inputs. (Alt+R)</system:String>
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
-        <!-- Buttons hug their label (one space of padding each side) so the run button row stays compact and
-             leaves room for the jog pad to its right. No MinWidth/MaxWidth - each button is content-sized. -->
+        <!-- Fixed MinWidth (sized to the longest label, "Feed Hold"/"Check Run") so the run button row reads
+             as an even grid instead of ragged content-sized buttons. -->
         <!-- BasedOn the app-wide implicit Button style (AppleStyles.xaml) so Feed Hold/Stop/Rewind/Run get
              the same rounded pill/gradient look as everything else - an explicit x:Key style does NOT
              inherit the implicit default on its own, it replaces it outright, which is why these buttons
@@ -45,6 +45,7 @@
         <Style x:Key="JobButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="90" />
             <Setter Property="Focusable" Value="False" />
         </Style>
         <!-- Run glows green when a wizard program is the active source and ready to run ("press me"). -->
@@ -132,14 +133,28 @@
                Opened="StartModePopup_Opened" StaysOpen="False" AllowsTransparency="True">
             <Border Background="White" BorderBrush="#FF999999" BorderThickness="1">
                 <StackPanel>
-                    <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Run normally."/>
-                    <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
-                    <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
-                    <Button x:Uid="btn_startModeSimulate" Content="{StaticResource StartModeSimulate}" Tag="simulate" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
-                            ToolTip="Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."/>
+                    <!-- Normal Run/Dry Run/Check Run/Simulate picker - hidden instead of pnlGenerateAndRun
+                         below while a Generate-first tab that opted into SupportsGenerateAndRun is focused
+                         (see UpdateGenerateAndRunVisibility). -->
+                    <StackPanel x:Name="pnlNormalModes">
+                        <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Run normally."/>
+                        <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
+                        <Button x:Uid="btn_startModeCheck" Content="{StaticResource StartModeCheck}" Tag="check" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Grbl check mode ($C) - the controller parses the program without moving, to validate it before a real run."/>
+                        <Button x:Uid="btn_startModeSimulate" Content="{StaticResource StartModeSimulate}" Tag="simulate" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                                ToolTip="Switch to the bundled simulator, run there, then reconnect to the real controller once the run finishes or is aborted."/>
+                    </StackPanel>
+                    <!-- Generate-first tab opted into MacroProcessor.SupportsGenerateAndRun (Start Job) - a
+                         one-click "build the program and run it" that skips that tab's own routine confirm
+                         dialogs and the generated program's (MBOX) prompts (MacroProcessor.Run's own
+                         unattended parameter) - genuine safety-gate prompts (out-of-travel size, G28 not
+                         set, ...) still show even here, only the "are you sure/ready" ones are skipped. -->
+                    <StackPanel x:Name="pnlGenerateAndRun" Visibility="Collapsed">
+                        <Button x:Uid="btn_generateAndRun" Content="Generate and Run" Style="{StaticResource StartModeItemStyle}" Click="GenerateAndRun_Click"
+                                ToolTip="Generate and run in one step, skipping the routine confirmation prompts (real safety warnings still show)."/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Popup>

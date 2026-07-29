@@ -328,6 +328,13 @@
                                 <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="16,0,0,0" VerticalAlignment="Center"
                                           ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
                             </StackPanel>
+                            <StackPanel x:Name="pnlMaterial" Orientation="Horizontal" Margin="0,4,0,4" Visibility="Collapsed">
+                                <Label x:Uid="ls_material" Content="Material:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                                <ComboBox x:Uid="cbxMaterial" x:Name="cbxMaterial" MinWidth="140" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxMaterial_SelectionChanged"
+                                          ToolTip="Stock material - used by the Odd Jobs job wizards' Feeds and Speeds recommendation."/>
+                            </StackPanel>
+                            <cnccontrols:NumericField x:Uid="ls_keepout" x:Name="fldKeepOutInset" Label="Keep-out inset:" ColonAt="120" Unit="mm" Format="####0.0##" Value="15" Margin="0,2,0,4"
+                                                      ToolTip="Perimeter clearance to stay clear of - typically clamps/screws holding the stock down around its edge. Shown as a dotted red line on the drawing; used by the Odd Jobs job wizards' own toolpaths."/>
                             <cnccontrols:NumericField x:Name="fldWidth"     x:Uid="ls_width"     Label="Est. width (X):"     ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,6,0,2"/>
                             <cnccontrols:NumericField x:Name="fldHeight"    x:Uid="ls_height"    Label="Est. height (Y):"    ColonAt="120" Unit="mm" Format="####0.0##" Value="100" Margin="0,2"/>
                             <cnccontrols:NumericField x:Name="fldThickness" x:Uid="ls_thickness" Label="Est. thickness (Z):" ColonAt="120" Unit="mm" Format="####0.0##" Value="19"  Margin="0,2"/>
@@ -343,9 +350,9 @@
                         </StackPanel>
                     </GroupBox>
 
-                    <GroupBox x:Uid="ls_grpActions" Header="Actions" Margin="0,8,0,0">
+                    <GroupBox x:Uid="ls_grpActions" x:Name="grpActions" Header="Actions" Margin="0,8,0,0">
                         <StackPanel x:Name="pnlActions" Margin="6">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <StackPanel x:Name="pnlSetOriginRow" Orientation="Horizontal" Margin="0,0,0,2">
                                 <CheckBox x:Uid="ls_setorigin" x:Name="chkSetOrigin" Content="Set origin or offset:" IsChecked="True" VerticalAlignment="Center"
                                           ToolTip="On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on), or as a G92 temporary offset if G92 is selected. Off: still probes/measures and reports the numbers, but leaves the selected WCS/offset untouched."/>
                                 <ComboBox x:Uid="cbxWcs" x:Name="cbxWcs" MinWidth="80" MinHeight="22" Margin="6,0,0,0" VerticalAlignment="Center" SelectedIndex="0"
@@ -409,7 +416,7 @@
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+                <StackPanel x:Name="pnlCopyVerifyButtons" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
                     <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"

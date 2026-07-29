@@ -110,6 +110,20 @@
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OddJobsView.xaml.cs">
+      <DependentUpon>OddJobsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OddJobsGeometry.cs" />
+    <Compile Include="OddJobsStockCanvas.cs" />
+    <Compile Include="WorkOrderModel.cs" />
+    <Compile Include="WorkOrderCompiler.cs" />
+    <Compile Include="OddJobsToolMemory.cs" />
+    <Compile Include="WorkOrderView.xaml.cs">
+      <DependentUpon>WorkOrderView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OddJobsFeedsSpeedsDialog.xaml.cs">
+      <DependentUpon>OddJobsFeedsSpeedsDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="FeedsAndSpeedsView.xaml.cs">
       <DependentUpon>FeedsAndSpeedsView.xaml</DependentUpon>
     </Compile>
@@ -263,6 +277,12 @@
     <Compile Include="MacroExecuteControl.xaml.cs">
       <DependentUpon>MacroExecuteControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MacroPinnedListControl.xaml.cs">
+      <DependentUpon>MacroPinnedListControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MacroCreateDialog.xaml.cs">
+      <DependentUpon>MacroCreateDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MacroToolbarControl.xaml.cs">
       <DependentUpon>MacroToolbarControl.xaml</DependentUpon>
     </Compile>
@@ -412,6 +432,18 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ToolsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OddJobsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="WorkOrderView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OddJobsFeedsSpeedsDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -584,6 +616,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MacroExecuteControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroPinnedListControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroCreateDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
