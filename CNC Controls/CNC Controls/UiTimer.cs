@@ -1,5 +1,5 @@
 /*
- * UiTimer.cs - part of CNC Core library
+ * UiTimer.cs - part of CNC Controls library
  *
  * Portable replacement for System.Windows.Threading.DispatcherTimer: a periodic timer whose Tick is
  * raised on the host's UI thread (or inline, if the host registered no UI thread).
@@ -14,8 +14,9 @@
 
 using System;
 using System.Threading;
+using CNC.Core;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     public class UiTimer : IDisposable
     {

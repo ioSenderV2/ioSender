@@ -1,5 +1,5 @@
 /*
- * XInput.cs - part of CNC Core library for Grbl
+ * XInput.cs - part of CNC Controls library for Grbl
  *
  * Minimal P/Invoke wrapper around the Windows XInput API for Xbox controllers.
  * No third-party dependency - calls xinput1_4.dll directly (with a 9_1_0 fallback).
@@ -9,7 +9,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     [Flags]
     public enum XInputButton : ushort

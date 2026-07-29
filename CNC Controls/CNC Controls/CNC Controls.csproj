@@ -190,6 +190,11 @@
     <Compile Include="UiPump.cs" />
     <Compile Include="UiState.cs" />
     <Compile Include="ObsBridge.cs" />
+    <Compile Include="ControllerService.cs" />
+    <Compile Include="ControllerMapper.cs" />
+    <Compile Include="XInput.cs" />
+    <Compile Include="UiTimer.cs" />
+    <Compile Include="GamepadInput.cs" />
     <Compile Include="LegacySecrets.cs" />
     <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />

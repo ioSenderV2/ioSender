@@ -75,15 +75,12 @@
     <Compile Include="Grbl.cs" />
     <Compile Include="Comms.cs" />
     <Compile Include="ConfigStore.cs" />
-    <Compile Include="ControllerService.cs" />
-    <Compile Include="ControllerMapper.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
     <Compile Include="FeedsSpeedsAdvisor.cs" />
     <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="GCodeJob.cs" />
     <Compile Include="Geometry.cs" />
     <Compile Include="Threading.cs" />
-    <Compile Include="UiTimer.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="JogController.cs" />
     <Compile Include="LibStrings.cs" />
@@ -96,7 +93,6 @@
     <Compile Include="UserPrompt.cs" />
     <Compile Include="TelnetStream.cs" />
     <Compile Include="WebsocketStream.cs" />
-    <Compile Include="XInput.cs" />
     <Compile Include="YModem.cs" />
   </ItemGroup>
   <ItemGroup>

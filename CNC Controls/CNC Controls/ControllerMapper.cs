@@ -1,5 +1,5 @@
 /*
- * ControllerMapper.cs - part of CNC Core library for Grbl
+ * ControllerMapper.cs - part of CNC Controls library for Grbl
  *
  * Maps Xbox controller buttons (from ControllerService) to named machine actions
  * and executes them. The button->action map is editable (Controller tab) and
@@ -16,8 +16,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Xml.Serialization;
+using CNC.Core;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     [XmlType("ControllerMapping")]
     [XmlRoot("ControllerMap")]

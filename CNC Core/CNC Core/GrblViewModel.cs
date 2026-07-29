@@ -94,13 +94,9 @@ namespace CNC.Core
 
             Keyboard = KeyboardFactory != null ? KeyboardFactory(this) : new JogController(this);
 
-            try
-            {
-                Controller = new ControllerService();
-                ControllerMapper = new ControllerMapper(this, Controller);
-                Controller.Start();
-            }
-            catch { /* XInput or dispatcher unavailable - controller support stays inert */ }
+            // Xbox controller input is client-side (CNC.Controls.GamepadInput) - it is a human input
+            // device, and XInput is a Windows P/Invoke. It used to be constructed here, which meant every
+            // GrblViewModel started its own 60Hz poller; MainWindow now attaches exactly one to the main model.
 
             MDICommand = new ActionCommand<string>(ExecuteMDI);
             StartFromBlock = new ActionCommand<int>(ExecuteStartFromBlock, canExecuteStartFromBlock);
@@ -352,8 +348,6 @@ namespace CNC.Core
         /// </summary>
         public static Func<GrblViewModel, JogController> KeyboardFactory;
 
-        public ControllerService Controller { get; private set; }
-        public ControllerMapper ControllerMapper { get; private set; }
 
         // Supplied by the jog panel (CNC Controls) so non-UI code (e.g. controller jogging) can use the
         // same distance/feed the on-screen jog uses. Null until the jog panel has loaded.

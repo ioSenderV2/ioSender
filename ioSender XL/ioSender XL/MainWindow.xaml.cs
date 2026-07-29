@@ -195,7 +195,10 @@ namespace GCode_Sender
             };
 
             if (DataContext is GrblViewModel viewModel)
+            {
                 CNC.Core.Grbl.GrblViewModel = viewModel;
+                CNC.Controls.GamepadInput.Attach(viewModel);   // one gamepad stack, bound to the main model
+            }
 
             // The run control is now fixed at the main-window bottom (always visible on every tab), so the
             // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers

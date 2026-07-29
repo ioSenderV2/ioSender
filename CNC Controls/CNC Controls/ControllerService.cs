@@ -1,5 +1,5 @@
 /*
- * ControllerService.cs - part of CNC Core library for Grbl
+ * ControllerService.cs - part of CNC Controls library for Grbl
  *
  * Polls an Xbox controller via XInput on the UI thread and surfaces button
  * edge events, connect/disconnect, analog state and rumble. The mapping layer
@@ -8,8 +8,9 @@
  */
 
 using System;
+using CNC.Core;
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     public class ControllerButtonEventArgs : EventArgs
     {

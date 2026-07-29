@@ -87,9 +87,9 @@ namespace CNC.Controls
                 .Select(r => new TabShortcut { Id = r.Model.Method, Key = r.Model.Key == Key.None ? string.Empty : ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
                 .ToList();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
             {
-                var m = model.ControllerMapper;
+                var m = GamepadInput.Mapper;
                 foreach (var r in controllerRows)
                     m.SetAction(r.Button, r.Action);
 
@@ -271,7 +271,7 @@ namespace CNC.Controls
             foreach (var row in rows)
                 row.ResetToDefault();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
                 foreach (var r in controllerRows)
                     r.Action = ControllerMapper.DefaultAction(r.Button);
 
@@ -395,19 +395,19 @@ namespace CNC.Controls
         {
             ActionItems = BuildActionItems();
 
-            if (model.Controller == null || model.ControllerMapper == null)
+            if (GamepadInput.Service == null || GamepadInput.Mapper == null)
             {
                 lblController.Text = "Controller support is not available.";
                 return;
             }
 
-            model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
+            GamepadInput.Mapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
             {
                 var def = ControllerMapper.DefaultAction(b);
                 var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label, a.Description) : a).ToList();
-                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), GamepadInput.Mapper.GetAction(b), choices));
             }
 
             gridController.ItemsSource = controllerRows;
@@ -417,7 +417,7 @@ namespace CNC.Controls
             UpdateRestoreDefaultsButton();
 
             // Analog jog settings
-            var m = model.ControllerMapper;
+            var m = GamepadInput.Mapper;
             chkAnalogEnabled.IsChecked = m.AnalogJogEnabled;
             txtDeadzone.Text = m.DeadzonePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
             txtFeedScale.Text = m.FeedScale.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
@@ -436,15 +436,15 @@ namespace CNC.Controls
             // write straight to Config.TabShortcuts) are reflected here, even though this editor is built once.
             SyncTabRows();
 
-            if (_controllerHooked || model.Controller == null || model.ControllerMapper == null)
+            if (_controllerHooked || GamepadInput.Service == null || GamepadInput.Mapper == null)
                 return;
 
             _controllerHooked = true;
-            model.ControllerMapper.Enabled = false;
+            GamepadInput.Mapper.Enabled = false;
             UpdateControllerStatus();
-            model.Controller.Connected += Controller_StatusChanged;
-            model.Controller.Disconnected += Controller_StatusChanged;
-            model.Controller.Polled += Controller_Polled;
+            GamepadInput.Service.Connected += Controller_StatusChanged;
+            GamepadInput.Service.Disconnected += Controller_StatusChanged;
+            GamepadInput.Service.Polled += Controller_Polled;
         }
 
         // Tab hidden / view left: unhook and resume machine dispatch.
@@ -454,20 +454,20 @@ namespace CNC.Controls
                 return;
 
             _controllerHooked = false;
-            if (model.Controller != null)
+            if (GamepadInput.Service != null)
             {
-                model.Controller.Connected -= Controller_StatusChanged;
-                model.Controller.Disconnected -= Controller_StatusChanged;
-                model.Controller.Polled -= Controller_Polled;
+                GamepadInput.Service.Connected -= Controller_StatusChanged;
+                GamepadInput.Service.Disconnected -= Controller_StatusChanged;
+                GamepadInput.Service.Polled -= Controller_Polled;
             }
-            if (model.ControllerMapper != null)
-                model.ControllerMapper.Enabled = true;   // resume machine dispatch
+            if (GamepadInput.Mapper != null)
+                GamepadInput.Mapper.Enabled = true;   // resume machine dispatch
         }
 
         private void UpdateControllerStatus()
         {
-            lblController.Text = model.Controller != null && model.Controller.IsConnected
-                ? "Controller connected (slot " + model.Controller.ControllerIndex + ")."
+            lblController.Text = GamepadInput.Service != null && GamepadInput.Service.IsConnected
+                ? "Controller connected (slot " + GamepadInput.Service.ControllerIndex + ")."
                 : "No controller detected.";
         }
 
@@ -480,7 +480,7 @@ namespace CNC.Controls
         // check of what the controller actually reports (D-pad lights here = input is getting through).
         private void Controller_Polled(object sender, EventArgs e)
         {
-            ushort buttons = model.Controller.State.wButtons;
+            ushort buttons = GamepadInput.Service.State.wButtons;
             foreach (var r in controllerRows)
                 r.Pressed = (buttons & (ushort)r.Button) != 0;
         }
