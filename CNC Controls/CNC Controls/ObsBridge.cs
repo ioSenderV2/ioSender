@@ -1,5 +1,5 @@
 /*
- * ObsBridge.cs - part of Grbl Code Sender
+ * ObsBridge.cs - part of CNC Controls library
  *
  * Opt-in OBS Studio recording control over obs-websocket (v5). Turned on together
  * with the demo-marker facility (-demomarker) so a demo shoot can auto-record:
@@ -13,7 +13,11 @@
  *
  * Everything here is best-effort and never throws: if OBS isn't running, the
  * server isn't enabled, or the password is wrong, the bridge simply no-ops.
- * Reuses the websocket-sharp dependency already used by WebsocketStream.
+ * Lives in CNC.Controls, not CNC.Core: driving OBS Studio for a demo shoot is client functionality -
+ * every caller is a view (RtspCamerasControl, MainWindow's run bar, the Camera settings panel), and
+ * nothing in Core calls it. It was also the only UNCONDITIONAL websocket-sharp reference in Core, so
+ * moving it here is what let CNC.Core compile against net8.0 with that dependency confined to
+ * WebsocketStream's #if USEWEBSOCKET (a real controller transport, and a genuine server concern).
  */
 
 using System;
@@ -23,8 +27,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using WebSocketSharp;
+using CNC.Core;   // DemoMarker / DebugLog
 
-namespace CNC.Core
+namespace CNC.Controls
 {
     /// <summary>
     /// Static, opt-in OBS recording controller over obs-websocket v5. No-op unless

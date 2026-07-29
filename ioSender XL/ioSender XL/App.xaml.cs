@@ -237,8 +237,8 @@ namespace GCode_Sender
             if (demoMarker)
             {
                 var cam = CNC.Controls.AppConfig.Settings.Base.Camera;
-                CNC.Core.ObsBridge.Init(true, cam.ObsHost, cam.ObsPort, cam.ObsPassword);
-                CNC.Core.ObsBridge.ConfigureCameras(cam.ObsCamASource, cam.ObsCamAFilter, cam.ObsCamBSource, cam.ObsCamBFilter, cam.ObsAppSource, cam.ObsAppFilter);
+                CNC.Controls.ObsBridge.Init(true, cam.ObsHost, cam.ObsPort, cam.ObsPassword);
+                CNC.Controls.ObsBridge.ConfigureCameras(cam.ObsCamASource, cam.ObsCamAFilter, cam.ObsCamBSource, cam.ObsCamBFilter, cam.ObsAppSource, cam.ObsAppFilter);
             }
 
             main.AttachSplash(splash);

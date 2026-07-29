@@ -42,6 +42,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
+using CNC.Controls;   // ObsBridge (client-side, moved out of CNC.Core)
 
 namespace CNC.Controls.Camera
 {

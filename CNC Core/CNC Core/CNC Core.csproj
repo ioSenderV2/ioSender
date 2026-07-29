@@ -66,7 +66,6 @@
     <Compile Include="DebugLog.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
-    <Compile Include="ObsBridge.cs" />
     <Compile Include="SecretStore.cs" />
     <Compile Include="EltimaStream.cs" />
     <Compile Include="GCode.cs" />

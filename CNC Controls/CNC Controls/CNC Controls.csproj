@@ -65,6 +65,10 @@
     <Reference Include="ToggleSwitch">
       <HintPath>..\..\toggle-switch-control-master\WPF\ToggleSwitch\bin\Release\ToggleSwitch.dll</HintPath>
     </Reference>
+    <Reference Include="websocket-sharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
+    </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -185,6 +189,7 @@
     <Compile Include="GeometryInterop.cs" />
     <Compile Include="UiPump.cs" />
     <Compile Include="UiState.cs" />
+    <Compile Include="ObsBridge.cs" />
     <Compile Include="LegacySecrets.cs" />
     <Compile Include="PathConstructor.cs" />
     <Compile Include="KeypressHandler.cs" />

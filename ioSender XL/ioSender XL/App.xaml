@@ -26,7 +26,7 @@
              swaps to a red square (recording - press to stop) via an IsChecked trigger. Both shapes
              stay in the template always; only Visibility toggles, so there's no ContentPresenter/Content
              dependency. Shared by RtspCamerasControl's per-camera/All toggles and MainWindow's run-bar
-             "All" button (btnAllRecord) - both drive/reflect the same CNC.Core.ObsBridge state. -->
+             "All" button (btnAllRecord) - both drive/reflect the same CNC.Controls.ObsBridge state. -->
         <Style x:Key="RecordToggleStyle" TargetType="ToggleButton">
             <Setter Property="Width" Value="28"/>
             <Setter Property="Height" Value="28"/>

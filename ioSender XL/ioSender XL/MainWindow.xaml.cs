@@ -333,7 +333,7 @@ namespace GCode_Sender
             // ObsBridge just like RtspCamerasControl's own "All" row, so either control reflects the
             // other's state regardless of which one (or a keyboard shortcut) triggered a change.
             btnAllRecord.Visibility = btnTimeLapse.Visibility;
-            CNC.Core.ObsBridge.CamerasChanged += AllRecord_Resync;
+            CNC.Controls.ObsBridge.CamerasChanged += AllRecord_Resync;
             AllRecord_Resync();
         }
 
@@ -343,8 +343,8 @@ namespace GCode_Sender
         {
             _suppressAllRecordToggled = true;
             bool allRecording = true;
-            for (int i = 0; i < CNC.Core.ObsBridge.Cameras.Length; i++)
-                allRecording &= CNC.Core.ObsBridge.IsCameraRecording(i);
+            for (int i = 0; i < CNC.Controls.ObsBridge.Cameras.Length; i++)
+                allRecording &= CNC.Controls.ObsBridge.IsCameraRecording(i);
             btnAllRecord.IsChecked = allRecording;
             _suppressAllRecordToggled = false;
         }
@@ -618,11 +618,11 @@ namespace GCode_Sender
         {
             if (string.IsNullOrEmpty(fileName))
             {
-                CNC.Core.ObsBridge.StopRecording();   // file closed: stop the demo recording (safety net)
+                CNC.Controls.ObsBridge.StopRecording();   // file closed: stop the demo recording (safety net)
                 jobProgramView?.Disconnect();   // file closed: drop the job view (overlay reverts to the empty state)
                 return;
             }
-            CNC.Core.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
+            CNC.Controls.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
             if (jobProgramView == null)
             {
                 jobProgramView = new CNC.Controls.ProgramView { AutoShow = false, IsLoadedJob = true };
@@ -894,12 +894,12 @@ namespace GCode_Sender
 
             // Demo-shoot RTSP camera hotkeys - route through ObsBridge.SetCameraRecording, the same entry
             // point the RtspCamerasControl panel's toggles use, so either can drive the other's state.
-            ActionKeyBinder.Register("ObsCamAStart", k => { CNC.Core.ObsBridge.SetCameraRecording(0, true); return true; });
-            ActionKeyBinder.Register("ObsCamAStop", k => { CNC.Core.ObsBridge.SetCameraRecording(0, false); return true; });
-            ActionKeyBinder.Register("ObsCamBStart", k => { CNC.Core.ObsBridge.SetCameraRecording(1, true); return true; });
-            ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Core.ObsBridge.SetCameraRecording(1, false); return true; });
-            ActionKeyBinder.Register("ObsAppStart", k => { CNC.Core.ObsBridge.SetCameraRecording(2, true); return true; });
-            ActionKeyBinder.Register("ObsAppStop", k => { CNC.Core.ObsBridge.SetCameraRecording(2, false); return true; });
+            ActionKeyBinder.Register("ObsCamAStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(0, true); return true; });
+            ActionKeyBinder.Register("ObsCamAStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(0, false); return true; });
+            ActionKeyBinder.Register("ObsCamBStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(1, true); return true; });
+            ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(1, false); return true; });
+            ActionKeyBinder.Register("ObsAppStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(2, true); return true; });
+            ActionKeyBinder.Register("ObsAppStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(2, false); return true; });
 
 #if DEBUG
             ActionKeyBinder.Register("Screenshot", Screenshot_Action);

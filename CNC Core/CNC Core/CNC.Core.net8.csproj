@@ -23,18 +23,15 @@
     <BaseOutputPath>bin\net8probe\</BaseOutputPath>
     <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
     <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0067</NoWarn>   <!-- pre-existing unused-variable noise -->
-    <!-- USEWEBSOCKET intentionally NOT defined for the first pass: websocket-sharp is a net462 binary and
-         would drown out every other finding. Added back once the rest is clean. -->
+    <!-- USEWEBSOCKET is NOT defined: websocket-sharp is an unmaintained net462-only binary, so the
+         WebsocketStream body stays out. That is the one remaining portability debt in CNC.Core, and
+         unlike ObsBridge (which moved to CNC.Controls, being client functionality) it is a genuine
+         server concern - a controller transport - so it needs a real fix: System.Net.WebSockets. -->
     <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- ObsBridge is excluded, not portable: it uses websocket-sharp (an unmaintained net462-only
-         binary) UNCONDITIONALLY, unlike WebsocketStream which is behind #if USEWEBSOCKET. Excluding it
-         here answers "is anything else non-portable hiding behind that one dependency?". Making OBS
-         support portable means swapping websocket-sharp for System.Net.WebSockets.ClientWebSocket,
-         which is its own change against a live feature. -->
-    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs;ObsBridge.cs" />
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="LibStrings.xaml" />
   </ItemGroup>
 
