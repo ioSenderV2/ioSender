@@ -2312,6 +2312,17 @@ namespace GCode_Sender
             if (!tabReorderDragging)
                 sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
 
+            // Never activate/deactivate views mid-reorder-drag. Reordering does Items.Remove/Insert, which
+            // raises SelectionChanged SYNCHRONOUSLY while the moved TabItem is unparented - and an unparented
+            // TabItem has no inherited DataContext, so a view activated in that window sees DataContext == null.
+            // That crashed the app with a NullReferenceException in SDCardView.Activate (crash report
+            // 2026-07-29 14:47:29Z), and SDCardView is not special - any view whose Activate touches
+            // DataContext was exposed. The drag also fired this on EVERY tick, activating a different view
+            // each time, which is the real source of the repaint churn the drag-clip was introduced to mask.
+            // On drop, the settled selection raises this once more and the right view activates normally.
+            if ((sender as StretchTabControl)?.IsReordering == true)
+                return;
+
             if ((DataContext as GrblViewModel).IsReady &&
                 UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
             {
