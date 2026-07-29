@@ -8,6 +8,11 @@
     and the build info ('$I'), and prints what comes back. It sends nothing that can move a machine.
 
     dotnet run (project tools/net8-smoke) COM6
+
+    Confirmed on a literal .NET 8 runtime (8.0.29) against the real controller, 2026-07-29:
+    9 live status reports and $I -> [VER:1.1f.20260712:], port opened and closed cleanly.
+    (The first run of this host was on .NET 10 via DOTNET_ROLL_FORWARD, because no 8.0 runtime
+    was installed at the time; that caveat no longer applies.)
   -->
 
   <PropertyGroup>
