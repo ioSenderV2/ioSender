@@ -84,6 +84,7 @@
     <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="GCodeJob.cs" />
     <Compile Include="GrblViewModel.cs" />
+    <Compile Include="JogController.cs" />
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="LibStrings.cs" />
     <Compile Include="Machine.cs" />

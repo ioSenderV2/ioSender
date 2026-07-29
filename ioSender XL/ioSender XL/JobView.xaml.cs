@@ -69,11 +69,11 @@ namespace GCode_Sender
                 return;
             var jog = AppConfig.Settings.Jog;
             model.Keyboard.JogStepDistance = jog.StepDistance;
-            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = jog.SlowDistance;
-            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = jog.FastDistance;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = jog.StepFeedrate;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = jog.SlowFeedrate;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = jog.FastFeedrate;
+            model.Keyboard.JogDistances[(int)JogMode.Slow] = jog.SlowDistance;
+            model.Keyboard.JogDistances[(int)JogMode.Fast] = jog.FastDistance;
+            model.Keyboard.JogFeedrates[(int)JogMode.Step] = jog.StepFeedrate;
+            model.Keyboard.JogFeedrates[(int)JogMode.Slow] = jog.SlowFeedrate;
+            model.Keyboard.JogFeedrates[(int)JogMode.Fast] = jog.FastFeedrate;
             model.Keyboard.DefaultSpeedFast = jog.DefaultSpeedFast;
             model.Keyboard.IsJoggingEnabled = jog.KeyboardEnable;
         }

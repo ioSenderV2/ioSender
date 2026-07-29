@@ -374,7 +374,7 @@ namespace CNC.Core
 
             double feed = grbl.JogFeedProvider != null ? grbl.JogFeedProvider() : 0d;
             if (feed <= 0d && grbl.Keyboard != null)
-                feed = grbl.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step];
+                feed = grbl.Keyboard.JogFeedrates[(int)JogMode.Step];
             if (feed <= 0d)
                 feed = 500d;
 

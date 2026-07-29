@@ -79,9 +79,15 @@ namespace CNC.Core
             new JogKey(8)
         };
 
+        /// <summary>Portable jog execution (clamping, "$J=" rendering, transport). This handler only
+        /// decides intent and hands it a JogCommand.</summary>
+        public JogController Jog { get; private set; }
+
         public KeypressHandler(GrblViewModel model)
         {
             grbl = model;
+            Jog = new JogController(model);
+
             for (int i = 0; i < axisjog.Length; i++)
                 axisjog[i] = new AxisJog();
 
@@ -108,6 +114,8 @@ namespace CNC.Core
 
         public void Configure(int numAxes, string axisLetters, bool lathe)
         {
+            Jog.Configure(numAxes, axisLetters, lathe);   // axis letters / lathe orientation are machine config
+
             N_AXIS = numAxes;
             axisLetters = axisLetters.Replace("-", "");
             for (int i = 0; i < jogKeys.Length; i++)
@@ -122,13 +130,8 @@ namespace CNC.Core
             }
         }
 
-        public enum JogMode
-        {
-            Step = 0,
-            Slow,
-            Fast,
-            None // must be last!
-        }
+        // JogMode moved to CNC.Core.JogMode (JogController.cs) - it is jog state, not a keyboard concern,
+        // and JogCommand is typed in it. Callers now use the namespace-level JogMode.
 
         [XmlType(TypeName = "KeyMapping")]
         public class KeypressHandlerFn
@@ -228,8 +231,9 @@ namespace CNC.Core
         public double[] JogDistances { get; set; } = new double[3] { 0.01, 500.0, 500.0 };
         public double[] JogFeedrates { get; set; } = new double[3] { 100.0, 200.0, 500.0 };
         public double JogStepDistance { get { return JogDistances[(int)JogMode.Step]; } set { grbl.JogStep = JogDistances[(int)JogMode.Step] = value; } }
-        public double LimitSwitchesClearance { get; set; } = .5d;
-        public bool SoftLimits { get; set; } = false;
+        // Forwarded so there is one source of truth: the JogController does the clamping that uses them.
+        public double LimitSwitchesClearance { get { return Jog.LimitSwitchesClearance; } set { Jog.LimitSwitchesClearance = value; } }
+        public bool SoftLimits { get { return Jog.SoftLimits; } set { Jog.SoftLimits = value; } }
         public bool IsJoggingEnabled { get; set; } = true;
         public bool IsContinuousJoggingEnabled { get; set; }
         public bool IsRepeating { get; private set; } = false;
@@ -627,59 +631,21 @@ namespace CNC.Core
 
                     if (jogMode != JogMode.None)
                     {
-                        if (GrblInfo.IsGrblHAL || !SoftLimits)
+                        // Intent only: which axes, which way, how far, how fast. The JogController does
+                        // the soft-limit clamping, G91/G53 selection and "$J=" rendering - machine safety
+                        // stays server-side rather than in a key handler.
+                        var jog = new JogCommand(N_AXIS)
                         {
-                            var distance = JogDistances[(int)jogMode].ToInvariantString();
+                            Mode = jogMode,
+                            Distance = JogDistances[(int)jogMode],
+                            Feedrate = JogFeedrates[(int)jogMode],
+                            CancelFirst = preCancel
+                        };
 
-                            for (int i = 0; i < N_AXIS; i++)
-                            {
-                                if (axisjog[i].Distance != 0d)
-                                    command += string.Format(axisjog[i].Command, distance);
-                            }
+                        for (int i = 0; i < N_AXIS; i++)
+                            jog.Directions[i] = axisjog[i].Distance;
 
-                            SendJogCommand("$J=G91G21" + command + string.Format("F{0}", JogFeedrates[(int)jogMode].ToInvariantString()));
-                        }
-                        else
-                        {
-                            for (int i = 0; i < N_AXIS; i++)
-                            {
-                                if (axisjog[i].Distance != 0d)
-                                {
-                                    axisjog[i].Distance = grbl.MachinePosition.Values[i] + JogDistances[(int)jogMode] * axisjog[i].Distance;
-
-                                    if (i == GrblConstants.A_AXIS && GrblInfo.MaxTravel.Values[GrblConstants.A_AXIS] == 0d)
-                                        continue;
-
-                                    if (GrblInfo.ForceSetOrigin)
-                                    {
-                                        if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(i)))
-                                        {
-                                            if (axisjog[i].Distance > 0)
-                                                axisjog[i].Distance = 0;
-                                            else if(axisjog[i].Distance < (-GrblInfo.MaxTravel.Values[i] + LimitSwitchesClearance))
-                                                axisjog[i].Distance = (-GrblInfo.MaxTravel.Values[i] + LimitSwitchesClearance);
-                                        } else
-                                        {
-                                            if (axisjog[i].Distance < 0d)
-                                                axisjog[i].Distance = 0d;
-                                            else if (axisjog[i].Distance > (GrblInfo.MaxTravel.Values[i] - LimitSwitchesClearance))
-                                                axisjog[i].Distance = GrblInfo.MaxTravel.Values[i] - LimitSwitchesClearance;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (axisjog[i].Distance > -LimitSwitchesClearance)
-                                            axisjog[i].Distance = -LimitSwitchesClearance;
-                                        else if (axisjog[i].Distance < -(GrblInfo.MaxTravel.Values[i] - LimitSwitchesClearance))
-                                            axisjog[i].Distance = -(GrblInfo.MaxTravel.Values[i] - LimitSwitchesClearance);
-                                    }
-
-                                    command += string.Format(axisjog[i].Command, axisjog[i].Distance.ToInvariantString());
-                                }
-                            }
-
-                            SendJogCommand("$J=G53G21" + string.Format(command.Replace('-', ' ') + "F{0}", JogFeedrates[(int)jogMode].ToInvariantString()));
-                        }
+                        Jog.Execute(jog);
                     }
 
                     return jogMode != JogMode.None;
@@ -732,21 +698,15 @@ namespace CNC.Core
 
         public void JogCancel()
         {
-            while (Comms.com.OutCount != 0) ;
-            Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL); // Cancel jog
+            Jog.Cancel();
             jogMode = JogMode.None;
             NotifyJogModeChanged();
         }
 
+        // Retained for callers that render their own jog block (ControllerMapper's gamepad jogging).
         public void SendJogCommand(string command)
         {
-            if (IsJogging)
-            {
-                while (Comms.com.OutCount != 0) ;
-                if(preCancel)
-                    Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL); // Cancel current jog
-            }
-            Comms.com.WriteCommand(command);
+            Jog.Send(command, preCancel);
         }
 
         private bool FeedOverrideFinePlus(Key key)
