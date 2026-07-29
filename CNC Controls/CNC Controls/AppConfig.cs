@@ -326,9 +326,11 @@ namespace CNC.Controls
             get { return _theme; }
             set {
                 _theme = value; //.Substring(0, 1).ToUpper() + value.Substring(1);
-                Properties.Settings.Default.ColorMode = value; // value.Substring(0, 1).ToUpper() + value.Substring(1);
-                Properties.Settings.Default.Save();
                 OnPropertyChanged();
+                // Deliberately no save here: this setter also runs while XmlSerializer deserializes the
+                // Core section, and saving mid-load (Base half-replaced) makes the config unloadable.
+                // Theme lives in Base, so it is persisted by the normal config save.
+                AppConfig.NotifyColorModeChanged();
             }
         }
         public int PollInterval { get { return _pollInterval < 100 ? 100 : _pollInterval; } set { _pollInterval = value; OnPropertyChanged(); } }
@@ -594,6 +596,9 @@ namespace CNC.Controls
             // Drag-reorder order for the sub-tab strips that have no other order authority (Probing/Settings).
             ConfigStore.Register(new OwnedSection<TabOrderConfig>("TabOrder"));
 
+            // Jog panel selection, migrated off Properties.Settings/user.config (see UiState.cs).
+            ConfigStore.Register(new OwnedSection<UiState>("UiState", UiState.ImportLegacy));
+
             // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
             // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback
             // (for the wizard's DataGrid), so it registers via XmlObjectSection directly rather than
@@ -748,12 +753,14 @@ namespace CNC.Controls
         private AppConfig()
         {
             RegisterSections();
-            Properties.Settings.Default.PropertyChanged += Default_PropertyChanged;
         }
 
-        private void Default_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        // Was raised off Properties.Settings.Default.PropertyChanged. Kept a no-op until the singleton
+        // exists so a Config deserialized before/outside AppConfig cannot re-enter the Lazy initializer.
+        internal static void NotifyColorModeChanged()
         {
-            OnPropertyChanged(nameof(ColorMode));   
+            if (settings.IsValueCreated)
+                settings.Value.OnPropertyChanged(nameof(ColorMode));
         }
 
         public static AppConfig Settings { get { return settings.Value; } }
@@ -768,7 +775,8 @@ namespace CNC.Controls
         public static event System.Action TabShortcutsChanged;
         public static void NotifyTabShortcutsChanged() { TabShortcutsChanged?.Invoke(); }
 
-        public static string ColorMode { get { return Properties.Settings.Default.ColorMode; } }
+        // Base.Theme IS the colour mode - Settings.Default.ColorMode was only ever a mirror of it.
+        public static string ColorMode { get { return Settings.Base?.Theme ?? "Standard"; } }
 
         public Config Base
         {

@@ -853,9 +853,10 @@ namespace CNC.Controls
         {
             if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.KeepUiJogSelection)
             {
-                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogStep));
-                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogFeed));
-                StepSize = Properties.Settings.Default.UiJogContinuous ? JogStep.Continuous : _lastStep;
+                var ui = UiState.Current;
+                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, ui.UiJogStep));
+                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, ui.UiJogFeed));
+                StepSize = ui.UiJogContinuous ? JogStep.Continuous : _lastStep;
             }
             _persistSelection = true;
 
@@ -869,15 +870,19 @@ namespace CNC.Controls
                 };
         }
 
-        // Persist the current selection immediately (user settings store - isolated from the Base config file).
+        // Persist the current selection immediately. Now stored in App.config's UiState section rather than
+        // user.config - see UiState.cs for why that isolation was given up. Gated on KeepUiJogSelection, so
+        // this only writes when the user asked for the selection to be remembered.
         private void PersistSelection()
         {
             if (!_persistSelection || AppConfig.Settings.Base == null || !AppConfig.Settings.Base.Jog.KeepUiJogSelection)
                 return;
-            Properties.Settings.Default.UiJogStep = DistanceIndex;
-            Properties.Settings.Default.UiJogContinuous = Continuous;
-            Properties.Settings.Default.UiJogFeed = (int)_jogFeed;
-            Properties.Settings.Default.Save();
+
+            var ui = UiState.Current;
+            ui.UiJogStep = DistanceIndex;
+            ui.UiJogContinuous = Continuous;
+            ui.UiJogFeed = (int)_jogFeed;
+            AppConfig.Settings.Save();
         }
 
         public void SetMetric(bool on)
