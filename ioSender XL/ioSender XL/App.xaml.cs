@@ -168,9 +168,9 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             CNC.Core.ConsoleLog.Init();
-            // CNC.Core marshals to the UI thread through this instead of Application.Current.Dispatcher.
-            CNC.Core.UiContext.Register();
-            CNC.Controls.UiPump.Register();   // EventUtils.DoEvents - must be installed with the context above
+            // CNC.Core marshals to the UI thread and pumps messages through this instead of
+            // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
+            CNC.Controls.UiPump.Register();
             CNC.Controls.AppMessageBox.Register();
             // GrblViewModel.Keyboard is the portable JogController by default; point it at the WPF
             // keypress handler before the first model is built (MainWindow.xaml instantiates one).

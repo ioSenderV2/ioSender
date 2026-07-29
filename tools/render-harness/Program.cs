@@ -64,9 +64,8 @@ namespace RenderHarness
 
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
 
-            // CNC.Core marshals to the UI thread and pumps messages through these rather than through
+            // CNC.Core marshals to the UI thread and pumps messages through this rather than through
             // Application.Current.Dispatcher; AppConfig.LoadConfig below calls EventUtils.DoEvents.
-            UiContext.Register();
             UiPump.Register();
 
             // Real on-disk config (whatever profile "ioSender" resolves to on this machine) - read-only,
