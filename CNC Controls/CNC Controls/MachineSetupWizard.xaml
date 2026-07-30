@@ -284,6 +284,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -310,6 +311,24 @@
                         <Button x:Uid="pdl_edit" x:Name="btnProbeEdit" Content="Edit" Click="ProbeEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                         <Button x:Uid="pdl_delete" x:Name="btnProbeDelete" Content="Delete" Click="ProbeDelete_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                     </StackPanel>
+
+                    <!-- Machine-wide TLO baseline (AppConfig.Settings.Base.TloRefBaseline) - referenced ONCE here
+                         against the toolsetter puck, a fixed physical object, so every job's own tool-length
+                         reference (and Test position's corner-locate) can trust "work Z0 under TLO" as the same
+                         real height regardless of which tool is currently mounted, with no cached spoilboard
+                         value needed anywhere. Re-run this any time (new puck, machine re-leveled, etc.) -
+                         it's just a fresh probe, not a one-time-ever setup step. -->
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock x:Uid="txt_tloRefDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                                       Text="Tool-length reference baseline - probed once against the toolsetter puck, reused by every job so 'work Z0' means the same real height no matter which tool is mounted. Whatever's in the spindle now touches the puck; check the box first if that's the 3D probe itself."/>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox x:Uid="chk_tloRef3d" x:Name="chkTloRef3dProbe" Content="3D probe is in the spindle now" VerticalAlignment="Center"/>
+                                <Button x:Uid="btn_tloRef" x:Name="btnReferenceTlo" Content="Reference TLO" Click="ReferenceTlo_Click" Margin="20,0,0,0" Padding="10,2" MinHeight="26"/>
+                                <TextBlock x:Name="txtTloRefValue" VerticalAlignment="Center" Margin="14,0,0,0" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </TabItem>
 

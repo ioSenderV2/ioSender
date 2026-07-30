@@ -16,6 +16,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -147,6 +148,8 @@ namespace CNC.Controls
             // Step 6 hosts the fixture library inline, same pattern as Probes. Starts empty (no prepopulation).
             grdFixtures.ItemsSource = Fixtures.Items;
 
+            UpdateTloRefValueDisplay();
+
             // Colour the step tabs from the start - incomplete steps show red immediately, before any load.
             RefreshStepColors();
         }
@@ -181,7 +184,15 @@ namespace CNC.Controls
 
         // Per-step completeness for the startup setup gate. Returns the first step (1-6) not yet satisfied,
         // or 0 when fully set up. All checks read live controller/app state populated on connect ($$, $I).
-        public static int FirstIncompleteStep()
+        // hardGateOnly=true is the STARTUP gate's own check (MainWindow.ForceMachineSetupIfNeeded) - only
+        // steps 1-4 (machine identity/homing/axis/limits) block the app from opening at all, since the
+        // machine genuinely can't be jogged or run anything without them. Steps 5 (probe definitions, now
+        // seeded with generic defaults on a fresh install - ProbeDefinitions.SetItems) and 7 (ATC macros)
+        // are real requirements too, but only for probing/ATC-dependent work specifically - they're deferred
+        // to a readiness check when Start Job or Odd Jobs Setup is actually opened (StartJobView's own
+        // check), not forced on every startup. Every OTHER caller (tab coloring, IsSetupComplete, etc.) keeps
+        // checking all steps via the false default.
+        public static int FirstIncompleteStep(bool hardGateOnly = false)
         {
             // Can't judge the machine until the controller has reported version + settings ($I/$$). Returning
             // 0 (complete) here means a not-yet-ready / transient state never fires the setup gate.
@@ -206,6 +217,9 @@ namespace CNC.Controls
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1 &&
                 GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) != 1)
                 return 4;
+
+            if (hardGateOnly)
+                return 0;
 
             // 5 - Probe definitions: at least one defined (Load Stock / probing need it).
             if (ProbeDefinitions.Items.Count == 0)
@@ -990,12 +1004,19 @@ namespace CNC.Controls
         {
             var def = new Fixture();
             var dlg = new FixtureEditDialog(def, model) { Owner = Window.GetWindow(this) };
-            if (dlg.ShowDialog() == true)
+            // Non-modal (Show, not ShowDialog) - Set/Test position needs the main window's jog pad and
+            // keyboard jogging reachable while this is open, which a modal dialog blocks entirely. The
+            // ShowDialog()-return-value idiom becomes a Closed handler instead.
+            dlg.Closed += (s, ev) =>
             {
-                Fixtures.Items.Add(def);
-                Fixtures.Save();
-                grdFixtures.SelectedItem = def;
-            }
+                if (dlg.Saved)
+                {
+                    Fixtures.Items.Add(def);
+                    Fixtures.Save();
+                    grdFixtures.SelectedItem = def;
+                }
+            };
+            dlg.Show();
         }
 
         private void FixtureEdit_Click(object sender, RoutedEventArgs e)
@@ -1012,12 +1033,17 @@ namespace CNC.Controls
 
             var edit = sel.Clone();
             var dlg = new FixtureEditDialog(edit, model) { Owner = Window.GetWindow(this) };
-            if (dlg.ShowDialog() == true)
+            // Non-modal - see FixtureAdd_Click's own comment.
+            dlg.Closed += (s, ev) =>
             {
-                sel.CopyFrom(edit);
-                Fixtures.Save();
-                grdFixtures.Items.Refresh();
-            }
+                if (dlg.Saved)
+                {
+                    sel.CopyFrom(edit);
+                    Fixtures.Save();
+                    grdFixtures.Items.Refresh();
+                }
+            };
+            dlg.Show();
         }
 
         private void FixtureDelete_Click(object sender, RoutedEventArgs e)
@@ -1073,6 +1099,112 @@ namespace CNC.Controls
             }
             else
                 AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already
+        // uses for LS_X/LS_Y.
+        private static readonly System.Text.RegularExpressions.Regex rxTloRefZ =
+            new System.Text.RegularExpressions.Regex(@"TLOREF_Z\s*=\s*(-?\d+(?:\.\d+)?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private void UpdateTloRefValueDisplay()
+        {
+            double v = AppConfig.Settings.Base.TloRefBaseline;
+            txtTloRefValue.Text = v == 0d ? "Never referenced" : string.Format("Baseline: {0:0.0##} mm", v);
+        }
+
+        // Machine-wide TLO baseline (see the XAML comment on this section) - probes the puck exactly like
+        // tc.macro's own non-T8 (rigid tool, toolsetter input) branch, or its T8 (self-triggering 3D probe,
+        // main input) branch when the checkbox says a 3D probe is what's actually mounted right now - then
+        // stores the RAW machine-Z touch point as the baseline every job will load into #<_tlo_ref> at its own
+        // start. Uses the "Tool setter" probe definition's own feeds, not tc.macro's hardcoded F500/F25,
+        // matching every other probe move already threaded through a ProbeDefinition in this app.
+        private void ReferenceTlo_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter);
+            if (p == null)
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Define a Tool setter probe first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            bool probeInSpindle = chkTloRef3dProbe.IsChecked == true;
+            string searchF = p.ProbeFeedRate.ToInvariantString("0.0##"), latchF = p.LatchFeedRate.ToInvariantString("0.0##");
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - reference TLO at the puck)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm, ATC=1, G30, G59.3)");
+            b.AppendLine("G21 G90 G94 G17");
+            b.AppendLine("G49");
+            b.AppendLine("G53 G0 Z-5");
+            b.AppendLine("G59.3");
+            b.AppendLine("G0 X0 Y0");
+            b.AppendLine("G0 Z0");
+            // Main probe input (Q0) if a self-triggering 3D probe is actually in the spindle, else the
+            // toolsetter input (Q1) for a rigid/cutting tool relying on continuity through the puck - same
+            // convention tc.macro's own T8-vs-not branch uses.
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, probeInSpindle ? 0 : 1));
+            b.AppendLine("G91");
+            b.AppendLine(string.Format("G38.2 Z-90 F{0}", searchF));
+            b.AppendLine("G0 Z2");
+            b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
+            b.AppendLine("#<_probe_z> = #5063");
+            b.AppendLine("G0 Z10");
+            b.AppendLine("G90");
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
+            b.AppendLine("G53 G0 Z-5");
+            b.AppendLine("G53 G0 X#5181 Y#5182");
+            b.AppendLine("G53 G0 Z#5183");
+
+            double? captured = null;
+            PropertyChangedEventHandler zHandler = (s, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
+                    return;
+                var m = rxTloRefZ.Match(model.Message);
+                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+                    captured = v;
+            };
+            model.PropertyChanged += zHandler;
+
+            bool started = false;
+            PropertyChangedEventHandler doneHandler = null;
+            doneHandler = (s, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                if (!started)
+                {
+                    started = true;
+                    return;
+                }
+                var st = model.StreamingState;
+                if (st == StreamingState.Idle || st == StreamingState.NoFile || st == StreamingState.Stop)
+                {
+                    model.PropertyChanged -= doneHandler;
+                    model.PropertyChanged -= zHandler;
+                    bool alarmed = model.GrblState.State == GrblStates.Alarm;
+                    if (!alarmed && captured.HasValue)
+                    {
+                        AppConfig.Settings.Base.TloRefBaseline = captured.Value;
+                        AppConfig.Settings.Save();
+                        UpdateTloRefValueDisplay();
+                        model.Message = "TLO baseline referenced.";
+                    }
+                    else
+                        model.Message = "Reference TLO failed or alarmed - baseline not changed.";
+                }
+            };
+            model.PropertyChanged += doneHandler;
+
+            if (!MacroProcessor.Run(model, "Reference TLO", b.ToString(), true))
+            {
+                model.PropertyChanged -= doneHandler;
+                model.PropertyChanged -= zHandler;
+            }
         }
 
         // ---- Step 8: build a simulator matching this machine ----

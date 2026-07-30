@@ -500,8 +500,35 @@ namespace CNC.Controls
                     AbortPump();
                     JobTimer.Stop();
                     streamingHandler.Call(StreamingState.Stop, true);
+                    DiscardResumableJob();
+                    break;
+
+                case nameof(GrblViewModel.HomedState):
+                    // A homing cycle just re-established trusted position - the same moment "resume the same
+                    // generated program" (see MacroProcessor.DiscardGenerated's own comment, and the
+                    // GrblReset case above) stops making sense: a home doesn't continue anything, it re-zeros
+                    // the very position reference the paused job's remaining lines were written against.
+                    // Confirmed on real hardware 2026-07-29: after a real collision alarm and a controller
+                    // power cycle, the surviving generated program silently resumed and ran to completion -
+                    // including a toolsetter probe - the moment a stray Cycle Start signal arrived after a
+                    // successful rehome, with no operator "Run" click at all.
+                    if ((sender as GrblViewModel).HomedState == HomedState.Homed)
+                        DiscardResumableJob();
                     break;
             }
+        }
+
+        // Wipes everything that lets a later Cycle Start (or Run) silently continue a job from wherever it
+        // left off. Called after a controller reboot or a completed homing cycle - the two events that make
+        // "resume the same run" unsafe regardless of which alarm, if any, preceded them. Deliberately
+        // narrower than a plain Stop/error abort (see OnStop, and MainWindow's own DiscardGenerated call,
+        // which stay resumable on purpose) - e.g. Alarm:5 (a probe search came up empty; nothing was ever
+        // touched) is fine to unlock and continue right where it left off, without either of these two
+        // events happening first.
+        private void DiscardResumableJob()
+        {
+            job = new JobData();
+            MacroProcessor.DiscardGenerated?.Invoke();
         }
 
         public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }

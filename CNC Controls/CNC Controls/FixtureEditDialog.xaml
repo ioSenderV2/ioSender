@@ -32,7 +32,9 @@
              position (vise only) run the real probe, so this applies regardless of which schematic is
              showing. Docked Bottom AFTER the OK/Cancel row above, so DockPanel stacks it directly over
              those buttons rather than the schematic. -->
-        <TextBlock x:Uid="fxd_probeNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#C0392B" FontSize="16.5" Margin="0,10,0,0"
+        <!-- Text is set from code (UpdateProbeNote) per the Probe: selection - the 3D-probe wording below is
+             just the XAML-time default before the constructor runs. -->
+        <TextBlock x:Uid="fxd_probeNote" x:Name="txtProbeNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#C0392B" FontSize="16.5" Margin="0,10,0,0"
                    Text="The 3D probe must be installed before Set/Test position - and the saved position must be within ~10 mm above the spoilboard (the probe search is capped to 12 mm below it)."/>
 
         <!-- Fields (incl. Name/Type - moved INTO this column 2026-07-18, they used to span the whole
@@ -101,13 +103,17 @@
                 <local:NumericField x:Name="fldPositionZ" x:Uid="fxd_posZ" Label="Z Axis:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding Z, Mode=TwoWay}" Margin="0,2"
                                      ToolTip="Direct edit of this position's Z - an alternative to jogging there and clicking Set. Editing invalidates Test position, same as a re-jog."/>
 
-                <!-- Vise-only: the jaw is bare metal, always conductive - Touch Plate probes it directly (no
-                     separate plate object, no thickness offset needed - see FixtureActiveProbe). -->
+                <!-- Which probe Test position (and, for edge-probing kinds, the corner-locate pass) uses -
+                     same physical probe input as the 3D probe (see FixtureActiveProbe), so nothing else
+                     downstream needs to know which one ran. Vise: the jaw itself is bare metal, always
+                     conductive, so Touch Plate probes it directly with no separate plate object. Any other
+                     kind: Touch Plate here means an operator-staged conductive object AT the saved position
+                     (e.g. a spare touch plate placed there for the run) - there is no jaw to probe against. -->
                 <WrapPanel x:Name="pnlFxProbeType" Margin="0,8,0,2" Visibility="Collapsed">
                     <Label x:Uid="fxd_lblProbe" Content="Probe:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                     <RadioButton x:Uid="fxd_rbProbe3d" x:Name="rbFxProbe3d" Content="3D Probe" GroupName="FxProbeType" IsChecked="True" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     <RadioButton x:Uid="fxd_rbProbeTouch" x:Name="rbFxProbeTouch" Content="Touch Plate" GroupName="FxProbeType" VerticalAlignment="Center" Margin="14,0,0,0"
-                                 ToolTip="The jaw is bare metal (always conductive) - probes by electrical continuity, same physical probe input as the 3D probe."/>
+                                 ToolTip="Probes by electrical continuity instead of mechanical deflection, same physical probe input as the 3D probe. For a vise the bare jaw is the conductor; for any other fixture, stage a conductive object at the saved position first - there is nothing there to sense otherwise."/>
                 </WrapPanel>
 
                 <!-- Vise-only: drawing-only dimensions (Start Job's stock drawing + this dialog's own schematic

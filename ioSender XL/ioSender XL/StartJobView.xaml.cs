@@ -569,6 +569,10 @@ namespace GCode_Sender
                 Subscribe(true);
                 RefreshCapabilities();   // EXPR / probe / rotation / ATC gating - refreshed again on connect (see Model_PropertyChanged)
                 UpdateDrawing();
+                // Deferred so the tab actually finishes rendering before a popup can appear on top of it -
+                // see CheckReadiness's own comment for what this covers and why it lives here, not the
+                // startup gate.
+                Dispatcher.BeginInvoke((System.Action)CheckReadiness, System.Windows.Threading.DispatcherPriority.Background);
                 if (!string.IsNullOrEmpty(program))
                 {
                     EnsureProgramView();
@@ -1255,6 +1259,66 @@ namespace GCode_Sender
                 chkSetTloRef.IsChecked = GrblInfo.HasATC;   // re-force in case ATC capability arrived after construction
         }
 
+        // The soft-gate replacement for the old hard Machine Setup stop (see MainWindow.ForceMachineSetupIfNeeded's
+        // own comment) - probe definitions and ATC macros no longer force every startup to a halt, but this tab is
+        // exactly where they actually matter, so it's the right place to surface what's still outstanding instead
+        // of silently letting Generate fail later with a less helpful message. Purely informational: Yes jumps to
+        // Machine Setup, No just dismisses and lets the operator keep going - nothing here blocks anything. Runs
+        // every time this tab activates, but naturally stops appearing once every item is actually resolved.
+        private void CheckReadiness()
+        {
+            if (model == null)
+                return;
+
+            bool macrosBad = false;
+            if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
+                macrosBad = AtcMacros.GetStatus(model).Any(r => r.State != AtcMacros.MacroState.Installed);
+            bool probesUnreviewed = !AppConfig.Settings.Base.ProbeDefinitionsReviewed;
+            bool noFixtures = Fixtures.Items.Count == 0;
+            bool noTloRef = AppConfig.Settings.Base.TloRefBaseline == 0d;
+
+            if (!macrosBad && !probesUnreviewed && !noFixtures && !noTloRef)
+                return;
+
+            var msg = new System.Text.StringBuilder();
+            msg.AppendLine("A few things aren't set up yet:");
+            msg.AppendLine();
+            int jumpStep = 0;   // Machine Setup step to land on - Probes=5, Fixtures=6, Macros=7 (see MachineSetupWizard)
+            if (macrosBad)
+            {
+                msg.AppendLine("- ATC macros are out of date. This needs updating before you can go any further with tool changes or probing.");
+                jumpStep = 7;
+            }
+            if (probesUnreviewed)
+            {
+                msg.AppendLine("- A typical 3D probe and touch plate come preinstalled, but haven't been reviewed yet. They can't really be trusted until you've checked the numbers against your own hardware and either accepted or changed them.");
+                if (jumpStep == 0)
+                    jumpStep = 5;
+            }
+            if (noTloRef)
+            {
+                msg.AppendLine("- Tool-length reference hasn't been set yet. Every job needs this to trust Z regardless of which tool is mounted - it's a single 'Reference TLO' button on the Probe definitions step.");
+                if (jumpStep == 0)
+                    jumpStep = 5;
+            }
+            if (noFixtures)
+            {
+                msg.AppendLine("- No fixtures defined yet. Until one is, only the free-form Dynamic fixture is available - jogging to each corner by hand every run. A defined fixture eliminates that manual jogging.");
+                if (jumpStep == 0)
+                    jumpStep = 6;
+            }
+            msg.AppendLine();
+            msg.AppendLine("Open Machine Setup now?");
+
+            bool goSetup = AppDialogs.Show(msg.ToString(), "Setup check", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes;
+            // Told once either way - don't re-nag on every tab activation for something already explained.
+            // Actually changing the probes/reviewing them for real still happens in Machine Setup, not here.
+            AppConfig.Settings.Base.ProbeDefinitionsReviewed = true;
+            AppConfig.Settings.Save();
+            if (goSetup)
+                GCode_Sender.MainWindow.ui?.GoToMachineSetupStep(jumpStep);
+        }
+
         // Start Job always references the front-left (TFL) corner.
         private Corner SelectedCorner { get { return Corner.FrontLeft; } }
 
@@ -1297,18 +1361,14 @@ namespace GCode_Sender
                 }
             }
 
-            // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y and reuses Fixture.SpoilboardZ
-            // instead of locating the corner + spoilboard fresh (see BuildProgram) - a fixture saved/tested
-            // before those features shipped (or one whose Coords was re-set since, which zeros both - see
-            // Fixture.Coords) has 0s here, which would aim the tight probe at a point right next to the jogged
-            // reference and/or seed a bogus safety floor. Neither is ever legitimately exactly 0 (Coords is
-            // always jogged clear of the corner and above the spoilboard), so this is a safe "never actually
-            // tested under this scheme" check.
-            // OR, not AND: SpoilboardZ was added after CornerOffsetX/Y (same Test run captures all three
-            // together now), so a fixture tested between those two changes could have X/Y populated but
-            // SpoilboardZ still 0 - any ONE of the three being unset makes #<_bottom> below untrustworthy.
+            // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y instead of locating the corner
+            // fresh (see BuildProgram) - a fixture saved/tested before that feature shipped (or one whose
+            // Coords was re-set since, which zeros both - see Fixture.Coords) has 0s here, which would aim the
+            // tight probe at a point right next to the jogged reference. Neither is ever legitimately exactly
+            // 0 (Coords is always jogged clear of the corner), so this is a safe "never actually tested under
+            // this scheme" check.
             if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
-                && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
+                && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
             {
                 AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
                     "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
@@ -1712,6 +1772,19 @@ namespace GCode_Sender
             L("(PREREQ, connected, homed, EXPR, ATC=1, G30, G59.3)");
             L("G21 G90 G94 G17");
             L("G49");
+            // Save whatever #<_tlo_ref> held before this program touched it (restored near the end, on a clean
+            // finish - see that comment), then load the machine-wide TLO baseline (Machine Setup's own
+            // "Reference TLO" - AppConfig.Settings.Base.TloRefBaseline) as an INPUT, not a reset to 0. Every
+            // job now starts from the same known reference regardless of what ran before it, and tc.macro's
+            // own "first tool this session" branch (#<_tlo_ref> EQ 0) never fires again once a real baseline
+            // exists - every tool change, including the very first one below, computes G43.1 relative to the
+            // baseline instead of relative to whichever tool happened to run first. See the TLO-baseline
+            // design conversation this came from - replaces the old #<_tlo_ref> = 0 reset entirely.
+            if (setTloRef)
+            {
+                L("#<_tlo_saved> = #<_tlo_ref>");
+                L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
+            }
             // Select the probe input for the chosen probe (tool setter -> 1, else the main probe -> 0), the same
             // rule the Probing page uses (SelectControllerProbe). Guards against a stale selection from an
             // interrupted tool-setter cycle (tc.macro leaves G65 P5 Q1) sending this 3D-probe descent to the wrong
@@ -1739,6 +1812,7 @@ namespace GCode_Sender
             L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
             L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
             L(string.Format("#<_ls_lipoffset> = {0}", N(lipOffset)));
+            L("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
             // Probe-geometry offset (into the stock, from the fixture's reference) - derived from the SAME
             // probe definition doing the probing, not stored per-fixture: the fixture only captures the
             // single reference point (fx.Coords, "Set position"), which the Fixture edit dialog's schematic
@@ -1752,8 +1826,8 @@ namespace GCode_Sender
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is no longer emitted -
-            // corner 1 now runs REUSE mode too (Fixture.SpoilboardZ seeds #<_bottom> directly, below), so no
-            // call in this whole program ever takes the DISCOVER branch anymore.
+            // corner 1 runs REUSE mode (below), fed #<_ls_maxz> from the fresh puck touch instead, so no call
+            // in this whole program ever takes the DISCOVER branch.
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
@@ -1761,12 +1835,26 @@ namespace GCode_Sender
             // travel bottom) that target can fall below reachable Z and a G53 move to it trips Alarm:2 (soft
             // limit). pcorner clamps start_z to this. Assumes Z homes to the top and travels negative (the usual
             // case); 1 mm above the absolute limit. -9999 (= no clamp) when travel ($132) is unknown/zero.
-            L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d)));
+            L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d)));
 
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
             L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+
+            // Tool-length reference (opt-in) now runs FIRST, before any stock probing - see the TLO-baseline
+            // design conversation this came from. #<_probe_z> (the puck's own machine-Z touch point, always
+            // safely above any stock by construction) is left readable afterward, giving corner 1's own probe
+            // a fresh, tool-length-independent known-safe travel height with no cached spoilboard value
+            // needed - see EmitTloReference's own comment.
+            if (setTloRef)
+            {
+                EmitTloReference(L, p, touchPlate);
+                // Full retract before crossing to corner 1's own reference - the puck (G59.3) and corner 1's
+                // saved Coords are unrelated locations, so there is no "trusted previous height" to reuse yet
+                // the way corners 2-4 reuse corner 1's own #<c1_maxz> below.
+                L("G53 G0 Z0");
+            }
 
             // Corner 1 = the selected origin corner.
             L(string.Format("(--- corner 1 = {0} (origin): reference {1} ---)", cornerName, fx.Name));
@@ -1787,21 +1875,34 @@ namespace GCode_Sender
             }
             else
             {
-                // REUSE mode (NOT DISCOVER/9999) - Fixture.SpoilboardZ (FixtureEditDialog's "Test position", a
-                // one-time probe against the physical fence/spoilboard) seeds #<_bottom> directly, so this call
-                // skips pcorner.macro's own spoilboard probe entirely instead of re-running it every job (same
-                // "trust the once-tested fixture reference" model CornerOffsetX/Y already uses for the corner
-                // XY - see the "double probe of corner 1" backlog item). topx/topy point straight at
+                // REUSE mode (NOT DISCOVER/9999) - #<_ls_maxz> below, fed from the fresh puck touch, gives
+                // this call a known-safe travel height without ever probing a spoilboard at all (same "trust
+                // a fresh, tool-length-safe reference" idea CornerOffsetX/Y already applies to the corner XY -
+                // see the "double probe of corner 1" backlog item). topx/topy point straight at
                 // CornerOffsetX/Y's tight ~5mm-inset anchor, same as before. CornerOffsetX/Y encode the true
                 // corner's position under sx=sy=+1 (SelectedCorner is always FrontLeft today - see its getter)
                 // plus the same 5mm interior inset the old exact-size re-probe used (topx = offset + inset
                 // lands 5mm inside the true corner, same derivation as corner 2's own hand-specified anchor
                 // below).
                 const double cornerInsetMm = 5d;
-                L(string.Format("#<_bottom> = [{0} + {1}]", N(fx.SpoilboardZ), N(spacer)));
+                // #<_bottom> (the seek-depth cap for corner 1's own top probe) no longer comes from a cached
+                // Fixture.SpoilboardZ - that was a raw machine-Z reading only ever valid for the exact tool
+                // length that captured it, unsound the moment a different bit is in the spindle (see the
+                // TLO-baseline design conversation this replaced). Falls back to the machine's own Z floor
+                // instead - a wider cap than a tight cached estimate, but still a real, probe-guarded search.
+                L(string.Format("#<_bottom> = {0}",
+                    N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d)));
                 L(string.Format("#<_ls_topx> = {0}", N(fx.CornerOffsetX + cornerInsetMm)));
                 L(string.Format("#<_ls_topy> = {0}", N(fx.CornerOffsetY + cornerInsetMm)));
-                EmitCall(id1, refX, refY, "0");
+                // Known-safe travel height for THIS call, same #<_ls_maxz> mechanism corners 2-4 use below -
+                // fed from the puck touch EmitTloReference just ran (#<_probe_z>, still readable - neither it
+                // nor tc.macro's own M6 T8 path clear it afterward), not from any cached spoilboard value. The
+                // puck sits above any stock by construction, so this is always safe, freshly verified THIS
+                // run, with whatever tool is actually in the spindle right now. Falls back to "0" (unset,
+                // pcorner uses its own #<_bottom>-derived estimate instead) when the operator skipped the TLO
+                // reference this run.
+                string c1maxz = setTloRef ? string.Format("[#<_probe_z> + {0}]", N(cornerTravelMarginMm)) : "0";
+                EmitCall(id1, refX, refY, "0", c1maxz);
             }
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));   // restore for corners 2-4's default (non-exact) path below
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
@@ -1828,25 +1929,6 @@ namespace GCode_Sender
             // plateOffset back on top when running a touch plate, or a margin smaller than the plate's own
             // thickness would rapid the tool straight into the plate at the next corner instead of clearing it.
             L(string.Format("#<c1_maxz> = [#<c1z> + {0}]", N(cornerTravelMarginMm + plateOffset)));
-
-            // Tool-length reference (opt-in): with measure UNCHECKED this makes Load Stock == a plain Start Job
-            // (origin + TLO ref). The 3D probe is already in the spindle (installed at the top), so this is the
-            // M6 T8 "reference" path in tc.macro: reset the ref, probe the puck at G59.3, store the probe machine-Z
-            // as #<_tlo_ref>, park at G30. Emitted right after corner 1 while WCO is still 0, so the remaining
-            // corners (probed in work coords) and the end-of-run origin block are unaffected. Needs ATC + a
-            // toolsetter at G59.3 (both already in the PREREQ). tc.macro is what applies the ref on later M6s.
-            if (setTloRef)
-            {
-                EmitTloReference(L, p, touchPlate);
-                // tc.macro's M6 T8 parks at G30 - an arbitrary, possibly-distant point not verified clear of
-                // any fence/clamp hardware, unlike corner-to-corner travel (a known area, already crossed
-                // once). Explicit full retract for JUST this leg, as its own discrete step - not baked into
-                // maxz (that used to zero out maxz for corner 2's ENTIRE call, which also meant its internal
-                // face-probe repositioning fell back to a freshly-computed height instead of the same trusted
-                // one corners 3/4 use, for no reason - see the conversation this came from). Once retracted,
-                // corner 2 gets the same trusted #<c1_maxz> as everything else below.
-                L("G53 G0 Z0");
-            }
 
             if (measure)
             {
@@ -2007,6 +2089,15 @@ namespace GCode_Sender
                     L("(PRINT, LS_ROT=#<rot>)");
                 }
             }
+            // Restore whatever #<_tlo_ref> held before this program touched it (see the save right after the
+            // PREREQ block, near the top) - same save/restore idiom pcorner.macro/tc.macro already use for the
+            // caller's WCS. Guarded on setTloRef too - #<_tlo_saved> was never written when it's off, and
+            // restoring from an unset named parameter would stomp whatever #<_tlo_ref> legitimately held.
+            // Only covers a CLEAN finish; an aborted/alarmed run never reaches this line, so #<_tlo_ref> is
+            // left at the baseline this run loaded rather than the true prior value - safe (the baseline is
+            // itself a trusted reference), just not a perfect restore. Known, accepted gap.
+            if (setTloRef)
+                L("#<_tlo_ref> = #<_tlo_saved>");
             L("M2");
 
             return b.ToString();
@@ -2163,6 +2254,13 @@ namespace GCode_Sender
 
             L("G21 G90 G94 G17");
             L("G49");
+            // Save/load the TLO baseline - same mechanism and reasoning as BuildProgram's own top-of-program
+            // comment.
+            if (setTloRef)
+            {
+                L("#<_tlo_saved> = #<_tlo_ref>");
+                L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
+            }
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
             if (GrblInfo.RotationSupported)
@@ -2172,6 +2270,16 @@ namespace GCode_Sender
             EmitGotoG30(L);
             L("(WAITIDLE)");
             L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+
+            // Tool-length reference (opt-in) now runs FIRST, before the stock-top probe - same ordering and
+            // reasoning as BuildProgram's own call site (see its comment). The vise's own Z-probe safety
+            // doesn't depend on TLO state (expectedTopZ comes from the fixture's own validated jawTopZ, not a
+            // cached spoilboard value), but the ordering stays uniform across both program types.
+            if (setTloRef)
+            {
+                EmitTloReference(L, p, touchPlate);
+                L("G53 G0 Z0");
+            }
 
             // Clear G54 so the Z probe below runs in machine coordinates (same reasoning as pcorner.macro).
             L("G10 L2 P1 X0 Y0 Z0");
@@ -2215,11 +2323,6 @@ namespace GCode_Sender
             // rapid to within a small, trusted margin of it instead of retracting all the way to machine top.
             L("#<_lv_safe_z> = [#<_stock_z> + 5]");
 
-            // Tool-length reference (opt-in), right after the Z probe while WCO is still 0 - same placement/
-            // reasoning as BuildProgram's.
-            if (setTloRef)
-                EmitTloReference(L, p, touchPlate);
-
             // Partial Measure (opt-in): corners 2 (FR, diagonal) and 4 (BR, X-neighbour) are clear of the jaw
             // on both faces, so they get the full pcorner.macro face+Z probe. Corners 1 (FL) and 3 (BL) sit
             // along the jaw-covered EDGE, but the jaw's own body only blocks their Y face (it sits at the
@@ -2241,6 +2344,7 @@ namespace GCode_Sender
                 L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
                 L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
                 L(string.Format("#<_ls_lipoffset> = {0}", N(lipOffset)));
+                L("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
                 L(string.Format("#<_ls_spacer> = {0}", N(0d)));
                 L(string.Format("#<_ls_thickness> = {0}", N(thickness)));   // face probe depth = top - thickness/2 (see pcorner.macro)
                 // Entered stock sizes are EXACT for the vise (precision machinist stock, not an estimate to
@@ -2264,7 +2368,7 @@ namespace GCode_Sender
                 L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));
                 L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));
-                L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d)));
+                L(string.Format("#<_ls_zfloor> = {0}", N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d)));
                 // Seed the REUSE fail-fast #<_bottom> from the KNOWN stock bottom, not an arbitrary buffer -
                 // this also drives the rapid approach height (_bottom+30) for corner 2/4's own top-probe, so
                 // getting it too HIGH isn't just "slower fail-fast", it risks that rapid driving into the
@@ -2355,6 +2459,10 @@ namespace GCode_Sender
                 L(string.Format("G10 L2 {0} X{1} Y{2} Z{3}", pCode(wcsP), originX, N(fxPos.Y), originZ));
                 L(wcs + "  (activate the coordinate system)");
             }
+            // Restore the pre-job #<_tlo_ref> on a clean finish - see BuildProgram's own comment (same
+            // save/restore idiom, same accepted "not on abort" gap).
+            if (setTloRef)
+                L("#<_tlo_ref> = #<_tlo_saved>");
             L("M2");
 
             return b.ToString();
@@ -2489,22 +2597,22 @@ namespace GCode_Sender
 
         private static void EmitGotoG30(System.Action<string> L) => CNC.Controls.MacroProcessor.EmitGotoG30(L);
 
-        // Tool-length reference at the toolsetter puck, right after the origin corner while WCO is still 0.
-        // "M6 T8" is tc.macro's own sentinel for this ("probe already in spindle, skip the swap prompt") but
-        // it ALSO hardcodes the MAIN probe input (tc.macro:73-75) on the assumption that T8 means a
-        // self-triggering 3D mechanical probe stylus is in the spindle - true for Start Job's 3D-probe path,
-        // but NOT for Touch Plate: there is no self-triggering probe there, just a bare bit/tool relying on
-        // electrical continuity through the STOCK, and the puck was never wired into that circuit. Confirmed
-        // on real hardware: M6 T8 in Touch Plate mode drove the tool straight into the puck, fully compressing
-        // it without ever triggering - the main input genuinely saw nothing. For Touch Plate, bypass tc.macro's
-        // M6 flow entirely and inline the SAME probe-the-puck sequence it uses for a rigid tool (its non-T8
-        // branch, tc.macro:76-90), explicitly selecting the TOOLSETTER input instead - using the probe
-        // definition's OWN feeds rather than tc.macro's hardcoded F500/F25, matching every other Start Job
-        // probe move.
+        // Tool-length reference at the toolsetter puck - now emitted BEFORE any stock probing (see BuildProgram's
+        // own call site comment), against the machine-wide baseline already loaded into #<_tlo_ref> at the top
+        // of the program - NOT a fresh "first tool this session" baseline of its own. "M6 T8" is tc.macro's own
+        // sentinel for this ("probe already in spindle, skip the swap prompt") but it ALSO hardcodes the MAIN
+        // probe input (tc.macro:73-75) on the assumption that T8 means a self-triggering 3D mechanical probe
+        // stylus is in the spindle - true for Start Job's 3D-probe path, but NOT for Touch Plate: there is no
+        // self-triggering probe there, just a bare bit/tool relying on electrical continuity through the STOCK,
+        // and the puck was never wired into that circuit. Confirmed on real hardware: M6 T8 in Touch Plate mode
+        // drove the tool straight into the puck, fully compressing it without ever triggering - the main input
+        // genuinely saw nothing. For Touch Plate, bypass tc.macro's M6 flow entirely and inline the SAME
+        // probe-the-puck sequence it uses for a rigid tool (its non-T8 branch, tc.macro:76-90), explicitly
+        // selecting the TOOLSETTER input instead - using the probe definition's OWN feeds rather than tc.macro's
+        // hardcoded F500/F25, matching every other Start Job probe move.
         private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
         {
-            L("(--- set tool-length reference at the puck ---)");
-            L("#<_tlo_ref> = 0");
+            L("(--- reference TLO at the puck, against the machine-wide baseline ---)");
             if (touchPlate)
             {
                 L("(touch plate - no self-triggering probe in the spindle, use the toolsetter input directly)");
@@ -2521,27 +2629,29 @@ namespace GCode_Sender
                 // $TLR - the REAL grblHAL system command that commits the tool length reference to the
                 // controller's own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's
                 // TLR: field) - same one the Probing tab's own Tool Length flow uses (ToolLengthControl.xaml.cs).
-                // #<_tlo_ref> below is a SEPARATE, older, script-only convention (tc.macro's own bookkeeping
-                // for its manual G43.1 apply-on-next-M6 logic) that never touched this native flag at all -
-                // confirmed on real hardware 2026-07-27: Setup's own TLO-ref step "succeeded" (no alarm) but
-                // IsTloReferenceSet stayed false the whole session, so every PREREQ gate checking "tlo"
-                // (Contour, etc.) could never pass. Sent here, machine still AT the touched Z, matching
-                // ToolLengthControl's own timing (right after the probe stops, before any retraction).
+                // Sent here, machine still AT the touched Z, matching ToolLengthControl's own timing (right
+                // after the probe stops, before any retraction).
                 L("$TLR");
                 L("G0 Z10");
                 L("G90");
                 L("G65 P5 Q0");   // restore the main/default probe input
                 L("G54");
-                L("#<_tlo_ref> = #<_probe_z>");
-                L("(PRINT, LS_TLO_REF ref=#<_tlo_ref>)");
+                // Apply G43.1 relative to the ALREADY-loaded baseline (BuildProgram's own top-of-program load)
+                // rather than overwriting #<_tlo_ref> with this tool's own reading - same computation
+                // tc.macro's "not the first tool this session" branch already does (tc.macro:136), now the
+                // ONLY branch that ever runs, since #<_tlo_ref> starts non-zero every job.
+                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+                L("(PRINT, LS_TLO_APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])");
                 L("G53 G0 Z-5");
                 L("G53 G0 X#5181 Y#5182");
                 L("G53 G0 Z#5183");
             }
             else
             {
-                // M6 T8 runs tc.macro, which does its OWN probe of the puck and sends $TLR itself the very
-                // first time this session (see tc.macro's own o200 IF block) - nothing more needed here.
+                // M6 T8 runs tc.macro, which does its own probe of the puck and applies G43.1 relative to
+                // whatever #<_tlo_ref> already holds - the baseline BuildProgram loaded at the top of the
+                // program, not a fresh "first tool this session" value tc.macro would otherwise set (its own
+                // #<_tlo_ref> EQ 0 branch never fires anymore once a real baseline exists).
                 L("(3D probe already in spindle - M6 T8 selects the main probe input itself, see tc.macro)");
                 L("M6 T8");
             }

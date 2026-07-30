@@ -360,6 +360,38 @@ namespace CNC.Controls
         // successful connection - wired to GrblInfo.LastKnownBuild at startup (see AppConfig.RegisterSections)
         // so a firmware change across connections/reboots can be flagged in the console.
         public string LastFirmwareBuild { get; set; } = string.Empty;
+        // Machine-wide tool-length-reference baseline (machine Z at the toolsetter puck), captured ONCE via
+        // Machine Setup's Probes step ("Reference TLO") - every job loads this into #<_tlo_ref> at its own
+        // start instead of resetting it to 0, so "work Z" under G43.1 means the same physical height (the
+        // puck's own) regardless of which tool is currently mounted. Replaces the old per-fixture
+        // Fixture.SpoilboardZ scheme entirely, which cached a RAW machine-Z reading that was only ever valid
+        // for the specific tool length in the spindle when it was captured - unsound for Touch Plate users,
+        // who deliberately probe with whatever bit they're about to cut with (see the design conversation
+        // this replaced - "No need for Zspoil" once TLO is referenced against a fixed physical object first).
+        // 0 = never captured.
+        public double TloRefBaseline { get; set; } = 0d;
+        // ProbeDefinitions.SetItems seeds a typical 3D probe + touch plate on a fresh install (see its own
+        // comment) so the Machine Setup gate no longer has to force a stop for step 5 - but those are generic
+        // numbers, not this machine's actual probe geometry. False until the operator has been through Start
+        // Job/Odd Jobs Setup's readiness popup at least once (whether they edited them or accepted them as-is).
+        public bool ProbeDefinitionsReviewed { get; set; } = false;
+        // Odd Jobs Work Order tab: which .workorder file the CONTENT currently showing came from (null = never
+        // loaded from/saved to one - New, or content only ever entered by hand). The content itself is a
+        // separate WorkOrderView.SectionConfig fragment that ConfigPanel<T> already auto-persists on every edit
+        // (see ConfigPanel.Persist) - that survives a restart on its own, but WorkOrderView.currentFilePath was
+        // just a private field, not part of that fragment, so the association with its SOURCE FILE was lost on
+        // every restart even though the toolpaths/operations themselves came back fine. Confirmed as a real gap
+        // 2026-07-30. LastWorkOrderName is the New dialog's chosen name (WorkOrderView.pendingName) for the
+        // same reason - both are read back in WorkOrderView.OnConfigReady.
+        public string LastWorkOrderFilePath { get; set; } = null;
+        public string LastWorkOrderName { get; set; } = null;
+        // True from the first edit after a New/Load/Save until the next Save - the live (auto-persisted)
+        // content has diverged from LastWorkOrderFilePath on disk (or was never saved to a file at all, if
+        // that's null too). Persisted (not just an in-memory flag) so the warning survives a restart - the
+        // live content itself always comes back via the auto-persisted fragment either way, this only tracks
+        // whether the NAMED FILE is stale. Checked by WorkOrderView.Activate(false) to prompt for a save when
+        // leaving Odd Jobs with unsaved changes.
+        public bool WorkOrderDirty { get; set; } = false;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -1005,13 +1037,9 @@ namespace CNC.Controls
             // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
             // "never actually probed under this scheme" - force those fixtures back to not-validated so the
             // operator is prompted to re-run Test position (which now also captures the corner offset).
-            // 2026-07-20 (later same day): Fixture.SpoilboardZ is new too, added right after CornerOffsetX/Y -
-            // a fixture tested in the short window between those two changes has X/Y populated but
-            // SpoilboardZ still 0 (StartJobView.BuildProgram would seed #<_bottom> from a bogus 0). Same fixup,
-            // same reasoning, separate condition since X/Y alone no longer implies "fully captured."
             foreach (var fx in Fixtures.Items)
                 if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
-                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
+                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
                     fx.PositionValidated = false;
 
             // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to

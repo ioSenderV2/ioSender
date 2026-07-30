@@ -470,7 +470,7 @@ namespace CNC.Core
         public ObservableCollection<string> SystemInfo { get { return GrblInfo.SystemInfo; } }
         public string Tool { get { return _tool; } set { _tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
         public int Probe { get { return int.Parse(_probe); } set { _probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
-        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); } }
+        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
         public bool IsTloReferenceSet {
             get { return _isTloRefSet; }
             private set
@@ -481,7 +481,20 @@ namespace CNC.Core
                         TloReference = double.NaN;
                     _isTloRefSet = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(TloReferenceTooltip));
                 }
+            }
+        }
+        // Signal indicator tooltips only showed IsTloReferenceSet's bool ("Tool length reference set") with no
+        // way to see WHAT it was set to short of digging into a console log - added so the value itself is
+        // visible at a glance (SignalsControl's "T" LED).
+        public string TloReferenceTooltip
+        {
+            get
+            {
+                return IsTloReferenceSet && !double.IsNaN(TloReference)
+                    ? string.Format("Tool length reference set: {0:0.000}", TloReference)
+                    : "Tool length reference not set";
             }
         }
         public bool IsCameraVisible { get { return _isCameraVisible; } set { if (_isCameraVisible != value) { _isCameraVisible = value; OnPropertyChanged(); } } }
