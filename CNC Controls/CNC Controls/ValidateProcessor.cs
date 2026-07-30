@@ -196,7 +196,7 @@ namespace CNC.Controls
                 bool loaded = job.Count > ModalPrefix.Length && LoadProgram(job, "Validate - passed moves") > 0;
 
                 string status = (aborted ? "Completed (stopped early)" : "Completed")
-                              + (loaded ? " - passed moves loaded, press Run to view in 3D." : ".");
+                              + (loaded ? string.Format(" - passed moves loaded, press {0} to view in 3D.", RunLabels.CycleStart) : ".");
 
                 // Enable "View Summary" on the (non-modal) panel - the user opens the full report when ready.
                 progress.SetCompleted(status, () => ShowResults(model, tests, snapshot, aborted, unhomed));
