@@ -7,21 +7,7 @@
              mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="980">
     <Grid VerticalAlignment="Stretch">
-        <!-- Held on the root Grid rather than as ConfigPanel.Resources: the root element is the generic
-             ConfigPanel<WorkOrder>, and XAML has no property-element syntax for a generic type. -->
-        <Grid.Resources>
-            <!-- One definition of "a button on this tab": the app's standard 75px fixed width, and NO explicit
-                 Height - the themed Button style's own 14,6 padding decides the height, which is what stops the
-                 text clipping. Overriding Height/Padding is exactly what clipped Load.../Save... before. -->
-            <Style x:Key="WoButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                <Setter Property="Width" Value="75"/>
-                <Setter Property="MinHeight" Value="28"/>
-            </Style>
-        </Grid.Resources>
-
         <Grid.ColumnDefinitions>
-            <!-- MinWidth = 3.5 x the 75px standard button, so the three-button row below the tree can never be
-                 squeezed narrower than it needs. -->
             <ColumnDefinition Width="270" MinWidth="263"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="1*" MinWidth="290"/>
@@ -37,40 +23,30 @@
         <Grid Grid.Column="0" Margin="5,5,0,5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <!-- Title bar: the + adds a toolpath (picks its geometry first). -->
-            <Grid Grid.Row="0" Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Uid="txt_wohdr" Grid.Column="0" Text="Toolpaths" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button x:Uid="btn_woload" x:Name="btnLoad" Content="Load..." Style="{StaticResource WoButtonStyle}" Margin="0,0,6,0" Click="btnLoad_Click"
-                            ToolTip="Replace the current work order with one saved to a .workorder file."/>
-                    <Button x:Uid="btn_wosave" x:Name="btnSave" Content="Save..." Style="{StaticResource WoButtonStyle}" Margin="0,0,6,0" Click="btnSave_Click"
-                            ToolTip="Save this work order to a .workorder file so it can be reloaded or shared. The current work order is always kept automatically as well."/>
-                    <!-- Square by design: an icon button, not one of the fixed-width text buttons. -->
-                    <Button x:Uid="btn_woaddtp" x:Name="btnAddToolpath" Content="+" FontSize="15" FontWeight="Bold"
-                            Width="30" MinHeight="28" Padding="0" Click="btnAddToolpath_Click"
-                            ToolTip="Add a toolpath - pick its geometry (line, circle, oval, square or rectangle), then add the operations that cut it."/>
-                </StackPanel>
-            </Grid>
-            <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
+            <!-- File-level commands, not item-level ones (those move to the tree's own context menu below) -
+                 New/Load/Save act on the whole work order, so they read as a menu bar, not buttons competing
+                 with the tree for the same title row. -->
+            <Menu Grid.Row="0" Margin="0,0,0,4" Background="Transparent">
+                <MenuItem x:Uid="mnu_wonew" Header="New" Click="MenuNew_Click"
+                          ToolTip="Start a blank work order, after asking what to call it."/>
+                <MenuItem x:Uid="mnu_woload" Header="Load..." Click="btnLoad_Click"
+                          ToolTip="Replace the current work order with one saved to a .workorder file."/>
+                <MenuItem x:Uid="mnu_wosave" Header="Save..." Click="btnSave_Click"
+                          ToolTip="Save this work order to a .workorder file so it can be reloaded or shared. The current work order is always kept automatically as well."/>
+            </Menu>
+            <!-- Work order's own name (its file's name, no path or extension) - not the word "Toolpaths",
+                 which said nothing this panel doesn't already show by being full of toolpaths. -->
+            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold"
+                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis"/>
+            <Border Grid.Row="2" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
                 <TreeView x:Name="treeToolpaths" BorderThickness="0" Background="Transparent"
-                          SelectedItemChanged="treeToolpaths_SelectedItemChanged"/>
+                          SelectedItemChanged="treeToolpaths_SelectedItemChanged" PreviewKeyDown="TreeToolpaths_PreviewKeyDown"/>
             </Border>
-            <StackPanel Grid.Row="2" Margin="0,14,0,0">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                    <Button x:Uid="btn_woup" x:Name="btnMoveUp" Content="Up" Style="{StaticResource WoButtonStyle}" Click="btnMoveUp_Click"
-                            ToolTip="Move the selected operation (or toolpath) earlier in the run order."/>
-                    <Button x:Uid="btn_wodown" x:Name="btnMoveDown" Content="Down" Style="{StaticResource WoButtonStyle}" Margin="6,0,0,0" Click="btnMoveDown_Click"
-                            ToolTip="Move the selected operation (or toolpath) later in the run order."/>
-                    <Button x:Uid="btn_woremove" x:Name="btnRemove" Content="Remove" Style="{StaticResource WoButtonStyle}" Margin="6,0,0,0" Click="btnRemove_Click"
-                            ToolTip="Remove the selected operation, or the whole toolpath when a toolpath is selected."/>
-                </StackPanel>
+            <StackPanel Grid.Row="3" Margin="0,14,0,0">
                 <CheckBox x:Uid="chk_wogroupbytool" x:Name="chkGroupByTool" Content="Group operations by tool" Click="chkGroupByTool_Click"
                           ToolTip="Emit the program grouped onto as few tool changes as possible instead of strictly in tree order. Each toolpath's own operation order is always preserved - roughing still runs before the finishing passes that depend on it - so grouping only combines tools where that allows."/>
                 <TextBlock x:Name="txtGroupByToolSummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>

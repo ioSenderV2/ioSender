@@ -126,6 +126,45 @@ namespace CNC.Controls
             }
         }
 
+        // Toolpath geometry/envelope colors tuned to stay legible against this material's own stock fill
+        // (StockFillBrush, above) - the plain steel-blue palette that reads fine on the tan/parchment
+        // default washes out on MDF's olive and Aluminum's light grey, and Silver (held-back) disappears
+        // into Aluminum entirely. One coordinated set per material: Selected/Normal/HeldBack strokes plus
+        // the translucent envelope Fill/Edge, all built from the same accent hue so a material change
+        // reads as one deliberate palette swap, not a color picked in isolation.
+        public static (Brush Selected, Brush Normal, Brush HeldBack, Brush EnvelopeFill, Brush EnvelopeEdge) GeometryBrushes(string material)
+        {
+            switch (material)
+            {
+                case "MDF":         // olive fill - needs a dark, saturated accent
+                    return Palette(0x6A, 0x1B, 0x9A);    // deep violet
+                case "Aluminum":    // light grey fill - Silver/SteelBlue both wash out
+                    return Palette(0x8B, 0x00, 0x00);    // dark red
+                case "Steel":       // darker grey fill - needs a LIGHT accent, not a dark one
+                    return (
+                        new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)),           // gold
+                        new SolidColorBrush(Color.FromRgb(0xF2, 0xE2, 0x9B)),           // pale gold
+                        new SolidColorBrush(Color.FromRgb(0xD8, 0xD8, 0xD8)),           // light grey
+                        new SolidColorBrush(Color.FromArgb(70, 0xFF, 0xD7, 0x00)),
+                        new SolidColorBrush(Color.FromArgb(150, 0xFF, 0xD7, 0x00)));
+                default:            // Softwood/Hardwood/Plywood/Brass/unset - all light warm fills; original
+                                    // steel blue is fine, but Silver (a light grey) is nearly as light as
+                                    // these fills - a brand-new toolpath with no operations yet always draws
+                                    // in THIS state (see DrawDiagram's willRun check), so it's the state
+                                    // you're most likely to be looking at, not a rare corner case.
+                    return (Brushes.SteelBlue, Brushes.LightSteelBlue, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                        new SolidColorBrush(Color.FromArgb(48, 0x46, 0x82, 0xB4)),
+                        new SolidColorBrush(Color.FromArgb(120, 0x46, 0x82, 0xB4)));
+            }
+
+            (Brush, Brush, Brush, Brush, Brush) Palette(byte r, byte g, byte b) => (
+                new SolidColorBrush(Color.FromRgb(r, g, b)),
+                new SolidColorBrush(Color.FromRgb((byte)Math.Min(255, r + 0x35), (byte)Math.Min(255, g + 0x35), (byte)Math.Min(255, b + 0x35))),
+                new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                new SolidColorBrush(Color.FromArgb(70, r, g, b)),
+                new SolidColorBrush(Color.FromArgb(150, r, g, b)));
+        }
+
         public static Point ToPixel(Transform t, double x, double y)
         {
             return new Point(t.OriginX + x * t.Scale, t.OriginY - y * t.Scale);

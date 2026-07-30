@@ -34,6 +34,16 @@ namespace CNC.Controls
         private WorkOrderOperation selectedOp;
         // Guards the field->model write-back while the fields are being populated FROM the model on selection.
         private bool loadingFields = false;
+        // Which toolpath's operations the user has manually collapsed - RebuildTree throws every TreeViewItem
+        // away and remakes them on every edit, so without this a real collapse (as opposed to the old
+        // permanently-forced IsExpanded="true") would spring back open the moment you changed anything.
+        private readonly HashSet<WorkOrderToolpath> collapsedToolpaths = new HashSet<WorkOrderToolpath>();
+        // The .workorder file this came from/was last saved to - null until one of those happens. Drives the
+        // title bar (name, no path or extension) and Save's suggested filename.
+        private string currentFilePath = null;
+        // Set by New's name prompt, cleared by the first successful Save - lets the title bar and Save's
+        // suggested filename reflect what the operator typed before there's an actual file on disk yet.
+        private string pendingName = null;
 
         public WorkOrderView()
         {
@@ -91,11 +101,10 @@ namespace CNC.Controls
 
         #region Composition (add / remove / reorder)
 
-        // The + in the Toolpaths title bar: pick the geometry first, since that's what decides which
-        // operations are even possible on it.
-        private void btnAddToolpath_Click(object sender, RoutedEventArgs e)
+        // Reached by clicking the tree's own "<Add Toolpath>" placeholder row: pick the geometry first, since
+        // that's what decides which operations are even possible on it. Mirrors OpenOperationPicker below.
+        private void OpenAddToolpathPicker(UIElement anchor)
         {
-            var anchor = (UIElement)sender;
             // Deferred for the same reason as OpenOperationPicker - see its comment.
             Dispatcher.BeginInvoke((System.Action)(() =>
             {
@@ -216,7 +225,11 @@ namespace CNC.Controls
             return op;
         }
 
-        private void btnRemove_Click(object sender, RoutedEventArgs e)
+        // Reached from a tree row's own context menu (Remove) and the Delete key - see AttachRowContextMenu
+        // and TreeToolpaths_PreviewKeyDown. No longer a standing button: the old Up/Down/Remove row sat below
+        // the whole tree, disconnected from the row it acted on - a right-click context menu on the row itself
+        // is the standard place for per-item actions like this.
+        private void RemoveSelected()
         {
             if (selectedOp != null && selectedToolpath != null)
                 selectedToolpath.Operations.Remove(selectedOp);
@@ -228,9 +241,6 @@ namespace CNC.Controls
             RebuildTree(null);
             OnWorkOrderChanged();
         }
-
-        private void btnMoveUp_Click(object sender, RoutedEventArgs e) { Move(-1); }
-        private void btnMoveDown_Click(object sender, RoutedEventArgs e) { Move(1); }
 
         // Reorders within the selection's own level: an operation moves inside its toolpath, a toolpath moves
         // among the other toolpaths.
@@ -316,16 +326,24 @@ namespace CNC.Controls
                 {
                     Header = MakeCheckHeader(WorkOrderRules.Summarize(tp), tp.Enabled, on => ToggleEnabled(owner, null, on)),
                     Tag = tp,
-                    IsExpanded = true
+                    // Real collapse now (see collapsedToolpaths' own comment) - not a hardcoded "true" that
+                    // made this a flat checklist wearing tree chrome rather than an actual disclosure tree.
+                    IsExpanded = !collapsedToolpaths.Contains(tp)
                 };
+                tpItem.Expanded += (s, ev) => collapsedToolpaths.Remove(owner);
+                tpItem.Collapsed += (s, ev) => collapsedToolpaths.Add(owner);
+                AttachRowContextMenu(tpItem, isToolpath: true);
                 foreach (var op in tp.Operations)
                 {
                     var ownerOp = op;
-                    tpItem.Items.Add(new TreeViewItem
+                    var opItem = new TreeViewItem
                     {
                         Header = MakeCheckHeader(WorkOrderRules.Summarize(op), op.Enabled, on => ToggleEnabled(owner, ownerOp, on)),
-                        Tag = op
-                    });
+                        Tag = op,
+                        ToolTip = FeedsSummaryText(owner, op)
+                    };
+                    AttachRowContextMenu(opItem, isToolpath: false);
+                    tpItem.Items.Add(opItem);
                 }
 
                 // Always last: the placeholder that adds the next operation. A toolpath with no operations
@@ -351,11 +369,118 @@ namespace CNC.Controls
                 treeToolpaths.Items.Add(tpItem);
             }
 
+            // Root-level placeholder that adds a whole new toolpath - replaces the old "+" button in the
+            // title bar, so the tree itself is the one place composition happens, same idiom as
+            // "<add operation>" above.
+            var addToolpathItem = new TreeViewItem
+            {
+                Header = "<Add Toolpath>",
+                Foreground = Brushes.SteelBlue,
+                FontStyle = FontStyles.Italic
+            };
+            addToolpathItem.PreviewMouseLeftButtonUp += (s, ev) =>
+            {
+                ev.Handled = true;
+                OpenAddToolpathPicker((UIElement)s);
+            };
+            treeToolpaths.Items.Add(addToolpathItem);
+
             if (toSelect != null)
                 SelectInTree(toSelect);
-            UpdateButtons();
         }
 
+        // Right-click actions for a toolpath or operation row - Move Up/Down/Remove - replacing the old
+        // standing Up/Down/Remove buttons below the whole tree. Standard placement for per-item list actions
+        // is a context menu on the item itself, not buttons disconnected from the row they act on; Delete and
+        // Ctrl+Up/Ctrl+Down (TreeToolpaths_PreviewKeyDown) cover the keyboard-only case.
+        private void AttachRowContextMenu(TreeViewItem item, bool isToolpath)
+        {
+            var up = new MenuItem { Header = "Move Up" };
+            var down = new MenuItem { Header = "Move Down" };
+            var remove = new MenuItem { Header = isToolpath ? "Remove Toolpath" : "Remove Operation" };
+            up.Click += (s, ev) => { item.IsSelected = true; Move(-1); };
+            down.Click += (s, ev) => { item.IsSelected = true; Move(1); };
+            remove.Click += (s, ev) => { item.IsSelected = true; RemoveSelected(); };
+
+            var menu = new ContextMenu();
+            menu.Items.Add(up);
+            menu.Items.Add(down);
+            menu.Items.Add(remove);
+            // Recomputed each time it opens rather than once at build time - RebuildTree runs often enough
+            // (every edit) that a stale enabled/disabled state would rarely be visibly wrong, but there's no
+            // reason to risk it when the index is cheap to look up again.
+            menu.Opened += (s, ev) =>
+            {
+                int i, count;
+                if (isToolpath)
+                {
+                    var tp = (WorkOrderToolpath)item.Tag;
+                    i = workOrder.Toolpaths.IndexOf(tp);
+                    count = workOrder.Toolpaths.Count;
+                }
+                else
+                {
+                    var op = (WorkOrderOperation)item.Tag;
+                    var owner = workOrder.Toolpaths.FirstOrDefault(t => t.Operations.Contains(op));
+                    i = owner?.Operations.IndexOf(op) ?? -1;
+                    count = owner?.Operations.Count ?? 0;
+                }
+                up.IsEnabled = i > 0;
+                down.IsEnabled = i >= 0 && i < count - 1;
+            };
+            item.ContextMenu = menu;
+
+            // WPF's own ContextMenuService opens on right-button UP by default, which something else in this
+            // row (or the TreeViewItem's own input handling) swallows before it gets there - matches the same
+            // class of bug TabKeyBinder.AttachBindMenu already works around, same fix: open it ourselves on
+            // right-button DOWN and swallow both the down and the following up so the framework's own
+            // up-triggered open doesn't also fire and immediately re-toggle it.
+            item.PreviewMouseRightButtonDown += (s, ev) =>
+            {
+                ev.Handled = true;
+                item.IsSelected = true;
+                item.Focus();
+                // Deferred, same reason as OpenOperationPicker/OpenAddToolpathPicker: selecting a DIFFERENT
+                // row a click above just triggered a synchronous LoadFields()/DrawDiagram() (new parameter
+                // panel, redrawn diagram) - opening the menu against item's bounds in that same tick placement-
+                // computes off whatever hadn't finished re-laying-out yet, which is what put it at the screen's
+                // top-left corner on anything but the row that was already selected. MousePoint placement (not
+                // the default Bottom-of-item) also means it opens under the cursor even once the layout settles.
+                Dispatcher.BeginInvoke((System.Action)(() =>
+                {
+                    menu.PlacementTarget = item;
+                    menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+                    menu.IsOpen = true;
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            };
+            item.PreviewMouseRightButtonUp += (s, ev) => ev.Handled = true;
+        }
+
+        // Delete removes the selected row; Ctrl+Up/Ctrl+Down reorders it - keyboard equivalents of the
+        // context menu above, so composing a work order doesn't require the mouse.
+        private void TreeToolpaths_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Delete)
+            {
+                RemoveSelected();
+                e.Handled = true;
+            }
+            else if (System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control &&
+                     (e.Key == System.Windows.Input.Key.Up || e.Key == System.Windows.Input.Key.Down))
+            {
+                Move(e.Key == System.Windows.Input.Key.Up ? -1 : 1);
+                e.Handled = true;
+            }
+        }
+
+        // Re-selects a toolpath/operation after RebuildTree threw every TreeViewItem away and remade them -
+        // e.g. right after Move() reorders one via Ctrl+Up/Down. IsSelected alone leaves keyboard FOCUS on
+        // the old (now-destroyed) item, which WPF's default TreeViewItem style reads as "selected but not the
+        // active selection" and paints with the dimmed/inactive highlight instead of the normal one - looks
+        // like the selection went stale even though the data model already points at the right row. Focus()
+        // fixes the highlight and means Ctrl+Up immediately after Ctrl+Down keeps working on the same item.
+        // Deferred to DispatcherPriority.Loaded - the item was just added this call and has no layout yet, so
+        // an immediate Focus() would silently no-op.
         private void SelectInTree(object tag)
         {
             foreach (TreeViewItem tpItem in treeToolpaths.Items)
@@ -363,12 +488,14 @@ namespace CNC.Controls
                 if (ReferenceEquals(tpItem.Tag, tag))
                 {
                     tpItem.IsSelected = true;
+                    tpItem.Dispatcher.BeginInvoke((System.Action)(() => tpItem.Focus()), System.Windows.Threading.DispatcherPriority.Loaded);
                     return;
                 }
                 foreach (TreeViewItem opItem in tpItem.Items)
                     if (ReferenceEquals(opItem.Tag, tag))
                     {
                         opItem.IsSelected = true;
+                        opItem.Dispatcher.BeginInvoke((System.Action)(() => opItem.Focus()), System.Windows.Threading.DispatcherPriority.Loaded);
                         return;
                     }
             }
@@ -385,7 +512,6 @@ namespace CNC.Controls
                 selectedToolpath = placeholder.Toolpath;
                 selectedOp = null;
                 LoadFields();
-                UpdateButtons();
                 DrawDiagram();
                 return;
             }
@@ -395,14 +521,7 @@ namespace CNC.Controls
                 ?? (selectedOp != null ? workOrder.Toolpaths.FirstOrDefault(t => t.Operations.Contains(selectedOp)) : null);
 
             LoadFields();
-            UpdateButtons();
             DrawDiagram();
-        }
-
-        private void UpdateButtons()
-        {
-            btnRemove.IsEnabled = selectedToolpath != null;
-            btnMoveUp.IsEnabled = btnMoveDown.IsEnabled = selectedToolpath != null;
         }
 
         #endregion
@@ -702,6 +821,7 @@ namespace CNC.Controls
                 SpindleRPM = op.SpindleRPM, Feed = op.Feed, PlungeFeed = op.PlungeFeed,
                 DepthOfCut = doc,
                 Material = material,
+                IsHssDrill = op.DrillHss,
                 // A ball engaging near its TIP (a bottom-finish pass skimming the floor) behaves like a much
                 // smaller cutter than nominal - the advisor needs the engagement depth to say anything useful.
                 EngagementDepthMm = op.Kind == WorkOrderOpKind.BottomFinish ? op.FloorStockToLeave : (double?)null
@@ -719,7 +839,10 @@ namespace CNC.Controls
             if (op.Kind == WorkOrderOpKind.Chamfer)
                 op.ChamferDepth = dlg.DepthOfCut;
             else if (isDrill)
+            {
                 op.PeckDepth = dlg.DepthOfCut;
+                op.DrillHss = dlg.IsHssDrill;
+            }
             else if (isBore)
                 op.BoreStepDown = dlg.DepthOfCut;
             else if (showDoc)
@@ -735,16 +858,40 @@ namespace CNC.Controls
         {
             if (txtFeedsSummary == null)
                 return;
-            if (selectedOp == null)
-            {
-                txtFeedsSummary.Text = string.Empty;
-                return;
-            }
-            var op = selectedOp;
+            txtFeedsSummary.Text = selectedOp == null ? string.Empty : FeedsSummaryText(selectedToolpath, selectedOp);
+        }
+
+        // Shared by the "Feeds and speeds..." button's own small-text summary (UpdateFeedsSummary, above) and
+        // each operation row's ToolTip in the tree (BuildTree) - one op's worth of "what will actually run"
+        // (tool/diameter/rpm/feed/plunge/step down/stepover), without having to open the Feeds and speeds
+        // dialog or select the op to see it. Step down/stepover applicability mirrors LoadFields' own Show()
+        // gating for fldDepthOfCut/fldBoreStepDown/fldStepover - only shown where that op kind actually uses it.
+        private static string FeedsSummaryText(WorkOrderToolpath tp, WorkOrderOperation op)
+        {
             double rpm = op.SpindleRPM > 0d ? op.SpindleRPM : 0.70d * op.BitMaxRPM;
-            double dia = selectedToolpath != null ? WorkOrderCompiler.EffectiveBitDiameter(selectedToolpath, op) : op.BitDiameter;
-            txtFeedsSummary.Text = string.Format("T{0} {1} - Ã˜{2:0.0##} mm - {3:0} rpm - {4:0}/{5:0} mm/min feed/plunge",
+            double dia = tp != null ? WorkOrderCompiler.EffectiveBitDiameter(tp, op) : op.BitDiameter;
+            var s = string.Format("T{0} {1} - Ø{2:0.0##} mm - {3:0} rpm - {4:0}/{5:0} mm/min feed/plunge",
                 WorkOrderCompiler.ToolNumberFor(op), ToolName((OddJobsTool)op.Tool), dia, rpm, op.Feed, op.PlungeFeed);
+
+            if (op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour)
+                s += string.Format(" - {0:0.0##} mm step down", op.DepthOfCut);
+            else if (op.Kind == WorkOrderOpKind.Bore)
+                s += string.Format(" - {0:0.0##} mm step down/rev", op.BoreStepDown);
+
+            if (op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.BottomFinish
+                || (op.Kind == WorkOrderOpKind.Bore && WorkOrderRules.NeedsSteppedBore(op.HoleDiameter, op.BitDiameter)))
+                s += string.Format(" - {0:0}% stepover", op.Stepover);
+
+            if (op.Kind == WorkOrderOpKind.Drill)
+                s += string.Format(" - {0} - {1:0.0##} mm peck", op.DrillHss ? "HSS" : "brad point", op.PeckDepth);
+            else if (op.Kind == WorkOrderOpKind.Chamfer)
+                s += string.Format(" - {0:0.0##} mm chamfer depth", op.ChamferDepth);
+            else if (op.Kind == WorkOrderOpKind.SideFinish)
+                s += string.Format(" - {0:0.0##} mm wall stock to leave", op.WallStockToLeave);
+            else if (op.Kind == WorkOrderOpKind.BottomFinish)
+                s += string.Format(" - {0:0.0##} mm floor stock to leave", op.FloorStockToLeave);
+
+            return s;
         }
 
         private static string ToolName(OddJobsTool tool)
@@ -777,6 +924,10 @@ namespace CNC.Controls
             UpdateValidation();
             DrawDiagram();
             DiscardProgram();
+            // Diverged from LastWorkOrderFilePath on disk (if any) - Persist() below saves this alongside the
+            // content itself in the same App.config write. See AppConfig.Base.WorkOrderDirty's own comment and
+            // Activate(false), which prompts to save when leaving with this set.
+            AppConfig.Settings.Base.WorkOrderDirty = true;
             Persist();
         }
 
@@ -956,13 +1107,14 @@ namespace CNC.Controls
                     foreach (var pos in tp.PatternPositions())
                         DrawEnvelope(tp, pos[0], pos[1], scale);
 
+            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(OddJobsSetupConfig.Section?.Material ?? string.Empty);
             foreach (var tp in workOrder.Toolpaths)
             {
                 bool isSelected = ReferenceEquals(tp, selectedToolpath);
                 // Still drawn when held back - it's geometry you authored and want to see for fit against the
                 // rest - but greyed, so what's actually going to be cut reads at a glance.
                 bool willRun = workOrder.EnabledOperations(tp).Any();
-                var stroke = !willRun ? Brushes.Silver : isSelected ? Brushes.SteelBlue : Brushes.LightSteelBlue;
+                var stroke = !willRun ? geomBrushes.HeldBack : isSelected ? geomBrushes.Selected : geomBrushes.Normal;
                 double thickness = isSelected ? 2d : 1d;
                 var positions = tp.PatternPositions().ToList();
 
@@ -1037,8 +1189,9 @@ namespace CNC.Controls
                 return;
 
             var center = OddJobsStockCanvas.ToPixel(stockTransform, atX, atY);
-            var fill = new SolidColorBrush(Color.FromArgb(48, 0x46, 0x82, 0xB4));    // steel blue, faint
-            var edge = new SolidColorBrush(Color.FromArgb(120, 0x46, 0x82, 0xB4));
+            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(OddJobsSetupConfig.Section?.Material ?? string.Empty);
+            var fill = geomBrushes.EnvelopeFill;
+            var edge = geomBrushes.EnvelopeEdge;
             double outside = OutsideReachMm(tp) * scale;
 
             switch (tp.Geometry)
@@ -1128,6 +1281,17 @@ namespace CNC.Controls
             }
             else
             {
+                // An untitled work order (no file association at all) is dirty by default, same as one that's
+                // been edited since its last save - see AppConfig.Base.WorkOrderDirty's own comment. Guarded on
+                // Toolpaths.Count so a genuinely empty work order (nothing entered, nothing to lose) never
+                // prompts - only content actually worth saving does.
+                bool needsSave = workOrder.Toolpaths.Count > 0
+                    && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
+                if (needsSave && AppDialogs.Show(
+                        "This work order has unsaved changes. Save before leaving?",
+                        "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                    btnSave_Click(null, null);
+
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
                 MacroProcessor.AllowRunModesWhenGenerated = false;
@@ -1209,7 +1373,16 @@ namespace CNC.Controls
         // there's nothing for the base class to watch - OnWorkOrderChanged calls Persist() directly.
         protected override DependencyProperty[] PersistedProperties => new DependencyProperty[0];
 
-        protected override void ApplyConfig(WorkOrder config) { workOrder = config ?? new WorkOrder(); }
+        protected override void ApplyConfig(WorkOrder config)
+        {
+            workOrder = config ?? new WorkOrder();
+            // The work order CONTENT is this fragment, auto-persisted by ConfigPanel<T> on every edit - but
+            // which file it came from (or the New dialog's chosen name) was never part of it, just a private
+            // field, so it reset to null every restart even though the content itself came back fine. See
+            // AppConfig.Base.LastWorkOrderFilePath's own comment.
+            currentFilePath = AppConfig.Settings.Base.LastWorkOrderFilePath;
+            pendingName = AppConfig.Settings.Base.LastWorkOrderName;
+        }
 
         protected override WorkOrder CaptureConfig() { return workOrder; }
 
@@ -1246,6 +1419,13 @@ namespace CNC.Controls
                 var serializer = new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder));
                 using (var writer = new System.IO.StreamWriter(dlg.FileName))
                     serializer.Serialize(writer, workOrder);
+                currentFilePath = dlg.FileName;
+                pendingName = null;
+                AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
+                AppConfig.Settings.Base.LastWorkOrderName = null;
+                AppConfig.Settings.Base.WorkOrderDirty = false;
+                AppConfig.Settings.Save();
+                UpdateTitleBar();
                 AppDialogs.Show(string.Format("Work order saved to\n{0}", dlg.FileName), "Work order", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -1254,15 +1434,84 @@ namespace CNC.Controls
             }
         }
 
-        // Names the file after the job rather than a timestamp: the toolpaths are what the operator recognizes.
+        // Prefers the name the operator already gave this work order - via New's prompt, or the file it was
+        // loaded from/last saved to - over guessing from the toolpaths, so Save's suggestion matches what the
+        // title bar is already showing instead of surprising them with something different.
         private string SuggestedFileName()
         {
-            string name = workOrder.Toolpaths.Count > 0 ? workOrder.Toolpaths[0].Name : "work order";
-            if (workOrder.Toolpaths.Count > 1)
-                name += string.Format(" +{0}", workOrder.Toolpaths.Count - 1);
+            string name = !string.IsNullOrEmpty(pendingName) ? pendingName
+                : currentFilePath != null ? System.IO.Path.GetFileNameWithoutExtension(currentFilePath)
+                : null;
+            if (string.IsNullOrEmpty(name))
+            {
+                name = workOrder.Toolpaths.Count > 0 ? workOrder.Toolpaths[0].Name : "work order";
+                if (workOrder.Toolpaths.Count > 1)
+                    name += string.Format(" +{0}", workOrder.Toolpaths.Count - 1);
+            }
             foreach (char c in System.IO.Path.GetInvalidFileNameChars())
                 name = name.Replace(c, '_');
             return name;
+        }
+
+        // Clears the tab to a blank, untitled work order - the top-level command Load/Save were missing a
+        // counterpart for. No name prompt: an untitled work order is dirty by default (currentFilePath == null
+        // - see AppConfig.Base.WorkOrderDirty), so Activate(false) already asks for a save (and therefore a
+        // name/file) once there's actually something in it worth naming, instead of demanding a name upfront
+        // for what might stay empty.
+        private void MenuNew_Click(object sender, RoutedEventArgs e)
+        {
+            if (workOrder.Toolpaths.Count > 0 &&
+                AppDialogs.Show(string.Format("Discard the current work order ({0} toolpath{1}) and start a new one?",
+                        workOrder.Toolpaths.Count, workOrder.Toolpaths.Count == 1 ? "" : "s"),
+                    "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            workOrder = new WorkOrder();
+            currentFilePath = null;
+            pendingName = null;
+            AppConfig.Settings.Base.LastWorkOrderFilePath = null;
+            AppConfig.Settings.Base.LastWorkOrderName = null;
+            AppConfig.Settings.Save();
+            selectedToolpath = null;
+            selectedOp = null;
+
+            loadingFields = true;
+            chkGroupByTool.IsChecked = workOrder.GroupByTool;
+            chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
+            loadingFields = false;
+
+            RebuildTree(null);
+            LoadFields();
+            UpdateTitleBar();
+            OnWorkOrderChanged();
+            // Not diverged from a saved file since there's nothing in it yet (OnWorkOrderChanged above just set
+            // this true, same as any other content change) - Activate(false)'s prompt still treats "untitled"
+            // (currentFilePath == null) as needing a save on its own once real content exists, so this doesn't
+            // mean New can never prompt, just that an empty new work order alone doesn't.
+            AppConfig.Settings.Base.WorkOrderDirty = false;
+            AppConfig.Settings.Save();
+        }
+
+        // The tree panel's own title bar: the work order's name with no path or extension - "Toolpaths" said
+        // nothing this panel doesn't already show by being full of toolpaths, where the name of the actual
+        // job being composed is worth surfacing. Full path lives in the tooltip instead of cluttering the row.
+        private void UpdateTitleBar()
+        {
+            if (currentFilePath != null)
+            {
+                txtWorkOrderName.Text = System.IO.Path.GetFileNameWithoutExtension(currentFilePath);
+                txtWorkOrderName.ToolTip = currentFilePath;
+            }
+            else if (!string.IsNullOrEmpty(pendingName))
+            {
+                txtWorkOrderName.Text = pendingName;
+                txtWorkOrderName.ToolTip = "Not yet saved";
+            }
+            else
+            {
+                txtWorkOrderName.Text = "(untitled)";
+                txtWorkOrderName.ToolTip = "Not yet saved";
+            }
         }
 
         private void btnLoad_Click(object sender, RoutedEventArgs e)
@@ -1300,6 +1549,11 @@ namespace CNC.Controls
                 return;
 
             workOrder = loaded;
+            currentFilePath = dlg.FileName;
+            pendingName = null;
+            AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
+            AppConfig.Settings.Base.LastWorkOrderName = null;
+            AppConfig.Settings.Save();
             selectedToolpath = null;
             selectedOp = null;
 
@@ -1310,7 +1564,12 @@ namespace CNC.Controls
 
             RebuildTree(workOrder.Toolpaths.FirstOrDefault());
             LoadFields();
+            UpdateTitleBar();
             OnWorkOrderChanged();
+            // Matches what's on disk right after loading it (OnWorkOrderChanged above set this true, same as
+            // any other content change - override it back to false here).
+            AppConfig.Settings.Base.WorkOrderDirty = false;
+            AppConfig.Settings.Save();
         }
 
         #endregion
@@ -1325,6 +1584,7 @@ namespace CNC.Controls
             loadingFields = false;
             RebuildTree(workOrder.Toolpaths.FirstOrDefault());
             LoadFields();
+            UpdateTitleBar();
             UpdateGroupByToolSummary();
             UpdateSkipFirstToolChangeSummary();
             UpdateValidation();
