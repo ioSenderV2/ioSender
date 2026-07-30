@@ -792,9 +792,16 @@ namespace CNC.Controls
         // "Cycle Start"/"Start" (and the dropdown item that shares the same text) and "Feed Hold"/"Pause" -
         // grbl's own terminology by default, the friendlier pair when AppConfig.Base.UseFriendlyRunLabels is
         // on. A naming preference, not a fix, so it's opt-in rather than a replacement.
+        // Base can still be null here - this fires from JobControl_DataContextChanged, which XAML load raises
+        // WHILE MainWindow's own InitializeComponent() is still running, well before AppConfig's config
+        // section is loaded. Confirmed on real hardware 2026-07-30: a straight Base.UseFriendlyRunLabels
+        // access crashed startup outright (NullReferenceException, Dispatcher.UnhandledException). Same
+        // Base == null fallback pattern AppConfig's own properties already use (e.g. Macros/Jog above).
+        private bool UseFriendlyRunLabels => AppConfig.Settings.Base != null && AppConfig.Settings.Base.UseFriendlyRunLabels;
+
         private object NormalModeLabel()
         {
-            return FindResource(AppConfig.Settings.Base.UseFriendlyRunLabels ? "StartModeFriendly" : "StartModeNormal");
+            return FindResource(UseFriendlyRunLabels ? "StartModeFriendly" : "StartModeNormal");
         }
 
         private void UpdateRunButtonLabel()
@@ -803,7 +810,7 @@ namespace CNC.Controls
                 return;
 
             if (btnHold != null)
-                btnHold.Content = AppConfig.Settings.Base.UseFriendlyRunLabels ? "Pause" : "Feed Hold";
+                btnHold.Content = UseFriendlyRunLabels ? "Pause" : "Feed Hold";
             if (btnStartModeNormalItem != null)
                 btnStartModeNormalItem.Content = NormalModeLabel();
 
