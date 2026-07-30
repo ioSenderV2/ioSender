@@ -1635,3 +1635,99 @@ CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Window
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Last toolpath: a 45 deg V-bit traces the pocket's true top edge to break the sharp corner. Runs after roughing and any finishing passes.
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Chamfer feeds and speeds...
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"V-bit spindle RPM, feed rate and chamfer depth."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wonew:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,New
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wonew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Start a blank work order, after asking what to call it."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_woload:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load...
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_woload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Replace the current work order with one saved to a .workorder file.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wosave:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save...
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wosave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Save this work order to a .workorder file so it can be reloaded or shared. The current work order is always kept automatically as well.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Group operations by tool
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Emit the program grouped onto as few tool changes as possible instead of strictly in tree order. Each toolpath's own operation order is always preserved - roughing still runs before the finishing passes that depend on it - so grouping only combines tools where that allows.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woskipfirsttc:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,First tool already loaded
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woskipfirsttc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Leave out the M6 for the program's first tool, on the basis that it is already in the spindle - usually true when it is the tool you just set up with. Note the tool change is also what re-probes the toolsetter and applies the tool length offset, so the first operation will run on whatever offset is currently in force."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_woname:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wogeom:System.Windows.Controls.ContentControl.Content,Label,True,True,,Geometry:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wox:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wox:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woy:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woy:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wolen:CNC.Controls.NumericField.Label,None,False,True,,Length:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wolen:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:CNC.Controls.NumericField.Label,None,False,True,,Angle:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodia:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosize:CNC.Controls.NumericField.Label,None,False,True,,Size:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosize:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wow:CNC.Controls.NumericField.Label,None,False,True,,Width (X):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wow:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wod:CNC.Controls.NumericField.Label,None,False,True,,Depth (Y):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wod:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wopattern:System.Windows.Controls.ContentControl.Content,Label,True,True,,Pattern:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocols:CNC.Controls.NumericField.Label,None,False,True,,Columns (X):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:CNC.Controls.NumericField.Label,None,False,True,,X spacing:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Center-to-center distance between columns. Negative runs the grid in -X.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worows:CNC.Controls.NumericField.Label,None,False,True,,Rows (Y):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:CNC.Controls.NumericField.Label,None,False,True,,Y spacing:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Center-to-center distance between rows. Negative runs the grid in -Y.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopcount:CNC.Controls.NumericField.Label,None,False,True,,Count:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:CNC.Controls.NumericField.Label,None,False,True,,Bolt circle radius:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance from the anchor X/Y out to each instance.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:CNC.Controls.NumericField.Label,None,False,True,,Start angle:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Where the first instance sits, measured from +X counter-clockwise."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:CNC.Controls.NumericField.Label,None,False,True,,Arc span:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"360 spreads the instances evenly around the full circle. A smaller span spreads them across that arc, with one instance at each end."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wothrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wothrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut all the way through the stock (thickness + 0.5 mm overcut) instead of to a set depth.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:CNC.Controls.NumericField.Label,None,False,True,,Hole diameter:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The hole this operation makes, centered on the toolpath. Independent of the geometry's own diameter, so several holes of different sizes can share one centerline."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Axial step per pass - how much deeper each pass goes.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Label,None,False,True,,Peck depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:CNC.Controls.NumericField.Label,None,False,True,,Step down (per rev):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much deeper the helix goes on each revolution around the hole.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:CNC.Controls.NumericField.Unit,None,False,True,,%
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Radial engagement for clearing the interior, as a % of the bit's diameter. 30-50% is typical for a 2-3 flute end mill."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:CNC.Controls.NumericField.Label,None,False,True,,Wall stock to leave:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material the roughing operation leaves on the wall for this pass to remove. Roughing's wall is inset by this; this pass cuts to the true outline.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:CNC.Controls.NumericField.Label,None,False,True,,Floor stock to leave:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wochamferdepth:CNC.Controls.NumericField.Label,None,False,True,,Chamfer depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wochamferdepth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,txt_wotabs:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tabs
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wonumtabs:CNC.Controls.NumericField.Label,None,False,True,,Number of tabs:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabwidth:CNC.Controls.NumericField.Label,None,False,True,,Tab width:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabheight:CNC.Controls.NumericField.Label,None,False,True,,Tab height:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_wofeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_wofeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Pick the tool and set its RPM, feed and plunge - with a recommendation lookup by material, -10%/+10% nudges, and your own dialed-in values remembered per tool and material."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,hlp_woBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_slower:System.Windows.Controls.ContentControl.Content,Button,True,True,,-10%
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_slower:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Knock the feed and plunge down 10% - click again to keep backing off. Chart values assume an industrial machine; this is how you dial a bit in for yours. Whatever you settle on is remembered for this tool and material.
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_faster:System.Windows.Controls.ContentControl.Content,Button,True,True,,+10%
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_faster:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Push the feed and plunge back up 10%.
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsLoadLatest:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load latest export
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsWriteApply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write apply file
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsAskAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask AI to review
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsSelectAllAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Prefer AI for all
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_drillstyle:System.Windows.Controls.ContentControl.Content,Label,True,True,,Drill style:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_tloRefDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Tool-length reference baseline - probed once against the toolsetter puck, reused by every job so 'work Z0' means the same real height no matter which tool is mounted. Whatever's in the spindle now touches the puck; check the box first if that's the 3D probe itself."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_tloRef3d:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,3D probe is in the spindle now
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_tloRef:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reference TLO
