@@ -98,7 +98,6 @@ namespace CNC.Controls
         private double _maxOpening = 0d;
         private double _cornerOffsetX = 0d;
         private double _cornerOffsetY = 0d;
-        private double _spoilboardZ = 0d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public FixtureKind Kind { get { return _kind; } set { _kind = value; OnChanged(); OnChanged(nameof(KindName)); OnChanged(nameof(Implemented)); } }
@@ -123,13 +122,6 @@ namespace CNC.Controls
         public double CornerOffsetX { get { return _cornerOffsetX; } set { _cornerOffsetX = value; OnChanged(); } }
         public double CornerOffsetY { get { return _cornerOffsetY; } set { _cornerOffsetY = value; OnChanged(); } }
 
-        // Edge-probing kinds only, same scheme as CornerOffsetX/Y: the spoilboard's machine Z at Coords,
-        // captured ONCE by Test position's own spoilboard search. The fence is bolted down and the spoilboard
-        // doesn't move, so this is exactly as reproducible run to run as CornerOffsetX/Y already is - Start
-        // Job reuses it directly (StartJobView.BuildProgram) instead of re-probing the spoilboard every job,
-        // same "trust the once-tested fixture reference" model already applied to X/Y. 0 means "never
-        // captured" (see CornerOffsetX/Y's own comment - real 0 never occurs in practice).
-        public double SpoilboardZ { get { return _spoilboardZ; } set { _spoilboardZ = value; OnChanged(); } }
 
         // Friendly kind name for the list grid (derived, not persisted).
         [XmlIgnore]
@@ -215,7 +207,6 @@ namespace CNC.Controls
             Coords = o.Coords; PositionValidated = o.PositionValidated;
             JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
             CornerOffsetX = o.CornerOffsetX; CornerOffsetY = o.CornerOffsetY;
-            SpoilboardZ = o.SpoilboardZ;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -174,3 +174,26 @@ ioSender.g.en-US.resources:startjobview.baml,ls_safez:System.Windows.FrameworkEl
 ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Label,None,False,True,,Keep-out inset:
 ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Unit,None,False,True,,mm
 ioSender.g.en-US.resources:startjobview.baml,ls_keepout:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Perimeter clearance to stay clear of - typically clamps/screws holding the stock down around its edge. Shown as a dotted red line on the drawing; used by the Odd Jobs job wizards' own toolpaths."
+ioSender.g.en-US.resources:startjobview.baml,ls_grpGeometry:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Geometry
+ioSender.g.en-US.resources:startjobview.baml,ls_geomExternal:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,External
+ioSender.g.en-US.resources:startjobview.baml,ls_geomInternal:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Internal
+ioSender.g.en-US.resources:startjobview.baml,ls_geomIsCircle:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Is Circle
+ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:CNC.Controls.NumericField.Label,None,False,True,,Passes:
+ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."
+ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probe height map
+ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Label,None,False,True,,Grid X:
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grid spacing along X for the height-map probe (mm between probed points).
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:CNC.Controls.NumericField.Label,None,False,True,,Grid Y:
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grid spacing along Y for the height-map probe (mm between probed points).
+ioSender.g.en-US.resources:startjobview.baml,ls_grpDynamic:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Dynamic probe point
+ioSender.g.en-US.resources:startjobview.baml,ls_centerSolid:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Solid boss
+ioSender.g.en-US.resources:startjobview.baml,ls_centerHole:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Hole
+ioSender.g.en-US.resources:startjobview.baml,ls_holeRound:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Round
+ioSender.g.en-US.resources:startjobview.baml,ls_holeNotRound:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Not round
+ioSender.g.en-US.resources:startjobview.baml,ls_holeNotRound:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Not implemented in this prototype - non-round hole probing needs more probe points than the round case handles today.
+ioSender.g.en-US.resources:programpanel.baml,txt_noProgramHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,No program loaded - use Load File in the menu.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Load File...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.

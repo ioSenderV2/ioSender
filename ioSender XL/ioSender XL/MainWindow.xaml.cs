@@ -63,7 +63,7 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
-        private const string legacyVersion = "2.33";
+        private const string legacyVersion = "2.34";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
@@ -956,6 +956,12 @@ namespace GCode_Sender
 
         // On first run (no machine saved) wait for the controller to report version + settings, then bring the
         // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
+        // Soft gate (see the design conversation this came from): only steps 1-4 (machine identity/homing/
+        // axis/limits) - the machine genuinely can't be jogged or run anything without those - ever force
+        // this dialog open at startup. Probe definitions and ATC macros (steps 5/7) are real requirements
+        // too, but only for probing/ATC-dependent work specifically, so they're deferred to a readiness
+        // check when Start Job/Odd Jobs Setup is actually opened (StartJobView's own check) instead of
+        // blocking every session on a machine that's otherwise perfectly usable.
         private void ForceMachineSetupIfNeeded()
         {
             if (_machineSetupForced)
@@ -979,7 +985,7 @@ namespace GCode_Sender
                 }
                 // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
-                int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep(hardGateOnly: true);
                 if (step == 0 || sim)
                 {
                     RevealMainWindow();   // setup complete (or simulator): straight to the normal UI
@@ -999,7 +1005,7 @@ namespace GCode_Sender
                     confirm.Stop();
                     if (GrblSettings.IsLoaded)
                     {
-                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep(hardGateOnly: true);
                         // TEMP DIAGNOSTIC (2026-07-19) - see above. step2==0 means the settle re-check
                         // caught a transient race (as designed); step2!=0 means it's still incomplete after
                         // settling, i.e. NOT just the known post-reset stale-listing race.
@@ -1190,6 +1196,23 @@ namespace GCode_Sender
             AppDialogs.Show(this,
                 "Let's finish setting up your machine.\n\nWork through the steps - the normal screen opens once all are complete.",
                 "Machine setup", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Jump to a Machine Setup step by CHOICE, not the startup gate - e.g. Start Job/Odd Jobs Setup's own
+        // readiness popup sending the operator to review probe definitions or fixtures. Unlike ShowMachineSetup
+        // (the forced-gate path), this does NOT set _machineSetupForced or wire the Apply-driven "stay here
+        // until every step is complete" loop - the operator can navigate away freely, same as opening the tab
+        // by hand. Internal (not private): StartJobView is in this same assembly and has no MainWindow
+        // reference of its own to call an instance method on other than the shared MainWindow.ui.
+        internal void GoToMachineSetupStep(int step)
+        {
+            TabItem tab = getTab(ViewType.MachineSetup);
+            if (tab != null)
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;
+                (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
+            }
         }
 
         // Apply fired: re-check the setup steps. Still gaps -> lead to the next one and stay; all complete

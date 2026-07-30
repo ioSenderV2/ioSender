@@ -176,6 +176,16 @@ namespace CNC.Controls
             if (list?.Items != null)
                 foreach (var d in list.Items)
                     _items.Add(d);
+            // Fresh install (no Probes section at all yet): ship a typical 3D probe + touch plate rather than
+            // an empty library, so the Machine Setup gate no longer has to force a stop over this (step 5 in
+            // MachineSetupWizard.FirstIncompleteStep) - a new operator can go straight into Start Job/Odd Jobs
+            // Setup, which prompts them once to review these generic numbers against their actual hardware
+            // (see AppConfig.Settings.Base.ProbeDefinitionsReviewed) rather than blocking on it up front.
+            if (_items.Count == 0)
+            {
+                _items.Add(new ProbeDefinition { Name = "3D probe", ProbeType = ProbeType.ThreeDProbe });
+                _items.Add(new ProbeDefinition { Name = "Touch plate", ProbeType = ProbeType.TouchPlate });
+            }
             Renumber(_items);
         }
 

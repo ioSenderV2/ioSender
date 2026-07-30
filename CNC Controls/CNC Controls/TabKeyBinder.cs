@@ -88,11 +88,38 @@ namespace CNC.Controls
             // used above instead of tab.ContextMenu).
             tab.PreviewMouseRightButtonDown += (s, e) =>
             {
+                // Bail out - don't handle, don't open - when the click landed in the tab's own CONTENT rather
+                // than its header. Content is only logically parented under the TabItem (see the comment
+                // above), but a right-click's PreviewMouseRightButtonDown TUNNELS from the root down, and in
+                // this app's own StretchTabControl the selected tab's content sits in the same visual route as
+                // its TabItem - so without this check, EVERY right-click anywhere in the tab's body (a
+                // right-click context menu inside a nested control, say) would be swallowed here before it
+                // ever reached that control's own handler. Same class of bug, same fix, as
+                // UnitToggleMenu.IsDescendant.
+                if (tab.Content is DependencyObject content && IsDescendant(e.OriginalSource as DependencyObject, content))
+                    return;
+
                 menu.PlacementTarget = header ?? (FrameworkElement)tab;
                 menu.IsOpen = true;
                 e.Handled = true;
             };
-            tab.PreviewMouseRightButtonUp += (s, e) => e.Handled = true;
+            tab.PreviewMouseRightButtonUp += (s, e) =>
+            {
+                if (tab.Content is DependencyObject content && IsDescendant(e.OriginalSource as DependencyObject, content))
+                    return;
+                e.Handled = true;
+            };
+        }
+
+        private static bool IsDescendant(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                    return true;
+                node = VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node);
+            }
+            return false;
         }
 
         // Friendly name for a tab id (from the editor catalog), for dialog prompts.
