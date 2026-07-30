@@ -517,12 +517,12 @@ namespace CNC.Controls
             return new List<ActionItem>
             {
                 new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
-                new ActionItem(ControllerAction.CycleStart, "Run / Resume", "Start the loaded program, or resume after a feed hold."),
-                new ActionItem(ControllerAction.FeedHold, "Feed Hold", "Pause motion (feed hold)."),
+                new ActionItem(ControllerAction.CycleStart, RunLabels.CycleStart + " / Resume", string.Format("Start the loaded program, or resume after a {0}.", RunLabels.FeedHold)),
+                new ActionItem(ControllerAction.FeedHold, RunLabels.FeedHold, "Pause motion."),
                 new ActionItem(ControllerAction.Reset, "Reset (soft-reset)", "Soft-reset the controller (Ctrl-X)."),
                 new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),
                 new ActionItem(ControllerAction.Home, "Home", "Run the homing cycle ($H)."),
-                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", "Stop the spindle (during a feed hold)."),
+                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", string.Format("Stop the spindle (during a {0}).", RunLabels.FeedHold)),
                 new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis +" + xp + jogNote),
                 new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis −" + xm + jogNote),
                 new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis +" + yp + jogNote),
@@ -785,13 +785,13 @@ namespace CNC.Controls
 
         private static readonly Dictionary<string, string> descriptions = new Dictionary<string, string>
         {
-            { "JobControl.StartJob", "Start the loaded job, or resume after a feed hold." },
+            { "JobControl.StartJob", string.Format("Start the loaded job, or resume after a {0}.", RunLabels.FeedHold) },
             { "JobControl.StopJob", "Stop the running job." },
             { "JobControl.Home", "Run the homing cycle." },
             { "JobControl.Unlock", "Clear an alarm / unlock the controller ($X)." },
             { "JobControl.Reset", "Soft-reset the controller (Ctrl-X)." },
             { "JobControl.ResetAndUnlock", "Soft-reset the controller, then clear the alarm ($X) once it restarts." },
-            { "JobControl.FeedHold", "Pause motion (feed hold)." },
+            { "JobControl.FeedHold", "Pause motion." },
             { "JobControl.FeedRateUp", "Increase the programmed feed rate." },
             { "JobControl.FeedRateDown", "Decrease the programmed feed rate." },
             { "JobControl.FeedRateUpFine", "Increase the feed rate in a small step." },
@@ -841,7 +841,7 @@ namespace CNC.Controls
             { "KeypressHandler.SpindleOverrideFineMinus", "Decrease spindle override by 1%." },
             { "KeypressHandler.SpindleOverrideCoarsePlus", "Increase spindle override by 10%." },
             { "KeypressHandler.SpindleOverrideCoarseMinus", "Decrease spindle override by 10%." },
-            { "KeypressHandler.SpindleOverrideStop", "Stop the spindle while in feed hold." },
+            { "KeypressHandler.SpindleOverrideStop", string.Format("Stop the spindle while in {0}.", RunLabels.FeedHold) },
             { "KeypressHandler.ProbeConnectedToggle", "Toggle the simulated probe-connected state." },
             { "KeypressHandler.OptionalStopToggle", "Toggle optional stop (M1) handling." },
             { "KeypressHandler.SingleBlockToggle", "Toggle single-block (step one line at a time) mode." }
@@ -869,13 +869,13 @@ namespace CNC.Controls
 
         private static readonly Dictionary<string, string> labels = new Dictionary<string, string>
         {
-            { "JobControl.StartJob", "Start / resume job" },
+            { "JobControl.StartJob", RunLabels.CycleStart + " / resume job" },
             { "JobControl.StopJob", "Stop job" },
             { "JobControl.Home", "Home" },
             { "JobControl.Unlock", "Unlock (clear alarm)" },
             { "JobControl.Reset", "Reset (soft-reset)" },
             { "JobControl.ResetAndUnlock", "Reset and unlock" },
-            { "JobControl.FeedHold", "Feed hold" },
+            { "JobControl.FeedHold", RunLabels.FeedHold },
             { "JobControl.FeedRateUp", "Feed rate +" },
             { "JobControl.FeedRateDown", "Feed rate −" },
             { "JobControl.FeedRateUpFine", "Feed rate + (fine)" },

@@ -46,6 +46,11 @@ namespace CNC.Controls
         public SignalsControl()
         {
             InitializeComponent();
+            // Signal-pin tooltips for the two actions RunLabels covers - see its own comment. Set once here
+            // (not live-bound) same as JobControl's own run-bar buttons; a Settings-panel toggle takes effect
+            // on the next open/reload rather than instantly.
+            sigFeedHold.ToolTip = RunLabels.FeedHold;
+            sigCycleStart.ToolTip = RunLabels.CycleStart;
         }
     }
 }

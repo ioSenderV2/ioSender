@@ -452,7 +452,7 @@ namespace CNC.Controls
             if (RunStreamedJobInPlace == null)
             {
                 // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
-                ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
+                ShowMessage(string.Format("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and {0} / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.", RunLabels.FeedHold),
                     "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }

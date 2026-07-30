@@ -14,13 +14,10 @@
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <system:String x:Uid="str_checking" x:Key="Checking">Checking...</system:String>
         <system:String x:Uid="str_dryrun" x:Key="DryRun">Dry run - spindle/coolant off, tool changes skipped...</system:String>
-        <!-- Run's own button label, switched at runtime (JobControl.xaml.cs's UpdateRunButtonLabel)
-             to reflect the run mode chosen from the mode dropdown to its right - also used for that dropdown's
-             own item text, so the label and the choice that produced it always read identically. Default is
-             grbl's own terminology; AppConfig.Base.UseFriendlyRunLabels swaps to StartModeFriendly ("Start")
-             instead - see UpdateRunButtonLabel. -->
+        <!-- Design-time-only default (RunLabels.CycleStart overrides it via code-behind before it's ever
+             visible - UpdateRunButtonLabel fires from DataContextChanged, very early in XAML load). Keep this
+             in sync with RunLabels.CycleStart's own "Cycle Start" literal. -->
         <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Cycle Start</system:String>
-        <system:String x:Uid="str_startModeFriendly" x:Key="StartModeFriendly">Start</system:String>
         <system:String x:Uid="str_startModeDryRun" x:Key="StartModeDryRun">Dry Run</system:String>
         <system:String x:Uid="str_startModeCheck" x:Key="StartModeCheck">Check Run</system:String>
         <system:String x:Uid="str_startModeSimulate" x:Key="StartModeSimulate">Simulate</system:String>
