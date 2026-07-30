@@ -176,20 +176,39 @@ namespace CNC.Controls
         // it rapids to G30, prompts for the tool, cancels TLO with G49 and re-probes the toolsetter - so a
         // redundant M6 for the tool already fitted costs a full probe cycle and an operator prompt for nothing.
         // Confirmed on hardware 2026-07-28 (a grouped run re-prompted 4x for the same T1).
-        private static void AppendToolStart(List<string> lines, WorkOrderOperation op, int currentTool)
+        // spindleOn/currentRpm mirror the spindle's actual state across the tool-grouped operation sequence
+        // (see AppendToolEnd) - a tool-grouped run (e.g. drill all holes, then chamfer all of them) otherwise
+        // stopped and restarted the spindle between every single operation of the SAME tool for no reason.
+        // M3 is only needed when the spindle isn't already spinning (a real tool change, or the very first
+        // operation); a same-tool RPM change while already running just needs a bare S word (grblHAL applies
+        // a speed override live, no M3 required) - confirmed on real hardware 2026-07-30 (unwanted stop/start
+        // between same-tool operations was burning time and cycling the spindle for no reason).
+        private static void AppendToolStart(List<string> lines, WorkOrderOperation op, int currentTool, bool spindleOn, double currentRpm)
         {
-            if (ToolNumberFor(op) != currentTool)
+            bool toolChanged = ToolNumberFor(op) != currentTool;
+            if (toolChanged)
                 lines.Add("M6 T" + N(ToolNumberFor(op)));
             double rpm = Rpm(op);
             if (rpm > 0d)
-                lines.Add("S" + N(rpm) + " M3");
+            {
+                if (!spindleOn || toolChanged)
+                    lines.Add("S" + N(rpm) + " M3");
+                else if (Math.Abs(rpm - currentRpm) > 0.5d)
+                    lines.Add("S" + N(rpm));
+            }
         }
 
-        private static void AppendToolEnd(List<string> lines, WorkOrderOperation op)
+        // sameToolNext: the NEXT scheduled operation (if any) uses the same tool as this one - if so, leave
+        // the spindle running (AppendToolStart above skips the redundant M3) instead of stopping it here just
+        // to restart it a few lines later. Always still retracts to a safe Z between operations regardless.
+        // Retracts BEFORE stopping, not after - confirmed as a real gap on real hardware 2026-07-30: stopping
+        // the spindle first left it decelerating to a stop while still down near the just-cut material, then
+        // retracting with the bit no longer spinning, instead of clearing the material first.
+        private static void AppendToolEnd(List<string> lines, WorkOrderOperation op, bool sameToolNext)
         {
-            if (Rpm(op) > 0d)
-                lines.Add("M5");
             lines.Add("G0 Z" + F(SafeZ()));
+            if (!sameToolNext && Rpm(op) > 0d)
+                lines.Add("M5");
         }
 
         // Walks a path at floorZ, emitting tab bridges when this operation is the one that finishes a through
@@ -482,10 +501,10 @@ namespace CNC.Controls
         // One operation across EVERY pattern instance, inside a single tool change. Instance-minor rather than
         // instance-major on purpose: 6 holes drilled then 6 chamfered costs two tool changes, whereas
         // completing each hole in turn would cost twelve.
-        private static List<string> BuildOperation(WorkOrderToolpath tp, WorkOrderOperation op, double openDepth, int currentTool)
+        private static List<string> BuildOperation(WorkOrderToolpath tp, WorkOrderOperation op, double openDepth, int currentTool, bool spindleOn, double currentRpm, bool sameToolNext)
         {
             var lines = new List<string>();
-            AppendToolStart(lines, op, currentTool);
+            AppendToolStart(lines, op, currentTool, spindleOn, currentRpm);
 
             var positions = tp.PatternPositions().ToList();
             for (int n = 0; n < positions.Count; n++)
@@ -506,7 +525,7 @@ namespace CNC.Controls
                 }
             }
 
-            AppendToolEnd(lines, op);
+            AppendToolEnd(lines, op, sameToolNext);
             return lines;
         }
 
@@ -742,9 +761,16 @@ namespace CNC.Controls
                 // What the spindle is holding as the program runs, so only real tool changes emit an M6. Seeding
                 // it with the first tool is exactly what suppresses that first M6 - no special case needed.
                 int spindleTool = skipFirst ? firstTool : int.MinValue;
+                // Actual spindle run state (separate from spindleTool) - starts false regardless of skipFirst,
+                // since the spindle itself is off at program start even when the tool is assumed already
+                // loaded. See AppendToolStart/AppendToolEnd's own comments.
+                bool spindleOn = false;
+                double spindleRpm = 0d;
 
-                foreach (var scheduled in Schedule(wo))
+                var schedule = Schedule(wo);
+                for (int si = 0; si < schedule.Count; si++)
                 {
+                    var scheduled = schedule[si];
                     var tp = scheduled.Key;
                     var op = scheduled.Value;
                     double openDepth = open[tp][0], openRadius = open[tp][1];
@@ -783,11 +809,18 @@ namespace CNC.Controls
                             continue;
                     }
 
+                    // Whether the NEXT scheduled operation (if any) uses the same tool - if so, AppendToolEnd
+                    // leaves the spindle running instead of stopping it just to restart a few lines later.
+                    bool sameToolNext = si + 1 < schedule.Count && ToolNumberFor(schedule[si + 1].Value) == ToolNumberFor(op);
+
                     // Tool number up front in the header: it's what the operator has to have in the spindle, and
                     // ProgramView's title-bar tooltip reads these to list what's still to come.
                     AppendSection(lines, string.Format("T{0} {1} - {2}{3}", ToolNumberFor(op), tp.Name, desc, suffix),
-                        BuildOperation(tp, op, usableOpen, spindleTool));
+                        BuildOperation(tp, op, usableOpen, spindleTool, spindleOn, spindleRpm, sameToolNext));
                     spindleTool = ToolNumberFor(op);
+                    double rpmThisOp = Rpm(op);
+                    if (rpmThisOp > 0d) { spindleRpm = rpmThisOp; spindleOn = sameToolNext; }
+                    else spindleOn = false;
 
                     // Record what this operation leaves open at each centerline, for the hole operations after
                     // it - every instance is identical, so one figure covers them all.
@@ -812,6 +845,14 @@ namespace CNC.Controls
             }
 
             lines.Add("G0 Z" + F(SafeZ()));
+            // Park at G30 instead of leaving the machine sitting wherever the last operation finished - same
+            // raw-machine-coordinate convention tc.macro/StartJobView already use for this (reading the stored
+            // G30 position directly via #5181-3, not the bare G30 word) so a G92/WCS offset in effect at the
+            // end of the job can't send this move somewhere unexpected. Confirmed as a real gap on real
+            // hardware 2026-07-30 - the machine (and spindle, which AppendToolEnd already stopped on the last
+            // operation, however that call came out) was left sitting directly over the just-cut material.
+            lines.Add("G53 G0 X#5181 Y#5182");
+            lines.Add("G53 G0 Z#5183");
             // Restore whatever #<_tlo_ref> held before this program touched it - same save/restore idiom
             // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never
             // reaches this line, so #<_tlo_ref> is left at the baseline this run loaded rather than the true
