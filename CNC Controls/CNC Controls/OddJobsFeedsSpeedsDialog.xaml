@@ -21,6 +21,13 @@
                 <ComboBoxItem x:Uid="fs_tooldrill" Content="Drill bit (size = hole)"/>
             </ComboBox>
         </StackPanel>
+        <StackPanel x:Name="pnlDrillStyle" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">
+            <Label x:Uid="fs_drillstyle" Content="Drill style:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxDrillStyle" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxDrillStyle_SelectionChanged">
+                <ComboBoxItem x:Uid="fs_drillbrad" Content="Brad point / twist"/>
+                <ComboBoxItem x:Uid="fs_drillhss" Content="HSS twist"/>
+            </ComboBox>
+        </StackPanel>
         <local:NumericField x:Uid="fs_diameter" x:Name="fldDiameter" Label="Tool diameter:" ColonAt="120" Format="###0.0##" Unit="mm"/>
         <local:NumericField x:Uid="fs_flutes" x:Name="fldFlutes" Label="Flutes:" ColonAt="120" Format="#0" Unit=""/>
         <local:NumericField x:Uid="fs_rpm" x:Name="fldRpm" Label="Spindle RPM:" ColonAt="120" Format="######0" Unit="" PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>

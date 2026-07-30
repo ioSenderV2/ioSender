@@ -64,6 +64,7 @@ namespace CNC.Controls
         public double DepthOfCut = 2d;      // axial step per pass - milling operations
         public double Stepover = 40d;       // radial engagement, % of bit diameter - area clearing
         public double PeckDepth = 2d;       // Drill
+        public bool DrillHss = false;       // Drill - false = brad point/twist (default), true = HSS
         public double BoreStepDown = 1d;    // Bore - depth gained per helical revolution
 
         public double WallStockToLeave = 0.3d;    // SideFinish

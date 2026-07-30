@@ -83,7 +83,8 @@ namespace CNC.Core
         public double MaxAxialFrac;
         public double MaxRadialFrac;
         public string Notes;
-        public DrillRef Drill;
+        public DrillRef Drill;      // brad point / twist drill (the original, single drill reference)
+        public DrillRef DrillHss;   // HSS twist drill - null where no distinct data exists yet (metals)
     }
 
     public class DrillRef
@@ -123,6 +124,20 @@ namespace CNC.Core
                 Notes = "Twist/brad-point drill in wood: chips clear easily, so deep pecks are fine; " +
                         "back out on deep holes to avoid heat/burning.",
             };
+            // HSS twist drill - added 2026-07-30 alongside the brad-point/twist split. HSS dulls faster and
+            // runs hotter than a sharp brad-point/carbide bit, especially in MDF's abrasive resin - lower
+            // surface speed and a shallower, more frequent peck reduce burning risk. NO empirical tuning
+            // behind these numbers yet (unlike woodDrill, which came from real-machine notes) - a rough
+            // starting point pending real cuts, same disclaimer as the untuned Brass/Steel entries below.
+            var hssDrill = new DrillRef
+            {
+                SurfaceSpeed = (15, 25, 40),
+                FeedPerRev = new Dictionary<double, double> { { 3.0, 0.05 }, { 6.0, 0.10 }, { 10.0, 0.15 }, { 13.0, 0.20 } },
+                PeckFrac = 1.5,
+                Notes = "HSS twist drill: UNTUNED reference data, treat as a rough starting point only. Dulls " +
+                        "faster and runs hotter than carbide/brad-point, especially in MDF's abrasive resin - " +
+                        "runs slower with a shallower, more frequent peck to keep the bit and material cool.",
+            };
 
             var refs = new Dictionary<string, MaterialRef>
             {
@@ -135,6 +150,7 @@ namespace CNC.Core
                     Notes = "Hardwood (oak, maple, walnut, cherry) is dense and abrasive. Lower chip loads than " +
                             "softwood to avoid tear-out around grain reversals and to keep cutting forces in range.",
                     Drill = woodDrill,
+                    DrillHss = hssDrill,
                 },
                 ["Softwood"] = new MaterialRef
                 {
@@ -145,6 +161,7 @@ namespace CNC.Core
                     Notes = "Softwood (pine, cedar, fir) cuts easily; you can run higher chip loads to clear chips " +
                             "and keep heat down. Watch for fuzzy tear-out on cross-grain finishing passes.",
                     Drill = woodDrill,
+                    DrillHss = hssDrill,
                 },
                 ["Plywood"] = new MaterialRef
                 {
@@ -155,6 +172,7 @@ namespace CNC.Core
                     Notes = "Plywood's glue layers eat tooling fast. Run lower chip loads and pick downcut or " +
                             "compression bits to keep the top veneer clean. Allow generous chip evacuation.",
                     Drill = woodDrill,
+                    DrillHss = hssDrill,
                 },
                 ["MDF"] = new MaterialRef
                 {
@@ -165,6 +183,7 @@ namespace CNC.Core
                     Notes = "MDF dust is fine, abundant, and extremely abrasive - dust collection matters more than " +
                             "chip load. Higher RPMs help, but a sharp upcut bit + strong vacuum beats any chart value.",
                     Drill = woodDrill,
+                    DrillHss = hssDrill,
                 },
                 ["Aluminum"] = new MaterialRef
                 {
@@ -438,7 +457,11 @@ namespace CNC.Core
 
         private static void EvaluateDrill(FeedsSpeedsOperation op, MaterialRef reference, OperationRecommendation rec)
         {
-            var dref = reference.Drill;
+            // Tool.Type carries the drill style ("drill-hss" vs the default "drill" = brad point/twist - see
+            // OddJobsFeedsSpeedsDialog.ToolType()). Falls back to the brad-point reference if a material has
+            // no distinct HSS data yet (e.g. metals, where Drill itself is often null too).
+            bool hss = (op.Tool?.Type ?? "").ToLowerInvariant().Contains("hss");
+            var dref = (hss ? reference.DrillHss : null) ?? reference.Drill;
             var dia = op.Tool?.DiameterMm;
             if (dref == null)
             {

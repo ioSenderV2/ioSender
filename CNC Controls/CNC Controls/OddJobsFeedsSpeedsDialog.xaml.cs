@@ -147,11 +147,36 @@ namespace CNC.Controls
             }
         }
 
-        // "mill" for FeedsSpeedsAdvisor.Evaluate's ToolClass() unless the V-bit is selected, which routes
-        // into its EvaluateVBit branch (matched on Tool.Type containing "chamfer" - see ToolClass()).
+        // "mill" for FeedsSpeedsAdvisor.Evaluate's ToolClass() unless the V-bit is selected (routes into
+        // EvaluateVBit, matched on Tool.Type containing "chamfer") or the Drill Bit is selected (routes into
+        // EvaluateDrill, matched on Tool.Type containing "drill" - see ToolClass()). Confirmed missing on real
+        // use 2026-07-30: without this, a drill op fell through to the generic end-mill formula (RPM x flutes
+        // x chip-load, sized for radial milling engagement) instead of the drill-specific mm/rev + peck-frac
+        // table, producing wildly inflated numbers (e.g. an 8mm HSS twist drill in MDF getting a 2-flute
+        // milling chip load applied to it).
+        // "-hss" suffix (still containing "drill", so ToolClass() routing is unaffected) picks
+        // FeedsSpeedsAdvisor's DrillHss reference instead of the default brad-point/twist one - see
+        // EvaluateDrill's own comment and pnlDrillStyle (visible only for the Drill Bit tool).
         private string ToolType()
         {
+            if (SelectedTool == OddJobsTool.DrillBit)
+                return IsHssDrill ? "drill-hss" : "drill";
             return SelectedTool == OddJobsTool.VBit45 ? "chamfer" : "mill";
+        }
+
+        // pnlDrillStyle's own SelectedIndex, 1 = HSS twist, 0 (or unset) = brad point/twist (the default,
+        // preserving old behavior for anyone not yet using the new selector). Public (not just read via
+        // ToolType()) so the caller can both seed it from WorkOrderOperation.DrillHss on open and read it
+        // back to persist on OK - session-only state until WorkOrderView started saving it 2026-07-30.
+        public bool IsHssDrill
+        {
+            get { return cbxDrillStyle.SelectedIndex == 1; }
+            set { cbxDrillStyle.SelectedIndex = value ? 1 : 0; }
+        }
+
+        private void cbxDrillStyle_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ComputeRecommendation();
         }
 
         private void cbxTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -170,6 +195,9 @@ namespace CNC.Controls
                 // it from the geometry rather than this dropdown supplying a nominal.
                 case OddJobsTool.DrillBit: Flutes = 2; break;
             }
+            pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
+            if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)
+                cbxDrillStyle.SelectedIndex = 0;   // default brad point/twist - preserves old behavior
             ComputeRecommendation();
         }
 
@@ -200,7 +228,7 @@ namespace CNC.Controls
             var op = new FeedsSpeedsOperation
             {
                 Id = "oddjob",
-                Strategy = "adaptive",
+                Strategy = SelectedTool == OddJobsTool.DrillBit ? "drill" : "adaptive",
                 Tool = new FeedsSpeedsTool { Type = ToolType(), DiameterMm = diaForLookup, Flutes = Flutes },
                 Current = new FeedsSpeedsCurrent { Rpm = SpindleRPM, CuttingFeed = Feed, PlungeFeed = PlungeFeed, AxialStep = DepthOfCut }
             };
