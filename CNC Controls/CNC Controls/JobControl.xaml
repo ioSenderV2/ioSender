@@ -16,8 +16,11 @@
         <system:String x:Uid="str_dryrun" x:Key="DryRun">Dry run - spindle/coolant off, tool changes skipped...</system:String>
         <!-- Run's own button label, switched at runtime (JobControl.xaml.cs's UpdateRunButtonLabel)
              to reflect the run mode chosen from the mode dropdown to its right - also used for that dropdown's
-             own item text, so the label and the choice that produced it always read identically. -->
-        <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Run</system:String>
+             own item text, so the label and the choice that produced it always read identically. Default is
+             grbl's own terminology; AppConfig.Base.UseFriendlyRunLabels swaps to StartModeFriendly ("Start")
+             instead - see UpdateRunButtonLabel. -->
+        <system:String x:Uid="str_startModeNormal" x:Key="StartModeNormal">Cycle Start</system:String>
+        <system:String x:Uid="str_startModeFriendly" x:Key="StartModeFriendly">Start</system:String>
         <system:String x:Uid="str_startModeDryRun" x:Key="StartModeDryRun">Dry Run</system:String>
         <system:String x:Uid="str_startModeCheck" x:Key="StartModeCheck">Check Run</system:String>
         <system:String x:Uid="str_startModeSimulate" x:Key="StartModeSimulate">Simulate</system:String>
@@ -137,7 +140,7 @@
                          below while a Generate-first tab that opted into SupportsGenerateAndRun is focused
                          (see UpdateGenerateAndRunVisibility). -->
                     <StackPanel x:Name="pnlNormalModes">
-                        <Button x:Uid="btn_startModeNormal" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
+                        <Button x:Uid="btn_startModeNormal" x:Name="btnStartModeNormalItem" Content="{StaticResource StartModeNormal}" Tag="normal" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
                                 ToolTip="Run normally."/>
                         <Button x:Uid="btn_startModeDryRun" Content="{StaticResource StartModeDryRun}" Tag="dryrun" Style="{StaticResource StartModeItemStyle}" Click="StartMode_Click"
                                 ToolTip="Next run: offset Z clear of stock, force the spindle/coolant off, and skip tool changes for the whole run, regardless of what the program contains - watch the toolpath without cutting, spinning, or pausing for a tool swap."/>
@@ -158,6 +161,9 @@
                 </StackPanel>
             </Border>
         </Popup>
+        <!-- Content set in code-behind (UpdateRunButtonLabel) - "Feed Hold" by default, "Pause" when
+             AppConfig.Base.UseFriendlyRunLabels is on, same condition as the Run button's own swap. Left as
+             a literal here purely as the design-time/fallback value. -->
         <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
         <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
         <Button x:Uid="btn_rewind" x:Name="btnRewind" Content="Rewind" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsRewindEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnRewind_Click"/>
