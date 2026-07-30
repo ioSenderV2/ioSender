@@ -701,7 +701,9 @@ namespace CNC.Controls
             if (wo.AnyHeldBack)
                 lines.Add(string.Format("(PARTIAL RUN - {0} of {1} operations enabled, {2} held back)",
                     opCount, wo.TotalOperationCount, wo.TotalOperationCount - opCount));
-            lines.Add("(PREREQ, connected, homed, noalarm, tlo, G59)");
+            // EXPR added alongside the #<_tlo_ref> save/load/restore below - named-parameter assignments in
+            // the main streamed program (not just inside a called macro) need grblHAL's NGC expression support.
+            lines.Add("(PREREQ, connected, homed, noalarm, tlo, EXPR, G59)");
 
             // Needed both for the header note and to seed the spindle state below.
             int firstTool = FirstToolNumber(wo);
@@ -714,6 +716,18 @@ namespace CNC.Controls
             lines.Add("G90 G94 G17 G21");
             lines.Add("G59");
             lines.Add("G0 Z" + F(SafeZ()));
+
+            // Load the machine-wide TLO-reference baseline (AppConfig.Base.TloRefBaseline, set once via
+            // Machine Setup's "Reference TLO" step) as an INPUT to every M6 in this run, the same fix
+            // StartJobView.BuildProgram applies - see its own comment. Without this, tc.macro's G43.1 for
+            // each tool change was computed relative to whatever #<_tlo_ref> happened to already be sitting
+            // in controller memory (leftover from an unrelated prior action, or 0 after a reset) instead of
+            // a real reference - confirmed on real hardware 2026-07-30: a Work Order's SECOND tool change
+            // (a V-bit chamfer after an end mill counterbore/bore) plunged ~21mm past the intended 0.5mm
+            // chamfer depth, straight through 19mm of stock and into the spoilboard - the two tools' G43.1
+            // offsets were computed against different/stale #<_tlo_ref> values instead of the same baseline.
+            lines.Add("#<_tlo_saved> = #<_tlo_ref>");
+            lines.Add(string.Format("#<_tlo_ref> = {0}", F(AppConfig.Settings.Base.TloRefBaseline)));
 
             // Tracks, per toolpath, the clear cylinder previous operations have already cut at its centerline,
             // so a hole op can rapid through it instead of feeding down open air - the
@@ -798,6 +812,11 @@ namespace CNC.Controls
             }
 
             lines.Add("G0 Z" + F(SafeZ()));
+            // Restore whatever #<_tlo_ref> held before this program touched it - same save/restore idiom
+            // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never
+            // reaches this line, so #<_tlo_ref> is left at the baseline this run loaded rather than the true
+            // prior value - safe (the baseline is itself a trusted reference), just not a perfect restore.
+            lines.Add("#<_tlo_ref> = #<_tlo_saved>");
             lines.Add("M30");
             return lines;
         }
