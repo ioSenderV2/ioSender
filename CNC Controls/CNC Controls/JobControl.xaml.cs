@@ -789,10 +789,23 @@ namespace CNC.Controls
             MacroProcessor.ActiveGenerateAndRun?.Invoke();
         }
 
+        // "Cycle Start"/"Start" (and the dropdown item that shares the same text) and "Feed Hold"/"Pause" -
+        // grbl's own terminology by default, the friendlier pair when AppConfig.Base.UseFriendlyRunLabels is
+        // on. A naming preference, not a fix, so it's opt-in rather than a replacement.
+        private object NormalModeLabel()
+        {
+            return FindResource(AppConfig.Settings.Base.UseFriendlyRunLabels ? "StartModeFriendly" : "StartModeNormal");
+        }
+
         private void UpdateRunButtonLabel()
         {
             if (model == null || btnStart == null)
                 return;
+
+            if (btnHold != null)
+                btnHold.Content = AppConfig.Settings.Base.UseFriendlyRunLabels ? "Pause" : "Feed Hold";
+            if (btnStartModeNormalItem != null)
+                btnStartModeNormalItem.Content = NormalModeLabel();
 
             // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard,
             // Odd Jobs' job wizards) is focused: it owns no standalone Generate button of its own any more
@@ -815,7 +828,7 @@ namespace CNC.Controls
             // logic below instead.
             if (MacroProcessor.SupportsGenerateMode && !MacroProcessor.AllowRunModesWhenGenerated)
             {
-                btnStart.Content = FindResource("StartModeNormal");
+                btnStart.Content = NormalModeLabel();
                 IsRunActionEnabled = IsRunEnabled;
                 IsGenerateActionReady = false;
                 btnStart.ToolTip = FindResource("StartTipNormal");
@@ -851,7 +864,7 @@ namespace CNC.Controls
             btnStart.Content = showCheck ? FindResource("StartModeCheck")
                               : showSimulate ? FindResource("StartModeSimulate")
                               : connected && model.IsDryRunMode ? FindResource("StartModeDryRun")
-                              : FindResource("StartModeNormal");
+                              : NormalModeLabel();
             btnStart.ToolTip = !IsRunEnabled ? FindResource("StartTipDisabled")
                               : showCheck ? FindResource("StartTipCheck")
                               : showSimulate ? FindResource("StartTipSimulate")

@@ -392,6 +392,13 @@ namespace CNC.Controls
         // whether the NAMED FILE is stale. Checked by WorkOrderView.Activate(false) to prompt for a save when
         // leaving Odd Jobs with unsaved changes.
         public bool WorkOrderDirty { get; set; } = false;
+        // Run bar labels: default is grbl's own terminology (Cycle Start/Feed Hold) - accurate to what the
+        // buttons actually send, but Cycle Start in particular reads oddly to a newer/non-grbl-fluent operator
+        // expecting a plain "Start". Opt-in (not the default) since it's a naming preference, not a fix -
+        // JobControl.UpdateRunButtonLabel reads this for the normal-mode label; Feed Hold's swap to "Pause"
+        // is set alongside it, same condition. Check Run/Dry Run/Simulate keep their own names either way -
+        // those are modes worth understanding on their own terms, not a rename target.
+        public bool UseFriendlyRunLabels { get; set; } = false;
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
