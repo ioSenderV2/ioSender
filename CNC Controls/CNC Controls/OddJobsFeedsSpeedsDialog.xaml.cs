@@ -285,6 +285,11 @@ namespace CNC.Controls
             pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
             if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)
                 cbxDrillStyle.SelectedIndex = 0;   // default brad point/twist - preserves old behavior
+
+            // A drill only ever moves sideways as a rapid between pecks (see WorkOrderCompiler.BuildDrill) -
+            // every actual cutting move is the peck plunge itself, fed at Plunge feed. "Feed rate" has nothing
+            // to drive for this tool, so showing it invites setting a number that's silently ignored.
+            fldFeed.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Collapsed : Visibility.Visible;
             ComputeRecommendation();
         }
 
