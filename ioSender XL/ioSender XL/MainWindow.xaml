@@ -39,10 +39,10 @@
             <ScaleTransform ScaleX="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"
                             ScaleY="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"/>
         </DockPanel.LayoutTransform>
-        <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load/Load
-             Folder/Save/Close live on the program view, Open Console is a double-click on the Console tab,
-             and Transform is in the program list's right-click menu. Exit is dropped - the window X / Alt+F4
-             (both routed through Window_Closing) quit the app. -->
+        <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load File is
+             its own top-level item, Save/Close live on the program view, Open Console is a double-click on
+             the Console tab, and Transform is in the program list's right-click menu. Exit is dropped - the
+             window X / Alt+F4 (both routed through Window_Closing) quit the app. -->
         <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
             <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load File..." Click="LoadFile_Click"
@@ -377,7 +377,7 @@
              MinWidth/MaxWidth before, which ran over half the client area on a narrower window. -->
         <Border x:Name="overlayProgram" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
-            <!-- Hosts whichever tool's own ProgramView is connected (Load File/Folder, or a wizard's Generate
+            <!-- Hosts whichever tool's own ProgramView is connected (Load File, or a wizard's Generate
                  output) - each carries its own title bar. Nothing shows here (and the "Program" button is
                  disabled) when nothing is connected; the loaded job's own docked list (ProgramPanel, in the
                  Job tab) is the persistent view of that content, so this popup never duplicates it. -->

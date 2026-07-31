@@ -2,7 +2,7 @@
  * ProgramView.xaml.cs - a standalone, streamer-connectable program view.
  *
  * Part of the ProgramView refactor (docs/Architecture-ProgramView-Refactor.md): replaces the single shared
- * program overlay with a reusable object. Each Load File / Load Folder / wizard Generate creates its own
+ * program overlay with a reusable object. Each Load File / wizard Generate creates its own
  * instance; instances exist independently. The streamer is allocated to a view by an explicit Connect/Disconnect
  * push/pop stack - the connected view (stack top) is what Cycle Start runs.
  *

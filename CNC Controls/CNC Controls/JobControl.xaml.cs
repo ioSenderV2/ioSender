@@ -876,7 +876,7 @@ namespace CNC.Controls
 
         // honorActiveProgram: when a wizard tab is up it registers its program as the active program
         // (MacroProcessor.ActiveRun). A fresh (idle) Run then runs THAT instead of the loaded job - so one
-        // Run runs whatever program is active, file/folder or wizard. The internal stream-starters that
+        // Run runs whatever program is active, loaded file or wizard. The internal stream-starters that
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {

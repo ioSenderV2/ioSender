@@ -7,7 +7,7 @@
              mc:Ignorable="d" d:DesignHeight="335" d:DesignWidth="400">
     <!-- Standalone, streamer-connectable program view: a titled host around the shared GCodeListControl.
          Owns its own G-code (Blocks) and can be Connect()'d to the streamer - see ProgramView.xaml.cs.
-         One instance per Load File / Load Folder / wizard Generate; the connected one (stack top) runs. -->
+         One instance per Load File / wizard Generate; the connected one (stack top) runs. -->
     <DockPanel>
         <!-- Click anywhere on the title bar to toggle between the full program and the compact 3-line run view
              (previous / current / next line). Cursor + hint make it discoverable. -->

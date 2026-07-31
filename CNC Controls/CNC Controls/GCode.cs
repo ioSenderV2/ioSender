@@ -112,15 +112,15 @@ namespace CNC.Controls
 
             // Dry-run mode is a per-run, deliberately-armed toggle (see GrblViewModel.IsDryRunMode) - it must
             // never silently carry over onto a DIFFERENT program the operator just loaded. This is the single
-            // point both Load File/Load Folder funnel through (see the comment below), so it can't be missed
-            // by loading via a different route.
+            // point every load funnels through (see the comment below), so it can't be missed by loading via
+            // a different route.
             if (Model != null)
                 Model.IsDryRunMode = false;
 
-            // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File/Load
-            // Folder - this is the single point both funnel through (GCodeJob.FileChanged), so callers (e.g.
-            // touch-plate probing's edge-radius compensation, CarveView's 3D carve simulation) never need to
-            // re-scan the program themselves.
+            // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File - this is
+            // the single point every load funnels through (GCodeJob.FileChanged), so callers (e.g. touch-plate
+            // probing's edge-radius compensation, CarveView's 3D carve simulation) never need to re-scan the
+            // program themselves.
             GCodeProgramComments.Refresh();
 
             if (Model != null)
@@ -425,9 +425,9 @@ namespace CNC.Controls
                 if (ok[0])
                 {
                     Program.RaiseFileChanged();
-                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers the same way
-                    // Load Folder's stitching does (GCodeJob.ParseFileLines calls BeginSection on a match) -
-                    // an ordinary file with no such markers leaves this false, same as before.
+                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers
+                    // (GCodeJob.ParseFileLines calls BeginSection on a match) - an ordinary file with no such
+                    // markers leaves this false.
                     Model.HasOutline = Program.HasSections;
                     Model.Blocks = Blocks;
                 }

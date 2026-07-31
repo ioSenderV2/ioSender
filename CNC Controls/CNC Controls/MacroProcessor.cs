@@ -75,7 +75,7 @@ namespace CNC.Controls
 
         // The active program's run action: a tool registers its "generate-and-run" here when its tab is shown and
         // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
-        // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)
+        // so one Cycle Start runs whatever program is active (the loaded file on the Job tab, or a wizard on its tab)
         // and tools no longer need their own Run button. Null = no tool active: Cycle Start streams the job.
         // Setting it raises ActiveProgramChanged so program views can re-mark which one is the configured source.
         private static System.Action _activeRun;

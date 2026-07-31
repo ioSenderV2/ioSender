@@ -5,8 +5,8 @@
  * currently loaded program - (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle] [L=length]) and
  * (STOCK X=.. Y=.. Z=..) - so any consumer can look up "what diameter/shape/length is tool N" or "what
  * stock size did the post declare" without re-scanning the program or duplicating the regex. Rebuilt once
- * per completed Load File/Load Folder (see GCode.cs's Program_FileChanged, the shared completion point
- * both funnel through via GCodeJob.FileChanged). Used by CarveView (CNC GCodeViewer, 3D carve simulation)
+ * per completed Load File (see GCode.cs's Program_FileChanged, the shared completion point every load
+ * funnels through via GCodeJob.FileChanged). Used by CarveView (CNC GCodeViewer, 3D carve simulation)
  * and touch-plate probing's edge-radius compensation (CNC Controls Probing, ProbingViewModel.SelectedProbe).
  *
  */
@@ -44,8 +44,7 @@ namespace CNC.Controls
         private static readonly Dictionary<int, GCodeToolInfo> tools = new Dictionary<int, GCodeToolInfo>();
 
         // Rebuild the tool-number -> diameter/shape map and the stock-size info from the currently loaded
-        // program. Called once per completed Load File/Load Folder (GCode.cs's Program_FileChanged) - not on
-        // every lookup.
+        // program. Called once per completed Load File (GCode.cs's Program_FileChanged) - not on every lookup.
         public static void Refresh()
         {
             tools.Clear();

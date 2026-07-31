@@ -141,9 +141,9 @@ namespace CNC.Core
         // reset) before this fix.
         public bool HasToolChange { get; set; }
 
-        // Outline grouping: set when a program is assembled from a folder of
-        // per-toolpath files (see GCode.LoadFolder). Null for ordinary single-
-        // file loads (the Program list then renders flat, ungrouped).
+        // Outline grouping: set when the Fusion add-in's own section-marker comments are recognized in a
+        // loaded file (see rxSectionMarker below). Null for a file with no section markers (the Program list
+        // then renders flat, ungrouped).
         public string Section { get; set; }
         public bool IsSectionStart { get; set; }
 
@@ -167,8 +167,7 @@ namespace CNC.Core
 
         // Section-marker comment the Fusion ioSenderBatchPost add-in emits between operations in its combined
         // output - "(--- 2: FinishBottom (T2) ---)" - captures the inner text verbatim as the section name
-        // (matches FolderToolpath.Section's "{seq}: {name} (T{tool})" format exactly, since that's what the
-        // add-in wraps). Recognized during a plain Load File parse, not just Load Folder's stitching.
+        // ("{seq}: {name} (T{tool})", the format the add-in wraps). Recognized during a plain Load File parse.
         private static readonly Regex rxSectionMarker = new Regex(@"^\(---\s*(.+?)\s*---\)$");
 
         // Neutralise interior parens in a comment line so it survives as ONE well-formed comment regardless of
@@ -259,8 +258,8 @@ namespace CNC.Core
         private bool sectionStartPending = false;
 
         // True once BeginSection() has been called at least once since the last Reset() - i.e. this program
-        // has an outline to show (GrblViewModel.HasOutline), regardless of whether it came from Load Folder's
-        // stitching or Load File recognizing the Fusion add-in's (--- seq: name (Tn) ---) section markers.
+        // has an outline to show (GrblViewModel.HasOutline), from Load File recognizing the Fusion add-in's
+        // (--- seq: name (Tn) ---) section markers.
         public bool HasSections { get; private set; }
 
         // Modal state (distance/feed mode, plane, units) to replay when starting mid-program from an
@@ -350,8 +349,8 @@ namespace CNC.Core
                             LineNumber++;
 
                         // Recognize the Fusion add-in's (--- seq: name (Tn) ---) section-marker comments so a
-                        // plain Load File builds the same outline Load Folder's stitching produces - AddStamped
-                        // (not Emit) is what actually attaches Section/IsSectionStart to the block.
+                        // plain Load File builds a grouped outline - AddStamped (not Emit) is what actually
+                        // attaches Section/IsSectionStart to the block.
                         if (isComment)
                         {
                             var sm = rxSectionMarker.Match(block);

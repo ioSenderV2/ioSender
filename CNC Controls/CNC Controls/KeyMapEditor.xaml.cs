@@ -576,7 +576,7 @@ namespace CNC.Controls
 
         public static bool IsGroupExpanded(string name)
         {
-            // Default collapsed (like the Load Folder outline); remembered once toggled this session.
+            // Default collapsed (like the program-list toolpath outline); remembered once toggled this session.
             bool v;
             return name != null && groupExpanded.TryGetValue(name, out v) && v;
         }

@@ -558,8 +558,8 @@ namespace CNC.Core
         public EnumFlags<Signals> OptionalSignals { get; set; } = new EnumFlags<Signals>(Core.Signals.Off);
         public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
         public string FileName { get { return _fileName; } set { _fileName = value; SDRewind = false; OnPropertyChanged(); OnPropertyChanged(nameof(IsFileLoaded)); OnPropertyChanged(nameof(IsPhysicalFileLoaded)); } }
-        // Full source path for display tooltips: the file path for a single file, the full folder path for a
-        // Load-Folder program, or the tool/wizard name for a generated program (no on-disk path). Set in GCode.
+        // Full source path for display tooltips: the file path for a loaded file, or the tool/wizard name for
+        // a generated program (no on-disk path). Set in GCode.
         public string ProgramPath { get { return _programPath; } set { _programPath = value; OnPropertyChanged(); } }
         public bool IsSDCardJob { get { return FileName.StartsWith("SDCard:"); } }
         public bool SDRewind { get; set; }
@@ -580,11 +580,11 @@ namespace CNC.Core
         // Consumed (and reset) by CycleStart. Used by "Run just this toolpath".
         public int RunToBlock { get; set; } = -1;
         public int BlockExecuting { get { return _executingBlock; } set { _executingBlock = value; OnPropertyChanged(); } }
-        // True when the loaded program has an outline to show - either Load Folder's stitching (GCode.LoadFolder)
-        // or Load File recognizing the Fusion add-in's (--- seq: name (Tn) ---) section markers
-        // (GCodeJob.HasSections) - the Program list then renders as a grouped outline.
+        // True when the loaded program has an outline to show - Load File recognizing the Fusion add-in's
+        // (--- seq: name (Tn) ---) section markers (GCodeJob.HasSections) - the Program list then renders as
+        // a grouped outline.
         public bool HasOutline { get { return _hasOutline; } set { if (_hasOutline != value) { _hasOutline = value; OnPropertyChanged(); } } }
-        // True while a file/folder is being read+parsed on the background loader. The program view(s) show a
+        // True while a file is being read+parsed on the background loader. The program view(s) show a
         // Wait cursor while it is set; the rest of the UI stays responsive. See GCode.BackgroundLoad.
         public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }
         public string FsCwd { get { return _fsCwd; } private set { _fsCwd = value; OnPropertyChanged(); } }

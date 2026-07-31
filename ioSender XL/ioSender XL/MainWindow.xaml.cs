@@ -201,7 +201,7 @@ namespace GCode_Sender
             // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
             // use ?.Invoke, so they no-op). Feed Hold / Stop are always reachable from the fixed bar.
 
-            // Every producer (Load/Load Folder and each wizard) owns its ProgramView and connects it; host the
+            // Every producer (Load File and each wizard) owns its ProgramView and connects it; host the
             // connected view in the overlay with its own title bar. Wizards (AutoShow) pop it open as Generate
             // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
             CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
@@ -302,7 +302,7 @@ namespace GCode_Sender
             mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
-            // A real file/folder load creates the job's own program view and connects it (ProgramView refactor):
+            // A real file load creates the job's own program view and connects it (ProgramView refactor):
             // the overlay hosts it like any tool's view, and Cycle Start streams the freshly loaded file.
             if (DataContext is GrblViewModel gvm)
                 gvm.PropertyChanged += (s, e) =>
@@ -583,11 +583,11 @@ namespace GCode_Sender
         }
 
 
-        // The loaded job's own program view (ProgramView refactor): Load File / Load Folder create+connect it so
-        // the overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
+        // The loaded job's own program view (ProgramView refactor): Load File creates+connects it so the
+        // overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
         // case. It renders via SetProgram(null) (the null == loaded-job convention) so it keeps the live streamed
-        // collection, the mint source highlight and folder outline grouping; AutoShow is off so a load doesn't
-        // pop the overlay open.
+        // collection, the mint source highlight and toolpath outline grouping; AutoShow is off so a load
+        // doesn't pop the overlay open.
         private CNC.Controls.ProgramView jobProgramView;
 
         // A plain streamed macro (not a tool that owns its own view) runs in this dedicated view, so it shows in
@@ -628,7 +628,7 @@ namespace GCode_Sender
         }
 
         // A program is just a list of G-code blocks; build one from generated text so a wizard program renders
-        // in the same program view as a file/folder (no raw-text special case).
+        // in the same program view as a loaded file (no raw-text special case).
         // Host the connected ProgramView in the popup ONLY when it's genuinely transient (AutoShow - a wizard's
         // Generate output, or a plain macro run). The loaded job's own view (jobProgramView, AutoShow=false)
         // already has a persistent home in the docked Job-tab panel (ProgramPanel), so this popup must never
@@ -2331,8 +2331,9 @@ namespace GCode_Sender
             Topmost = false;
         }
 
-        // (fileSave/Open/OpenFolder/Close menu handlers removed in the menu overhaul - Load/Load Folder/Close
-        //  are now on the program-view header and Save is in its right-click menu, all via the static GCode.File.)
+        // (fileSave/Open/OpenFolder/Close menu handlers removed in the menu overhaul - Load File is its own
+        //  top-level menu item, Close is on the program-view header, and Save is in its right-click menu, all
+        //  via the static GCode.File. Load Folder itself was retired entirely - see GCodeJob.HasSections.)
 
         private void TabMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
