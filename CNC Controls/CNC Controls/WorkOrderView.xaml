@@ -145,6 +145,8 @@
                         <local:NumericField x:Uid="fld_wofloorleave" x:Name="fldFloorStockToLeave" Label="Floor stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wocountersink" x:Name="fldCountersinkDiameter" Label="Countersink diameter:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically."/>
 
                         <!-- Only a through CONTOUR frees a piece that needs holding in place. -->
                         <StackPanel x:Name="pnlTabs">

@@ -72,7 +72,7 @@ namespace CNC.Controls
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
                            fldNumTabs, fldTabWidth, fldTabHeight,
-                           fldWallStockToLeave, fldFloorStockToLeave, fldChamferDepth };
+                           fldWallStockToLeave, fldFloorStockToLeave, fldChamferDepth, fldCountersinkDiameter };
         }
 
         private bool placing = false;
@@ -209,6 +209,9 @@ namespace CNC.Controls
                 case WorkOrderOpKind.Chamfer:
                     op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
                     op.Feed = 500d;
+                    break;
+                case WorkOrderOpKind.Countersink:
+                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("countersink", material);
                     break;
             }
 
@@ -602,6 +605,7 @@ namespace CNC.Controls
             fldWallStockToLeave.Value = op.WallStockToLeave;
             fldFloorStockToLeave.Value = op.FloorStockToLeave;
             fldChamferDepth.Value = op.ChamferDepth;
+            fldCountersinkDiameter.Value = op.CountersinkDiameter;
             chkThrough.IsChecked = op.Through;
 
             bool supportsThrough = WorkOrderRules.SupportsThrough(op.Kind);
@@ -638,6 +642,7 @@ namespace CNC.Controls
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
             Show(fldChamferDepth, op.Kind == WorkOrderOpKind.Chamfer);
+            Show(fldCountersinkDiameter, op.Kind == WorkOrderOpKind.Countersink);
             Show(pnlTabs, selectedToolpath != null && WorkOrderRules.SupportsTabs(selectedToolpath, op));
 
             // A drill's diameter IS the hole - it comes from the geometry, so there's no bit to choose here.
@@ -663,6 +668,7 @@ namespace CNC.Controls
                 op.WallStockToLeave = fldWallStockToLeave.Value;
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
                 op.ChamferDepth = fldChamferDepth.Value;
+                op.CountersinkDiameter = fldCountersinkDiameter.Value;
             }
             else if (selectedToolpath != null)
             {
@@ -798,14 +804,17 @@ namespace CNC.Controls
             string material = OddJobsSetupConfig.Section?.Material ?? string.Empty;
             bool isDrill = op.Kind == WorkOrderOpKind.Drill;
             bool isBore = op.Kind == WorkOrderOpKind.Bore;
+            bool isCountersink = op.Kind == WorkOrderOpKind.Countersink;
             bool showDoc = op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
-                        || op.Kind == WorkOrderOpKind.Chamfer || isDrill || isBore;
+                        || op.Kind == WorkOrderOpKind.Chamfer || isDrill || isBore || isCountersink;
 
             string docLabel = op.Kind == WorkOrderOpKind.Chamfer ? "Chamfer depth:"
+                            : isCountersink ? "Countersink diameter:"
                             : isDrill ? "Peck depth:"
                             : isBore ? "Step down (per rev):"
                             : "Depth of cut:";
             double doc = op.Kind == WorkOrderOpKind.Chamfer ? op.ChamferDepth
+                       : isCountersink ? op.CountersinkDiameter
                        : isDrill ? op.PeckDepth
                        : isBore ? op.BoreStepDown
                        : op.DepthOfCut;
@@ -826,6 +835,7 @@ namespace CNC.Controls
                 // smaller cutter than nominal - the advisor needs the engagement depth to say anything useful.
                 EngagementDepthMm = op.Kind == WorkOrderOpKind.BottomFinish ? op.FloorStockToLeave : (double?)null
             };
+            dlg.RestrictToolsFor(op.Kind);
 
             if (dlg.ShowDialog() != true)
                 return;
@@ -838,6 +848,8 @@ namespace CNC.Controls
             op.SpindleRPM = dlg.SpindleRPM; op.Feed = dlg.Feed; op.PlungeFeed = dlg.PlungeFeed;
             if (op.Kind == WorkOrderOpKind.Chamfer)
                 op.ChamferDepth = dlg.DepthOfCut;
+            else if (isCountersink)
+                op.CountersinkDiameter = dlg.DepthOfCut;
             else if (isDrill)
             {
                 op.PeckDepth = dlg.DepthOfCut;
@@ -886,6 +898,8 @@ namespace CNC.Controls
                 s += string.Format(" - {0} - {1:0.0##} mm peck", op.DrillHss ? "HSS" : "brad point", op.PeckDepth);
             else if (op.Kind == WorkOrderOpKind.Chamfer)
                 s += string.Format(" - {0:0.0##} mm chamfer depth", op.ChamferDepth);
+            else if (op.Kind == WorkOrderOpKind.Countersink)
+                s += string.Format(" - Ø{0:0.##} mm target", op.CountersinkDiameter);
             else if (op.Kind == WorkOrderOpKind.SideFinish)
                 s += string.Format(" - {0:0.0##} mm wall stock to leave", op.WallStockToLeave);
             else if (op.Kind == WorkOrderOpKind.BottomFinish)
@@ -907,10 +921,10 @@ namespace CNC.Controls
                 case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
                 case OddJobsTool.BallEnd18: return "1/8\" ball end";
                 case OddJobsTool.DrillBit: return "drill";
-                case OddJobsTool.CountersinkBit38: return "3/8\" countersink bit";
-                case OddJobsTool.CountersinkBit916: return "9/16\" countersink bit";
-                case OddJobsTool.CountersinkBit1316: return "13/16\" countersink bit";
-                case OddJobsTool.CountersinkBit118: return "1-1/8\" countersink bit";
+                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
+                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
+                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
+                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
                 default: return tool.ToString();
             }
         }
@@ -1042,17 +1056,19 @@ namespace CNC.Controls
                     if (op.Kind == WorkOrderOpKind.Bore && op.BitDiameter >= op.HoleDiameter)
                         warnings.Add(opLabel + "bit must be smaller than the hole to bore it - use a Drill if the bit IS the hole size.");
 
-                    if (op.Kind == WorkOrderOpKind.Chamfer && OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)op.Tool))
+                    if (op.Kind == WorkOrderOpKind.Countersink)
                     {
                         if (tp.Geometry != WorkOrderGeometryKind.Circle)
-                            warnings.Add(opLabel + "a countersink bit only plunges a round hole - pick the V-bit for this shape.");
+                            warnings.Add(opLabel + "a countersink bit only plunges a round hole - pick a Chamfer operation for this shape.");
+                        else if (!OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)op.Tool))
+                            warnings.Add(opLabel + "pick one of the countersink bits for this operation.");
                         else
                         {
-                            // Same 45-deg-per-side geometry as the V-bit trace (see the countersink enum
-                            // values' own comment) - the cone can't reach a diameter wider than the bit's own,
-                            // so the deepest usable ChamferDepth is half the bit diameter.
-                            if (op.BitDiameter < 2d * op.ChamferDepth)
-                                warnings.Add(opLabel + string.Format("bit too small to reach this chamfer depth - max depth for a {0:0.0##} mm bit is {1:0.0##} mm.", op.BitDiameter, op.BitDiameter / 2d));
+                            // Same 45-deg-per-side geometry as the V-bit trace - the cone can't reach a
+                            // diameter wider than the bit's own, so the deepest usable target is the bit's
+                            // own diameter.
+                            if (op.BitDiameter < op.CountersinkDiameter)
+                                warnings.Add(opLabel + string.Format("bit too small to reach this target diameter - a {0:0.0##} mm bit can't cut wider than {0:0.0##} mm across.", op.BitDiameter));
                             if (op.BitDiameter <= tp.Diameter)
                                 warnings.Add(opLabel + "bit must be larger than the hole to chamfer its rim, not just re-cut the hole itself.");
                         }
@@ -1075,13 +1091,18 @@ namespace CNC.Controls
 
         // How far OUTSIDE its nominal outline a toolpath actually removes material. Pocket, Contour (on closed
         // geometry) and the finishing passes all run with the tool center inset by its radius, so they cut only
-        // up to the nominal line - nothing beyond it. A chamfer's V-bit spreads outward by roughly its depth.
+        // up to the nominal line - nothing beyond it. A chamfer's V-bit spreads outward by roughly its depth. A
+        // countersink's target diameter can likewise extend past the hole's own nominal circle.
         private static double OutsideReachMm(WorkOrderToolpath tp)
         {
             double extra = 0d;
             foreach (var op in tp.Operations)
+            {
                 if (op.Kind == WorkOrderOpKind.Chamfer)
                     extra = Math.Max(extra, op.ChamferDepth);
+                else if (op.Kind == WorkOrderOpKind.Countersink)
+                    extra = Math.Max(extra, (op.CountersinkDiameter - tp.Diameter) / 2d);
+            }
             return extra;
         }
 

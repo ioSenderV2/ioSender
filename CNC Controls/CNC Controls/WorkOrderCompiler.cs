@@ -483,25 +483,11 @@ namespace CNC.Controls
         }
 
         // A 45 deg V-bit traces the feature's TRUE top edge (no bit-radius offset - the cone's own geometry
-        // does the work) to break the sharp corner.
+        // does the work) to break the sharp corner. Works on any shape - unlike Countersink below, which only
+        // makes sense on a round hole.
         private static List<string> BuildChamfer(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-
-            // Countersink bit on a round hole: plunge straight down the centerline instead of tracing the
-            // outline - the bit's own 90-deg cone does the chamfering as it descends (same geometry the V-bit
-            // trace relies on), so there's no need to follow an edge at all when the feature is round. See
-            // OddJobsFeedsSpeedsDialog.IsCountersinkBit's own comment. PlungeFeed (not Feed) since this is a
-            // genuine axial plunge, not a light corner-breaking trace.
-            if (OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)op.Tool) && tp.Geometry == WorkOrderGeometryKind.Circle)
-            {
-                lines.Add("G0 X" + F(cx) + " Y" + F(cy));
-                lines.Add("G0 Z" + F(SafeZ()));
-                lines.Add("G1 Z" + F(-op.ChamferDepth) + " F" + F(op.PlungeFeed));
-                lines.Add("G0 Z" + F(SafeZ()));
-                return lines;
-            }
-
             var edge = Outline(tp, cx, cy, 0d);
 
             lines.Add("G0 " + XY(edge[0]));
@@ -509,6 +495,23 @@ namespace CNC.Controls
             lines.Add("G1 Z" + F(-op.ChamferDepth) + " F" + F(op.Feed));
             for (int i = 1; i < edge.Count; i++)
                 lines.Add("G1 " + XY(edge[i]) + " F" + F(op.Feed));
+            lines.Add("G0 Z" + F(SafeZ()));
+            return lines;
+        }
+
+        // A countersink bit plunged straight down a round hole's centerline - the bit's own 90-deg cone does
+        // the chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
+        // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted here
+        // (depth = diameter / 2, same 45-deg-per-side cone math Chamfer's V-bit uses, just specified the other
+        // way around). PlungeFeed (not Feed) since this is a genuine axial plunge, not a corner-breaking trace.
+        private static List<string> BuildCountersink(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+            double depth = op.CountersinkDiameter / 2d;
+
+            lines.Add("G0 X" + F(cx) + " Y" + F(cy));
+            lines.Add("G0 Z" + F(SafeZ()));
+            lines.Add("G1 Z" + F(-depth) + " F" + F(op.PlungeFeed));
             lines.Add("G0 Z" + F(SafeZ()));
             return lines;
         }
@@ -537,6 +540,7 @@ namespace CNC.Controls
                     case WorkOrderOpKind.SideFinish: lines.AddRange(BuildSideFinish(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.BottomFinish: lines.AddRange(BuildBottomFinish(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.Chamfer: lines.AddRange(BuildChamfer(tp, op, cx, cy)); break;
+                    case WorkOrderOpKind.Countersink: lines.AddRange(BuildCountersink(tp, op, cx, cy)); break;
                 }
             }
 
@@ -588,10 +592,10 @@ namespace CNC.Controls
                 case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
                 case OddJobsTool.BallEnd18: return "1/8\" ball end";
                 case OddJobsTool.DrillBit: return "drill";
-                case OddJobsTool.CountersinkBit38: return "3/8\" countersink bit";
-                case OddJobsTool.CountersinkBit916: return "9/16\" countersink bit";
-                case OddJobsTool.CountersinkBit1316: return "13/16\" countersink bit";
-                case OddJobsTool.CountersinkBit118: return "1-1/8\" countersink bit";
+                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
+                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
+                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
+                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
                 default: return tool.ToString();
             }
         }
@@ -823,6 +827,9 @@ namespace CNC.Controls
                             break;
                         case WorkOrderOpKind.Chamfer:
                             desc = string.Format("chamfer, {0:0.0#} mm", op.ChamferDepth);
+                            break;
+                        case WorkOrderOpKind.Countersink:
+                            desc = string.Format("countersink, Ø{0:0.##} mm target", op.CountersinkDiameter);
                             break;
                         default:
                             continue;
