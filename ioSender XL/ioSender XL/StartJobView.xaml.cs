@@ -150,6 +150,18 @@ namespace GCode_Sender
             set { cbxProbeType.SelectedIndex = value ? 1 : 0; }
         }
 
+        // Conductive is now a property of the selected Material (Aluminum/Brass/Steel), not a manual checkbox -
+        // a touch plate probes by electrical continuity, so it only closes the circuit directly against
+        // conductive stock. Non-conductive stock needs a separate metal plate (PlateThickness/LipWidth offsets).
+        private bool StockConductive
+        {
+            get
+            {
+                string material = cbxMaterial.SelectedItem as string;
+                return material != null && CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.TryGetValue(material, out var mr) && mr.Conductive;
+            }
+        }
+
         // cbxWcs's 7th entry (index 6, after G54-G59) - see the "Set origin or offset" plan section.
         private bool IsG92 { get { return cbxWcs.SelectedIndex == 6; } }
 
@@ -239,11 +251,9 @@ namespace GCode_Sender
             chkRotate.Unchecked += (s, e) => InputChanged();
             chkSetTloRef.Checked += (s, e) => InputChanged();
             chkSetTloRef.Unchecked += (s, e) => InputChanged();
-            chkStockConductive.Checked += (s, e) => { UpdateMeasureAvailability(); InputChanged(); };
-            chkStockConductive.Unchecked += (s, e) => { UpdateMeasureAvailability(); InputChanged(); };
             // Switching probe type changes which ProbeDefinition Generate needs (and whether it's defined) -
             // re-gate immediately rather than waiting for the next Activate/capability refresh.
-            cbxProbeType.SelectionChanged += (s, e) => { UpdateProbeWarning(); InputChanged(); };
+            cbxProbeType.SelectionChanged += (s, e) => { UpdateProbeWarning(); UpdateGeometryPanel(); InputChanged(); };
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldWidth, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldHeight, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); InputChanged(); });
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField)).AddValueChanged(fldThickness, (s, e) => { MarkSizeFieldsTouched(); CheckStockAgainstProgram(); UpdateThicknessWarning(); InputChanged(); });
@@ -271,6 +281,8 @@ namespace GCode_Sender
 
         private void cbxMaterial_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateGeometryPanel();
+            UpdateMeasureAvailability();
             InputChanged();
         }
 
@@ -431,10 +443,6 @@ namespace GCode_Sender
             if (!touchAvailable && IsTouchPlate)
                 IsTouchPlate = false;
 
-            // The conductive checkbox only matters for Touch Plate probing - mirrors what the old
-            // rbProbeTouch.IsChecked ElementName binding on chkStockConductive.IsEnabled did.
-            chkStockConductive.IsEnabled = IsTouchPlate;
-
             bool ok = ActiveProbe() != null;
             if (isActiveTab)
                 MacroProcessor.IsGenerateReady = ok;
@@ -449,9 +457,9 @@ namespace GCode_Sender
         // real hardware and see how it behaves, rather than assume the theoretical limitation in software.
         private void UpdateMeasureAvailability()
         {
-            bool touchNonConductive = IsTouchPlate && chkStockConductive.IsChecked != true;
+            bool touchNonConductive = IsTouchPlate && !StockConductive;
             chkMeasure.ToolTip = touchNonConductive
-                ? "Touch Plate probing on non-conductive stock: in theory the plate closes the circuit itself, so the stock's edges may never trigger it - try it and see. Switch to 3D Probe, or check 'Stock conductive' if the stock is touched directly, if it doesn't work."
+                ? "Touch Plate probing on non-conductive stock: in theory the plate closes the circuit itself, so the stock's edges may never trigger it - try it and see. Switch to 3D Probe, or pick a conductive Material (Aluminum/Brass/Steel) if the stock is touched directly, if it doesn't work."
                 : "Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set.";
         }
 
@@ -581,6 +589,13 @@ namespace GCode_Sender
         {
             bool isCircle = chkIsCircle.IsChecked == true;
             bool internalMode = rbGeomInternal.IsChecked == true;
+
+            // Touch Plate probing of internal (hole) geometry, or an external circle, normally needs conductive
+            // stock touched directly - a standard flat plate can't reach inside a hole or wrap a curved surface.
+            // Warning only (not a hard block, 2026-07-31 user decision): a custom plate shaped to reach the
+            // probe point can still make it work on non-conductive stock.
+            txtGeomConductiveWarn.Visibility = IsTouchPlate && !StockConductive && (internalMode || isCircle)
+                ? Visibility.Visible : Visibility.Collapsed;
 
             pnlEdgePickerExt.Visibility = !isCircle && !internalMode ? Visibility.Visible : Visibility.Collapsed;
             pnlEdgePickerInt.Visibility = !isCircle && internalMode ? Visibility.Visible : Visibility.Collapsed;
@@ -1457,7 +1472,7 @@ namespace GCode_Sender
                 return;
             }
             bool touchPlate = IsTouchPlate;
-            bool stockConductive = chkStockConductive.IsChecked == true;
+            bool stockConductive = StockConductive;
 
             var fx = SelectedFixture;
             if (fx == null || !fx.Implemented || !fx.PositionValidated)
@@ -1618,7 +1633,6 @@ namespace GCode_Sender
                 chkRotate.IsChecked = s.ApplyRotation;
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
-                chkStockConductive.IsChecked = s.StockConductive;
                 cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
                 IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
@@ -1636,6 +1650,7 @@ namespace GCode_Sender
                 chkHeightMap.IsChecked = s.HeightMap;
                 fldHeightMapGridX.Value = s.HeightMapGridX;
                 fldHeightMapGridY.Value = s.HeightMapGridY;
+                UpdateGeometryPanel();   // re-check the conductive-stock warning against the just-loaded Material/Probe
             }
             catch { /* start with defaults */ }
             finally
@@ -1665,7 +1680,6 @@ namespace GCode_Sender
                     ApplyRotation = chkRotate.IsChecked == true,
                     ExactSize = chkExactSize.IsChecked == true,
                     SetTloRef = chkSetTloRef.IsChecked == true,
-                    StockConductive = chkStockConductive.IsChecked == true,
                     Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                     Fixture = SelectedFixture?.Name ?? string.Empty,
                     GeomInternal = rbGeomInternal.IsChecked == true,

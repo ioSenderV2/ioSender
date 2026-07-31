@@ -131,8 +131,12 @@
                                  height PLUS a whole extra row for these three controls. -->
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                 <RadioButton x:Uid="ls_geomExternal" x:Name="rbGeomExternal" Content="External" GroupName="geomInOut" IsChecked="True" Margin="0,0,0,6"/>
-                                <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut" Margin="0,0,0,6"/>
-                                <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle"/>
+                                <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut" Margin="0,0,0,6"
+                                             ToolTip="Touch Plate probing of internal (hole) geometry normally needs conductive stock touched directly - a custom plate shaped to reach inside a hole can still work on non-conductive stock, but a standard flat plate can't."/>
+                                <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle"
+                                          ToolTip="Touch Plate probing of a round boss normally needs conductive stock touched directly - the plate can't wrap the curved surface. A custom plate may still work on non-conductive stock."/>
+                                <TextBlock x:Name="txtGeomConductiveWarn" Foreground="#C0392B" TextWrapping="Wrap" Width="140" FontSize="14" Margin="0,6,0,0" Visibility="Collapsed"
+                                           Text="Touch Plate + non-conductive stock: this normally only works with a custom plate shaped to reach the probe point."/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
                             <!-- Outer 228x212: 32px pad on the LEFT only (kept - that's the gap to the
@@ -351,8 +355,6 @@
                                 <CheckBox x:Uid="ls_exactsize" x:Name="chkExactSize" Content="Stock size is exact" IsChecked="False" VerticalAlignment="Center"
                                           IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
                                           ToolTip="Off (default): width/height above are a conservative ESTIMATE - a few mm larger than actual - so far-corner references land safely outside the stock. On: they are treated as exact, and corners 2-4 probe close to their computed true position instead (corner 2 assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2). Faster and tighter, but a wrong entered size can miss the stock - only enable if you trust the numbers."/>
-                                <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="16,0,0,0" VerticalAlignment="Center"
-                                          ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
                             </StackPanel>
                             <StackPanel x:Name="pnlMaterial" Orientation="Horizontal" Margin="0,4,0,4">
                                 <Label x:Uid="ls_material" Content="Material:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>

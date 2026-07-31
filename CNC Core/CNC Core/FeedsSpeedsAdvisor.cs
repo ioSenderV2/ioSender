@@ -82,6 +82,7 @@ namespace CNC.Core
         public Dictionary<double, double> ChipLoad;
         public double MaxAxialFrac;
         public double MaxRadialFrac;
+        public bool Conductive;   // true for metals - gates touch-plate probing of internal/circle geometry (see StartJobView.StockConductive)
         public string Notes;
         public DrillRef Drill;      // brad point / twist drill (the original, single drill reference)
         public DrillRef DrillHss;   // HSS twist drill - null where no distinct data exists yet (metals)
@@ -191,6 +192,7 @@ namespace CNC.Core
                     // machine's actual spindle limit (ApplyMachineLimits / the connected controller's $30).
                     // Tuned for 6061-class aluminum, sharp carbide, air-blast-only cooling.
                     SurfaceSpeed = (120, 180, 250),   // m/min
+                    Conductive = true,
                     ChipLoad = new Dictionary<double, double> { { 1.5, 0.012 }, { 3.0, 0.030 }, { 6.0, 0.060 }, { 9.5, 0.090 }, { 12.7, 0.120 } },
                     MaxAxialFrac = 0.5,
                     MaxRadialFrac = 0.4,
@@ -214,6 +216,7 @@ namespace CNC.Core
                     // Free-machining brass (C360-class) cuts easily with carbide - moderate surface speed,
                     // similar ballpark to aluminum but slightly gentler chip loads for a lighter router spindle.
                     SurfaceSpeed = (100, 150, 200),
+                    Conductive = true,
                     ChipLoad = new Dictionary<double, double> { { 1.5, 0.010 }, { 3.0, 0.025 }, { 6.0, 0.050 }, { 9.5, 0.075 }, { 12.7, 0.100 } },
                     MaxAxialFrac = 0.5,
                     MaxRadialFrac = 0.4,
@@ -226,6 +229,7 @@ namespace CNC.Core
                     // Mild steel (1018-class) is a stretch for a router-class machine with air-blast-only
                     // cooling - deliberately conservative surface speed to keep heat/tool wear in check.
                     SurfaceSpeed = (30, 45, 60),
+                    Conductive = true,
                     ChipLoad = new Dictionary<double, double> { { 1.5, 0.006 }, { 3.0, 0.015 }, { 6.0, 0.030 }, { 9.5, 0.045 }, { 12.7, 0.060 } },
                     MaxAxialFrac = 0.3,
                     MaxRadialFrac = 0.3,

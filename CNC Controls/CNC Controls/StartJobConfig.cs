@@ -46,8 +46,8 @@ namespace CNC.Controls
         // meaningless) - lets Measure/Verify-style runs report numbers without moving the selected WCS.
         public bool SetOrigin = true;
         // A touch plate probes by electrical continuity with the stock, so it only works on conductive
-        // material (metal). Gates the Probe selection below - unchecked forces "ThreeDProbe".
-        public bool StockConductive = false;
+        // material (metal) - now derived from the selected Material (FeedsSpeedsAdvisor.MaterialRef.Conductive),
+        // not a separate saved field.
         public string Probe = "ThreeDProbe";   // "ThreeDProbe" or "TouchPlate" (UI selection only - not yet wired into BuildProgram)
         public string Fixture = string.Empty;   // selected fixture's Name (Machine Setup > Fixture definitions)
         // Dynamic fixture's Geometry panel (External/Internal + Is Circle + picked corner/edge) and the
