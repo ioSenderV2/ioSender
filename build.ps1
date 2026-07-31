@@ -38,6 +38,15 @@
     on a modal error dialog. Use for unattended runs; omit for interactive testing so you
     still see the crash dialog.
 
+.PARAMETER Clean
+    Delete every project's bin\ and obj\ folders before building. MSBuild's own -t:Clean only
+    removes files it tracked THIS build - it doesn't fix a stale incremental cache (confirmed
+    2026-07-31: obj\Debug's MarkupCompile cache still listed a just-deleted .xaml file, and the
+    project failed to build with "Could not find file ...xaml" pointing at an unrelated view,
+    since Page-list caching is keyed on the whole project, not the one file that changed). A
+    real delete-and-rebuild is the only fix once that happens; use -Clean when a build fails
+    referencing a file you know is gone, or after deleting/renaming any .xaml/.cs file.
+
 .DESCRIPTION (no env vars)
     ioSender itself reads NO environment variables (2026-07-25) - every launch-time behavior
     is a real CLI flag, and every persistent setting (OBS demo-recording config, AI review
@@ -68,6 +77,11 @@
     .\build.ps1 -Scratch
     Verify-only build into bin\Debug.scratch\ - doesn't touch bin\Debug\, so a running test
     instance launched from there keeps running untouched.
+
+.EXAMPLE
+    .\build.ps1 -Clean -Launch
+    Wipe every project's bin\/obj\ first, then build and launch - use after a build fails
+    referencing a file that was just deleted/renamed (stale incremental cache), not routinely.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -77,6 +91,7 @@ param(
     [switch]$NoKill,
     [switch]$Scratch,
     [switch]$Headless,
+    [switch]$Clean,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
     #   .\build.ps1 -Launch -forgetnetwork -demomarker
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -132,9 +147,32 @@ function ScratchOutDir([string]$Config) {
 if (-not (Test-Path $solution)) { throw "Solution not found: $solution" }
 $msbuild = Find-MSBuild
 
-# A scratch build never touches bin\<Config>\ at all, so there's nothing to kill.
-if (-not $NoKill -and -not $Scratch) {
+# A scratch build never touches bin\<Config>\ at all, so there's normally nothing to kill - but
+# -Clean deletes the LIVE bin\ tree too (not just scratch's side folder), so a running instance's
+# locked DLLs must go first regardless of -Scratch, or the delete below fails with Access to the
+# path ... is denied (confirmed 2026-07-31).
+if (-not $NoKill -and (-not $Scratch -or $Clean)) {
     Get-Process ioSender -ErrorAction SilentlyContinue | Stop-Process -Force
+}
+
+if ($Clean) {
+    # MSBuild's own -m (node reuse) leaves worker processes alive after this script exits, holding
+    # file locks on satellite resource DLLs (e.g. bin\Debug\en-US\*.resources.dll) even though no
+    # ioSender.exe is running - confirmed 2026-07-31: Remove-Item failed Access to the path ... is
+    # denied on one of these with zero ioSender processes present. Killing ioSender alone (above)
+    # isn't enough; these must go too before a clean delete can succeed.
+    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(MSBuild|VBCSCompiler)$' } | Stop-Process -Force
+    Write-Host "==> -Clean: removing bin\/obj\ for every project ..." -ForegroundColor Cyan
+    Get-ChildItem -Path $root -Filter '*.csproj' -Recurse -File | ForEach-Object {
+        $projDir = $_.DirectoryName
+        foreach ($sub in 'bin', 'obj') {
+            $p = Join-Path $projDir $sub
+            if (Test-Path $p) {
+                Remove-Item $p -Recurse -Force
+                Write-Host "    removed $p"
+            }
+        }
+    }
 }
 
 switch ($Configuration) {
