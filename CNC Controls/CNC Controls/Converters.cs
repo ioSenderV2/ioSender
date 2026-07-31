@@ -512,6 +512,27 @@ namespace CNC.Controls
         }
     }
 
+    // Per-axis DRO field tooltip - "G54 X offset: 0.000" - so hovering a single axis shows THAT axis's own
+    // work coordinate offset without checking the separate Offsets flyout (see WcsHeaderSuffixConverter for
+    // the DRO group header's own, whole-panel "(G54)" indicator this complements). ConverterParameter carries
+    // the axis letter (fixed - "X"/"Y"/etc, the underlying WorkPositionOffset property name - not whatever a
+    // remapped axis Label happens to display). No tooltip at all (null) until a controller has actually
+    // reported a WCS - showing "Offset: 0.000" before any connection would look like a real reading.
+    public class WcsOffsetTooltipConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            string wcs = values.Length > 0 ? values[0] as string : null;
+            if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
+                return null;
+            return string.Format(CultureInfo.CurrentCulture, "{0} {1} offset: {2:0.000}", wcs, parameter, offset);
+        }
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class LogicalNotConverter : IValueConverter
     {
         public IValueConverter FinalConverter { get; set; }
