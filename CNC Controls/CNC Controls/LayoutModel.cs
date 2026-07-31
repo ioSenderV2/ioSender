@@ -106,9 +106,10 @@ namespace CNC.Controls
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
+                    // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs'
+                    // own slot only ever hosts the Work Order composer.
                     new LayoutNode(LayoutKeys.OddJobs,
-                        new LayoutSlot(LayoutKeys.SlotOddJobs, new[] {
-                            LayoutKeys.OddJobsSetup, LayoutKeys.OddJobsWorkOrder })),
+                        new LayoutSlot(LayoutKeys.SlotOddJobs, new[] { LayoutKeys.OddJobsWorkOrder })),
                     new LayoutNode(LayoutKeys.MachineSetup),
                     new LayoutNode(LayoutKeys.LatheWizards)));
         }

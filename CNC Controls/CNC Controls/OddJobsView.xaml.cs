@@ -1,9 +1,9 @@
 /*
  * OddJobsView.xaml.cs - part of CNC Controls library
  *
- * Top-level "Odd Jobs" tab: a Setup sub-tab (a second StartJobView instance sharing the real Start Job
- * tab's own StartJobConfig section - registered from MainWindow.xaml.cs since only it can see StartJobView)
- * plus simple one-off job wizards (Surface Stock, Drill/Bore Hole, Pocket, Contour/Slot). Same
+ * Top-level "Odd Jobs" tab: hosts the Work Order composer sub-tab. Setup used to be a second sub-tab here
+ * (a StartJobView instance of its own) - it's now the Start Job tab itself, one shared Setup screen for
+ * both (job-flow unification, 2026-07-31), so this view no longer hosts or knows about it at all. Same
  * sub-tab-from-layout-tree hosting as ToolsView.
  */
 
@@ -27,10 +27,9 @@ namespace CNC.Controls
         // run; that gate is gone (see StartJobConfig.cs for what replaced it and why) - a job can be composed
         // and inspected whenever, and Generate is where the cached-origin question gets asked.
 
-        // Register the work-order composer as a placeable component (Setup itself is registered by
-        // MainWindow.xaml.cs, which is the only assembly that can see both ComponentRegistry and StartJobView).
-        // This one tab replaced the five fixed job wizards - the operator composes whatever operations a job
-        // needs instead of picking the tab whose feature set happens to match.
+        // Register the work-order composer as a placeable component. This one tab replaced the five fixed
+        // job wizards - the operator composes whatever operations a job needs instead of picking the tab
+        // whose feature set happens to match.
         private static void RegisterJobs()
         {
             ComponentRegistry.Register(LayoutKeys.OddJobsWorkOrder, L("TabOddJobsWorkOrder", "Work Order"), () => new WorkOrderView());
@@ -102,8 +101,7 @@ namespace CNC.Controls
 
         #endregion
 
-        // Activate/deactivate the selected sub-tab, whether it hosts an IGrblConfigTab (the job wizards) or
-        // an ICNCView (Setup, a StartJobView).
+        // Activate/deactivate the selected sub-tab, whether it hosts an IGrblConfigTab or an ICNCView.
         private void ActivateTab(TabItem tab, bool activate)
         {
             if (tab == null)

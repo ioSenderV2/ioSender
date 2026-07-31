@@ -87,13 +87,16 @@ namespace GCode_Sender
         // Guards Model_PropertyChanged's PRINT-line parsing (corners/measured size/etc.) to whichever
         // StartJobView instance most recently triggered a run. Subscribe() deliberately never unsubscribes on
         // deactivate (see its own comment - a run started here must still get its results parsed even after
-        // the tab is left) - but with 2 separate StartJobView instances alive at once (the real Start Job tab
-        // AND Odd Jobs' constrained Setup, both reading/writing the SAME shared GrblViewModel.Message), that
-        // means BOTH stay permanently subscribed to every PRINT line either one ever triggers, for the rest of
-        // the session, the moment each has been activated once. Confirmed on real hardware: running Setup's
-        // probe popped its OWN correct "measured size differs" warning AND the real Start Job tab's (dormant,
-        // stale entered width/height from an earlier, unrelated job) - same messages, same regexes, 2
-        // independent instances each reacting to the one physical probe run.
+        // the tab is left). This dates from when 2 separate StartJobView instances were alive at once (the
+        // real Start Job tab AND Odd Jobs' own constrained Setup, both reading/writing the SAME shared
+        // GrblViewModel.Message) - without it, BOTH stayed permanently subscribed to every PRINT line either
+        // one ever triggered, the moment each had been activated once. Confirmed on real hardware: running
+        // Setup's probe popped its OWN correct "measured size differs" warning AND the OTHER (dormant, stale
+        // entered width/height from an earlier, unrelated job) instance's - same messages, same regexes, 2
+        // independent instances each reacting to the one physical probe run. There's only one StartJobView
+        // instance at all now (job-flow unification, 2026-07-31 - Odd Jobs no longer has its own Setup), so
+        // this can never trigger again in practice, but the guard is harmless to keep (trivially always true
+        // for a lone instance) and cheaper than re-verifying that removing it changes nothing.
         //
         // A simple "am I waiting" bool - set before Run(), cleared after it returns - does NOT work: Run()'s
         // FINAL burst is always fire-and-forget (see MacroProcessor.Run's own comment on Flush's 'wait'
@@ -181,31 +184,21 @@ namespace GCode_Sender
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
-        // Odd Jobs' "Setup" sub-tab and the real Start Job tab now share ONE StartJobView identity: same
-        // config section (StartJobConfig.Section), same free WCS choice, same TLO-ref/Material controls -
-        // there is no more "which entry point" distinction for Setup itself (see the job-flow-unification
-        // notes: Setup is one shared, persistent fact regardless of what program you're about to run).
-        //
-        // The one thing still gated is WCS rotation, and only as a TEMPORARY safety measure: WorkOrderCompiler
-        // has zero rotation awareness (confirmed 2026-07-31 - no G10 L2 R / rotation handling anywhere in it),
-        // so a Work Order run against a WCS that picked up a rotation via the general flow would cut skewed
-        // with no warning. The real fix belongs in WorkOrderRules.Validate (check the active WCS for a
-        // rotation and refuse/warn at Generate time, regardless of how Setup was reached) - until that lands,
-        // suppress rotation here for the Odd-Jobs-embedded instance the same way it always has been, rather
-        // than removing a safety guard with nothing yet in place to replace it.
-        private readonly bool suppressRotationForOddJobs;
-
-        // The persisted settings section this instance reads/writes - always the one shared StartJobConfig
-        // section now, whichever tab this instance is embedded in.
+        // This is now THE Setup screen - one instance, one shared config section (StartJobConfig.Section) -
+        // there is no more separate Odd Jobs "Setup" sub-tab instance to distinguish from (job-flow
+        // unification, 2026-07-31: Setup is one shared, persistent fact regardless of what program you're
+        // about to run). WCS-rotation safety for Work Orders now lives in WorkOrderRules.Validate (checks the
+        // active WCS's own rotation at Generate time), not as a per-instance UI restriction here - a Work
+        // Order is exactly as free to use a rotated WCS as anything else is, it just gets warned about it at
+        // the one moment that actually matters.
         private CNC.Controls.StartJobSettings Section
         {
             get { return CNC.Controls.StartJobConfig.Section; }
             set { CNC.Controls.StartJobConfig.Section = value; }
         }
 
-        public StartJobView(bool suppressRotationForOddJobs = false)
+        public StartJobView()
         {
-            this.suppressRotationForOddJobs = suppressRotationForOddJobs;
             InitializeComponent();
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             WireInputs();
@@ -220,14 +213,6 @@ namespace GCode_Sender
             // specific to how the resulting program gets composed).
             foreach (var material in CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(m => m))
                 cbxMaterial.Items.Add(material);
-
-            if (suppressRotationForOddJobs)
-            {
-                // See suppressRotationForOddJobs's own comment - temporary, pending a real Generate-time check
-                // in WorkOrderRules. Never rotate the WCS from measured skew here.
-                chkRotate.IsChecked = false;
-                chkRotate.Visibility = Visibility.Collapsed;
-            }
         }
 
         // Any input edit redraws the stock outline AND invalidates a previously generated program (so Run is
@@ -1627,9 +1612,7 @@ namespace GCode_Sender
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkSetOrigin.IsChecked = s.SetOrigin;
                 chkMeasure.IsChecked = s.Measure;
-                // See suppressRotationForOddJobs's own comment - always false here regardless of what's
-                // persisted (the shared Section may carry a real rotation set via the general Start Job tab).
-                chkRotate.IsChecked = !suppressRotationForOddJobs && s.ApplyRotation;
+                chkRotate.IsChecked = s.ApplyRotation;
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 chkStockConductive.IsChecked = s.StockConductive;
@@ -1676,10 +1659,7 @@ namespace GCode_Sender
                     Wcs = cbxWcs.SelectedIndex + 1,
                     SetOrigin = chkSetOrigin.IsChecked == true,
                     Measure = chkMeasure.IsChecked == true,
-                    // Preserve whatever the shared Section already has when this instance never offers a real
-                    // choice here (see suppressRotationForOddJobs) - otherwise saving from the Odd-Jobs-
-                    // embedded instance would silently clobber a rotation the general Start Job tab set.
-                    ApplyRotation = suppressRotationForOddJobs ? (Section?.ApplyRotation ?? false) : chkRotate.IsChecked == true,
+                    ApplyRotation = chkRotate.IsChecked == true,
                     ExactSize = chkExactSize.IsChecked == true,
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,

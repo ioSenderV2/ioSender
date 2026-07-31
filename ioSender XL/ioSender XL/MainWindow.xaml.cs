@@ -701,13 +701,9 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
-            // Odd Jobs' "Setup" sub-tab is a second StartJobView instance sharing the same StartJobConfig
-            // section as the real Start Job tab (see StartJobView's suppressRotationForOddJobs - the one
-            // remaining difference, a temporary safety measure, not a separate setup). OddJobsView (CNC
-            // Controls library) can't reference StartJobView (ioSender XL) itself, so this is the one place -
-            // it can see both - that registers the component; OddJobsView just looks it up by key like any
-            // other. Must run before BuildTabs() (which constructs OddJobsView, which reads this registry).
-            CNC.Controls.ComponentRegistry.Register(CNC.Controls.LayoutKeys.OddJobsSetup, "Setup", () => new StartJobView(suppressRotationForOddJobs: true));
+            // Odd Jobs no longer has its own "Setup" sub-tab (job-flow unification, 2026-07-31) - Setup is
+            // the Start Job tab now, one shared screen for both. See AppConfig's layout-migration fixup for
+            // dropping the retired sub-tab entry from any profile that still has it.
 
             // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
             // before anything that resolves a tab via getTab()/getView() below.
@@ -2506,11 +2502,11 @@ namespace GCode_Sender
             // (ComponentAvailability). Tabs that only need a live controller stay available and act on connect.
             // enabledWhenDisconnected: which tabs are usable before a controller connects. Job stays on for
             // offline g-code load/preview; Settings/Tools/Machine Setup are config/setup work. The operational
-            // tabs (Start Job, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
+            // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
             // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 10, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds & Speeds"), () => new FeedsAndSpeedsView(), 20, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabStartJob", "Start Job"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,

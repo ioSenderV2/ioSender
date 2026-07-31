@@ -1117,6 +1117,9 @@ namespace CNC.Controls
             // saved with the old leaves would keep rendering tabs whose components no longer exist (silently
             // skipped by BuildJobs, leaving stale entries in the tab-editor's list) - drop them and add the
             // new one.
+            // 2026-07-31: Odd Jobs' own "Setup" sub-tab is retired too (job-flow unification - Setup is one
+            // shared screen now, hosted on the Start Job tab, not duplicated per program source) - same
+            // stale-entry problem, same fix: drop it from any profile that has it.
             var oddJobsNode = LayoutTree.Flatten(layoutSection?.Root).FirstOrDefault(n => n.Component == LayoutKeys.OddJobs);
             if (oddJobsNode != null)
             {
@@ -1126,11 +1129,10 @@ namespace CNC.Controls
                     oddJobsSlot = new LayoutSlot(LayoutKeys.SlotOddJobs);
                     oddJobsNode.Slots.Add(oddJobsSlot);
                 }
-                string[] retiredWizards = { "SurfaceStock", "DrillBore", "Counterbore", "Pocket", "Contour" };
-                oddJobsSlot.Items.RemoveAll(n => retiredWizards.Contains(n.Component));
-                foreach (var key in new[] { LayoutKeys.OddJobsSetup, LayoutKeys.OddJobsWorkOrder })
-                    if (!oddJobsSlot.Items.Any(n => n.Component == key))
-                        oddJobsSlot.Items.Add(new LayoutNode(key));
+                string[] retiredComponents = { "SurfaceStock", "DrillBore", "Counterbore", "Pocket", "Contour", LayoutKeys.OddJobsSetup };
+                oddJobsSlot.Items.RemoveAll(n => retiredComponents.Contains(n.Component));
+                if (!oddJobsSlot.Items.Any(n => n.Component == LayoutKeys.OddJobsWorkOrder))
+                    oddJobsSlot.Items.Add(new LayoutNode(LayoutKeys.OddJobsWorkOrder));
             }
 
             // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly

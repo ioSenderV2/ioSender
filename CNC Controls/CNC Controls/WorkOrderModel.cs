@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -409,6 +410,22 @@ namespace CNC.Controls
         public static List<string> Validate(WorkOrder wo)
         {
             var warnings = new List<string>();
+
+            // A rotated WCS (G10 L2 R, grblHAL ROTATION_ENABLE) is a real hazard here: WorkOrderCompiler
+            // computes every toolpath's X/Y assuming the active WCS's axes are aligned with the machine's
+            // physical axes - it has no rotation compensation anywhere in it. This used to be prevented
+            // structurally (Odd Jobs' Setup was pinned to its own G59, always left unrotated) - now that Setup
+            // is one shared thing with a free WCS choice (job-flow unification, 2026-07-31), this check is the
+            // ONLY thing standing between a rotation set via ordinary Setup use and a Work Order silently
+            // cutting skewed. Checked once for the whole work order, not per-toolpath - it's a property of
+            // whichever WCS is currently active, not anything configured in Odd Jobs itself.
+            string activeWcs = Grbl.GrblViewModel?.WorkCoordinateSystem;
+            var activeCs = string.IsNullOrEmpty(activeWcs) ? null : GrblWorkParameters.GetCoordinateSystem(activeWcs);
+            if (activeCs != null && Math.Abs(activeCs.Rotation) > 1e-6)
+                warnings.Add(string.Format(CultureInfo.InvariantCulture,
+                    "{0} has a {1:0.###} deg rotation set - Work Order toolpaths don't account for WCS rotation and would cut skewed. Clear the rotation (or switch to an unrotated WCS) before generating.",
+                    activeWcs, activeCs.Rotation));
+
             foreach (var tp in wo.Toolpaths)
             {
                 string label = tp.Name + ": ";

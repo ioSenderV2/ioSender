@@ -655,7 +655,7 @@ namespace CNC.Controls
         {
             new TabTarget("Tab.Settings",     "Settings tab",      "Switch to the Settings tab."),
             new TabTarget("Tab.FeedsSpeeds",  "Feeds & Speeds tab", "Switch to the Feeds & Speeds tab."),
-            new TabTarget("Tab.StartJob",     "Start Job tab",     "Switch to the Start Job tab."),
+            new TabTarget("Tab.StartJob",     "Setup tab",         "Switch to the Setup tab."),
             new TabTarget("Tab.Job",          "Job tab",           "Switch to the Job tab."),
             new TabTarget("Tab.Offsets",      "Offsets tab",       "Switch to the Offsets tab."),
             new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
