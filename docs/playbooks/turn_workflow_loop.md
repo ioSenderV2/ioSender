@@ -25,7 +25,11 @@ a per-turn thing).
 3. **Iterate on the plan/implementation.** Ask questions when a design point is ambiguous (one
    sentence, per [[iosender-core-rules]]). Watch for additional informational prompts arriving
    mid-turn (they surface as a `<system-reminder>` alongside the next tool result, not a fresh
-   conversational turn) - address them as they arrive rather than plowing through a stale plan.
+   conversational turn) - address them as they arrive rather than plowing through a stale plan. **On
+   a rename/refactor: grep the old identifier repo-wide as the LAST editing step, before the first
+   build** - not a follow-up check after already building once (see
+   [[feedback-grep-old-name-before-first-build]] - caught twice this way already, most recently
+   2026-07-30 doing it build-then-grep instead of grep-then-build).
 4. **Once implementation + EN-US loc scaffolding is done** (every new control gets an inline `x:Uid`
    as you create it - cheap insurance, see `localization_pass.md`'s own rule): **any time there's a
    change that needs testing, build with `-Launch`.** No exceptions, no "first build of a batch"
@@ -48,9 +52,15 @@ a per-turn thing).
    builds (checking an individual fix compiles, verifying on `master` before a forward-merge, etc.)
    NEVER pass `-Launch` - only the truly LAST build of the turn, the one on the branch the user will
    actually test, right after the final change is committed, gets `-Launch -message="..."`.** Don't
-   pass `-Launch` "just in case" on a build you know isn't the final one.
-   Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, and this kill-on-every-build
-   gotcha) - simplify to this one rule;
+   pass `-Launch` "just in case" on a build you know isn't the final one. **Also pass `-NoKill` on
+   every interim/verification build** - it's a compile check, not a relaunch, so there's no reason
+   for it to kill whatever instance the user is currently testing:
+   ```powershell
+   .\build.ps1 -Configuration Debug -NoKill        # interim/verification build
+   .\build.ps1 -Launch -message="what we're testing"   # the one truly final build of the turn
+   ```
+   Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, the kill-on-every-build
+   gotcha, and the -NoKill addition) - simplify to this one rule;
    stop trying to guess whether a relaunch would be disruptive, and stop burning a throwaway
    compile-only build before the one that actually puts something in front of the user.
 5. **Commit as you go, right after each verified change** - NOT gated behind the user declaring the
