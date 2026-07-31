@@ -40,7 +40,14 @@ a per-turn thing).
    (`-message=` is an ioSender.exe startup arg, not a build.ps1 parameter - it rides through via
    build.ps1's `$AppArgs` passthrough, forwarded verbatim to the launched exe. A multi-word message
    needs build.ps1's own quoting fix from 2026-07-30 - see Notes - to survive as one argv token.)
-   Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition) - simplify to this one rule;
+   **build.ps1 always kills a running ioSender.exe first, `-Launch` or not** - so if a turn needs
+   several builds (e.g. verify on `master`, forward-merge, verify on the PR branch), every build
+   after the `-Launch` one silently kills the running instance without restarting it, unless THAT
+   build also passes `-Launch`. It's the LAST build in the turn - the one on the branch the user will
+   actually test - that needs `-Launch`, not just the first one. Caught 2026-07-30: the user asked
+   "what happened to -Launch" after a master→merge→verify sequence quietly left nothing running.
+   Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, and this kill-on-every-build
+   gotcha) - simplify to this one rule;
    stop trying to guess whether a relaunch would be disruptive, and stop burning a throwaway
    compile-only build before the one that actually puts something in front of the user.
 5. **Commit as you go, right after each verified change** - NOT gated behind the user declaring the
