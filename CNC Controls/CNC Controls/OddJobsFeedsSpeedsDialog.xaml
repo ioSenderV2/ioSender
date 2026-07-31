@@ -19,6 +19,7 @@
                 <ComboBoxItem x:Uid="fs_tool2f18" Content="1/8&quot; 2-flute endmill"/>
                 <ComboBoxItem x:Uid="fs_toolball18" Content="1/8&quot; Ball end"/>
                 <ComboBoxItem x:Uid="fs_tooldrill" Content="Drill bit (size = hole)"/>
+                <ComboBoxItem x:Uid="fs_toolcountersink" Content="Countersink bit (plunge chamfer)"/>
             </ComboBox>
         </StackPanel>
         <StackPanel x:Name="pnlDrillStyle" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">
