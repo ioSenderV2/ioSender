@@ -701,12 +701,13 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
-            // Odd Jobs' "Setup" sub-tab is a second, constrained StartJobView instance (always G59, Measure
-            // + TLO ref forced on - see StartJobView's constrainedToOddJobs). OddJobsView (CNC Controls
-            // library) can't reference StartJobView (ioSender XL) itself, so this is the one place - it can
-            // see both - that registers the component; OddJobsView just looks it up by key like any other.
-            // Must run before BuildTabs() (which constructs OddJobsView, which reads this registry).
-            CNC.Controls.ComponentRegistry.Register(CNC.Controls.LayoutKeys.OddJobsSetup, "Setup", () => new StartJobView(constrainedToOddJobs: true));
+            // Odd Jobs' "Setup" sub-tab is a second StartJobView instance sharing the same StartJobConfig
+            // section as the real Start Job tab (see StartJobView's suppressRotationForOddJobs - the one
+            // remaining difference, a temporary safety measure, not a separate setup). OddJobsView (CNC
+            // Controls library) can't reference StartJobView (ioSender XL) itself, so this is the one place -
+            // it can see both - that registers the component; OddJobsView just looks it up by key like any
+            // other. Must run before BuildTabs() (which constructs OddJobsView, which reads this registry).
+            CNC.Controls.ComponentRegistry.Register(CNC.Controls.LayoutKeys.OddJobsSetup, "Setup", () => new StartJobView(suppressRotationForOddJobs: true));
 
             // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
             // before anything that resolves a tab via getTab()/getView() below.

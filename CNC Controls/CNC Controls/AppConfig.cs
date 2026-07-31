@@ -630,11 +630,12 @@ namespace CNC.Controls
             // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
             RegisterFolded<StepperCalProbeParams>("StepperCalProbe",
                 () => StepperCalibrationProbeWizard.SectionConfig, v => StepperCalibrationProbeWizard.SectionConfig = v, "StepperCalProbe.xml");
+            // Shared by both StartJobView instances now - the real Start Job tab and Odd Jobs' "Setup" sub-tab
+            // (job-flow unification, 2026-07-31 - see StartJobConfig's own comment). Used to be two
+            // independent sections; the second ("OddJobsSetup") is retired outright, no migration - Setup was
+            // never meant to be duplicated per program source in the first place.
             RegisterFolded<StartJobSettings>("StartJob",
                 () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
-            // Odd Jobs' own dedicated Setup instance (always G59) - no legacy file, new section.
-            RegisterFolded<StartJobSettings>("OddJobsSetup",
-                () => OddJobsSetupConfig.Section, v => OddJobsSetupConfig.Section = v, "OddJobsSetup.xml");
             // The composed work order (jobs -> operations) that replaced the five fixed job wizards, plus the
             // per-(tool, diameter, material) feeds/speeds the operator dialed in themselves.
             RegisterFolded<WorkOrder>("OddJobsWorkOrder",

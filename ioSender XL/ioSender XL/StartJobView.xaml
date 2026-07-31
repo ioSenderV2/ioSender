@@ -328,7 +328,7 @@
                                 <CheckBox x:Uid="ls_conductive" x:Name="chkStockConductive" Content="Stock conductive" IsChecked="False" Margin="16,0,0,0" VerticalAlignment="Center"
                                           ToolTip="Touch plate only. Checked: the tool touches the conductive stock directly, no offset. Unchecked: a separate metal touch plate is used against non-conductive stock - its ProbeDefinition PlateThickness is subtracted from the probed Z."/>
                             </StackPanel>
-                            <StackPanel x:Name="pnlMaterial" Orientation="Horizontal" Margin="0,4,0,4" Visibility="Collapsed">
+                            <StackPanel x:Name="pnlMaterial" Orientation="Horizontal" Margin="0,4,0,4">
                                 <Label x:Uid="ls_material" Content="Material:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                                 <ComboBox x:Uid="cbxMaterial" x:Name="cbxMaterial" MinWidth="140" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxMaterial_SelectionChanged"
                                           ToolTip="Stock material - used by the Odd Jobs job wizards' Feeds and Speeds recommendation."/>

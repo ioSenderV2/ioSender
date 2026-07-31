@@ -1,4 +1,4 @@
-﻿/*
+/*
  * WorkOrderView.xaml.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order": the single composer tab that replaced the five fixed job wizards (Surface Stock,
@@ -121,7 +121,7 @@ namespace CNC.Controls
 
         private void AddToolpath(WorkOrderGeometryKind kind)
         {
-            var s = OddJobsSetupConfig.Section;
+            var s = StartJobConfig.Section;
             var tp = new WorkOrderToolpath
             {
                 Geometry = kind,
@@ -185,7 +185,7 @@ namespace CNC.Controls
         // open on - a finishing pass wants a ball end, a chamfer a V-bit.
         private static WorkOrderOperation NewOperation(WorkOrderOpKind kind, WorkOrderToolpath tp)
         {
-            string material = OddJobsSetupConfig.Section?.Material ?? string.Empty;
+            string material = StartJobConfig.Section?.Material ?? string.Empty;
             var op = new WorkOrderOperation { Kind = kind };
 
             // A hole starts out matching the geometry it's centered on - the common case is one hole at the
@@ -978,7 +978,7 @@ namespace CNC.Controls
 
             var op = selectedOp;
             var tp = selectedToolpath;
-            string material = OddJobsSetupConfig.Section?.Material ?? string.Empty;
+            string material = StartJobConfig.Section?.Material ?? string.Empty;
             bool isDrill = op.Kind == WorkOrderOpKind.Drill;
             bool isBore = op.Kind == WorkOrderOpKind.Bore;
             bool isCountersink = op.Kind == WorkOrderOpKind.Countersink;
@@ -1197,7 +1197,7 @@ namespace CNC.Controls
         private List<string> ParameterWarnings()
         {
             var warnings = new List<string>();
-            double thickness = OddJobsSetupConfig.Section?.Thickness ?? 0d;
+            double thickness = StartJobConfig.Section?.Thickness ?? 0d;
 
             foreach (var tp in workOrder.Toolpaths)
             {
@@ -1338,7 +1338,7 @@ namespace CNC.Controls
                     foreach (var pos in tp.PatternPositions())
                         DrawEnvelope(GeometrySource(tp), pos[0], pos[1], scale);
 
-            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(OddJobsSetupConfig.Section?.Material ?? string.Empty);
+            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
             foreach (var tp in workOrder.Toolpaths)
             {
                 // What actually decides the drawn shape/size/reach - the toolpath itself, or (Indirect) whatever
@@ -1440,7 +1440,7 @@ namespace CNC.Controls
                 return;
 
             var center = OddJobsStockCanvas.ToPixel(stockTransform, atX, atY);
-            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(OddJobsSetupConfig.Section?.Material ?? string.Empty);
+            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
             var fill = geomBrushes.EnvelopeFill;
             var edge = geomBrushes.EnvelopeEdge;
             double outside = OutsideReachMm(tp) * scale;

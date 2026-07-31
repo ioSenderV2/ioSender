@@ -6,7 +6,7 @@
  * engine the Feeds & Speeds tab uses (FeedsSpeedsAdvisor.Evaluate) so Odd Jobs gets real published
  * chip-load/surface-speed reference data instead of an ad hoc guess - no separate/duplicated advisor logic.
  *
- * Material is NOT picked here - it lives on the Setup tab (OddJobsSetupConfig.Section.Material) since it's
+ * Material is NOT picked here - it lives on the Setup tab (StartJobConfig.Section.Material) since it's
  * a property of the STOCK, not of any one operation; this dialog just reads it (read-only) for the lookup.
  */
 
@@ -263,7 +263,7 @@ namespace CNC.Controls
             }
         }
 
-        // Read-only from here - Material lives on the Setup tab (OddJobsSetupConfig.Section.Material).
+        // Read-only from here - Material lives on the Setup tab (StartJobConfig.Section.Material).
         // Setting it (the caller does this once, right after construction) computes and SHOWS the
         // recommendation readout, but does NOT apply it - the dialog opens with the wizard's own CURRENT
         // values (already set by the caller before this) untouched, same as the fields it was constructed

@@ -1,9 +1,10 @@
 /*
  * OddJobsView.xaml.cs - part of CNC Controls library
  *
- * Top-level "Odd Jobs" tab: a Setup sub-tab (a constrained Start Job instance targeting G59, registered
- * from MainWindow.xaml.cs since only it can see StartJobView) plus simple one-off job wizards (Surface
- * Stock, Drill/Bore Hole, Pocket, Contour/Slot). Same sub-tab-from-layout-tree hosting as ToolsView.
+ * Top-level "Odd Jobs" tab: a Setup sub-tab (a second StartJobView instance sharing the real Start Job
+ * tab's own StartJobConfig section - registered from MainWindow.xaml.cs since only it can see StartJobView)
+ * plus simple one-off job wizards (Surface Stock, Drill/Bore Hole, Pocket, Contour/Slot). Same
+ * sub-tab-from-layout-tree hosting as ToolsView.
  */
 
 using System.Linq;

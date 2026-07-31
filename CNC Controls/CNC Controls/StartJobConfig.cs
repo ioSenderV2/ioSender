@@ -8,8 +8,6 @@
  * it reads/writes StartJobConfig.Section directly and calls AppConfig.Settings.Save().
  */
 
-using System;
-
 namespace CNC.Controls
 {
     // Persisted Load Stock inputs so the estimate/corner/options survive restarts.
@@ -62,18 +60,18 @@ namespace CNC.Controls
         public bool HeightMap = false;
         public double HeightMapGridX = 25d;
         public double HeightMapGridY = 25d;
-        // Odd Jobs' constrained Setup instance only: stock material (FeedsSpeedsAdvisor.MaterialRefs key),
-        // used by the job wizards' Feeds and Speeds recommendation. Unused/blank on the real Start Job tab.
+        // Entered on both Start Job instances now (it's a Setup-level fact - what am I cutting - same as
+        // stock location), but only actually CONSUMED by the Odd Jobs job wizards' Feeds and Speeds
+        // recommendation (FeedsSpeedsAdvisor.MaterialRefs key); a loaded file has no equivalent consumer yet.
         public string Material = string.Empty;
-        // Odd Jobs' constrained Setup instance only: the shared safe-Z retract height every job wizard's
-        // own generated program uses between passes/tool changes - NOT the same thing as
-        // CornerTravelMarginMm ("Safe Z delta" above), which is specific to Start Job's own corner-probing
-        // macro. Unused on the real Start Job tab.
+        // The safe-Z retract height every Odd Jobs job wizard's own generated program uses between
+        // passes/tool changes - NOT the same thing as CornerTravelMarginMm ("Safe Z delta" above), which is
+        // specific to Start Job's own corner-probing macro. A loaded file has no equivalent consumer.
         public double SafeZ = 20d;
-        // General to both Start Job instances (the real tab AND Odd Jobs' constrained Setup): perimeter
-        // clearance to stay clear of - typically clamps/screws holding the stock down around its outer edge.
-        // Both instances draw it as a dotted red inset on the stock outline; the Odd Jobs job wizards' own
-        // toolpaths (e.g. Surface Stock's raster) additionally stay inside it via OddJobsSetupConfig, so it
+        // General to both Start Job instances (the real tab AND Odd Jobs' Setup sub-tab, now sharing this one
+        // section): perimeter clearance to stay clear of - typically clamps/screws holding the stock down
+        // around its outer edge. Both instances draw it as a dotted red inset on the stock outline; the Odd
+        // Jobs job wizards' own toolpaths (e.g. Surface Stock's raster) additionally stay inside it, so it
         // never has to be re-entered per job. The real Start Job tab has no toolpath of its own to keep clear
         // of anything - there it's purely a visual reference while jogging/placing clamps.
         public double KeepOutInset = 15d;
@@ -84,45 +82,29 @@ namespace CNC.Controls
     }
 
     // Static holder backing the "StartJob" App.config section (read/written by AppConfig.RegisterFolded and
-    // by StartJobView's LoadInputs/SaveInputs).
+    // by StartJobView's LoadInputs/SaveInputs). Shared by BOTH StartJobView instances now - the real Start Job
+    // tab and Odd Jobs' "Setup" sub-tab (job-flow unification, 2026-07-31): Setup is one persistent fact
+    // regardless of what program you're about to run, not something duplicated per program source. It used to
+    // be two independent sections (a separate OddJobsSetupConfig, deliberately pinned to G59 so it could never
+    // touch this one) - that isolation solved a problem that doesn't actually exist: running G-code against a
+    // WCS only READS it, and the only thing that ever WRITES to it is the explicit Setup action itself, which
+    // was already its own deliberate, rare step. See StartJobView's suppressRotationForOddJobs for the one
+    // remaining (temporary) difference between the two instances.
+    //
+    // There is deliberately NO completion gate here.
+    //
+    // Odd Jobs used to hide the job tabs until Setup had provably run: an in-memory "completed" flag armed by
+    // Setup's own Run and torn down live by a rehome, a G59 move or the TLO reference clearing, plus a
+    // -trustme launch flag to bypass it. It cost far more than it bought - it kept getting in the way of
+    // simply composing a job, tabs vanished out from under the operator, and the invalidation watches produced
+    // their own false positives (a plain Reset re-reading G59 0.011mm off, a soft reset blipping HomedState)
+    // that closed the gate for no real reason.
+    //
+    // What replaced it: Generate asks, once, whether to go ahead on the cached origin and tool length
+    // reference (see WorkOrderView.Generate). The operator is the one who knows whether those are still good,
+    // and can now build and inspect a work order freely without any of it being gated on the machine.
     public static class StartJobConfig
     {
         public static StartJobSettings Section;
-    }
-
-    // Separate persisted holder for the Odd Jobs tab's own "Setup" sub-tab - a second, independent instance
-    // of StartJobView (constrainedToOddJobs: true) that always targets G59 with Measure/TLO ref forced on,
-    // so it never overwrites the real Start Job tab's own StartJobConfig.Section (which may be aimed at a
-    // different WCS for the operator's loaded G-code file). Same DTO shape, own "OddJobsSetup" App.config
-    // section (see AppConfig.RegisterFolded).
-    public static class OddJobsSetupConfig
-    {
-        private static StartJobSettings _section;
-
-        // A property (not a plain field) so OddJobsView can react immediately when Setup's Generate commits
-        // new settings (SetOrigin becoming true), instead of only re-checking on some later tab-switch.
-        public static StartJobSettings Section
-        {
-            get { return _section; }
-            set { _section = value; Changed?.Invoke(); }
-        }
-
-        // Raised whenever Section is (re)assigned - i.e. whenever Setup's Generate_Click saves its inputs
-        // (see StartJobView.SaveInputs via its Section property) - or whenever IsCompleted below changes.
-        // OddJobsView subscribes to re-enable/disable the other 4 job tabs without waiting for a tab switch.
-        public static event Action Changed;
-
-        // There is deliberately NO completion gate here any more.
-        //
-        // Odd Jobs used to hide the job tabs until Setup had provably run: an in-memory "completed" flag armed
-        // by Setup's own Run and torn down live by a rehome, a G59 move or the TLO reference clearing, plus a
-        // -trustme launch flag to bypass it. It cost far more than it bought - it kept getting in the way of
-        // simply composing a job, tabs vanished out from under the operator, and the invalidation watches
-        // produced their own false positives (a plain Reset re-reading G59 0.011mm off, a soft reset blipping
-        // HomedState) that closed the gate for no real reason.
-        //
-        // What replaced it: Generate asks, once, whether to go ahead on the cached G59 origin and tool length
-        // reference (see WorkOrderView.Generate). The operator is the one who knows whether those are still
-        // good, and can now build and inspect a work order freely without any of it being gated on the machine.
     }
 }

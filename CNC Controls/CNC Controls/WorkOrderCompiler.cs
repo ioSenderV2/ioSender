@@ -37,8 +37,8 @@ namespace CNC.Controls
         private static string N(double v) { return ((int)Math.Round(v)).ToString(CultureInfo.InvariantCulture); }
         private static string XY(double[] p) { return "X" + F(p[0]) + " Y" + F(p[1]); }
 
-        private static double StockThickness() { return OddJobsSetupConfig.Section?.Thickness ?? 0d; }
-        private static double SafeZ() { return OddJobsSetupConfig.Section?.SafeZ > 0d ? OddJobsSetupConfig.Section.SafeZ : 20d; }
+        private static double StockThickness() { return StartJobConfig.Section?.Thickness ?? 0d; }
+        private static double SafeZ() { return StartJobConfig.Section?.SafeZ > 0d ? StartJobConfig.Section.SafeZ : 20d; }
 
         private static double Rpm(WorkOrderOperation op) { return op.SpindleRPM > 0d ? op.SpindleRPM : 0.70d * op.BitMaxRPM; }
 

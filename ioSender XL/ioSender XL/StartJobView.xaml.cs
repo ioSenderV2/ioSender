@@ -181,65 +181,52 @@ namespace GCode_Sender
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
-        // True for the Odd Jobs tab's own "Setup" sub-tab instance: a second, independent Start Job that
-        // always targets G59 with Measure/TLO ref forced on, so it never touches the real Start Job tab's
-        // own WCS/settings (StartJobConfig.Section) - see OddJobsSetupConfig. The WCS/Measure/TLO-ref
-        // controls are collapsed entirely (not just disabled) since they aren't a choice made here - frees
-        // the real estate they'd otherwise take in this already-busy layout.
-        private readonly bool constrainedToOddJobs;
+        // Odd Jobs' "Setup" sub-tab and the real Start Job tab now share ONE StartJobView identity: same
+        // config section (StartJobConfig.Section), same free WCS choice, same TLO-ref/Material controls -
+        // there is no more "which entry point" distinction for Setup itself (see the job-flow-unification
+        // notes: Setup is one shared, persistent fact regardless of what program you're about to run).
+        //
+        // The one thing still gated is WCS rotation, and only as a TEMPORARY safety measure: WorkOrderCompiler
+        // has zero rotation awareness (confirmed 2026-07-31 - no G10 L2 R / rotation handling anywhere in it),
+        // so a Work Order run against a WCS that picked up a rotation via the general flow would cut skewed
+        // with no warning. The real fix belongs in WorkOrderRules.Validate (check the active WCS for a
+        // rotation and refuse/warn at Generate time, regardless of how Setup was reached) - until that lands,
+        // suppress rotation here for the Odd-Jobs-embedded instance the same way it always has been, rather
+        // than removing a safety guard with nothing yet in place to replace it.
+        private readonly bool suppressRotationForOddJobs;
 
-        // The persisted settings section this instance reads/writes - the real Start Job tab's own section,
-        // or (constrained) the Odd Jobs tab's dedicated one. Every LoadInputs/SaveInputs call site below goes
-        // through this instead of touching StartJobConfig.Section directly.
+        // The persisted settings section this instance reads/writes - always the one shared StartJobConfig
+        // section now, whichever tab this instance is embedded in.
         private CNC.Controls.StartJobSettings Section
         {
-            get { return constrainedToOddJobs ? CNC.Controls.OddJobsSetupConfig.Section : CNC.Controls.StartJobConfig.Section; }
-            set { if (constrainedToOddJobs) CNC.Controls.OddJobsSetupConfig.Section = value; else CNC.Controls.StartJobConfig.Section = value; }
+            get { return CNC.Controls.StartJobConfig.Section; }
+            set { CNC.Controls.StartJobConfig.Section = value; }
         }
 
-        public StartJobView(bool constrainedToOddJobs = false)
+        public StartJobView(bool suppressRotationForOddJobs = false)
         {
-            this.constrainedToOddJobs = constrainedToOddJobs;
+            this.suppressRotationForOddJobs = suppressRotationForOddJobs;
             InitializeComponent();
             DataContextChanged += (s, e) => { if (e.NewValue is GrblViewModel m) model = m; };
             WireInputs();
 
-            // Perimeter keep-out (typically clamps/screws around the stock's edge): general to both this and
-            // the real Start Job tab, not Odd-Jobs-specific - shown on the drawing either way, and read by the
-            // Odd Jobs job wizards' own toolpaths via OddJobsSetupConfig when this is the constrained instance.
+            // Perimeter keep-out (typically clamps/screws around the stock's edge) - shown on the drawing for
+            // both tabs, and read by the Odd Jobs job wizards' own toolpaths via the shared StartJobConfig.
             DependencyPropertyDescriptor.FromProperty(NumericField.ValueProperty, typeof(NumericField))
                 .AddValueChanged(fldKeepOutInset, (s, e) => InputChanged());
 
-            if (constrainedToOddJobs)
+            // Material feeds the job wizards' Feeds and Speeds recommendation (FeedsSpeedsAdvisor) - shown for
+            // both tabs now (it's a Setup-level fact - "what am I cutting" - same as stock location, not
+            // specific to how the resulting program gets composed).
+            foreach (var material in CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(m => m))
+                cbxMaterial.Items.Add(material);
+
+            if (suppressRotationForOddJobs)
             {
-                // Force G59 + TLO ref (ATC only) and hide the controls that would otherwise let the operator
-                // change them - not a choice this instance offers. Measure is different: with the corner-1
-                // origin/TLO-ref job done either way, the ONLY thing Measure adds here is validating the
-                // entered width/height against the probed size (see CheckSizeAgainstEntered) - nothing
-                // downstream actually consumes the MEASURED size (every Odd Jobs wizard reads the ENTERED
-                // Width/Height back off Section, not a measured value) - so it's a real choice, exposed and
-                // off by default rather than forced on.
-                cbxWcs.SelectedIndex = 5;   // G59
-                chkSetTloRef.IsChecked = GrblInfo.HasATC;
-                chkSetTloRef.Visibility = Visibility.Collapsed;
-                // Never rotate the WCS from measured skew here - Odd Jobs' simple shapes assume an
-                // unrotated G59, and the WCS-rotation firmware bug (see StartJobSettings.ApplyRotation's own
-                // comment) makes this a real hazard, not just an unwanted default.
+                // See suppressRotationForOddJobs's own comment - temporary, pending a real Generate-time check
+                // in WorkOrderRules. Never rotate the WCS from measured skew here.
                 chkRotate.IsChecked = false;
                 chkRotate.Visibility = Visibility.Collapsed;
-                // "Set origin in:" + its G54-G59 dropdown - Setup always commits to G59 (chkSetOrigin's own
-                // default is already true in XAML, never touched otherwise), so the whole row is forced/hidden.
-                pnlSetOriginRow.Visibility = Visibility.Collapsed;
-                // The Actions group ITSELF stays visible now - Measure lives in it and is a real, exposed
-                // choice here (see the constructor comment above chkMeasure.IsChecked). Copy size/Verify skew
-                // are still not meaningful for a quick Odd Jobs setup - hide those buttons only.
-                pnlCopyVerifyButtons.Visibility = Visibility.Collapsed;
-
-                // Material feeds the job wizards' Feeds and Speeds recommendation (FeedsSpeedsAdvisor) -
-                // not needed/shown on the real Start Job tab, which has no such downstream consumer.
-                pnlMaterial.Visibility = Visibility.Visible;
-                foreach (var material in CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(m => m))
-                    cbxMaterial.Items.Add(material);
             }
         }
 
@@ -512,10 +499,6 @@ namespace GCode_Sender
             string current = SelectedFixture?.Name;
             if (string.IsNullOrEmpty(current))
                 current = Section?.Fixture;
-            // Odd Jobs' Setup instance defaults to the synthetic G28 (loose probe) fixture - no fence/vise
-            // setup needed for a quick auxiliary job - unless a real fixture was already picked/persisted.
-            if (string.IsNullOrEmpty(current) && constrainedToOddJobs)
-                current = G28Fixture.Name;
             var items = Fixtures.Items.Where(f => f.PositionValidated).ToList();
             items.Add(G28Fixture);   // always available - synthetic, not a saved/validated fixture (see its own comment)
             cbxFixture.ItemsSource = items;
@@ -1410,11 +1393,7 @@ namespace GCode_Sender
             UpdateProbeWarning();
             UpdateFixtureWarning();   // also drives chkRotate visibility (gated on RotationSupported AND the fixture type probing edges)
             UpdateExpressionWarning();
-            // Constrained (Odd Jobs' Setup) instance keeps this permanently collapsed - see the constructor.
-            chkSetTloRef.Visibility = constrainedToOddJobs ? Visibility.Collapsed
-                : (GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed);
-            if (constrainedToOddJobs)
-                chkSetTloRef.IsChecked = GrblInfo.HasATC;   // re-force in case ATC capability arrived after construction
+            chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // The soft-gate replacement for the old hard Machine Setup stop (see MainWindow.ForceMachineSetupIfNeeded's
@@ -1648,12 +1627,13 @@ namespace GCode_Sender
                 cbxWcs.SelectedIndex = Math.Max(0, Math.Min(5, s.Wcs - 1));
                 chkSetOrigin.IsChecked = s.SetOrigin;
                 chkMeasure.IsChecked = s.Measure;
-                chkRotate.IsChecked = s.ApplyRotation;
+                // See suppressRotationForOddJobs's own comment - always false here regardless of what's
+                // persisted (the shared Section may carry a real rotation set via the general Start Job tab).
+                chkRotate.IsChecked = !suppressRotationForOddJobs && s.ApplyRotation;
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 chkStockConductive.IsChecked = s.StockConductive;
-                if (constrainedToOddJobs)
-                    cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
+                cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
                 IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
@@ -1696,7 +1676,10 @@ namespace GCode_Sender
                     Wcs = cbxWcs.SelectedIndex + 1,
                     SetOrigin = chkSetOrigin.IsChecked == true,
                     Measure = chkMeasure.IsChecked == true,
-                    ApplyRotation = chkRotate.IsChecked == true,
+                    // Preserve whatever the shared Section already has when this instance never offers a real
+                    // choice here (see suppressRotationForOddJobs) - otherwise saving from the Odd-Jobs-
+                    // embedded instance would silently clobber a rotation the general Start Job tab set.
+                    ApplyRotation = suppressRotationForOddJobs ? (Section?.ApplyRotation ?? false) : chkRotate.IsChecked == true,
                     ExactSize = chkExactSize.IsChecked == true,
                     SetTloRef = chkSetTloRef.IsChecked == true,
                     StockConductive = chkStockConductive.IsChecked == true,
@@ -1709,7 +1692,7 @@ namespace GCode_Sender
                     HeightMap = chkHeightMap.IsChecked == true,
                     HeightMapGridX = fldHeightMapGridX.Value,
                     HeightMapGridY = fldHeightMapGridY.Value,
-                    Material = constrainedToOddJobs ? (cbxMaterial.SelectedItem as string ?? string.Empty) : string.Empty,
+                    Material = cbxMaterial.SelectedItem as string ?? string.Empty,
                     SafeZ = 20d
                 };
                 AppConfig.Settings.Save();

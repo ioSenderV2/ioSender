@@ -3,7 +3,7 @@
  *
  * Shared stock-outline drawing + click-to-place for the Odd Jobs job wizards that have an X/Y anchor point
  * (Drill/Bore, Pocket, Contour/Slot - Surface Stock has none, it always covers the whole stock). Draws the
- * real stock rectangle (from Setup's own Width/Height - OddJobsSetupConfig.Section) to scale, origin marker
+ * real stock rectangle (from Setup's own Width/Height - StartJobConfig.Section) to scale, origin marker
  * at the front-left corner (matches Start Job's own corner convention - G59's origin), and gives callers the
  * mm<->pixel transform so they can draw their own shape and wire up a click/drag placement handler.
  */
@@ -34,7 +34,7 @@ namespace CNC.Controls
             if (w <= 0 || h <= 0)
                 return t;
 
-            var s = OddJobsSetupConfig.Section;
+            var s = StartJobConfig.Section;
             double stockW = s != null && s.Width > 0d ? s.Width : 100d;
             double stockH = s != null && s.Height > 0d ? s.Height : 100d;
 
@@ -83,7 +83,7 @@ namespace CNC.Controls
         // Perimeter clearance from Setup - see StartJobSettings.KeepOutInset's own comment. >= 0 always.
         public static double KeepOutInset()
         {
-            return Math.Max(0d, OddJobsSetupConfig.Section?.KeepOutInset ?? 15d);
+            return Math.Max(0d, StartJobConfig.Section?.KeepOutInset ?? 15d);
         }
 
         // The work-space rectangle every wizard's placement should stay inside: the stock footprint (Setup's
@@ -91,7 +91,7 @@ namespace CNC.Controls
         // sides. Returns false when the inset swallows the whole area (nothing safe to place in).
         public static bool TrySafeArea(out double minX, out double minY, out double maxX, out double maxY)
         {
-            var s = OddJobsSetupConfig.Section;
+            var s = StartJobConfig.Section;
             double stockW = s != null && s.Width > 0d ? s.Width : 100d;
             double stockH = s != null && s.Height > 0d ? s.Height : 100d;
             double inset = KeepOutInset();
