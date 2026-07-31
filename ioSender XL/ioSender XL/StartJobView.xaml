@@ -317,8 +317,15 @@
                                 </Path>
                             </Grid>
 
-                            <Grid Width="120" Height="120" HorizontalAlignment="Left">
-                                <Image x:Name="imgCenterPreview" Stretch="Uniform" Visibility="Collapsed"/>
+                            <!-- 180x180 (not the images' own native 120x120) to match the External/Internal
+                                 picker's own 180x180 inner grid - centerI.png/CenterO.png otherwise looked
+                                 shrunk relative to it, since they're genuinely a smaller source image, not
+                                 just differently padded. Stretch=Uniform upscales cleanly (simple flat
+                                 line-art). Was also missing its OWN Visibility toggle (only imgCenterPreview/
+                                 xmarkCenter inside it were toggled) - reserved a permanent 120x120 blank gap
+                                 in the Geometry box whenever Is Circle wasn't checked. -->
+                            <Grid x:Name="pnlCenterPreview" Width="180" Height="180" HorizontalAlignment="Left" Visibility="Collapsed">
+                                <Image x:Name="imgCenterPreview" Stretch="Uniform"/>
                                 <!-- Is Circle probes straight down AT the centre - no outward/inward offset needed,
                                      unlike the corner/edge picks above. -->
                                 <Path x:Name="xmarkCenter" Style="{StaticResource XMark}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0" Visibility="Collapsed"/>
