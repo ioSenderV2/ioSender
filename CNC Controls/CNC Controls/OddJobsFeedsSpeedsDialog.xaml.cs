@@ -120,13 +120,29 @@ namespace CNC.Controls
                 return OddJobsTool.BallEnd;
             if (operation == "drilling")
                 return OddJobsTool.DrillBit;
-            if (operation == "countersink")
-                return OddJobsTool.CountersinkBit38;   // smallest of the 4 - operator sizes up if needed
+            // "countersink" deliberately NOT handled here - SmallestCountersinkBitFor (below) picks by the
+            // operation's own target diameter, a strictly better answer than a generic operation-name guess.
             if (string.Equals(material, "Aluminum", StringComparison.OrdinalIgnoreCase))
                 return OddJobsTool.OFlute;
             if (operation == "roughing")
                 return OddJobsTool.RoughingEndMill3Flute;
             return OddJobsTool.EndMill2Flute;
+        }
+
+        // The smallest of the 4 countersink bits that can actually reach the given target diameter (a bit's
+        // own diameter is the widest it can cut - see BuildCountersink's own comment, and IsCountersinkBit
+        // above). Falls back to the largest bit if even that one is too small - ParameterWarnings still flags
+        // that case once a real bit is picked; this just gives the closest starting point rather than
+        // silently understating what's needed. Used both for a new Countersink operation's initial tool and
+        // whenever the operator edits the target diameter afterward (see WorkOrderView.CaptureFields) -
+        // confirmed on real hardware 2026-07-30: the operator wants the diameter to drive the bit choice, not
+        // the other way around.
+        public static OddJobsTool SmallestCountersinkBitFor(double targetDiameterMm)
+        {
+            if (targetDiameterMm <= ThreeEighthInchMm) return OddJobsTool.CountersinkBit38;
+            if (targetDiameterMm <= NineSixteenthInchMm) return OddJobsTool.CountersinkBit916;
+            if (targetDiameterMm <= ThirteenSixteenthInchMm) return OddJobsTool.CountersinkBit1316;
+            return OddJobsTool.CountersinkBit118;
         }
 
         // Restricts the tool dropdown to only the tools that make sense for the given operation kind - added

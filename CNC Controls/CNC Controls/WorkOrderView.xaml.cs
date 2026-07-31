@@ -211,7 +211,9 @@ namespace CNC.Controls
                     op.Feed = 500d;
                     break;
                 case WorkOrderOpKind.Countersink:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("countersink", material);
+                    // op.CountersinkDiameter already holds its own default (12.5mm - see WorkOrderModel) at
+                    // this point, so the tool is picked from that instead of a generic "smallest" guess.
+                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SmallestCountersinkBitFor(op.CountersinkDiameter);
                     break;
             }
 
@@ -669,6 +671,13 @@ namespace CNC.Controls
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
                 op.ChamferDepth = fldChamferDepth.Value;
                 op.CountersinkDiameter = fldCountersinkDiameter.Value;
+                // The target diameter drives the bit choice, not the other way around - confirmed on real
+                // hardware 2026-07-30 (operator: a 19.5mm target should pick the 21mm bit automatically).
+                // Only for a Countersink op - CountersinkDiameter is still captured unconditionally above
+                // (harmless for any other kind, same as every other hidden field here), but re-picking op.Tool
+                // from it would silently clobber an unrelated operation's own tool choice.
+                if (op.Kind == WorkOrderOpKind.Countersink)
+                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SmallestCountersinkBitFor(op.CountersinkDiameter);
             }
             else if (selectedToolpath != null)
             {
@@ -1042,6 +1051,18 @@ namespace CNC.Controls
                         if (!op.Through && op.TotalDepth <= 0d)
                             warnings.Add(opLabel + "set a total depth (or tick Through with a stock thickness).");
                     }
+
+                    // A Drill/Bore's own HoleDiameter is independent of the toolpath's nominal Diameter (it
+                    // only seeds the INITIAL default - see NewOperation) - nothing constrains it afterward, so
+                    // it can end up wider than what the toolpath nominally represents with no warning at all.
+                    // Flagged rather than clipped: silently resizing would override a value the operator
+                    // explicitly typed, and legitimately wanting a wider counterbore than the toolpath's own
+                    // label - though unusual - isn't impossible. Confirmed as a real gap 2026-07-30 (an 18.5mm
+                    // bore on an 18mm toolpath compiled and cut exactly as entered, wider than the diagram
+                    // shows and wider than nearby feature spacing may have assumed).
+                    if ((op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore)
+                        && tp.Geometry == WorkOrderGeometryKind.Circle && op.HoleDiameter > tp.Diameter + 1e-6)
+                        warnings.Add(opLabel + string.Format("hole Ø{0:0.##} mm is wider than the toolpath's own Ø{1:0.##} mm - resize the toolpath to match, or this cuts wider than the diagram shows.", op.HoleDiameter, tp.Diameter));
 
                     // A drill's diameter comes from the geometry, so there's no bit size of its own to check.
                     if (op.Kind != WorkOrderOpKind.Drill && op.BitDiameter <= 0d)

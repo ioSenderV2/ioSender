@@ -43,9 +43,12 @@ a per-turn thing).
    **build.ps1 always kills a running ioSender.exe first, `-Launch` or not** - so if a turn needs
    several builds (e.g. verify on `master`, forward-merge, verify on the PR branch), every build
    after the `-Launch` one silently kills the running instance without restarting it, unless THAT
-   build also passes `-Launch`. It's the LAST build in the turn - the one on the branch the user will
-   actually test - that needs `-Launch`, not just the first one. Caught 2026-07-30: the user asked
-   "what happened to -Launch" after a master→merge→verify sequence quietly left nothing running.
+   build also passes `-Launch`. Caught 2026-07-30: the user asked "what happened to -Launch" after a
+   master→merge→verify sequence quietly left nothing running. **Corrected rule: interim/verification
+   builds (checking an individual fix compiles, verifying on `master` before a forward-merge, etc.)
+   NEVER pass `-Launch` - only the truly LAST build of the turn, the one on the branch the user will
+   actually test, right after the final change is committed, gets `-Launch -message="..."`.** Don't
+   pass `-Launch` "just in case" on a build you know isn't the final one.
    Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, and this kill-on-every-build
    gotcha) - simplify to this one rule;
    stop trying to guess whether a relaunch would be disruptive, and stop burning a throwaway
