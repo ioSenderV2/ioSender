@@ -242,7 +242,10 @@
                                      visibility gate as Timelapse, set alongside it in MainWindow.xaml.cs). -->
                                 <ToggleButton x:Uid="btnAllRecord" x:Name="btnAllRecord" MinWidth="36" Margin="6,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="OBS Control - All: click to start/stop every camera together" Style="{StaticResource RecordToggleStyle}" Checked="AllRecord_Toggled" Unchecked="AllRecord_Toggled"/>
                             </StackPanel>
-                            <cnccontrols:JogPresetSelector Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <cnccontrols:KbdDefaultSpeedControl Margin="0,0,16,0"/>
+                                <cnccontrols:JogPresetSelector/>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),

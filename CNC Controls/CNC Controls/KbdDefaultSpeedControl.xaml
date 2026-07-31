@@ -1,0 +1,45 @@
+<UserControl x:Class="CNC.Controls.KbdDefaultSpeedControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d" Loaded="UserControl_Loaded"
+             d:DesignHeight="20" d:DesignWidth="180">
+    <!-- Run-bar readout of the keyboard jog panel's default continuous-jog speed (Config.Jog.DefaultSpeedFast -
+         the speed used when jogging by keyboard with no modifier held; Shift/Ctrl+Shift still reach the other
+         one either way - see KeypressHandler.DefaultSpeedFast). Both Slow and Fast feedrates are shown at
+         once, the currently-DEFAULT one bolded, so which applies is visible without opening the Jog settings
+         tab. Click anywhere on it to flip the default - same toggle the Jog tab's own control edits. -->
+    <UserControl.Resources>
+        <Style x:Key="SlowFeedStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=DefaultSpeedFast}" Value="False">
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="FastFeedStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=DefaultSpeedFast}" Value="True">
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <StackPanel x:Name="pnlRoot" Orientation="Horizontal" VerticalAlignment="Center" Cursor="Hand"
+                MouseLeftButtonUp="pnlRoot_MouseLeftButtonUp"
+                ToolTip="Default keyboard jog speed (no modifier held) - click to toggle Slow/Fast.">
+        <Label x:Uid="lbl_kbdDefSpeed" Content="Kbd Def Speed:" Padding="0" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBlock Style="{StaticResource SlowFeedStyle}" Text="{Binding Path=SlowFeedrate, StringFormat={}{0:0}}" VerticalAlignment="Center"/>
+        <TextBlock Text=" " VerticalAlignment="Center"/>
+        <TextBlock Style="{StaticResource FastFeedStyle}" Text="{Binding Path=FastFeedrate, StringFormat={}{0:0}}" VerticalAlignment="Center"/>
+        <TextBlock Text=" mm/min" VerticalAlignment="Center" Margin="2,0,0,0"/>
+    </StackPanel>
+</UserControl>
