@@ -323,13 +323,21 @@
                                  line-art). Was also missing its OWN Visibility toggle (only imgCenterPreview/
                                  xmarkCenter inside it were toggled) - reserved a permanent 120x120 blank gap
                                  in the Geometry box whenever Is Circle wasn't checked. -->
-                            <Grid x:Name="pnlCenterPreview" Width="180" Height="180" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <!-- Same 228x212 frame as pnlEdgePickerExt/Int (not the images' own smaller native
+                                 size) - toggling Is Circle used to visibly resize the whole Geometry box because
+                                 this frame was 180x180 while the corner/edge pickers were 228x212; matching the
+                                 frame size means only the picture inside ever changes, same as External/Internal
+                                 already did. Stretch=Uniform centers the (smaller) image within it either way. -->
+                            <Grid x:Name="pnlCenterPreview" Width="228" Height="212" HorizontalAlignment="Left" Visibility="Collapsed">
                                 <Image x:Name="imgCenterPreview" Stretch="Uniform"/>
                                 <!-- Is Circle probes straight down AT the centre - no outward/inward offset needed,
                                      unlike the corner/edge picks above. -->
                                 <Path x:Name="xmarkCenter" Style="{StaticResource XMark}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0" Visibility="Collapsed"/>
                             </Grid>
-                            <cnccontrols:NumericField x:Name="fldCenterPasses" x:Uid="ls_centerPasses" Label="Passes:" ColonAt="55" Unit="" Format="0" Value="1" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Collapsed"
+                            <!-- Hidden (space still reserved), not Collapsed, when not in Circle mode - so the
+                                 panel's total height stays constant across all 3 states instead of growing/
+                                 shrinking by this row's height whenever Is Circle is toggled. -->
+                            <cnccontrols:NumericField x:Name="fldCenterPasses" x:Uid="ls_centerPasses" Label="Passes:" ColonAt="55" Unit="" Format="0" Value="1" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Hidden"
                                                       ToolTip="Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."/>
                             </StackPanel>
                         </Grid>

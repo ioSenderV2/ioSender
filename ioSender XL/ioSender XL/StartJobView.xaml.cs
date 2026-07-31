@@ -587,7 +587,9 @@ namespace GCode_Sender
             pnlCenterPreview.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
             imgCenterPreview.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
             xmarkCenter.Visibility = imgCenterPreview.Visibility;
-            fldCenterPasses.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
+            // Hidden (not Collapsed) when off - keeps its row's space reserved so the panel's total height
+            // never changes when Is Circle is toggled, matching the picker frame's own now-constant size.
+            fldCenterPasses.Visibility = isCircle ? Visibility.Visible : Visibility.Hidden;
             if (isCircle)
                 imgCenterPreview.Source = new BitmapImage(new Uri(
                     "pack://application:,,,/CNC.Controls.Probing;component/Resources/" + (internalMode ? "centerI.png" : "CenterO.png")));
