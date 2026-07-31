@@ -333,10 +333,7 @@ namespace CNC.Controls
                     bool ours = ChecksumFile.Equals(bn, StringComparison.OrdinalIgnoreCase)
                                 || Required.Any(r => r.Equals(bn, StringComparison.OrdinalIgnoreCase));
                     if (ours && !full.StartsWith(targetPrefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + full);
-                        Comms.com.AwaitAck();
-                    }
+                        UnlinkWithTimeout(full);
                 }
 
                 // (Re)write the full set - macros are small and this is rare - then refresh the checksum sidecar.
@@ -464,6 +461,33 @@ namespace CNC.Controls
             return (string.IsNullOrEmpty(dir) ? string.Empty : dir.TrimEnd('/')) + "/" + name;
         }
 
+        // Comms.AwaitAck() itself has NO timeout anywhere in this codebase (see the comment above where the
+        // Alarm-state case bails out to avoid it) - it spins EventUtils.DoEvents() on the calling (UI) thread
+        // until CommandState leaves AwaitAck/DataReceived, forever, if the controller never replies. Confirmed
+        // on real hardware 2026-07-31: a stray unlink of an already-provisioned file hung the UI solid, requiring
+        // an exit/restart. This wraps the raw unlink+AwaitAck calls below with the same wall-clock cap
+        // ReadControllerFile already uses successfully - on timeout we just proceed to the write attempt anyway
+        // (an unlink that silently didn't happen just means the coming YModem upload overwrites/truncates
+        // in place instead of starting from a clean slate - not ideal, but far better than an unrecoverable hang).
+        static void UnlinkWithTimeout(string path)
+        {
+            Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + path);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while ((Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
+                   && sw.ElapsedMilliseconds < 3000)
+                EventUtils.DoEvents();
+            if (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
+                ConsoleLog.Write("[AtcMacros] UnlinkWithTimeout: '" + path + "' - no ack within 3000ms, proceeding anyway");
+        }
+
+        // -notoolsetter (App.xaml.cs) - testing aid for the touch-plate TLO path added 2026-07-31: flips
+        // tc.macro's own #<_tc_touchplate> flag from 0 to 1 before it's ever hashed/sized/uploaded, so every
+        // consumer (EmbeddedChecksum, ExpectedSize, the actual write) sees the SAME patched content and stays
+        // internally consistent - no separate "patch at upload time only" path that could drift from what the
+        // checksum sidecar/status detection think is installed. Single-character replace (both digits are one
+        // byte), so ExpectedSize's byte-length check is unaffected by the swap.
+        public static bool NoToolsetter = false;
+
         static string ReadEmbedded(string name)
         {
             using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
@@ -471,7 +495,12 @@ namespace CNC.Controls
                 if (s == null)
                     return null;
                 using (var r = new StreamReader(s))
-                    return r.ReadToEnd();
+                {
+                    string content = r.ReadToEnd();
+                    if (NoToolsetter && name.Equals("tc.macro", StringComparison.OrdinalIgnoreCase))
+                        content = content.Replace("#<_tc_touchplate> = 0", "#<_tc_touchplate> = 1");
+                    return content;
+                }
             }
         }
 
@@ -531,10 +560,7 @@ namespace CNC.Controls
                 for (int attempt = 0; attempt < 3; attempt++)
                 {
                     if (fileExists || attempt > 0)
-                    {
-                        Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_UNLINK + target);
-                        Comms.com.AwaitAck();
-                    }
+                        UnlinkWithTimeout(target);
 
                     if (new YModem().Upload(temp, target))
                         return true;

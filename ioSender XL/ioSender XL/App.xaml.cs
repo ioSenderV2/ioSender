@@ -139,6 +139,14 @@ namespace GCode_Sender
                         selfRelaunch = true;
                         break;
 
+                    // -notoolsetter  test the touch-plate TLO path (2026-07-31) without a toolsetter puck
+                    // mounted: flips tc.macro's own #<_tc_touchplate> flag to 1 before it's provisioned to the
+                    // controller (AtcMacros.ReadEmbedded), so every tool - including T8's 3D-probe stylus -
+                    // probes via the main probe input instead of switching to the toolsetter input.
+                    case "-notoolsetter":
+                        CNC.Controls.AtcMacros.NoToolsetter = true;
+                        break;
+
                     default:
                         if (arg == "-debuglog" || arg.StartsWith("-debuglog=", StringComparison.OrdinalIgnoreCase))
                         {

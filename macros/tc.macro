@@ -10,10 +10,11 @@
 ;   - For real swaps (selected_tool != 8): rapid to G30 (foam bin),
 ;     prompt operator, M0 hold for cycle start.
 ;   - For T8 (sentinel = probe already in spindle): skip swap.
-;   - Rapid to G59.3 origin (over puck).
-;   - Probe puck: seek down at F500, pull off 2mm, slow re-touch at F25.
-;     G38.2 auto-routes to the toolsetter input because XY is at G59.3
-;     within TOOLSETTER_RADIUS (motion_control.c:1018-1019).
+;   - Rapid to G59.3 origin (over puck / touch-plate block).
+;   - Probe: seek down at F500, pull off 2mm, slow re-touch at F25.
+;     Toolsetter mode: G38.2 auto-routes to the toolsetter input because XY
+;     is at G59.3 within TOOLSETTER_RADIUS (motion_control.c:1018-1019).
+;     Touch-plate mode: always the MAIN probe input (see _tc_touchplate below).
 ;   - First call of session (#<_tlo_ref> == 0): store probe machine-Z as
 ;     the reference; no G43.1 applied.
 ;   - Subsequent calls: G43.1 Z[probe_z - tlo_ref] applies dynamic TLO.
@@ -22,11 +23,29 @@
 ; Required state:
 ;   - Machine is homed.
 ;   - G30 is set to the tool-swap position (over foam bin, near max Z).
-;   - G59.3 is set to the toolsetter approach position (over puck,
-;     XY centered, Z high enough that the longest tool clears the puck
-;     during the XY rapid in).
+;   - G59.3 is set to the approach position over whichever TLO target is in
+;     use (toolsetter puck, or a fixed touch-plate block - see _tc_touchplate
+;     below), XY centered, Z high enough that the longest tool clears it
+;     during the XY rapid in.
 ;   - #<_tlo_ref> is initialized to 0 at start of session (start_job.macro
 ;     does this).
+;
+; #<_tc_touchplate> (set below, 2026-07-31): 0 = toolsetter puck (default,
+; original behavior - mechanical NC switch on the TOOLSETTER input, only
+; rigid cutting tools use it, T8's 3D-probe stylus always uses the main
+; input). 1 = fixed touch-plate block instead - no toolsetter hardware at
+; all, so EVERY tool (T8's stylus included) probes via the MAIN probe input.
+; A plain metal tool tip closes the circuit against the plate the same way
+; stock-edge touch-plate probing does (Start Job's Touch Plate probe type) -
+; this relies on the TOOL being conductive (true for essentially any
+; carbide/HSS cutting tool), not the stock, so it works regardless of the
+; job's Material setting. The TLO math itself is unaffected either way: the
+; block's exact thickness/position never appears in the calculation below -
+; only the DELTA between the reference tool's probed Z and each subsequent
+; tool's probed Z matters (same reasoning that makes the puck's own exact
+; height irrelevant), so a flat block works as a TLO target with zero
+; changes beyond skipping the toolsetter-input switch.
+#<_tc_touchplate> = 0
 ;
 ; Firmware-supplied NGC params:
 ;   #<_current_tool>  - currently mounted tool ID
@@ -78,15 +97,21 @@ G0 Z0
 (PRINT, TC02 at G59.3)
 
 ; --- Select probe input based on the tool in the spindle ---
-; T8 = 3D mechanical probe. Its stylus is sensitive (sub-mm deflection)
-; and is NOT designed to bear downward force on the puck. We probe via
-; the MAIN probe input (pin 15) — the stylus triggers it on first touch,
-; well before any meaningful pressure on the puck.
-; Any other tool = rigid cutting tool with no electrical sensing. The
-; puck's NC switch on the TOOLSETTER input fires when the tool pushes
-; down on it.
+; Touch-plate mode: no toolsetter hardware exists, so every tool (T8's
+; stylus included) always probes via the MAIN probe input - see
+; _tc_touchplate's comment at the top of this file.
+; Toolsetter mode (default): T8 = 3D mechanical probe. Its stylus is
+; sensitive (sub-mm deflection) and is NOT designed to bear downward force
+; on the puck. We probe via the MAIN probe input (pin 15) — the stylus
+; triggers it on first touch, well before any meaningful pressure on the
+; puck. Any other tool = rigid cutting tool with no electrical sensing. The
+; puck's NC switch on the TOOLSETTER input fires when the tool pushes down
+; on it.
 ; G65 P5 Q<id>: Q0 = Probe_Default (main), Q1 = Probe_Toolsetter (probe.h:40).
-o150 IF [#<_selected_tool> EQ 8]
+o150 IF [#<_tc_touchplate> EQ 1]
+  G65 P5 Q0
+  (PRINT, TC02b main probe selected (touch-plate mode))
+o150 ELSEIF [#<_selected_tool> EQ 8]
   G65 P5 Q0
   (PRINT, TC02b main probe selected for T8)
 o150 ELSE
