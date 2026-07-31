@@ -131,7 +131,10 @@ namespace CNC.Controls
                 Y = s != null ? Math.Round(s.Height / 2d, 1) : 0d
             };
             if (kind == WorkOrderGeometryKind.Indirect)
+            {
                 tp.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !t.IsIndirect)?.Name;
+                UpdateIndirectName(tp);
+            }
             workOrder.Toolpaths.Add(tp);
             RebuildTree(tp);
             OnWorkOrderChanged();
@@ -646,7 +649,12 @@ namespace CNC.Controls
             var tp = selectedToolpath;
             txtPanelHeader.Text = "Toolpath geometry";
 
+            // Indirect's name is generated, not typed - see UpdateIndirectName - so the box is shown but
+            // disabled, same idiom as a drill's hole diameter field being driven by the geometry instead of
+            // editable (LoadOperationFields).
             txtName.Text = tp.Name;
+            txtName.IsEnabled = !tp.IsIndirect;
+            txtName.ToolTip = tp.IsIndirect ? "Generated from the source toolpath and X/Y - change those instead." : null;
             cbxGeometry.SelectedIndex = Array.IndexOf(WorkOrderRules.AllGeometries, tp.Geometry);
 
             fldX.Value = tp.X; fldY.Value = tp.Y;
@@ -677,19 +685,26 @@ namespace CNC.Controls
                 cbxIndirectSource.SelectedItem = tp.IndirectSource;
             }
 
-            cbxPattern.SelectedIndex = Array.IndexOf(WorkOrderRules.AllPatterns, tp.Pattern);
-            fldColumns.Value = tp.Columns; fldColumnSpacing.Value = tp.ColumnSpacing;
-            fldRows.Value = tp.Rows; fldRowSpacing.Value = tp.RowSpacing;
-            fldPatternCount.Value = tp.PatternCount; fldPatternRadius.Value = tp.PatternRadius;
-            fldPatternStartAngle.Value = tp.PatternStartAngle; fldPatternArcSpan.Value = tp.PatternArcSpan;
+            // Indirect already IS a single repeat of the source at a different X/Y - a pattern on top of that
+            // would be a repeat of a repeat, and everything else about the cut lives on the source anyway (see
+            // pnlPatternSection's own comment), so the whole section is hidden rather than just left blank.
+            Show(pnlPatternSection, !tp.IsIndirect);
+            if (!tp.IsIndirect)
+            {
+                cbxPattern.SelectedIndex = Array.IndexOf(WorkOrderRules.AllPatterns, tp.Pattern);
+                fldColumns.Value = tp.Columns; fldColumnSpacing.Value = tp.ColumnSpacing;
+                fldRows.Value = tp.Rows; fldRowSpacing.Value = tp.RowSpacing;
+                fldPatternCount.Value = tp.PatternCount; fldPatternRadius.Value = tp.PatternRadius;
+                fldPatternStartAngle.Value = tp.PatternStartAngle; fldPatternArcSpan.Value = tp.PatternArcSpan;
 
-            Show(pnlGrid, tp.Pattern == WorkOrderPatternKind.Grid);
-            Show(pnlCircular, tp.Pattern == WorkOrderPatternKind.Circular);
+                Show(pnlGrid, tp.Pattern == WorkOrderPatternKind.Grid);
+                Show(pnlCircular, tp.Pattern == WorkOrderPatternKind.Circular);
 
-            int instances = tp.InstanceCount;
-            txtPatternSummary.Text = instances > 1
-                ? string.Format("{0} instances - every operation on this toolpath is cut at each one.", instances)
-                : string.Empty;
+                int instances = tp.InstanceCount;
+                txtPatternSummary.Text = instances > 1
+                    ? string.Format("{0} instances - every operation on this toolpath is cut at each one.", instances)
+                    : string.Empty;
+            }
         }
 
         private void LoadOperationFields()
@@ -783,18 +798,26 @@ namespace CNC.Controls
             {
                 var tp = selectedToolpath;
                 tp.X = fldX.Value; tp.Y = fldY.Value;
-                tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
-                tp.Diameter = fldDiameter.Value; tp.Size = fldSize.Value;
-                tp.Width = fldWidth.Value; tp.Depth = fldDepthY.Value;
-                tp.Columns = fldColumns.Value; tp.ColumnSpacing = fldColumnSpacing.Value;
-                tp.Rows = fldRows.Value; tp.RowSpacing = fldRowSpacing.Value;
-                tp.PatternCount = fldPatternCount.Value; tp.PatternRadius = fldPatternRadius.Value;
-                tp.PatternStartAngle = fldPatternStartAngle.Value; tp.PatternArcSpan = fldPatternArcSpan.Value;
 
-                int n = tp.InstanceCount;
-                txtPatternSummary.Text = n > 1
-                    ? string.Format("{0} instances - every operation on this toolpath is cut at each one.", n)
-                    : string.Empty;
+                if (tp.IsIndirect)
+                {
+                    UpdateIndirectName(tp);
+                }
+                else
+                {
+                    tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
+                    tp.Diameter = fldDiameter.Value; tp.Size = fldSize.Value;
+                    tp.Width = fldWidth.Value; tp.Depth = fldDepthY.Value;
+                    tp.Columns = fldColumns.Value; tp.ColumnSpacing = fldColumnSpacing.Value;
+                    tp.Rows = fldRows.Value; tp.RowSpacing = fldRowSpacing.Value;
+                    tp.PatternCount = fldPatternCount.Value; tp.PatternRadius = fldPatternRadius.Value;
+                    tp.PatternStartAngle = fldPatternStartAngle.Value; tp.PatternArcSpan = fldPatternArcSpan.Value;
+
+                    int n = tp.InstanceCount;
+                    txtPatternSummary.Text = n > 1
+                        ? string.Format("{0} instances - every operation on this toolpath is cut at each one.", n)
+                        : string.Empty;
+                }
             }
             else
                 return;
@@ -822,12 +845,24 @@ namespace CNC.Controls
 
             // Changing between open and closed can invalidate operations already on this toolpath (Pocket and
             // Bottom finish need an enclosed area) - drop those rather than leave the work order in a state
-            // Generate would just reject.
+            // Generate would just reject. Switching TO Indirect drops every operation the same way (it's
+            // never in AvailableOperations - see WorkOrderRules) and also clears any Pattern, since Indirect
+            // already IS a single repeat of the source elsewhere - patterning it too would be a repeat of a
+            // repeat (see pnlPatternSection's own comment).
             var allowed = WorkOrderRules.AvailableOperations(selectedToolpath).ToList();
             int dropped = selectedToolpath.Operations.RemoveAll(o => !allowed.Contains(o.Kind));
             if (dropped > 0)
-                AppDialogs.Show(string.Format("{0} operation{1} removed - not possible on an open geometry.", dropped, dropped == 1 ? "" : "s"),
+                AppDialogs.Show(string.Format("{0} operation{1} removed - not possible on {2}.", dropped, dropped == 1 ? "" : "s",
+                    kind == WorkOrderGeometryKind.Indirect ? "an Indirect toolpath" : "an open geometry"),
                     "Work Order", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            if (kind == WorkOrderGeometryKind.Indirect)
+            {
+                selectedToolpath.Pattern = WorkOrderPatternKind.None;
+                if (string.IsNullOrEmpty(selectedToolpath.IndirectSource))
+                    selectedToolpath.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !ReferenceEquals(t, selectedToolpath) && !t.IsIndirect)?.Name;
+                UpdateIndirectName(selectedToolpath);
+            }
 
             RebuildTree(selectedToolpath);
             LoadFields();
@@ -839,8 +874,25 @@ namespace CNC.Controls
             if (loadingFields || selectedToolpath == null)
                 return;
             selectedToolpath.IndirectSource = cbxIndirectSource.SelectedItem as string;
+            UpdateIndirectName(selectedToolpath);
             RebuildTree(selectedToolpath);
             OnWorkOrderChanged();
+        }
+
+        // Indirect's name is generated from what it actually does - "@source(x,y)" - rather than typed, since
+        // there's nothing else about it left to name: no dimensions, no operations of its own, just a source
+        // and a position. Keeps the tree/diagram label honest without the operator having to keep it in sync
+        // by hand every time the source or position changes.
+        private void UpdateIndirectName(WorkOrderToolpath tp)
+        {
+            string source = string.IsNullOrEmpty(tp.IndirectSource) ? "?" : tp.IndirectSource;
+            tp.Name = string.Format("@{0}({1:0.###},{2:0.###})", source, tp.X, tp.Y);
+            if (ReferenceEquals(selectedToolpath, tp))
+            {
+                loadingFields = true;
+                txtName.Text = tp.Name;
+                loadingFields = false;
+            }
         }
 
         private void chkGroupByTool_Click(object sender, RoutedEventArgs e)

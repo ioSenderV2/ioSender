@@ -95,31 +95,35 @@
                         <local:NumericField x:Uid="fld_wod" x:Name="fldDepthY" Label="Depth (Y):" ColonAt="150" Format="###0.0##" Unit="mm"/>
 
                         <!-- Pattern: repeats this toolpath - geometry AND all its operations - at each instance
-                             position. The X/Y above stays the anchor: a grid grows from it, a circle orbits it. -->
-                        <Separator Margin="0,8"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <Label x:Uid="lbl_wopattern" Content="Pattern:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cbxPattern" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxPattern_SelectionChanged"
-                                      ToolTip="Repeat this whole toolpath at several positions - every operation on it is repeated too, each within a single tool change."/>
+                             position. The X/Y above stays the anchor: a grid grows from it, a circle orbits it.
+                             Not offered on Indirect - it already IS a single repeat of another toolpath at a
+                             different X/Y, so patterning it too would be a repeat of a repeat. -->
+                        <StackPanel x:Name="pnlPatternSection">
+                            <Separator Margin="0,8"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Label x:Uid="lbl_wopattern" Content="Pattern:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="cbxPattern" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxPattern_SelectionChanged"
+                                          ToolTip="Repeat this whole toolpath at several positions - every operation on it is repeated too, each within a single tool change."/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlGrid">
+                                <local:NumericField x:Uid="fld_wocols" x:Name="fldColumns" Label="Columns (X):" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_wocolsp" x:Name="fldColumnSpacing" Label="X spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Center-to-center distance between columns. Negative runs the grid in -X."/>
+                                <local:NumericField x:Uid="fld_worows" x:Name="fldRows" Label="Rows (Y):" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_worowsp" x:Name="fldRowSpacing" Label="Y spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Center-to-center distance between rows. Negative runs the grid in -Y."/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlCircular">
+                                <local:NumericField x:Uid="fld_wopcount" x:Name="fldPatternCount" Label="Count:" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_woprad" x:Name="fldPatternRadius" Label="Bolt circle radius:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Distance from the anchor X/Y out to each instance."/>
+                                <local:NumericField x:Uid="fld_wopstart" x:Name="fldPatternStartAngle" Label="Start angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
+                                                    ToolTip="Where the first instance sits, measured from +X counter-clockwise."/>
+                                <local:NumericField x:Uid="fld_wopspan" x:Name="fldPatternArcSpan" Label="Arc span:" ColonAt="150" Format="-###0.0#" Unit="deg"
+                                                    ToolTip="360 spreads the instances evenly around the full circle. A smaller span spreads them across that arc, with one instance at each end."/>
+                            </StackPanel>
+                            <TextBlock x:Name="txtPatternSummary" Foreground="#586069" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
-                        <StackPanel x:Name="pnlGrid">
-                            <local:NumericField x:Uid="fld_wocols" x:Name="fldColumns" Label="Columns (X):" ColonAt="150" Format="##0" Unit=""/>
-                            <local:NumericField x:Uid="fld_wocolsp" x:Name="fldColumnSpacing" Label="X spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                                ToolTip="Center-to-center distance between columns. Negative runs the grid in -X."/>
-                            <local:NumericField x:Uid="fld_worows" x:Name="fldRows" Label="Rows (Y):" ColonAt="150" Format="##0" Unit=""/>
-                            <local:NumericField x:Uid="fld_worowsp" x:Name="fldRowSpacing" Label="Y spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                                ToolTip="Center-to-center distance between rows. Negative runs the grid in -Y."/>
-                        </StackPanel>
-                        <StackPanel x:Name="pnlCircular">
-                            <local:NumericField x:Uid="fld_wopcount" x:Name="fldPatternCount" Label="Count:" ColonAt="150" Format="##0" Unit=""/>
-                            <local:NumericField x:Uid="fld_woprad" x:Name="fldPatternRadius" Label="Bolt circle radius:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                                ToolTip="Distance from the anchor X/Y out to each instance."/>
-                            <local:NumericField x:Uid="fld_wopstart" x:Name="fldPatternStartAngle" Label="Start angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
-                                                ToolTip="Where the first instance sits, measured from +X counter-clockwise."/>
-                            <local:NumericField x:Uid="fld_wopspan" x:Name="fldPatternArcSpan" Label="Arc span:" ColonAt="150" Format="-###0.0#" Unit="deg"
-                                                ToolTip="360 spreads the instances evenly around the full circle. A smaller span spreads them across that arc, with one instance at each end."/>
-                        </StackPanel>
-                        <TextBlock x:Name="txtPatternSummary" Foreground="#586069" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- ===== Operation: how to cut it, including how deep ===== -->
