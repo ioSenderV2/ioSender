@@ -117,9 +117,6 @@
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="OddJobsView.xaml.cs">
-      <DependentUpon>OddJobsView.xaml</DependentUpon>
-    </Compile>
     <Compile Include="OddJobsGeometry.cs" />
     <Compile Include="OddJobsStockCanvas.cs" />
     <Compile Include="WorkOrderModel.cs" />
@@ -439,10 +436,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ToolsView.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="OddJobsView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

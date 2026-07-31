@@ -661,7 +661,7 @@ namespace CNC.Controls
             new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
             new TabTarget("Tab.Probing",      "Probing tab",       "Switch to the Probing tab."),
             new TabTarget("Tab.Tools",        "Tools tab",         "Switch to the Tools tab."),
-            new TabTarget("Tab.OddJobs",      "Odd Jobs tab",      "Switch to the Odd Jobs tab."),
+            new TabTarget("Tab.WorkOrder",    "Work Order tab",    "Switch to the Work Order tab."),
             new TabTarget("Tab.MachineSetup", "Machine Setup tab", "Switch to the Machine Setup tab."),
             new TabTarget("Tab.HeightMap",    "Height Map tab",    "Switch to the Height Map tab."),
             new TabTarget("Tab.LatheWizard",  "Lathe Tools tab",   "Switch to the Lathe Tools tab."),

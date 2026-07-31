@@ -60,7 +60,7 @@ namespace CNC.Controls
         HeightMap,
         MachineSetup,
         FeedsAndSpeeds,
-        OddJobs
+        WorkOrder   // was OddJobs - promoted from Odd Jobs' sub-tab to a top-level tab, 2026-07-31
     }
 
     public interface ICNCView

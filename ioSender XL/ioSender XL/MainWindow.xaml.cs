@@ -1991,6 +1991,27 @@ namespace GCode_Sender
             GCode.File.Open();
         }
 
+        // Main-menu entry points for the Work Order tab (2026-07-31), same idea as Load File above: jump
+        // straight to the tab and run its New/Load action, rather than making the operator find the tab
+        // and its own toolbar button first.
+        private void NewWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            var tab = getTab(ViewType.WorkOrder);
+            if (tab == null)
+                return;
+            ui.tabMode.SelectedItem = tab;
+            (getView(tab) as WorkOrderView)?.New();
+        }
+
+        private void LoadWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            var tab = getTab(ViewType.WorkOrder);
+            if (tab == null)
+                return;
+            ui.tabMode.SelectedItem = tab;
+            (getView(tab) as WorkOrderView)?.Load();
+        }
+
         private void connectMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
@@ -2513,7 +2534,7 @@ namespace GCode_Sender
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.OddJobs, TabLabel("TabOddJobs", "Odd Jobs"), () => new OddJobsView(), 85, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 85, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 110, enabledWhenDisconnected: false));
@@ -2745,7 +2766,7 @@ namespace GCode_Sender
             { "Tab.SDCard",       ViewType.SDCard },
             { "Tab.Probing",      ViewType.Probing },
             { "Tab.Tools",        ViewType.Tools },
-            { "Tab.OddJobs",      ViewType.OddJobs },
+            { "Tab.WorkOrder",    ViewType.WorkOrder },
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },

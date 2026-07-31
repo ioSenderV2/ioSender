@@ -54,6 +54,7 @@
     <!-- Top-level tab labels (built in code by ioSender XL's RegisterBuiltinTabs). -->
     <system:String x:Uid="str_tabJob" x:Key="TabJob">Job</system:String>
     <system:String x:Uid="str_tabSetup" x:Key="TabSetup">Setup</system:String>
+    <system:String x:Uid="str_tabWorkOrder" x:Key="TabWorkOrder">Work Order</system:String>
     <system:String x:Uid="str_tabOffsets" x:Key="TabOffsets">Offsets</system:String>
     <system:String x:Uid="str_tabSettings" x:Key="TabSettings">Settings</system:String>
     <system:String x:Uid="str_tabProbing" x:Key="TabProbing">Probing</system:String>

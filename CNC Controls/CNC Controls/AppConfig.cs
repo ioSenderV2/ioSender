@@ -1135,6 +1135,28 @@ namespace CNC.Controls
                     oddJobsSlot.Items.Add(new LayoutNode(LayoutKeys.OddJobsWorkOrder));
             }
 
+            // 2026-07-31 (same day, later still): the Odd Jobs container itself is retired now - Work Order
+            // was its only remaining sub-tab (the fixup just above), so it's promoted to a bare top-level tab
+            // instead of a tab-inside-a-tab. Swap OddJobs for WorkOrder at the SAME position in both the
+            // tree's tabs slot and the legacy flat Base.Tabs list, rather than remove+append, so an operator's
+            // existing tab ORDER doesn't jump just because the tab was renamed/promoted underneath them.
+            if (tabsSlot != null)
+            {
+                int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.OddJobs);
+                if (idx >= 0)
+                    tabsSlot.Items[idx] = new LayoutNode(LayoutKeys.WorkOrder);
+                else if (!LayoutTree.Contains(layoutSection.Root, LayoutKeys.WorkOrder))
+                    tabsSlot.Items.Add(new LayoutNode(LayoutKeys.WorkOrder));
+            }
+            if (Base != null && Base.Tabs.Count > 0)
+            {
+                int idx = Base.Tabs.IndexOf(LayoutKeys.OddJobs);
+                if (idx >= 0)
+                    Base.Tabs[idx] = LayoutKeys.WorkOrder;
+                else if (!Base.Tabs.Contains(LayoutKeys.WorkOrder))
+                    Base.Tabs.Add(LayoutKeys.WorkOrder);
+            }
+
             // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly
             // lived as a loose FeedsAndSpeedsIntroShown.txt marker file in the config folder before moving
             // into Config.FeedsAndSpeedsIntroShown (this file, above) - clean up that now-unused stray file

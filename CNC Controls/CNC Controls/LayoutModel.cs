@@ -60,7 +60,13 @@ namespace CNC.Controls
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
                             LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
-                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", OddJobs = "OddJobs";
+                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", WorkOrder = "WorkOrder";
+        // OddJobs (the old container tab) is retired (2026-07-31) - Work Order was its only remaining sub-tab
+        // (Setup fixup already folded into the Setup tab itself), so it's promoted to a bare top-level leaf
+        // (WorkOrder, above) instead of a tab-inside-a-tab. OddJobs/SlotOddJobs/OddJobsWorkOrder/OddJobsSetup
+        // stay defined ONLY for AppConfig.ApplyOneTimeFixups' migration of already-persisted layouts - nothing
+        // current registers or reads them.
+        public const string OddJobs = "OddJobs";
 
         // Grbl tab's center container (JobWorkspace) + slot
         public const string SlotCenter = "center";
@@ -106,10 +112,10 @@ namespace CNC.Controls
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
-                    // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs'
-                    // own slot only ever hosts the Work Order composer.
-                    new LayoutNode(LayoutKeys.OddJobs,
-                        new LayoutSlot(LayoutKeys.SlotOddJobs, new[] { LayoutKeys.OddJobsWorkOrder })),
+                    // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs' own
+                    // slot only ever hosted the Work Order composer, so Work Order is promoted to a bare
+                    // top-level tab (same date) instead of a tab-inside-a-tab.
+                    new LayoutNode(LayoutKeys.WorkOrder),
                     new LayoutNode(LayoutKeys.MachineSetup),
                     new LayoutNode(LayoutKeys.LatheWizards)));
         }

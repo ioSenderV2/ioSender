@@ -25,7 +25,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class WorkOrderView : ConfigPanel<WorkOrder>, IGrblConfigTab
+    public partial class WorkOrderView : ConfigPanel<WorkOrder>, IGrblConfigTab, ICNCView
     {
         private GrblViewModel model = null;
         private string program = string.Empty;
@@ -1495,6 +1495,29 @@ namespace CNC.Controls
             Canvas.SetLeft(r, center.X - hw); Canvas.SetTop(r, center.Y - hh);
             canvasDiagram.Children.Add(r);
         }
+
+        #endregion
+
+        #region Methods required by ICNCView
+        // Promoted from an Odd Jobs sub-tab to its own top-level tab (2026-07-31) - this needs BOTH interfaces:
+        // IGrblConfigTab.Activate(bool) is the pre-existing internal lifecycle hook (kept below, unchanged);
+        // ICNCView is what MainWindow's own top-level tab-switching (TabMode_SelectionChanged/getView) actually
+        // looks for - a bare IGrblConfigTab-only tab (like the Trinamic tuner) never gets Activate called by
+        // MainWindow at all, it just relies on being otherwise stateless. Overload resolution keeps both
+        // Activate methods distinct (different parameter lists), so both interfaces coexist cleanly.
+
+        public ViewType ViewType { get { return ViewType.WorkOrder; } }
+        public bool CanEnable { get { return DataContext is GrblViewModel ? (DataContext as GrblViewModel).SystemCommandsAllowed : true; } }
+        public void Activate(bool activate, ViewType chgMode) { Activate(activate); }
+        public void CloseFile() { }
+        public void Setup(UIViewModel model, AppConfig profile) { }
+
+        // Entry points for the main menu's New/Load Work Order items (2026-07-31) - the tab's own toolbar
+        // buttons (MenuNew_Click/btnLoad_Click below) stay as the in-context way to do the same thing; these
+        // just let the operator jump straight into a new/existing work order from outside the tab, same as
+        // Load File does for the Job tab. Neither handler reads its (sender, e) args, so null is safe here.
+        public void New() { MenuNew_Click(this, null); }
+        public void Load() { btnLoad_Click(this, null); }
 
         #endregion
 

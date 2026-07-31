@@ -47,6 +47,10 @@
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
             <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load File..." Click="LoadFile_Click"
                       ToolTip="Load a single g-code file."/>
+            <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
+                      ToolTip="Switch to the Work Order tab and start composing a new one."/>
+            <MenuItem x:Uid="mnu_loadWorkOrder" x:Name="menuLoadWorkOrder" Header="Loa_d Work Order..." Click="LoadWorkOrder_Click"
+                      ToolTip="Switch to the Work Order tab and open a saved .workorder file."/>
             <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">
                 <MenuItem x:Uid="mnu_open" Header="_Open" Click="CameraOpen_Click"/>
             </MenuItem>
