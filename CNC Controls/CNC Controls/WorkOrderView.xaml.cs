@@ -655,6 +655,13 @@ namespace CNC.Controls
             txtName.Text = tp.Name;
             txtName.IsEnabled = !tp.IsIndirect;
             txtName.ToolTip = tp.IsIndirect ? "Generated from the source toolpath and X/Y - change those instead." : null;
+
+            // Once a toolpath IS Indirect, there's nothing left to decide here - the combo still being
+            // interactive (rather than genuinely greyed out) while everything around it disappears read as
+            // broken, not disabled. Switching INTO Indirect is still done through this same combo on a normal
+            // toolpath (see cbxGeometry_SelectionChanged) - it only disappears once you're already there.
+            // Getting back out is Remove + Add a new toolpath of the geometry you actually want.
+            Show(pnlGeometryRow, !tp.IsIndirect);
             cbxGeometry.SelectedIndex = Array.IndexOf(WorkOrderRules.AllGeometries, tp.Geometry);
 
             fldX.Value = tp.X; fldY.Value = tp.Y;

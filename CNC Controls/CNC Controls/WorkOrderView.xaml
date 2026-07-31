@@ -74,7 +74,7 @@
                             <TextBox x:Name="txtName" MinWidth="180" MinHeight="22" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                      TextChanged="txtName_TextChanged"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <StackPanel x:Name="pnlGeometryRow" Orientation="Horizontal" Margin="0,0,0,6">
                             <Label x:Uid="lbl_wogeom" Content="Geometry:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxGeometry" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxGeometry_SelectionChanged"/>
                         </StackPanel>
