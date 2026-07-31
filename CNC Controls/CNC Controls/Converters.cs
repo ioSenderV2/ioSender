@@ -528,9 +528,12 @@ namespace CNC.Controls
     // IS its stored value avoids repeating that.
     //
     // A 3rd binding (values[2], GrblViewModel.ToolOffset.Z) is optional - only Z's own MultiBinding in
-    // DROControl.xaml supplies it, since TLO is a Z-axis concept (see GrblViewModel's own TLO parsing, which
-    // folds a reported TLO straight into ToolOffset.Z). Every other axis's tooltip just omits the literal TLO
-    // number since there isn't one to show. NaN (TLO not yet established/known) is treated the same as absent.
+    // DROControl.xaml supplies it, since TLO is a Z-axis-only concept (see GrblViewModel's own TLO parsing,
+    // which folds a reported TLO straight into ToolOffset.Z and always zeroes ToolOffset.X/Y - confirmed
+    // 2026-07-31, there is no X/Y TLO to show). Its ABSENCE (not just a null/NaN value) is what decides
+    // whether "TLO" is mentioned at all - X/Y/A/B/C/U/V/W say "(G54 + G92 combined)" with no TLO wording,
+    // since it plays no part in their offset; only Z (which always supplies a 3rd binding, even if the value
+    // itself is NaN before TLO is known) says "+ TLO".
     public class WcsOffsetTooltipConverter : IMultiValueConverter
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
@@ -539,10 +542,16 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
                 return null;
 
-            double? tlo = values.Length > 2 && values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
-            string line2 = tlo.HasValue
-                ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
-                : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
+            string line2;
+            if (values.Length <= 2)
+                line2 = string.Format(CultureInfo.CurrentCulture, "({0} + G92 combined)", wcs);
+            else
+            {
+                double? tlo = values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
+                line2 = tlo.HasValue
+                    ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
+                    : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
+            }
 
             return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
         }
