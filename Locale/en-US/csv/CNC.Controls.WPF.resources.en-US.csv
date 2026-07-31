@@ -1519,3 +1519,5 @@ CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojPromptSave:
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojPromptSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask before each auto-save instead of saving silently.
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojToolTable:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tools - click one to view or tune its feeds and speeds:
 CNC.Controls.WPF.g.en-US.resources:kbddefaultspeedcontrol.baml,lbl_kbdDefSpeed:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kbd Def Speed:
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabWorkOrder:System.String.$Content,None,True,True,,Work Order
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,grb_workOrderConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Work Order
