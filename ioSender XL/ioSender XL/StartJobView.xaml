@@ -129,7 +129,7 @@
                             <!-- In/out + Is Circle stacked vertically to the LEFT of the picker diagram (rather
                                  than above it) so the panel's height is the diagram's height, not the diagram's
                                  height PLUS a whole extra row for these three controls. -->
-                            <StackPanel Grid.Column="0" VerticalAlignment="Top" Margin="0,0,12,0">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                                 <RadioButton x:Uid="ls_geomExternal" x:Name="rbGeomExternal" Content="External" GroupName="geomInOut" IsChecked="True" Margin="0,0,0,6"/>
                                 <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut" Margin="0,0,0,6"/>
                                 <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle"/>

@@ -584,6 +584,7 @@ namespace GCode_Sender
 
             pnlEdgePickerExt.Visibility = !isCircle && !internalMode ? Visibility.Visible : Visibility.Collapsed;
             pnlEdgePickerInt.Visibility = !isCircle && internalMode ? Visibility.Visible : Visibility.Collapsed;
+            pnlCenterPreview.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
             imgCenterPreview.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
             xmarkCenter.Visibility = imgCenterPreview.Visibility;
             fldCenterPasses.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
