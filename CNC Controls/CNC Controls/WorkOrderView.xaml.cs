@@ -1538,10 +1538,24 @@ namespace CNC.Controls
                 // prompts - only content actually worth saving does.
                 bool needsSave = workOrder.Toolpaths.Count > 0
                     && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
-                if (needsSave && AppDialogs.Show(
-                        "This work order has unsaved changes. Save before leaving?",
-                        "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                    btnSave_Click(null, null);
+                if (needsSave)
+                {
+                    // Default (off): today's unconditional prompt, unchanged - the safety net for anyone who
+                    // never touches the new Settings:App > Odd Jobs toggle. On: save without asking, unless
+                    // PromptBeforeAutoSaveWorkOrder also wants a confirm first (same prompt, just opt-in).
+                    bool doSave;
+                    if (!AppConfig.Settings.Base.AutoSaveWorkOrderOnExit)
+                        doSave = AppDialogs.Show("This work order has unsaved changes. Save before leaving?",
+                            "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+                    else if (AppConfig.Settings.Base.PromptBeforeAutoSaveWorkOrder)
+                        doSave = AppDialogs.Show("Save these work order changes now?",
+                            "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+                    else
+                        doSave = true;
+
+                    if (doSave)
+                        btnSave_Click(null, null);
+                }
 
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;

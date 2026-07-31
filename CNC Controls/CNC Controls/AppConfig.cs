@@ -313,6 +313,7 @@ namespace CNC.Controls
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
+        private bool _autoSaveWorkOrderOnExit = false, _promptBeforeAutoSaveWorkOrder = false;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -528,6 +529,11 @@ namespace CNC.Controls
         // hardware). When off, leaving the tab with unsaved changes still prompts "save now?" (legacy behavior).
         public bool AutoSaveGrblSettings { get { return _autoSaveGrblSettings; } set { _autoSaveGrblSettings = value; OnPropertyChanged(); } }
         public bool PromptOnGrblSave { get { return _promptOnGrblSave; } set { _promptOnGrblSave = value; OnPropertyChanged(); } }
+        // Odd Jobs Work Order autosave on leaving that tab (opt-in, default off - preserves the legacy
+        // unconditional "save before leaving?" prompt). When on, PromptBeforeAutoSaveWorkOrder decides whether
+        // that save happens silently or still asks first - see WorkOrderView.Activate(false).
+        public bool AutoSaveWorkOrderOnExit { get { return _autoSaveWorkOrderOnExit; } set { _autoSaveWorkOrderOnExit = value; OnPropertyChanged(); } }
+        public bool PromptBeforeAutoSaveWorkOrder { get { return _promptBeforeAutoSaveWorkOrder; } set { _promptBeforeAutoSaveWorkOrder = value; OnPropertyChanged(); } }
 
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();

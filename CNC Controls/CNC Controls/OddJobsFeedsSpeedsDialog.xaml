@@ -7,6 +7,14 @@
     <StackPanel Margin="14" Width="380">
         <TextBlock x:Uid="fs_materialro" x:Name="txtMaterial" Foreground="#586069" Margin="0,0,0,8" FontStyle="Italic"
                    Text="Material: (set on the Setup tab)"/>
+        <!-- Browse mode only (EnableMaterialPicker, e.g. Settings:App > Odd Jobs' tool table) - there's no
+             work order/Setup tab material to read here, so the operator picks one directly to preview that
+             tool's feeds and speeds in it. Hidden/collapsed otherwise; txtMaterial above is what normal
+             (work-order-driven) callers see instead. -->
+        <StackPanel x:Name="pnlMaterialPicker" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
+            <Label x:Uid="fs_materialpick" Content="Material:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxMaterialPicker" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxMaterialPicker_SelectionChanged"/>
+        </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
             <Label x:Uid="fs_tool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
             <ComboBox x:Name="cbxTool" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged">

@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -62,6 +63,31 @@ namespace CNC.Controls
         private OperationRecommendation lastRecommendation;
         private string material = string.Empty;
         private bool showDoc = true;
+
+        // The exact wording shown in cbxTool's own dropdown - kept as one lookup so a caller with no
+        // WorkOrderOperation to read a name off of (Settings:App > Odd Jobs' tool table) can list every tool
+        // with the same names the operator already recognizes from this dialog. Update alongside the
+        // ComboBoxItems in OddJobsFeedsSpeedsDialog.xaml if either ever changes.
+        public static string DisplayName(OddJobsTool tool)
+        {
+            switch (tool)
+            {
+                case OddJobsTool.EndMill2Flute: return "1/4\" 2-flute endmill";
+                case OddJobsTool.RoughingEndMill3Flute: return "1/4\" 3-flute roughing endmill";
+                case OddJobsTool.OFlute: return "1/4\" O-flute";
+                case OddJobsTool.BallEnd: return "1/4\" Ball end";
+                case OddJobsTool.SurfacingBit25mm: return "25mm 2-flute surfacing bit";
+                case OddJobsTool.VBit45: return "45 deg V-bit (chamfer)";
+                case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute endmill";
+                case OddJobsTool.BallEnd18: return "1/8\" Ball end";
+                case OddJobsTool.DrillBit: return "Drill bit (size = hole)";
+                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
+                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
+                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
+                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
+                default: return tool.ToString();
+            }
+        }
 
         // True for any of the 4 countersink bit sizes - shared by WorkOrderCompiler (BuildChamfer's
         // plunge-vs-trace switch, ToolDeclarations' TYPE= tag) and WorkOrderView (ParameterWarnings) so the
@@ -200,6 +226,41 @@ namespace CNC.Controls
                 DependencyPropertyDescriptor.FromProperty(valueProp, typeof(NumericField)).AddValueChanged(field, (s, e) => ComputeRecommendation());
 
             SelectedTool = preferredTool;
+        }
+
+        // Switches Material from the normal read-only display (bound to the Setup tab's stock material) to an
+        // editable dropdown - for a caller with no work order/Setup context at all, e.g. Settings:App > Odd
+        // Jobs' tool table, where the point is previewing/tuning a tool's feeds and speeds in a material of
+        // the operator's choosing rather than reading one off a job in progress. Starts with nothing selected
+        // (Material stays empty, same as an unset Setup material) - the operator picks one to see anything.
+        public void EnableMaterialPicker()
+        {
+            txtMaterial.Visibility = Visibility.Collapsed;
+            pnlMaterialPicker.Visibility = Visibility.Visible;
+
+            cbxMaterialPicker.Items.Clear();
+            foreach (var m in FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(k => k))
+                cbxMaterialPicker.Items.Add(m);
+            cbxMaterialPicker.SelectedIndex = -1;
+        }
+
+        private void cbxMaterialPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Material = cbxMaterialPicker.SelectedItem as string ?? string.Empty;
+
+            // No live WorkOrderOperation to clobber here (unlike the normal caller, which already seeded these
+            // fields from the operation before Material is ever set) - recalling the operator's last settled
+            // values for this tool/diameter/material, same idiom NewOperation uses, is exactly the point of
+            // browsing by material in the first place.
+            var remembered = OddJobsToolMemory.Find(SelectedTool, BitDiameter, Material);
+            if (remembered != null)
+            {
+                SpindleRPM = remembered.Rpm;
+                Feed = remembered.Feed;
+                PlungeFeed = remembered.PlungeFeed;
+                if (showDoc)
+                    DepthOfCut = remembered.DepthOfCut;
+            }
         }
 
         // Read-only from here - Material lives on the Setup tab (OddJobsSetupConfig.Section.Material).

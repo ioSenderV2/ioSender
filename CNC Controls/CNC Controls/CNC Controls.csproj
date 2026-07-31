@@ -99,6 +99,9 @@
     <Compile Include="BasicConfigControl.xaml.cs">
       <DependentUpon>BasicConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OddJobsSettingsControl.xaml.cs">
+      <DependentUpon>OddJobsSettingsControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GrblConfigControl.xaml.cs">
       <DependentUpon>GrblConfigControl.xaml</DependentUpon>
     </Compile>
@@ -489,6 +492,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="BasicConfigControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OddJobsSettingsControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

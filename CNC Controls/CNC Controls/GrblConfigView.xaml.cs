@@ -184,7 +184,7 @@ namespace CNC.Controls
             _camProbeColumn = new StackPanel { Orientation = Orientation.Vertical };
 
             // App-config panels bind to the Config object.
-            pnlAppLeft.DataContext = pnlAppRight.DataContext = profile.Base;
+            pnlAppLeft.DataContext = pnlAppMiddle.DataContext = pnlAppRight.DataContext = profile.Base;
             pnlJoggingLeft.DataContext = pnlJoggingRight.DataContext = profile.Base;
             pnlGCodeLeft.DataContext = pnlGCodeRight.DataContext = profile.Base;
 
@@ -192,6 +192,7 @@ namespace CNC.Controls
             // Feature panels (Camera/Probing/Viewer/Lathe) also self-add to model.ConfigControls from their own
             // views - usually after this Setup - so bucket present controls now and react to later additions.
             model.ConfigControls.Add(new BasicConfigControl());
+            model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());
             model.ConfigControls.Add(new StripGCodeConfigControl());
@@ -260,6 +261,8 @@ namespace CNC.Controls
         {
             if (c is BasicConfigControl)
                 return pnlAppLeft;
+            if (c is OddJobsSettingsControl)
+                return pnlAppMiddle;
             if (c is JogUiConfigControl)
                 return pnlJoggingLeft;
             if (c is JogConfigControl)
@@ -464,6 +467,8 @@ namespace CNC.Controls
         private TabItem TabFor(UserControl c)
         {
             if (c is BasicConfigControl)
+                return tabApp;
+            if (c is OddJobsSettingsControl)
                 return tabApp;
             if (c is JogUiConfigControl || c is JogConfigControl)
                 return tabJogging;

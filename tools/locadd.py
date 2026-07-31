@@ -54,6 +54,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/ErrorsAndAlarms.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OddJobsSettingsControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),

@@ -1,0 +1,24 @@
+<UserControl x:Class="CNC.Controls.OddJobsSettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="360" d:DesignWidth="300">
+    <GroupBox x:Uid="grb_oddJobsConfig" x:Name="grpOddJobs" Header="Odd Jobs" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="300">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
+            <CheckBox x:Uid="chk_ojAutoSave" Content="Auto-save workorder on exit" Margin="5,0,0,0"
+                      IsChecked="{Binding Path=AutoSaveWorkOrderOnExit, Mode=TwoWay}"
+                      ToolTip="Save the Work Order automatically when leaving that tab, instead of always asking."/>
+            <CheckBox x:Uid="chk_ojPromptSave" Content="Prompt before auto-saving" Margin="25,0,0,0"
+                      IsChecked="{Binding Path=PromptBeforeAutoSaveWorkOrder, Mode=TwoWay}"
+                      IsEnabled="{Binding Path=AutoSaveWorkOrderOnExit}"
+                      ToolTip="Ask before each auto-save instead of saving silently."/>
+            <Separator Margin="0,10,0,6"/>
+            <TextBlock x:Uid="lbl_ojToolTable" Text="Tools - click one to view or tune its feeds and speeds:" Margin="5,0,0,4" TextWrapping="Wrap"/>
+            <ListBox x:Name="lstOddJobsTools" Height="220" MinWidth="290" Margin="5,0,0,0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" SelectionChanged="lstOddJobsTools_SelectionChanged"/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>
