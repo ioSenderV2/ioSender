@@ -1,10 +1,10 @@
 /*
  * KbdDefaultSpeedControl.xaml.cs - part of CNC Controls library
  *
- * Run-bar readout + toggle for the keyboard jog panel's default continuous-jog speed
- * (Config.Jog.DefaultSpeedFast). Binds directly to the shared JogConfig object, same idiom
- * JogPresetSelector uses for its own shared model (set DataContext on Loaded, not inherited from the
- * ambient run-bar DataContext, which is GrblViewModel, not AppConfig).
+ * Run-bar readout + toggle for the keyboard jog panel's default continuous-jog speed. Wraps the SAME
+ * KeyboardJogViewModel the Keyboard Jogging panel (KbdJogGridControl) uses, rather than reading/writing
+ * Config.Jog directly - its SpeedIndex setter both persists the choice and pushes it into the live
+ * KeypressHandler.DefaultSpeedFast so a click here takes effect immediately, same as the real panel.
  */
 
 using System.Windows;
@@ -16,6 +16,8 @@ namespace CNC.Controls
 {
     public partial class KbdDefaultSpeedControl : UserControl
     {
+        private KeyboardJogViewModel kbd;
+
         public KbdDefaultSpeedControl()
         {
             InitializeComponent();
@@ -23,17 +25,15 @@ namespace CNC.Controls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            DataContext = AppConfig.Settings.Base?.Jog;
+            if (kbd == null && DataContext is GrblViewModel gvm)
+                kbd = new KeyboardJogViewModel(gvm.Keyboard);
+            pnlRoot.DataContext = kbd;
         }
 
         private void pnlRoot_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            var jog = AppConfig.Settings.Base?.Jog;
-            if (jog == null)
-                return;
-
-            jog.DefaultSpeedFast = !jog.DefaultSpeedFast;
-            AppConfig.Settings.Save();
+            if (kbd != null)
+                kbd.SpeedIndex = kbd.SpeedIndex == 0 ? 1 : 0;
         }
     }
 }

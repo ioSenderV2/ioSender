@@ -6,29 +6,31 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d" Loaded="UserControl_Loaded"
              d:DesignHeight="20" d:DesignWidth="180">
-    <!-- Run-bar readout of the keyboard jog panel's default continuous-jog speed (Config.Jog.DefaultSpeedFast -
-         the speed used when jogging by keyboard with no modifier held; Shift/Ctrl+Shift still reach the other
-         one either way - see KeypressHandler.DefaultSpeedFast). Both Slow and Fast feedrates are shown at
-         once, the currently-DEFAULT one bolded, so which applies is visible without opening the Jog settings
-         tab. Click anywhere on it to flip the default - same toggle the Jog tab's own control edits. -->
+    <!-- Run-bar readout of the keyboard jog panel's default continuous-jog speed - the speed used when
+         jogging by keyboard with no modifier held (Shift/Ctrl+Shift still reach the other one either way -
+         see KeypressHandler.DefaultSpeedFast). Backed by the SAME KeyboardJogViewModel the real Keyboard
+         Jogging panel (KbdJogGridControl) uses - not a fresh read of Config.Jog - so toggling here also
+         pushes straight into the live KeypressHandler.DefaultSpeedFast (see SpeedIndex's setter) instead of
+         only updating the persisted config until next restart. Selected chip highlighted the same light
+         green (#9FE09F) KbdJogGridControl uses for its own Slow/Fast cells, for visual consistency. -->
     <UserControl.Resources>
-        <Style x:Key="SlowFeedStyle" TargetType="TextBlock">
-            <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Foreground" Value="#888"/>
+        <Style x:Key="SlowChip" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Padding" Value="3,0"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding Path=DefaultSpeedFast}" Value="False">
-                    <Setter Property="FontWeight" Value="Bold"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                <DataTrigger Binding="{Binding Path=SpeedIndex}" Value="0">
+                    <Setter Property="Background" Value="#FF9FE09F"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="FastFeedStyle" TargetType="TextBlock">
-            <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Foreground" Value="#888"/>
+        <Style x:Key="FastChip" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Padding" Value="3,0"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding Path=DefaultSpeedFast}" Value="True">
-                    <Setter Property="FontWeight" Value="Bold"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                <DataTrigger Binding="{Binding Path=SpeedIndex}" Value="1">
+                    <Setter Property="Background" Value="#FF9FE09F"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -37,9 +39,13 @@
                 MouseLeftButtonUp="pnlRoot_MouseLeftButtonUp"
                 ToolTip="Default keyboard jog speed (no modifier held) - click to toggle Slow/Fast.">
         <Label x:Uid="lbl_kbdDefSpeed" Content="Kbd Def Speed:" Padding="0" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBlock Style="{StaticResource SlowFeedStyle}" Text="{Binding Path=SlowFeedrate, StringFormat={}{0:0}}" VerticalAlignment="Center"/>
+        <Border Style="{StaticResource SlowChip}">
+            <TextBlock Text="{Binding Path=SlowText}" VerticalAlignment="Center"/>
+        </Border>
         <TextBlock Text=" " VerticalAlignment="Center"/>
-        <TextBlock Style="{StaticResource FastFeedStyle}" Text="{Binding Path=FastFeedrate, StringFormat={}{0:0}}" VerticalAlignment="Center"/>
+        <Border Style="{StaticResource FastChip}">
+            <TextBlock Text="{Binding Path=FastText}" VerticalAlignment="Center"/>
+        </Border>
         <TextBlock Text=" mm/min" VerticalAlignment="Center" Margin="2,0,0,0"/>
     </StackPanel>
 </UserControl>
