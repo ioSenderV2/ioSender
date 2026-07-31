@@ -491,9 +491,9 @@ namespace CNC.Controls
             // Countersink bit on a round hole: plunge straight down the centerline instead of tracing the
             // outline - the bit's own 90-deg cone does the chamfering as it descends (same geometry the V-bit
             // trace relies on), so there's no need to follow an edge at all when the feature is round. See
-            // OddJobsTool.CountersinkBit's own comment. PlungeFeed (not Feed) since this is a genuine axial
-            // plunge, not a light corner-breaking trace.
-            if ((OddJobsTool)op.Tool == OddJobsTool.CountersinkBit && tp.Geometry == WorkOrderGeometryKind.Circle)
+            // OddJobsFeedsSpeedsDialog.IsCountersinkBit's own comment. PlungeFeed (not Feed) since this is a
+            // genuine axial plunge, not a light corner-breaking trace.
+            if (OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)op.Tool) && tp.Geometry == WorkOrderGeometryKind.Circle)
             {
                 lines.Add("G0 X" + F(cx) + " Y" + F(cy));
                 lines.Add("G0 Z" + F(SafeZ()));
@@ -561,7 +561,7 @@ namespace CNC.Controls
                         continue;
 
                     var tool = (OddJobsTool)op.Tool;
-                    string type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.CountersinkBit) ? "VBIT A=90"
+                    string type = (tool == OddJobsTool.VBit45 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
                                 : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
                                 : "FLAT";
                     yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, ToolDescription(tool));
@@ -588,7 +588,10 @@ namespace CNC.Controls
                 case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
                 case OddJobsTool.BallEnd18: return "1/8\" ball end";
                 case OddJobsTool.DrillBit: return "drill";
-                case OddJobsTool.CountersinkBit: return "countersink bit";
+                case OddJobsTool.CountersinkBit38: return "3/8\" countersink bit";
+                case OddJobsTool.CountersinkBit916: return "9/16\" countersink bit";
+                case OddJobsTool.CountersinkBit1316: return "13/16\" countersink bit";
+                case OddJobsTool.CountersinkBit118: return "1-1/8\" countersink bit";
                 default: return tool.ToString();
             }
         }

@@ -35,12 +35,15 @@ namespace CNC.Controls
         // A real twist drill - straight-plunge drilling now picks the bit that matches the hole (see
         // WorkOrderRules.TryMatchDrill), rather than being approximated with an O-flute.
         DrillBit,
-        // A 90-deg countersink/chamfer bit (e.g. a QWORK-style single-flute cobalt countersink) - for a
-        // Chamfer operation on a round-hole toolpath small enough for the bit's own diameter to span it, this
-        // plunges straight down the hole's centerline instead of tracing the outline like the 45-deg V-bit
-        // does (see WorkOrderCompiler.BuildChamfer). Same 45-deg-per-side geometry as VBit45, so ChamferDepth
-        // means the same thing either way - only the MOTION differs.
-        CountersinkBit
+        // 90-deg countersink/chamfer bits (e.g. a QWORK-style graduated cobalt countersink set) - the
+        // operator's own actual 4 sizes (3/8", 9/16", 13/16", 1-1/8"), not a generic placeholder, so each
+        // shows up as its own preset diameter in the dropdown rather than one entry the operator retypes the
+        // diameter into every time. For a Chamfer operation on a round-hole toolpath small enough for the
+        // bit's own diameter to span it, these plunge straight down the hole's centerline instead of tracing
+        // the outline like the 45-deg V-bit does (see WorkOrderCompiler.BuildChamfer / IsCountersinkBit).
+        // Same 45-deg-per-side geometry as VBit45, so ChamferDepth means the same thing either way - only the
+        // MOTION differs.
+        CountersinkBit38, CountersinkBit916, CountersinkBit1316, CountersinkBit118
     }
 
     public partial class OddJobsFeedsSpeedsDialog : Window
@@ -48,9 +51,25 @@ namespace CNC.Controls
         private const double QuarterInchMm = 6.35d;
         private const double EighthInchMm = 3.175d;
         private const double TwentyFiveMm = 25.0d;
+        // The operator's actual 4 countersink bit sizes - exact inch-to-mm conversions, not the rounded
+        // 10/14/21/28mm they're commonly quoted as, since the reach-depth math (BitDiameter/2) cares about
+        // the real number.
+        private const double ThreeEighthInchMm = 9.525d;
+        private const double NineSixteenthInchMm = 14.2875d;
+        private const double ThirteenSixteenthInchMm = 20.6375d;
+        private const double OneOneEighthInchMm = 28.575d;
         private OperationRecommendation lastRecommendation;
         private string material = string.Empty;
         private bool showDoc = true;
+
+        // True for any of the 4 countersink bit sizes - shared by WorkOrderCompiler (BuildChamfer's
+        // plunge-vs-trace switch, ToolDeclarations' TYPE= tag) and WorkOrderView (ParameterWarnings) so the
+        // "is this a countersink bit" check lives in exactly one place.
+        public static bool IsCountersinkBit(OddJobsTool tool)
+        {
+            return tool == OddJobsTool.CountersinkBit38 || tool == OddJobsTool.CountersinkBit916
+                || tool == OddJobsTool.CountersinkBit1316 || tool == OddJobsTool.CountersinkBit118;
+        }
 
         public double BitDiameter { get { return fldDiameter.Value; } set { fldDiameter.Value = value; } }
         public double Flutes { get { return fldFlutes.Value; } set { fldFlutes.Value = value; } }
@@ -167,9 +186,9 @@ namespace CNC.Controls
         {
             if (SelectedTool == OddJobsTool.DrillBit)
                 return IsHssDrill ? "drill-hss" : "drill";
-            // CountersinkBit is the same 45-deg-per-side conical geometry as VBit45 (see its own enum
-            // comment) - routes into the same EvaluateVBit advisor path.
-            return SelectedTool == OddJobsTool.VBit45 || SelectedTool == OddJobsTool.CountersinkBit ? "chamfer" : "mill";
+            // The countersink bits are the same 45-deg-per-side conical geometry as VBit45 (see the enum's
+            // own comment) - route into the same EvaluateVBit advisor path.
+            return SelectedTool == OddJobsTool.VBit45 || IsCountersinkBit(SelectedTool) ? "chamfer" : "mill";
         }
 
         // pnlDrillStyle's own SelectedIndex, 1 = HSS twist, 0 (or unset) = brad point/twist (the default,
@@ -202,9 +221,10 @@ namespace CNC.Controls
                 // Diameter deliberately left alone: a drill's size IS the hole being cut, so the caller sets
                 // it from the geometry rather than this dropdown supplying a nominal.
                 case OddJobsTool.DrillBit: Flutes = 2; break;
-                // No nominal diameter - these come as a graduated set (e.g. 2-8/6-10/10-15/15-20mm cutting
-                // diameter), so whichever physical bit is chucked determines it; the operator enters it.
-                case OddJobsTool.CountersinkBit: Flutes = 2; break;
+                case OddJobsTool.CountersinkBit38: BitDiameter = ThreeEighthInchMm; Flutes = 2; break;
+                case OddJobsTool.CountersinkBit916: BitDiameter = NineSixteenthInchMm; Flutes = 2; break;
+                case OddJobsTool.CountersinkBit1316: BitDiameter = ThirteenSixteenthInchMm; Flutes = 2; break;
+                case OddJobsTool.CountersinkBit118: BitDiameter = OneOneEighthInchMm; Flutes = 2; break;
             }
             pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
             if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)
