@@ -10,19 +10,19 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
             <Label x:Uid="fs_tool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
             <ComboBox x:Name="cbxTool" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged">
-                <ComboBoxItem x:Uid="fs_tool2f" Content="1/4&quot; 2-flute endmill"/>
-                <ComboBoxItem x:Uid="fs_tool3fr" Content="1/4&quot; 3-flute roughing endmill"/>
-                <ComboBoxItem x:Uid="fs_toolof" Content="1/4&quot; O-flute"/>
-                <ComboBoxItem x:Uid="fs_toolball" Content="1/4&quot; Ball end"/>
-                <ComboBoxItem x:Uid="fs_toolsurf" Content="25mm 2-flute surfacing bit"/>
-                <ComboBoxItem x:Uid="fs_toolvbit" Content="45 deg V-bit (chamfer)"/>
-                <ComboBoxItem x:Uid="fs_tool2f18" Content="1/8&quot; 2-flute endmill"/>
-                <ComboBoxItem x:Uid="fs_toolball18" Content="1/8&quot; Ball end"/>
-                <ComboBoxItem x:Uid="fs_tooldrill" Content="Drill bit (size = hole)"/>
-                <ComboBoxItem x:Uid="fs_toolcountersink38" Content="3/8&quot; countersink bit (plunge chamfer)"/>
-                <ComboBoxItem x:Uid="fs_toolcountersink916" Content="9/16&quot; countersink bit (plunge chamfer)"/>
-                <ComboBoxItem x:Uid="fs_toolcountersink1316" Content="13/16&quot; countersink bit (plunge chamfer)"/>
-                <ComboBoxItem x:Uid="fs_toolcountersink118" Content="1-1/8&quot; countersink bit (plunge chamfer)"/>
+                <ComboBoxItem x:Uid="fs_tool2f" x:Name="itemEndMill2Flute" Content="1/4&quot; 2-flute endmill"/>
+                <ComboBoxItem x:Uid="fs_tool3fr" x:Name="itemRoughingEndMill3Flute" Content="1/4&quot; 3-flute roughing endmill"/>
+                <ComboBoxItem x:Uid="fs_toolof" x:Name="itemOFlute" Content="1/4&quot; O-flute"/>
+                <ComboBoxItem x:Uid="fs_toolball" x:Name="itemBallEnd" Content="1/4&quot; Ball end"/>
+                <ComboBoxItem x:Uid="fs_toolsurf" x:Name="itemSurfacingBit25mm" Content="25mm 2-flute surfacing bit"/>
+                <ComboBoxItem x:Uid="fs_toolvbit" x:Name="itemVBit45" Content="45 deg V-bit (chamfer)"/>
+                <ComboBoxItem x:Uid="fs_tool2f18" x:Name="itemEndMill2Flute18" Content="1/8&quot; 2-flute endmill"/>
+                <ComboBoxItem x:Uid="fs_toolball18" x:Name="itemBallEnd18" Content="1/8&quot; Ball end"/>
+                <ComboBoxItem x:Uid="fs_tooldrill" x:Name="itemDrillBit" Content="Drill bit (size = hole)"/>
+                <ComboBoxItem x:Uid="fs_toolcountersink38" x:Name="itemCountersinkBit38" Content="3/8&quot; (10mm) countersink bit"/>
+                <ComboBoxItem x:Uid="fs_toolcountersink916" x:Name="itemCountersinkBit916" Content="9/16&quot; (14mm) countersink bit"/>
+                <ComboBoxItem x:Uid="fs_toolcountersink1316" x:Name="itemCountersinkBit1316" Content="13/16&quot; (21mm) countersink bit"/>
+                <ComboBoxItem x:Uid="fs_toolcountersink118" x:Name="itemCountersinkBit118" Content="1-1/8&quot; (28mm) countersink bit"/>
             </ComboBox>
         </StackPanel>
         <StackPanel x:Name="pnlDrillStyle" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">

@@ -35,14 +35,15 @@ namespace CNC.Controls
         // A real twist drill - straight-plunge drilling now picks the bit that matches the hole (see
         // WorkOrderRules.TryMatchDrill), rather than being approximated with an O-flute.
         DrillBit,
-        // 90-deg countersink/chamfer bits (e.g. a QWORK-style graduated cobalt countersink set) - the
+        // 90-deg single-flute countersink bits (e.g. a QWORK-style graduated cobalt countersink set) - the
         // operator's own actual 4 sizes (3/8", 9/16", 13/16", 1-1/8"), not a generic placeholder, so each
         // shows up as its own preset diameter in the dropdown rather than one entry the operator retypes the
-        // diameter into every time. For a Chamfer operation on a round-hole toolpath small enough for the
-        // bit's own diameter to span it, these plunge straight down the hole's centerline instead of tracing
-        // the outline like the 45-deg V-bit does (see WorkOrderCompiler.BuildChamfer / IsCountersinkBit).
-        // Same 45-deg-per-side geometry as VBit45, so ChamferDepth means the same thing either way - only the
-        // MOTION differs.
+        // diameter into every time. Only usable for the dedicated Countersink operation kind (a round-hole
+        // toolpath small enough for the bit's own diameter to span it) - see
+        // WorkOrderCompiler.BuildCountersink / IsCountersinkBit. Same 45-deg-per-side cone geometry as
+        // VBit45 for feeds/speeds purposes (ToolType()), but a distinct operation from Chamfer: the operator
+        // specifies the target finished diameter, not a raw depth - WorkOrderCompiler converts it
+        // (depth = diameter / 2).
         CountersinkBit38, CountersinkBit916, CountersinkBit1316, CountersinkBit118
     }
 
@@ -119,11 +120,45 @@ namespace CNC.Controls
                 return OddJobsTool.BallEnd;
             if (operation == "drilling")
                 return OddJobsTool.DrillBit;
+            if (operation == "countersink")
+                return OddJobsTool.CountersinkBit38;   // smallest of the 4 - operator sizes up if needed
             if (string.Equals(material, "Aluminum", StringComparison.OrdinalIgnoreCase))
                 return OddJobsTool.OFlute;
             if (operation == "roughing")
                 return OddJobsTool.RoughingEndMill3Flute;
             return OddJobsTool.EndMill2Flute;
+        }
+
+        // Restricts the tool dropdown to only the tools that make sense for the given operation kind - added
+        // 2026-07-30 after Drill was showing V-bit/ball end/surfacing bit/countersink choices that can never
+        // apply to a straight-plunge drill. Called once, right after construction (order doesn't matter
+        // relative to SelectedTool - Visibility=Collapsed on a ComboBoxItem only hides it from the dropdown
+        // LIST, not from being displayed as the current selection when closed).
+        public void RestrictToolsFor(WorkOrderOpKind kind)
+        {
+            bool isDrill = kind == WorkOrderOpKind.Drill;
+            bool isCountersink = kind == WorkOrderOpKind.Countersink;
+            bool isChamfer = kind == WorkOrderOpKind.Chamfer;
+            bool isMill = !isDrill && !isCountersink && !isChamfer;
+
+            Show(itemEndMill2Flute, isMill);
+            Show(itemRoughingEndMill3Flute, isMill);
+            Show(itemOFlute, isMill);
+            Show(itemBallEnd, isMill);
+            Show(itemSurfacingBit25mm, isMill);
+            Show(itemEndMill2Flute18, isMill);
+            Show(itemBallEnd18, isMill);
+            Show(itemVBit45, isChamfer);
+            Show(itemDrillBit, isDrill);
+            Show(itemCountersinkBit38, isCountersink);
+            Show(itemCountersinkBit916, isCountersink);
+            Show(itemCountersinkBit1316, isCountersink);
+            Show(itemCountersinkBit118, isCountersink);
+        }
+
+        private static void Show(UIElement el, bool visible)
+        {
+            el.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // docLabel: "Depth of cut:" for milling operations, "Peck depth:" for Drill/Bore's drill mode -
@@ -221,10 +256,15 @@ namespace CNC.Controls
                 // Diameter deliberately left alone: a drill's size IS the hole being cut, so the caller sets
                 // it from the geometry rather than this dropdown supplying a nominal.
                 case OddJobsTool.DrillBit: Flutes = 2; break;
-                case OddJobsTool.CountersinkBit38: BitDiameter = ThreeEighthInchMm; Flutes = 2; break;
-                case OddJobsTool.CountersinkBit916: BitDiameter = NineSixteenthInchMm; Flutes = 2; break;
-                case OddJobsTool.CountersinkBit1316: BitDiameter = ThirteenSixteenthInchMm; Flutes = 2; break;
-                case OddJobsTool.CountersinkBit118: BitDiameter = OneOneEighthInchMm; Flutes = 2; break;
+                // Single-flute, and the operator suspects (not confirmed against the actual bit spec) a max
+                // RPM well under typical router speeds - the material table would otherwise recommend
+                // 14000-22000 (Hardwood/MDF RpmRange), which could exceed a real rating for a bit like this.
+                // 8000 is a conservative STARTING value, not a verified safe number - confirmed on real
+                // hardware 2026-07-30 (operator: "not sure about RPM rating but I suspect is below 10,000").
+                case OddJobsTool.CountersinkBit38: BitDiameter = ThreeEighthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
+                case OddJobsTool.CountersinkBit916: BitDiameter = NineSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
+                case OddJobsTool.CountersinkBit1316: BitDiameter = ThirteenSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
+                case OddJobsTool.CountersinkBit118: BitDiameter = OneOneEighthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
             }
             pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
             if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)

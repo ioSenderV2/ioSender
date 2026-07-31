@@ -29,7 +29,7 @@ namespace CNC.Controls
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
-    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer }
+    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink }
 
     // How to cut the parent toolpath's geometry. Carries no geometry of its own and no tool number.
     public class WorkOrderOperation
@@ -70,6 +70,11 @@ namespace CNC.Controls
         public double WallStockToLeave = 0.3d;    // SideFinish
         public double FloorStockToLeave = 0.3d;   // BottomFinish
         public double ChamferDepth = 0.5d;        // Chamfer
+        // Countersink - the FINISHED diameter the operator wants (e.g. to seat a specific screw head), not a
+        // raw plunge depth - WorkOrderCompiler.BuildCountersink converts it (depth = diameter / 2, same
+        // 45-deg-per-side cone math as Chamfer's V-bit, just specified the other way around since a
+        // countersink bit's whole point is being sized to a target diameter).
+        public double CountersinkDiameter = 12.5d;   // Countersink
 
         public double Feed = 800d, PlungeFeed = 200d, SpindleRPM = 15000d, BitMaxRPM = 18000d;
     }
@@ -285,6 +290,7 @@ namespace CNC.Controls
                 case WorkOrderOpKind.SideFinish: return "Side finishing pass";
                 case WorkOrderOpKind.BottomFinish: return "Bottom finishing pass";
                 case WorkOrderOpKind.Chamfer: return "Chamfer the top edge";
+                case WorkOrderOpKind.Countersink: return "Countersink (plunge to a target diameter)";
                 default: return kind.ToString();
             }
         }
@@ -343,6 +349,9 @@ namespace CNC.Controls
             {
                 yield return WorkOrderOpKind.Drill;
                 yield return WorkOrderOpKind.Bore;
+                // Plunges a countersink bit straight down the hole's centerline - only makes sense on a
+                // round hole, unlike Chamfer's outline trace which works on any shape.
+                yield return WorkOrderOpKind.Countersink;
             }
 
             yield return WorkOrderOpKind.SideFinish;
@@ -459,6 +468,8 @@ namespace CNC.Controls
                     return string.Format("Bottom finish - Ø{0:0.##}, leaves {1:0.0##} mm", op.BitDiameter, op.FloorStockToLeave);
                 case WorkOrderOpKind.Chamfer:
                     return string.Format("Chamfer - {0:0.0#} mm deep", op.ChamferDepth);
+                case WorkOrderOpKind.Countersink:
+                    return string.Format("Countersink - Ø{0:0.##} mm target", op.CountersinkDiameter);
                 default:
                     return op.Kind.ToString();
             }
