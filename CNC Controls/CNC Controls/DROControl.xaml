@@ -16,12 +16,27 @@
                     <local:LatheModeToStringConverter x:Key="LatheModeConverter" />
                     <local:LogicalNotConverter x:Key="BooleanConverter" />
                     <local:BoolToVisibleConverter x:Key="IsVisibleConverter" />
+                    <local:WcsHeaderSuffixConverter x:Key="WcsHeaderSuffixConverter" />
                 </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
+    <!-- Own header template (not the shared PositionHeaderTemplate other position panels use) so it can
+         append the active work coordinate system - "DRO (G54)" - once a controller has reported one
+         (GrblViewModel.WorkCoordinateSystem), making it clear which WCS Zero/typed values write into without
+         checking the separate Offsets flyout. The localized "DRO" text itself (Header="DRO", several locales
+         have a real translation, not just the literal word) is untouched - only the suffix is dynamic. -->
+    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
               ToolTip="Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.">
+        <GroupBox.HeaderTemplate>
+            <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="9" Height="9" Fill="{StaticResource PositionBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="{Binding}"/>
+                    <TextBlock Text="{Binding Path=DataContext.WorkCoordinateSystem, RelativeSource={RelativeSource AncestorType=GroupBox}, Converter={StaticResource WcsHeaderSuffixConverter}}"/>
+                </StackPanel>
+            </DataTemplate>
+        </GroupBox.HeaderTemplate>
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,5,0,5">
             <Label x:Name="lblXMode" Content="{Binding Path=LatheMode, Mode=OneWay, Converter={StaticResource LatheModeConverter}}" Visibility="{Binding Path=LatheModeEnabled, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}" HorizontalContentAlignment="Right" Margin="20,0,65,0"/>
             <local:DROBaseControl x:Name="axisX" Label="X"

@@ -494,6 +494,24 @@ namespace CNC.Controls
         }
     }
 
+    // Appended after the (localized) DRO header text - blank before a controller connection has reported a
+    // work coordinate system, " (G54)" once GrblViewModel.WorkCoordinateSystem has a real value. A separate
+    // run rather than baked into the header string itself, so the translated "DRO" word (several locales have
+    // a real translation, not just the literal word - de-DE "Anzeige", ru-RU/uk-UA/zh-CN their own) stays
+    // driven by the normal x:Uid/CSV mechanism instead of being replaced by an English-only binding.
+    public class WcsHeaderSuffixConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string wcs = value as string;
+            return string.IsNullOrEmpty(wcs) ? string.Empty : string.Format(" ({0})", wcs);
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class LogicalNotConverter : IValueConverter
     {
         public IValueConverter FinalConverter { get; set; }
