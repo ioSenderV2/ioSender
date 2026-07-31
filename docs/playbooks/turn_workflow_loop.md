@@ -54,21 +54,26 @@ a per-turn thing).
    actually test, right after the final change is committed, gets `-Launch -message="..."`.** Don't
    pass `-Launch` "just in case" on a build you know isn't the final one.
    ```powershell
-   .\build.ps1 -Configuration Debug                     # interim/verification build
-   .\build.ps1 -Launch -message="what we're testing"    # the one truly final build of the turn
+   .\build.ps1 -Scratch                                  # interim/verification build
+   .\build.ps1 -Launch -message="what we're testing"     # the one truly final build of the turn
    ```
    **`-NoKill` does NOT avoid this** - tried adding it to interim builds 2026-07-30, same session,
    and it fails outright (MSB3027/MSB3021 "file is locked by ioSender") the moment there's actually
    something to rebuild: Windows won't let MSBuild overwrite a DLL/EXE the running process still has
-   loaded, and `-NoKill` only skips the kill step, it can't make the OS release the lock. There is no
-   way to rebuild the same Debug output currently running without ending that instance first - an
-   interim build killing the user's current test session is not a bug to work around, it's an
-   unavoidable side effect of needing to touch the same files. The user does not need the app running
-   while a subsequent verification build happens; they need it running once the LAST build launches it.
-   Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, the kill-on-every-build
-   gotcha, and finding `-NoKill` doesn't actually solve it) - simplify to this one rule;
-   stop trying to guess whether a relaunch would be disruptive, and stop burning a throwaway
-   compile-only build before the one that actually puts something in front of the user.
+   loaded, and `-NoKill` only skips the kill step, it can't make the OS release the lock.
+   **`-Scratch` (added 2026-07-30, later the same day) is the actual fix** - it redirects the WHOLE
+   solution's output to `bin\<Config>.scratch\` via MSBuild's `OutDir` override instead of the live
+   `bin\<Config>\` tree, so an interim build never touches the files the running instance has locked
+   in the first place: no kill, no wait, nothing disturbed. Verified by running it while a live Debug
+   instance kept running, untouched, throughout. It implies no launch (warns if `-Launch` is also
+   passed) and no kill (`-NoKill` becomes redundant with it) - it's verify-only, never the build the
+   user actually tests. Use `-Scratch` for every interim/verification build now; reserve plain
+   `-Configuration Debug` (no `-Scratch`) for when you genuinely want to rebuild the live tree without
+   also launching it.
+   Corrected 2026-07-25 (twice), 2026-07-30 (the -message addition and the kill-on-every-build
+   gotcha), and again 2026-07-30 (`-Scratch` supersedes the earlier "an interim build ending the
+   user's session is unavoidable" conclusion - turned out to be avoidable after all, just not via
+   `-NoKill`).
 5. **Commit as you go, right after each verified change** - NOT gated behind the user declaring the
    whole testing session done. In practice this means: implement -> build (verify it compiles, and if
    it's the first test build of this change, `-Launch` per step 4) -> commit -> move to the next
@@ -99,7 +104,10 @@ a per-turn thing).
 ## Ready commands
 
 ```powershell
-# Step 4: any change that needs testing - build + launch with a message, every time
+# Interim/verification build - never touches the live tree, nothing to kill, no launch
+.\build.ps1 -Scratch
+
+# Step 4: the one truly final build of the turn - build + launch with a message
 .\build.ps1 -Launch -message="what we're testing"
 
 # Step 5: commit right after that build/verification succeeds - don't save it up
@@ -126,3 +134,12 @@ python tools/locadd.py
   ioSender.exe, and only the first word ever landed on `-message=`. Fixed by quoting any argument
   containing whitespace before the join. If `-message` ever appears to show only one word again,
   check this fix hasn't regressed before assuming it's a usage error.
+- 2026-07-30, later the same day: added `-Scratch` to `build.ps1` - a real fix for the
+  interim-build/running-instance conflict, not a workaround like `-NoKill` turned out to be. It
+  redirects the whole solution's output to `bin\<Config>.scratch\` via MSBuild's `OutDir` override,
+  so an interim build never touches the live tree's locked files at all. Hit one real bug getting
+  it working: a bare trailing backslash on the OutDir path (`...Debug.scratch\`) gets read by
+  Win32's argv parser as an ESCAPED quote once .NET wraps the arg in quotes (it contains a space -
+  "ioSender XL") - the quote never closes and every following MSBuild argument gets silently
+  absorbed into that one value. Fixed by doubling the trailing backslash (`\\`) so it escapes to a
+  single literal backslash instead. If OutDir-style paths ever misbehave again, check this first.
