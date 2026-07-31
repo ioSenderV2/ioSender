@@ -52,15 +52,21 @@ a per-turn thing).
    builds (checking an individual fix compiles, verifying on `master` before a forward-merge, etc.)
    NEVER pass `-Launch` - only the truly LAST build of the turn, the one on the branch the user will
    actually test, right after the final change is committed, gets `-Launch -message="..."`.** Don't
-   pass `-Launch` "just in case" on a build you know isn't the final one. **Also pass `-NoKill` on
-   every interim/verification build** - it's a compile check, not a relaunch, so there's no reason
-   for it to kill whatever instance the user is currently testing:
+   pass `-Launch` "just in case" on a build you know isn't the final one.
    ```powershell
-   .\build.ps1 -Configuration Debug -NoKill        # interim/verification build
-   .\build.ps1 -Launch -message="what we're testing"   # the one truly final build of the turn
+   .\build.ps1 -Configuration Debug                     # interim/verification build
+   .\build.ps1 -Launch -message="what we're testing"    # the one truly final build of the turn
    ```
+   **`-NoKill` does NOT avoid this** - tried adding it to interim builds 2026-07-30, same session,
+   and it fails outright (MSB3027/MSB3021 "file is locked by ioSender") the moment there's actually
+   something to rebuild: Windows won't let MSBuild overwrite a DLL/EXE the running process still has
+   loaded, and `-NoKill` only skips the kill step, it can't make the OS release the lock. There is no
+   way to rebuild the same Debug output currently running without ending that instance first - an
+   interim build killing the user's current test session is not a bug to work around, it's an
+   unavoidable side effect of needing to touch the same files. The user does not need the app running
+   while a subsequent verification build happens; they need it running once the LAST build launches it.
    Corrected 2026-07-25 (twice) and 2026-07-30 (the -message addition, the kill-on-every-build
-   gotcha, and the -NoKill addition) - simplify to this one rule;
+   gotcha, and finding `-NoKill` doesn't actually solve it) - simplify to this one rule;
    stop trying to guess whether a relaunch would be disruptive, and stop burning a throwaway
    compile-only build before the one that actually puts something in front of the user.
 5. **Commit as you go, right after each verified change** - NOT gated behind the user declaring the
