@@ -116,7 +116,11 @@
                          panel's DataContext - see EnsureGeometryVm) so clicking a cell sets its real ProbeEdge
                          property, same as on those tabs. Is Circle shows a plain reference picture instead
                          (External/Internal alone already says solid-boss vs hole - nothing further to click). -->
-                    <GroupBox x:Uid="ls_grpGeometry" x:Name="grpGeometry" Header="Geometry" Margin="0,8,0,0" Visibility="Collapsed">
+                    <!-- Left-aligned (not Stretch, the GroupBox default) - unlike Setup/Stock above/below, whose
+                         content actually uses the panel's full width, Geometry's content is a fixed-size
+                         control column + diagram that stops well short of it, so Stretch just left a wide dead
+                         band down the right side of the box. -->
+                    <GroupBox x:Uid="ls_grpGeometry" x:Name="grpGeometry" Header="Geometry" Margin="0,8,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
                         <Grid Margin="6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
