@@ -70,6 +70,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Z">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.Z" Mode="OneWay"/>
+                        <Binding Path="ToolOffset.Z" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>

@@ -512,12 +512,25 @@ namespace CNC.Controls
         }
     }
 
-    // Per-axis DRO field tooltip - "G54 X offset: 0.000" - so hovering a single axis shows THAT axis's own
-    // work coordinate offset without checking the separate Offsets flyout (see WcsHeaderSuffixConverter for
-    // the DRO group header's own, whole-panel "(G54)" indicator this complements). ConverterParameter carries
-    // the axis letter (fixed - "X"/"Y"/etc, the underlying WorkPositionOffset property name - not whatever a
-    // remapped axis Label happens to display). No tooltip at all (null) until a controller has actually
-    // reported a WCS - showing "Offset: 0.000" before any connection would look like a real reading.
+    // Per-axis DRO field tooltip - so hovering a single axis shows THAT axis's own live work offset without
+    // checking the separate Offsets flyout (see WcsHeaderSuffixConverter for the DRO group header's own,
+    // whole-panel "(G54)" indicator this complements). ConverterParameter carries the axis letter (fixed -
+    // "X"/"Y"/etc, the underlying WorkPositionOffset property name - not whatever a remapped axis Label
+    // happens to display). No tooltip at all (null) until a controller has actually reported a WCS - showing
+    // "0.000" before any connection would look like a real reading.
+    //
+    // Deliberately NOT worded "<WCS> offset" - GrblViewModel.WorkPositionOffset is grblHAL's WCO, which bundles
+    // the active WCS's own stored value with G92 and any active tool length offset (G43.1) - see
+    // macros/pcorner.macro's own comment ("WCO = G5x offset + G92 offset + TLO"). Confirmed as a real,
+    // user-facing mislabel 2026-07-31: the Offsets grid showed G54's Z stored at 0.000, but this tooltip said
+    // "G54 Z offset: -9.341" - correct NUMBER (that's really what's shifting Z right now), wrong claim about
+    // where it came from (an active TLO, not G54's table entry). Naming the WCS but not claiming the number
+    // IS its stored value avoids repeating that.
+    //
+    // A 3rd binding (values[2], GrblViewModel.ToolOffset.Z) is optional - only Z's own MultiBinding in
+    // DROControl.xaml supplies it, since TLO is a Z-axis concept (see GrblViewModel's own TLO parsing, which
+    // folds a reported TLO straight into ToolOffset.Z). Every other axis's tooltip just omits the literal TLO
+    // number since there isn't one to show. NaN (TLO not yet established/known) is treated the same as absent.
     public class WcsOffsetTooltipConverter : IMultiValueConverter
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
@@ -525,7 +538,13 @@ namespace CNC.Controls
             string wcs = values.Length > 0 ? values[0] as string : null;
             if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
                 return null;
-            return string.Format(CultureInfo.CurrentCulture, "{0} {1} offset: {2:0.000}", wcs, parameter, offset);
+
+            double? tlo = values.Length > 2 && values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
+            string line2 = tlo.HasValue
+                ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
+                : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
+
+            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
         }
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
