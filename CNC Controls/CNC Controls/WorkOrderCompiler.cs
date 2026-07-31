@@ -231,6 +231,53 @@ namespace CNC.Controls
 
         #endregion
 
+        // Indirect toolpaths carry no geometry or operations of their own - they borrow both, LIVE, from
+        // another toolpath by name (see WorkOrderRules.ResolveIndirectSource). Every consumer below (Schedule,
+        // ToolDeclarations, BuildOperation, Outline, ...) only ever needs an ordinary WorkOrderToolpath
+        // (Geometry + Operations + PatternPositions), so resolving once here - substituting each Indirect
+        // entry for a shadow toolpath that borrows the source's geometry/operations but keeps the Indirect
+        // one's own name/position/pattern - lets everything else in this file stay oblivious to Indirect
+        // existing at all. The shadow's Operations is the SAME list instance as the source's, not a copy, so
+        // editing the source afterward is picked up the next time this runs. A broken reference (missing
+        // source, self-reference, chained Indirect) is dropped entirely rather than resolved - same as any
+        // toolpath with no enabled operations always is; WorkOrderRules.Validate is what surfaces that to the
+        // operator, not this method.
+        private static WorkOrder ResolveIndirect(WorkOrder wo)
+        {
+            if (!wo.Toolpaths.Any(t => t.IsIndirect))
+                return wo;
+
+            var resolved = new WorkOrder { GroupByTool = wo.GroupByTool, SkipFirstToolChange = wo.SkipFirstToolChange };
+            foreach (var tp in wo.Toolpaths)
+            {
+                if (!tp.IsIndirect)
+                {
+                    resolved.Toolpaths.Add(tp);
+                    continue;
+                }
+
+                var source = WorkOrderRules.ResolveIndirectSource(wo, tp);
+                if (source == null)
+                    continue;
+
+                resolved.Toolpaths.Add(new WorkOrderToolpath
+                {
+                    Name = tp.Name,
+                    Geometry = source.Geometry,
+                    Enabled = tp.Enabled,
+                    X = tp.X, Y = tp.Y,
+                    Length = source.Length, Angle = source.Angle, Diameter = source.Diameter,
+                    Width = source.Width, Depth = source.Depth, Size = source.Size,
+                    Pattern = tp.Pattern,
+                    Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
+                    PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
+                    PatternStartAngle = tp.PatternStartAngle, PatternArcSpan = tp.PatternArcSpan,
+                    Operations = source.Operations
+                });
+            }
+            return resolved;
+        }
+
         #region Cross-operation coordination
 
         // The through contour whose tab settings apply, if there is one - tabs are defined once, on the
@@ -703,6 +750,7 @@ namespace CNC.Controls
         // setting is actually worth on this particular work order rather than promising a saving in the abstract.
         public static int ToolChangeCount(WorkOrder wo, bool grouped)
         {
+            wo = ResolveIndirect(wo);
             bool wasGrouped = wo.GroupByTool;
             wo.GroupByTool = grouped;
             try
@@ -726,12 +774,13 @@ namespace CNC.Controls
         // it follows grouping rather than tree order.
         public static int FirstToolNumber(WorkOrder wo)
         {
-            var first = Schedule(wo).FirstOrDefault();
+            var first = Schedule(ResolveIndirect(wo)).FirstOrDefault();
             return first.Value != null ? ToolNumberFor(first.Value) : int.MinValue;
         }
 
         public static List<string> BuildProgram(WorkOrder wo)
         {
+            wo = ResolveIndirect(wo);
             var lines = new List<string>();
             int opCount = wo.EnabledOperationCount;
             int tpCount = wo.Toolpaths.Count(t => wo.EnabledOperations(t).Any());

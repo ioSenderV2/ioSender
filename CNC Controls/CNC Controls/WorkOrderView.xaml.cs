@@ -130,6 +130,8 @@ namespace CNC.Controls
                 X = s != null ? Math.Round(s.Width / 2d, 1) : 0d,
                 Y = s != null ? Math.Round(s.Height / 2d, 1) : 0d
             };
+            if (kind == WorkOrderGeometryKind.Indirect)
+                tp.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !t.IsIndirect)?.Name;
             workOrder.Toolpaths.Add(tp);
             RebuildTree(tp);
             OnWorkOrderChanged();
@@ -247,6 +249,59 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        // Independent copy of a toolpath and every operation on it, appending "(n)" to the name for
+        // uniqueness. Unlike an Indirect toolpath (which stays a live reference to its source), this diverges
+        // immediately - editing either copy afterward doesn't touch the other.
+        private void DuplicateToolpath(WorkOrderToolpath tp)
+        {
+            var copy = new WorkOrderToolpath
+            {
+                Name = NextDuplicateName(tp.Name),
+                Geometry = tp.Geometry,
+                Enabled = tp.Enabled,
+                X = tp.X, Y = tp.Y,
+                Length = tp.Length, Angle = tp.Angle, Diameter = tp.Diameter,
+                Width = tp.Width, Depth = tp.Depth, Size = tp.Size,
+                Pattern = tp.Pattern,
+                Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
+                PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
+                PatternStartAngle = tp.PatternStartAngle, PatternArcSpan = tp.PatternArcSpan,
+                IndirectSource = tp.IndirectSource
+            };
+            foreach (var op in tp.Operations)
+                copy.Operations.Add(CloneOperation(op));
+
+            workOrder.Toolpaths.Insert(workOrder.Toolpaths.IndexOf(tp) + 1, copy);
+            RebuildTree(copy);
+            OnWorkOrderChanged();
+        }
+
+        private static WorkOrderOperation CloneOperation(WorkOrderOperation op)
+        {
+            return new WorkOrderOperation
+            {
+                Kind = op.Kind, Enabled = op.Enabled, Tool = op.Tool, BitDiameter = op.BitDiameter,
+                HoleDiameter = op.HoleDiameter, TotalDepth = op.TotalDepth, Through = op.Through,
+                NumTabs = op.NumTabs, TabWidth = op.TabWidth, TabHeight = op.TabHeight,
+                DepthOfCut = op.DepthOfCut, Stepover = op.Stepover, PeckDepth = op.PeckDepth, DrillHss = op.DrillHss,
+                BoreStepDown = op.BoreStepDown, WallStockToLeave = op.WallStockToLeave,
+                FloorStockToLeave = op.FloorStockToLeave, ChamferDepth = op.ChamferDepth,
+                CountersinkDiameter = op.CountersinkDiameter,
+                Feed = op.Feed, PlungeFeed = op.PlungeFeed, SpindleRPM = op.SpindleRPM, BitMaxRPM = op.BitMaxRPM
+            };
+        }
+
+        // Strips a trailing " (n)" before re-deriving the next free number, so duplicating a duplicate lands
+        // on "Foo (3)" instead of chaining into "Foo (2) (2)".
+        private string NextDuplicateName(string baseName)
+        {
+            string root = System.Text.RegularExpressions.Regex.Replace(baseName, @"\s\(\d+\)$", string.Empty);
+            int n = 2;
+            while (workOrder.Toolpaths.Any(t => string.Equals(t.Name, root + " (" + n + ")", StringComparison.OrdinalIgnoreCase)))
+                n++;
+            return root + " (" + n + ")";
+        }
+
         // Reorders within the selection's own level: an operation moves inside its toolpath, a toolpath moves
         // among the other toolpaths.
         private void Move(int delta)
@@ -338,39 +393,64 @@ namespace CNC.Controls
                 tpItem.Expanded += (s, ev) => collapsedToolpaths.Remove(owner);
                 tpItem.Collapsed += (s, ev) => collapsedToolpaths.Add(owner);
                 AttachRowContextMenu(tpItem, isToolpath: true);
-                foreach (var op in tp.Operations)
-                {
-                    var ownerOp = op;
-                    var opItem = new TreeViewItem
-                    {
-                        Header = MakeCheckHeader(WorkOrderRules.Summarize(op), op.Enabled, on => ToggleEnabled(owner, ownerOp, on)),
-                        Tag = op,
-                        ToolTip = FeedsSummaryText(owner, op)
-                    };
-                    AttachRowContextMenu(opItem, isToolpath: false);
-                    tpItem.Items.Add(opItem);
-                }
 
-                // Always last: the placeholder that adds the next operation. A toolpath with no operations
-                // yet shows nothing but this, which is the prompt to add one.
-                var addItem = new TreeViewItem
+                if (tp.IsIndirect)
                 {
-                    Header = "<add operation>",
-                    Tag = new AddOperationPlaceholder { Toolpath = tp },
-                    Foreground = Brushes.SteelBlue,
-                    FontStyle = FontStyles.Italic
-                };
-                // Driven by the click itself rather than by selection: opening the picker from
-                // SelectedItemChanged meant the click's own mouse-up landed after the menu appeared and
-                // dismissed it instantly, and re-clicking an already-selected placeholder raised no
-                // selection change at all, so nothing happened.
-                var owningToolpath = tp;
-                addItem.PreviewMouseLeftButtonUp += (s, ev) =>
+                    // No operations of its own to list, and none can be added here - see WorkOrderRules
+                    // .AvailableOperations. Read-only rows instead, listing what the source actually
+                    // contributes, so the tree still shows what this toolpath will cut without implying it
+                    // can be edited from here.
+                    var source = workOrder.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
+                    if (source == null)
+                    {
+                        tpItem.Items.Add(new TreeViewItem { Header = "(source not found)", Foreground = Brushes.IndianRed, FontStyle = FontStyles.Italic });
+                    }
+                    else if (source.Operations.Count == 0)
+                    {
+                        tpItem.Items.Add(new TreeViewItem { Header = "(source has no operations yet)", Foreground = Brushes.Gray, FontStyle = FontStyles.Italic });
+                    }
+                    else
+                    {
+                        foreach (var op in source.Operations)
+                            tpItem.Items.Add(new TreeViewItem { Header = WorkOrderRules.Summarize(op), Foreground = Brushes.Gray, IsEnabled = false });
+                    }
+                }
+                else
                 {
-                    ev.Handled = true;
-                    OpenOperationPicker(owningToolpath, (UIElement)s);
-                };
-                tpItem.Items.Add(addItem);
+                    foreach (var op in tp.Operations)
+                    {
+                        var ownerOp = op;
+                        var opItem = new TreeViewItem
+                        {
+                            Header = MakeCheckHeader(WorkOrderRules.Summarize(op), op.Enabled, on => ToggleEnabled(owner, ownerOp, on)),
+                            Tag = op,
+                            ToolTip = FeedsSummaryText(owner, op)
+                        };
+                        AttachRowContextMenu(opItem, isToolpath: false);
+                        tpItem.Items.Add(opItem);
+                    }
+
+                    // Always last: the placeholder that adds the next operation. A toolpath with no operations
+                    // yet shows nothing but this, which is the prompt to add one.
+                    var addItem = new TreeViewItem
+                    {
+                        Header = "<add operation>",
+                        Tag = new AddOperationPlaceholder { Toolpath = tp },
+                        Foreground = Brushes.SteelBlue,
+                        FontStyle = FontStyles.Italic
+                    };
+                    // Driven by the click itself rather than by selection: opening the picker from
+                    // SelectedItemChanged meant the click's own mouse-up landed after the menu appeared and
+                    // dismissed it instantly, and re-clicking an already-selected placeholder raised no
+                    // selection change at all, so nothing happened.
+                    var owningToolpath = tp;
+                    addItem.PreviewMouseLeftButtonUp += (s, ev) =>
+                    {
+                        ev.Handled = true;
+                        OpenOperationPicker(owningToolpath, (UIElement)s);
+                    };
+                    tpItem.Items.Add(addItem);
+                }
                 treeToolpaths.Items.Add(tpItem);
             }
 
@@ -402,6 +482,12 @@ namespace CNC.Controls
         {
             var up = new MenuItem { Header = "Move Up" };
             var down = new MenuItem { Header = "Move Down" };
+            MenuItem duplicate = null;
+            if (isToolpath)
+            {
+                duplicate = new MenuItem { Header = "Duplicate" };
+                duplicate.Click += (s, ev) => DuplicateToolpath((WorkOrderToolpath)item.Tag);
+            }
             var remove = new MenuItem { Header = isToolpath ? "Remove Toolpath" : "Remove Operation" };
             up.Click += (s, ev) => { item.IsSelected = true; Move(-1); };
             down.Click += (s, ev) => { item.IsSelected = true; Move(1); };
@@ -410,6 +496,8 @@ namespace CNC.Controls
             var menu = new ContextMenu();
             menu.Items.Add(up);
             menu.Items.Add(down);
+            if (duplicate != null)
+                menu.Items.Add(duplicate);
             menu.Items.Add(remove);
             // Recomputed each time it opens rather than once at build time - RebuildTree runs often enough
             // (every edit) that a stale enabled/disabled state would rarely be visibly wrong, but there's no
@@ -566,7 +654,8 @@ namespace CNC.Controls
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
 
-            // Only the dimensions this geometry actually has.
+            // Only the dimensions this geometry actually has. Indirect has none of its own - it borrows
+            // whatever the source toolpath has.
             bool isLine = tp.Geometry == WorkOrderGeometryKind.Line;
             bool isCircle = tp.Geometry == WorkOrderGeometryKind.Circle;
             bool isWD = tp.Geometry == WorkOrderGeometryKind.Oval || tp.Geometry == WorkOrderGeometryKind.Rect;
@@ -576,6 +665,17 @@ namespace CNC.Controls
             Show(fldSize, tp.Geometry == WorkOrderGeometryKind.Square);
             Show(fldWidth, isWD);
             Show(fldDepthY, isWD);
+
+            Show(pnlIndirectSource, tp.IsIndirect);
+            if (tp.IsIndirect)
+            {
+                // Every OTHER non-Indirect toolpath is a legal source - excluding Indirect ones keeps this to a
+                // single hop rather than a chain WorkOrderCompiler would have to resolve recursively.
+                cbxIndirectSource.Items.Clear();
+                foreach (var candidate in workOrder.Toolpaths.Where(t => !ReferenceEquals(t, tp) && !t.IsIndirect))
+                    cbxIndirectSource.Items.Add(candidate.Name);
+                cbxIndirectSource.SelectedItem = tp.IndirectSource;
+            }
 
             cbxPattern.SelectedIndex = Array.IndexOf(WorkOrderRules.AllPatterns, tp.Pattern);
             fldColumns.Value = tp.Columns; fldColumnSpacing.Value = tp.ColumnSpacing;
@@ -731,6 +831,15 @@ namespace CNC.Controls
 
             RebuildTree(selectedToolpath);
             LoadFields();
+            OnWorkOrderChanged();
+        }
+
+        private void cbxIndirectSource_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null)
+                return;
+            selectedToolpath.IndirectSource = cbxIndirectSource.SelectedItem as string;
+            RebuildTree(selectedToolpath);
             OnWorkOrderChanged();
         }
 
@@ -1163,19 +1272,24 @@ namespace CNC.Controls
 
             // Envelopes first, so the nominal outlines stay legible on top of them.
             // A held-back toolpath gets no envelope: the envelope shows where material WILL be removed, and
-            // this one isn't going to remove any.
+            // this one isn't going to remove any. An Indirect toolpath's "own operations" are borrowed from
+            // its source (see WillRun/GeometrySource) - it has none of its own to check here.
             foreach (var tp in workOrder.Toolpaths)
-                if (workOrder.EnabledOperations(tp).Any())
+                if (WillRun(tp))
                     foreach (var pos in tp.PatternPositions())
-                        DrawEnvelope(tp, pos[0], pos[1], scale);
+                        DrawEnvelope(GeometrySource(tp), pos[0], pos[1], scale);
 
             var geomBrushes = OddJobsStockCanvas.GeometryBrushes(OddJobsSetupConfig.Section?.Material ?? string.Empty);
             foreach (var tp in workOrder.Toolpaths)
             {
+                // What actually decides the drawn shape/size/reach - the toolpath itself, or (Indirect) whatever
+                // it currently points at. Position, pattern and the name label still come from tp itself.
+                var geom = GeometrySource(tp);
+
                 bool isSelected = ReferenceEquals(tp, selectedToolpath);
                 // Still drawn when held back - it's geometry you authored and want to see for fit against the
                 // rest - but greyed, so what's actually going to be cut reads at a glance.
-                bool willRun = workOrder.EnabledOperations(tp).Any();
+                bool willRun = WillRun(tp);
                 var stroke = !willRun ? geomBrushes.HeldBack : isSelected ? geomBrushes.Selected : geomBrushes.Normal;
                 double thickness = isSelected ? 2d : 1d;
                 var positions = tp.PatternPositions().ToList();
@@ -1185,22 +1299,22 @@ namespace CNC.Controls
                 foreach (var pos in positions)
                 {
                     var center = OddJobsStockCanvas.ToPixel(stockTransform, pos[0], pos[1]);
-                    switch (tp.Geometry)
+                    switch (geom.Geometry)
                     {
                         case WorkOrderGeometryKind.Line:
-                            AddLine(center, tp, scale, stroke, thickness);
+                            AddLine(center, geom, scale, stroke, thickness);
                             break;
                         case WorkOrderGeometryKind.Circle:
-                            AddEllipse(center, tp.Diameter / 2d * scale, tp.Diameter / 2d * scale, stroke, thickness, null);
+                            AddEllipse(center, geom.Diameter / 2d * scale, geom.Diameter / 2d * scale, stroke, thickness, null);
                             break;
                         case WorkOrderGeometryKind.Oval:
-                            AddEllipse(center, tp.Width / 2d * scale, tp.Depth / 2d * scale, stroke, thickness, null);
+                            AddEllipse(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
                             break;
                         case WorkOrderGeometryKind.Square:
-                            AddRect(center, tp.Size / 2d * scale, tp.Size / 2d * scale, stroke, thickness, null);
+                            AddRect(center, geom.Size / 2d * scale, geom.Size / 2d * scale, stroke, thickness, null);
                             break;
                         default:
-                            AddRect(center, tp.Width / 2d * scale, tp.Depth / 2d * scale, stroke, thickness, null);
+                            AddRect(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
                             break;
                     }
 
@@ -1223,9 +1337,25 @@ namespace CNC.Controls
                 };
                 label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 Canvas.SetLeft(label, anchor.X - label.DesiredSize.Width / 2d);
-                Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(tp, scale) - 17d);
+                Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(geom, scale) - 17d);
                 canvasDiagram.Children.Add(label);
             }
+        }
+
+        // The toolpath that actually decides drawn shape/size/reach for `tp` - itself, unless `tp` is Indirect,
+        // in which case its resolved source (or `tp` itself, drawing as a default-sized placeholder, if the
+        // reference is currently broken - see WorkOrderRules.ResolveIndirectSource).
+        private WorkOrderToolpath GeometrySource(WorkOrderToolpath tp)
+        {
+            return WorkOrderRules.ResolveIndirectSource(workOrder, tp) ?? tp;
+        }
+
+        // Whether this toolpath's cut will actually show up in Generate - its own enabled operations, or
+        // (Indirect) its resolved source's.
+        private bool WillRun(WorkOrderToolpath tp)
+        {
+            var source = WorkOrderRules.ResolveIndirectSource(workOrder, tp);
+            return source != null && workOrder.EnabledOperations(source).Any();
         }
 
         // Vertical half-extent in pixels, so a label can sit clear of the shape it names.

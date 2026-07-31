@@ -78,6 +78,11 @@
                             <Label x:Uid="lbl_wogeom" Content="Geometry:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxGeometry" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxGeometry_SelectionChanged"/>
                         </StackPanel>
+                        <StackPanel x:Name="pnlIndirectSource" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_wosource" Content="Source toolpath:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxIndirectSource" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxIndirectSource_SelectionChanged"
+                                      ToolTip="Runs this toolpath's CURRENT geometry and operations here, at this toolpath's own X/Y - a live reference, not a copy. Editing the source later changes this one too."/>
+                        </StackPanel>
 
                         <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>

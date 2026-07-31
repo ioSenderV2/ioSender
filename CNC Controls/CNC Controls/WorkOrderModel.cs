@@ -23,8 +23,13 @@ using System.Linq;
 
 namespace CNC.Controls
 {
-    // Every geometry this tab can handle. Line is the only OPEN one - the rest are closed loops.
-    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect }
+    // Every geometry this tab can handle. Line is the only OPEN one - the rest are closed loops. Indirect is
+    // not really a shape at all - it carries no dimensions of its own and no operations; it borrows both,
+    // live, from another toolpath named in IndirectSource (see WorkOrderToolpath), and only supplies a
+    // different X/Y (and optionally its own Pattern) to run them at. Editing the source's geometry or
+    // operations is reflected the next time this one generates - that's the whole point versus Duplicate,
+    // which forks an independent copy instead.
+    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Indirect }
 
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
@@ -106,9 +111,16 @@ namespace CNC.Controls
         public double Columns = 2d, RowSpacing = 50d, ColumnSpacing = 32d, Rows = 1d;   // Grid
         public double PatternCount = 6d, PatternRadius = 40d, PatternStartAngle = 0d, PatternArcSpan = 360d;   // Circular
 
+        // Indirect only: the Name of another toolpath whose geometry and operations run here instead. A plain
+        // name rather than an object reference or id because the model is otherwise entirely value-based (see
+        // .workorder save/load) - the cost is that renaming the source breaks the link, which
+        // WorkOrderRules.Validate flags rather than something the compiler can silently paper over.
+        public string IndirectSource = null;
+
         public List<WorkOrderOperation> Operations = new List<WorkOrderOperation>();
 
         public bool IsClosed { get { return Geometry != WorkOrderGeometryKind.Line; } }
+        public bool IsIndirect { get { return Geometry == WorkOrderGeometryKind.Indirect; } }
 
         // Every position this toolpath's geometry is cut at, instance one first. A None pattern yields exactly
         // the anchor point, so callers never need to special-case the unpatterned toolpath.
@@ -202,7 +214,7 @@ namespace CNC.Controls
     {
         public static readonly WorkOrderGeometryKind[] AllGeometries =
             { WorkOrderGeometryKind.Line, WorkOrderGeometryKind.Circle, WorkOrderGeometryKind.Oval,
-              WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect };
+              WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Indirect };
 
         #region Standard drill sizes
 
@@ -253,6 +265,17 @@ namespace CNC.Controls
 
         #endregion
 
+        // The toolpath an Indirect one actually borrows geometry and operations from, or null if the reference
+        // is broken (missing, renamed, or itself Indirect - see Validate). Everything else resolves to itself,
+        // so a caller that always goes through this method never needs to special-case "not Indirect".
+        public static WorkOrderToolpath ResolveIndirectSource(WorkOrder wo, WorkOrderToolpath tp)
+        {
+            if (!tp.IsIndirect)
+                return tp;
+            var source = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
+            return source != null && !source.IsIndirect ? source : null;
+        }
+
         public static readonly WorkOrderPatternKind[] AllPatterns =
             { WorkOrderPatternKind.None, WorkOrderPatternKind.Grid, WorkOrderPatternKind.Circular };
 
@@ -275,6 +298,7 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Oval: return "Oval (width, depth)";
                 case WorkOrderGeometryKind.Square: return "Square (size)";
                 case WorkOrderGeometryKind.Rect: return "Rectangle (width, depth)";
+                case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
                 default: return kind.ToString();
             }
         }
@@ -338,6 +362,10 @@ namespace CNC.Controls
         //  - Drill and Bore need a round hole, so they're Circle-only, and each carries its own diameter.
         public static IEnumerable<WorkOrderOpKind> AvailableOperations(WorkOrderToolpath tp)
         {
+            // Indirect carries no operations of its own - it runs whatever the source toolpath currently has.
+            if (tp.IsIndirect)
+                yield break;
+
             if (!HasRoughing(tp))
             {
                 if (tp.IsClosed)
@@ -384,6 +412,22 @@ namespace CNC.Controls
             foreach (var tp in wo.Toolpaths)
             {
                 string label = tp.Name + ": ";
+
+                if (tp.IsIndirect)
+                {
+                    var source = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
+                    if (string.IsNullOrEmpty(tp.IndirectSource))
+                        warnings.Add(label + "no source toolpath selected.");
+                    else if (string.Equals(tp.IndirectSource, tp.Name, StringComparison.OrdinalIgnoreCase))
+                        warnings.Add(label + "can't reference itself.");
+                    else if (source == null)
+                        warnings.Add(string.Format("{0}source toolpath \"{1}\" no longer exists - it was renamed or removed.", label, tp.IndirectSource));
+                    else if (source.IsIndirect)
+                        warnings.Add(label + "an Indirect toolpath can't point at another Indirect toolpath.");
+                    else if (source.Operations.Count == 0)
+                        warnings.Add(string.Format("{0}source toolpath \"{1}\" has no operations of its own yet.", label, tp.IndirectSource));
+                    continue;
+                }
 
                 if (tp.Operations.Count == 0)
                 {
@@ -434,6 +478,10 @@ namespace CNC.Controls
                     return string.Format("oval {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
                 case WorkOrderGeometryKind.Square:
                     return string.Format("square {0:0.#}", tp.Size);
+                case WorkOrderGeometryKind.Indirect:
+                    return string.IsNullOrEmpty(tp.IndirectSource)
+                        ? "indirect (no source selected)"
+                        : string.Format("indirect -> {0}", tp.IndirectSource);
                 default:
                     return string.Format("rect {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
             }
