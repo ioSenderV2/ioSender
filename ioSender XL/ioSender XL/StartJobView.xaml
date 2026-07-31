@@ -135,11 +135,13 @@
                                 <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                            <!-- Outer 244x244: 32px pad around the 180x180 picker so the External X marks
-                                 (drawn OUTSIDE the corner/edge) have room to render without being clipped by
-                                 the enclosing StackPanel/GroupBox - a plain overflow render was tried first
-                                 and silently clipped. -->
-                            <Grid x:Name="pnlEdgePickerExt" Width="244" Height="244" HorizontalAlignment="Left">
+                            <!-- Outer 228x212: 32px pad on the LEFT only (kept - that's the gap to the
+                                 External/Internal/Is Circle column, left alone on purpose), 16px on
+                                 top/right/bottom (halved from the original uniform 32 - was just dead space,
+                                 nothing renders past the X marks' own small reach on those sides) around the
+                                 180x180 picker. Every X mark's margin below is computed against these same 4
+                                 pad values so they stay correctly placed relative to the corner/edge they mark. -->
+                            <Grid x:Name="pnlEdgePickerExt" Width="228" Height="212" HorizontalAlignment="Left">
                                 <Grid.Resources>
                                     <cnccontrols:EnumValueToBooleanConverter x:Key="EnumToEdgeConverter"/>
                                     <Style x:Key="GeomFlag" TargetType="RadioButton">
@@ -164,7 +166,7 @@
                                         </Setter>
                                     </Style>
                                 </Grid.Resources>
-                                <Grid Width="180" Height="180" Margin="32,32,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <Grid Width="180" Height="180" Margin="32,16,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="60"/><RowDefinition Height="60"/><RowDefinition Height="60"/>
                                     </Grid.RowDefinitions>
@@ -181,53 +183,52 @@
                                     <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerB.png" Grid.Row="2" Grid.Column="2" Style="{StaticResource GeomFlag}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=B}"/>
                                 </Grid>
                                 <!-- Probe-placement X marks (External = outward, past the corner/edge). Margins are
-                                     relative to THIS outer 244x244 grid, i.e. picker-local (32,32,0,0) + the same
-                                     offsets used inside the 180x180 picker itself. Corner offset matches the edge
-                                     offset (6) - close to the green dot, NOT the icon's own distant arrow-bend
-                                     graphic (tried that from a pixel-level read of cornerA.png; wrong landmark). -->
-                                <Path Style="{StaticResource XMark}" Margin="18,18,0,0">
+                                     relative to THIS outer grid's own 4 pad values (32 left, 16 top/right/bottom -
+                                     see the Grid's own comment): near-side coordinate = pad - 14, far-side
+                                     coordinate = outerDimension - pad - 2, centered coordinate = pad + 82. -->
+                                <Path Style="{StaticResource XMark}" Margin="18,2,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="D"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="210,18,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="210,2,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="C"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="18,210,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="18,194,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="A"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="210,210,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="210,194,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="B"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="114,18,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="114,2,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="CD"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="18,114,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="18,98,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="AD"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="210,114,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="210,98,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="CB"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="114,210,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="114,194,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="AB"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
                             </Grid>
 
-                            <Grid x:Name="pnlEdgePickerInt" Width="244" Height="244" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <Grid x:Name="pnlEdgePickerInt" Width="228" Height="212" HorizontalAlignment="Left" Visibility="Collapsed">
                                 <Grid.Resources>
                                     <cnccontrols:EnumValueToBooleanConverter x:Key="EnumToEdgeConverter"/>
                                     <Style x:Key="GeomFlagInt" TargetType="RadioButton">
@@ -252,7 +253,7 @@
                                         </Setter>
                                     </Style>
                                 </Grid.Resources>
-                                <Grid Width="180" Height="180" Margin="32,32,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <Grid Width="180" Height="180" Margin="32,16,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="60"/><RowDefinition Height="60"/><RowDefinition Height="60"/>
                                     </Grid.RowDefinitions>
@@ -269,48 +270,46 @@
                                     <RadioButton Content="/CNC.Controls.Probing;component/Resources/cornerIB.png" Grid.Row="2" Grid.Column="2" Style="{StaticResource GeomFlagInt}" IsChecked="{Binding Path=ProbeEdge, Mode=TwoWay, Converter={StaticResource EnumToEdgeConverter}, ConverterParameter=B}"/>
                                 </Grid>
                                 <!-- Probe-placement X marks (Internal = inward, past the corner/edge toward the grid centre).
-                                     Corner marks sit ON the diagonal through that corner toward the OPPOSITE corner
-                                     (equal x/y offset from the corner point, 40px along the diagonal, in outer-grid
-                                     coordinates: pad 32 + local-grid offset - a previous version mixed up the pad
-                                     constant per corner, which put C/A off-diagonal while D/B looked fine by
-                                     coincidence, since a uniform (dx,dy) error only cancels out when dx and dy sit
-                                     on the same corner's own diagonal). -->
-                                <Path Style="{StaticResource XMark}" Margin="64,64,0,0">
+                                     Corner marks sit ON the diagonal through that corner toward the OPPOSITE corner.
+                                     Margins are relative to THIS outer grid's own 4 pad values (32 left, 16
+                                     top/right/bottom - see the Grid's own comment): near-side coordinate = pad + 32,
+                                     far-side coordinate = outerDimension - pad - 48, centered coordinate = pad + 82. -->
+                                <Path Style="{StaticResource XMark}" Margin="64,48,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="D"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="164,64,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="164,48,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="C"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="64,164,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="64,148,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="A"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="164,164,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="164,148,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="B"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="114,64,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="114,48,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="CD"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="64,114,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="64,98,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="AD"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="164,114,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="164,98,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="CB"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
                                 </Path>
-                                <Path Style="{StaticResource XMark}" Margin="114,164,0,0">
+                                <Path Style="{StaticResource XMark}" Margin="114,148,0,0">
                                     <Path.Visibility>
                                         <MultiBinding Converter="{StaticResource ProbeEdgeVisibleConverter}" ConverterParameter="AB"><Binding Path="ProbeEdge"/></MultiBinding>
                                     </Path.Visibility>
