@@ -117,13 +117,20 @@
                          property, same as on those tabs. Is Circle shows a plain reference picture instead
                          (External/Internal alone already says solid-boss vs hole - nothing further to click). -->
                     <GroupBox x:Uid="ls_grpGeometry" x:Name="grpGeometry" Header="Geometry" Margin="0,8,0,0" Visibility="Collapsed">
-                        <StackPanel Margin="6">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <RadioButton x:Uid="ls_geomExternal" x:Name="rbGeomExternal" Content="External" GroupName="geomInOut" IsChecked="True" Margin="0,0,12,0"/>
-                                <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut"/>
-                                <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle" Margin="24,0,0,0"/>
+                        <Grid Margin="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- In/out + Is Circle stacked vertically to the LEFT of the picker diagram (rather
+                                 than above it) so the panel's height is the diagram's height, not the diagram's
+                                 height PLUS a whole extra row for these three controls. -->
+                            <StackPanel Grid.Column="0" VerticalAlignment="Top" Margin="0,0,12,0">
+                                <RadioButton x:Uid="ls_geomExternal" x:Name="rbGeomExternal" Content="External" GroupName="geomInOut" IsChecked="True" Margin="0,0,0,6"/>
+                                <RadioButton x:Uid="ls_geomInternal" x:Name="rbGeomInternal" Content="Internal" GroupName="geomInOut" Margin="0,0,0,6"/>
+                                <CheckBox x:Uid="ls_geomIsCircle" x:Name="chkIsCircle" Content="Is Circle"/>
                             </StackPanel>
-
+                            <StackPanel Grid.Column="1">
                             <!-- Outer 244x244: 32px pad around the 180x180 picker so the External X marks
                                  (drawn OUTSIDE the corner/edge) have room to render without being clipped by
                                  the enclosing StackPanel/GroupBox - a plain overflow render was tried first
@@ -314,7 +321,8 @@
                             </Grid>
                             <cnccontrols:NumericField x:Name="fldCenterPasses" x:Uid="ls_centerPasses" Label="Passes:" ColonAt="55" Unit="" Format="0" Value="1" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Collapsed"
                                                       ToolTip="Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."/>
-                        </StackPanel>
+                            </StackPanel>
+                        </Grid>
                     </GroupBox>
 
                     <!-- Right-click this panel's header for a Show in inches/millimeters toggle (UnitToggleMenu,
