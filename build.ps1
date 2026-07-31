@@ -119,10 +119,19 @@ if ($Launch) {
             $finalArgs = @($AppArgs)
             if ($Headless -and -not ($finalArgs -contains '-headless')) { $finalArgs += '-headless' }
 
-            $cmdLine = if ($finalArgs) { "$exe $($finalArgs -join ' ')" } else { $exe }
+            # Start-Process -ArgumentList joins array elements with a bare space and does NOT re-quote ones
+            # that contain whitespace - so a multi-word value (e.g. -message="two words") silently split back
+            # into separate argv entries on the CHILD side, and ioSender only ever saw the first word attached
+            # to -message=. Confirmed on real hardware 2026-07-30 (user: "never seen ioSender display more
+            # than one word"). Quote any element containing whitespace before joining so it survives as one
+            # argv token - the quotes are just command-line syntax (stripped by the OS's own argv parser),
+            # not literal content, so ioSender's own arg.StartsWith("-message=") still sees the raw text.
+            $quotedArgs = $finalArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+
+            $cmdLine = if ($finalArgs) { "$exe $($quotedArgs -join ' ')" } else { $exe }
             Write-Host "==> Launching: $cmdLine" -ForegroundColor Cyan
 
-            if ($finalArgs) { Start-Process $exe -ArgumentList $finalArgs } else { Start-Process $exe }
+            if ($finalArgs) { Start-Process $exe -ArgumentList ($quotedArgs -join ' ') } else { Start-Process $exe }
         }
         else {
             Write-Host "==> Built exe not found: $exe" -ForegroundColor Red
