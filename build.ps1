@@ -20,7 +20,17 @@
     "Both" (ambiguous which to launch); combine with -Configuration Debug.
 
 .PARAMETER NoKill
-    Skip killing a running ioSender.exe first.
+    Skip killing a running ioSender.exe first. Only skips the kill step - it can't release the
+    OS file lock a running instance holds on its own DLLs/EXE, so this alone still fails
+    (MSB3027/MSB3021 "file is locked") the moment there's an actual rebuild to do. Prefer
+    -Scratch for an interim/verification build that must not disturb a running test instance.
+
+.PARAMETER Scratch
+    Build into a side output folder (bin\<Configuration>.scratch\, via MSBuild's OutDir
+    override) instead of the live bin\<Configuration>\ tree, so the rebuild can never collide
+    with a running instance's file lock in the first place - no kill needed, nothing disturbed.
+    This is what an interim/verification build should use. Implies no launch and no kill: a
+    scratch build only proves the code compiles, it isn't the build you're meant to test.
 
 .PARAMETER Headless
     Launch with -headless forwarded to ioSender.exe, so an unhandled exception dumps to
@@ -53,6 +63,11 @@
     command-line parser (it tries to build an array at the comma), not this script; the
     error surfaces before build.ps1 even starts running. Once quoted, PositionalBinding is
     off (see CmdletBinding below) so it can't be mis-bound to -Configuration either.
+
+.EXAMPLE
+    .\build.ps1 -Scratch
+    Verify-only build into bin\Debug.scratch\ - doesn't touch bin\Debug\, so a running test
+    instance launched from there keeps running untouched.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -60,6 +75,7 @@ param(
     [string]$Configuration = 'Debug',
     [switch]$Launch,
     [switch]$NoKill,
+    [switch]$Scratch,
     [switch]$Headless,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
     #   .\build.ps1 -Launch -forgetnetwork -demomarker
@@ -86,10 +102,16 @@ function Find-MSBuild {
 }
 
 function Invoke-Build {
-    param([string]$Config)
-    Write-Host "==> Building $Config ..." -ForegroundColor Cyan
+    param([string]$Config, [string]$OutDir)
+    Write-Host "==> Building $Config$(if ($OutDir) { ' (scratch)' }) ..." -ForegroundColor Cyan
     # -restore so PackageReference deps (e.g. WpfUiTestServer from NuGet) resolve before Build.
-    & $msbuild $solution -restore -t:Build "-p:Configuration=$Config" -m -nologo -v:minimal -clp:ErrorsOnly
+    $props = @("-p:Configuration=$Config")
+    # OutDir is a global MSBuild property: passed on the command line, it overrides every
+    # project's own (per-project-relative) OutputPath and consolidates the whole solution's
+    # output into ONE folder - same shape as the normal bin\<Config>\ tree, just elsewhere, so
+    # a scratch build can never collide with the live tree's file lock.
+    if ($OutDir) { $props += "-p:OutDir=$OutDir" }
+    & $msbuild $solution -restore -t:Build @props -m -nologo -v:minimal -clp:ErrorsOnly
     if ($LASTEXITCODE -ne 0) {
         Write-Host "==> $Config build FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
         exit $LASTEXITCODE
@@ -97,20 +119,37 @@ function Invoke-Build {
     Write-Host "==> $Config build OK" -ForegroundColor Green
 }
 
+function ScratchOutDir([string]$Config) {
+    # MSBuild wants OutDir to end in a separator, but a SINGLE trailing backslash right before the
+    # closing quote .NET adds around this arg (it contains a space - "ioSender XL") gets read by
+    # Win32's own argv parser as an ESCAPED quote, not an end-of-argument marker - the quote never
+    # closes and everything after silently gets absorbed into this one value (confirmed: every
+    # following project's restore step failed with garbage combining this path with "-m -nologo
+    # ..."). Doubling it (\\) escapes to one literal backslash instead, which is what OutDir wants.
+    (Join-Path $root ("ioSender XL\ioSender XL\bin\{0}.scratch" -f $Config)) + '\\'
+}
+
 if (-not (Test-Path $solution)) { throw "Solution not found: $solution" }
 $msbuild = Find-MSBuild
 
-if (-not $NoKill) {
+# A scratch build never touches bin\<Config>\ at all, so there's nothing to kill.
+if (-not $NoKill -and -not $Scratch) {
     Get-Process ioSender -ErrorAction SilentlyContinue | Stop-Process -Force
 }
 
 switch ($Configuration) {
-    'Both'  { Invoke-Build 'Debug'; Invoke-Build 'Release' }
-    default { Invoke-Build $Configuration }
+    'Both'  {
+        Invoke-Build 'Debug' $(if ($Scratch) { ScratchOutDir 'Debug' })
+        Invoke-Build 'Release' $(if ($Scratch) { ScratchOutDir 'Release' })
+    }
+    default { Invoke-Build $Configuration $(if ($Scratch) { ScratchOutDir $Configuration }) }
 }
 
 if ($Launch) {
-    if ($Configuration -eq 'Both') {
+    if ($Scratch) {
+        Write-Host "==> -Launch ignored with -Scratch (a scratch build is verify-only)." -ForegroundColor Yellow
+    }
+    elseif ($Configuration -eq 'Both') {
         Write-Host "==> -Launch ignored for 'Both' (pass -Configuration Debug to launch)." -ForegroundColor Yellow
     }
     else {
