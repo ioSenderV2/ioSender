@@ -487,6 +487,21 @@ namespace CNC.Controls
         private static List<string> BuildChamfer(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
+
+            // Countersink bit on a round hole: plunge straight down the centerline instead of tracing the
+            // outline - the bit's own 90-deg cone does the chamfering as it descends (same geometry the V-bit
+            // trace relies on), so there's no need to follow an edge at all when the feature is round. See
+            // OddJobsTool.CountersinkBit's own comment. PlungeFeed (not Feed) since this is a genuine axial
+            // plunge, not a light corner-breaking trace.
+            if ((OddJobsTool)op.Tool == OddJobsTool.CountersinkBit && tp.Geometry == WorkOrderGeometryKind.Circle)
+            {
+                lines.Add("G0 X" + F(cx) + " Y" + F(cy));
+                lines.Add("G0 Z" + F(SafeZ()));
+                lines.Add("G1 Z" + F(-op.ChamferDepth) + " F" + F(op.PlungeFeed));
+                lines.Add("G0 Z" + F(SafeZ()));
+                return lines;
+            }
+
             var edge = Outline(tp, cx, cy, 0d);
 
             lines.Add("G0 " + XY(edge[0]));
@@ -546,7 +561,7 @@ namespace CNC.Controls
                         continue;
 
                     var tool = (OddJobsTool)op.Tool;
-                    string type = tool == OddJobsTool.VBit45 ? "VBIT A=90"
+                    string type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.CountersinkBit) ? "VBIT A=90"
                                 : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
                                 : "FLAT";
                     yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, ToolDescription(tool));
@@ -573,6 +588,7 @@ namespace CNC.Controls
                 case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
                 case OddJobsTool.BallEnd18: return "1/8\" ball end";
                 case OddJobsTool.DrillBit: return "drill";
+                case OddJobsTool.CountersinkBit: return "countersink bit";
                 default: return tool.ToString();
             }
         }

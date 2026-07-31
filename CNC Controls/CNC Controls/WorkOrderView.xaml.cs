@@ -907,6 +907,7 @@ namespace CNC.Controls
                 case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
                 case OddJobsTool.BallEnd18: return "1/8\" ball end";
                 case OddJobsTool.DrillBit: return "drill";
+                case OddJobsTool.CountersinkBit: return "countersink bit";
                 default: return tool.ToString();
             }
         }
@@ -1037,6 +1038,22 @@ namespace CNC.Controls
 
                     if (op.Kind == WorkOrderOpKind.Bore && op.BitDiameter >= op.HoleDiameter)
                         warnings.Add(opLabel + "bit must be smaller than the hole to bore it - use a Drill if the bit IS the hole size.");
+
+                    if (op.Kind == WorkOrderOpKind.Chamfer && (OddJobsTool)op.Tool == OddJobsTool.CountersinkBit)
+                    {
+                        if (tp.Geometry != WorkOrderGeometryKind.Circle)
+                            warnings.Add(opLabel + "a countersink bit only plunges a round hole - pick the V-bit for this shape.");
+                        else
+                        {
+                            // Same 45-deg-per-side geometry as the V-bit trace (see OddJobsTool.CountersinkBit's
+                            // own comment) - the cone can't reach a diameter wider than the bit's own, so the
+                            // deepest usable ChamferDepth is half the bit diameter.
+                            if (op.BitDiameter < 2d * op.ChamferDepth)
+                                warnings.Add(opLabel + string.Format("bit too small to reach this chamfer depth - max depth for a {0:0.0##} mm bit is {1:0.0##} mm.", op.BitDiameter, op.BitDiameter / 2d));
+                            if (op.BitDiameter <= tp.Diameter)
+                                warnings.Add(opLabel + "bit must be larger than the hole to chamfer its rim, not just re-cut the hole itself.");
+                        }
+                    }
 
                     if (op.Kind == WorkOrderOpKind.BottomFinish && rough != null)
                     {

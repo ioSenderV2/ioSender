@@ -34,7 +34,13 @@ namespace CNC.Controls
         EndMill2Flute18, BallEnd18,
         // A real twist drill - straight-plunge drilling now picks the bit that matches the hole (see
         // WorkOrderRules.TryMatchDrill), rather than being approximated with an O-flute.
-        DrillBit
+        DrillBit,
+        // A 90-deg countersink/chamfer bit (e.g. a QWORK-style single-flute cobalt countersink) - for a
+        // Chamfer operation on a round-hole toolpath small enough for the bit's own diameter to span it, this
+        // plunges straight down the hole's centerline instead of tracing the outline like the 45-deg V-bit
+        // does (see WorkOrderCompiler.BuildChamfer). Same 45-deg-per-side geometry as VBit45, so ChamferDepth
+        // means the same thing either way - only the MOTION differs.
+        CountersinkBit
     }
 
     public partial class OddJobsFeedsSpeedsDialog : Window
@@ -161,7 +167,9 @@ namespace CNC.Controls
         {
             if (SelectedTool == OddJobsTool.DrillBit)
                 return IsHssDrill ? "drill-hss" : "drill";
-            return SelectedTool == OddJobsTool.VBit45 ? "chamfer" : "mill";
+            // CountersinkBit is the same 45-deg-per-side conical geometry as VBit45 (see its own enum
+            // comment) - routes into the same EvaluateVBit advisor path.
+            return SelectedTool == OddJobsTool.VBit45 || SelectedTool == OddJobsTool.CountersinkBit ? "chamfer" : "mill";
         }
 
         // pnlDrillStyle's own SelectedIndex, 1 = HSS twist, 0 (or unset) = brad point/twist (the default,
@@ -194,6 +202,9 @@ namespace CNC.Controls
                 // Diameter deliberately left alone: a drill's size IS the hole being cut, so the caller sets
                 // it from the geometry rather than this dropdown supplying a nominal.
                 case OddJobsTool.DrillBit: Flutes = 2; break;
+                // No nominal diameter - these come as a graduated set (e.g. 2-8/6-10/10-15/15-20mm cutting
+                // diameter), so whichever physical bit is chucked determines it; the operator enters it.
+                case OddJobsTool.CountersinkBit: Flutes = 2; break;
             }
             pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
             if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)
