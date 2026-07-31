@@ -67,9 +67,15 @@ a per-turn thing).
    in the first place: no kill, no wait, nothing disturbed. Verified by running it while a live Debug
    instance kept running, untouched, throughout. It implies no launch (warns if `-Launch` is also
    passed) and no kill (`-NoKill` becomes redundant with it) - it's verify-only, never the build the
-   user actually tests. Use `-Scratch` for every interim/verification build now; reserve plain
-   `-Configuration Debug` (no `-Scratch`) for when you genuinely want to rebuild the live tree without
-   also launching it.
+   user actually tests.
+   **Only reach for `-Scratch` when there's a genuine interim build to do** - a multi-file/multi-step
+   turn where you need to confirm something compiles WHILE a running instance is still mid-test and
+   shouldn't be disturbed yet. **Don't run it reflexively before every `-Launch` build "just to check"
+   first** - corrected 2026-07-31 after doing exactly that on straightforward single-fix turns (a
+   `-Scratch` build immediately followed by an identical `-Launch` build, doubling build time for
+   nothing): the vast majority of changes compile clean, so when a turn has only ONE build to do, that
+   build IS `-Launch` - if it fails, the error surfaces there and gets fixed same as any other build
+   failure, no separate pre-check needed.
    Corrected 2026-07-25 (twice), 2026-07-30 (the -message addition and the kill-on-every-build
    gotcha), and again 2026-07-30 (`-Scratch` supersedes the earlier "an interim build ending the
    user's session is unavoidable" conclusion - turned out to be avoidable after all, just not via
