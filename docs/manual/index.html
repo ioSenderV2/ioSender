@@ -251,7 +251,7 @@
     <p>The key insight: <strong>your CAM program is written around a work origin it can't know the real
     location of.</strong> "Zeroing" (usually with a probe) is how you tell the machine <em>where that work
     origin sits in machine space</em>. Do that well and the part lands exactly where you intend. See
-    <a href="#offsets">Work offsets</a> and <a href="#start-job">Start Job</a>.</p>
+    <a href="#offsets">Work offsets</a> and <a href="#setup">Setup</a>.</p>
     <figure class="svgfig">
       <svg viewBox="0 0 640 360" role="img" aria-label="Diagram: machine coordinates versus work coordinates">
         <defs>
@@ -366,7 +366,7 @@
       <tr><td><strong>Toolsetter</strong></td><td>A fixed button at a known machine location. The tool touches it to measure its <strong>length</strong> — the key to painless tool changes (below).</td></tr>
       <tr><td><strong>Touch/edge combos</strong></td><td>Many setups use a touch plate <em>or</em> a 3D probe for XY plus a toolsetter for tool length.</td></tr>
     </table>
-    <p>ioSender's <a href="#probing">Probing</a> tab and <a href="#start-job">Start Job</a> drive these routines for you.</p>
+    <p><a href="#setup">Setup</a> drives these routines for you.</p>
 
     <h3>The controller &amp; the grbl language</h3>
     <p>The <strong>controller</strong> is the machine's brain — a small board (grblHAL on a Teensy or STM32,
@@ -489,7 +489,7 @@
       <figcaption>The manual touch-plate change (left) re-establishes Z against the stock on every swap and risks moving the XY origin. With a toolsetter (right) you probe the origin once; each tool change only re-measures length at a fixed location, so the part's origin is never disturbed.</figcaption>
     </figure>
     <div class="callout note"><span class="k">In ioSender</span><br>
-      <a href="#start-job">Start Job</a> sets the work origin with the probe, and the
+      <a href="#setup">Setup</a> sets the work origin with the probe, and the
       <a href="#tools">Tools</a> / tool-change flow uses the toolsetter to re-measure length on each change —
       so multi-tool jobs stay accurate without re-zeroing.</div>
 
@@ -510,7 +510,7 @@
       ioSender window, then <a href="#connect">Connect</a> to your machine — the Novice track walks you
       through the rest in order (use the <em>Next</em> button below).</div>
 
-    <div class="xref">Related: <a href="#offsets">Work offsets (WCS)</a> · <a href="#probing">Probing</a> · <a href="#settings">Settings (grbl)</a> · <a href="#start-job">Start Job</a> · <a href="#tools">Tools</a></div>
+    <div class="xref">Related: <a href="#offsets">Work offsets (WCS)</a> · <a href="#settings">Settings (grbl)</a> · <a href="#setup">Setup</a> · <a href="#tools">Tools</a></div>
   </section>
 
   <!-- ===================== GETTING STARTED ===================== -->
@@ -526,11 +526,11 @@
     <p>Across the top is a row of <strong>tabs</strong>. The important ones, left to right:</p>
     <table class="reftab">
       <tr><th>Tab</th><th>What it's for</th></tr>
-      <tr><td><a href="#start-job">Start Job</a></td><td>The front door: measure your stock, set the origin, and launch a job.</td></tr>
+      <tr><td><a href="#setup">Setup</a></td><td>The front door: measure your stock, set the origin, and launch a job.</td></tr>
       <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run bar.</td></tr>
+      <tr><td><a href="#work-order">Work Order</a></td><td>Compose a quick job (pockets, drills, contours…) without a CAM round-trip.</td></tr>
       <tr><td><a href="#machine-setup">Machine&nbsp;Setup</a></td><td>Guided first-time commissioning of a new controller.</td></tr>
       <tr><td><a href="#tools">Tools</a></td><td>Tool table, spoilboard surfacing, gantry squaring, stepper calibration, Trinamic/PID.</td></tr>
-      <tr><td><a href="#probing">Probing</a></td><td>Edge/corner/center/tool-length probing routines.</td></tr>
       <tr><td><a href="#settings">Settings</a></td><td>All grbl <code>$</code> settings plus the app's own preferences.</td></tr>
     </table>
 
@@ -539,7 +539,8 @@
       <li><a href="#connect">Connect</a> to the controller (serial port or network).</li>
       <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once.</li>
       <li>Learn to <a href="#jogging">jog</a> — move the machine safely by hand.</li>
-      <li>Load some g-code on the <a href="#job">Job</a> tab, or use <a href="#start-job">Start Job</a>.</li>
+      <li>Load some g-code on the <a href="#job">Job</a> tab, use <a href="#setup">Setup</a> to probe your
+      stock, or compose a quick job in <a href="#work-order">Work Order</a>.</li>
       <li>Know your <a href="#errors-alarms">errors &amp; alarms</a> for when something stops.</li>
     </ol>
 
@@ -607,7 +608,7 @@
       <li><strong>Machine position</strong> — relative to the machine's home corner. Fixed, set by homing.</li>
     </ul>
     <p>The per-axis <strong>zero</strong> buttons set the <em>work</em> origin at the current spot — handy for
-    quick manual setups (though probing is more repeatable, see <a href="#start-job">Start Job</a>).</p>
+    quick manual setups (though probing is more repeatable, see <a href="#setup">Setup</a>).</p>
 
     <h3>Two ways to jog</h3>
     <p><strong>On-screen jog pad</strong> — arrow buttons for each axis, with:</p>
@@ -703,7 +704,7 @@
     <h3>5. A disciplined, repeatable origin</h3>
     <p>Repeatability comes from setting the work origin the <em>same way every time</em>. Probe it rather than
     eyeballing, verify Z zero, and know exactly where <code>0,&nbsp;0,&nbsp;0</code> sits on your stock.
-    <a href="#start-job">Start Job</a> and <a href="#probing">Probing</a> exist to make this identical run to
+    <a href="#setup">Setup</a> exists to make this identical run to
     run — that's what turns "it worked once" into "it works every time." See also
     <a href="#offsets">Work offsets</a>.</p>
 
@@ -717,7 +718,7 @@
       high whine and dust mean you're rubbing; chatter marks mean too much engagement or not enough rigidity.
       Adjust the <strong>feed-rate override</strong> on the fly and note what worked for next time.</div>
 
-    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#probing">Probing</a> · <a href="#tools">Tools (surface the spoilboard)</a> · <a href="#gcode-viewer">3D viewer</a></div>
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#tools">Tools (surface the spoilboard)</a> · <a href="#gcode-viewer">3D viewer</a></div>
   </section>
 
   <!-- ===================== ACCURACY & CALIBRATION (Machinist opener) ===================== -->
@@ -769,20 +770,19 @@
       <li><strong>WCS discipline</strong> — use <code>G54</code>–<code>G59.3</code> deliberately; set offsets
       with <code>G10&nbsp;L2/L20</code>; keep an <code>R0</code>-before-<code>G53</code> habit; know at every
       line whether you're in machine or work space. Skew/rotation via <code>G10&nbsp;L2&nbsp;R</code>
-      (<a href="#start-job">Start Job</a> uses this).</li>
+      (<a href="#setup">Setup</a> uses this).</li>
     </ol>
 
     <h3>Then verify</h3>
     <p>Calibration isn't done until you've <em>proved</em> it: cut a test — a circle-diamond-square, a
     calibration cube, or a simple gauge — and measure it with calipers or an indicator. Adjust and repeat until
-    the numbers match. A <a href="#heightmap">height map</a> can compensate a surface you can't make physically
-    flatter (e.g. PCB isolation).</p>
+    the numbers match.</p>
 
     <div class="callout note"><span class="k">Closed-loop ≠ calibrated</span><br>
       Closed-loop steppers and servos remove the "lost steps" failure mode, but they don't fix geometry — a
       machine that's out of square is out of square whether or not it can report position. You still calibrate.</div>
 
-    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#tools">Tools (Auto Square, stepper cal, Trinamic/PID)</a> · <a href="#probing">Probing</a> · <a href="#offsets">Work offsets</a> · <a href="#heightmap">Height map</a></div>
+    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#tools">Tools (Auto Square, stepper cal, Trinamic/PID)</a> · <a href="#offsets">Work offsets</a></div>
   </section>
 
   <!-- ===================== THE JOB SCREEN ===================== -->
@@ -817,10 +817,15 @@
       <li><strong>Load Folder...</strong> — open a whole folder of per-operation <code>.nc</code> files
       (as a CAM post often produces) and combine them into one ordered program, using the program-view
       header button (or drag-and-drop a folder onto the list).</li>
+      <li><strong>Work Order</strong> — press <strong>Run</strong> on the <a href="#work-order">Work
+      Order</a> tab and the program it just compiled loads here as the real, active job — not a preview.
+      Whatever was loaded before is restored once the run ends.</li>
     </ul>
     <p>Large files and folders load on a background thread, so the window stays responsive while a big program
-    parses. In ioSender <em>a program is a program</em>: whether it came from a file, a folder, or a wizard,
-    it shows in the same g-code list and runs the same way.</p>
+    parses. In ioSender <em>a program is a program</em>: whether it came from a file, a folder, or
+    <a href="#work-order">Work Order</a>, it shows in the same g-code list, runs the same way, and updates
+    the same live per-line status as it executes. The program-view header's title names what's loaded (a
+    filename, or "Work Order" for a generated run).</p>
 
     <h3>The g-code list &amp; the 3D view</h3>
     <p>The loaded program appears as a scrolling line list beside the live <a href="#gcode-viewer">3D
@@ -872,32 +877,64 @@
       watching traffic on a second monitor while you work the Job screen. <kbd>Esc</kbd> still toggles the
       console.</div>
 
-    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#gcode-viewer">3D viewer</a> · <a href="#clean-results">Clean results</a> · <a href="#sdcard">SD card</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#gcode-viewer">3D viewer</a> · <a href="#clean-results">Clean results</a> · <a href="#sdcard">SD card</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
 
-  <!-- ===================== START JOB ===================== -->
-  <section class="topic" id="start-job" data-title="Start Job — measure stock &amp; set origin" data-level="nov"
+  <!-- ===================== SETUP ===================== -->
+  <section class="topic" id="setup" data-title="Setup — measure stock &amp; set the origin" data-level="nov"
            data-track="novice:6,intermediate:4,machinist:8" data-video="pending">
-    <h2>Start Job — measure stock &amp; set the origin <a class="anchor" href="#start-job">#</a></h2>
+    <h2>Setup — measure stock &amp; set the origin <a class="anchor" href="#setup">#</a></h2>
     <div class="tags"><span class="tag nov">Novice</span><span class="tag int">Intermediate</span></div>
-    <p><strong>Start Job</strong> is the guided front door to running a part. Instead of jogging around and
-    zeroing by eye, you let the machine <em>probe</em> your stock: it finds the real size and position,
-    optionally corrects for how the stock sits skewed on the table, sets the work origin, and takes a
-    tool-length reference — then launches the job.</p>
+    <p><strong>Setup</strong> (formerly called "Start Job") is the guided front door to running a part.
+    Instead of jogging around and zeroing by eye, you let the machine <em>probe</em> your stock: it finds
+    the real size and position, optionally corrects for how the stock sits skewed on the table, sets the
+    work origin, and takes a tool-length reference.</p>
+    <p>Setup is a single, shared fact about the machine — not something you redo per program. It's the same
+    tab and the same saved state whether you go on to run a loaded <code>.nc</code> file from the
+    <a href="#job">Job</a> tab or a program you compose in <a href="#work-order">Work Order</a>; there's no
+    separate "setup" step duplicated inside Work Order. Run Setup once, then use either.</p>
 
     <figure>
-      <img src="img/start-job-panel.png" alt="The Start Job setup panel">
-      <figcaption>The Start Job setup panel.</figcaption>
+      <img src="img/start-job-panel.png" alt="The Setup panel">
+      <figcaption>The Setup panel.</figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li><strong>Setup</strong> — pick the physical Fixture you clamped the stock against and which Probe to use; Safe Z delta sets how high the probe retracts between touches.</li>
-      <li><strong>Stock</strong> — the nominal Width/Height/Thickness you already know (from your CAM file or a tape measure); tick <strong>Stock size is exact</strong> only if you trust those numbers precisely, since it changes how aggressively the probe searches for the real edge.</li>
-      <li><strong>Actions</strong> — <strong>Set origin in</strong> picks which work-coordinate slot (G54, etc.) receives the new origin; <strong>Set tool-length reference</strong> also probes the current tool's length while it's at it.</li>
-      <li><strong>Measured stock / Flatness / Squareness</strong> — filled in once you've run a probe: the real measured size, how flat the top is, and how far off-square (skewed) the stock actually sits.</li>
-      <li><strong>The Stock diagram</strong> (right) — a live schematic of the four probed corners, with each corner's angle and Z height plus the diagonal measurements, so you can see at a glance how square and flat the material really is.</li>
-      <li><strong>Copy size / Verify skew</strong> — copy the measured size back into the nominal fields, or re-touch two corners to double-check the computed rotation.</li>
-      <li>The green <strong>Generate</strong>/Run button at the bottom of the window builds (then runs) the job once you're happy with the setup.</li>
+      <li><strong>Setup</strong> (top group) — pick the physical <strong>Fixture</strong> you clamped the
+      stock against (defined in <a href="#machine-setup">Machine&nbsp;Setup</a>'s Fixture definitions, or the
+      built-in <strong>Dynamic</strong> fixture below) and which <strong>Probe</strong> to use — a 3D probe,
+      or a Touch Plate (electrical continuity). Safe Z delta sets how high the probe retracts between
+      touches.</li>
+      <li><strong>Geometry</strong> — only shown when the <strong>Dynamic</strong> fixture is picked: choose
+      External/Internal and Is Circle with clickable corner/edge/centre picker grids, so a one-off feature
+      that doesn't have a saved fixture position can still be set up here without leaving the tab.</li>
+    </ul>
+
+    <figure>
+      <img src="img/setup-dynamic-geometry.png" alt="Setup with the Dynamic fixture and Geometry panel expanded, showing an Internal pick and the non-conductive Touch Plate warning">
+      <figcaption>The Dynamic fixture's Geometry panel, picking an Internal feature — the red text is the conductive-stock warning from a Touch Plate probe on non-conductive (MDF) stock.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Stock</strong> — the nominal Width/Height/Thickness you already know (from your CAM file or
+      a tape measure); tick <strong>Stock size is exact</strong> only if you trust those numbers precisely,
+      since it changes how aggressively the probe searches for the real edge. A <strong>Material</strong>
+      picker here also drives probing rules (see the conductive-stock callout below) and feeds the
+      chipload-based feeds/speeds advisor used elsewhere (e.g. <a href="#work-order">Work Order</a>).</li>
+      <li><strong>Actions</strong> — <strong>Set origin or offset</strong> picks the destination: any
+      work-coordinate slot G54–G59, or G92 for a temporary offset; <strong>Set tool-length reference</strong>
+      also probes the current tool's length at the same time; <strong>Measure stock size</strong> probes all
+      four corners; <strong>Probe height map</strong> (once stock is measured) probes a grid over the stock
+      and applies the resulting surface compensation to the run; <strong>Set work rotation from skew</strong>
+      applies the measured skew as a work-coordinate rotation.</li>
+      <li><strong>Measured stock / Flatness / Squareness</strong> — filled in once you've run a probe: the
+      real measured size, how flat the top is, and how far off-square (skewed) the stock actually sits.</li>
+      <li><strong>The Stock diagram</strong> (right) — a live schematic of the four probed corners, with each
+      corner's angle and Z height plus the diagonal measurements, so you can see at a glance how square and
+      flat the material really is.</li>
+      <li><strong>Copy size / Verify skew</strong> — copy the measured size back into the nominal fields, or
+      re-touch two corners to double-check the computed rotation.</li>
+      <li>The green <strong>Generate</strong>/Run button at the bottom of the window builds (then runs) the
+      job once you're happy with the setup.</li>
     </ul>
 
     <h3>The steps</h3>
@@ -918,12 +955,83 @@
       <strong>Verify skew</strong> re-touches the two back corners to double-check the rotation it measured
       before you commit to cutting.</div>
 
-    <div class="callout warn"><span class="k">Behind the scenes</span><br>
-      Start Job writes a controller-side <code>start_job.macro</code> and performs an automatic 3D probe as
-      part of the sequence. It must land on the Job tab to bootstrap the controller handshake. The work
-      rotation uses grblHAL's <code>G10&nbsp;L2&nbsp;R</code> — measured skew is applied as its negative.</div>
+    <div class="callout note"><span class="k">Conductive stock &amp; the Touch Plate</span><br>
+      A Touch Plate probe reads electrical continuity, so it needs a conductive path. ioSender reads
+      conductivity from the <strong>Material</strong> you picked in Stock (aluminium/brass/steel are
+      conductive; wood-based materials aren't) rather than a separate checkbox. Probing a Dynamic
+      Internal/Is-Circle feature on non-conductive stock with a Touch Plate shows a warning rather than a
+      hard block — a custom-shaped touch plate can still reach those points.</div>
 
-    <div class="xref">Related: <a href="#probing">Probing</a> · <a href="#offsets">Work offsets</a> · <a href="#job">The Job screen</a></div>
+    <div class="callout warn"><span class="k">Behind the scenes</span><br>
+      Setup writes a controller-side <code>start_job.macro</code> and performs an automatic 3D (or touch
+      plate) probe as part of the sequence. It must land on the Job tab to bootstrap the controller
+      handshake. The work rotation uses grblHAL's <code>G10&nbsp;L2&nbsp;R</code> — measured skew is applied
+      as its negative. There's no completion gate: nothing hides other tabs until Setup has "provably" run —
+      Generate simply asks, once, whether to proceed on the currently cached origin and tool-length
+      reference.</div>
+
+    <div class="xref">Related: <a href="#offsets">Work offsets</a> · <a href="#job">The Job screen</a> · <a href="#work-order">Work Order</a></div>
+  </section>
+
+  <!-- ===================== WORK ORDER ===================== -->
+  <section class="topic" id="work-order" data-title="Work Order — build a job without a CAM round-trip" data-level="int"
+           data-track="novice:0,intermediate:5,machinist:6" data-video="pending">
+    <h2>Work Order — build a job without a CAM round-trip <a class="anchor" href="#work-order">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <p><strong>Work Order</strong> is a top-level tab for jobs that don't deserve a trip out to CAD/CAM and
+    back — drill a hole, cut a pocket, chamfer an edge, two minutes at the machine instead of a design
+    session. You describe the job as a tree of toolpaths and operations; ioSender compiles it into an
+    ordinary g-code program and runs it exactly like a loaded file.</p>
+
+    <figure>
+      <img src="img/work-order.png" alt="The Work Order tab: toolpath/operations tree, tool-order summary and the compiled program">
+      <figcaption>The Work Order tab, with the compiled tool order and generated g-code shown in the flyout.</figcaption>
+    </figure>
+    <p><strong>What you're looking at:</strong></p>
+    <ul>
+      <li><strong>Toolpaths</strong> — the geometry: line, circle, oval, square or rectangle. Add one, then
+      hang <strong>operations</strong> underneath it: pocket, contour, drill, bore, side finish, bottom
+      finish, chamfer. Geometry belongs to the toolpath; the operations act on it — that's why a counterbore
+      is just one circle carrying a shallow bore, a through drill and a chamfer on the same centreline,
+      rather than a special case.</li>
+      <li><strong>Enable checkboxes</strong> per row — untick a toolpath or operation to leave it out of the
+      next Generate; ticking/unticking a toolpath cascades to its operations, and back.</li>
+      <li><strong>Feeds and speeds</strong> — a dialog proposes chipload-based feed/speed/depth-of-cut
+      numbers per tool and the Material picked in <a href="#setup">Setup</a>'s Stock group, and remembers
+      what you actually used last. Each operation also has a per-row <strong>Climb/Conventional</strong> cut
+      direction (defaulting to Conventional) — climb orbits the <em>same</em> direction as the spindle for an
+      internal feature (a bore/pocket) but the <em>opposite</em> direction for an external one (a contour
+      cutting a part free), and ioSender works out the correct raw winding for you rather than you having to
+      reason about CW/CCW by hand.</li>
+      <li><strong>Generate</strong> — compiles every enabled row into one g-code program, not a pile of
+      separate files. Tool order is chosen, not stumbled into: each candidate ordering is scored by
+      simulating it to completion, so a job with many sections and only a few distinct tools still does the
+      minimum number of real tool changes — the compiler tracks what's already in the spindle rather than
+      revisiting a tool because of where it happened to sit in the tree.</li>
+      <li><strong>Run</strong> — sends the generated program to the <a href="#job">Job</a> tab as the actual
+      loaded job (see below), then streams it through the normal run pipeline.</li>
+    </ul>
+
+    <h3>Running a Work Order</h3>
+    <p>Pressing <strong>Run</strong> switches you to the <a href="#job">Job</a> tab and loads the generated
+    program into its real, docked program list — the same list a loaded <code>.nc</code> file uses, not a
+    separate floating preview, with the same live per-line status (<code>ok</code>/<code>*</code>) as any
+    other run. When the run ends — completes, is stopped, or a prerequisite check fails — ioSender switches
+    you back to Work Order and restores whatever program was loaded before the run, so re-running the Work
+    Order never clobbers a file you had open.</p>
+
+    <div class="callout note"><span class="k">One Setup, not one per program</span><br>
+      Work Order doesn't have its own separate stock-setup step. It uses the same <a href="#setup">Setup</a>
+      tab and cached origin/tool-length reference as everything else. Generate asks once — proceed on the
+      currently cached Setup? — rather than gating the tab behind a certified "Setup complete" state.</div>
+
+    <div class="callout warn"><span class="k">Tool numbering</span><br>
+      Tool numbers are preassigned from the Feeds &amp; Speeds tool list position. If your machine's ATC
+      macros reserve a tool number for a fixed sentinel (for example, a 3D probe already fitted to the
+      spindle), that number is skipped in the Work Order's own numbering — check your macro setup before
+      assuming T-numbers line up 1:1 with the tool list.</div>
+
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#job">The Job screen</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#tools">Tools</a></div>
   </section>
 
   <!-- ===================== MACHINE SETUP ===================== -->
@@ -962,8 +1070,8 @@
       <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
       <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
-      <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#start-job">Start Job</a> know what's available.</td><td>—</td></tr>
-      <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#start-job">Start Job</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
+      <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
+      <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
       <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
       <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
@@ -985,51 +1093,7 @@
       <em>every</em> <code>$</code> setting for fine-tuning, and <a href="#accuracy-calibration">Accuracy &amp;
       calibration</a> covers dialing in steps/mm and squareness to a real dimension.</div>
 
-    <div class="xref">Related: <a href="#connect">Connect</a> · <a href="#settings">Settings (grbl $)</a> · <a href="#probing">Probing</a> · <a href="#tools">Tools</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a></div>
-  </section>
-
-  <!-- ===================== PROBING ===================== -->
-  <section class="topic" id="probing" data-title="Probing" data-level="int"
-           data-track="novice:0,intermediate:5,machinist:5" data-video="pending">
-    <h2>Probing <a class="anchor" href="#probing">#</a></h2>
-    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
-    <figure>
-      <img src="img/probing-tabs.png" alt="The Probing tab and its routine sub-tabs">
-      <figcaption>The Probing routines, with the probe selector at the top.</figcaption>
-    </figure>
-    <p><strong>What you're looking at:</strong></p>
-    <ul>
-      <li>The <strong>Probe:</strong> selector (top) — choose which physical probe you're using; the routine's own parameters (feeds, travel, tip size) follow automatically from that probe's Machine Setup definition.</li>
-      <li>The sub-tabs (Tool length offset, Edge finder external/internal, Center finder) are separate routines — pick the one that matches what you're trying to measure.</li>
-      <li><strong>Probe fixture @ G59.3</strong> / <strong>Establish reference offset</strong> — the two ways to run a tool-length probe: against a fixed toolsetter location, or to record the master-tool baseline other tools compare against.</li>
-      <li><strong>Also set work origin</strong> — tick this to additionally zero the work Z from this same touch-off, choosing which coordinate system (G54, etc.) or a raw G92 offset receives it.</li>
-      <li>The live X/Y/Z readout (right) shows the probe's last recorded position once a routine completes.</li>
-      <li><strong>Start / Stop</strong> (bottom left) run and abort the selected routine.</li>
-    </ul>
-    <p><strong>Probing</strong> is how the machine <em>touches</em> the work to measure position precisely,
-    instead of you lining it up by eye (see <a href="#intro-to-cnc">Intro → probes</a>). The Probing tab
-    gathers the individual routines, each on its own sub-tab:</p>
-    <table class="reftab">
-      <tr><th>Routine</th><th>Finds</th></tr>
-      <tr><td><strong>Edge finder, external</strong></td><td>An outside edge of your stock — sets that axis's work zero.</td></tr>
-      <tr><td><strong>Edge finder, internal</strong></td><td>The inside of a bore or pocket.</td></tr>
-      <tr><td><strong>Center finder</strong></td><td>The centre of a hole or a round boss.</td></tr>
-      <tr><td><strong>Tool length offset</strong></td><td>The length of the current tool (against a toolsetter or plate).</td></tr>
-      <tr><td><a href="#heightmap">Height map</a></td><td>A grid of Z heights across a surface, for compensation.</td></tr>
-    </table>
-
-    <h3>Pick the probe, get its parameters</h3>
-    <p>A <strong>Probe:</strong> selector chooses which physical probe you're using (3D probe, touch plate,
-    toolsetter). The routine's parameters — tip diameter, feeds, travel — come from that probe's
-    <strong>definition</strong>, which you declared in <a href="#machine-setup">Machine Setup → Probe
-    definitions</a>. Change the probe and the numbers follow. <strong>Pre/post macros</strong> can run
-    controller-side macros around a probe cycle.</p>
-
-    <p>A successful probe writes the result into the active <a href="#offsets">work offset</a> or the tool
-    length. Use these routines for one-off measurements; for the everyday "measure the stock and set the
-    origin" sequence, <a href="#start-job">Start Job</a> chains them together for you.</p>
-
-    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#offsets">Work offsets</a> · <a href="#heightmap">Height map</a> · <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#intro-to-cnc">Intro → probes</a></div>
+    <div class="xref">Related: <a href="#connect">Connect</a> · <a href="#settings">Settings (grbl $)</a> · <a href="#tools">Tools</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a></div>
   </section>
 
   <!-- ===================== TOOLS ===================== -->
@@ -1112,9 +1176,9 @@
       Because these three store <em>wherever the machine currently is</em> rather than a typed target
       (no rapid move is ever issued), editing their row asks for confirmation before committing — click
       <strong>Get</strong>, then leave the row, to record today's position into one of them.</div>
-    <p>Most of the time you don't edit these by hand: <a href="#probing">Probing</a> and
-    <a href="#start-job">Start Job</a> populate the <em>active</em> WCS for you when you zero on your stock.
-    The Offsets tab is for reviewing them, nudging a value, or setting up a second fixture.</p>
+    <p>Most of the time you don't edit these by hand: <a href="#setup">Setup</a> populates the
+    <em>active</em> WCS for you when you zero on your stock. The Offsets tab is for reviewing them, nudging
+    a value, or setting up a second fixture.</p>
 
     <div class="callout note"><span class="k">Machinist — G10 &amp; discipline</span><br>
       Under the hood, offsets are set with <code>G10&nbsp;L2</code> (define a WCS in absolute machine
@@ -1123,7 +1187,7 @@
       Keep an <code>R0</code>-before-<code>G53</code> habit so a leftover rotation never contaminates a
       machine-coordinate move. See <a href="#accuracy-calibration">Accuracy &amp; calibration → WCS discipline</a>.</div>
 
-    <div class="xref">Related: <a href="#start-job">Start Job</a> · <a href="#probing">Probing</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#intro-to-cnc">Intro → coordinates</a></div>
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#intro-to-cnc">Intro → coordinates</a></div>
   </section>
 
   <!-- ===================== SETTINGS ===================== -->
@@ -1319,45 +1383,9 @@
     <p>You can also <strong>start a job from a chosen toolpath</strong> here — pick the point to resume from
     (see <a href="#job">the Job screen</a>).</p>
 
-    <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#jogging">Jogging</a> · <a href="#start-job">Start Job</a></div>
+    <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#jogging">Jogging</a> · <a href="#setup">Setup</a></div>
   </section>
 
-  <!-- ===================== HEIGHT MAP ===================== -->
-  <section class="topic" id="heightmap" data-title="Height map (surface compensation)" data-level="mac"
-           data-track="novice:0,intermediate:0,machinist:7">
-    <h2>Height map — surface compensation <a class="anchor" href="#heightmap">#</a></h2>
-    <div class="tags"><span class="tag mac">Machinist</span></div>
-    <figure>
-      <img src="img/heightmap.png" alt="The Height map view with area and grid controls">
-      <figcaption>Building a height map over the probed area.</figcaption>
-    </figure>
-    <p><strong>What you're looking at:</strong></p>
-    <ul>
-      <li><strong>Area to probe</strong> — either "From program" (matched to your loaded job's footprint via Set from program limits) or "Full table" (the whole machine bed); X/Y/W/H can be fine-tuned by hand.</li>
-      <li><strong>Grid size</strong> — how many probe points to take across that area; a smaller spacing (denser grid) is slower but captures more surface detail — Lock keeps X and Y spacing equal.</li>
-      <li><strong>Probe depth / feed</strong> — how far down to search for the surface and how gently to approach it.</li>
-      <li><strong>Start</strong> begins probing the grid point-by-point; the result draws into the <strong>Surface</strong> panel (right) once it finishes.</li>
-      <li><strong>Apply</strong> rewrites your loaded program's Z moves to follow the measured surface; <strong>Save</strong>/<strong>Load</strong> let you reuse a captured map later without re-probing.</li>
-    </ul>
-    <p>A <strong>height map</strong> compensates for a surface that isn't perfectly flat. The machine probes a
-    grid of points across your stock, learns the real Z at each, then <em>shifts Z as it cuts</em> to follow
-    the actual surface. The classic use is <strong>PCB isolation milling</strong> or engraving a slightly
-    warped board, where a few tenths of a millimetre of waviness would otherwise ruin the depth.</p>
-    <h3>The workflow</h3>
-    <ol>
-      <li><strong>Set the work origin</strong> on the stock (probe or jog + zero).</li>
-      <li><strong>Choose the area + grid</strong> — the <em>Area to probe</em> and <em>Grid size</em>, or
-      <em>Set from program limits</em> to match your loaded program exactly.</li>
-      <li>Pick the <strong>probe</strong> and <strong>Start</strong> — the machine touches each grid point.</li>
-      <li><strong>Apply</strong> the map to the running program's Z (and <strong>Save</strong> / <strong>Load</strong>
-      to reuse it).</li>
-    </ol>
-    <div class="callout note"><span class="k">Compensate vs fix</span><br>
-      A height map corrects for a surface you <em>can't</em> make flatter. For the machine's own flatness and
-      tram, or to flatten the spoilboard itself, see <a href="#tools">Surface Spoilboard</a> and
-      <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</div>
-    <div class="xref">Related: <a href="#probing">Probing</a> · <a href="#tools">Tools (surfacing)</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a></div>
-  </section>
 
   <!-- ===================== LATHE ===================== -->
   <section class="topic" id="lathe" data-title="Lathe mode &amp; wizards" data-level="mac"

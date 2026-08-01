@@ -8,23 +8,32 @@ h1 { font-size:16px; font-weight:600; }
 .card img { width:100%; display:block; border-bottom:1px solid #444; }
 .cap { padding:6px 8px; font-size:13px; }
 .mtime { color:#999; font-size:11px; }
+.card.stale { outline:2px solid #c0392b; }
+.card.done { outline:2px solid #2ecc71; }
+.card.placeholder { background:#332; border:2px dashed #d4a017; display:flex; flex-direction:column; }
+.card.placeholder .ph { flex:1; min-height:180px; display:flex; align-items:center; justify-content:center; color:#d4a017; font-size:13px; text-align:center; padding:12px; }
+.flag { color:#e08; font-size:11px; }
+.flagok { color:#2ecc71; font-size:11px; }
 </style></head>
 <body>
-<h1>docs/manual/img - 14 images (regenerate: tools\gen-image-review.ps1)</h1>
+<h1>docs/manual/img - 15 images (regenerate: tools\gen-image-review.ps1) - job-flow redesign batch 2026-07-31/08-01</h1>
 <div class="grid">
-<div class='card'><img src='img/connect-dialog.png' loading='lazy'><div class='cap'>connect-dialog.png<br><span class='mtime'>2026-07-07 09:13:33</span></div></div>
-<div class='card'><img src='img/errors-dialog.png' loading='lazy'><div class='cap'>errors-dialog.png<br><span class='mtime'>2026-07-07 09:13:34</span></div></div>
-<div class='card'><img src='img/feeds-and-speeds.png' loading='lazy'><div class='cap'>feeds-and-speeds.png<br><span class='mtime'>2026-07-25 14:53:04</span></div></div>
-<div class='card'><img src='img/gcode-viewer.png' loading='lazy'><div class='cap'>gcode-viewer.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/heightmap.png' loading='lazy'><div class='cap'>heightmap.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/job-runscreen.png' loading='lazy'><div class='cap'>job-runscreen.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/lathe-wizard.png' loading='lazy'><div class='cap'>lathe-wizard.png<br><span class='mtime'>2026-07-07 09:13:34</span></div></div>
-<div class='card'><img src='img/machine-setup-overview.png' loading='lazy'><div class='cap'>machine-setup-overview.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/offsets-table.png' loading='lazy'><div class='cap'>offsets-table.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/probing-tabs.png' loading='lazy'><div class='cap'>probing-tabs.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/sdcard.png' loading='lazy'><div class='cap'>sdcard.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/settings-grbl.png' loading='lazy'><div class='cap'>settings-grbl.png<br><span class='mtime'>2026-07-25 14:49:20</span></div></div>
-<div class='card'><img src='img/start-job-panel.png' loading='lazy'><div class='cap'>start-job-panel.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/tools-tab.png' loading='lazy'><div class='cap'>tools-tab.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
+<div class='card'><img src='img/connect-dialog.png' loading='lazy'><div class='cap'>connect-dialog.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card'><img src='img/errors-dialog.png' loading='lazy'><div class='cap'>errors-dialog.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card'><img src='img/feeds-and-speeds.png' loading='lazy'><div class='cap'>feeds-and-speeds.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card'><img src='img/gcode-viewer.png' loading='lazy'><div class='cap'>gcode-viewer.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card stale'><img src='img/heightmap.png' loading='lazy'><div class='cap'>heightmap.png<br><span class='mtime'>2026-07-29 10:05:24</span><br><span class='flag'>orphaned - #heightmap topic removed from manual 2026-08-01</span></div></div>
+<div class='card done'><img src='img/job-runscreen.png' loading='lazy'><div class='cap'>job-runscreen.png<br><span class='mtime'>2026-08-01 05:45:02</span><br><span class='flagok'>reshot again - docked list live status column (ok/*), no floating panel, hover-tooltip bonus</span></div></div>
+<div class='card'><img src='img/lathe-wizard.png' loading='lazy'><div class='cap'>lathe-wizard.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card'><img src='img/machine-setup-overview.png' loading='lazy'><div class='cap'>machine-setup-overview.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card'><img src='img/odd-jobs-work-order.png' loading='lazy'><div class='cap'>odd-jobs-work-order.png<br><span class='mtime'>2026-07-30 19:07:43</span><br><span class='flag'>orphaned - old Odd Jobs shell, not referenced by index.html</span></div></div>
+<div class='card done'><img src='img/offsets-table.png' loading='lazy'><div class='cap'>offsets-table.png<br><span class='mtime'>2026-08-01 05:59:46</span><br><span class='flagok'>reshot - stale run control replaced</span></div></div>
+<div class='card stale'><img src='img/probing-tabs.png' loading='lazy'><div class='cap'>probing-tabs.png<br><span class='mtime'>2026-07-29 10:05:24</span><br><span class='flag'>orphaned - #probing topic removed from manual 2026-08-01</span></div></div>
+<div class='card done'><img src='img/sdcard.png' loading='lazy'><div class='cap'>sdcard.png<br><span class='mtime'>2026-08-01 06:06:17</span><br><span class='flagok'>reshot - current tab strip/run control</span></div></div>
+<div class='card done'><img src='img/settings-grbl.png' loading='lazy'><div class='cap'>settings-grbl.png<br><span class='mtime'>2026-08-01 06:23:32</span><br><span class='flagok'>reshot - current tab strip/run control</span></div></div>
+<div class='card done'><img src='img/start-job-panel.png' loading='lazy'><div class='cap'>start-job-panel.png<br><span class='mtime'>2026-08-01 04:35:44</span><br><span class='flagok'>reshot - current Setup tab</span></div></div>
+<div class='card'><img src='img/tools-tab.png' loading='lazy'><div class='cap'>tools-tab.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card done'><img src='img/work-order.png' loading='lazy'><div class='cap'>work-order.png<br><span class='mtime'>2026-08-01 04:39:19</span><br><span class='flagok'>new - toolpath tree + tool-order popover</span></div></div>
+<div class='card done'><img src='img/setup-dynamic-geometry.png' loading='lazy'><div class='cap'>setup-dynamic-geometry.png<br><span class='mtime'>2026-08-01 05:55:36</span><br><span class='flagok'>new bonus shot - Dynamic fixture, Geometry panel, conductive-stock warning</span></div></div>
 </div>
 </body></html>
