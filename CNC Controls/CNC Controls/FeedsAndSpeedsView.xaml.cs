@@ -225,7 +225,7 @@ namespace CNC.Controls
                 // Feeds and Speeds command deletes its own copy when the dialog closes, so this is the
                 // only record that the check happened at all, even when it comes back clean. One shared
                 // timestamp per load so a later apply-file archive (if any) pairs up with this one.
-                _archiveStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                _archiveStamp = CNC.Core.RotatingFileStore.Stamp();
                 ArchiveToLogs(_exportPath, _archiveStamp);
 
                 Recompute();
@@ -585,7 +585,7 @@ namespace CNC.Controls
 
                 // Same stamp as this load's own export archive (set in LoadLatestExport), so the two
                 // pair up under matching filenames; falls back to a fresh one if somehow unset.
-                string archiveNote = ArchiveToLogs(applyPath, _archiveStamp ?? DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                string archiveNote = ArchiveToLogs(applyPath, _archiveStamp ?? CNC.Core.RotatingFileStore.Stamp());
 
                 AppDialogs.Show($"Wrote {byOp.Count} operation(s) to:\n{applyPath}\n\n" +
                                 "Switch back to Fusion and pick Action -> Apply." + archiveNote, "Feeds and Speeds");
@@ -598,20 +598,21 @@ namespace CNC.Controls
 
         // Fusion's Feeds and Speeds command deletes both the export and apply files when it closes (a
         // deliberate "nothing lingers" cleanup), so this is the only remaining record of what was
-        // imported and (if anything) what got asked for - archive into the app's logs folder
-        // (timestamped, alongside the crash/debug/console logs CNC.Core.Resources.ResolveLogsDirectory()
-        // already resolves) so a later "wait, what did we change?" has somewhere to look. Called once per
-        // load (the export) and again per apply-file write, sharing one timestamp so the pair matches up.
-        // Best-effort: never blocks the actual file write if it fails. Returns a note for the caller's
-        // dialog (empty string if archiving itself failed).
+        // imported and (if anything) what got asked for - archive into the same day-of-week logs folder
+        // (RotatingFileStore - the same scheme the crash/debug/console logs and the App.config/Grbl
+        // backups use) so a later "wait, what did we change?" has somewhere to look, with the same
+        // 10-per-day retention. Called once per load (the export) and again per apply-file write, sharing
+        // one timestamp so the pair matches up. Best-effort: never blocks the actual file write if it
+        // fails. Returns a note for the caller's dialog (empty string if archiving itself failed).
         private static string ArchiveToLogs(string path, string stamp)
         {
             try
             {
-                string logsDir = System.IO.Path.Combine(CNC.Core.Resources.ResolveLogsDirectory(), "FeedsAndSpeeds");
-                Directory.CreateDirectory(logsDir);
-                File.Copy(path, Path.Combine(logsDir, $"{stamp}_{Path.GetFileName(path)}"), true);
-                return $"\n\nArchived a copy to:\n{logsDir}";
+                string logsRoot = CNC.Core.Resources.ResolveLogsDirectory();
+                string dayDir = CNC.Core.RotatingFileStore.PrepareDayDirectory(logsRoot, "FeedsAndSpeeds", retentionCount: 10);
+                string dest = Path.Combine(dayDir, $"FeedsAndSpeeds_{stamp}_{Path.GetFileName(path)}");
+                File.Copy(path, dest, true);
+                return $"\n\nArchived a copy to:\n{dayDir}";
             }
             catch
             {
