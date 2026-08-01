@@ -37,6 +37,26 @@ namespace CNC.Controls
 
     public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink }
 
+    // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
+    // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
+    // material rather than pulled into it. Climb cuts with the rotation (chip starts thick, thins to zero) -
+    // generally a cleaner finish and less tearout in wood, but a machine with any backlash can let the
+    // cutter grab and self-feed into the material. See WorkOrderCompiler.OrderForDirection/BoreArcCommand
+    // for how this translates into actual G-code direction (which raw CW/CCW orbit means "climb" flips
+    // between an internal feature like a pocket/bore and an external one like a Contour cut).
+    public enum WorkOrderCutDirection { Conventional, Climb }
+
+    // A machine-level fact, not a per-work-order one - lives in AppConfig.Config.SpindleDirectionCapability
+    // (Settings:App > Work Order), read by WorkOrderCompiler to get Climb/Conventional's raw CW/CCW orbit
+    // math right for hardware that can't actually run bidirectional. Some VFD/spindle setups only have a
+    // single relay/direction wired, and - as with a real one found 2026-08-01 - the one direction they DO
+    // run isn't necessarily the one the M3/"CW" label implies; ioSender's Work Order g-code always sends M3
+    // (AppendToolStart never emits M4), so what matters here is which way the spindle ACTUALLY turns when
+    // that M3 lands, not the label. FixedCW: M3 physically spins CW as expected (same as Bidirectional for
+    // this purpose - the difference only matters to code that would otherwise offer M4 as a live option, see
+    // SpindleControl). FixedCCW: M3 physically spins CCW - flips which raw orbit direction is climb.
+    public enum SpindleDirectionCapability { Bidirectional, FixedCW, FixedCCW }
+
     // How to cut the parent toolpath's geometry. Carries no geometry of its own and no tool number.
     public class WorkOrderOperation
     {
@@ -83,6 +103,10 @@ namespace CNC.Controls
         public double CountersinkDiameter = 12.5d;   // Countersink
 
         public double Feed = 800d, PlungeFeed = 200d, SpindleRPM = 15000d, BitMaxRPM = 18000d;
+
+        // Meaningless for Drill/Countersink (a straight on-center plunge has no path to reverse) - defaults
+        // to Conventional, the safer choice on a machine with any backlash/flex (see the enum's own comment).
+        public WorkOrderCutDirection Direction = WorkOrderCutDirection.Conventional;
     }
 
     // A named piece of geometry plus the operations that cut it.

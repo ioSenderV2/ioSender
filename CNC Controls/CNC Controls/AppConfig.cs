@@ -314,6 +314,7 @@ namespace CNC.Controls
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
         private bool _autoSaveWorkOrderOnExit = false, _promptBeforeAutoSaveWorkOrder = false;
+        private SpindleDirectionCapability _spindleDirectionCapability = SpindleDirectionCapability.Bidirectional;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -538,6 +539,9 @@ namespace CNC.Controls
         // that save happens silently or still asks first - see WorkOrderView.Activate(false).
         public bool AutoSaveWorkOrderOnExit { get { return _autoSaveWorkOrderOnExit; } set { _autoSaveWorkOrderOnExit = value; OnPropertyChanged(); } }
         public bool PromptBeforeAutoSaveWorkOrder { get { return _promptBeforeAutoSaveWorkOrder; } set { _promptBeforeAutoSaveWorkOrder = value; OnPropertyChanged(); } }
+        // Read by WorkOrderCompiler (Climb/Conventional's CW/CCW orbit math) and SpindleControl (hides
+        // whichever of CW/CCW the machine can't actually run) - see SpindleDirectionCapability's own comment.
+        public SpindleDirectionCapability SpindleDirectionCapability { get { return _spindleDirectionCapability; } set { _spindleDirectionCapability = value; OnPropertyChanged(); } }
 
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();
@@ -926,9 +930,10 @@ namespace CNC.Controls
         {
             // Try the live config first. If it is missing, 0 bytes, or otherwise unreadable - an
             // interrupted save or a sync truncation can leave it empty - fall back to the newest
-            // Backups\<datetime>_App.config startup snapshot. Recovering the last good copy avoids
-            // losing the user's settings AND the destructive "create new?" prompt that a false
-            // "invalid" used to trigger.
+            // Backups\<DayOfWeek>\App.config_<timestamp> startup snapshot (latest_App.config is a
+            // hard-linked alias to it, checked first). Recovering the last good copy avoids losing
+            // the user's settings AND the destructive "create new?" prompt that a false "invalid"
+            // used to trigger.
             _migratedFormat = false;
 
             if (TryLoad(filename))
@@ -937,9 +942,12 @@ namespace CNC.Controls
             string newest = null;
             try
             {
-                newest = Directory.Exists(Resources.BackupsFolder)
-                    ? Directory.GetFiles(Resources.BackupsFolder, "*_App.config").OrderByDescending(f => f).FirstOrDefault()
-                    : null;
+                string latest = Path.Combine(Resources.BackupsFolder, "latest_App.config");
+                newest = File.Exists(latest) ? latest
+                    : RotatingFileStore.ExistingDayDirectories(Resources.BackupsFolder)
+                        .SelectMany(d => Directory.GetFiles(d, "App.config_*"))
+                        .OrderByDescending(f => f)
+                        .FirstOrDefault();
             }
             catch { }
 
@@ -953,9 +961,11 @@ namespace CNC.Controls
             return false;
         }
 
-        // Snapshot the current live config to Backups\<datetime>_App.config, once per session (before
-        // any in-session edits), so Load() has a known-good fallback and the user has a manual restore
-        // point. Best-effort; failure must not block startup.
+        // Snapshot the current live config to Backups\<DayOfWeek>\App.config_<timestamp>, once per
+        // session (before any in-session edits), so Load() has a known-good fallback and the user has a
+        // manual restore point. Folder placement, per-folder retention and the "latest_App.config" alias
+        // are all handled by RotatingFileStore - the same scheme the debug/console/crash logs use.
+        // Best-effort; failure must not block startup.
         public static void BackupStartupSnapshot(string filename)
         {
             try
@@ -963,11 +973,11 @@ namespace CNC.Controls
                 if (!File.Exists(filename))
                     return;
 
-                Directory.CreateDirectory(Resources.BackupsFolder);
-                string name = string.Format("{0}_App.config", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-                File.Copy(filename, System.IO.Path.Combine(Resources.BackupsFolder, name), true);
+                string dayDir = RotatingFileStore.PrepareDayDirectory(Resources.BackupsFolder, "App.config", retentionCount: 10);
+                string path = Path.Combine(dayDir, "App.config_" + RotatingFileStore.Stamp() + ".config");
+                File.Copy(filename, path, true);
 
-                Resources.PruneBackups();
+                RotatingFileStore.UpdateLatestLink(Resources.BackupsFolder, "latest_App.config", path);
             }
             catch { }
         }

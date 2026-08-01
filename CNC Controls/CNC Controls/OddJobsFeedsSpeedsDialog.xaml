@@ -31,6 +31,15 @@
                 <ComboBoxItem x:Uid="fs_toolcountersink916" x:Name="itemCountersinkBit916" Content="9/16&quot; (14mm) countersink bit"/>
                 <ComboBoxItem x:Uid="fs_toolcountersink1316" x:Name="itemCountersinkBit1316" Content="13/16&quot; (21mm) countersink bit"/>
                 <ComboBoxItem x:Uid="fs_toolcountersink118" x:Name="itemCountersinkBit118" Content="1-1/8&quot; (28mm) countersink bit"/>
+                <ComboBoxItem x:Uid="fs_toolchamfer4f" x:Name="itemChamferBit4Flute90" Content="1/4&quot; 4-flute chamfer bit (90 deg)"/>
+            </ComboBox>
+        </StackPanel>
+        <StackPanel x:Name="pnlDirection" Orientation="Horizontal" Margin="0,0,0,6">
+            <Label x:Uid="fs_direction" Content="Direction:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"
+                   ToolTip="Conventional cuts against the cutter's rotation - slower to bite in, more forgiving of backlash/flex. Climb cuts with the rotation - cleaner finish and less tearout in wood, but needs a backlash-free, rigid setup or the cutter can grab and dig in."/>
+            <ComboBox x:Name="cbxDirection" MinWidth="220" MinHeight="22" VerticalAlignment="Center">
+                <ComboBoxItem x:Uid="fs_dirconv" Content="Conventional"/>
+                <ComboBoxItem x:Uid="fs_dirclimb" Content="Climb"/>
             </ComboBox>
         </StackPanel>
         <StackPanel x:Name="pnlDrillStyle" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">

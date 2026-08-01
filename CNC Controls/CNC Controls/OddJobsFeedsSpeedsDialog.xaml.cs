@@ -45,7 +45,11 @@ namespace CNC.Controls
         // VBit45 for feeds/speeds purposes (ToolType()), but a distinct operation from Chamfer: the operator
         // specifies the target finished diameter, not a raw depth - WorkOrderCompiler converts it
         // (depth = diameter / 2).
-        CountersinkBit38, CountersinkBit916, CountersinkBit1316, CountersinkBit118
+        CountersinkBit38, CountersinkBit916, CountersinkBit1316, CountersinkBit118,
+        // Dedicated 4-flute chamfer bit, same 90-deg (45-deg-per-side) cone as VBit45 but more flutes and a
+        // flat/pointed chamfer-ground tip rather than a true point - used the same way as VBit45 (Chamfer
+        // operation, edge trace) via ToolType()/ToolDeclarations' shared VBit45-or-countersink check.
+        ChamferBit4Flute90
     }
 
     public partial class OddJobsFeedsSpeedsDialog : Window
@@ -85,6 +89,7 @@ namespace CNC.Controls
                 case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
                 case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
                 case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
+                case OddJobsTool.ChamferBit4Flute90: return "1/4\" 4-flute chamfer bit (90 deg)";
                 default: return tool.ToString();
             }
         }
@@ -131,6 +136,12 @@ namespace CNC.Controls
         {
             get { return (OddJobsTool)cbxTool.SelectedIndex; }
             set { cbxTool.SelectedIndex = (int)value; }
+        }
+
+        public WorkOrderCutDirection CutDirection
+        {
+            get { return cbxDirection.SelectedIndex == 1 ? WorkOrderCutDirection.Climb : WorkOrderCutDirection.Conventional; }
+            set { cbxDirection.SelectedIndex = value == WorkOrderCutDirection.Climb ? 1 : 0; }
         }
 
         // Suggests a default tool from the operation being performed and (where it matters - Aluminum
@@ -191,6 +202,7 @@ namespace CNC.Controls
             Show(itemEndMill2Flute18, isMill);
             Show(itemBallEnd18, isMill);
             Show(itemVBit45, isChamfer);
+            Show(itemChamferBit4Flute90, isChamfer);
             Show(itemDrillBit, isDrill);
             Show(itemCountersinkBit38, isCountersink);
             Show(itemCountersinkBit916, isCountersink);
@@ -210,13 +222,18 @@ namespace CNC.Controls
         // there is no axial-step value for this dialog to read OR write; showing the advisor's generic
         // "Depth of cut" recommendation there was confusing (a number that looks like it should relate to
         // wall/floor stock-to-leave, but doesn't - that's a different concept entirely).
-        public OddJobsFeedsSpeedsDialog(OddJobsTool preferredTool, string docLabel = "Depth of cut:", bool showDoc = true)
+        // showDirection: false for Drill/Countersink - both are a straight on-center plunge with no path to
+        // reverse, so climb/conventional isn't a meaningful choice there.
+        public OddJobsFeedsSpeedsDialog(OddJobsTool preferredTool, string docLabel = "Depth of cut:", bool showDoc = true, bool showDirection = true)
         {
             InitializeComponent();
             fldDoc.Label = docLabel;
             if (!showDoc)
                 fldDoc.Visibility = Visibility.Collapsed;
             this.showDoc = showDoc;
+            cbxDirection.SelectedIndex = 0;
+            if (!showDirection)
+                pnlDirection.Visibility = Visibility.Collapsed;
 
             // Live highlight refresh: recompute whenever anything that affects the comparison changes - the
             // 4 value fields themselves (typing toward/away from the recommendation) and the tool geometry
@@ -298,9 +315,10 @@ namespace CNC.Controls
         {
             if (SelectedTool == OddJobsTool.DrillBit)
                 return IsHssDrill ? "drill-hss" : "drill";
-            // The countersink bits are the same 45-deg-per-side conical geometry as VBit45 (see the enum's
-            // own comment) - route into the same EvaluateVBit advisor path.
-            return SelectedTool == OddJobsTool.VBit45 || IsCountersinkBit(SelectedTool) ? "chamfer" : "mill";
+            // The countersink bits and the 4-flute chamfer bit are the same 45-deg-per-side conical geometry
+            // as VBit45 (see the enum's own comments) - route into the same EvaluateVBit advisor path.
+            return SelectedTool == OddJobsTool.VBit45 || SelectedTool == OddJobsTool.ChamferBit4Flute90
+                || IsCountersinkBit(SelectedTool) ? "chamfer" : "mill";
         }
 
         // pnlDrillStyle's own SelectedIndex, 1 = HSS twist, 0 (or unset) = brad point/twist (the default,
@@ -342,6 +360,7 @@ namespace CNC.Controls
                 case OddJobsTool.CountersinkBit916: BitDiameter = NineSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
                 case OddJobsTool.CountersinkBit1316: BitDiameter = ThirteenSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
                 case OddJobsTool.CountersinkBit118: BitDiameter = OneOneEighthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
+                case OddJobsTool.ChamferBit4Flute90: BitDiameter = QuarterInchMm; Flutes = 4; break;
             }
             pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
             if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)

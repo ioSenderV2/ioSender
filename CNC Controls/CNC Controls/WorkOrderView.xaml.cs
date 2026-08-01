@@ -996,7 +996,10 @@ namespace CNC.Controls
                        : isBore ? op.BoreStepDown
                        : op.DepthOfCut;
 
-            var dlg = new OddJobsFeedsSpeedsDialog((OddJobsTool)op.Tool, docLabel: docLabel, showDoc: showDoc)
+            // Drill/Countersink are a straight on-center plunge - no path to reverse, so no direction choice.
+            bool showDirection = !isDrill && !isCountersink;
+
+            var dlg = new OddJobsFeedsSpeedsDialog((OddJobsTool)op.Tool, docLabel: docLabel, showDoc: showDoc, showDirection: showDirection)
             {
                 Owner = Window.GetWindow(this),
                 // Flutes deliberately NOT set - the dialog's tool dropdown sets the right count for the
@@ -1008,6 +1011,7 @@ namespace CNC.Controls
                 DepthOfCut = doc,
                 Material = material,
                 IsHssDrill = op.DrillHss,
+                CutDirection = op.Direction,
                 // A ball engaging near its TIP (a bottom-finish pass skimming the floor) behaves like a much
                 // smaller cutter than nominal - the advisor needs the engagement depth to say anything useful.
                 EngagementDepthMm = op.Kind == WorkOrderOpKind.BottomFinish ? op.FloorStockToLeave : (double?)null
@@ -1023,6 +1027,8 @@ namespace CNC.Controls
             if (!isDrill)
                 op.BitDiameter = dlg.BitDiameter;
             op.SpindleRPM = dlg.SpindleRPM; op.Feed = dlg.Feed; op.PlungeFeed = dlg.PlungeFeed;
+            if (showDirection)
+                op.Direction = dlg.CutDirection;
             if (op.Kind == WorkOrderOpKind.Chamfer)
                 op.ChamferDepth = dlg.DepthOfCut;
             else if (isCountersink)

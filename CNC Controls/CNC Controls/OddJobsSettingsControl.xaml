@@ -15,6 +15,15 @@
                       IsChecked="{Binding Path=PromptBeforeAutoSaveWorkOrder, Mode=TwoWay}"
                       IsEnabled="{Binding Path=AutoSaveWorkOrderOnExit}"
                       ToolTip="Ask before each auto-save instead of saving silently."/>
+            <StackPanel Orientation="Horizontal" Margin="5,10,0,0">
+                <Label x:Uid="lbl_ojSpindleDir" Content="Spindle direction:" Padding="0,0,4,0" VerticalAlignment="Center"
+                       ToolTip="Some spindle/VFD setups only run one physical direction regardless of M3/M4 - if that's yours, set it here so Climb/Conventional on Work Order operations gets the cut direction right, and so the Job tab's Spindle panel only offers the direction that actually works."/>
+                <ComboBox x:Name="cbxSpindleDirection" MinWidth="160" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxSpindleDirection_SelectionChanged">
+                    <ComboBoxItem x:Uid="cbx_sdBidir" Content="Bidirectional (standard)"/>
+                    <ComboBoxItem x:Uid="cbx_sdFixedCW" Content="Fixed - CW only"/>
+                    <ComboBoxItem x:Uid="cbx_sdFixedCCW" Content="Fixed - CCW only"/>
+                </ComboBox>
+            </StackPanel>
             <Separator Margin="0,10,0,6"/>
             <TextBlock x:Uid="lbl_ojToolTable" Text="Tools - click one to view or tune its feeds and speeds:" Margin="5,0,0,4" TextWrapping="Wrap"/>
             <ListBox x:Name="lstOddJobsTools" Height="220" MinWidth="290" Margin="5,0,0,0"

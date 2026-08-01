@@ -94,6 +94,67 @@ namespace CNC.Controls
             }
         }
 
+        // Climb vs conventional isn't a fixed CW-or-CCW answer - it flips depending on which SIDE of the cut
+        // path the material being removed is on. On an INTERNAL feature (a bore/pocket/hole, where the wall
+        // material is OUTSIDE the tool's path) climb means orbiting the SAME direction as the spindle; on an
+        // EXTERNAL feature (a Contour cutting a part free, where the kept material is INSIDE the tool's path)
+        // climb means orbiting OPPOSITE the spindle. Conventional is the other one in each case.
+        // Chamfer is geometrically ambiguous - it just traces whatever outline it's given (BuildChamfer),
+        // which could be a hole's rim or a part's outer edge - treated as internal here since breaking a
+        // hole/counterbore's top edge is Odd Jobs' actual motivating use case, not a profile's; an operator
+        // chamfering an external edge can compensate by picking the opposite Direction setting.
+        private static bool IsInternalFeature(WorkOrderOpKind kind)
+        {
+            return kind != WorkOrderOpKind.Contour;
+        }
+
+        // Which way the spindle ACTUALLY turns when this compiler's g-code runs it - AppendToolStart always
+        // emits M3, never M4, so the only way that's not physically CW is a machine whose spindle/VFD is
+        // documented as only running backwards from the M3/"CW" label (see SpindleDirectionCapability's own
+        // comment - found on real hardware 2026-08-01). Bidirectional and FixedCW both mean M3 spins CW here;
+        // only FixedCCW differs.
+        private static bool PhysicalSpindleIsCW()
+        {
+            return AppConfig.Settings.Base?.SpindleDirectionCapability != SpindleDirectionCapability.FixedCCW;
+        }
+
+        // Translates the operator's Climb/Conventional choice, IsInternalFeature, and the machine's actual
+        // physical spindle direction into a raw CW/CCW orbit: climb means "same direction as the spindle" for
+        // an internal feature and "opposite the spindle" for an external one (see IsInternalFeature) - so
+        // this is CW only when that relationship, evaluated against PhysicalSpindleIsCW, lands on CW.
+        private static bool WantsCWOrbit(WorkOrderOperation op)
+        {
+            bool climb = op.Direction == WorkOrderCutDirection.Climb;
+            bool orbitMatchesSpindle = IsInternalFeature(op.Kind) ? climb : !climb;
+            bool spindleCW = PhysicalSpindleIsCW();
+            return orbitMatchesSpindle ? spindleCW : !spindleCW;
+        }
+
+        // OddJobsGeometry's CirclePoints/EllipsePoints/RectPoints all generate CCW, closed (first == last).
+        // On the (default, and by far the most common) case of a standard CW spindle, that raw CCW order is
+        // already Conventional for an internal feature and Climb for an external one - so this only needs to
+        // reverse the list when WantsCWOrbit calls for the opposite of that. Reversing a closed list (first
+        // == last) flips the walked direction without moving the start point, since the old last point (==
+        // the old first) is still first after Reverse(). Open geometry (a Line) has no inside/outside to
+        // speak of, so Direction is a no-op there.
+        private static List<double[]> OrderForDirection(List<double[]> path, WorkOrderToolpath tp, WorkOrderOperation op)
+        {
+            if (!tp.IsClosed || !WantsCWOrbit(op))
+                return path;
+
+            var reversed = new List<double[]>(path);
+            reversed.Reverse();
+            return reversed;
+        }
+
+        // Bore is always an internal feature (a hole). On a standard CW spindle this is G2 for Climb, G3 for
+        // Conventional - G2 was also this method's long-standing unconditional behavior before Direction
+        // existed. Both use the same I/J center offset; only the arc word changes.
+        private static string BoreArcCommand(WorkOrderOperation op)
+        {
+            return WantsCWOrbit(op) ? "G2" : "G3";
+        }
+
         // Concentric interior clearing rings, innermost (nearest center) first, stopping short of the wall
         // outline itself - that gets traced separately as the final contour at each Z level. The innermost
         // ring's own radius is always below the bit radius by construction, so its cutting swath covers the
@@ -329,8 +390,9 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             double wallLeave = WallLeave(tp);
-            var wall = Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave);
-            var rings = ClearingRings(tp, cx, cy, op.BitDiameter, wallLeave, op.Stepover);
+            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave), tp, op);
+            var rings = ClearingRings(tp, cx, cy, op.BitDiameter, wallLeave, op.Stepover)
+                .Select(r => OrderForDirection(r, tp, op)).ToList();
             var depths = PassDepths(RoughDepth(tp, op), op.DepthOfCut);
 
             double previousZ = 0d;
@@ -360,7 +422,7 @@ namespace CNC.Controls
         private static List<string> BuildContour(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-            var path = Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d + WallLeave(tp) : 0d);
+            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d + WallLeave(tp) : 0d), tp, op);
             var depths = PassDepths(RoughDepth(tp, op), op.DepthOfCut);
 
             double previousZ = 0d;
@@ -470,12 +532,13 @@ namespace CNC.Controls
                 }
                 else
                 {
+                    string arc = BoreArcCommand(op);
                     while (z < depth - 1e-6)
                     {
                         z = Math.Min(z + step, depth);
-                        lines.Add("G2 X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(op.Feed));
+                        lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(op.Feed));
                     }
-                    lines.Add("G2 X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(op.Feed));
+                    lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(op.Feed));
                 }
             }
             return lines;
@@ -487,7 +550,7 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             var rough = WorkOrderRules.RoughingOp(tp);
-            var path = Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d);
+            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d), tp, op);
             var depths = PassDepths(rough != null ? RoughDepth(tp, rough) : op.TotalDepth, rough?.DepthOfCut ?? 2d);
 
             double previousZ = 0d;
@@ -513,11 +576,11 @@ namespace CNC.Controls
             var lines = new List<string>();
             var rough = WorkOrderRules.RoughingOp(tp);
             double finishZ = -(rough != null ? TrueDepth(rough) : op.TotalDepth);
-            var wall = Outline(tp, cx, cy, op.BitDiameter / 2d);
+            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d), tp, op);
 
             lines.Add("G0 X" + F(cx) + " Y" + F(cy));
             AppendPlunge(lines, finishZ, 0d, op.PlungeFeed);
-            foreach (var ring in ClearingRings(tp, cx, cy, op.BitDiameter, 0d, op.Stepover))
+            foreach (var ring in ClearingRings(tp, cx, cy, op.BitDiameter, 0d, op.Stepover).Select(r => OrderForDirection(r, tp, op)))
             {
                 lines.Add("G1 " + XY(ring[0]) + " F" + F(op.Feed));
                 for (int i = 1; i < ring.Count; i++)
@@ -535,7 +598,7 @@ namespace CNC.Controls
         private static List<string> BuildChamfer(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-            var edge = Outline(tp, cx, cy, 0d);
+            var edge = OrderForDirection(Outline(tp, cx, cy, 0d), tp, op);
 
             lines.Add("G0 " + XY(edge[0]));
             lines.Add("G0 Z" + F(SafeZ()));
@@ -612,7 +675,7 @@ namespace CNC.Controls
                         continue;
 
                     var tool = (OddJobsTool)op.Tool;
-                    string type = (tool == OddJobsTool.VBit45 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
+                    string type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.ChamferBit4Flute90 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
                                 : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
                                 : "FLAT";
                     yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, ToolDescription(tool));
@@ -643,6 +706,7 @@ namespace CNC.Controls
                 case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
                 case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
                 case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
+                case OddJobsTool.ChamferBit4Flute90: return "4-flute chamfer bit";
                 default: return tool.ToString();
             }
         }

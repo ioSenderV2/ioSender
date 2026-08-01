@@ -26,6 +26,19 @@ namespace CNC.Controls
 
             foreach (OddJobsTool tool in Enum.GetValues(typeof(OddJobsTool)))
                 lstOddJobsTools.Items.Add(new ListBoxItem { Content = OddJobsFeedsSpeedsDialog.DisplayName(tool), Tag = tool });
+
+            // Read/written directly against AppConfig.Settings.Base rather than a XAML binding, same as
+            // ResetToDefaults below - this is a machine-level fact (see SpindleDirectionCapability's own
+            // comment), not something tied to a particular work order or DataContext.
+            var cfg = AppConfig.Settings.Base;
+            cbxSpindleDirection.SelectedIndex = cfg == null ? 0 : (int)cfg.SpindleDirectionCapability;
+        }
+
+        private void cbxSpindleDirection_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var cfg = AppConfig.Settings.Base;
+            if (cfg != null && cbxSpindleDirection.SelectedIndex >= 0)
+                cfg.SpindleDirectionCapability = (SpindleDirectionCapability)cbxSpindleDirection.SelectedIndex;
         }
 
         // The docLabel/showDoc pair WorkOrderView's own Feeds and Speeds button passes per operation kind -
@@ -70,6 +83,8 @@ namespace CNC.Controls
 
             cfg.AutoSaveWorkOrderOnExit = false;
             cfg.PromptBeforeAutoSaveWorkOrder = false;
+            cfg.SpindleDirectionCapability = SpindleDirectionCapability.Bidirectional;
+            cbxSpindleDirection.SelectedIndex = 0;
         }
     }
 }
