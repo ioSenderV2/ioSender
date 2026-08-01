@@ -233,7 +233,7 @@ namespace GCode_Sender
 
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, onDone);
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, preferJobView, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, preferJobView, onDone);
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
             // instance must not become a pipe listener either, or a later normal launch would silently
@@ -1042,7 +1042,7 @@ namespace GCode_Sender
         // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
         // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
         // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, System.Action onDone)
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, bool preferJobView, System.Action onDone)
         {
             if (code == null || code.Length == 0)
             {
@@ -1050,7 +1050,21 @@ namespace GCode_Sender
                 return;
             }
 
-            var prog = new CNC.Controls.GCode(m);                        // transient - does not mutate the job/Model
+            // preferJobView (Work Order, which already made itself the loaded job via GCode.File.Push/LoadText
+            // before streaming) opts OUT of the "never touch the Job tab" rule below and builds this burst
+            // straight into GCode.File itself instead of a disconnected transient copy. The Job tab's actual
+            // docked list (ProgramPanel's own GCodeListControl, in ProgramPanel.xaml) is permanently bound to
+            // GCode.File.Data (its own Loaded handler falls back to it and nothing ever redirects it away) -
+            // an EARLIER attempt at this fix routed the live burst into jobProgramView instead (a SEPARATE
+            // ProgramView instance, not the one ProgramPanel actually displays) and the docked status column
+            // never updated, confirmed on real hardware 2026-08-01. Rebuilding directly into GCode.File means
+            // the same collection ProgramPanel is already watching receives the live "ok"/"*"/"@" writes.
+            // Single-burst assumption: Work Order's compiled program has no (MBOX)/(WAITIDLE), so
+            // MacroProcessor.Run always flushes it as ONE burst - Action.New here replaces GCode.File's
+            // content wholesale, which would be wrong for a hypothetical FUTURE multi-burst preferJobView
+            // caller (each burst would wipe the previous one's). Fine for Work Order today; revisit if
+            // preferJobView ever gets a second caller that streams more than one burst.
+            var prog = preferJobView ? GCode.File : new CNC.Controls.GCode(m);   // else: transient, does not mutate the job/Model
             prog.AddBlock(name, CNC.Core.Action.New);
             for (int i = 0; i < code.Length - 1; i++)
                 prog.AddBlock(code[i], CNC.Core.Action.Add);
@@ -1060,16 +1074,20 @@ namespace GCode_Sender
             // Mark the ACTUAL streamed program in a ProgramView so the live per-line markers ("@"/"ok") and scroll
             // track the run. A tool that owns its view (a wizard) marks its own; a plain macro - no tool view, or
             // only the loaded-job view is active - gets a dedicated run view, so a run never overwrites the job.
-            var connected = CNC.Controls.ProgramView.Active;
-            if (connected != null && connected != jobProgramView)
-                connected.SetProgram(prog.Data);
-            else
+            // preferJobView needs none of this - prog IS GCode.File, already shown by the docked view.
+            if (!preferJobView)
             {
-                EnsureMacroRunView();
-                _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
-                _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
-                _macroRunView.SetProgram(prog.Data);
-                _macroRunView.Connect();
+                var connected = CNC.Controls.ProgramView.Active;
+                if (connected != null && connected != jobProgramView)
+                    connected.SetProgram(prog.Data);
+                else
+                {
+                    EnsureMacroRunView();
+                    _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
+                    _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
+                    _macroRunView.SetProgram(prog.Data);
+                    _macroRunView.Connect();
+                }
             }
             RestoreSourceOnEnd(m, prog, isFinalBurst, onDone);   // revert to the job source when THIS burst ends, then signal completion
 

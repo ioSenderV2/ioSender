@@ -27,8 +27,11 @@
 ;     use (toolsetter puck, or a fixed touch-plate block - see _tc_touchplate
 ;     below), XY centered, Z high enough that the longest tool clears it
 ;     during the XY rapid in.
-;   - #<_tlo_ref> is initialized to 0 at start of session (start_job.macro
-;     does this).
+;   - #<_tlo_ref> defaults to 0 the first time this macro runs in a session if
+;     nothing else has set it yet (guarded below with EXISTS[] - Setup's own
+;     generated program also loads a baseline into it, but a tool change run
+;     standalone on a truly cold session, before Setup ever runs, must not
+;     error trying to read an undefined named parameter).
 ;
 ; #<_tc_touchplate> (set below, 2026-07-31): 0 = toolsetter puck (default,
 ; original behavior - mechanical NC switch on the TOOLSETTER input, only
@@ -154,6 +157,10 @@ o120 ELSE
 o120 ENDIF
 (PRINT, TC03 probe_z=#<_probe_z>)
 
+o199 IF [EXISTS[#<_tlo_ref>]]
+o199 ELSE
+  #<_tlo_ref> = 0
+o199 ENDIF
 o200 IF [#<_tlo_ref> EQ 0]
   #<_tlo_ref> = #<_probe_z>
   (PRINT, TC04 TLO REF SET ref=#<_tlo_ref>)

@@ -154,16 +154,22 @@ namespace CNC.Controls
         public static string ActiveProgramName;
 
         // Hook to stream a generated program with full flow control (Feed Hold/Stop live) WITHOUT touching the
-        // loaded job: args are (model, name, lines, onDone). Set by the shell (ioSender XL). EVERY streamed run
-        // goes through this - a tool that owns a ProgramView streams into it, a plain macro gets its own run
-        // view - so a run never overwrites the loaded program or hijacks the Job tab. Cycle Start is deferred to
-        // a background dispatcher tick (see the implementation), so this call returns before the burst actually
-        // starts - onDone is invoked once it reaches a true terminal state, letting StreamProgram optionally
-        // wait for it (see Flush's 'wait' parameter) instead of racing the next burst against this one.
+        // loaded job: args are (model, name, lines, isFinalBurst, preferJobView, onDone). Set by the shell
+        // (ioSender XL). EVERY streamed run goes through this - a tool that owns a ProgramView streams into it,
+        // a plain macro gets its own run view - so a run never overwrites the loaded program or hijacks the Job
+        // tab. Cycle Start is deferred to a background dispatcher tick (see the implementation), so this call
+        // returns before the burst actually starts - onDone is invoked once it reaches a true terminal state,
+        // letting StreamProgram optionally wait for it (see Flush's 'wait' parameter) instead of racing the next
+        // burst against this one.
         // isFinalBurst (added alongside the wait plumbing below): true only for the macro's own fire-and-forget
         // closing burst (Flush's wait=false call) - the host uses it to tell "the whole macro just finished" apart
         // from "one more mid-macro burst just finished, more is coming right behind it".
-        public static System.Action<GrblViewModel, string, string[], bool, System.Action> RunStreamedJobInPlace;
+        // preferJobView (2026-08-01): opt-in escape hatch from the "never hijack the Job tab" rule above, for
+        // the one case where hijacking it is exactly the point - Work Order already made itself the loaded job
+        // via GCode.File.Push/LoadText before streaming, so its own burst should show live status in the real
+        // docked Job-tab list instead of a separate floating view. False for every other caller (Setup,
+        // calibration, fixture tools, ...) - those must keep the "don't touch the Job tab" guarantee.
+        public static System.Action<GrblViewModel, string, string[], bool, bool, System.Action> RunStreamedJobInPlace;
 
         // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
         // its generated program off to the Job tab ("one mental model of running a program" regardless of
@@ -186,7 +192,7 @@ namespace CNC.Controls
         /// MacroProcessor.SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures and
         /// alarm-abort checks still apply and still stop the run; this only skips prompts that exist purely
         /// to ask "are you sure" / "ready?", not safety gates.</param>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false)
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, bool preferJobView = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -284,7 +290,7 @@ namespace CNC.Controls
                     // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
                     if (Body(raw, "PROMPT").Trim().Length == 0 && !unattended)
                     {
-                        Flush(model, buffer, true);
+                        Flush(model, buffer, true, preferJobView);
                         if (AbortedByAlarm(model, name))
                             return false;
                         if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
@@ -296,7 +302,7 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "MBOX"))
                 {
-                    Flush(model, buffer, true);
+                    Flush(model, buffer, true, preferJobView);
                     // A burst just flushed above may have alarmed (e.g. a probe search that never triggered)
                     // without WaitForIdle in the picture at all - Flush only waits for the burst to reach SOME
                     // terminal StreamingState, it doesn't check WHICH one. Without this, the macro sailed
@@ -314,7 +320,7 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "WAITIDLE"))
                 {
-                    Flush(model, buffer, true);
+                    Flush(model, buffer, true, preferJobView);
                     if (!WaitForIdle(model))
                     {
                         ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
@@ -326,7 +332,7 @@ namespace CNC.Controls
 
                 buffer.Append(SanitizeComment(ApplySubstitutions(raw, fields))).Append('\n');
             }
-            Flush(model, buffer, false);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
+            Flush(model, buffer, false, preferJobView);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
 
             return true;
         }
@@ -428,7 +434,7 @@ namespace CNC.Controls
         // MBOX/WAITIDLE/prompt gate) MUST pass wait=true so this burst genuinely finishes first - restoring the
         // strict ordering the old MDI queue gave for free. The macro's FINAL burst passes wait=false (fire and
         // forget) so a "Run" click doesn't block until the physical job completes.
-        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait)
+        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait, bool preferJobView = false)
         {
             if (buffer.Length == 0)
                 return;
@@ -467,13 +473,14 @@ namespace CNC.Controls
                 return;
             }
 
-            StreamProgram(model, lines, wait);
+            StreamProgram(model, lines, wait, preferJobView);
         }
 
-        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView, WITHOUT touching
-        // the loaded job. A run flushes several bursts (a park move, then each O<...> CALL); every one takes this
-        // path, so a run never overwrites the loaded program or hijacks the Job tab.
-        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait)
+        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView. By default
+        // WITHOUT touching the loaded job - a run flushes several bursts (a park move, then each O<...> CALL);
+        // every one takes this path, so a run never overwrites the loaded program or hijacks the Job tab.
+        // preferJobView opts a caller OUT of that guarantee - see RunStreamedJobInPlace's own comment.
+        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait, bool preferJobView = false)
         {
             var code = new List<string>();
             foreach (var l in lines)
@@ -486,7 +493,7 @@ namespace CNC.Controls
                 return;
 
             bool done = false;
-            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, () =>
+            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, preferJobView, () =>
             {
                 done = true;
                 DebugLog.Write("macro", string.Format("StreamProgram: onDone fired, StreamingState={0} GrblState={1}",

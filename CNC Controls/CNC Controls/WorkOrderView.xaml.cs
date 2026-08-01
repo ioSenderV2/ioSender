@@ -1536,8 +1536,11 @@ namespace CNC.Controls
 
         private void EnsureProgramView()
         {
+            // No EditTargetTab: this preview only ever shows while Generate is pressed FROM the Work Order
+            // tab (ActiveGenerate is only wired up in Activate(true)), so an Edit-back-to-Work-Order button
+            // would just switch to the tab it's already showing on - a no-op, removed 2026-08-01.
             if (programView == null)
-                programView = new ProgramView { Title = "Work Order", Source = ProgramSource.Generated, EditTargetTab = ViewType.WorkOrder };
+                programView = new ProgramView { Title = "Work Order", Source = ProgramSource.Generated };
         }
 
         public void Activate(bool activate)
@@ -1628,9 +1631,16 @@ namespace CNC.Controls
         // overlay - so the Job tab's real docked list (ProgramPanel) and jobProgramView show it exactly like
         // any loaded file, since both are hard-wired to that same shared instance. Push remembers whatever
         // was loaded before (or that nothing was); WatchForRunEnd's Pop() restores it once this run reaches
-        // its true terminal. The actual STREAMING still goes through MacroProcessor.Run's own transient
-        // program (RunStreamedJobInPlace) - GCode.File here is purely the display, built from the identical
-        // text, so the two never disagree.
+        // its true terminal.
+        //
+        // The actual STREAMING still goes through MacroProcessor.Run's own transient program
+        // (RunStreamedJobInPlace), never GCode.File directly - but Run() is called here with preferJobView:
+        // true (2026-08-01), so that transient program's live per-line status ("ok"/"*") is written straight
+        // into jobProgramView instead of a separate floating run view (every OTHER MacroProcessor.Run caller
+        // - Setup, calibration, fixture tools - leaves that false and keeps the "never touch the Job tab"
+        // default). jobProgramView temporarily shows the transient collection rather than GCode.File.Data;
+        // GCode.File.Pop()'s own FileChanged handler rebinds it back once the run ends, so this is a
+        // self-reverting redirect, not a permanent takeover - see RunStreamedJobInPlace's own comment.
         private void Run()
         {
             if (model == null)
@@ -1650,7 +1660,7 @@ namespace CNC.Controls
             // is actually going to stream, so pop back to whatever was loaded before immediately rather than
             // leaving the generated program sitting there as "the job" with nothing to ever restore it, and
             // switch back to this tab - the borrowed slot on the Job tab is done with, hand it back.
-            if (!MacroProcessor.Run(model, "Work Order", toRun, true))
+            if (!MacroProcessor.Run(model, "Work Order", toRun, true, false, true))
             {
                 GCode.File.Pop();
                 MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);

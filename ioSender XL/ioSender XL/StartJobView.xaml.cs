@@ -1592,8 +1592,8 @@ namespace GCode_Sender
             {
                 program = FixtureKinds.ProbesEdges(fx.Kind)
                     ? BuildProgram(p, fx, SelectedCorner, widthMm, heightMm,
-                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value, thicknessMm, touchPlate, stockConductive, fldCornerMargin.Value, exactSize, setOrigin, IsG92)
-                    : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p), setOrigin, IsG92);
+                                   cbxWcs.SelectedIndex + 1, measure, applyRotation, setTloRef, fldSpacer.Value, thicknessMm, touchPlate, stockConductive, fldCornerMargin.Value, exactSize, setOrigin, model.IsTloReferenceSet, IsG92)
+                    : BuildViseProgram(p, fx, widthMm, heightMm, thicknessMm, cbxWcs.SelectedIndex + 1, setTloRef, touchPlate, stockConductive, measureVise, ActiveOrFallbackProbeDiameter(p), setOrigin, model.IsTloReferenceSet, IsG92);
             }
             ResetResults();
             SaveInputs();
@@ -1895,7 +1895,7 @@ namespace GCode_Sender
         // edge-probing here. That gets its own generator, BuildViseProgram (below), not this one -
         // Generate_Click branches on ProbesEdges to pick between them. BuildViseProgram has its OWN partial
         // Measure (2 of 4 corners, no skew) via the same pcorner.macro this function calls.
-        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize, bool setOrigin, bool useG92 = false)
+        private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize, bool setOrigin, bool tloAlreadyReferenced, bool useG92 = false)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius (3D probe) / bit radius (touch plate) -> edge comp
             // Touch plate against non-conductive stock needs a real physical plate, whose known PlateThickness
@@ -1970,7 +1970,18 @@ namespace GCode_Sender
             // design conversation this came from - replaces the old #<_tlo_ref> = 0 reset entirely.
             if (setTloRef)
             {
-                L("#<_tlo_saved> = #<_tlo_ref>");
+                // #<_tlo_ref> is only ever assigned by a prior tc.macro/Setup run, so a truly first-ever
+                // session (fresh NVS, or right after a firmware update) has it undefined - reading it
+                // directly errors out (grblHAL error 2). Decided HERE in C# via the controller's own $TLR
+                // report (tloAlreadyReferenced), NOT with an O-word IF/ELSE/ENDIF in the streamed program -
+                // confirmed on real hardware 2026-08-01 that RunStreamedJobInPlace's line pipeline
+                // (GCode.AddBlock, used for every streamed burst) silently drops bare O-word ELSE/ENDIF-only
+                // lines, leaving the controller's o-word engine waiting for a matching ENDIF that never
+                // arrives - it kept accepting/acking every subsequent line but stopped queuing any real
+                // motion for the rest of the session, only clearing on a reboot. tc.macro's own o199/o200
+                // IF/ELSE/ENDIF is fine since it's uploaded as a raw file (YModem), never tokenized/streamed
+                // through this path - do not add O-word branching to any program built here.
+                L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
                 L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
             }
             // Select the probe input for the chosen probe (tool setter -> 1, else the main probe -> 0), the same
@@ -2534,7 +2545,7 @@ namespace GCode_Sender
         // the jaw is assumed machine-aligned (square to the axes), so skew is never computed here, only
         // width/height/flatness.
         // UNVERIFIED on hardware - this is a first cut (see the file header note).
-        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm, bool setOrigin, bool useG92 = false)
+        private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm, bool setOrigin, bool tloAlreadyReferenced, bool useG92 = false)
         {
             var fxPos = new Position(fx.Coords);
             // Same touch-plate/conductive-stock rule as BuildProgram - see its comment. The vise's XY origin
@@ -2585,7 +2596,10 @@ namespace GCode_Sender
             // comment.
             if (setTloRef)
             {
-                L("#<_tlo_saved> = #<_tlo_ref>");
+                // See BuildProgram's own comment - #<_tlo_ref> can be undefined on a truly first-ever
+                // session, and O-word IF/ELSE/ENDIF is unsafe in a streamed (not raw-uploaded) program;
+                // decided in C# via tloAlreadyReferenced instead.
+                L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
                 L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
             }
             if (GrblInfo.HasToolSetter)
