@@ -206,6 +206,27 @@ namespace GCode_Sender
             // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
             CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
 
+            // A generated program whose source lives on another tab (e.g. Work Order) shows an Edit button;
+            // ProgramView/CNC Controls has no reference to MainWindow's tab strip, so it raises this instead
+            // of switching tabs itself.
+            CNC.Controls.ProgramView.EditRequested += view =>
+            {
+                if (!view.EditTargetTab.HasValue)
+                    return;
+                var tab = getTab(view.EditTargetTab.Value);
+                if (tab != null)
+                    ui.tabMode.SelectedItem = tab;
+            };
+
+            // Work Order's Run hands its generated program off to the Job tab and back again - same
+            // tab-switch mechanism as EditRequested above.
+            CNC.Controls.MacroProcessor.SwitchToTab = viewType =>
+            {
+                var tab = getTab(viewType);
+                if (tab != null)
+                    ui.tabMode.SelectedItem = tab;
+            };
+
             // When the active view collapses to its 3-line run view, size the overlay popup to content (top-
             // aligned) instead of stretching full height, so the popup itself shrinks - not just the grid.
             CNC.Controls.ProgramView.CompactChanged += ApplyOverlayCompact;

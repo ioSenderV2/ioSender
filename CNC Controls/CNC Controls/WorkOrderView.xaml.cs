@@ -1531,7 +1531,7 @@ namespace CNC.Controls
         private void EnsureProgramView()
         {
             if (programView == null)
-                programView = new ProgramView { Title = "Work Order" };
+                programView = new ProgramView { Title = "Work Order", Source = ProgramSource.Generated, EditTargetTab = ViewType.WorkOrder };
         }
 
         public void Activate(bool activate)
@@ -1563,21 +1563,29 @@ namespace CNC.Controls
                     && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
                 if (needsSave)
                 {
+                    // Says up front that Yes overwrites the existing file (when there is one) - so SaveToDisk's
+                    // SaveFileDialog can turn off its own native "replace it?" prompt (OverwritePrompt=false)
+                    // without silently skipping that warning, just moving it here instead of a second, redundant
+                    // confirm right on top of this one.
+                    string overwriteNote = currentFilePath != null
+                        ? string.Format(" This overwrites {0}.", System.IO.Path.GetFileName(currentFilePath))
+                        : string.Empty;
+
                     // Default (off): today's unconditional prompt, unchanged - the safety net for anyone who
                     // never touches the new Settings:App > Odd Jobs toggle. On: save without asking, unless
                     // PromptBeforeAutoSaveWorkOrder also wants a confirm first (same prompt, just opt-in).
                     bool doSave;
                     if (!AppConfig.Settings.Base.AutoSaveWorkOrderOnExit)
-                        doSave = AppDialogs.Show("This work order has unsaved changes. Save before leaving?",
+                        doSave = AppDialogs.Show("This work order has unsaved changes. Save before leaving?" + overwriteNote,
                             "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
                     else if (AppConfig.Settings.Base.PromptBeforeAutoSaveWorkOrder)
-                        doSave = AppDialogs.Show("Save these work order changes now?",
+                        doSave = AppDialogs.Show("Save these work order changes now?" + overwriteNote,
                             "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
                     else
                         doSave = true;
 
                     if (doSave)
-                        btnSave_Click(null, null);
+                        SaveToDisk();
                 }
 
                 MacroProcessor.ActiveRun = null;
@@ -1603,6 +1611,20 @@ namespace CNC.Controls
 
         #endregion
 
+        // Switches to the Job tab FIRST, then streams - one click does both. The switch fires this tab's own
+        // Activate(false) synchronously (WPF tab selection is not deferred), which is also where the existing
+        // unsaved-changes prompt/auto-save-on-exit already lives (AppConfig.Base.AutoSaveWorkOrderOnExit) - so
+        // "Run saves, moves to the Job tab, and starts" falls out of that existing mechanism with no new save
+        // logic needed here. That same Activate(false) clears the `program` field, so it must be captured into
+        // a local BEFORE switching, or the calls below would be handed an empty string and no-op.
+        //
+        // GCode.File.Push()/LoadText() make the generated program the actual loaded job - not a floating
+        // overlay - so the Job tab's real docked list (ProgramPanel) and jobProgramView show it exactly like
+        // any loaded file, since both are hard-wired to that same shared instance. Push remembers whatever
+        // was loaded before (or that nothing was); WatchForRunEnd's Pop() restores it once this run reaches
+        // its true terminal. The actual STREAMING still goes through MacroProcessor.Run's own transient
+        // program (RunStreamedJobInPlace) - GCode.File here is purely the display, built from the identical
+        // text, so the two never disagree.
         private void Run()
         {
             if (model == null)
@@ -1612,18 +1634,63 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Work Order", program, true);
+            string toRun = program;
+            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
+
+            GCode.File.Push();
+            GCode.File.LoadText("Work Order", toRun);
+
+            // Declined at the confirm (or any other pre-flight rejection - PREREQ, MBOX Cancel, ...) - nothing
+            // is actually going to stream, so pop back to whatever was loaded before immediately rather than
+            // leaving the generated program sitting there as "the job" with nothing to ever restore it, and
+            // switch back to this tab - the borrowed slot on the Job tab is done with, hand it back.
+            if (!MacroProcessor.Run(model, "Work Order", toRun, true))
+            {
+                GCode.File.Pop();
+                MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
+            }
+            else
+                WatchForRunEnd();
         }
 
-        private void Generate()
+        // Pop the loaded job back to whatever was there before, once this run reaches its TRUE terminal state
+        // (Idle/NoFile - a clean finish or a Stop) - mirrors MainWindow.RestoreSourceOnEnd's own arm-on-
+        // running/fire-on-terminal pattern (see its comment for why Idle/NoFile, not JobFinished). Left in
+        // place through an Error/Halted (alarm) on purpose, same as every other Generate-first tool, so the
+        // operator can still see what failed rather than having it silently vanish back to the previous file
+        // mid-inspection.
+        private void WatchForRunEnd()
+        {
+            bool started = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = model.StreamingState;
+                if (st == StreamingState.Send || st == StreamingState.SendMDI)
+                    started = true;
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
+                    return;
+                model.PropertyChanged -= handler;
+                GCode.File.Pop();
+                MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
+            };
+            model.PropertyChanged += handler;
+        }
+
+        // Shared by Generate and Run: validate + build program text into the
+        // `program` field. False (nothing built, `program` untouched) on any validation failure or a "no" to
+        // the G59/tool-length confirm.
+        private bool BuildProgram()
         {
             if (model == null)
-                return;
+                return false;
 
             if (workOrder.Toolpaths.Count == 0)
             {
                 AppDialogs.Show("Add at least one toolpath first.", "Work Order", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
+                return false;
             }
 
             var warnings = WorkOrderRules.Validate(workOrder);
@@ -1631,7 +1698,7 @@ namespace CNC.Controls
             if (warnings.Count > 0)
             {
                 AppDialogs.Show("Fix these first:\n\n" + string.Join("\n", warnings), "Work Order", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
+                return false;
             }
 
             // The whole of the old Setup gate, reduced to one question at the one moment it matters. Everything
@@ -1643,9 +1710,16 @@ namespace CNC.Controls
                     "If the machine has been re-homed, the origin has moved, or the tool length reference has been cleared since they were set, run Setup again first.\n\n" +
                     "Proceed?",
                     "Work Order", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
-                return;
+                return false;
 
             program = string.Join("\r\n", WorkOrderCompiler.BuildProgram(workOrder));
+            return true;
+        }
+
+        private void Generate()
+        {
+            if (!BuildProgram())
+                return;
             MacroProcessor.PublishGenerated("Work Order", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;
@@ -1689,36 +1763,55 @@ namespace CNC.Controls
             return CNC.Core.Resources.WorkOrdersFolder;
         }
 
-        private void btnSave_Click(object sender, RoutedEventArgs e)
+        // Actual save-to-disk. True "Save" semantics when a file is already associated (silent, reuses
+        // currentFilePath - critical for the auto-save-on-exit path: AutoSaveWorkOrderOnExit + no prompt is
+        // supposed to mean NO dialog at all, but Run's tab-switch hits this far more often than the old
+        // occasional tab-leave did, so a picker popping every time defeats the point). Only an untitled work
+        // order (currentFilePath == null - the true first save) shows the picker, same as Save As always has.
+        private bool SaveToDisk()
         {
-            var dlg = new Microsoft.Win32.SaveFileDialog
+            string path = currentFilePath;
+
+            if (path == null)
             {
-                Filter = WorkOrderFilter,
-                AddExtension = true,
-                DefaultExt = ".workorder",
-                InitialDirectory = WorkOrdersFolder(),
-                FileName = SuggestedFileName()
-            };
-            if (dlg.ShowDialog() != true)
-                return;
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = WorkOrderFilter,
+                    AddExtension = true,
+                    DefaultExt = ".workorder",
+                    InitialDirectory = WorkOrdersFolder(),
+                    FileName = SuggestedFileName(),
+                    // The needsSave prompt above already says "this overwrites <file>" up front when there's
+                    // an existing association - the native replace-confirm here would just be a second,
+                    // redundant "are you sure" on top of that one for the (rare) case of picking an existing
+                    // filename on a true first save.
+                    OverwritePrompt = false
+                };
+                if (dlg.ShowDialog() != true)
+                    return false;
+                path = dlg.FileName;
+            }
 
             try
             {
                 var serializer = new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder));
-                using (var writer = new System.IO.StreamWriter(dlg.FileName))
+                using (var writer = new System.IO.StreamWriter(path))
                     serializer.Serialize(writer, workOrder);
-                currentFilePath = dlg.FileName;
+                currentFilePath = path;
                 pendingName = null;
                 AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
                 AppConfig.Settings.Base.LastWorkOrderName = null;
                 AppConfig.Settings.Base.WorkOrderDirty = false;
                 AppConfig.Settings.Save();
                 UpdateTitleBar();
-                AppDialogs.Show(string.Format("Work order saved to\n{0}", dlg.FileName), "Work order", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (model != null)
+                    model.Message = "Work order saved to " + path;
+                return true;
             }
             catch (Exception ex)
             {
                 AppDialogs.Show("Could not save the work order:\n" + ex.Message, "Work order", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 

@@ -23,6 +23,14 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
+    // What produced this program - File (Load File/Folder) or Generated (a wizard/Work Order Generate).
+    // Lets a producer opt this instance into source-specific affordances (currently: the Edit button below).
+    public enum ProgramSource
+    {
+        File,
+        Generated
+    }
+
     public partial class ProgramView : UserControl
     {
         public ProgramView()
@@ -31,6 +39,25 @@ namespace CNC.Controls
             DataContextChanged += (s, e) => HookModel(e.NewValue as GrblViewModel);
             UpdateTitleHint();
             titleBar.ToolTip = DefaultTitleTooltip;
+        }
+
+        public ProgramSource Source { get; set; } = ProgramSource.File;
+
+        // Set by a producer whose generated program has an editable source elsewhere (e.g. the Work Order
+        // tab's toolpath list) - shows the title-bar Edit button, which raises EditRequested rather than
+        // reaching into MainWindow directly (ProgramView/CNC Controls has no reference to it).
+        private ViewType? _editTargetTab;
+        public ViewType? EditTargetTab
+        {
+            get { return _editTargetTab; }
+            set { _editTargetTab = value; UpdateEditButtonVisibility(); }
+        }
+
+        public static event System.Action<ProgramView> EditRequested;
+
+        private void BtnEdit_Click(object sender, RoutedEventArgs e)
+        {
+            EditRequested?.Invoke(this);
         }
 
         // The program this view owns and renders. Set by the producer (Load/Generate); the same block objects
@@ -99,6 +126,11 @@ namespace CNC.Controls
                 txtTitle.Text = value ?? string.Empty;
                 titleBar.Visibility = string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
             }
+        }
+
+        private void UpdateEditButtonVisibility()
+        {
+            btnEdit.Visibility = EditTargetTab.HasValue ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // When this view Connect()s, whether the host overlay should auto-pop into view. Wizards leave it true

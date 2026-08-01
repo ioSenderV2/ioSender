@@ -1635,12 +1635,6 @@ CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Window
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Last toolpath: a 45 deg V-bit traces the pocket's true top edge to break the sharp corner. Runs after roughing and any finishing passes.
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Chamfer feeds and speeds...
 CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"V-bit spindle RPM, feed rate and chamfer depth."
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wonew:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,New
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wonew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Start a blank work order, after asking what to call it."
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_woload:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load...
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_woload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Replace the current work order with one saved to a .workorder file.
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wosave:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save...
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mnu_wosave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Save this work order to a .workorder file so it can be reloaded or shared. The current work order is always kept automatically as well.
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Group operations by tool
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Emit the program grouped onto as few tool changes as possible instead of strictly in tree order. Each toolpath's own operation order is always preserved - roughing still runs before the finishing passes that depend on it - so grouping only combines tools where that allows.
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woskipfirsttc:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,First tool already loaded
@@ -1746,3 +1740,4 @@ CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojToolTable:S
 CNC.Controls.WPF.g.en-US.resources:kbddefaultspeedcontrol.baml,lbl_kbdDefSpeed:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kbd Def Speed:
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabWorkOrder:System.String.$Content,None,True,True,,Work Order
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,grb_workOrderConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Work Order
+CNC.Controls.WPF.g.en-US.resources:programview.baml,btn_progvieweditsource:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit

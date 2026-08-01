@@ -165,6 +165,16 @@ namespace CNC.Controls
         // from "one more mid-macro burst just finished, more is coming right behind it".
         public static System.Action<GrblViewModel, string, string[], bool, System.Action> RunStreamedJobInPlace;
 
+        // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
+        // its generated program off to the Job tab ("one mental model of running a program" regardless of
+        // source), then switches BACK to Work Order once the Job tab's borrowed program is done with (a
+        // failed prereq, or the run's own true terminal - see WorkOrderView.Run/WatchForRunEnd). Switching
+        // straight back also sidesteps a WPF quirk found 2026-08-01: the Job tab's docked list didn't
+        // visually repaint its outline grouping after GCode.Pop restored a large file WHILE that tab stayed
+        // in view - but a genuine tab switch always forces a correct repaint, so leaving (and not looking at
+        // the stale frame) beats fighting to force one in place.
+        public static System.Action<ViewType> SwitchToTab;
+
         // Name given to the in-memory program when a flush is streamed (set per run).
         private static string _streamName = "Macro";
 

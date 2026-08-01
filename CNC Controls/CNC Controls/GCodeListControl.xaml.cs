@@ -416,6 +416,21 @@ namespace CNC.Controls
                 if (grouped)
                     view.GroupDescriptions.Add(new PropertyGroupDescription("Section"));
             }
+
+            view.Refresh();
+
+            // None of DeferRefresh's Dispose (documented to trigger a refresh), an explicit view.Refresh(),
+            // nor UpdateLayout() was enough to make the grouped layout actually repaint when this fires right
+            // after GCode.Pop's batched restore (2026-08-01) - the data was correct throughout (confirmed:
+            // even a minute of scrolling never surfaced it), only an actual tab switch did. A tab switch is a
+            // much stronger signal than a view refresh - Visibility Collapsed->Visible plus, more to the
+            // point, the DataGrid's ItemsSource binding gets fully torn down and rebuilt against a "new"
+            // DataContext, not just asked to redraw its EXISTING one. Replicate that directly: toggle
+            // DataContext off and back on to force ItemsSource/virtualization to rebuild from scratch, rather
+            // than trying to find the one specific Invalidate*/Refresh call that a plain re-layout was missing.
+            var dc = grdGCode.DataContext;
+            grdGCode.DataContext = null;
+            grdGCode.DataContext = dc;
         }
 
         private void StartSection_Click(object sender, RoutedEventArgs e)

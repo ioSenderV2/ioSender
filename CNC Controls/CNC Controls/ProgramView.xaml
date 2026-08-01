@@ -19,6 +19,10 @@
             <DockPanel>
                 <TextBlock x:Name="txtTitleHint" DockPanel.Dock="Right" Foreground="#FF888888" FontSize="11"
                            VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <!-- Only shown when EditTargetTab is set (generated-from-a-source-tab programs, e.g. Work
+                     Order) - jumps back to that tab to edit the source rather than the generated g-code. -->
+                <Button x:Uid="btn_progvieweditsource" x:Name="btnEdit" DockPanel.Dock="Right" Content="Edit" Padding="8,0" Margin="8,0,0,0"
+                        VerticalAlignment="Center" Visibility="Collapsed" Click="BtnEdit_Click"/>
                 <TextBlock x:Name="txtTitle" FontWeight="SemiBold"/>
             </DockPanel>
         </Border>

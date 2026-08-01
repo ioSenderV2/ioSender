@@ -226,7 +226,10 @@ namespace CNC.Core
         }
 
         private string filename = string.Empty;
-        public ObservableCollection<GCodeBlock> blocks = new ObservableCollection<GCodeBlock>();
+        // Concrete type is BulkObservableCollection (AddRange/ReplaceAll - one notification for many items,
+        // not one per item) - declared as the plain base type since every external reader only needs
+        // INotifyCollectionChanged/IList; callers that need the bulk API (GCode.cs's load/Pop paths) cast.
+        public ObservableCollection<GCodeBlock> blocks = new BulkObservableCollection<GCodeBlock>();
 
         public Queue<string> commands = new Queue<string>();
 
@@ -555,6 +558,67 @@ namespace CNC.Core
             filename = "";
 
             FileChanged?.Invoke(filename);
+        }
+
+        // --- Lightweight snapshot/restore (GCode.File.Push/Pop) ------------------------------------------
+        // Swap the loaded job out for another program's blocks/limits and back again WITHOUT re-reading/
+        // re-parsing from disk. A naive Pop that just re-Load()ed the previous filename took 30+ seconds on
+        // real hardware (2026-07-31, a ~220k-line file) - full lexical re-parse every time. This captures
+        // exactly the two things that actually matter and are cheap to copy: the block list (each
+        // GCodeBlock already carries its own per-line Tokens from the original parse, so hover-explain etc.
+        // keep working with no extra work) and the bounding box (a Clone - BoundingBox.Reset() mutates the
+        // SAME object in place on every subsequent load, so a bare reference would get corrupted by
+        // whatever loads in between Push and Pop). NOT captured: GCodeParser's own summary stats
+        // (ToolChanges/Decimals/HasGoPredefinedPosition - private setters, would need reaching into Parser
+        // internals) and min_feed/max_feed (currently unread anywhere in the app). Those stay whatever the
+        // intervening load left them at until the next real Load - a stale summary number is a display gap,
+        // not a correctness one; the block list and bounding box (what's actually displayed/streamed/used
+        // for travel-limit sanity) are exact.
+        // Public, not internal: the caller (GCode.Pop/PopAsync, a DIFFERENT assembly - CNC.Controls) needs to
+        // read Blocks/HasSections directly to batch the restore and set Model.HasOutline at the right moment
+        // (see PrepareRestore's own comment) - it can't be done as one opaque Restore() call.
+        public class Snapshot
+        {
+            public string FileName;
+            public List<GCodeBlock> Blocks;
+            public GcodeBoundingBox BoundingBox;
+            public bool HasSections;
+            public bool HeightMapApplied;
+        }
+
+        public Snapshot TakeSnapshot()
+        {
+            return new Snapshot
+            {
+                FileName = filename,
+                Blocks = new List<GCodeBlock>(blocks),
+                BoundingBox = new GcodeBoundingBox
+                {
+                    Min = (double[])BoundingBox.Min.Clone(),
+                    Max = (double[])BoundingBox.Max.Clone(),
+                    Size = (double[])BoundingBox.Size.Clone()
+                },
+                HasSections = HasSections,
+                HeightMapApplied = HeightMapApplied
+            };
+        }
+
+        // Split from a single Restore() call into Prepare/(caller bulk-adds blocks)/RaiseFileChanged so the
+        // caller (GCode.Pop) can populate `blocks` via BulkObservableCollection.ReplaceAll - one Reset
+        // notification for the whole program, not one Add() notification per block (confirmed on real
+        // hardware, 2026-08-01: a plain foreach-Add over ~220k blocks on the live, DataGrid-bound collection
+        // froze the app "Not Responding"). Deliberately does NOT clear `blocks` itself - ReplaceAll's own
+        // clear+add is the single atomic operation; clearing here first would just be a second, wasted Reset.
+        // This split also lets the caller set Model.HasOutline (GrblViewModel, not visible from GCodeJob)
+        // AFTER blocks/BoundingBox/HasSections are all fully consistent but BEFORE FileChanged fires - setting
+        // it any earlier let GCodeListControl's HasOutline-changed handler call ApplyGrouping against
+        // still-stale block data (the outgoing program, not yet cleared) rather than the restored one.
+        public void PrepareRestore(Snapshot snapshot)
+        {
+            filename = snapshot.FileName;
+            BoundingBox = snapshot.BoundingBox;
+            HasSections = snapshot.HasSections;
+            HeightMapApplied = snapshot.HeightMapApplied;
         }
 
         private void Reset()

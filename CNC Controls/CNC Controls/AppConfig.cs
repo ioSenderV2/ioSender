@@ -386,6 +386,10 @@ namespace CNC.Controls
         // same reason - both are read back in WorkOrderView.OnConfigReady.
         public string LastWorkOrderFilePath { get; set; } = null;
         public string LastWorkOrderName { get; set; } = null;
+        // Load File's own remembered folder (GCode.Open) - kept separate from Work Order's Load/Save
+        // dialogs (which explicitly pin InitialDirectory to the Work Orders folder every time) so loading a
+        // work order doesn't silently drag the next Load File open there too. See GCode.Open's own comment.
+        public string LastGCodeFolder { get; set; } = null;
         // True from the first edit after a New/Load/Save until the next Save - the live (auto-persisted)
         // content has diverged from LastWorkOrderFilePath on disk (or was never saved to a file at all, if
         // that's null too). Persisted (not just an in-memory flag) so the warning survives a restart - the

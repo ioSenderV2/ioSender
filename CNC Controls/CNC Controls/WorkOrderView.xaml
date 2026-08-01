@@ -27,17 +27,10 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <!-- File-level commands, not item-level ones (those move to the tree's own context menu below) -
-                 New/Load/Save act on the whole work order, so they read as a menu bar, not buttons competing
-                 with the tree for the same title row. -->
-            <Menu Grid.Row="0" Margin="0,0,0,4" Background="Transparent">
-                <MenuItem x:Uid="mnu_wonew" Header="New" Click="MenuNew_Click"
-                          ToolTip="Start a blank work order, after asking what to call it."/>
-                <MenuItem x:Uid="mnu_woload" Header="Load..." Click="btnLoad_Click"
-                          ToolTip="Replace the current work order with one saved to a .workorder file."/>
-                <MenuItem x:Uid="mnu_wosave" Header="Save..." Click="btnSave_Click"
-                          ToolTip="Save this work order to a .workorder file so it can be reloaded or shared. The current work order is always kept automatically as well."/>
-            </Menu>
+            <!-- No in-tab New/Load/Save UI - New/Load live on the main menu (2026-07-31, ViewType.WorkOrder
+                 entry points); Save happens implicitly (the existing tab-leave auto-save/prompt, unchanged)
+                 as part of Run switching to the Job tab - see Run()'s own comment. Generate/Run are the shared
+                 bottom run bar, same as every other Generate-first tab. -->
             <!-- Work order's own name (its file's name, no path or extension) - not the word "Toolpaths",
                  which said nothing this panel doesn't already show by being full of toolpaths. -->
             <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold"

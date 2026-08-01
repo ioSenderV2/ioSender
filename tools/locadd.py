@@ -43,6 +43,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ToolView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/WorkOrderView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ProgramView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/TrinamicView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PIDLogView.xaml', 'CNC.Controls.WPF'),
