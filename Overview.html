@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>193 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>194 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -313,6 +313,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Feed rate/Spindle/Outline could stretch wide enough (Outline's wrapped warning text especially) to squeeze the Program/3D View/Console workspace.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr145">145</a></td></tr>
 <tr><td>Hovering a program-list line now reliably explains THAT line (was matching an unrelated line's tokens); Machine/Program limits read as one compact interval per axis instead of two full-width fields.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr177">177</a></td></tr>
 <tr><td>The cut-trail line in the 3D carve view was invisible in every state; stock top-face color lightened for contrast.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr180">180</a></td></tr>
+<tr><td>Work Order's Run hands its program to the Job tab as the real loaded job (pops back after); Load File no longer freezes on a large file.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr194">194</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -607,7 +608,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.32</td></tr>
 <tr><td class="n">192</td><td><a href="#pr192">Odd Jobs tab &mdash; Setup + Work Order builder</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">48</span> <span class="del">0</span> <span class="add">+11</span><br><span class="k">Lines:</span> <span class="add">+6404</span> <span class="del">-125</span></td></tr>
 <tr><td class="n">193</td><td><a href="#pr193">Work Order tab, conductive-material rules, touch-plate TLO</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">32</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+251</span> <span class="del">-218</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (193 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1662</span> <span class="del">23</span> <span class="add">+198</span><br><span class="k">Lines:</span> <span class="add">+70283</span> <span class="del">-12184</span></td></tr>
+<tr><td class="n">194</td><td><a href="#pr194">Work Order &rarr; Job tab handoff, load performance</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+440</span> <span class="del">-103</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (194 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1679</span> <span class="del">23</span> <span class="add">+199</span><br><span class="k">Lines:</span> <span class="add">+70723</span> <span class="del">-12287</span></td></tr>
 </table>
 </div>
 
@@ -3852,6 +3854,26 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (14 files, 7 locales)</td><td class="num add">42</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Continues the Job/Setup/Odd-Jobs flow redesign: the Work Order composer is now a top-level tab in its own right (Odd Jobs' shell, which only ever hosted this one sub-tab, is retired), Setup's probing rules now follow the selected stock Material, and the ATC tool-change macro can use a fixed touch-plate block for tool-length reference instead of a dedicated toolsetter.</p><ul><li><strong>Work Order tab</strong> - promoted from an Odd Jobs sub-tab to a top-level tab; "New Work Order..." / "Load Work Order..." main menu items added (same idea as Load File) alongside its existing toolbar buttons. An existing saved layout's tab order is preserved by a one-time migration.</li><li><strong>Conductive-material probing rules</strong> - the "Stock conductive" checkbox is gone; conductivity is now read from the selected Material (Aluminum/Brass/Steel are conductive, wood-based materials aren't). Touch Plate probing of Internal or External-Is-Circle geometry on non-conductive stock shows a warning instead of a hard block, since a custom-shaped plate can still reach those points.</li><li><strong>Touch-plate TLO block</strong> - tc.macro can now use a fixed block in place of a toolsetter puck (new #&lt;_tc_touchplate&gt; flag): every tool probes the fixed position via the main probe input instead of switching to a dedicated toolsetter input. The TLO math is unaffected since it was already purely differential.</li><li><strong>Setup Geometry preview images</strong> - the Is-Circle preview images were redrawn to match the External/Internal picker's thin-line style (the first pass had a heavy dark-filled circle and thick arrows that didn't match).</li></ul><p class="foot">Debug build verified after each change; touch-plate TLO path awaiting a hardware test pass.</p></div>
+</div>
+<!-- ===== #194 ===== -->
+<div class="pr">
+<h2 id="pr194"><span class="badge">#194</span>Work Order runs from the Job tab; Load File performance</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">116</td><td class="num del">23</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">96</td><td class="num del">26</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">65</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/BulkObservableCollection.cs</td><td class="num add">66</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProgramView.xaml.cs</td><td class="num add">32</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">15</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">4</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProgramView.xaml</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num del">42</td></tr>
+</table>
+<div class="desc"><p>Work Order's Run button now hands its generated program to the Job tab as the actual loaded job, not a floating preview overlay - it shows in the Job tab's real docked program list (the same one a loaded .nc file uses), streams through the existing run pipeline, and pops back to whatever was loaded before once the run ends (or is stopped, or a prerequisite check fails), switching the operator back to the Work Order tab.</p><ul><li><strong>GCode.File.Push()/Pop()</strong> - a real push/pop against the loaded job. Push snapshots the current program (in memory, not a filename to re-read); LoadText loads generated G-code through the same completion pipeline Load File uses; Pop restores the snapshot.</li><li><strong>ProgramView</strong> gained a Source (File/Generated) and an Edit button that jumps back to the source tab for a generated program's own preview.</li><li><strong>Load File performance</strong> - parsing now writes into a private buffer instead of the live, DataGrid-bound collection, and binds once via a new BulkObservableCollection (a single Reset notification instead of one per line). Fixes a real UI freeze restoring a large loaded job (confirmed "Not Responding" on a 220k-line file); the originally-reported Load File slowness itself timed out at ~44s of pure parsing, not binding.</li></ul><p class="foot">Built and tested on real hardware across several iterations this session; Load File's own parse-time cost (not binding) is a separate, not-yet-started investigation.</p></div>
 </div>
 </section>
 
