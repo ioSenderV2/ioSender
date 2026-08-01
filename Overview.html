@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>194 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>195 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -281,6 +281,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Probing's "Max search distance" (G38.2 travel limit) is now editable right on Tool length offset, Edge finder (external/internal) and Center finder, instead of only via Machine Setup &gt; Probe definitions.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr188">188</a></td></tr>
 <tr><td>Odd Jobs &mdash; describe a small job as toolpaths (line/circle/oval/square/rect) with operations under them (pocket, contour, drill, bore, chamfer, finishing) and it compiles to one program with a sane tool order</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr192">192</a></td></tr>
 <tr><td>Work Order is now a top-level tab (New/Load menu items added); Setup's Touch Plate probing follows the selected Material's conductivity; tc.macro can use a fixed touch-plate block instead of a toolsetter.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr193">193</a></td></tr>
+<tr><td>New 4-flute chamfer bit option and a per-operation Climb/Conventional cut direction (correct internal/external orbit math) on Work Order operations, plus a Settings:App spindle-direction-capability setting for hardware that can't run both directions; shared day-of-week rotation for the debug/console/crash logs and App.config/Grbl backups; fixed a Spindle-panel crash.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr195">195</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -610,7 +611,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.33</td></tr>
 <tr><td class="n">193</td><td><a href="#pr193">Work Order tab, conductive-material rules, touch-plate TLO</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">32</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+251</span> <span class="del">-218</span></td></tr>
 <tr><td class="n">194</td><td><a href="#pr194">Work Order &rarr; Job tab handoff, load performance</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+440</span> <span class="del">-103</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (194 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1679</span> <span class="del">23</span> <span class="add">+199</span><br><span class="k">Lines:</span> <span class="add">+70723</span> <span class="del">-12287</span></td></tr>
+<tr><td class="n">195</td><td><a href="#pr195">Work Order chamfer bit, cut direction, spindle-direction setting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">22</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+424</span> <span class="del">-173</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (195 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1701</span> <span class="del">23</span> <span class="add">+200</span><br><span class="k">Lines:</span> <span class="add">+71147</span> <span class="del">-12460</span></td></tr>
 </table>
 </div>
 
@@ -3875,6 +3877,31 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num del">42</td></tr>
 </table>
 <div class="desc"><p>Work Order's Run button now hands its generated program to the Job tab as the actual loaded job, not a floating preview overlay - it shows in the Job tab's real docked program list (the same one a loaded .nc file uses), streams through the existing run pipeline, and pops back to whatever was loaded before once the run ends (or is stopped, or a prerequisite check fails), switching the operator back to the Work Order tab.</p><ul><li><strong>GCode.File.Push()/Pop()</strong> - a real push/pop against the loaded job. Push snapshots the current program (in memory, not a filename to re-read); LoadText loads generated G-code through the same completion pipeline Load File uses; Pop restores the snapshot.</li><li><strong>ProgramView</strong> gained a Source (File/Generated) and an Edit button that jumps back to the source tab for a generated program's own preview.</li><li><strong>Load File performance</strong> - parsing now writes into a private buffer instead of the live, DataGrid-bound collection, and binds once via a new BulkObservableCollection (a single Reset notification instead of one per line). Fixes a real UI freeze restoring a large loaded job (confirmed "Not Responding" on a 220k-line file); the originally-reported Load File slowness itself timed out at ~44s of pure parsing, not binding.</li></ul><p class="foot">Built and tested on real hardware across several iterations this session; Load File's own parse-time cost (not binding) is a separate, not-yet-started investigation.</p></div>
+</div>
+<!-- ===== #195 ===== -->
+<div class="pr">
+<h2 id="pr195"><span class="badge">#195</span>Work Order: 4-flute chamfer bit, Climb/Conventional cut direction, spindle-direction setting</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/RotatingFileStore.cs</td><td class="num add">118</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/LogFile.cs</td><td class="num add">19</td><td class="num del">76</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ConsoleLog.cs</td><td class="num add">7</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/DebugLog.cs</td><td class="num add">6</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">20</td><td class="num del">40</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">7</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FeedsAndSpeedsView.xaml.cs</td><td class="num add">13</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">23</td><td class="num del">13</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">74</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml.cs</td><td class="num add">24</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsSettingsControl.xaml.cs</td><td class="num add">15</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsSettingsControl.xaml</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SpindleControl.xaml.cs</td><td class="num add">21</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">28</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Follow-on fit-and-finish for the Work Order tab, plus a shared file-rotation scheme for logs and backups that had each been reimplementing their own ad hoc retention.</p><ul><li><strong>4-flute chamfer bit</strong> - a dedicated 1/4&quot; 90&deg; chamfer bit alongside the existing V-bit, same cone geometry for feeds/speeds and TOOL declarations.</li><li><strong>Climb/Conventional cut direction</strong> - a per-operation choice on the Feeds and Speeds dialog, defaulting to Conventional. Climb/Conventional isn't a fixed CW-or-CCW answer: it flips depending on whether the feature is internal (a bore/pocket, where climb orbits the SAME direction as the spindle) or external (a Contour cutting a part free, where climb orbits OPPOSITE it) - WorkOrderCompiler now derives the correct raw arc/winding direction per operation instead of hardcoding one.</li><li><strong>Spindle-direction-capability setting</strong> (Settings:App &gt; Work Order) - for a spindle/VFD that can only physically run one direction regardless of the M3/M4 label (found on real hardware: grblHAL's own capability report said reversible, the VFD's documented behavior says otherwise). WorkOrderCompiler's direction math accounts for it, and the Job tab's Spindle panel now hides whichever of CW/CCW can't actually run.</li><li><strong>Fixed a real crash</strong> - the Spindle panel's RPM field threw a NullReferenceException on Enter (its key handler cast the wrong control type).</li><li><strong>Shared day-of-week log/backup rotation</strong> - new RotatingFileStore generalizes the scheme the console/debug/crash logs already used (a fresh timestamped file per run inside a <code>logs\&lt;DayOfWeek&gt;\</code> folder, capped and pruned per folder, with a <code>latest_*</code> alias at the top level) to App.config/Grbl settings backups and the Feeds &amp; Speeds Fusion-archive copies, replacing several flat, unbounded-growth folders.</li></ul><p class="foot">Debug build verified after each change; the new Work Order direction/tool options and the spindle-direction setting have not yet had a real-hardware cutting test pass.</p></div>
 </div>
 </section>
 
