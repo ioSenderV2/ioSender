@@ -270,10 +270,14 @@
                          better spent on digits, so the unit moved into the tooltip (issue #21). ToolTip is on
                          the panel so it covers the "Feed:" label and the readout alike. MinWidth is sized for
                          the 5 digits Format="####0" can produce, allowing for the NumericTextBox style's 8px
-                         horizontal padding + 1px border. -->
+                         horizontal padding + 1px border.
+                         The tooltip is a composed TextBlock rather than a Binding+StringFormat on purpose:
+                         LocBaml can only reach literal values, so a StringFormat's prose would be permanently
+                         English. Splitting it lets the wording live in an x:Uid'd Run (localized like every
+                         other tooltip) while the unit stays live off FeedrateUnit. -->
                     <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
                         <StackPanel.ToolTip>
-                            <Binding Path="FeedrateUnit" Mode="OneWay" StringFormat="Current feed rate ({0})"/>
+                            <TextBlock><Run x:Uid="txt_runFeedTip" Text="Current feed rate"/><Run Text=" ("/><Run Text="{Binding Path=FeedrateUnit, Mode=OneWay}"/><Run Text=")"/></TextBlock>
                         </StackPanel.ToolTip>
                         <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
                         <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>

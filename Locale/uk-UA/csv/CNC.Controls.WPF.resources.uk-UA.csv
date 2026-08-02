@@ -1768,3 +1768,5 @@ CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:CNC.Contr
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Not used for Drill or Countersink - their feed formulas don't factor in flute count.
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wowcs:System.Windows.Controls.ContentControl.Content,Label,True,True,,Origin (WCS):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wowcs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Which work coordinate system this work order's origin/tool length reference lives in. &quot;Follow Setup&quot; (the default) always uses whatever Setup is currently set to; pin a specific one instead if this work order's origin needs to stay on a particular WCS even after Setup moves on to a different job.

@@ -143,6 +143,11 @@ def prop_for(tag, attr):
         return ('System.Windows.Controls.ContentControl.Content', CONTENT_CATEGORY[tag], 'True', 'True')
     if attr == 'Text' and tag == 'TextBlock':
         return ('System.Windows.Controls.TextBlock.Text', 'Text', 'True', 'True')
+    if attr == 'Text' and tag == 'Run':
+        # Inline runs inside a TextBlock - used where part of a sentence needs its own styling, or
+        # where a literal phrase sits next to a data-bound one (a bound value can't be localized, so
+        # the prose has to be its own Run to stay reachable).
+        return ('System.Windows.Documents.Run.Text', 'Text', 'True', 'True')
     return None
 
 
