@@ -3,18 +3,14 @@
  *
  * Settings:App panel for Odd Jobs - the Work Order autosave-on-exit pair (mirrors the existing "Auto-save
  * settings on exit" / "Prompt before auto-saving" idiom, see AppConfig.Config), plus a scrollable list of
- * every tool Odd Jobs knows about - the built-ins, then any user-added custom tools (CustomTool.cs).
- * Clicking a tool opens the same Feeds and Speeds dialog the Work Order builder itself uses
- * (OddJobsFeedsSpeedsDialog), but in its material-picker mode (EnableMaterialPicker) - there's no work
- * order/Setup tab material to read here, so the operator picks one to preview and dial in that tool's
- * numbers ahead of time. Settling on values there is remembered the same way as from a real operation
- * (OddJobsToolMemory), so it's ready to prefill the next time that tool/material pair is used (built-in
- * tools only - a custom tool has no memory of its own yet).
- *
- * Custom tools add on top: the "+" button (btnAddTool_Click) opens CustomToolEditDialog to create one;
- * right-clicking a custom row (built-ins get no context menu - nothing to edit/delete) offers Edit/Delete.
- * Left-click keeps its existing launch-Feeds-and-Speeds behavior for every row, built-in or custom - Edit/
- * Delete deliberately live on the right-click menu instead of overloading the same click.
+ * every tool Odd Jobs knows about (CustomTool.cs) - the factory defaults seeded from Default-App.config and
+ * anything the operator has added, with no distinction between the two: every row can be clicked to preview/
+ * tune its feeds and speeds, and right-clicked to Edit/Delete. Left-click opens the same Feeds and Speeds
+ * dialog the Work Order builder itself uses (OddJobsFeedsSpeedsDialog), in its material-picker mode
+ * (EnableMaterialPicker) - there's no work order/Setup tab material to read here, so the operator picks one
+ * to preview and dial in that tool's numbers ahead of time. Settling on values there is remembered the same
+ * way as from a real operation (OddJobsToolMemory). The "+" button (btnAddTool_Click) opens
+ * CustomToolEditDialog to add a new one.
  */
 
 using System;
@@ -49,19 +45,9 @@ namespace CNC.Controls
 
         // The docLabel/showDoc pair WorkOrderView's own Feeds and Speeds button passes per operation kind -
         // mirrored here per TOOL instead, since each of these tools only ever means one operation kind in
-        // practice (a countersink bit is always a Countersink op, the V-bit always a Chamfer, the drill bit
-        // always a Drill) - see WorkOrderView.btnFeedsSpeeds_Click for the operation-kind version this parallels.
-        private static string DocLabelFor(OddJobsTool tool)
-        {
-            if (OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool))
-                return "Countersink diameter:";
-            if (tool == OddJobsTool.VBit45)
-                return "Chamfer depth:";
-            if (tool == OddJobsTool.DrillBit)
-                return "Peck depth:";
-            return "Depth of cut:";
-        }
-
+        // practice (a countersink bit is always a Countersink op, a V-bit/chamfer bit always a Chamfer, a
+        // drill always a Drill) - see WorkOrderView.btnFeedsSpeeds_Click for the operation-kind version this
+        // parallels.
         private static string DocLabelFor(CustomTool tool)
         {
             switch (tool.Kind)
@@ -77,46 +63,30 @@ namespace CNC.Controls
         {
             lstOddJobsTools.Items.Clear();
 
-            foreach (OddJobsTool tool in Enum.GetValues(typeof(OddJobsTool)))
-                lstOddJobsTools.Items.Add(new ListBoxItem { Content = OddJobsFeedsSpeedsDialog.DisplayName(tool), Tag = tool });
-
-            var customTools = CustomTools.SectionConfig?.Entries;
-            if (customTools == null || customTools.Count == 0)
+            var tools = CustomTools.SectionConfig?.Entries;
+            if (tools == null)
                 return;
 
-            lstOddJobsTools.Items.Add(new Separator());
-            foreach (var ct in customTools)
+            foreach (var ct in tools)
             {
                 var item = new ListBoxItem { Content = ct.Name, Tag = ct };
-                AttachCustomToolContextMenu(item, ct);
+                AttachToolContextMenu(item, ct);
                 lstOddJobsTools.Items.Add(item);
             }
         }
 
         private void lstOddJobsTools_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (lstOddJobsTools.SelectedItem is ListBoxItem item)
+            if (lstOddJobsTools.SelectedItem is ListBoxItem item && item.Tag is CustomTool ct)
             {
-                if (item.Tag is OddJobsTool tool)
+                var dlg = new OddJobsFeedsSpeedsDialog(ct.Id, docLabel: DocLabelFor(ct))
                 {
-                    var dlg = new OddJobsFeedsSpeedsDialog((int)tool, docLabel: DocLabelFor(tool))
-                    {
-                        Owner = Window.GetWindow(this)
-                    };
-                    dlg.EnableMaterialPicker();
+                    Owner = Window.GetWindow(this)
+                };
+                dlg.EnableMaterialPicker();
 
-                    if (dlg.ShowDialog() == true)
-                        OddJobsToolMemory.Remember(dlg.SelectedTool, dlg.BitDiameter, dlg.Material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
-                }
-                else if (item.Tag is CustomTool ct)
-                {
-                    var dlg = new OddJobsFeedsSpeedsDialog(CustomTools.IdBase + ct.Id, docLabel: DocLabelFor(ct))
-                    {
-                        Owner = Window.GetWindow(this)
-                    };
-                    dlg.EnableMaterialPicker();
-                    dlg.ShowDialog();   // no OddJobsToolMemory - that's keyed by OddJobsTool, custom tools have no memory of their own yet
-                }
+                if (dlg.ShowDialog() == true)
+                    OddJobsToolMemory.Remember(dlg.SelectedToolValue, dlg.BitDiameter, dlg.Material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
             }
 
             // Cleared rather than left selected, so clicking the SAME row again still raises SelectionChanged -
@@ -138,17 +108,18 @@ namespace CNC.Controls
             BuildToolList();
         }
 
-        // Right-click only (see the class header comment for why) - Edit clones-then-copies-back like
-        // ProbeDefinitionEditDialog; Delete confirms first, same as ProbeDelete_Click/FixtureDelete_Click
-        // (MachineSetupWizard.xaml.cs). Neither locks on the tool being referenced by an existing Work Order
-        // operation - WorkOrderView.ParameterWarnings flags that at Generate time instead (same as a
-        // Fixture/Probe still in use elsewhere in the app today).
-        private void AttachCustomToolContextMenu(ListBoxItem item, CustomTool ct)
+        // Right-click only - Edit clones-then-copies-back like ProbeDefinitionEditDialog; Delete confirms
+        // first, same as ProbeDelete_Click/FixtureDelete_Click (MachineSetupWizard.xaml.cs). Applies to every
+        // row, factory-default or operator-added - there's no protected/read-only tier any more. Neither
+        // locks on the tool being referenced by an existing Work Order operation - WorkOrderView.
+        // ParameterWarnings flags that at Generate time instead (same as a Fixture/Probe still in use
+        // elsewhere in the app today).
+        private void AttachToolContextMenu(ListBoxItem item, CustomTool ct)
         {
             var editItem = new MenuItem { Header = "Edit…" };
             var deleteItem = new MenuItem { Header = "Delete" };
-            editItem.Click += (s, ev) => EditCustomTool(ct);
-            deleteItem.Click += (s, ev) => DeleteCustomTool(ct);
+            editItem.Click += (s, ev) => EditTool(ct);
+            deleteItem.Click += (s, ev) => DeleteTool(ct);
 
             var menu = new ContextMenu();
             menu.Items.Add(editItem);
@@ -170,7 +141,7 @@ namespace CNC.Controls
             item.PreviewMouseRightButtonUp += (s, ev) => ev.Handled = true;
         }
 
-        private void EditCustomTool(CustomTool ct)
+        private void EditTool(CustomTool ct)
         {
             var dlg = new CustomToolEditDialog(ct) { Owner = Window.GetWindow(this) };
             if (dlg.ShowDialog() == true)
@@ -180,9 +151,9 @@ namespace CNC.Controls
             }
         }
 
-        private void DeleteCustomTool(CustomTool ct)
+        private void DeleteTool(CustomTool ct)
         {
-            if (AppDialogs.Show(Window.GetWindow(this), string.Format("Delete custom tool \"{0}\"?", ct.Name), "Custom tool",
+            if (AppDialogs.Show(Window.GetWindow(this), string.Format("Delete tool \"{0}\"?", ct.Name), "Tool",
                                  MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 

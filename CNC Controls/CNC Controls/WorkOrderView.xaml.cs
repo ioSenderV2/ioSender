@@ -196,33 +196,33 @@ namespace CNC.Controls
             switch (kind)
             {
                 case WorkOrderOpKind.Pocket:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
                     break;
                 case WorkOrderOpKind.Contour:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
                     break;
                 case WorkOrderOpKind.Drill:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("drilling", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("drilling", material);
                     break;
                 case WorkOrderOpKind.Bore:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("roughing", material);
                     break;
                 case WorkOrderOpKind.SideFinish:
                 case WorkOrderOpKind.BottomFinish:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
                     break;
                 case WorkOrderOpKind.Chamfer:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
                     op.Feed = 500d;
                     break;
                 case WorkOrderOpKind.Countersink:
                     // op.CountersinkDiameter already holds its own default (12.5mm - see WorkOrderModel) at
                     // this point, so the tool is picked from that instead of a generic "smallest" guess.
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SmallestCountersinkBitFor(op.CountersinkDiameter);
+                    op.Tool = OddJobsFeedsSpeedsDialog.SmallestCountersinkBitFor(op.CountersinkDiameter);
                     break;
                 case WorkOrderOpKind.Surface:
-                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
-                    // SuggestTool("facing") always returns SurfacingBit25mm - seed its real 25mm diameter here
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
+                    // SuggestTool("facing") picks the seeded surfacing bit - seed its real 25mm diameter here
                     // too, not just the tool choice. Without this, op.BitDiameter sits at WorkOrderOperation's
                     // generic 6.35mm default until the Feeds and Speeds dialog is confirmed once, and the
                     // dialog's own tool-switch default gets overwritten right back to that stale 6.35mm by the
@@ -235,7 +235,7 @@ namespace CNC.Controls
 
             // Recall whatever this tool/material was last dialed in to, so a new operation starts from the
             // operator's own proven numbers rather than the chart default (see OddJobsToolMemory).
-            var remembered = OddJobsToolMemory.Find((OddJobsTool)op.Tool, op.BitDiameter, material);
+            var remembered = OddJobsToolMemory.Find(op.Tool, op.BitDiameter, material);
             if (remembered != null)
             {
                 if (remembered.Rpm > 0d) op.SpindleRPM = remembered.Rpm;
@@ -359,7 +359,11 @@ namespace CNC.Controls
         // Header for a toolpath/operation row: an enable checkbox plus the summary text. The text is a separate
         // TextBlock rather than the CheckBox's own Content on purpose - as Content, clicking the row's label to
         // SELECT it would toggle the checkbox as a side effect.
-        private FrameworkElement MakeCheckHeader(string text, bool enabled, Action<bool> onToggle)
+        // invalidTool: red text (same IndianRed as the indirect-toolpath "(source not found)" placeholder row)
+        // when this operation's Tool doesn't resolve to a real tool (see ParameterWarnings) - lets the operator
+        // spot which row a "pick a different tool" warning refers to at a glance instead of cross-referencing
+        // the text list. Always false for a toolpath row (toolpaths don't carry a tool of their own).
+        private FrameworkElement MakeCheckHeader(string text, bool enabled, Action<bool> onToggle, bool invalidTool = false)
         {
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
             var check = new CheckBox
@@ -372,13 +376,17 @@ namespace CNC.Controls
             // Handled so the toggle doesn't also bubble up as a row selection change.
             check.Click += (s, ev) => { ev.Handled = true; onToggle(((CheckBox)s).IsChecked == true); };
             panel.Children.Add(check);
-            panel.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            var label = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
+            if (invalidTool)
+                label.Foreground = Brushes.IndianRed;
+            panel.Children.Add(label);
             return panel;
         }
 
-        // Updates an existing check-header in place: text, checked state, and the dimming that shows a row is
-        // held back. Cheaper than rebuilding the tree, and it keeps selection and expansion state.
-        private static void SetCheckHeader(TreeViewItem item, string text, bool enabled, bool effective)
+        // Updates an existing check-header in place: text, checked state, the dimming that shows a row is
+        // held back, and the invalid-tool highlight (see MakeCheckHeader's own comment). Cheaper than
+        // rebuilding the tree, and it keeps selection and expansion state.
+        private static void SetCheckHeader(TreeViewItem item, string text, bool enabled, bool effective, bool invalidTool = false)
         {
             var panel = item.Header as StackPanel;
             if (panel == null || panel.Children.Count < 2)
@@ -388,6 +396,12 @@ namespace CNC.Controls
             label.Text = text;
             // Dimmed when this row won't run - either unchecked itself, or under an unchecked toolpath.
             label.Opacity = effective ? 1.0 : 0.45;
+            // ClearValue (not a hardcoded "back to black") so a row that's since been fixed reverts to
+            // whatever the tree's normal inherited/themed text color actually is.
+            if (invalidTool)
+                label.Foreground = Brushes.IndianRed;
+            else
+                label.ClearValue(TextBlock.ForegroundProperty);
         }
 
         private void RebuildTree(object toSelect)
@@ -436,7 +450,8 @@ namespace CNC.Controls
                         var ownerOp = op;
                         var opItem = new TreeViewItem
                         {
-                            Header = MakeCheckHeader(WorkOrderRules.Summarize(op), op.Enabled, on => ToggleEnabled(owner, ownerOp, on)),
+                            Header = MakeCheckHeader(WorkOrderRules.Summarize(op), op.Enabled, on => ToggleEnabled(owner, ownerOp, on),
+                                invalidTool: CustomTools.Find(op.Tool) == null),
                             Tag = op,
                             ToolTip = FeedsSummaryText(owner, op)
                         };
@@ -1032,7 +1047,7 @@ namespace CNC.Controls
             {
                 Owner = Window.GetWindow(this),
                 // Flutes deliberately NOT set - the dialog's tool dropdown sets the right count for the
-                // selected tool (2/3/1 per OddJobsTool). The old wizards all overrode it with a hardcoded 2,
+                // selected tool (CustomTool.Flutes). The old wizards all overrode it with a hardcoded 2,
                 // so the 3-flute roughing bit computed its chip load as if it were 2-flute.
                 // A drill's diameter is the hole itself, so it comes from the geometry, not from a bit field.
                 BitDiameter = isDrill ? op.HoleDiameter : op.BitDiameter,
@@ -1072,9 +1087,7 @@ namespace CNC.Controls
             else if (showDoc)
                 op.DepthOfCut = dlg.DepthOfCut;
 
-            // OddJobsToolMemory is keyed by OddJobsTool - a custom tool has no memory of its own yet.
-            if (dlg.SelectedCustomTool == null)
-                OddJobsToolMemory.Remember(dlg.SelectedTool, dlg.BitDiameter, material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
+            OddJobsToolMemory.Remember(dlg.SelectedToolValue, dlg.BitDiameter, material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
 
             LoadFields();
             OnWorkOrderChanged();
@@ -1097,7 +1110,7 @@ namespace CNC.Controls
             double rpm = op.SpindleRPM > 0d ? op.SpindleRPM : 0.70d * op.BitMaxRPM;
             double dia = tp != null ? WorkOrderCompiler.EffectiveBitDiameter(tp, op) : op.BitDiameter;
             var s = string.Format("T{0} {1} - Ø{2:0.0##} mm - {3:0} rpm - {4:0}/{5:0} mm/min feed/plunge",
-                WorkOrderCompiler.ToolNumberFor(op), ToolName((OddJobsTool)op.Tool), dia, rpm, op.Feed, op.PlungeFeed);
+                WorkOrderCompiler.ToolNumberFor(op), CustomTools.Find(op.Tool)?.Name ?? ("tool " + op.Tool), dia, rpm, op.Feed, op.PlungeFeed);
 
             if (op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour)
                 s += string.Format(" - {0:0.0##} mm step down", op.DepthOfCut);
@@ -1120,27 +1133,6 @@ namespace CNC.Controls
                 s += string.Format(" - {0:0.0##} mm floor stock to leave", op.FloorStockToLeave);
 
             return s;
-        }
-
-        private static string ToolName(OddJobsTool tool)
-        {
-            switch (tool)
-            {
-                case OddJobsTool.EndMill2Flute: return "2-flute end mill";
-                case OddJobsTool.RoughingEndMill3Flute: return "3-flute roughing end mill";
-                case OddJobsTool.OFlute: return "O-flute";
-                case OddJobsTool.BallEnd: return "ball end";
-                case OddJobsTool.SurfacingBit25mm: return "surfacing bit";
-                case OddJobsTool.VBit45: return "45 deg V-bit";
-                case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
-                case OddJobsTool.BallEnd18: return "1/8\" ball end";
-                case OddJobsTool.DrillBit: return "drill";
-                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
-                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
-                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
-                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
-                default: return tool.ToString();
-            }
         }
 
         #endregion
@@ -1177,7 +1169,8 @@ namespace CNC.Controls
                     var op = tp.Operations[i];
                     // An operation under an unchecked toolpath keeps its own tick but is dimmed too - it isn't
                     // going to run, and showing it bright would be a lie about what Generate will emit.
-                    SetCheckHeader((TreeViewItem)tpItem.Items[i], WorkOrderRules.Summarize(op), op.Enabled, op.Enabled && tp.Enabled);
+                    SetCheckHeader((TreeViewItem)tpItem.Items[i], WorkOrderRules.Summarize(op), op.Enabled, op.Enabled && tp.Enabled,
+                        invalidTool: CustomTools.Find(op.Tool) == null);
                 }
             }
         }
@@ -1247,12 +1240,13 @@ namespace CNC.Controls
                 {
                     string opLabel = label + WorkOrderRules.OpLabel(op.Kind) + " - ";
 
-                    // A custom tool (Settings:App > Work Order) can be deleted out from under an operation
-                    // that still references it - flag it explicitly rather than let the generic "bit
-                    // diameter must be > 0" check below fire on whatever stale op.BitDiameter was last saved.
-                    if (op.Tool >= CustomTools.IdBase && CustomTools.Find(op.Tool) == null)
+                    // Any tool (Settings:App > Work Order) - factory-default or operator-added - can be
+                    // deleted out from under an operation that still references it - flag it explicitly
+                    // rather than let the generic "bit diameter must be > 0" check below fire on whatever
+                    // stale op.BitDiameter was last saved.
+                    if (CustomTools.Find(op.Tool) == null)
                     {
-                        warnings.Add(opLabel + "this operation's tool was a custom tool that has since been deleted - pick a different tool.");
+                        warnings.Add(opLabel + "this operation's tool has since been deleted - pick a different tool.");
                         continue;
                     }
 

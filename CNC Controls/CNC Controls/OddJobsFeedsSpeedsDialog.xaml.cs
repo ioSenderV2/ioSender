@@ -22,86 +22,11 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    // The router bits Odd Jobs offers. Flute count/style and diameter are what actually change the
-    // feed/speed math (via FeedsSpeedsAdvisor's chip-load table) and suits different operations/materials.
-    //
-    // APPEND ONLY - never insert or reorder. The int value is persisted (WorkOrderOperation.Tool), is the key
-    // OddJobsToolMemory records dialed-in feeds against, and is what WorkOrderCompiler.ToolNumberFor turns
-    // into the T-number an M6 asks for; renumbering would silently repoint saved work orders at other tools.
-    public enum OddJobsTool
-    {
-        EndMill2Flute, RoughingEndMill3Flute, OFlute, BallEnd, SurfacingBit25mm, VBit45,
-        // 1/8" pair, for small pockets and holes a 1/4" bit can't get into.
-        EndMill2Flute18, BallEnd18,
-        // A real twist drill - straight-plunge drilling now picks the bit that matches the hole (see
-        // WorkOrderRules.TryMatchDrill), rather than being approximated with an O-flute.
-        DrillBit,
-        // 90-deg single-flute countersink bits (e.g. a QWORK-style graduated cobalt countersink set) - the
-        // operator's own actual 4 sizes (3/8", 9/16", 13/16", 1-1/8"), not a generic placeholder, so each
-        // shows up as its own preset diameter in the dropdown rather than one entry the operator retypes the
-        // diameter into every time. Only usable for the dedicated Countersink operation kind (a round-hole
-        // toolpath small enough for the bit's own diameter to span it) - see
-        // WorkOrderCompiler.BuildCountersink / IsCountersinkBit. Same 45-deg-per-side cone geometry as
-        // VBit45 for feeds/speeds purposes (ToolType()), but a distinct operation from Chamfer: the operator
-        // specifies the target finished diameter, not a raw depth - WorkOrderCompiler converts it
-        // (depth = diameter / 2).
-        CountersinkBit38, CountersinkBit916, CountersinkBit1316, CountersinkBit118,
-        // Dedicated 4-flute chamfer bit, same 90-deg (45-deg-per-side) cone as VBit45 but more flutes and a
-        // flat/pointed chamfer-ground tip rather than a true point - used the same way as VBit45 (Chamfer
-        // operation, edge trace) via ToolType()/ToolDeclarations' shared VBit45-or-countersink check.
-        ChamferBit4Flute90
-    }
-
     public partial class OddJobsFeedsSpeedsDialog : Window
     {
-        private const double QuarterInchMm = 6.35d;
-        private const double EighthInchMm = 3.175d;
-        private const double TwentyFiveMm = 25.0d;
-        // The operator's actual 4 countersink bit sizes - exact inch-to-mm conversions, not the rounded
-        // 10/14/21/28mm they're commonly quoted as, since the reach-depth math (BitDiameter/2) cares about
-        // the real number.
-        private const double ThreeEighthInchMm = 9.525d;
-        private const double NineSixteenthInchMm = 14.2875d;
-        private const double ThirteenSixteenthInchMm = 20.6375d;
-        private const double OneOneEighthInchMm = 28.575d;
         private OperationRecommendation lastRecommendation;
         private string material = string.Empty;
         private bool showDoc = true;
-
-        // The exact wording shown in cbxTool's own dropdown - kept as one lookup so a caller with no
-        // WorkOrderOperation to read a name off of (Settings:App > Odd Jobs' tool table) can list every tool
-        // with the same names the operator already recognizes from this dialog. Update alongside the
-        // ComboBoxItems in OddJobsFeedsSpeedsDialog.xaml if either ever changes.
-        public static string DisplayName(OddJobsTool tool)
-        {
-            switch (tool)
-            {
-                case OddJobsTool.EndMill2Flute: return "1/4\" 2-flute endmill";
-                case OddJobsTool.RoughingEndMill3Flute: return "1/4\" 3-flute roughing endmill";
-                case OddJobsTool.OFlute: return "1/4\" O-flute";
-                case OddJobsTool.BallEnd: return "1/4\" Ball end";
-                case OddJobsTool.SurfacingBit25mm: return "25mm 2-flute surfacing bit";
-                case OddJobsTool.VBit45: return "45 deg V-bit (chamfer)";
-                case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute endmill";
-                case OddJobsTool.BallEnd18: return "1/8\" Ball end";
-                case OddJobsTool.DrillBit: return "Drill bit (size = hole)";
-                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
-                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
-                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
-                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
-                case OddJobsTool.ChamferBit4Flute90: return "1/4\" 4-flute chamfer bit (90 deg)";
-                default: return tool.ToString();
-            }
-        }
-
-        // True for any of the 4 countersink bit sizes - shared by WorkOrderCompiler (BuildChamfer's
-        // plunge-vs-trace switch, ToolDeclarations' TYPE= tag) and WorkOrderView (ParameterWarnings) so the
-        // "is this a countersink bit" check lives in exactly one place.
-        public static bool IsCountersinkBit(OddJobsTool tool)
-        {
-            return tool == OddJobsTool.CountersinkBit38 || tool == OddJobsTool.CountersinkBit916
-                || tool == OddJobsTool.CountersinkBit1316 || tool == OddJobsTool.CountersinkBit118;
-        }
 
         public double BitDiameter { get { return fldDiameter.Value; } set { fldDiameter.Value = value; } }
         public double Flutes { get { return fldFlutes.Value; } set { fldFlutes.Value = value; } }
@@ -132,37 +57,20 @@ namespace CNC.Controls
             return 2d * Math.Sqrt(d * (2d * r - d));
         }
 
-        // Only meaningful when a BUILT-IN row is selected - garbage (an out-of-range enum value, though
-        // never throws) if a custom tool row is currently selected. Callers that need to handle either
-        // should go through SelectedToolValue/SelectCustomTool below instead.
-        public OddJobsTool SelectedTool
-        {
-            get { return (OddJobsTool)cbxTool.SelectedIndex; }
-            set { cbxTool.SelectedIndex = (int)value; }
-        }
+        // The tool behind the current selection - every row (factory-default or operator-added) is a real
+        // CustomTool now, tagged on its ComboBoxItem (see PopulateToolItems). Null only if nothing is
+        // selected yet (dialog mid-construction, before SelectToolValue runs).
+        public CustomTool SelectedTool => (cbxTool.SelectedItem as ComboBoxItem)?.Tag as CustomTool;
 
-        // The CustomTool behind the current selection, or null when a built-in row is selected - custom
-        // rows are appended after every built-in ComboBoxItem (see AppendCustomToolItems), each Tagged
-        // with its own CustomTool instance rather than an enum value.
-        public CustomTool SelectedCustomTool => (cbxTool.SelectedItem as ComboBoxItem)?.Tag as CustomTool;
+        // op.Tool-compatible form of the current selection. Use this (not SelectedTool) wherever the value
+        // is being stored back onto a WorkOrderOperation.
+        public int SelectedToolValue => SelectedTool?.Id ?? 0;
 
-        // op.Tool-compatible form of the current selection - a custom tool's IdBase-offset id, or the
-        // built-in enum value cast to int. Use this (not SelectedTool) wherever the caller doesn't already
-        // know in advance whether a custom tool might be selected.
-        public int SelectedToolValue
-        {
-            get
-            {
-                var ct = SelectedCustomTool;
-                return ct != null ? CustomTools.IdBase + ct.Id : (int)SelectedTool;
-            }
-        }
+        // Every tool ComboBoxItem this dialog instance populated, in list (= CustomTools.SectionConfig)
+        // order. Kept so RestrictToolsFor can filter them by Kind.
+        private readonly List<ComboBoxItem> toolItems = new List<ComboBoxItem>();
 
-        // Every custom-tool ComboBoxItem this dialog instance appended, in list order - built once in the
-        // constructor. Kept so RestrictToolsFor can filter them by Kind alongside the built-in itemXxx rows.
-        private readonly List<ComboBoxItem> customToolItems = new List<ComboBoxItem>();
-
-        private void AppendCustomToolItems()
+        private void PopulateToolItems()
         {
             var tools = CustomTools.SectionConfig?.Entries;
             if (tools == null)
@@ -171,22 +79,16 @@ namespace CNC.Controls
             {
                 var item = new ComboBoxItem { Content = ct.Name, Tag = ct };
                 cbxTool.Items.Add(item);
-                customToolItems.Add(item);
+                toolItems.Add(item);
             }
         }
 
-        // Select by op.Tool value (built-in enum int OR a custom tool's IdBase-offset id) - the inverse of
-        // SelectedToolValue. Use instead of the SelectedTool setter wherever the value might be custom.
+        // Select by op.Tool value (a CustomTool.Id) - the inverse of SelectedToolValue.
         public void SelectToolValue(int opToolValue)
         {
             var ct = CustomTools.Find(opToolValue);
-            if (ct != null)
-            {
-                foreach (var item in customToolItems)
-                    if (ReferenceEquals(item.Tag, ct)) { cbxTool.SelectedItem = item; return; }
-            }
-            else
-                SelectedTool = (OddJobsTool)opToolValue;
+            foreach (var item in toolItems)
+                if (ReferenceEquals(item.Tag, ct)) { cbxTool.SelectedItem = item; return; }
         }
 
         public WorkOrderCutDirection CutDirection
@@ -198,39 +100,53 @@ namespace CNC.Controls
         // Suggests a default tool from the operation being performed and (where it matters - Aluminum
         // specifically calls for a single-flute bit, see FeedsSpeedsAdvisor's own Aluminum notes) the
         // material. A starting point, not a hard rule - the operator can always pick a different tool.
-        public static OddJobsTool SuggestTool(string operation, string material)
+        // Picked by Kind (+ Flutes, to tell the roughing bit apart from an ordinary 2-flute end mill) rather
+        // than by a specific Id, so this keeps working if the operator retunes/renames the factory defaults -
+        // it just returns the FIRST list entry matching the bucket, which is the seeded default's own
+        // position in Default-App.config (see that file's CustomTools section) unless the operator reorders.
+        public static int SuggestTool(string operation, string material)
         {
+            var entries = CustomTools.SectionConfig?.Entries;
+            if (entries == null || entries.Count == 0)
+                return 0;
+
+            CustomTool pick = null;
             if (operation == "facing")
-                return OddJobsTool.SurfacingBit25mm;
-            if (operation == "chamfer")
-                return OddJobsTool.VBit45;
-            if (operation == "finishing")
-                return OddJobsTool.BallEnd;
-            if (operation == "drilling")
-                return OddJobsTool.DrillBit;
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.Surfacing);
+            else if (operation == "chamfer")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.VBitOrChamfer);
+            else if (operation == "finishing")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.BallEnd);
+            else if (operation == "drilling")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.Drill);
             // "countersink" deliberately NOT handled here - SmallestCountersinkBitFor (below) picks by the
             // operation's own target diameter, a strictly better answer than a generic operation-name guess.
-            if (string.Equals(material, "Aluminum", StringComparison.OrdinalIgnoreCase))
-                return OddJobsTool.OFlute;
-            if (operation == "roughing")
-                return OddJobsTool.RoughingEndMill3Flute;
-            return OddJobsTool.EndMill2Flute;
+            else if (string.Equals(material, "Aluminum", StringComparison.OrdinalIgnoreCase))
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.OFlute);
+            else if (operation == "roughing")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes >= 3);
+
+            if (pick == null)
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes == 2)
+                    ?? entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill)
+                    ?? entries[0];
+            return pick.Id;
         }
 
-        // The smallest of the 4 countersink bits that can actually reach the given target diameter (a bit's
-        // own diameter is the widest it can cut - see BuildCountersink's own comment, and IsCountersinkBit
-        // above). Falls back to the largest bit if even that one is too small - ParameterWarnings still flags
+        // The smallest countersink-kind tool that can actually reach the given target diameter (a bit's own
+        // diameter is the widest it can cut - see BuildCountersink's own comment, and CustomTools.IsCountersink
+        // above). Falls back to the largest one if even that is too small - ParameterWarnings still flags
         // that case once a real bit is picked; this just gives the closest starting point rather than
         // silently understating what's needed. Used both for a new Countersink operation's initial tool and
         // whenever the operator edits the target diameter afterward (see WorkOrderView.CaptureFields) -
         // confirmed on real hardware 2026-07-30: the operator wants the diameter to drive the bit choice, not
         // the other way around.
-        public static OddJobsTool SmallestCountersinkBitFor(double targetDiameterMm)
+        public static int SmallestCountersinkBitFor(double targetDiameterMm)
         {
-            if (targetDiameterMm <= ThreeEighthInchMm) return OddJobsTool.CountersinkBit38;
-            if (targetDiameterMm <= NineSixteenthInchMm) return OddJobsTool.CountersinkBit916;
-            if (targetDiameterMm <= ThirteenSixteenthInchMm) return OddJobsTool.CountersinkBit1316;
-            return OddJobsTool.CountersinkBit118;
+            var candidates = (CustomTools.SectionConfig?.Entries ?? new List<CustomTool>())
+                .Where(t => t.Kind == CustomToolKind.Countersink).OrderBy(t => t.DiameterMm).ToList();
+            var pick = candidates.FirstOrDefault(t => t.DiameterMm >= targetDiameterMm) ?? candidates.LastOrDefault();
+            return pick?.Id ?? 0;
         }
 
         // Restricts the tool dropdown to only the tools that make sense for the given operation kind - added
@@ -246,24 +162,7 @@ namespace CNC.Controls
             bool isSurface = kind == WorkOrderOpKind.Surface;
             bool isMill = !isDrill && !isCountersink && !isChamfer && !isSurface;
 
-            Show(itemEndMill2Flute, isMill);
-            Show(itemRoughingEndMill3Flute, isMill);
-            Show(itemOFlute, isMill);
-            Show(itemBallEnd, isMill);
-            // The surfacing bit is otherwise a normal mill-class tool (isMill's own bucket), but a Surface
-            // operation only ever wants IT - a facing pass with an ordinary endmill/ball end doesn't make sense.
-            Show(itemSurfacingBit25mm, isMill || isSurface);
-            Show(itemEndMill2Flute18, isMill);
-            Show(itemBallEnd18, isMill);
-            Show(itemVBit45, isChamfer);
-            Show(itemChamferBit4Flute90, isChamfer);
-            Show(itemDrillBit, isDrill);
-            Show(itemCountersinkBit38, isCountersink);
-            Show(itemCountersinkBit916, isCountersink);
-            Show(itemCountersinkBit1316, isCountersink);
-            Show(itemCountersinkBit118, isCountersink);
-
-            foreach (var item in customToolItems)
+            foreach (var item in toolItems)
             {
                 var ct = (CustomTool)item.Tag;
                 bool visible;
@@ -272,17 +171,14 @@ namespace CNC.Controls
                     case CustomToolKind.Drill: visible = isDrill; break;
                     case CustomToolKind.VBitOrChamfer: visible = isChamfer; break;
                     case CustomToolKind.Countersink: visible = isCountersink; break;
-                    // Same isMill||isSurface bucket the built-in SurfacingBit25mm gets, above.
+                    // The surfacing bit is otherwise a normal mill-class tool (isMill's own bucket), but a
+                    // Surface operation only ever wants IT - a facing pass with an ordinary endmill/ball end
+                    // doesn't make sense.
                     case CustomToolKind.Surfacing: visible = isMill || isSurface; break;
                     default: visible = isMill; break;   // EndMill, OFlute, BallEnd
                 }
-                Show(item, visible);
+                item.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             }
-        }
-
-        private static void Show(UIElement el, bool visible)
-        {
-            el.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // docLabel: "Depth of cut:" for milling operations, "Peck depth:" for Drill/Bore's drill mode -
@@ -294,9 +190,8 @@ namespace CNC.Controls
         // wall/floor stock-to-leave, but doesn't - that's a different concept entirely).
         // showDirection: false for Drill/Countersink - both are a straight on-center plunge with no path to
         // reverse, so climb/conventional isn't a meaningful choice there.
-        // preferredToolValue: an op.Tool-compatible value - a built-in OddJobsTool cast to int, or a custom
-        // tool's IdBase-offset id (see SelectedToolValue/SelectToolValue) - NOT necessarily a valid
-        // OddJobsTool, so it's resolved via SelectToolValue rather than the SelectedTool setter.
+        // preferredToolValue: an op.Tool-compatible value (a CustomTool.Id - see SelectedToolValue/
+        // SelectToolValue), resolved via SelectToolValue rather than a bare SelectedIndex/SelectedItem set.
         public OddJobsFeedsSpeedsDialog(int preferredToolValue, string docLabel = "Depth of cut:", bool showDoc = true, bool showDirection = true)
         {
             InitializeComponent();
@@ -307,7 +202,7 @@ namespace CNC.Controls
             cbxDirection.SelectedIndex = 0;
             if (!showDirection)
                 pnlDirection.Visibility = Visibility.Collapsed;
-            AppendCustomToolItems();
+            PopulateToolItems();
 
             // Live highlight refresh: recompute whenever anything that affects the comparison changes - the
             // 4 value fields themselves (typing toward/away from the recommendation) and the tool geometry
@@ -342,11 +237,10 @@ namespace CNC.Controls
             // No live WorkOrderOperation to clobber here (unlike the normal caller, which already seeded these
             // fields from the operation before Material is ever set) - recalling the operator's last settled
             // values for this tool/diameter/material, same idiom NewOperation uses, is exactly the point of
-            // browsing by material in the first place. OddJobsToolMemory is keyed by OddJobsTool, so this
-            // only applies to a built-in tool - a custom tool has no memory of its own yet.
-            if (SelectedCustomTool == null)
+            // browsing by material in the first place.
+            if (SelectedTool != null)
             {
-                var remembered = OddJobsToolMemory.Find(SelectedTool, BitDiameter, Material);
+                var remembered = OddJobsToolMemory.Find(SelectedToolValue, BitDiameter, Material);
                 if (remembered != null)
                 {
                     SpindleRPM = remembered.Rpm;
@@ -391,24 +285,18 @@ namespace CNC.Controls
         // EvaluateDrill's own comment and pnlDrillStyle (visible only for the Drill Bit tool).
         private string ToolType()
         {
-            var ct = SelectedCustomTool;
-            if (ct != null)
+            var ct = SelectedTool;
+            if (ct == null)
+                return "mill";
+            switch (ct.Kind)
             {
-                switch (ct.Kind)
-                {
-                    case CustomToolKind.Drill: return IsHssDrill ? "drill-hss" : "drill";
-                    case CustomToolKind.VBitOrChamfer:
-                    case CustomToolKind.Countersink: return "chamfer";
-                    default: return "mill";
-                }
+                case CustomToolKind.Drill: return IsHssDrill ? "drill-hss" : "drill";
+                // The countersink bits and any V-bit/chamfer-kind tool are the same 45-deg-per-side conical
+                // geometry - route into the same EvaluateVBit advisor path.
+                case CustomToolKind.VBitOrChamfer:
+                case CustomToolKind.Countersink: return "chamfer";
+                default: return "mill";
             }
-
-            if (SelectedTool == OddJobsTool.DrillBit)
-                return IsHssDrill ? "drill-hss" : "drill";
-            // The countersink bits and the 4-flute chamfer bit are the same 45-deg-per-side conical geometry
-            // as VBit45 (see the enum's own comments) - route into the same EvaluateVBit advisor path.
-            return SelectedTool == OddJobsTool.VBit45 || SelectedTool == OddJobsTool.ChamferBit4Flute90
-                || IsCountersinkBit(SelectedTool) ? "chamfer" : "mill";
         }
 
         // pnlDrillStyle's own SelectedIndex, 1 = HSS twist, 0 (or unset) = brad point/twist (the default,
@@ -428,52 +316,31 @@ namespace CNC.Controls
 
         private void cbxTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var ct = SelectedCustomTool;
-            if (ct != null)
-            {
-                BitDiameter = ct.DiameterMm;
-                Flutes = ct.Flutes;
-                bool isDrill = ct.Kind == CustomToolKind.Drill;
-                pnlDrillStyle.Visibility = isDrill ? Visibility.Visible : Visibility.Collapsed;
-                if (isDrill && cbxDrillStyle.SelectedIndex < 0)
-                    cbxDrillStyle.SelectedIndex = 0;
-                fldFeed.Visibility = isDrill ? Visibility.Collapsed : Visibility.Visible;
-                ComputeRecommendation();
+            var ct = SelectedTool;
+            if (ct == null)
                 return;
-            }
 
-            switch (SelectedTool)
-            {
-                case OddJobsTool.EndMill2Flute: BitDiameter = QuarterInchMm; Flutes = 2; break;
-                case OddJobsTool.RoughingEndMill3Flute: BitDiameter = QuarterInchMm; Flutes = 3; break;
-                case OddJobsTool.OFlute: BitDiameter = QuarterInchMm; Flutes = 1; break;
-                case OddJobsTool.BallEnd: BitDiameter = QuarterInchMm; Flutes = 2; break;
-                case OddJobsTool.SurfacingBit25mm: BitDiameter = TwentyFiveMm; Flutes = 2; break;
-                case OddJobsTool.VBit45: BitDiameter = QuarterInchMm; Flutes = 2; break;
-                case OddJobsTool.EndMill2Flute18: BitDiameter = EighthInchMm; Flutes = 2; break;
-                case OddJobsTool.BallEnd18: BitDiameter = EighthInchMm; Flutes = 2; break;
-                // Diameter deliberately left alone: a drill's size IS the hole being cut, so the caller sets
-                // it from the geometry rather than this dropdown supplying a nominal.
-                case OddJobsTool.DrillBit: Flutes = 2; break;
-                // Single-flute, and the operator suspects (not confirmed against the actual bit spec) a max
-                // RPM well under typical router speeds - the material table would otherwise recommend
-                // 14000-22000 (Hardwood/MDF RpmRange), which could exceed a real rating for a bit like this.
-                // 8000 is a conservative STARTING value, not a verified safe number - confirmed on real
-                // hardware 2026-07-30 (operator: "not sure about RPM rating but I suspect is below 10,000").
-                case OddJobsTool.CountersinkBit38: BitDiameter = ThreeEighthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
-                case OddJobsTool.CountersinkBit916: BitDiameter = NineSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
-                case OddJobsTool.CountersinkBit1316: BitDiameter = ThirteenSixteenthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
-                case OddJobsTool.CountersinkBit118: BitDiameter = OneOneEighthInchMm; Flutes = 1; SpindleRPM = 8000d; break;
-                case OddJobsTool.ChamferBit4Flute90: BitDiameter = QuarterInchMm; Flutes = 4; break;
-            }
-            pnlDrillStyle.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Visible : Visibility.Collapsed;
-            if (SelectedTool == OddJobsTool.DrillBit && cbxDrillStyle.SelectedIndex < 0)
+            bool isDrill = ct.Kind == CustomToolKind.Drill;
+            // Diameter deliberately left alone for a drill: a drill's size IS the hole being cut (see
+            // WorkOrderCompiler.EffectiveBitDiameter), so the caller sets it from the geometry rather than
+            // this dropdown supplying a nominal - applies to any Drill-kind tool, not just the factory default.
+            if (!isDrill)
+                BitDiameter = ct.DiameterMm;
+            Flutes = ct.Flutes;
+            // A one-time conservative STARTING RPM for tools whose real bit rating isn't in the advisor's
+            // material tables (currently just the seeded countersink defaults - see CustomTool.DefaultRpm's
+            // own comment), not a verified safe number.
+            if (ct.DefaultRpm > 0d)
+                SpindleRPM = ct.DefaultRpm;
+
+            pnlDrillStyle.Visibility = isDrill ? Visibility.Visible : Visibility.Collapsed;
+            if (isDrill && cbxDrillStyle.SelectedIndex < 0)
                 cbxDrillStyle.SelectedIndex = 0;   // default brad point/twist - preserves old behavior
 
             // A drill only ever moves sideways as a rapid between pecks (see WorkOrderCompiler.BuildDrill) -
             // every actual cutting move is the peck plunge itself, fed at Plunge feed. "Feed rate" has nothing
             // to drive for this tool, so showing it invites setting a number that's silently ignored.
-            fldFeed.Visibility = SelectedTool == OddJobsTool.DrillBit ? Visibility.Collapsed : Visibility.Visible;
+            fldFeed.Visibility = isDrill ? Visibility.Collapsed : Visibility.Visible;
             ComputeRecommendation();
         }
 
@@ -504,7 +371,7 @@ namespace CNC.Controls
             var op = new FeedsSpeedsOperation
             {
                 Id = "oddjob",
-                Strategy = SelectedTool == OddJobsTool.DrillBit ? "drill" : "adaptive",
+                Strategy = SelectedTool?.Kind == CustomToolKind.Drill ? "drill" : "adaptive",
                 Tool = new FeedsSpeedsTool { Type = ToolType(), DiameterMm = diaForLookup, Flutes = Flutes },
                 Current = new FeedsSpeedsCurrent { Rpm = SpindleRPM, CuttingFeed = Feed, PlungeFeed = PlungeFeed, AxialStep = DepthOfCut }
             };

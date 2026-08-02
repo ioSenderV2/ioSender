@@ -70,8 +70,14 @@ namespace CNC.Controls
         // than quietly coming back on the next launch.
         public bool Enabled = true;
 
-        // Which tool the Feeds and Speeds dialog was left on - the only place a tool is chosen.
-        public int Tool = (int)OddJobsTool.EndMill2Flute;
+        // Which tool the Feeds and Speeds dialog was left on - the only place a tool is chosen. A CustomTool.Id
+        // (see CustomTool.cs) - 0 is the factory-default "1/4" 2-flute endmill" seeded in Default-App.config.
+        // Tool is the real identity (stable even across a rename - see CustomTool.Id's own comment); ToolName
+        // is a save-time snapshot of that tool's Name, kept purely so the saved file is self-describing and
+        // so WorkOrder.ReconcileToolIds can tell "Id still means the same tool" apart from "Id now means a
+        // DIFFERENT tool" on load - see that method's own comment for why that distinction matters.
+        public int Tool = 0;
+        public string ToolName = string.Empty;
 
         public double BitDiameter = 6.35d;
 
@@ -242,6 +248,80 @@ namespace CNC.Controls
         public int EnabledOperationCount { get { return Toolpaths.Sum(t => EnabledOperations(t).Count()); } }
         public int TotalOperationCount { get { return Toolpaths.Sum(t => t.Operations.Count); } }
         public bool AnyHeldBack { get { return EnabledOperationCount != TotalOperationCount; } }
+
+        private IEnumerable<WorkOrderOperation> AllOperations => Toolpaths.SelectMany(t => t.Operations);
+
+        // Refreshes every operation's ToolName snapshot from its CURRENT tool - called right before every
+        // save (see AppConfig.RegisterSections' OddJobsWorkOrder registration) so the saved file always
+        // reflects whatever the tool was actually named at save time, regardless of which UI path set
+        // op.Tool (NewOperation, the Feeds and Speeds dialog, a countersink diameter edit, ...). A tool that
+        // no longer resolves (already-invalidated by ReconcileToolIds, or deleted since this operation was
+        // last touched) keeps its last-known name rather than being blanked - that's the name ReconcileToolIds
+        // needs to have any chance of finding it again on a future load.
+        public void SyncToolNames()
+        {
+            foreach (var op in AllOperations)
+            {
+                var name = CustomTools.Find(op.Tool)?.Name;
+                if (name != null)
+                    op.ToolName = name;
+            }
+        }
+
+        // Runs once right after load (AppConfig.RegisterSections' OddJobsWorkOrder registration) to catch
+        // the case a bare numeric Tool can't: the Id on disk now resolves to a DIFFERENT tool than what was
+        // actually saved (e.g. this file was authored against a different install's tool list, or a tool was
+        // deleted and a new one happened to land on the same Id later). Trusting the number alone there would
+        // silently run the wrong bit; this compares it against the saved ToolName and repairs or invalidates
+        // as needed. Returns whether anything changed (the caller resaves so the fix - and the ToolName
+        // backfill for a pre-existing file that predates this field - becomes durable, same idiom as
+        // AppConfig._migratedFormat).
+        public bool ReconcileToolIds()
+        {
+            bool changed = false;
+            var entries = CustomTools.SectionConfig?.Entries ?? new List<CustomTool>();
+
+            foreach (var op in AllOperations)
+            {
+                var current = CustomTools.Find(op.Tool);
+
+                if (string.IsNullOrEmpty(op.ToolName))
+                {
+                    // Pre-existing file from before ToolName existed (or a never-yet-saved operation) - no
+                    // saved name to compare the Id against, so there's nothing to reconcile. Just backfill
+                    // the name if resolvable, so the file upgrades to the self-describing format next save.
+                    if (current != null)
+                    {
+                        op.ToolName = current.Name;
+                        changed = true;
+                    }
+                    continue;
+                }
+
+                if (current != null && current.Name == op.ToolName)
+                    continue;   // Id still means the same tool it did when this was saved - all good.
+
+                // Id is stale (deleted) or now means something ELSE - look the tool up by its saved name
+                // instead. Self-heal only on an unambiguous single match.
+                var byName = entries.Where(t => t.Name == op.ToolName).ToList();
+                if (byName.Count == 1)
+                {
+                    op.Tool = byName[0].Id;
+                    changed = true;
+                }
+                else if (op.Tool != -1)
+                {
+                    // No (or ambiguous) match by name - do NOT silently keep using `current` (a tool with a
+                    // DIFFERENT name than what was actually saved). Invalidate instead, so
+                    // WorkOrderView.ParameterWarnings flags it and the operator picks a substitute, the same
+                    // path already used for a tool deleted outright.
+                    op.Tool = -1;
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
     }
 
     public static class WorkOrderRules

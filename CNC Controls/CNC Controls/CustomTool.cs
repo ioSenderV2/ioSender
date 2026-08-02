@@ -1,10 +1,11 @@
 /*
  * CustomTool.cs - part of CNC Controls library
  *
- * User-defined tools for Work Order, added from Settings:App > Work Order (OddJobsSettingsControl) - lets
- * an operator add a bit ioSender doesn't ship a preset for (e.g. a 1/16" 1-flute O-flute) without a code
- * change. Kind selects which of the existing feed/speed formulas and operation-kind restrictions applies -
- * mirrors the buckets the built-in OddJobsTool enum already falls into (see
+ * Every Work Order tool - both the factory-default set (seeded into Default-App.config at Id 0-13, promoted
+ * into an existing App.config the same way any other new default-config key is - see
+ * ConfigStore.ReadDocument's template-fallback path) and anything the operator adds from Settings:App > Work
+ * Order (OddJobsSettingsControl, "+" button / CustomToolEditDialog). There is no separate hardcoded tool
+ * list any more - Kind selects which of the feed/speed formulas and operation-kind restrictions applies (see
  * OddJobsFeedsSpeedsDialog.ToolType() and RestrictToolsFor's isMill/isDrill/isChamfer/isCountersink groups).
  * Persisted as an App.config section via AppConfig.RegisterFolded, same idiom as OddJobsToolMemory.
  */
@@ -36,6 +37,12 @@ namespace CNC.Controls
         // Ignored for Drill/Countersink (their advisor formulas don't use flute count) - harmless to leave
         // set, just not shown/editable for those kinds in CustomToolEditDialog.
         public int Flutes = 2;
+        // 0 = no override, let FeedsSpeedsAdvisor's material table drive the RPM (the normal case). Set only
+        // on the seeded countersink defaults, whose real bit rating isn't in the advisor's tables - see
+        // OddJobsFeedsSpeedsDialog.cbxTool_SelectionChanged's own comment on where the 8000 rpm came from.
+        // Not operator-editable via CustomToolEditDialog (retune the RPM field itself instead) - this is
+        // just the one-time starting value shown when the tool is first selected.
+        public double DefaultRpm = 0d;
     }
 
     public class CustomToolList
@@ -45,17 +52,15 @@ namespace CNC.Controls
 
     public static class CustomTools
     {
-        // WorkOrderOperation.Tool (int) space: 0..N-1 are OddJobsTool enum values (unchanged, still
-        // append-only/persisted - see that enum's own comment). A custom tool's op.Tool = IdBase + tool.Id,
-        // so every existing persisted work order/enum value is completely unaffected - this is purely
-        // additive new range, never colliding with a real (or future) OddJobsTool value.
-        public const int IdBase = 10000;
-
+        // WorkOrderOperation.Tool IS the tool's Id directly - no offset. The factory-default tools are
+        // seeded at Id 0-13 (matching the retired OddJobsTool enum's own ordinals exactly, so a work order
+        // saved before this file existed still resolves to the same tool); NextId() naturally continues
+        // from there for anything the operator adds afterward.
         public static CustomToolList SectionConfig;
 
         public static CustomTool Find(int opTool)
         {
-            return opTool >= IdBase ? SectionConfig?.Entries?.FirstOrDefault(t => t.Id == opTool - IdBase) : null;
+            return SectionConfig?.Entries?.FirstOrDefault(t => t.Id == opTool);
         }
 
         public static int NextId()
@@ -68,15 +73,10 @@ namespace CNC.Controls
             AppConfig.Settings.Save();
         }
 
-        // "is this op.Tool value (built-in OR custom) a countersink-kind tool" - the one check several call
-        // sites need in a form that works for both. Mirrors OddJobsFeedsSpeedsDialog.IsCountersinkBit's
-        // built-in-only version.
+        // "is this op.Tool value a countersink-kind tool" - the one check several call sites need.
         public static bool IsCountersink(int opTool)
         {
-            var ct = Find(opTool);
-            if (ct != null)
-                return ct.Kind == CustomToolKind.Countersink;
-            return opTool >= 0 && opTool < IdBase && OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)opTool);
+            return Find(opTool)?.Kind == CustomToolKind.Countersink;
         }
     }
 }

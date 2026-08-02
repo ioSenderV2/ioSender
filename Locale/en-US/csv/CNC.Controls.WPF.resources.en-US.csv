@@ -1534,7 +1534,7 @@ CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBL:System.Wi
 CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to front-right corner at safe Z
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a custom tool - a bit ioSender has no built-in preset for.
-CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojCustomToolHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Custom tools (below the built-ins) can be right-clicked to edit or delete.
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojCustomToolHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Right-click a tool to edit or delete it.
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_name:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_kind:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kind:
 CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_diameter:CNC.Controls.NumericField.Label,None,False,True,,Diameter:

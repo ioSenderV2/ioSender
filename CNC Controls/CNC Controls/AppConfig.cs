@@ -648,16 +648,28 @@ namespace CNC.Controls
             // never meant to be duplicated per program source in the first place.
             RegisterFolded<StartJobSettings>("StartJob",
                 () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
+            // Brand-new section (2026-08-01), no legacy standalone file - same "never exists" idiom as
+            // StepperCalProbe's own registration above. Registered BEFORE OddJobsWorkOrder deliberately -
+            // ConfigStore.ReadDocument processes sections in REGISTRATION order, and OddJobsWorkOrder's own
+            // load-side ReconcileToolIds (below) needs CustomTools.SectionConfig already populated (built-ins
+            // merged in) to look tools up against - MergeFactoryDefaultTools runs synchronously in THIS
+            // section's own set callback, so it's guaranteed done before OddJobsWorkOrder's runs next.
+            RegisterFolded<CustomToolList>("CustomTools",
+                () => CustomTools.SectionConfig,
+                v => { CustomTools.SectionConfig = v; if (MergeFactoryDefaultTools()) _migratedFormat = true; },
+                "CustomTools.xml");
             // The composed work order (jobs -> operations) that replaced the five fixed job wizards, plus the
-            // per-(tool, diameter, material) feeds/speeds the operator dialed in themselves.
+            // per-(tool, diameter, material) feeds/speeds the operator dialed in themselves. SyncToolNames
+            // runs on every save (get side effect - Write() reads through this getter) so each operation's
+            // ToolName snapshot is always current; ReconcileToolIds runs once on load (set side effect,
+            // BEFORE the section is exposed to the rest of the app) to repair/invalidate a Tool Id that no
+            // longer means what it did when saved - see both methods' own comments (WorkOrderModel.cs).
             RegisterFolded<WorkOrder>("OddJobsWorkOrder",
-                () => WorkOrderView.SectionConfig, v => WorkOrderView.SectionConfig = v, "OddJobsWorkOrder.xml");
+                () => { WorkOrderView.SectionConfig?.SyncToolNames(); return WorkOrderView.SectionConfig; },
+                v => { if (v != null && v.ReconcileToolIds()) _migratedFormat = true; WorkOrderView.SectionConfig = v; },
+                "OddJobsWorkOrder.xml");
             RegisterFolded<ToolMemoryList>("OddJobsToolMemory",
                 () => OddJobsToolMemory.SectionConfig, v => OddJobsToolMemory.SectionConfig = v, "OddJobsToolMemory.xml");
-            // Brand-new section (2026-08-01), no legacy standalone file - same "never exists" idiom as
-            // StepperCalProbe's own registration above.
-            RegisterFolded<CustomToolList>("CustomTools",
-                () => CustomTools.SectionConfig, v => CustomTools.SectionConfig = v, "CustomTools.xml");
 
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
@@ -1205,6 +1217,42 @@ namespace CNC.Controls
                     File.Delete(staleMarker);
             }
             catch { }
+        }
+
+        // 2026-08-02: the Work Order built-in tools moved from a hardcoded OddJobsTool enum into a seeded
+        // CustomTools section (Id 0-13 - see Default-App.config's own comment on that section). A profile
+        // whose CustomTools section already existed before this change (this box's own custom-tool testing
+        // earlier the same session, or simply anyone who added a custom tool before upgrading to a build
+        // with this merge) never gets the section-absent template fallback in ConfigStore.ReadDocument on
+        // its own - called from the CustomTools registration's own set callback (RegisterSections) to merge
+        // in whichever seeded Ids it's still missing, same "merge newly introduced defaults into an existing
+        // list" idiom as the Layout-tree fixups in ApplyOneTimeFixups. Reads the SAME template payload the
+        // absent-section path already falls back to, rather than duplicating the tool list here. Returns
+        // whether anything was added (caller resaves to make it durable).
+        private static bool MergeFactoryDefaultTools()
+        {
+            try
+            {
+                var payload = GetTemplateSectionPayload("CustomTools");
+                if (payload == null)
+                    return false;
+                var template = (CustomToolList)new XmlSerializer(typeof(CustomToolList)).Deserialize(payload.CreateReader());
+                if (template?.Entries == null)
+                    return false;
+
+                if (CustomTools.SectionConfig == null)
+                    CustomTools.SectionConfig = new CustomToolList();
+                var haveIds = new HashSet<int>(CustomTools.SectionConfig.Entries.Select(t => t.Id));
+                bool added = false;
+                foreach (var t in template.Entries)
+                    if (!haveIds.Contains(t.Id))
+                    {
+                        CustomTools.SectionConfig.Entries.Add(t);
+                        added = true;
+                    }
+                return added;
+            }
+            catch { return false; }
         }
 
         public void Shutdown()

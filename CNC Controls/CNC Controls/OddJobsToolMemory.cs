@@ -20,7 +20,7 @@ namespace CNC.Controls
 {
     public class ToolMemoryEntry
     {
-        public int Tool;                  // OddJobsTool
+        public int Tool;                  // CustomTool.Id
         public double DiameterMm;
         public string Material = string.Empty;
         public double Rpm, Feed, PlungeFeed, DepthOfCut;
@@ -37,21 +37,21 @@ namespace CNC.Controls
 
         // Diameters are matched to 0.01 mm - a bit's nominal size is a fixed physical property, so anything
         // finer than that is float noise from a units conversion, not a different tool.
-        private static bool Matches(ToolMemoryEntry e, OddJobsTool tool, double diameterMm, string material)
+        private static bool Matches(ToolMemoryEntry e, int tool, double diameterMm, string material)
         {
-            return e.Tool == (int)tool
+            return e.Tool == tool
                 && Math.Abs(e.DiameterMm - diameterMm) < 0.005d
                 && string.Equals(e.Material ?? string.Empty, material ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static ToolMemoryEntry Find(OddJobsTool tool, double diameterMm, string material)
+        public static ToolMemoryEntry Find(int tool, double diameterMm, string material)
         {
             if (string.IsNullOrEmpty(material))
                 return null;   // material is part of the key - without one there's nothing meaningful to recall
             return SectionConfig?.Entries?.FirstOrDefault(e => Matches(e, tool, diameterMm, material));
         }
 
-        public static void Remember(OddJobsTool tool, double diameterMm, string material, double rpm, double feed, double plungeFeed, double depthOfCut)
+        public static void Remember(int tool, double diameterMm, string material, double rpm, double feed, double plungeFeed, double depthOfCut)
         {
             if (string.IsNullOrEmpty(material) || diameterMm <= 0d)
                 return;
@@ -62,7 +62,7 @@ namespace CNC.Controls
             var entry = SectionConfig.Entries.FirstOrDefault(e => Matches(e, tool, diameterMm, material));
             if (entry == null)
             {
-                entry = new ToolMemoryEntry { Tool = (int)tool, DiameterMm = Math.Round(diameterMm, 2), Material = material };
+                entry = new ToolMemoryEntry { Tool = tool, DiameterMm = Math.Round(diameterMm, 2), Material = material };
                 SectionConfig.Entries.Add(entry);
             }
             entry.Rpm = rpm;

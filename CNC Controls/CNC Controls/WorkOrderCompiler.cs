@@ -832,22 +832,13 @@ namespace CNC.Controls
                         continue;
 
                     var ct = CustomTools.Find(op.Tool);
-                    string type, description;
-                    if (ct != null)
-                    {
-                        type = (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink) ? "VBIT A=90"
-                             : ct.Kind == CustomToolKind.BallEnd ? "BALL"
-                             : "FLAT";
-                        description = ct.Name;
-                    }
-                    else
-                    {
-                        var tool = (OddJobsTool)op.Tool;
-                        type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.ChamferBit4Flute90 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
-                                    : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
-                                    : "FLAT";
-                        description = ToolDescription(tool);
-                    }
+                    // ct is null only for a stale op.Tool referencing a tool since deleted from the list -
+                    // ParameterWarnings flags that at Generate time, this just keeps the comment generic.
+                    string type = ct == null ? "FLAT"
+                                : (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink) ? "VBIT A=90"
+                                : ct.Kind == CustomToolKind.BallEnd ? "BALL"
+                                : "FLAT";
+                    string description = ct?.Name ?? ("tool " + op.Tool);
                     yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, description);
                 }
         }
@@ -857,28 +848,6 @@ namespace CNC.Controls
         public static double EffectiveBitDiameter(WorkOrderToolpath tp, WorkOrderOperation op)
         {
             return op.Kind == WorkOrderOpKind.Drill ? op.HoleDiameter : op.BitDiameter;
-        }
-
-        private static string ToolDescription(OddJobsTool tool)
-        {
-            switch (tool)
-            {
-                case OddJobsTool.EndMill2Flute: return "2-flute end mill";
-                case OddJobsTool.RoughingEndMill3Flute: return "3-flute roughing end mill";
-                case OddJobsTool.OFlute: return "O-flute";
-                case OddJobsTool.BallEnd: return "ball end";
-                case OddJobsTool.SurfacingBit25mm: return "surfacing bit";
-                case OddJobsTool.VBit45: return "45 deg V-bit";
-                case OddJobsTool.EndMill2Flute18: return "1/8\" 2-flute end mill";
-                case OddJobsTool.BallEnd18: return "1/8\" ball end";
-                case OddJobsTool.DrillBit: return "drill";
-                case OddJobsTool.CountersinkBit38: return "3/8\" (10mm) countersink bit";
-                case OddJobsTool.CountersinkBit916: return "9/16\" (14mm) countersink bit";
-                case OddJobsTool.CountersinkBit1316: return "13/16\" (21mm) countersink bit";
-                case OddJobsTool.CountersinkBit118: return "1-1/8\" (28mm) countersink bit";
-                case OddJobsTool.ChamferBit4Flute90: return "4-flute chamfer bit";
-                default: return tool.ToString();
-            }
         }
 
         // The order operations are emitted in.
