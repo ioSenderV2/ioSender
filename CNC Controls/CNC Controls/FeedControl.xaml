@@ -15,8 +15,16 @@
                     <RowDefinition Height="Auto" MinHeight="30"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <local:NumericTextBox x:Name="cvFeedRate" Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" Background="#FFF8F8F8" HorizontalAlignment="Left" Margin="10,5,0,0" IsReadOnly="True" Focusable="False" VerticalAlignment="Top" Width="50"/>
-                <Label x:Name="lblFeedRrate" Content="{Binding Path=FeedrateUnit, Mode=OneWay}" HorizontalAlignment="Left" Margin="60,5,0,0" VerticalAlignment="Top"/>
+                <!-- Readout: the number and its unit label share a StackPanel so the label follows the box.
+                     This was a hard Width="50" with the label pinned at Margin="60,5,0,0" in the same cell,
+                     which left only ~32px of text area once the NumericTextBox style's 8px horizontal
+                     padding and 1px border came out of it - Format="####0" renders 5 digits but they had
+                     nowhere to go and clipped (issue #21). MinWidth holds a stable resting size for the
+                     usual 4-5 digits and grows rather than clips beyond that. -->
+                <StackPanel x:Name="readoutPanel" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,5,0,0">
+                    <local:NumericTextBox x:Name="cvFeedRate" Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" Background="#FFF8F8F8" IsReadOnly="True" Focusable="False" VerticalAlignment="Center" MinWidth="72"/>
+                    <Label x:Name="lblFeedRrate" Content="{Binding Path=FeedrateUnit, Mode=OneWay}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                </StackPanel>
                 <local:OverrideControl Grid.Row="1" Grid.ColumnSpan="2" x:Name="feedOverrideControl" Value="{Binding Path=FeedOverride, Mode=OneWay}" OverrideDisabled="{Binding Path=FeedOverrideDisabled, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,2,0" CommandGenerated="override_CommandGenerated" EncoderMode="FeedRate"/>
                 <Label x:Uid="lbl_rapids" Grid.Row="2" x:Name="lblRapids" Content="Rapids:" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top" Grid.RowSpan="2"/>
                 <local:OverrideControl Grid.Row="2" x:Name="rapidsOverrideControl" Ticks="25,50,100" Minimum="25" Maximum="100" Value="{Binding Path=RapidsOverride, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,19,2,0" CommandGenerated="override_CommandGenerated" EncoderMode="RapidRate"/>
