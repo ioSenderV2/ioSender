@@ -602,8 +602,9 @@ namespace GCode_Sender
             // WHY under Edit Main Page > Unavailable. Each gated view owns its own prerequisite + reason
             // (IAvailabilityGated) - the single source the removal and the listing now share. Survivors are
             // (re)enabled by UpdateConnectionGatedTabs on the connect transition. Height Map stays either way (it
-            // can still load/apply a saved .map offline, gated at run time instead). Tools stays even with no tool
-            // table (NumTools == 0) - only its tool-table sub-tab is dropped, in ToolsView.
+            // can still load/apply a saved .map offline, gated at run time instead). Tools now goes too when the
+            // controller supports none of the three tools it still hosts (2026-08-02) - it gates itself on its
+            // own children, so this one call drops both the sub-tabs and, if nothing survives, the tab itself.
             ComponentAvailability.Note(MainWindow.ui.tabMode.PruneUnavailable());
 
             MainWindow.EnableView(true, ViewType.Tools);

@@ -634,8 +634,10 @@ namespace CNC.Controls
 
             // Tool/wizard parameter blobs (were their own .xml files). These live in CNC.Controls so they save
             // via AppConfig directly; each keeps a static holder the section reads.
-            RegisterFolded<SurfaceParams>("SurfaceSpoilboard",
-                () => SurfaceSpoilboardWizard.SectionConfig, v => SurfaceSpoilboardWizard.SectionConfig = v, "SurfaceSpoilboard.xml");
+            // The "SurfaceSpoilboard" section is gone with its wizard (2026-08-02, replaced by the Work Order
+            // Surface toolpath, which persists inside the work order itself). An existing App.config may still
+            // carry the section; ConfigStore loads sections independently, so an unclaimed one is simply
+            // ignored rather than failing the load.
             RegisterFolded<AutoSquareParams>("AutoSquare",
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
             // No legacy standalone file (new section) - "StepperCalProbe.xml" never exists, so ImportLegacy is
@@ -1115,7 +1117,6 @@ namespace CNC.Controls
             if (toolsSlot != null)
             {
                 string[] desiredOrder = {
-                    LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                     LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID
                 };
                 var byKey = toolsSlot.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
@@ -1126,11 +1127,17 @@ namespace CNC.Controls
                 if (!toolsSlot.Items.Select(n => n.Component).SequenceEqual(reordered.Select(n => n.Component)))
                     toolsSlot.Items = reordered;
 
-                // 2026-08-01: StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) are
-                // retired - the probe method replaced both and moved into Machine Setup's own Calibration
-                // step. Drop any stale entries an already-persisted profile still has (same
-                // RemoveAll-retired-components pattern as the Odd Jobs slot fixup below).
-                string[] retiredToolsComponents = { LayoutKeys.StepperCal, LayoutKeys.StepperScratch };
+                // Drop retired Tools components a persisted profile still carries (same RemoveAll pattern as
+                // the Odd Jobs slot fixup below).
+                //   2026-08-01: StepperCal / StepperScratch - the probe method replaced both.
+                //   2026-08-02: StepperCalProbe + Squareness now live in Machine Setup's Calibration step and
+                //               SurfaceSpoilboard is a Work Order toolpath kind. Without this, an existing
+                //               profile keeps three dead nodes whose components no longer resolve, and
+                //               BuildTools would silently render an empty strip for them.
+                string[] retiredToolsComponents = {
+                    LayoutKeys.StepperCal, LayoutKeys.StepperScratch,
+                    LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard
+                };
                 toolsSlot.Items.RemoveAll(n => retiredToolsComponents.Contains(n.Component));
             }
 

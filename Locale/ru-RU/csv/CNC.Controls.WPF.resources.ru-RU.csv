@@ -590,42 +590,6 @@ CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_scNoAxisRes:System.String
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sboverlap:CNC.Controls.NumericField.Label,None,False,True,,Overlap:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sboverlap:CNC.Controls.NumericField.Unit,None,False,True,,%
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbstepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbstepover:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbtotal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbtotal:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:CNC.Controls.NumericField.Label,None,False,True,,Finish pass:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"A light final pass at this depth (0 = none). Roughing steps by Depth of cut down to Total depth minus this, then one pass removes the last Finish-pass amount for a clean surface."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbsafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbsafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:CNC.Controls.NumericField.Label,None,False,True,,Edge margin:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clearance kept between the raster and each machine travel limit (on top of the homing pull-off). The surfaced area = travel less twice this on each axis.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbwidth:CNC.Controls.NumericField.Label,None,False,True,,Area width:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbheight:CNC.Controls.NumericField.Label,None,False,True,,Area height:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,lbl_sbtool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sboutline:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Outline only
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sboutline:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Trace the rectangular perimeter of the area at safe Z - no plunge, spindle off - to check the extents before a full surfacing pass."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbdryrun:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Dry run
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbdryrun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Trace the path at safe Z with no plunge and the spindle off - to verify motion and extents without cutting.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbreuse:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Reuse Z0
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbreuse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Skip the park + Z touch-off + dust-boot prompts and reuse the work Z0 from the last run (same bit / setup, boot already fitted). Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,btn_sbgen:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,txt_asgangedaxis:System.Windows.Controls.TextBlock.Text,Text,True,True,,Ganged axis:
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asoffset:CNC.Controls.NumericField.Label,None,False,True,,Current offset:
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asoffset:CNC.Controls.NumericField.Unit,None,False,True,,mm
@@ -789,10 +753,6 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Wi
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the changed settings to the controller.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabToolTable:System.String.$Content,None,True,True,,Tool table
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperCal:System.String.$Content,None,True,True,,Stepper calibration
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperScratch:System.String.$Content,None,True,True,,Stepper calibration (scratch)
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSurfaceSpoilboard:System.String.$Content,None,True,True,,Surface spoilboard
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSquareness:System.String.$Content,None,True,True,,Squareness
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTrinamic:System.String.$Content,None,True,True,,Trinamic tuner
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabPID:System.String.$Content,None,True,True,,PID Tuner
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSelectProbe:System.String.$Content,None,True,True,,Select a probe definition first (Machine Setup Wizard &gt; Probe definitions).
@@ -808,10 +768,6 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSaveTitle:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmLoadTitle:System.String.$Content,None,True,True,,Load height map
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmFileFilter:System.String.$Content,None,True,True,,Height map files (*.map)|*.map|All files (*.*)|*.*
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_readyCycleStart:System.String.$Content,None,True,True,,{0} ready - press Cycle Start to run.
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbOverlapHigh:System.String.$Content,None,True,True,,Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoTravel:System.String.$Content,None,True,True,,"Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first."
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoArea:System.String.$Content,None,True,True,,Set the area width and height first (they default to the machine travel envelope).
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbRpmHigh:System.String.$Content,None,True,True,,Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoTravel:System.String.$Content,None,True,True,,Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoOffset:System.String.$Content,None,True,True,,No auto-square offset setting on this controller.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asCaution:System.String.$Content,None,True,True,,"\n\nCAUTION: {0:0.0} mm is a lot of offset - on a rigid gantry it will rack the frame and may bind. If so, the gantry is mechanically out of square (Y rails out of phase) and must be corrected there first."
@@ -844,9 +800,6 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchNext:System.W
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ask before writing changed grbl ($) settings to the controller when leaving the tab, instead of writing them silently."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_autoSaveGrblSettings:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save grbl settings on leave
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About surfacing the spoilboard
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Generates a raster (boustrophedon) facing program that skims the whole bed with a surfacing bit, so the spoilboard surface ends up perfectly parallel to the gantry.&#10;&#10;Set the bit diameter, overlap and depths, then Generate. The area defaults to the machine travel less the edge margin - adjust Area width/height to face a smaller region. Tick Outline only or Dry run to trace the extents at safe Z first, then Run to cut. Reuse Z0 skips the touch-off so you can re-run at the same height."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,txt_sbSummaryEmpty:System.Windows.Controls.TextBlock.Text,Text,True,True,,Set the parameters and click Generate - a summary of the generated program appears here.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.Controls.ContentControl.Content,Button,True,True,,Clear
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reset the squaring offset ($17x) to 0 and re-home - quicker than typing $17x=0 in MDI.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asgap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The gap you measured at the X-leg pin. Sets the New offset. (Leave 0 if you'd rather type the offset directly.)
@@ -1062,7 +1015,6 @@ CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_collapseAll:System.Wind
 CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_resetGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset group to defaults
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_transformCtx:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Transform
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the surfacing bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before surfacing.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,cbxGangedAxis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write."
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.
 CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.Controls.ContentControl.Content,Button,True,True,,Get data

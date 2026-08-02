@@ -1,9 +1,13 @@
 /*
  * ToolsView.xaml.cs - part of CNC Controls library
  *
- * Top-level "Tools" tab: the tool table plus the commissioning / tuning tools (stepper calibration,
- * spoilboard surfacing, Trinamic and PID tuning). The tool table is an ICNCView; the tools are
- * IGrblConfigTab. The selected child is activated either way (mirrors GrblConfigView).
+ * Top-level "Tools" tab: what's left after the 2026-08-02 consolidation - the tool table plus the
+ * Trinamic and PID tuners. The tool table is an ICNCView; the tuners are IGrblConfigTab. The selected
+ * child is activated either way (mirrors GrblConfigView).
+ *
+ * All three remaining children are hardware-gated (IAvailabilityGated), so on most controllers this tab
+ * has nothing to show - it gates itself the same way and disappears from the main bar entirely. See
+ * UnavailableReason below.
  */
 
 using System.Linq;
@@ -13,7 +17,7 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class ToolsView : UserControl, ICNCView, ITabBindingHost
+    public partial class ToolsView : UserControl, ICNCView, ITabBindingHost, IAvailabilityGated
     {
         public ToolsView()
         {
@@ -24,12 +28,13 @@ namespace CNC.Controls
 
         // Register the built-in tools as placeable components. Adding a new tool is a Register call from
         // its own code + a node in the default layout's Tools slot - no edit to this view's markup.
+        //
+        // Stepper calibration (probe) and Squareness moved to Machine Setup's Calibration step, and Surface
+        // spoilboard is now a Work Order toolpath kind - all three deregistered 2026-08-02. Their layout keys
+        // survive in LayoutKeys only so ApplyOneTimeFixups can strip them from already-persisted profiles.
         private static void RegisterTools()
         {
             ComponentRegistry.Register(LayoutKeys.ToolTable, L("TabToolTable", "Tool table"), () => new ToolView());
-            ComponentRegistry.Register(LayoutKeys.StepperCalProbe, L("TabStepperCalProbe", "Stepper calibration (probe)"), () => new StepperCalibrationProbeWizard());
-            ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, L("TabSurfaceSpoilboard", "Surface spoilboard"), () => new SurfaceSpoilboardWizard());
-            ComponentRegistry.Register(LayoutKeys.Squareness, L("TabSquareness", "Squareness"), () => new AutoSquareWizard());
             ComponentRegistry.Register(LayoutKeys.Trinamic, L("TabTrinamic", "Trinamic tuner"), () => new TrinamicView());
             ComponentRegistry.Register(LayoutKeys.PID, L("TabPID", "PID Tuner"), () => new PIDLogView());
         }
@@ -99,22 +104,32 @@ namespace CNC.Controls
         public void Activate(bool activate, ViewType chgMode)
         {
             if (activate)
-            {
                 EnsureToolsCurrent();
-                UpdateStepperCalProbeAvailability();
-            }
             ActivateTab(tabTools.SelectedItem as TabItem ?? tabTools.Items[0] as TabItem, activate);
         }
 
-        // Stepper Calibration (probe) needs a real 3D probe to do anything useful - grey the whole tab out
-        // (not just its own Generate/Save buttons) when none is configured, re-checked every time Tools is
-        // activated so it reflects a probe added/removed in Machine Setup mid-session.
-        private void UpdateStepperCalProbeAvailability()
+        #region IAvailabilityGated
+
+        // Everything still hosted here is hardware-gated, so on a controller with no tool table, no Trinamic
+        // drivers and no PID log the tab would sit on the main bar showing an empty strip. Gate the container
+        // on its own children rather than re-testing their prerequisites: each child already owns its
+        // condition + reason, and asking them keeps this to one source of truth.
+        //
+        // Safe to read here: BuildTools() runs in the constructor, so the child views exist by the time the
+        // main bar prunes at connect - which is well before this view's own Loaded handler prunes the strip.
+        public string UnavailableReason
         {
-            var tab = tabTools.Items.Cast<TabItem>().FirstOrDefault(t => (t.Tag as string) == LayoutKeys.StepperCalProbe);
-            if (tab != null)
-                tab.IsEnabled = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
+            get
+            {
+                bool anyAvailable = tabTools.Items.OfType<TabItem>().Any(t =>
+                    !(t.Content is IAvailabilityGated g && g.UnavailableReason != null && g.HideWhenUnavailable));
+                return anyAvailable ? null : "No tool table, Trinamic drivers or PID log on this controller.";
+            }
         }
+
+        public bool HideWhenUnavailable { get { return true; } }
+
+        #endregion
 
         // BuildTools() runs in the constructor, reading AppConfig.Settings.Layout at THAT moment - but
         // MainWindow's InitializeComponent builds the whole tab tree (including this view) before
@@ -209,10 +224,8 @@ namespace CNC.Controls
         {
             // Drop the Tools sub-tabs the controller can't support (empty tool table / no Trinamic drivers / no
             // PID log) and record why for Edit Main Page > Unavailable. Each tool owns its own prerequisite +
-            // reason (IAvailabilityGated) - the one source the removal and the listing share. Auto Square is kept
-            // even without the squaring-offset setting (it still serves as a squareness GAUGE - drill the L,
-            // measure the gap - with only the Apply-offset step disabled); PruneUnavailable notes that limitation
-            // without removing the tab.
+            // reason (IAvailabilityGated) - the one source the removal and the listing share, and the one this
+            // view's own UnavailableReason consults to decide whether the whole tab should go.
             ComponentAvailability.Note(tabTools.PruneUnavailable());
         }
     }

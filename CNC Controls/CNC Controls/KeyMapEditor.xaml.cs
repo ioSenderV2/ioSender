@@ -689,8 +689,6 @@ namespace CNC.Controls
             new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
 
             new TabTarget("Tab.Tools.ToolTable",         "Tools → Tool table",                   "Switch to Tools and show the Tool table tab."),
-            new TabTarget("Tab.Tools.SurfaceSpoilboard", "Tools → Surface spoilboard",           "Switch to Tools and show the Surface spoilboard tab."),
-            new TabTarget("Tab.Tools.Squareness",        "Tools → Squareness",                   "Switch to Tools and show the Squareness tab."),
             new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),
             new TabTarget("Tab.Tools.PID",               "Tools → PID Tuner",                    "Switch to Tools and show the PID Tuner tab."),
 

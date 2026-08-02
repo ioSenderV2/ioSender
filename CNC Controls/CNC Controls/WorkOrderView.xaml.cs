@@ -1590,7 +1590,7 @@ namespace CNC.Controls
 
         #region Methods required by IGrblConfigTab
 
-        public GrblConfigType GrblConfigType { get { return GrblConfigType.SurfaceSpoilboard; } }
+        public GrblConfigType GrblConfigType { get { return GrblConfigType.WorkOrder; } }
 
         private bool isActiveTab = false;
         private ProgramView programView;

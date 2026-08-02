@@ -2592,7 +2592,9 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
             TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
+            // Not alwaysVisible: every tool it still hosts is hardware-gated, so ToolsView gates itself and
+            // the main-bar prune drops the tab outright on a controller that supports none of them.
+            TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 85, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));

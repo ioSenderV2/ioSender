@@ -74,15 +74,17 @@ namespace CNC.Controls
 
         // Tools container slot + tool components
         public const string SlotTools = "tools";
-        public const string ToolTable = "ToolTable",
+        public const string ToolTable = "ToolTable", Trinamic = "Trinamic", PID = "PID";
+        // Retired Tools components, kept defined ONLY so AppConfig.ApplyOneTimeFixups can strip them from
+        // already-persisted layouts (same precedent as OddJobs above) - nothing registers or reads them now.
+        //   2026-08-01: StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) - the probe
+        //               method replaced both.
+        //   2026-08-02: StepperCalProbe and Squareness moved into Machine Setup's Calibration step, and
+        //               SurfaceSpoilboard became a Work Order toolpath kind. Tools now holds only the three
+        //               hardware-gated tools above, and hides itself when none of them are available.
+        public const string StepperCal = "StepperCal", StepperScratch = "StepperScratch",
                             StepperCalProbe = "StepperCalProbe",
-                            SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness",
-                            Trinamic = "Trinamic", PID = "PID";
-        // StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) are retired (2026-08-01) -
-        // the probe method (StepperCalProbe, now folded into Machine Setup's Calibration step) replaced both.
-        // Kept defined ONLY for AppConfig.ApplyOneTimeFixups' migration of already-persisted layouts, same
-        // precedent as OddJobs above - nothing current registers or reads them.
-        public const string StepperCal = "StepperCal", StepperScratch = "StepperScratch";
+                            SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness";
 
         // Odd Jobs container slot + job components
         public const string SlotOddJobs = "oddjobs";
@@ -112,9 +114,10 @@ namespace CNC.Controls
                     // Start Job "Dynamic" mode folds their functionality in - see issue #10) - NOT removed from
                     // TabRegistry, so they still show in Settings > Main Page > Tabs' Available column and can
                     // be dragged back onto the main page by anyone who still wants the standalone tabs.
+                    // Tools is down to the three hardware-gated tools; it removes itself from the main bar
+                    // when the controller supports none of them (ToolsView.UnavailableReason).
                     new LayoutNode(LayoutKeys.Tools,
                         new LayoutSlot(LayoutKeys.SlotTools, new[] {
-                            LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
                     // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs' own
                     // slot only ever hosted the Work Order composer, so Work Order is promoted to a bare

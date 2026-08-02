@@ -66,10 +66,6 @@
     <system:String x:Uid="str_tabFeedsSpeeds" x:Key="TabFeedsSpeeds">Feeds &amp; Speeds</system:String>
     <!-- Tools container sub-tab labels (built in code by ToolsView.RegisterTools). -->
     <system:String x:Uid="str_tabToolTable" x:Key="TabToolTable">Tool table</system:String>
-    <system:String x:Uid="str_tabStepperCal" x:Key="TabStepperCal">Stepper calibration (Manual)</system:String>
-    <system:String x:Uid="str_tabStepperScratch" x:Key="TabStepperScratch">Stepper calibration (scratch)</system:String>
-    <system:String x:Uid="str_tabSurfaceSpoilboard" x:Key="TabSurfaceSpoilboard">Surface spoilboard</system:String>
-    <system:String x:Uid="str_tabSquareness" x:Key="TabSquareness">Squareness</system:String>
     <system:String x:Uid="str_tabTrinamic" x:Key="TabTrinamic">Trinamic tuner</system:String>
     <system:String x:Uid="str_tabPID" x:Key="TabPID">PID Tuner</system:String>
     <!-- Height Map tab messages (newlines as \n, expanded in code; {0}.. are string.Format args). -->
@@ -86,11 +82,6 @@
     <system:String x:Uid="str_hmLoadTitle" x:Key="HmLoadTitle">Load height map</system:String>
     <system:String x:Uid="str_hmFileFilter" x:Key="HmFileFilter">Height map files (*.map)|*.map|All files (*.*)|*.*</system:String>
     <system:String x:Uid="str_readyCycleStart" x:Key="ReadyCycleStart">{0} ready - press {1} to run.</system:String>
-    <!-- Surface spoilboard wizard messages. -->
-    <system:String x:Uid="str_sbOverlapHigh" x:Key="SbOverlapHigh">Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.</system:String>
-    <system:String x:Uid="str_sbNoTravel" x:Key="SbNoTravel">Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first.</system:String>
-    <system:String x:Uid="str_sbNoArea" x:Key="SbNoArea">Set the area width and height first (they default to the machine travel envelope).</system:String>
-    <system:String x:Uid="str_sbRpmHigh" x:Key="SbRpmHigh">Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?</system:String>
     <!-- Auto square wizard messages. -->
     <system:String x:Uid="str_asNoTravel" x:Key="AsNoTravel">Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.</system:String>
     <system:String x:Uid="str_asNoOffset" x:Key="AsNoOffset">No auto-square offset setting on this controller.</system:String>

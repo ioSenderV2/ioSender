@@ -47,7 +47,7 @@ namespace CNC.Controls
         Trinamic,
         PidTuning,
         MachineSetup,
-        SurfaceSpoilboard,
+        WorkOrder,
         AutoSquare,
         Simulator
     }
