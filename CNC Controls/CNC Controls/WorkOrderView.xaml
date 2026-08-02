@@ -46,6 +46,19 @@
                 <CheckBox x:Uid="chk_woskipfirsttc" x:Name="chkSkipFirstToolChange" Content="First tool already loaded" Margin="0,4,0,0" Click="chkSkipFirstToolChange_Click"
                           ToolTip="Leave out the M6 for the program's first tool, on the basis that it is already in the spindle - usually true when it is the tool you just set up with. Note the tool change is also what re-probes the toolsetter and applies the tool length offset, so the first operation will run on whatever offset is currently in force."/>
                 <TextBlock x:Name="txtSkipFirstToolChangeSummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Label x:Uid="lbl_wowcs" Content="Origin (WCS):" Padding="0,0,4,0" VerticalAlignment="Center"
+                           ToolTip="Which work coordinate system this work order's origin/tool length reference lives in. &quot;Follow Setup&quot; (the default) always uses whatever Setup is currently set to; pin a specific one instead if this work order's origin needs to stay on a particular WCS even after Setup moves on to a different job."/>
+                    <ComboBox x:Name="cbxWcs" MinWidth="110" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxWcs_SelectionChanged">
+                        <ComboBoxItem x:Uid="cbx_wowcsfollow" Content="Follow Setup"/>
+                        <ComboBoxItem Content="G54"/>
+                        <ComboBoxItem Content="G55"/>
+                        <ComboBoxItem Content="G56"/>
+                        <ComboBoxItem Content="G57"/>
+                        <ComboBoxItem Content="G58"/>
+                        <ComboBoxItem Content="G59"/>
+                    </ComboBox>
+                </StackPanel>
             </StackPanel>
         </Grid>
 

@@ -1898,15 +1898,22 @@ namespace GCode_Sender
         private static string BuildProgram(ProbeDefinition p, Fixture fx, Corner corner, double estW, double estH, int wcsP, bool measure, bool applyRotation, bool setTloRef, double spacer, double thickness, bool touchPlate, bool stockConductive, double cornerTravelMarginMm, bool exactSize, bool setOrigin, bool tloAlreadyReferenced, bool useG92 = false)
         {
             double r = p.ProbeDiameter / 2d;                    // tip radius (3D probe) / bit radius (touch plate) -> edge comp
-            // Touch plate against non-conductive stock needs a real physical plate, whose known PlateThickness
-            // is subtracted from the probed Z (work Z0 = probed top - thickness). Conductive stock is touched
-            // directly (no plate, no offset) - see pcorner.macro's _ls_plateoffset.
-            double plateOffset = touchPlate && !stockConductive ? p.PlateThickness : 0d;
-            // Same gating as plateOffset - a plate that registers via a lip hooked over the corner probes its
-            // OWN wall, set back from the true stock edge by the lip's depth (ProbeDefinition.LipWidth); no
-            // plate at all (conductive stock, touched directly) means no lip either. See pcorner.macro's
-            // _ls_lipoffset.
-            double lipOffset = touchPlate && !stockConductive ? p.LipWidth : 0d;
+            // A touch plate's own geometry compensation is a property of the PLATE, not the stock - the
+            // electrical circuit for a touch-plate probe closes between the BIT and the PLATE (both metal),
+            // never through the stock underneath, so stock conductivity has no bearing on whether a plate was
+            // physically used. Gating this on !stockConductive was wrong: it silently zeroed both offsets
+            // whenever the operator probed conductive stock (e.g. aluminum) WITH a real touch plate - a real
+            // workflow (thin 0.0625" aluminum sheet, too thin/unreliable for a direct stylus touch) - not just
+            // a conductive-stock-touched-directly edge case. Confirmed on real hardware 2026-08-02: work-Z0
+            // landed exactly PlateThickness (12mm) high and X/Y landed on the plate's own lip edge instead of
+            // the stock's, both explained by these silently coming out as 0. Now driven by touchPlate alone -
+            // whatever probe TYPE the operator actually selected. stockConductive still matters elsewhere
+            // (the touch-plate-on-non-conductive-stock reliability warning on chkMeasure), just not here.
+            double plateOffset = touchPlate ? p.PlateThickness : 0d;
+            // Same reasoning as plateOffset, above - a plate that registers via a lip hooked over the corner
+            // probes its OWN wall, set back from the true stock edge by the lip's depth (ProbeDefinition.
+            // LipWidth), regardless of what the stock underneath is made of. See pcorner.macro's _ls_lipoffset.
+            double lipOffset = touchPlate ? p.LipWidth : 0d;
             string cornerName = Name(corner);
             var fxPos = new Position(fx.Coords);
             string refX = N(fxPos.X), refY = N(fxPos.Y);        // the fixture's saved machine XY - replaces firmware G28 (#5161/#5162)
@@ -2326,7 +2333,9 @@ namespace GCode_Sender
         private string BuildDynamicProbeProgram(ProbeDefinition p, double estW, double estH, int wcsP, bool useG92, bool setOrigin, bool setTloRef, bool touchPlate, bool stockConductive, double thicknessMm)
         {
             double r = p.ProbeDiameter / 2d;
-            double plateOffset = touchPlate && !stockConductive ? p.PlateThickness : 0d;
+            // See BuildProgram's own comment - plate geometry compensation depends on which probe TYPE was
+            // selected, not stock conductivity.
+            double plateOffset = touchPlate ? p.PlateThickness : 0d;
             string wcs = "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
 
             var b = new StringBuilder();
@@ -2548,11 +2557,11 @@ namespace GCode_Sender
         private static string BuildViseProgram(ProbeDefinition p, Fixture fx, double estW, double estH, double thickness, int wcsP, bool setTloRef, bool touchPlate, bool stockConductive, bool measure, double activeProbeDiameterMm, bool setOrigin, bool tloAlreadyReferenced, bool useG92 = false)
         {
             var fxPos = new Position(fx.Coords);
-            // Same touch-plate/conductive-stock rule as BuildProgram - see its comment. The vise's XY origin
-            // is already fixed from the fixture's Set position (never re-probed here); only the stock-top Z
-            // probe below is affected.
-            double plateOffset = touchPlate && !stockConductive ? p.PlateThickness : 0d;
-            double lipOffset = touchPlate && !stockConductive ? p.LipWidth : 0d;   // see BuildProgram's own comment / pcorner.macro's _ls_lipoffset
+            // The vise's XY origin is already fixed from the fixture's Set position (never re-probed here) -
+            // only the stock-top Z probe below is affected. Plate geometry compensation depends on which
+            // probe TYPE was selected, not stock conductivity - see BuildProgram's own comment.
+            double plateOffset = touchPlate ? p.PlateThickness : 0d;
+            double lipOffset = touchPlate ? p.LipWidth : 0d;
             string wcs = "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
 
             // Stock sits BETWEEN the jaws: from the jaw's probed front-left corner, it extends +X (rightward -

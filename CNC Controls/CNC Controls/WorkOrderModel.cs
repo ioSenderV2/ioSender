@@ -221,6 +221,16 @@ namespace CNC.Controls
     {
         public List<WorkOrderToolpath> Toolpaths = new List<WorkOrderToolpath>();
 
+        // Which WCS slot this work order's origin/TLO reference lives in - Setup is the only vehicle that
+        // ever writes a real origin into a WCS slot (StartJobConfig.Section.Wcs, same 1-6 = G54-G59 range -
+        // see StartJobView.WcsCode). 0 = FOLLOW Setup's current selection live, resolved fresh every time a
+        // program is built (WorkOrderCompiler.ResolveWcs) rather than cached - the default, and what an
+        // already-saved work order that predates this field gets for free (XmlSerializer leaves an absent
+        // element at its C# default). 1-6 = PINNED to that specific slot regardless of what Setup is set to
+        // right now - the operator's explicit override (cbxWcs on the Work Order tab) for the case Setup gets
+        // reused for a different job on a different WCS after this one's origin was actually established.
+        public int Wcs = 0;
+
         // Emit operations grouped by tool rather than strictly in tree order, to cut down tool changes. Off by
         // default: the default program order is exactly what the tree shows, which is easier to reason about
         // when something cuts wrong. Grouping NEVER reorders operations within a toolpath - see
@@ -541,14 +551,16 @@ namespace CNC.Controls
             // structurally (Odd Jobs' Setup was pinned to its own G59, always left unrotated) - now that Setup
             // is one shared thing with a free WCS choice (job-flow unification, 2026-07-31), this check is the
             // ONLY thing standing between a rotation set via ordinary Setup use and a Work Order silently
-            // cutting skewed. Checked once for the whole work order, not per-toolpath - it's a property of
-            // whichever WCS is currently active, not anything configured in Odd Jobs itself.
-            string activeWcs = Grbl.GrblViewModel?.WorkCoordinateSystem;
-            var activeCs = string.IsNullOrEmpty(activeWcs) ? null : GrblWorkParameters.GetCoordinateSystem(activeWcs);
-            if (activeCs != null && Math.Abs(activeCs.Rotation) > 1e-6)
+            // cutting skewed. Checked once for the whole work order, not per-toolpath. Resolves THIS work
+            // order's own effective WCS (WorkOrderCompiler.ResolveWcs - follows Setup live if wo.Wcs is 0,
+            // otherwise the pinned slot) rather than whatever happens to be active on the DRO right now -
+            // see WorkOrder.Wcs's own comment on why those can differ.
+            string wcs = WorkOrderCompiler.WcsCode(wo);
+            var wcsData = GrblWorkParameters.GetCoordinateSystem(wcs);
+            if (wcsData != null && Math.Abs(wcsData.Rotation) > 1e-6)
                 warnings.Add(string.Format(CultureInfo.InvariantCulture,
                     "{0} has a {1:0.###} deg rotation set - Work Order toolpaths don't account for WCS rotation and would cut skewed. Clear the rotation (or switch to an unrotated WCS) before generating.",
-                    activeWcs, activeCs.Rotation));
+                    wcs, wcsData.Rotation));
 
             foreach (var tp in wo.Toolpaths)
             {

@@ -967,6 +967,16 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        private void cbxWcs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields || cbxWcs.SelectedIndex < 0)
+                return;
+            // Index 0 = "Follow Setup" = WorkOrder.Wcs 0; indices 1-6 = pinned G54-G59 = WorkOrder.Wcs 1-6 -
+            // same numbering, no offset.
+            workOrder.Wcs = cbxWcs.SelectedIndex;
+            OnWorkOrderChanged();
+        }
+
         // Names the tool the program will start on, so the claim being made ("it's already loaded") is about a
         // specific tool rather than an abstract one - and grouping can change which tool that is.
         private void UpdateSkipFirstToolChangeSummary()
@@ -1696,6 +1706,18 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
+
+            // Captured as the very first thing, before Generate()/SwitchToTab/anything else in this method
+            // runs - GCode.File.LoadText below fires GCode.Program_FileChanged, which UNCONDITIONALLY clears
+            // model.IsDryRunMode (by design - see that method's own comment: dry-run is a per-run toggle that
+            // must never leak onto a DIFFERENT program the operator loads next), and MacroProcessor.Run
+            // further down reads model.IsDryRunMode itself - confirmed via temporary logging that this really
+            // was getting cleared and needed the restore below. checkModeArmed doesn't need the same
+            // treatment - it's consumed (the actual $C sent to the controller) in JobControl.Run() before
+            // MacroProcessor.ActiveRun (this method) is ever reached, so Check mode is already in effect at
+            // the controller level regardless of anything this method does.
+            bool dryRunArmed = model.IsDryRunMode;
+
             if (string.IsNullOrWhiteSpace(program))
                 Generate();
             if (string.IsNullOrWhiteSpace(program))
@@ -1706,6 +1728,7 @@ namespace CNC.Controls
 
             GCode.File.Push();
             GCode.File.LoadText("Work Order", toRun);
+            model.IsDryRunMode = dryRunArmed;
 
             // Declined at the confirm (or any other pre-flight rejection - PREREQ, MBOX Cancel, ...) - nothing
             // is actually going to stream, so pop back to whatever was loaded before immediately rather than
@@ -1748,7 +1771,7 @@ namespace CNC.Controls
 
         // Shared by Generate and Run: validate + build program text into the
         // `program` field. False (nothing built, `program` untouched) on any validation failure or a "no" to
-        // the G59/tool-length confirm.
+        // the WCS/tool-length confirm.
         private bool BuildProgram()
         {
             if (model == null)
@@ -1769,21 +1792,23 @@ namespace CNC.Controls
             }
 
             // The whole of the old Setup gate, reduced to one question at the one moment it matters. Everything
-            // this tab emits is written in the G59 work frame and relies on the tool length reference the
-            // toolsetter established - neither of which the app can re-verify without making the operator run
-            // Setup again. So it states what it's trusting and lets them answer.
+            // this tab emits is written in this work order's own WCS (workOrder.Wcs - see
+            // WorkOrderCompiler.WorkOrderWcs) and relies on the tool length reference the toolsetter
+            // established - neither of which the app can re-verify without making the operator run Setup
+            // again. So it states what it's trusting and lets them answer.
             //
             // Exception: Entire Spoilboard is fully machine-referenced (G53) and touches off its own fresh Z0
-            // at run time - it doesn't trust G59 or the tool-length reference at all, so the G59/TLO warning
-            // above is actively misleading for it. WorkOrderRules.Validate already requires it to be the work
-            // order's ONLY enabled operation when used, so "any enabled op is Entire Spoilboard" is the same
-            // as "every enabled op is." The retired standalone SurfaceSpoilboardWizard this replaced never
-            // showed a confirm at Generate either, for the same reason (nothing cached to be stale) - its own
-            // MBOX jog-to-touch prompt at RUN time (BuildSurfaceEntireSpoilboard) is where the operator
-            // actually confirms machine state, same as it always was.
+            // at run time - it doesn't trust the cached WCS or the tool-length reference at all, so the
+            // WCS/TLO warning above is actively misleading for it. WorkOrderRules.Validate already requires
+            // it to be the work order's ONLY enabled operation when used, so "any enabled op is Entire
+            // Spoilboard" is the same as "every enabled op is." The retired standalone SurfaceSpoilboardWizard
+            // this replaced never showed a confirm at Generate either, for the same reason (nothing cached to
+            // be stale) - its own MBOX jog-to-touch prompt at RUN time (BuildSurfaceEntireSpoilboard) is where
+            // the operator actually confirms machine state, same as it always was.
             bool entireSpoilboardOnly = workOrder.Toolpaths.Any(t => t.EntireSpoilboard && workOrder.EnabledOperations(t).Any());
+            string wcsCode = WorkOrderCompiler.WcsCode(workOrder);
             if (!entireSpoilboardOnly && AppDialogs.Show(
-                    "This program will be built on the cached work origin (G59) and the current tool length reference.\n\n" +
+                    string.Format("This program will be built on the cached work origin ({0}) and the current tool length reference.\n\n", wcsCode) +
                     "If the machine has been re-homed, the origin has moved, or the tool length reference has been cleared since they were set, run Setup again first.\n\n" +
                     "Proceed?",
                     "Work Order", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
@@ -1990,6 +2015,8 @@ namespace CNC.Controls
                     "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
+            // WorkOrder's own field default (Wcs = 0, "Follow Setup") is already the right starting point -
+            // no explicit seeding needed here.
             workOrder = new WorkOrder();
             currentFilePath = null;
             pendingName = null;
@@ -2002,6 +2029,7 @@ namespace CNC.Controls
             loadingFields = true;
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
+            cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
 
             RebuildTree(null);
@@ -2098,6 +2126,7 @@ namespace CNC.Controls
             loadingFields = true;
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
+            cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
 
             RebuildTree(workOrder.Toolpaths.FirstOrDefault());
@@ -2123,6 +2152,7 @@ namespace CNC.Controls
             loadingFields = true;
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
+            cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
             RebuildTree(workOrder.Toolpaths.FirstOrDefault());
             LoadFields();

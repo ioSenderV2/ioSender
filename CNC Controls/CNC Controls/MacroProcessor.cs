@@ -281,16 +281,22 @@ namespace CNC.Controls
                 return false;
 
             // Dry-run/verify mode: neutralise spindle-on (M3/M4), coolant-on (M7/M8) and tool-change (M6)
-            // lines, same as JobControl's live send loop and StreamPump's buffered path already do for an
-            // ordinary loaded file (GCodeJob.HasSpindleOrCoolantOn/HasToolChange, precomputed by the real
-            // parser) - this streamer is the third, independent path every Generate/Run tab uses
-            // (Work Order, Start Job, Auto Square, Stepper Calibration, Setup...) and had NO Dry Run
-            // awareness at all until now. Uses the real parser (not a regex) for the same reason those two
-            // do - so a comment that happens to mention "M3" can't cause a false positive - but only when
-            // Dry Run is actually armed, and only best-effort: a line the parser can't handle (some macro
+            // lines. Only needed here when preferJobView is FALSE: a preferJobView run (Work Order) ends up
+            // as the real, non-transient GCode.File source - RunStreamedJobInPlace hands it to
+            // RunControl.Run(0, false), which lands in JobControl.Run's ordinary Source.IsLoaded branch and
+            // gets FULL protection there (StreamPump's own HasSpindleOrCoolantOn/HasToolChange check, from
+            // the real parser, PLUS the G92 Z-offset clearance this streamer doesn't even provide) - so
+            // neutralising here too was pure redundant double-handling on the exact same lines, not defense
+            // in depth (confirmed while diagnosing a real hardware incident - see git history). Every OTHER
+            // caller (Start Job, Auto Square, Stepper Calibration, Fixture probes) streams as a TRANSIENT
+            // source, which StreamPump's own check explicitly EXCLUDES by design (dry-run must never leak
+            // into a probing/wizard macro just because a loaded-job test left it armed - see
+            // JobControl.Run's own comment) - for those, THIS is the only protection that exists, so it must
+            // still run. Uses the real parser (not a regex) so a comment that happens to mention "M3" can't
+            // cause a false positive - but only best-effort: a line the parser can't handle (some macro
             // directive/expression syntax this streamer tolerates that a strict parse might not) is left
             // exactly as it would have been before this existed, never blocked or altered.
-            var dryRunParser = model.IsDryRunMode ? new GCodeParser() : null;
+            var dryRunParser = (model.IsDryRunMode && !preferJobView) ? new GCodeParser() : null;
             dryRunParser?.Reset();
 
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
@@ -452,7 +458,15 @@ namespace CNC.Controls
             {
                 int tokenStart = parser.Tokens.Count;
                 string toParse = line;
-                if (!parser.ParseBlock(ref toParse, true))
+                // quiet:true is a DIFFERENT, lighter mode (see GCodeParser.ParseBlock's own early-out) that
+                // validates a line is well-formed WITHOUT actually parsing words into Tokens at all - fine
+                // for JobControl's own modal-state-only use of it, but useless here: this needs the REAL
+                // tokens to inspect for M3/M4/M6/M7/M8, so it must be quiet:false. Root cause of a real
+                // hardware incident - the spindle turning on during an armed Dry Run - confirmed via
+                // [WO-DIAG] logging: IsDryRunMode really was True the whole way through and dryRunParser was
+                // genuinely non-null, but every ParseBlock(quiet:true) call below silently produced zero
+                // tokens, so this loop never matched anything and every line passed through unchanged.
+                if (!parser.ParseBlock(ref toParse, false))
                     return line;
 
                 for (int i = tokenStart; i < parser.Tokens.Count; i++)
@@ -466,7 +480,10 @@ namespace CNC.Controls
                         return "()";
                 }
             }
-            catch { /* fail open - stream the line exactly as it would have been sent before Dry Run awareness existed */ }
+            catch
+            {
+                /* fail open - stream the line exactly as it would have been sent before Dry Run awareness existed */
+            }
 
             return line;
         }
