@@ -34,6 +34,10 @@ namespace CNC.Controls
         {
             InitializeComponent();
             DialogScaling.Apply(this);
+            // Shown non-modally (see Saved's comment) with ShowInTaskbar="False", the combination that leaves
+            // the main window minimized on close - see UIUtils.ActivateOwnerOnClose. Done here rather than at
+            // the two MachineSetupWizard call sites so it can't be forgotten by a third one.
+            UIUtils.ActivateOwnerOnClose(this);
             DataContext = fixture;
             this.model = model;
 

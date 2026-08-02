@@ -325,6 +325,35 @@ namespace CNC.Controls
             #endregion
         }
 
+        // Hand activation back to the owner when a NON-MODAL owned window closes.
+        //
+        // A window shown with Show() (not ShowDialog()) that has both an Owner and ShowInTaskbar=false leaves
+        // the OWNER minimized when it closes - reported against the Fixture definition dialog. A modal dialog
+        // never shows it (ShowDialog manages the owner's activation itself), which is why this only appeared
+        // once FixtureEditDialog went non-modal in 83fc9b4 so jogging stays reachable while it's open; the
+        // ShowInTaskbar="False" it pairs with has been there since the dialog was written.
+        //
+        // Deliberately a repair in Closed rather than a guess at the activation ordering: whatever Win32
+        // decides to activate as the child HWND dies, by the time Closed runs the damage is observable and
+        // undoable. Restores a minimized owner and re-activates it either way. Windows that are shown
+        // ShowActivated=false (the macro progress panel, ConsoleWindow) never take activation in the first
+        // place and don't need this.
+        public static void ActivateOwnerOnClose(Window win)
+        {
+            if (win == null)
+                return;
+
+            win.Closed += (s, e) =>
+            {
+                var owner = win.Owner;
+                if (owner == null || !owner.IsLoaded)
+                    return;
+                if (owner.WindowState == WindowState.Minimized)
+                    owner.WindowState = WindowState.Normal;
+                owner.Activate();
+            };
+        }
+
         public static T TryFindParent<T>(DependencyObject current) where T : class
         {
             DependencyObject parent = VisualTreeHelper.GetParent(current);

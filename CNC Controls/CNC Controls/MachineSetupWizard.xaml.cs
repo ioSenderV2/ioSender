@@ -1781,6 +1781,9 @@ namespace CNC.Controls
             };
             close.Click += (s, ev) => win.Close();
             win.Closed += (s, ev) => _fwInfoWindow = null;
+            // Same non-modal + owned + ShowInTaskbar=false combination as FixtureEditDialog, so the same
+            // owner-minimized-on-close symptom applies here - see UIUtils.ActivateOwnerOnClose.
+            UIUtils.ActivateOwnerOnClose(win);
 
             _fwInfoWindow = win;
             win.Show();   // non-modal
