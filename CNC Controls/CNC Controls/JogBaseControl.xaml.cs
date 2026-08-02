@@ -65,34 +65,10 @@ namespace CNC.Controls
         private static volatile int jogAxis = -1;
         private static bool _uiSelectionRestored = false;   // restore the saved jog selection only once per run
 
-        // Guards against sending an overlapping, unacknowledged $J - confirmed on real hardware (2026-07-15
-        // console log) that three Y+ jog clicks landing within ~500ms, before the first $J's "ok" came back,
-        // left the controller completely wedged (no ok/status/response to ANYTHING, including a bare $I,
-        // until a power cycle). This doesn't fix that firmware bug, it just stops ioSender's own jog buttons
-        // from being able to trigger it via fast repeated clicks. Static/shared like jogAxis above - multiple
-        // jog panels (main window + flyouts) can all fire at the same controller. The timeout is a safety net
-        // only, not the normal path: it's long enough that a genuinely wedged controller stays gated (nothing
-        // would get through anyway), but short enough that a single dropped "ok" from one console glitch
-        // doesn't lock jogging out for the rest of the session.
-        private static volatile bool jogAckPending = false;
-        private static DateTime jogSentAtUtc = DateTime.MinValue;
-        private static GrblViewModel jogAckModel = null;
-        private const int JogAckTimeoutMs = 2000;
-
-        private static void EnsureJogAckSubscription(GrblViewModel model)
-        {
-            if (model == null || ReferenceEquals(jogAckModel, model))
-                return;
-            if (jogAckModel != null)
-                jogAckModel.OnCommandResponseReceived -= JogAckReceived;
-            jogAckModel = model;
-            model.OnCommandResponseReceived += JogAckReceived;
-        }
-
-        private static void JogAckReceived(string data)
-        {
-            jogAckPending = false;
-        }
+        // The overlapping-unacknowledged-$J guard now lives in CNC.Core.JogGate, shared with the Xbox
+        // controller's D-pad (ControllerMapper.JogStep) - which built and sent its own $J and so was never
+        // covered by the private statics that used to sit here, leaving the 2026-07-15 wedge fully
+        // reproducible from the gamepad. See JogGate for the hardware evidence and the reasoning.
 
         private const Key xplus = Key.J, xminus = Key.H, yplus = Key.K, yminus = Key.L, zplus = Key.I, zminus = Key.M, aplus = Key.U, aminus = Key.N;
 
@@ -532,16 +508,16 @@ namespace CNC.Controls
 
             if (cmd == "stop") {
                 jogAxis = -1;
-                jogAckPending = false;   // cancel is a realtime byte, not gated - and clears whatever it's cancelling
+                JogGate.Clear();   // cancel is a realtime byte, not gated - and clears whatever it's cancelling
                 cmd = ((char)GrblConstants.CMD_JOG_CANCEL).ToString();
             }
             else
             {
-                // Refuse to fire another $J while the previous one hasn't been acknowledged yet (see
-                // jogAckPending's declaration above) - drop this click rather than risk the overlapping-jog
-                // wedge. The timeout means a genuinely stuck controller re-opens the gate eventually rather
-                // than locking the UI out permanently, but by then nothing sent would get through anyway.
-                if (jogAckPending && (DateTime.UtcNow - jogSentAtUtc).TotalMilliseconds < JogAckTimeoutMs)
+                // Claimed BEFORE the soft-limit accumulator below runs, not at the send site: `position` is a
+                // running total that += each jog's distance, so bailing out after mutating it would leave the
+                // next accepted jog aiming at a target that includes a move which never happened. Any early
+                // return past this point therefore has to hand the gate back (JogGate.Clear).
+                if (!JogGate.TryBegin())
                     return;
 
                 int axis = GrblInfo.AxisLetterToIndex(cmd[0]);
@@ -576,7 +552,10 @@ namespace CNC.Controls
                 if (softLimits)
                 {
                     if (!canJog(model.GrblState.State) || (jogAxis != -1 && axis != jogAxis))
+                    {
+                        JogGate.Clear();   // nothing sent - don't hold the gate closed for the timeout
                         return;
+                    }
 
                     if (axis != jogAxis || model.GrblState.State != GrblStates.Jog)
                         position = distance + model.MachinePosition.Values[axis];
@@ -609,7 +588,10 @@ namespace CNC.Controls
                     }
 
                     if (position == 0d)
+                    {
+                        JogGate.Clear();   // clamped to a no-op move - nothing sent, so release the gate
                         return;
+                    }
 
                     jogAxis = axis;
 
@@ -617,13 +599,6 @@ namespace CNC.Controls
                 }
                 else
                     cmd = string.Format("$J=G91{0}{1}{2}F{3}", mode, cmd.Substring(0, 1), distance.ToInvariantString(), Math.Ceiling(jogFeed).ToInvariantString());
-            }
-
-            if (cmd.Length > 1 && cmd.StartsWith("$J", StringComparison.Ordinal))
-            {
-                jogAckPending = true;
-                jogSentAtUtc = DateTime.UtcNow;
-                EnsureJogAckSubscription(model);
             }
 
             model.ExecuteCommand(cmd);

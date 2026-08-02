@@ -378,6 +378,14 @@ namespace CNC.Core
             if (feed <= 0d)
                 feed = 500d;
 
+            // Same overlapping-$J back-pressure the on-screen jog panels use. This path had none, so holding a
+            // D-pad direction down (or mashing it) fired one $J per button event with nothing waiting for the
+            // previous ack - the exact pattern that wedged the controller on 2026-07-15. Dropping the press is
+            // correct here: a discrete step the operator asked for while the controller was still busy is not
+            // one they want executed late. See JogGate.
+            if (!JogGate.TryBegin())
+                return;
+
             // Use the same path the on-screen jog buttons use (GrblViewModel.ExecuteCommand), not a raw
             // stream write - otherwise the jog line never reaches the controller.
             string cmd = string.Format(CultureInfo.InvariantCulture, "$J=G91G21{0}{1}F{2}", axis, dist, Math.Ceiling(feed));

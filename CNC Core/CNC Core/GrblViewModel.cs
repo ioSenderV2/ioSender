@@ -1552,10 +1552,19 @@ namespace CNC.Core
                     Comms.com.WriteByte(GrblConstants.CMD_AUTO_REPORTING_TOGGLE);
                 }
             }
-            else if (_grblState.State != GrblStates.Jog)
+            // Responses used to be suppressed entirely while the state was Jog. That silently starved the jog
+            // back-pressure gate of the very acknowledgement it waits for: the first $J puts the controller in
+            // Jog, so that jog's "ok" - and every later one - was swallowed, leaving JogGate to fall back on
+            // its 2s timeout and eventually emit an UNACKNOWLEDGED $J, exactly what it exists to prevent.
+            // Delivered unconditionally now; JobControl.ResponseReceived carries the Jog filter instead, since
+            // its streaming/MDI ack accounting is the one consumer that actually needed it.
+            else
             {
                 if (data == "ok")
+                {
+                    JogGate.Ack();
                     OnCommandResponseReceived?.Invoke(data);
+                }
                 else
                 {
                     if (data.StartsWith("error:"))
@@ -1567,6 +1576,7 @@ namespace CNC.Core
                         catch
                         {
                         }
+                        JogGate.Ack();
                         OnCommandResponseReceived?.Invoke(data);
                     }
                     else if (!data.StartsWith("?"))

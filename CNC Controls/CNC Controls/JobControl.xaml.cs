@@ -1832,6 +1832,15 @@ namespace CNC.Controls
             if (Comms.com == null)
                 return;
 
+            // Jog acks are not this handler's business, and counting them here corrupts real accounting:
+            // "missed" would climb on every jog, and a jog's "ok" would satisfy the SendMDI ack-pacing switch
+            // below as though it were the ack for an outstanding MDI command. Jogging while a macro streams is
+            // a live path (the fixture dialog is non-modal precisely so jogging stays reachable during one).
+            // This filter used to live in GrblViewModel, which suppressed responses for EVERY consumer while
+            // jogging - see the comment there for why it had to move: it was starving JogGate of its ack.
+            if (model != null && model.GrblState.State == GrblStates.Jog)
+                return;
+
             // When the background pump is driving the job it owns all flow-control accounting (off the UI
             // thread). Skip the accounting here; the MDI/Reset switch below still runs on the UI thread.
             // Check mode ($C) now also always sets pumpActive (see Run()) - the job.IsChecking branches
