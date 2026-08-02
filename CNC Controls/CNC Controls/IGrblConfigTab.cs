@@ -43,8 +43,6 @@ namespace CNC.Controls
     {
         None = 0,
         Base,
-        StepperCalibration,
-        StepperCalibrationScratch,
         StepperCalibrationProbe,
         Trinamic,
         PidTuning,

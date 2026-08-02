@@ -29,13 +29,15 @@ namespace CNC.Controls
     // live, from another toolpath named in IndirectSource (see WorkOrderToolpath), and only supplies a
     // different X/Y (and optionally its own Pattern) to run them at. Editing the source's geometry or
     // operations is reflected the next time this one generates - that's the whole point versus Duplicate,
-    // which forks an independent copy instead.
-    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Indirect }
+    // which forks an independent copy instead. Surface is a facing pass over a Width x Depth area (reuses
+    // those two fields, same as Oval/Rect) - it isn't cut relative to any enclosed shape, so it only ever
+    // carries the one Surface operation (see WorkOrderRules.AvailableOperations).
+    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect }
 
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
-    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink }
+    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface }
 
     // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
     // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
@@ -114,6 +116,13 @@ namespace CNC.Controls
     {
         public string Name = "Toolpath";
         public WorkOrderGeometryKind Geometry = WorkOrderGeometryKind.Circle;
+
+        // Surface only: face the whole in-bounds machine travel envelope (spoilboard resurfacing) instead of
+        // this toolpath's own Width/Depth/X/Y - which have no meaning here, since there's no fixture/WCS that
+        // covers the whole envelope. Machine-referenced (G53) with its own fresh Z0 touch-off, borrowing G54
+        // as scratch space and restoring the Work Order's own WCS afterward - see WorkOrderCompiler.BuildSurface.
+        // WorkOrderRules.Validate warns if this isn't the work order's only enabled operation.
+        public bool EntireSpoilboard = false;
 
         // Unchecked = the whole toolpath sits out of Generate, whatever its operations are set to. Their own
         // Enabled flags are left alone so re-checking the toolpath restores exactly what was set before.
@@ -239,7 +248,8 @@ namespace CNC.Controls
     {
         public static readonly WorkOrderGeometryKind[] AllGeometries =
             { WorkOrderGeometryKind.Line, WorkOrderGeometryKind.Circle, WorkOrderGeometryKind.Oval,
-              WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Indirect };
+              WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Surface,
+              WorkOrderGeometryKind.Indirect };
 
         #region Standard drill sizes
 
@@ -323,6 +333,7 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Oval: return "Oval (width, depth)";
                 case WorkOrderGeometryKind.Square: return "Square (size)";
                 case WorkOrderGeometryKind.Rect: return "Rectangle (width, depth)";
+                case WorkOrderGeometryKind.Surface: return "Surface (width, depth) - face the whole area";
                 case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
                 default: return kind.ToString();
             }
@@ -340,6 +351,7 @@ namespace CNC.Controls
                 case WorkOrderOpKind.BottomFinish: return "Bottom finishing pass";
                 case WorkOrderOpKind.Chamfer: return "Chamfer the top edge";
                 case WorkOrderOpKind.Countersink: return "Countersink (plunge to a target diameter)";
+                case WorkOrderOpKind.Surface: return "Surface (face the whole area)";
                 default: return kind.ToString();
             }
         }
@@ -390,6 +402,14 @@ namespace CNC.Controls
             // Indirect carries no operations of its own - it runs whatever the source toolpath currently has.
             if (tp.IsIndirect)
                 yield break;
+
+            // Surface faces the whole Width x Depth area - it isn't cut relative to an enclosed shape, so none
+            // of the outline-based operations (pocket, contour, drill, finishing, chamfer...) apply to it.
+            if (tp.Geometry == WorkOrderGeometryKind.Surface)
+            {
+                yield return WorkOrderOpKind.Surface;
+                yield break;
+            }
 
             if (!HasRoughing(tp))
             {
@@ -496,6 +516,12 @@ namespace CNC.Controls
 
                 foreach (var kind in tp.Operations.GroupBy(o => o.Kind).Where(g => g.Count() > 1 && !IsRepeatable(g.Key)).Select(g => g.Key))
                     warnings.Add(label + OpLabel(kind) + " appears more than once.");
+
+                // Entire-spoilboard touches off its own Z0 and temporarily borrows G54, machine-referenced -
+                // it resets the work origin, which would corrupt any operation that runs after it in the same
+                // program. Safe only as the work order's one and only enabled operation.
+                if (tp.EntireSpoilboard && wo.EnabledOperations(tp).Any() && wo.EnabledOperationCount > 1)
+                    warnings.Add(label + "Entire spoilboard resets the work origin - it must be the only enabled operation in this work order.");
             }
 
             // Everything above deliberately checks what's AUTHORED, not what's enabled: holding an operation
@@ -519,6 +545,8 @@ namespace CNC.Controls
                     return string.Format("oval {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
                 case WorkOrderGeometryKind.Square:
                     return string.Format("square {0:0.#}", tp.Size);
+                case WorkOrderGeometryKind.Surface:
+                    return string.Format("surface {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
                 case WorkOrderGeometryKind.Indirect:
                     return string.IsNullOrEmpty(tp.IndirectSource)
                         ? "indirect (no source selected)"
@@ -559,6 +587,8 @@ namespace CNC.Controls
                     return string.Format("Chamfer - {0:0.0#} mm deep", op.ChamferDepth);
                 case WorkOrderOpKind.Countersink:
                     return string.Format("Countersink - Ø{0:0.##} mm target", op.CountersinkDiameter);
+                case WorkOrderOpKind.Surface:
+                    return string.Format("Surface - {0}, Ø{1:0.##} bit, {2:0}% stepover", depth, op.BitDiameter, op.Stepover);
                 default:
                     return op.Kind.ToString();
             }

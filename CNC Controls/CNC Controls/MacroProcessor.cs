@@ -62,6 +62,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
+using CNC.GCode;
 
 namespace CNC.Controls
 {
@@ -279,6 +280,19 @@ namespace CNC.Controls
             else if (confirm && !unattended && !ConfirmRun(name))
                 return false;
 
+            // Dry-run/verify mode: neutralise spindle-on (M3/M4), coolant-on (M7/M8) and tool-change (M6)
+            // lines, same as JobControl's live send loop and StreamPump's buffered path already do for an
+            // ordinary loaded file (GCodeJob.HasSpindleOrCoolantOn/HasToolChange, precomputed by the real
+            // parser) - this streamer is the third, independent path every Generate/Run tab uses
+            // (Work Order, Start Job, Auto Square, Stepper Calibration, Setup...) and had NO Dry Run
+            // awareness at all until now. Uses the real parser (not a regex) for the same reason those two
+            // do - so a comment that happens to mention "M3" can't cause a false positive - but only when
+            // Dry Run is actually armed, and only best-effort: a line the parser can't handle (some macro
+            // directive/expression syntax this streamer tolerates that a strict parse might not) is left
+            // exactly as it would have been before this existed, never blocked or altered.
+            var dryRunParser = model.IsDryRunMode ? new GCodeParser() : null;
+            dryRunParser?.Reset();
+
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
             foreach (var raw in lines)
             {
@@ -290,8 +304,11 @@ namespace CNC.Controls
                     // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
                     if (Body(raw, "PROMPT").Trim().Length == 0 && !unattended)
                     {
+                        // Snapshot BEFORE Flush - see AbortedByAlarm's own comment on why sampling the
+                        // CURRENT state after the burst already ran isn't enough.
+                        long alarmBefore = model.AlarmEventCounter;
                         Flush(model, buffer, true, preferJobView);
-                        if (AbortedByAlarm(model, name))
+                        if (AbortedByAlarm(model, name, alarmBefore))
                             return false;
                         if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
                                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
@@ -302,6 +319,8 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "MBOX"))
                 {
+                    // Snapshot BEFORE Flush - see AbortedByAlarm's own comment.
+                    long alarmBefore = model.AlarmEventCounter;
                     Flush(model, buffer, true, preferJobView);
                     // A burst just flushed above may have alarmed (e.g. a probe search that never triggered)
                     // without WaitForIdle in the picture at all - Flush only waits for the burst to reach SOME
@@ -311,7 +330,7 @@ namespace CNC.Controls
                     // asking to position the gauge block, with the controller sitting in Alarm the whole time).
                     // Alarm-abort is checked even when unattended - this only skips the "are you ready" hold,
                     // never a real safety gate.
-                    if (AbortedByAlarm(model, name))
+                    if (AbortedByAlarm(model, name, alarmBefore))
                         return false;
                     if (!unattended && !ShowMBox(name, raw))
                         return false;   // Cancel / No - stop here
@@ -330,7 +349,8 @@ namespace CNC.Controls
                     continue;
                 }
 
-                buffer.Append(SanitizeComment(ApplySubstitutions(raw, fields))).Append('\n');
+                string line = SanitizeComment(ApplySubstitutions(raw, fields));
+                buffer.Append(DryRunNeutralize(dryRunParser, line)).Append('\n');
             }
             Flush(model, buffer, false, preferJobView);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
 
@@ -416,6 +436,39 @@ namespace CNC.Controls
                 result = result.Substring(0, open + 1) + result.Substring(open + 1, keep) + "...)";
             }
             return result;
+        }
+
+        // Dry Run mode's spindle/coolant/tool-change suppression for THIS streamer - see the (WAITIDLE)
+        // header comment's own note above. parser is null when Dry Run isn't armed (the common case), so
+        // this is then a single null-check per line, not a parse. Best-effort when armed: a line the parser
+        // throws on (some macro syntax this streamer otherwise tolerates without ever inspecting it) is
+        // passed through unmodified rather than aborting the run - same as before this existed.
+        private static string DryRunNeutralize(GCodeParser parser, string line)
+        {
+            if (parser == null || line.Length == 0 || line[0] == '(')   // pure comment/directive - nothing to neutralise
+                return line;
+
+            try
+            {
+                int tokenStart = parser.Tokens.Count;
+                string toParse = line;
+                if (!parser.ParseBlock(ref toParse, true))
+                    return line;
+
+                for (int i = tokenStart; i < parser.Tokens.Count; i++)
+                {
+                    var t = parser.Tokens[i];
+                    if (t is GCSpindleState && (t.Command == Commands.M3 || t.Command == Commands.M4))
+                        return "()";
+                    if (t is GCCoolantState && (t.Command == Commands.M7 || t.Command == Commands.M8))
+                        return "()";
+                    if (t.Command == Commands.M6)
+                        return "()";
+                }
+            }
+            catch { /* fail open - stream the line exactly as it would have been sent before Dry Run awareness existed */ }
+
+            return line;
         }
 
         // Send the accumulated g-code. EVERY burst - however small - goes through the flow-controlled job
@@ -513,9 +566,14 @@ namespace CNC.Controls
         // macro here, not sail on to the next prompt as if the burst had succeeded. Same Alarm/Unknown check
         // WaitForIdle already uses for the same reason, just reached from a different gate (WAITIDLE isn't
         // the only place a burst's outcome needs checking - any MBOX/PROMPT right after G-code content does).
-        private static bool AbortedByAlarm(GrblViewModel model, string name)
+        // alarmBefore: model.AlarmEventCounter captured BEFORE the burst that just ran (Flush) was sent - a
+        // latch, not a sampled value, so an alarm the operator already cleared (Reset+Unlock) faster than
+        // this check runs is still caught, instead of being silently missed the way sampling only the
+        // CURRENT GrblState.State would. See GrblViewModel.AlarmEventCounter's own comment - confirmed as a
+        // real bug 2026-08-01, same race class as the fix documented above this method's own call sites.
+        private static bool AbortedByAlarm(GrblViewModel model, string name, long alarmBefore)
         {
-            if (model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
+            if (model.AlarmEventCounter == alarmBefore && model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
                 return false;
             ShowMessage(string.Format("Macro \"{0}\" aborted: the controller alarmed (or the connection was lost) mid-run.", name),
                 "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -766,6 +824,14 @@ namespace CNC.Controls
             // stall/disconnect check below (2 consecutive silent report timeouts), so this can't hang forever.
             var token = new CancellationToken();
 
+            // Snapshot the alarm latch before waiting - see GrblViewModel.AlarmEventCounter's own comment.
+            // Checked alongside (not instead of) the sampled GrblState.State below: the counter catches an
+            // alarm the operator already cleared (Reset+Unlock) faster than this loop happened to poll,
+            // which the sampled state alone would miss entirely - confirmed as a real bug 2026-08-01, where
+            // that exact race let a macro silently continue past a probe-failure alarm the operator had
+            // already manually cleared, moving on to its next step as if nothing had happened.
+            long alarmCountAtStart = model.AlarmEventCounter;
+
             // A $F= job acks immediately and only then starts running, so first wait briefly for
             // the controller to actually leave Idle before watching for it to return - otherwise
             // the very first status report could still show the pre-run Idle and we would finish early.
@@ -776,9 +842,9 @@ namespace CNC.Controls
             {
                 PumpForReport(model, token, 500);
 
-                if (model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
+                if (model.AlarmEventCounter != alarmCountAtStart || model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
                 {
-                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - GrblState={0} while waiting to observe motion start", model.GrblState.State));
+                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - alarm seen (or GrblState={0}) while waiting to observe motion start", model.GrblState.State));
                     return false;
                 }
 
@@ -807,6 +873,12 @@ namespace CNC.Controls
                     continue;
                 }
                 silentReports = 0;
+
+                if (model.AlarmEventCounter != alarmCountAtStart)
+                {
+                    DebugLog.Write("macro", "WaitForIdle: abort - alarm seen (latched) while waiting for completion");
+                    return false;
+                }
 
                 switch (model.GrblState.State)
                 {

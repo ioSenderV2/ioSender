@@ -220,6 +220,17 @@ namespace CNC.Controls
                     // this point, so the tool is picked from that instead of a generic "smallest" guess.
                     op.Tool = (int)OddJobsFeedsSpeedsDialog.SmallestCountersinkBitFor(op.CountersinkDiameter);
                     break;
+                case WorkOrderOpKind.Surface:
+                    op.Tool = (int)OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
+                    // SuggestTool("facing") always returns SurfacingBit25mm - seed its real 25mm diameter here
+                    // too, not just the tool choice. Without this, op.BitDiameter sits at WorkOrderOperation's
+                    // generic 6.35mm default until the Feeds and Speeds dialog is confirmed once, and the
+                    // dialog's own tool-switch default gets overwritten right back to that stale 6.35mm by the
+                    // caller's own "restore last-confirmed value" BitDiameter=op.BitDiameter (see
+                    // btnFeedsSpeeds_Click) - badly wrong chip-load lookup (6mm bucket instead of 25mm) until
+                    // the operator happens to notice and fix it by hand.
+                    op.BitDiameter = 25.0d;
+                    break;
             }
 
             // Recall whatever this tool/material was last dialed in to, so a new operation starts from the
@@ -668,18 +679,25 @@ namespace CNC.Controls
             fldLength.Value = tp.Length; fldAngle.Value = tp.Angle;
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
+            chkEntireSpoilboard.IsChecked = tp.EntireSpoilboard;
 
             // Only the dimensions this geometry actually has. Indirect has none of its own - it borrows
             // whatever the source toolpath has.
             bool isLine = tp.Geometry == WorkOrderGeometryKind.Line;
             bool isCircle = tp.Geometry == WorkOrderGeometryKind.Circle;
-            bool isWD = tp.Geometry == WorkOrderGeometryKind.Oval || tp.Geometry == WorkOrderGeometryKind.Rect;
+            bool isSurface = tp.Geometry == WorkOrderGeometryKind.Surface;
+            bool isWD = tp.Geometry == WorkOrderGeometryKind.Oval || tp.Geometry == WorkOrderGeometryKind.Rect || isSurface;
+            // Entire spoilboard covers the whole machine travel, so X/Y/Width/Depth have nothing left to say.
+            bool entireSpoilboard = isSurface && tp.EntireSpoilboard;
+            Show(fldX, !entireSpoilboard);
+            Show(fldY, !entireSpoilboard);
             Show(fldLength, isLine);
             Show(fldAngle, isLine);
             Show(fldDiameter, isCircle);
             Show(fldSize, tp.Geometry == WorkOrderGeometryKind.Square);
-            Show(fldWidth, isWD);
-            Show(fldDepthY, isWD);
+            Show(fldWidth, isWD && !entireSpoilboard);
+            Show(fldDepthY, isWD && !entireSpoilboard);
+            Show(pnlEntireSpoilboard, isSurface);
 
             Show(pnlIndirectSource, tp.IsIndirect);
             if (tp.IsIndirect)
@@ -736,7 +754,8 @@ namespace CNC.Controls
             // Finishing passes and the chamfer follow the roughing operation's depth rather than setting their
             // own, so they show no depth field at all.
             bool ownsDepth = op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
-                          || op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore;
+                          || op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore
+                          || op.Kind == WorkOrderOpKind.Surface;
 
             bool isHole = op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore;
 
@@ -744,6 +763,7 @@ namespace CNC.Controls
             Show(fldHoleDiameter, isHole);
             // A through cut takes its depth from the stock thickness, so Total depth has nothing left to say.
             Show(fldTotalDepth, ownsDepth && !(supportsThrough && op.Through));
+            // Surface is a single skim pass, not stepped roughing - no depth-of-cut to set.
             Show(fldDepthOfCut, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour);
             Show(fldPeckDepth, op.Kind == WorkOrderOpKind.Drill);
             Show(fldBoreStepDown, op.Kind == WorkOrderOpKind.Bore);
@@ -761,7 +781,7 @@ namespace CNC.Controls
                     : string.Format("Bored in one continuous helix with the Ã˜{0:0.##} mm bit.", op.BitDiameter);
             // Stepover only matters where an enclosed area gets cleared - a pocket, a floor lap, or a bore
             // wide enough to need more than one helix.
-            Show(fldStepover, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.BottomFinish
+            Show(fldStepover, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.BottomFinish || op.Kind == WorkOrderOpKind.Surface
                            || (op.Kind == WorkOrderOpKind.Bore && WorkOrderRules.NeedsSteppedBore(op.HoleDiameter, op.BitDiameter)));
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
@@ -971,6 +991,15 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        private void chkEntireSpoilboard_Click(object sender, RoutedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null)
+                return;
+            selectedToolpath.EntireSpoilboard = chkEntireSpoilboard.IsChecked == true;
+            LoadFields();
+            OnWorkOrderChanged();
+        }
+
         private void btnFeedsSpeeds_Click(object sender, RoutedEventArgs e)
         {
             if (selectedOp == null)
@@ -999,7 +1028,7 @@ namespace CNC.Controls
             // Drill/Countersink are a straight on-center plunge - no path to reverse, so no direction choice.
             bool showDirection = !isDrill && !isCountersink;
 
-            var dlg = new OddJobsFeedsSpeedsDialog((OddJobsTool)op.Tool, docLabel: docLabel, showDoc: showDoc, showDirection: showDirection)
+            var dlg = new OddJobsFeedsSpeedsDialog(op.Tool, docLabel: docLabel, showDoc: showDoc, showDirection: showDirection)
             {
                 Owner = Window.GetWindow(this),
                 // Flutes deliberately NOT set - the dialog's tool dropdown sets the right count for the
@@ -1021,7 +1050,7 @@ namespace CNC.Controls
             if (dlg.ShowDialog() != true)
                 return;
 
-            op.Tool = (int)dlg.SelectedTool;
+            op.Tool = dlg.SelectedToolValue;
             // A drill's size is dictated by the hole, so whatever the dialog shows there isn't the operator's
             // to change - everything else takes the dialog's diameter.
             if (!isDrill)
@@ -1043,7 +1072,9 @@ namespace CNC.Controls
             else if (showDoc)
                 op.DepthOfCut = dlg.DepthOfCut;
 
-            OddJobsToolMemory.Remember(dlg.SelectedTool, dlg.BitDiameter, material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
+            // OddJobsToolMemory is keyed by OddJobsTool - a custom tool has no memory of its own yet.
+            if (dlg.SelectedCustomTool == null)
+                OddJobsToolMemory.Remember(dlg.SelectedTool, dlg.BitDiameter, material, dlg.SpindleRPM, dlg.Feed, dlg.PlungeFeed, dlg.DepthOfCut);
 
             LoadFields();
             OnWorkOrderChanged();
@@ -1215,8 +1246,19 @@ namespace CNC.Controls
                 foreach (var op in tp.Operations)
                 {
                     string opLabel = label + WorkOrderRules.OpLabel(op.Kind) + " - ";
+
+                    // A custom tool (Settings:App > Work Order) can be deleted out from under an operation
+                    // that still references it - flag it explicitly rather than let the generic "bit
+                    // diameter must be > 0" check below fire on whatever stale op.BitDiameter was last saved.
+                    if (op.Tool >= CustomTools.IdBase && CustomTools.Find(op.Tool) == null)
+                    {
+                        warnings.Add(opLabel + "this operation's tool was a custom tool that has since been deleted - pick a different tool.");
+                        continue;
+                    }
+
                     bool ownsDepth = op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
-                                  || op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore;
+                                  || op.Kind == WorkOrderOpKind.Drill || op.Kind == WorkOrderOpKind.Bore
+                                  || op.Kind == WorkOrderOpKind.Surface;
 
                     if (ownsDepth)
                     {
@@ -1255,7 +1297,7 @@ namespace CNC.Controls
                     {
                         if (tp.Geometry != WorkOrderGeometryKind.Circle)
                             warnings.Add(opLabel + "a countersink bit only plunges a round hole - pick a Chamfer operation for this shape.");
-                        else if (!OddJobsFeedsSpeedsDialog.IsCountersinkBit((OddJobsTool)op.Tool))
+                        else if (!CustomTools.IsCountersink(op.Tool))
                             warnings.Add(opLabel + "pick one of the countersink bits for this operation.");
                         else
                         {
@@ -1721,7 +1763,17 @@ namespace CNC.Controls
             // this tab emits is written in the G59 work frame and relies on the tool length reference the
             // toolsetter established - neither of which the app can re-verify without making the operator run
             // Setup again. So it states what it's trusting and lets them answer.
-            if (AppDialogs.Show(
+            //
+            // Exception: Entire Spoilboard is fully machine-referenced (G53) and touches off its own fresh Z0
+            // at run time - it doesn't trust G59 or the tool-length reference at all, so the G59/TLO warning
+            // above is actively misleading for it. WorkOrderRules.Validate already requires it to be the work
+            // order's ONLY enabled operation when used, so "any enabled op is Entire Spoilboard" is the same
+            // as "every enabled op is." The retired standalone SurfaceSpoilboardWizard this replaced never
+            // showed a confirm at Generate either, for the same reason (nothing cached to be stale) - its own
+            // MBOX jog-to-touch prompt at RUN time (BuildSurfaceEntireSpoilboard) is where the operator
+            // actually confirms machine state, same as it always was.
+            bool entireSpoilboardOnly = workOrder.Toolpaths.Any(t => t.EntireSpoilboard && workOrder.EnabledOperations(t).Any());
+            if (!entireSpoilboardOnly && AppDialogs.Show(
                     "This program will be built on the cached work origin (G59) and the current tool length reference.\n\n" +
                     "If the machine has been re-homed, the origin has moved, or the tool length reference has been cleared since they were set, run Setup again first.\n\n" +
                     "Proceed?",

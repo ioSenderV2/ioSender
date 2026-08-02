@@ -1745,3 +1745,26 @@ CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_direction:Sy
 CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_direction:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Conventional cuts against the cutter's rotation - slower to bite in, more forgiving of backlash/flex. Climb cuts with the rotation - cleaner finish and less tearout in wood, but needs a backlash-free, rigid setup or the cutter can grab and dig in."
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojSpindleDir:System.Windows.Controls.ContentControl.Content,Label,True,True,,Spindle direction:
 CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojSpindleDir:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Some spindle/VFD setups only run one physical direction regardless of M3/M4 - if that's yours, set it here so Climb/Conventional on Work Order operations gets the cut direction right, and so the Job tab's Spindle panel only offers the direction that actually works."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woentirespoilboard:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Entire spoilboard
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woentirespoilboard:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Face the whole in-bounds machine travel, ignoring this toolpath's Width/Depth/X/Y above. Machine-referenced (no WCS to set it from) - touches off its own Z0 by jogging to the surface, and must be the only enabled operation in this work order."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calibration:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Stepper calibration and frame squareness.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calibration:System.Windows.Controls.TextBlock.Text,Text,True,True,,8 · Calibration
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calStepper:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Correct steps/mm by probing a reference block of known size against a validated Corner Fence.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calStepper:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stepper calibration
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calSquareness:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check and correct gantry squareness.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calSquareness:System.Windows.Controls.TextBlock.Text,Text,True,True,,Squareness
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerTL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to back-left corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerTR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to back-right corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to front-left corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to front-right corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a custom tool - a bit ioSender has no built-in preset for.
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojCustomToolHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Custom tools (below the built-ins) can be right-clicked to edit or delete.
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_name:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_kind:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kind:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_diameter:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_diameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:CNC.Controls.NumericField.Label,None,False,True,,Flutes:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Not used for Drill or Countersink - their feed formulas don't factor in flute count.
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel

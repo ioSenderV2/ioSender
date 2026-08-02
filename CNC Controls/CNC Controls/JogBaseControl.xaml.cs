@@ -691,9 +691,10 @@ namespace CNC.Controls
         }
 
         // Centre button: while a jog is running it cancels the jog (the red stop sign shown then); when idle it
-        // rapids to a centre point at safe Z (bullseye). Target = the loaded program's XY-bounding-box centre
-        // ("stock") if it has moves, else the machine-envelope centre. The move always retracts Z to the top
-        // first and stays there (never plunges) - the same safe G53 jog pattern the 3D click-to-jog uses.
+        // rapids to the MACHINE envelope centre at safe Z (bullseye) - never the loaded program/stock's own
+        // bounding box, regardless of what happens to be loaded (see GoToCenter's own comment). The move
+        // always retracts Z to the top first and stays there (never plunges) - the same safe G53 jog pattern
+        // the 3D click-to-jog uses.
         private void CenterButton_Click(object sender, RoutedEventArgs e)
         {
             GrblViewModel model = DataContext as GrblViewModel;
@@ -732,25 +733,78 @@ namespace CNC.Controls
                 return;
             }
 
-            double mx, my;
-
-            if (ProgramHasMoves(model)) {
-                Position wco = new Position(model.WorkPositionOffset, model.UnitFactor);
-                ProgramLimits pl = model.ProgramLimits;
-                mx = ClampMachine(0, (pl.MinX + pl.MaxX) / 2d + wco.X);   // stock (work) centre -> machine
-                my = ClampMachine(1, (pl.MinY + pl.MaxY) / 2d + wco.Y);
-                model.Message = "Go to centre of stock at safe Z.";
-            } else {
-                mx = (ClampMachine(0, double.MaxValue) + ClampMachine(0, double.MinValue)) / 2d;   // envelope mid
-                my = (ClampMachine(1, double.MaxValue) + ClampMachine(1, double.MinValue)) / 2d;
-                model.Message = "Go to centre of machine at safe Z.";
-            }
+            // Always the machine envelope centre - never the loaded program/stock's bounding box, regardless
+            // of what's loaded (confirmed 2026-08-01: centering on stock instead surprised the operator when
+            // a file happened to be loaded for an unrelated reason, e.g. testing Check mode).
+            double mx = (ClampMachine(0, double.MaxValue) + ClampMachine(0, double.MinValue)) / 2d;
+            double my = (ClampMachine(1, double.MaxValue) + ClampMachine(1, double.MinValue)) / 2d;
+            model.Message = "Go to centre of machine at safe Z.";
 
             double mtop = ClampMachine(2, double.MaxValue);   // fully retracted toward the home/top end (safe Z)
             double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
 
             // Retract Z to the top first, then rapid to the centre XY and stay there. grblHAL runs queued $J=
             // jogs strictly FIFO, so the Z retract always completes before the XY traverse - never at depth.
+            model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+            model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
+        }
+
+        // Corner buttons: rapid to the corresponding machine corner, held back 20 mm from each travel limit
+        // (a fixed clearance, not the homing pull-off ClampMachine's other caller uses - see its own comment).
+        // Tag is "TL"/"TR"/"BL"/"BR" - matches the icon each button draws, which points at its own corner.
+        private const double CornerClearanceMm = 20d;
+
+        private void CornerButton_Click(object sender, RoutedEventArgs e)
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model != null && model.GrblState.State == GrblStates.Jog)
+                JogCommand("stop");
+            else
+            {
+                string tag = (string)(sender as Button)?.Tag;
+                if (tag != null && tag.Length == 2)
+                    GoToCorner(tag[1] == 'R', tag[0] == 'T');
+            }
+        }
+
+        private void GoToCorner(bool xMax, bool yMax)
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model == null)
+                return;
+
+            if (model.HomedState != HomedState.Homed) {
+                model.Message = "Go to corner: home the machine first.";
+                return;
+            }
+
+            if (model.IsJobRunning ||
+                 !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
+                model.Message = "Go to corner: the machine must be idle.";
+                return;
+            }
+
+            if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
+                model.Message = "Go to corner: set max travel ($130-$132) first.";
+                return;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
+                model.Message = "Go to corner: enable soft limits ($20=1) first.";
+                return;
+            }
+
+            double mx = xMax ? ClampMachine(0, double.MaxValue, CornerClearanceMm) : ClampMachine(0, double.MinValue, CornerClearanceMm);
+            double my = yMax ? ClampMachine(1, double.MaxValue, CornerClearanceMm) : ClampMachine(1, double.MinValue, CornerClearanceMm);
+            model.Message = string.Format("Go to {0}-{1} corner at safe Z.", yMax ? "back" : "front", xMax ? "right" : "left");
+
+            double mtop = ClampMachine(2, double.MaxValue);   // fully retracted toward the home/top end (safe Z)
+            double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
+
+            // Retract Z to the top first, then rapid to the corner XY and stay there - same FIFO-$J= pattern
+            // as GoToCenter.
             model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
             model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
         }
@@ -765,8 +819,12 @@ namespace CNC.Controls
         // Clamp an absolute machine-axis target to the safe travel range (mirrors the jog limiter above).
         private double ClampMachine(int axis, double pos)
         {
+            return ClampMachine(axis, pos, GrblSettings.GetDouble(GrblSetting.HomingPulloff));
+        }
+
+        private double ClampMachine(int axis, double pos, double clearance)
+        {
             double maxTravel = GrblInfo.MaxTravel.Values[axis];
-            double clearance = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
 
             if (GrblInfo.ForceSetOrigin) {
                 if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis))) {
@@ -784,21 +842,6 @@ namespace CNC.Controls
             return pos;
         }
 
-        // A loaded program "has moves" only when its bounding box has a real extent on some axis (an unloaded
-        // program is all-NaN, a moveless one all-zero). Mirrors LimitsControl's "Program limits" test.
-        private static bool ProgramHasMoves(GrblViewModel model)
-        {
-            if (!GCode.File.IsLoaded)
-                return false;
-
-            ProgramLimits pl = model.ProgramLimits;
-            for (int i = 0; i < GrblInfo.NumAxes; i++) {
-                double min = pl.MinValues[i], max = pl.MaxValues[i];
-                if (!double.IsNaN(min) && !double.IsNaN(max) && max != min)
-                    return true;
-            }
-            return false;
-        }
     }
 
     internal class ArrayValues<T> : ViewModelBase

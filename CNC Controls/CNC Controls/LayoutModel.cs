@@ -74,10 +74,15 @@ namespace CNC.Controls
 
         // Tools container slot + tool components
         public const string SlotTools = "tools";
-        public const string ToolTable = "ToolTable", StepperCal = "StepperCal", StepperScratch = "StepperScratch",
+        public const string ToolTable = "ToolTable",
                             StepperCalProbe = "StepperCalProbe",
                             SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness",
                             Trinamic = "Trinamic", PID = "PID";
+        // StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) are retired (2026-08-01) -
+        // the probe method (StepperCalProbe, now folded into Machine Setup's Calibration step) replaced both.
+        // Kept defined ONLY for AppConfig.ApplyOneTimeFixups' migration of already-persisted layouts, same
+        // precedent as OddJobs above - nothing current registers or reads them.
+        public const string StepperCal = "StepperCal", StepperScratch = "StepperScratch";
 
         // Odd Jobs container slot + job components
         public const string SlotOddJobs = "oddjobs";
@@ -110,7 +115,6 @@ namespace CNC.Controls
                     new LayoutNode(LayoutKeys.Tools,
                         new LayoutSlot(LayoutKeys.SlotTools, new[] {
                             LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
-                            LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                             LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
                     // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs' own
                     // slot only ever hosted the Work Order composer, so Work Order is promoted to a bare

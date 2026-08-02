@@ -1,0 +1,35 @@
+<Window x:Class="CNC.Controls.CustomToolEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="340"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Title="Custom tool" Icon="App.ico">
+    <StackPanel Margin="14">
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+            <Label x:Uid="ct_name" Content="Name:" Width="110" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="txtName" MinWidth="200" MinHeight="22" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+            <Label x:Uid="ct_kind" Content="Kind:" Width="110" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Uid="cbxKind" x:Name="cbxKind" MinWidth="200" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxKind_SelectionChanged">
+                <ComboBoxItem x:Uid="ct_kindEndMill" Content="End mill" Tag="EndMill"/>
+                <ComboBoxItem x:Uid="ct_kindOFlute" Content="O-flute" Tag="OFlute"/>
+                <ComboBoxItem x:Uid="ct_kindBallEnd" Content="Ball end" Tag="BallEnd"/>
+                <ComboBoxItem x:Uid="ct_kindSurfacing" Content="Surfacing bit" Tag="Surfacing"/>
+                <ComboBoxItem x:Uid="ct_kindDrill" Content="Drill" Tag="Drill"/>
+                <ComboBoxItem x:Uid="ct_kindVBit" Content="V-bit or chamfer bit" Tag="VBitOrChamfer"/>
+                <ComboBoxItem x:Uid="ct_kindCountersink" Content="Countersink" Tag="Countersink"/>
+            </ComboBox>
+        </StackPanel>
+        <local:NumericField x:Uid="ct_diameter" x:Name="fldDiameter" Label="Diameter:" ColonAt="110" Unit="mm" Format="##0.0##" Margin="0,2,0,0"/>
+        <local:NumericField x:Uid="ct_flutes" x:Name="fldFlutes" Label="Flutes:" ColonAt="110" Unit="" Format="#0" Margin="0,2,0,0"
+                             ToolTip="Not used for Drill or Countersink - their feed formulas don't factor in flute count."/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Uid="ct_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" MinWidth="75" MinHeight="24" IsDefault="True"/>
+            <Button x:Uid="ct_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" MinWidth="75" MinHeight="24" Margin="6,0,0,0"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

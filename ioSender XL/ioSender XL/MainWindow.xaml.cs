@@ -731,6 +731,19 @@ namespace GCode_Sender
             RegisterBuiltinTabs();
             BuildTabs();
 
+            // Tell the operator (not just the log) if ConfigStore had to discard a section on load - see
+            // ConfigStore.LoadWarnings / AppConfig.LastLoadWarnings' own comments. Once per launch; shown
+            // here (not the constructor) so it lands after the main window has actually painted.
+            if (AppConfig.LastLoadWarnings?.Count > 0)
+            {
+                AppDialogs.Show(this,
+                    "Some saved settings could not be loaded and were reset to their defaults (the rest of your "
+                    + "configuration loaded normally):\n\n" + string.Join("\n", AppConfig.LastLoadWarnings)
+                    + "\n\nThis usually means a value was saved by a version this build no longer recognises.",
+                    "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppConfig.LastLoadWarnings = null;
+            }
+
             // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
             // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -
             // so StretchTabControl.PruneUnavailable never sees it to report it. Note it explicitly here so

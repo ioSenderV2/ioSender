@@ -27,8 +27,6 @@ namespace CNC.Controls
         private static void RegisterTools()
         {
             ComponentRegistry.Register(LayoutKeys.ToolTable, L("TabToolTable", "Tool table"), () => new ToolView());
-            ComponentRegistry.Register(LayoutKeys.StepperCal, L("TabStepperCal", "Stepper calibration (Manual)"), () => new StepperCalibrationWizard());
-            ComponentRegistry.Register(LayoutKeys.StepperScratch, L("TabStepperScratch", "Stepper calibration (scratch)"), () => new StepperCalibrationScratchWizard());
             ComponentRegistry.Register(LayoutKeys.StepperCalProbe, L("TabStepperCalProbe", "Stepper calibration (probe)"), () => new StepperCalibrationProbeWizard());
             ComponentRegistry.Register(LayoutKeys.SurfaceSpoilboard, L("TabSurfaceSpoilboard", "Surface spoilboard"), () => new SurfaceSpoilboardWizard());
             ComponentRegistry.Register(LayoutKeys.Squareness, L("TabSquareness", "Squareness"), () => new AutoSquareWizard());

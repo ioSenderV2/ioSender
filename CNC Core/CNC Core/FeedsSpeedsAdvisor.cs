@@ -145,7 +145,13 @@ namespace CNC.Core
                 ["Hardwood"] = new MaterialRef
                 {
                     RpmRange = (14000, 18000, 22000),
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.025 }, { 3.0, 0.05 }, { 6.0, 0.10 }, { 9.5, 0.15 }, { 12.7, 0.20 } },
+                    // 25/50mm entries (2026-08-01) cover large 2-insert surfacing/facing bits - UNTUNED
+                    // (no real-cut data behind them yet), extrapolated one step past 12.7mm at roughly the
+                    // same ratio the smaller entries already climb by, then flattening out for 50mm rather
+                    // than continuing to compound - real facing-bit chip load per insert levels off with
+                    // diameter in practice (wide engagement + shallow depth, not linear scaling). Treat as a
+                    // rough starting point, same as this file's other UNTUNED tables, and back off from there.
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.025 }, { 3.0, 0.05 }, { 6.0, 0.10 }, { 9.5, 0.15 }, { 12.7, 0.20 }, { 25.0, 0.25 }, { 50.0, 0.28 } },
                     MaxAxialFrac = 1.0,
                     MaxRadialFrac = 0.4,
                     Notes = "Hardwood (oak, maple, walnut, cherry) is dense and abrasive. Lower chip loads than " +
@@ -156,7 +162,8 @@ namespace CNC.Core
                 ["Softwood"] = new MaterialRef
                 {
                     RpmRange = (14000, 18000, 22000),
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.030 }, { 3.0, 0.06 }, { 6.0, 0.13 }, { 9.5, 0.18 }, { 12.7, 0.25 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.030 }, { 3.0, 0.06 }, { 6.0, 0.13 }, { 9.5, 0.18 }, { 12.7, 0.25 }, { 25.0, 0.30 }, { 50.0, 0.34 } },
                     MaxAxialFrac = 1.0,
                     MaxRadialFrac = 0.5,
                     Notes = "Softwood (pine, cedar, fir) cuts easily; you can run higher chip loads to clear chips " +
@@ -167,7 +174,8 @@ namespace CNC.Core
                 ["Plywood"] = new MaterialRef
                 {
                     RpmRange = (15000, 18000, 22000),
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.025 }, { 3.0, 0.05 }, { 6.0, 0.10 }, { 9.5, 0.15 }, { 12.7, 0.20 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.025 }, { 3.0, 0.05 }, { 6.0, 0.10 }, { 9.5, 0.15 }, { 12.7, 0.20 }, { 25.0, 0.25 }, { 50.0, 0.28 } },
                     MaxAxialFrac = 1.0,
                     MaxRadialFrac = 0.4,
                     Notes = "Plywood's glue layers eat tooling fast. Run lower chip loads and pick downcut or " +
@@ -178,7 +186,8 @@ namespace CNC.Core
                 ["MDF"] = new MaterialRef
                 {
                     RpmRange = (16000, 20000, 24000),
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.030 }, { 3.0, 0.06 }, { 6.0, 0.15 }, { 9.5, 0.20 }, { 12.7, 0.28 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.030 }, { 3.0, 0.06 }, { 6.0, 0.15 }, { 9.5, 0.20 }, { 12.7, 0.28 }, { 25.0, 0.35 }, { 50.0, 0.40 } },
                     MaxAxialFrac = 1.0,
                     MaxRadialFrac = 0.5,
                     Notes = "MDF dust is fine, abundant, and extremely abrasive - dust collection matters more than " +
@@ -193,7 +202,8 @@ namespace CNC.Core
                     // Tuned for 6061-class aluminum, sharp carbide, air-blast-only cooling.
                     SurfaceSpeed = (120, 180, 250),   // m/min
                     Conductive = true,
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.012 }, { 3.0, 0.030 }, { 6.0, 0.060 }, { 9.5, 0.090 }, { 12.7, 0.120 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.012 }, { 3.0, 0.030 }, { 6.0, 0.060 }, { 9.5, 0.090 }, { 12.7, 0.120 }, { 25.0, 0.150 }, { 50.0, 0.170 } },
                     MaxAxialFrac = 0.5,
                     MaxRadialFrac = 0.4,
                     Notes = "Aluminum (6061-class), carbide, air blast only. Use a sharp 1-3 flute bit with " +
@@ -217,7 +227,8 @@ namespace CNC.Core
                     // similar ballpark to aluminum but slightly gentler chip loads for a lighter router spindle.
                     SurfaceSpeed = (100, 150, 200),
                     Conductive = true,
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.010 }, { 3.0, 0.025 }, { 6.0, 0.050 }, { 9.5, 0.075 }, { 12.7, 0.100 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.010 }, { 3.0, 0.025 }, { 6.0, 0.050 }, { 9.5, 0.075 }, { 12.7, 0.100 }, { 25.0, 0.130 }, { 50.0, 0.145 } },
                     MaxAxialFrac = 0.5,
                     MaxRadialFrac = 0.4,
                     Notes = "Brass (free-machining, C360-class) - UNTUNED reference data, treat as a rough " +
@@ -230,7 +241,8 @@ namespace CNC.Core
                     // cooling - deliberately conservative surface speed to keep heat/tool wear in check.
                     SurfaceSpeed = (30, 45, 60),
                     Conductive = true,
-                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.006 }, { 3.0, 0.015 }, { 6.0, 0.030 }, { 9.5, 0.045 }, { 12.7, 0.060 } },
+                    // 25/50mm entries - see Hardwood's own comment for the rationale (UNTUNED, flattening past 12.7mm).
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.006 }, { 3.0, 0.015 }, { 6.0, 0.030 }, { 9.5, 0.045 }, { 12.7, 0.060 }, { 25.0, 0.075 }, { 50.0, 0.085 } },
                     MaxAxialFrac = 0.3,
                     MaxRadialFrac = 0.3,
                     Notes = "Mild steel (1018-class) - UNTUNED reference data, treat as a rough starting point " +

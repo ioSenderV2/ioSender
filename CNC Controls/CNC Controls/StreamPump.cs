@@ -76,6 +76,13 @@ namespace CNC.Controls
         private bool useBuffering, sendComments, startSimulator;
         private System.Action onJobFinished;
         private System.Action<string> onError;
+        // Check mode ($C): every line is streamed and reported regardless of error, instead of the normal
+        // abort-on-first-error behavior - see onCheckError's own comment. No error text/line index is
+        // passed through: MarkSent (below) already writes the real per-line response (including error
+        // text) into Source.Data for every line via the normal coalesced Drain path, same as any other
+        // run - onCheckError only needs to drive the state-machine bookkeeping that path doesn't cover.
+        private bool continueOnError;
+        private System.Action onCheckError;
 
         // ---- pump-thread-owned accounting (no locking; single-thread access after Start) ----
         private int sendIdx;            // next block index to send (-1 = nothing left)
@@ -110,7 +117,8 @@ namespace CNC.Controls
         }
 
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
-                          bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError)
+                          bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError,
+                          bool continueOnError = false, System.Action onCheckError = null)
         {
             this.source = source;
             this.serialSize = serialSize;
@@ -119,6 +127,8 @@ namespace CNC.Controls
             this.startSimulator = startSimulator;
             this.onJobFinished = onJobFinished;
             this.onError = onError;
+            this.continueOnError = continueOnError;
+            this.onCheckError = onCheckError;
 
             sendIdx = fromBlock;
             this.pgmEndLine = pgmEndLine;
@@ -360,9 +370,18 @@ namespace CNC.Controls
 
             if (ack.StartsWith("error"))
             {
-                aborted = true;
-                dispatcher.BeginInvoke(onError, ack);
-                return;
+                if (!continueOnError)
+                {
+                    aborted = true;
+                    dispatcher.BeginInvoke(onError, ack);
+                    return;
+                }
+
+                // Check mode: report every error via the state-machine callback but keep streaming to the
+                // end, matching the legacy check-mode streamer's behavior this replaces. The per-line
+                // Sent text (including this error) was already written by MarkSent above, same as any
+                // other line.
+                dispatcher.BeginInvoke(onCheckError);
             }
 
             if (sendIdx < 0 && inflight.Count == 0)  // everything sent and acked

@@ -1078,21 +1078,19 @@ namespace CNC.Controls
                     while (res == null)
                         EventUtils.DoEvents();
 
-                    // The send/ack flow control runs on a dedicated background thread (StreamPump) so UI load
-                    // can never stall motion. Check mode ($C) keeps the legacy UI-thread streamer: it reports
-                    // every line's error and keeps going (the pump stops on first error), and there is no motion
-                    // to stutter, so the pump gives no benefit there.
-                    if (!job.IsChecking)
-                    {
-                        if (pump == null)
-                            pump = new StreamPump(model, Dispatcher);
-                        pumpActive = true;
-                        pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
-                                   AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
-                                   OnPumpJobFinished, OnPumpError);
-                    }
-                    else
-                        SendNextLine();
+                    // The send/ack flow control always runs on the dedicated background thread (StreamPump) so
+                    // UI load can never stall motion - including Check mode ($C), which used to fall back to
+                    // the legacy UI-thread streamer because it reports EVERY line's error and keeps going,
+                    // where the pump used to abort on the first error. StreamPump.continueOnError now
+                    // reproduces that same keep-going-and-report-every-error behavior (OnPumpCheckError below),
+                    // so Check mode no longer needs a separate streamer.
+                    if (pump == null)
+                        pump = new StreamPump(model, Dispatcher);
+                    pumpActive = true;
+                    pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
+                               AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
+                               OnPumpJobFinished, OnPumpError,
+                               continueOnError: job.IsChecking, onCheckError: OnPumpCheckError);
                 }
             }
         }
@@ -1158,6 +1156,18 @@ namespace CNC.Controls
             streamingHandler.Count = false;
             job.HasError = model.IsGrblHAL;
             ResetRunModeAfterJob();
+            streamingHandler.Call(StreamingState.Error, true);
+        }
+
+        // Check mode (StreamPump.continueOnError): fires on EVERY error line, not just the first - the run
+        // keeps streaming afterward (pump does not abort), so this must not tear the run down the way
+        // OnPumpError does. The actual per-line "Sent" text (the error response) is already written by
+        // StreamPump's own MarkSent/Drain, same path every other line's status uses - this only drives the
+        // state-machine/UI bookkeeping the legacy check-mode streamer used to do inline (ResponseReceived's
+        // old isError branch: streamingHandler.Call(StreamingState.Error, true) + job.HasError).
+        private void OnPumpCheckError()
+        {
+            job.HasError = model.IsGrblHAL;
             streamingHandler.Call(StreamingState.Error, true);
         }
 
@@ -1699,6 +1709,17 @@ namespace CNC.Controls
             else if (pumpActive)
                 ArmIdleKick();
 
+            // An alarm must release the pump (and, critically, Comms.com.AckSink) IMMEDIATELY, regardless of
+            // which tab currently has focus - this is a comms-safety concern, not a UI-state one. Confirmed
+            // as a real hang 2026-08-01: an alarm during a Check-mode run landed while a different tab was
+            // active, the isActive-gated switch below skipped AbortPump() entirely (its own case, further
+            // down), and the pump's AckSink stayed hijacked - every subsequent response (including jog acks
+            // sent from the other tab) silently vanished into the abandoned, undrained pump instead of
+            // reaching the app, and the pump's own still-queued lines from the aborted check file later got
+            // flushed mid-jog, producing a bogus "error:9 locked out during alarm or jog state".
+            if (newstate.State == GrblStates.Alarm)
+                AbortPump();
+
             // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
             // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
             // there too (Idle re-enables Run after a run, Hold/Tool/Alarm behave as on the Grbl tab).
@@ -1790,7 +1811,7 @@ namespace CNC.Controls
                     break;
 
                 case GrblStates.Alarm:
-                    AbortPump();
+                    // AbortPump() already ran unconditionally above, regardless of this gate.
                     grblState.State = newstate.State;
                     grblState.Substate = newstate.Substate;
                     streamingHandler.Call(StreamingState.Stop, false);
@@ -1813,6 +1834,10 @@ namespace CNC.Controls
 
             // When the background pump is driving the job it owns all flow-control accounting (off the UI
             // thread). Skip the accounting here; the MDI/Reset switch below still runs on the UI thread.
+            // Check mode ($C) now also always sets pumpActive (see Run()) - the job.IsChecking branches
+            // below this point are consequently unreachable for the checking case (kept rather than
+            // pruned: they're still live for job.IsSDFile, which shares the same conditionals, and this
+            // is real-time streaming code where a conservative diff beats a clever one).
             if (pumpActive)
             {
             }

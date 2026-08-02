@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -626,12 +627,166 @@ namespace CNC.Controls
             return lines;
         }
 
+        // Serpentine (boustrophedon) raster over a w x h area, stepping across the shorter axis by the
+        // stepover and cutting along the longer one, alternating direction - ported from the standalone
+        // SurfaceSpoilboardWizard this replaced. Local coordinates, (0,0) at one corner; BuildSurface offsets
+        // the result to the toolpath's own position.
+        private static List<double[]> RasterPath(double w, double h, double stepover)
+        {
+            var pts = new List<double[]>();
+            bool longIsX = w >= h;
+            double longLen = longIsX ? w : h;
+            double crossLen = longIsX ? h : w;
+            int nRows = Math.Max(2, (int)Math.Ceiling(crossLen / stepover) + 1);
+            double step = crossLen / (nRows - 1);   // even spacing, <= requested stepover, last row exactly at the far edge
+
+            void Add(bool lx, double longVal, double crossVal) => pts.Add(lx ? new[] { longVal, crossVal } : new[] { crossVal, longVal });
+
+            Add(longIsX, 0d, 0d);
+            double curLong = 0d;
+            for (int i = 0; i < nRows; i++)
+            {
+                double cross = Math.Min(i * step, crossLen);
+                if (i > 0)
+                    Add(longIsX, curLong, cross);            // step across to this row
+                double endLong = curLong == 0d ? longLen : 0d;  // cut along the long axis, alternating direction
+                Add(longIsX, endLong, cross);
+                curLong = endLong;
+            }
+            return pts;
+        }
+
+        #region Entire-spoilboard machine envelope (ported from the retired standalone SurfaceSpoilboardWizard)
+
+        // Per-axis max travel ($130 = X, $131 = Y), absolute value; 0 if unknown.
+        private static double AxisTravel(int axisIndex)
+        {
+            double t = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axisIndex);
+            return double.IsNaN(t) ? 0d : Math.Abs(t);
+        }
+
+        // +1 if the axis travels in the +machine direction away from home, else -1.
+        private static double AxisDir(int axis)
+        {
+            if (GrblInfo.ForceSetOrigin)
+                return GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis)) ? 1d : -1d;
+            return -1d;
+        }
+
+        // Machine-coordinate minimum (lower) corner of the travel envelope on one axis.
+        private static double EnvMin(int axis)
+        {
+            return AxisDir(axis) > 0d ? 0d : -AxisTravel(axis);
+        }
+
+        // Safe inset from each machine limit: the homing pull-off plus 1 mm, so the raster never grazes a
+        // limit switch at the home end.
+        private static double EnvelopeInset()
+        {
+            double pulloff = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
+            if (double.IsNaN(pulloff)) pulloff = 0d;
+            return pulloff + 1d;
+        }
+
+        #endregion
+
+        // Faces the whole Width x Depth area centered on (cx,cy) with a single boustrophedon pass -
+        // surfacing is a light skim, not stepped roughing. Ordinary WCS-relative cutting, same as every other
+        // Build* - the operator's already-established Setup Z0 is trusted, same as any other operation.
+        private static List<string> BuildSurface(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+            double w = Math.Max(0.1d, tp.Width), h = Math.Max(0.1d, tp.Depth);
+            double stepover = Math.Max(0.5d, op.BitDiameter * (op.Stepover / 100d));
+            double ox = cx - w / 2d, oy = cy - h / 2d;   // corner of the faced area
+            var raster = RasterPath(w, h, stepover).Select(p => new[] { p[0] + ox, p[1] + oy }).ToList();
+            double z = -TrueDepth(op);
+
+            lines.Add("G0 " + XY(raster[0]));
+            AppendPlunge(lines, z, 0d, op.PlungeFeed);
+            for (int i = 1; i < raster.Count; i++)
+                lines.Add("G1 " + XY(raster[i]) + " F" + F(op.Feed));
+            lines.Add("G0 Z" + F(SafeZ()));
+            return lines;
+        }
+
+        // Faces the WHOLE in-bounds machine travel envelope - spoilboard resurfacing, not a positioned cut, so
+        // this toolpath's Width/Depth/X/Y are ignored. No WCS covers "the whole envelope", so this is entirely
+        // machine-referenced (G53): it touches off its own fresh Z0 (the board may not be flat - trusting
+        // Setup's Z0 from wherever IT was touched off would be wrong here) by jogging to the surface, same
+        // MBOX-prompt idiom the retired standalone wizard used. Borrows G54 as scratch space to hold that
+        // touch-off (Work Order itself always runs in G59 - see BuildProgram - so G54 is otherwise untouched),
+        // then restores G59 before returning, since WorkOrderRules.Validate only WARNS this must be the sole
+        // enabled operation rather than enforcing it structurally.
+        private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderOperation op)
+        {
+            var lines = new List<string>();
+            double stepover = Math.Max(0.5d, op.BitDiameter * (op.Stepover / 100d));
+            double inset = EnvelopeInset();
+            double w = Math.Max(0d, AxisTravel(0) - 2d * inset);
+            double h = Math.Max(0d, AxisTravel(1) - 2d * inset);
+            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+            double zTop = EnvMin(2) + AxisTravel(2) - inset;
+            double z = -TrueDepth(op);
+
+            lines.Add("(surface - entire spoilboard, machine-referenced)");
+            lines.Add("G53 G0 Z" + F(zTop));
+            lines.Add(string.Format("G53 G0 X{0} Y{1}", F(ox), F(oy)));
+            lines.Add("(WAITIDLE)");
+            lines.Add("(MBOX, OKCANCEL, Jog to the HIGHEST point of the board [keyboard/jog moves X, Y and Z] and lower the bit until it just touches, then click OK to set work Z0 to that height. Click Cancel to abort.)");
+            lines.Add("(WAITIDLE)");
+            lines.Add("G10 L20 P1 Z0");
+            lines.Add("G53 G0 Z" + F(zTop));
+            lines.Add("(WAITIDLE)");
+            lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Click Cancel to abort.)");
+            lines.Add("(WAITIDLE)");
+            lines.Add(string.Format("G10 L2 P1 X{0} Y{1}", F(ox), F(oy)));
+            lines.Add("G54");
+            lines.Add("G0 Z" + F(SafeZ()));
+
+            // Tool change + spindle start happen HERE - after the machine-referenced park/touch-off is
+            // already done, not before it (BuildOperation skips its normal AppendToolStart/End wrapper for
+            // this op - see its own comment). G53 ignores the active WCS (G54-G59) but NOT an active G43
+            // tool-length offset, so doing a real M6 (which applies one) BEFORE the G53 moves above would let
+            // that offset stack onto their machine-coordinate targets and can overshoot a soft limit -
+            // confirmed on real hardware 2026-08-01 (ALARM 2 immediately after the M6/spindle-start when tried
+            // in the wrong order). The retired standalone SurfaceSpoilboardWizard always did it in this same
+            // order for the same reason.
+            int toolNum = ToolNumberFor(op);
+            lines.Add("M6 T" + N(toolNum));
+            double rpm = Rpm(op);
+            if (rpm > 0d)
+                lines.Add("S" + N(rpm) + " M3");
+
+            // G10 L2 P1 above already anchored G54's origin at (ox,oy), so the raster is walked directly in
+            // G54-relative coordinates starting at (0,0) - no further offset needed.
+            var raster = RasterPath(w, h, stepover);
+            lines.Add("G0 " + XY(raster[0]));
+            AppendPlunge(lines, z, 0d, op.PlungeFeed);
+            for (int i = 1; i < raster.Count; i++)
+                lines.Add("G1 " + XY(raster[i]) + " F" + F(op.Feed));
+
+            lines.Add("G0 Z" + F(SafeZ()));
+            if (rpm > 0d)
+                lines.Add("M5");
+            lines.Add("G59");   // restore the Work Order's own WCS for anything that follows
+            return lines;
+        }
+
         // One operation across EVERY pattern instance, inside a single tool change. Instance-minor rather than
         // instance-major on purpose: 6 holes drilled then 6 chamfered costs two tool changes, whereas
         // completing each hole in turn would cost twelve.
         private static List<string> BuildOperation(WorkOrderToolpath tp, WorkOrderOperation op, double openDepth, int currentTool, bool spindleOn, double currentRpm, bool sameToolNext)
         {
             var lines = new List<string>();
+
+            // Entire Spoilboard is fully self-contained - it emits its OWN tool change/spindle start
+            // positioned AFTER its machine-referenced park/touch-off (see BuildSurfaceEntireSpoilboard's own
+            // comment for why that order matters), not this generic wrapper's normal before-everything-else
+            // placement.
+            if (op.Kind == WorkOrderOpKind.Surface && tp.EntireSpoilboard)
+                return BuildSurfaceEntireSpoilboard(op);
+
             AppendToolStart(lines, op, currentTool, spindleOn, currentRpm);
 
             var positions = tp.PatternPositions().ToList();
@@ -651,6 +806,8 @@ namespace CNC.Controls
                     case WorkOrderOpKind.BottomFinish: lines.AddRange(BuildBottomFinish(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.Chamfer: lines.AddRange(BuildChamfer(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.Countersink: lines.AddRange(BuildCountersink(tp, op, cx, cy)); break;
+                    // EntireSpoilboard never reaches here - BuildOperation returns early for it, above.
+                    case WorkOrderOpKind.Surface: lines.AddRange(BuildSurface(tp, op, cx, cy)); break;
                 }
             }
 
@@ -674,11 +831,24 @@ namespace CNC.Controls
                     if (!seen.Add(t))
                         continue;
 
-                    var tool = (OddJobsTool)op.Tool;
-                    string type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.ChamferBit4Flute90 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
-                                : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
-                                : "FLAT";
-                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, ToolDescription(tool));
+                    var ct = CustomTools.Find(op.Tool);
+                    string type, description;
+                    if (ct != null)
+                    {
+                        type = (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink) ? "VBIT A=90"
+                             : ct.Kind == CustomToolKind.BallEnd ? "BALL"
+                             : "FLAT";
+                        description = ct.Name;
+                    }
+                    else
+                    {
+                        var tool = (OddJobsTool)op.Tool;
+                        type = (tool == OddJobsTool.VBit45 || tool == OddJobsTool.ChamferBit4Flute90 || OddJobsFeedsSpeedsDialog.IsCountersinkBit(tool)) ? "VBIT A=90"
+                                    : (tool == OddJobsTool.BallEnd || tool == OddJobsTool.BallEnd18) ? "BALL"
+                                    : "FLAT";
+                        description = ToolDescription(tool);
+                    }
+                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, description);
                 }
         }
 
@@ -870,7 +1040,13 @@ namespace CNC.Controls
             lines.AddRange(ToolDeclarations(wo));
             lines.Add("G90 G94 G17 G21");
             lines.Add("G59");
-            lines.Add("G0 Z" + F(SafeZ()));
+            // Entire Spoilboard doesn't trust G59 at all (see BuildSurfaceEntireSpoilboard) - an ordinary,
+            // non-G53 "G0 Z{SafeZ}" here would move relative to whatever G59 currently holds, which could be
+            // unset/stale on exactly the machine state this operation exists to not depend on. Its own first
+            // line is already a machine-referenced G53 rapid, making this redundant at best for that case.
+            bool entireSpoilboardOnly = wo.Toolpaths.Any(t => t.EntireSpoilboard && wo.EnabledOperations(t).Any());
+            if (!entireSpoilboardOnly)
+                lines.Add("G0 Z" + F(SafeZ()));
 
             // Load the machine-wide TLO-reference baseline (AppConfig.Base.TloRefBaseline, set once via
             // Machine Setup's "Reference TLO" step) as an INPUT to every M6 in this run, the same fix
@@ -943,6 +1119,11 @@ namespace CNC.Controls
                             break;
                         case WorkOrderOpKind.Countersink:
                             desc = string.Format("countersink, Ø{0:0.##} mm target", op.CountersinkDiameter);
+                            break;
+                        case WorkOrderOpKind.Surface:
+                            desc = tp.EntireSpoilboard
+                                ? string.Format("surface - entire spoilboard, {0:0.0} mm deep", TrueDepth(op))
+                                : string.Format("surface {0:0.0}x{1:0.0} mm, {2:0.0} mm deep", tp.Width, tp.Depth, TrueDepth(op));
                             break;
                         default:
                             continue;

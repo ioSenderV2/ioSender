@@ -681,6 +681,7 @@ namespace CNC.Controls
             new TabTarget("Tab.MachineSetup.Homing",   "Machine Setup → Homing & limits",    "Switch to Machine Setup and show the Homing & limits step."),
             new TabTarget("Tab.MachineSetup.Probes",   "Machine Setup → Probe definitions",  "Switch to Machine Setup and show the Probe definitions step."),
             new TabTarget("Tab.MachineSetup.Macros",   "Machine Setup → Controller macros",  "Switch to Machine Setup and show the Controller macros step."),
+            new TabTarget("Tab.MachineSetup.Calibration", "Machine Setup → Calibration",     "Switch to Machine Setup and show the Calibration step."),
 
             new TabTarget("Tab.Probing.ToolOffset",   "Probing → Tool length offset",    "Switch to Probing and show the Tool length offset tab."),
             new TabTarget("Tab.Probing.EdgeExternal", "Probing → Edge finder, external", "Switch to Probing and show the external Edge finder tab."),
@@ -688,8 +689,6 @@ namespace CNC.Controls
             new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
 
             new TabTarget("Tab.Tools.ToolTable",         "Tools → Tool table",                   "Switch to Tools and show the Tool table tab."),
-            new TabTarget("Tab.Tools.StepperCal",        "Tools → Stepper calibration",          "Switch to Tools and show the Stepper calibration tab."),
-            new TabTarget("Tab.Tools.StepperScratch",    "Tools → Stepper calibration (scratch)", "Switch to Tools and show the scratch Stepper calibration tab."),
             new TabTarget("Tab.Tools.SurfaceSpoilboard", "Tools → Surface spoilboard",           "Switch to Tools and show the Surface spoilboard tab."),
             new TabTarget("Tab.Tools.Squareness",        "Tools → Squareness",                   "Switch to Tools and show the Squareness tab."),
             new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),

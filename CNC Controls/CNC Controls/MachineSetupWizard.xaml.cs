@@ -134,6 +134,7 @@ namespace CNC.Controls
             TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
             TabKeyBinder.AttachTabBinding(tabStepFixtures, "Tab.MachineSetup.Fixtures");
             TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
+            TabKeyBinder.AttachTabBinding(tabStepCalibration, "Tab.MachineSetup.Calibration");
             TabKeyBinder.AttachTabBinding(tabStepSimulator, "Tab.MachineSetup.Simulator");
 
             model = DataContext as GrblViewModel;
@@ -296,6 +297,7 @@ namespace CNC.Controls
                 case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
                 case "Tab.MachineSetup.Fixtures": target = tabStepFixtures; break;
                 case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
+                case "Tab.MachineSetup.Calibration": target = tabStepCalibration; break;
                 case "Tab.MachineSetup.Simulator": target = tabStepSimulator; break;
                 default: target = null; break;
             }
@@ -337,6 +339,7 @@ namespace CNC.Controls
             SetStepColor(hdrProbes, StepStatusOf(5));
             SetStepColor(hdrFixtures, StepState.Complete);
             SetStepColor(hdrMacros, StepStatusOf(7));
+            SetStepColor(hdrCalibration, StepState.Complete);
             SetStepColor(hdrSimulator, StepState.Complete);
         }
 
@@ -434,6 +437,7 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
                 UpdateApplyState();
+                UpdateCalibrationStepAvailability();
                 // Deferred (2026-07-19 - "Machine Setup tab permanently unresponsive" investigation): this
                 // Activate(true) runs from MainWindow.TabMode_SelectionChanged, DURING the tab-switch's own
                 // layout pass (the newly-selected tab's content is being measured/arranged right now).
@@ -945,6 +949,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Save();
                 grdProbes.SelectedItem = def;
                 RefreshStepColors();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -968,6 +973,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // type may have changed
                 ProbeDefinitions.Save();
                 grdProbes.Items.Refresh();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -981,6 +987,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);
                 ProbeDefinitions.Save();
                 RefreshStepColors();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -1069,6 +1076,68 @@ namespace CNC.Controls
 
             if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepSimulator)
                 Dispatcher.BeginInvoke((System.Action)RefreshSimulatorStep, System.Windows.Threading.DispatcherPriority.Background);
+
+            // Calibration step: activate/deactivate whichever of its two sub-tabs (stepper cal / squareness)
+            // is currently selected, mirroring how ToolsView used to Activate() its own sub-tabs. Deferred for
+            // the same reason as the macro/simulator refreshes above - these wizards pump the dispatcher.
+            if (e.OriginalSource == tabSteps)
+            {
+                if (e.RemovedItems.Count == 1 && e.RemovedItems[0] == tabStepCalibration)
+                {
+                    calibrationStepActive = false;
+                    ActivateSelectedCalibrationChild(false);
+                }
+                if (tabSteps.SelectedItem == tabStepCalibration)
+                {
+                    calibrationStepActive = true;
+                    UpdateCalibrationStepAvailability();
+                    Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
+                }
+            }
+        }
+
+        // True only while the Calibration step itself is the selected outer step - guards Calibration_
+        // SelectionChanged from activating a sub-tab on startup/layout before the user has ever navigated here.
+        private bool calibrationStepActive = false;
+
+        private void ActivateSelectedCalibrationChild(bool activate)
+        {
+            var tab = tabCalibration?.SelectedItem as TabItem;
+            if (tab == tabCalStepper)
+                calStepperWizard.Activate(activate);
+            else if (tab == tabCalSquareness)
+                calSquarenessWizard.Activate(activate);
+        }
+
+        // Switching between Stepper calibration / Squareness within the Calibration step - deactivate the
+        // outgoing sub-tab, activate the incoming one. Ignored while the Calibration step itself isn't the
+        // active outer step (this event also bubbles up to Steps_SelectionChanged, which filters it out there
+        // via e.OriginalSource, same pattern as the macros/simulator checks above).
+        private void Calibration_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.OriginalSource != tabCalibration || !calibrationStepActive)
+                return;
+
+            if (e.RemovedItems.Count == 1)
+            {
+                var removed = e.RemovedItems[0] as TabItem;
+                if (removed == tabCalStepper)
+                    calStepperWizard.Activate(false);
+                else if (removed == tabCalSquareness)
+                    calSquarenessWizard.Activate(false);
+            }
+            Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Stepper calibration (probe) needs a real 3D probe to do anything useful - grey its sub-tab out
+        // (not just its own Generate/Save buttons) when none is configured. Re-checked whenever the
+        // Calibration step is shown and whenever a probe is added/edited/deleted, so it reflects changes
+        // made on the Probe definitions step in the same session (mirrors ToolsView's old
+        // UpdateStepperCalProbeAvailability).
+        private void UpdateCalibrationStepAvailability()
+        {
+            if (tabCalStepper != null)
+                tabCalStepper.IsEnabled = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 
         private void RefreshMacroStatus()

@@ -572,6 +572,12 @@ namespace CNC.Controls
         // or imported a legacy standalone file, so LoadConfig persists the converted form immediately.
         private bool _migratedFormat = false;
 
+        // One-line-per-section summary of anything ConfigStore had to discard on the last load (see
+        // ConfigStore.LoadWarnings) - null/empty on a clean load. Static + public so the shell can check
+        // it once after startup and show the operator a one-time notice; always also written to
+        // ConsoleLog regardless of whether anything shows it.
+        public static List<string> LastLoadWarnings = null;
+
         // Full Config serializer for reading the legacy v1 (<Config>) file - nested objects included.
         private static readonly XmlSerializer legacySerializer = new XmlSerializer(typeof(Config));
 
@@ -632,8 +638,6 @@ namespace CNC.Controls
                 () => SurfaceSpoilboardWizard.SectionConfig, v => SurfaceSpoilboardWizard.SectionConfig = v, "SurfaceSpoilboard.xml");
             RegisterFolded<AutoSquareParams>("AutoSquare",
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
-            RegisterFolded<ScratchParams>("StepperCalScratch",
-                () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
             // No legacy standalone file (new section) - "StepperCalProbe.xml" never exists, so ImportLegacy is
             // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
             RegisterFolded<StepperCalProbeParams>("StepperCalProbe",
@@ -650,6 +654,10 @@ namespace CNC.Controls
                 () => WorkOrderView.SectionConfig, v => WorkOrderView.SectionConfig = v, "OddJobsWorkOrder.xml");
             RegisterFolded<ToolMemoryList>("OddJobsToolMemory",
                 () => OddJobsToolMemory.SectionConfig, v => OddJobsToolMemory.SectionConfig = v, "OddJobsToolMemory.xml");
+            // Brand-new section (2026-08-01), no legacy standalone file - same "never exists" idiom as
+            // StepperCalProbe's own registration above.
+            RegisterFolded<CustomToolList>("CustomTools",
+                () => CustomTools.SectionConfig, v => CustomTools.SectionConfig = v, "CustomTools.xml");
 
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
@@ -1028,6 +1036,15 @@ namespace CNC.Controls
                             Base = new Config();
                         if (ConfigStore.MigratedOnLoad)
                             _migratedFormat = true;
+                        // Surface (don't silently swallow) any section ConfigStore had to skip - see
+                        // ConfigStore.LoadWarnings' own comment. Logged unconditionally (cheap, durable);
+                        // the shell shows a one-time startup notice too - see LastLoadWarnings.
+                        if (ConfigStore.LoadWarnings.Count > 0)
+                        {
+                            LastLoadWarnings = new List<string>(ConfigStore.LoadWarnings);
+                            foreach (var w in LastLoadWarnings)
+                                CNC.Core.ConsoleLog.Write("[AppConfig] section discarded on load - " + w);
+                        }
                     }
                     configfile = filename;
 
@@ -1087,7 +1104,6 @@ namespace CNC.Controls
             {
                 string[] desiredOrder = {
                     LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
-                    LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                     LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID
                 };
                 var byKey = toolsSlot.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
@@ -1097,6 +1113,13 @@ namespace CNC.Controls
                         reordered.Add(n);
                 if (!toolsSlot.Items.Select(n => n.Component).SequenceEqual(reordered.Select(n => n.Component)))
                     toolsSlot.Items = reordered;
+
+                // 2026-08-01: StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) are
+                // retired - the probe method replaced both and moved into Machine Setup's own Calibration
+                // step. Drop any stale entries an already-persisted profile still has (same
+                // RemoveAll-retired-components pattern as the Odd Jobs slot fixup below).
+                string[] retiredToolsComponents = { LayoutKeys.StepperCal, LayoutKeys.StepperScratch };
+                toolsSlot.Items.RemoveAll(n => retiredToolsComponents.Contains(n.Component));
             }
 
             // 2026-07-24: LayoutKeys.FeedsAndSpeeds (new top-level tab) was added to DefaultLayout.Build(),
@@ -1262,6 +1285,39 @@ namespace CNC.Controls
             return _factoryDefaults;
         }
 
+        // Raw XDocument of the shipped template, for ConfigStore.TemplateSectionLookup - separate cache
+        // from GetFactoryDefaults' deserialized Config (that one only carries Core/Jog/JogUiMetric; this
+        // one exposes EVERY section the template has, by key, undeserialized, so ConfigStore can hand a
+        // section's own payload to its own Read() regardless of which feature/build owns that key).
+        private static XDocument _templateDoc;
+        private static bool _templateDocLoadAttempted;
+
+        // ConfigStore.TemplateSectionLookup implementation - see that field's own comment. Loaded once,
+        // lazily, on first use (typically the first ReadDocument() of a load that has an absent section).
+        private static XElement GetTemplateSectionPayload(string key)
+        {
+            if (!_templateDocLoadAttempted)
+            {
+                _templateDocLoadAttempted = true;
+                try
+                {
+                    string dir = string.IsNullOrEmpty(CNC.Core.Resources.Path) ? AppDomain.CurrentDomain.BaseDirectory : CNC.Core.Resources.Path;
+                    string path = Path.Combine(dir, DefaultTemplateName);
+                    if (File.Exists(path))
+                    {
+                        var doc = XDocument.Load(path);
+                        if (!ConfigStore.IsLegacy(doc))
+                            _templateDoc = doc;
+                    }
+                }
+                catch { _templateDoc = null; }
+            }
+
+            return _templateDoc?.Root?.Elements("section")
+                                      .FirstOrDefault(sec => (string)sec.Attribute("key") == key)
+                                     ?.Elements().FirstOrDefault();
+        }
+
         // Deserialize one <section key="..."> payload from a v2 config document.
         private static object DeserializeSection(XDocument doc, string key, XmlSerializer ser)
         {
@@ -1366,6 +1422,11 @@ namespace CNC.Controls
             _useSimulatorPort = null;
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
+
+            // Wire the template-default fallback before anything below can call ReadDocument (a section
+            // absent from the user's own file - e.g. a feature added since they last saved - recovers the
+            // shipped template's curated value instead of just the bare C# field-initializer default).
+            ConfigStore.TemplateSectionLookup = GetTemplateSectionPayload;
 
             // Read-only shipped resources (CSVs, images, the App.config template) are read from the app folder;
             // all user-written state lives in a per-user folder (%AppData%\ioSender), seeded from the app folder

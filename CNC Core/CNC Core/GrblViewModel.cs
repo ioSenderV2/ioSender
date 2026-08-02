@@ -84,6 +84,15 @@ namespace CNC.Core
         public Action<string> OnWCOUpdated;
         public Action<Position> OnCameraProbe;
 
+        // Incremented the instant a transition INTO Alarm is parsed (see DataReceived) - a latch, not a
+        // sampled value, so a caller polling GrblState.State later can miss an alarm entirely if the
+        // operator clears it (Reset+Unlock) faster than the poll happens to run. Confirmed as a real bug
+        // 2026-08-01: MacroProcessor.WaitForIdle's poll-then-read-current-state pattern silently treated a
+        // probe-failure alarm the operator had already manually cleared as "finished successfully", letting
+        // the macro continue on to its next move as if nothing had happened. Thread-safe (Interlocked) since
+        // DataReceived isn't guaranteed to run on the UI thread.
+        public long AlarmEventCounter;
+
         public delegate void GrblResetHandler();
         public event EventHandler OnCycleStart;
         public event EventHandler OnStop;
@@ -1575,6 +1584,7 @@ namespace CNC.Core
             bool isBootBanner = data.ToLower().StartsWith("grbl");
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
+                System.Threading.Interlocked.Increment(ref AlarmEventCounter);
                 SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
             }
