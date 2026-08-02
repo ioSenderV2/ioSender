@@ -68,6 +68,35 @@ namespace CNC.Controls
             SafeGoto(model, tag == "G5x" ? CoordinateSystem : tag);
         }
 
+        // EVERY Go To below is a machine-coordinate move (G53 rapids, or a bare G28/G30 whose stored target is
+        // machine coordinates) - so all of them are only as trustworthy as the machine-coordinate reference
+        // itself. Refuse when the controller is not homed and homing is configured: MPos is then a fiction and
+        // the "go to" turns into a blind displacement from a false origin, at rapid.
+        //
+        // Confirmed on real hardware 2026-08-02, from the console log: an unexpected controller reboot (WDOG1
+        // hang-watchdog reset mid-job) brought grblHAL back up IDLE - not Alarm - with MPos:0,0,0 and H:0, at
+        // whatever physical spot the tool was sitting. A G30 sent ~55 min later chased the stored G30 machine
+        // coordinates as a displacement from that false zero and rapided (F22206) into the front-right hard
+        // stops, stalling X and both Y steppers. Soft limits are no backstop here - grblHAL only enforces them
+        // when homed. Note "Idle, not Alarm": nothing in the machine state forced a re-home, and ioSender's own
+        // HomedState only maps to NotHomed for Alarm substate 11 (GrblViewModel), landing on Unknown instead -
+        // so a check for "== Homed" is the correct polarity, NOT "!= NotHomed".
+        //
+        // The guard lives in these two shared routines rather than on the buttons because the button-level
+        // IsEnabled binding was exactly what was missing: GotoBaseControl.xaml's own button has it, the
+        // per-offset flyout's Go button (OffsetFlyout.xaml) never did.
+        private static bool MachinePositionTrusted (GrblViewModel model)
+        {
+            if (!model.IsHomingEnabled || model.HomedState == HomedState.Homed)
+                return true;
+
+            AppDialogs.Show("Machine is not homed - machine coordinates are not valid.\n\n" +
+                             "Go To moves are machine-coordinate moves, so this would rapid to a position " +
+                             "measured from an unknown origin. Home the machine ($H) first.",
+                              "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
         // THE single "Go To" routine - used by every go-to-offset button (this panel, the per-offset flyout)
         // so Safe Z is applied uniformly. <code> is a work-coordinate origin (G54-G59.3, G92) or the G28/G30
         // secondary home; its target machine position is read from the $#-populated coordinate table.
@@ -79,6 +108,9 @@ namespace CNC.Controls
         public static void SafeGoto(GrblViewModel model, string code)
         {
             if (model == null || string.IsNullOrEmpty(code))
+                return;
+
+            if (!MachinePositionTrusted(model))
                 return;
 
             CoordinateSystem cs = GrblWorkParameters.GetCoordinateSystem(code);
@@ -111,6 +143,9 @@ namespace CNC.Controls
         public static void SafeGotoMachine(GrblViewModel model, Position target)
         {
             if (model == null || target == null)
+                return;
+
+            if (!MachinePositionTrusted(model))
                 return;
 
             if (AppConfig.Settings.Base.SafeGotoZ && model.HomedState == HomedState.Homed
