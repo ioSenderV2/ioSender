@@ -2,10 +2,11 @@
  * WorkOrderCompiler.cs - part of CNC Controls library
  *
  * Compiles an Odd Jobs WorkOrder (toolpaths -> operations, see WorkOrderModel.cs) into ONE merged g-code
- * program: a single PREREQ/units/G59 header, one (TOOL ..) declaration per distinct tool used anywhere in the
- * work order, then each operation's own (TOOLPATH ..)-wrapped section in the order the operator composed
- * them, then a single M30. This replaced the five old per-wizard BuildProgram() methods, each of which
- * emitted a complete standalone program of its own.
+ * program: a single PREREQ/units/WCS-select header (WorkOrder.Wcs - whichever G54-G59 slot Setup actually
+ * established this work order's origin in, see WorkOrderWcs()), one (TOOL ..) declaration per distinct tool
+ * used anywhere in the work order, then each operation's own (TOOLPATH ..)-wrapped section in the order the
+ * operator composed them, then a single M30. This replaced the five old per-wizard BuildProgram() methods,
+ * each of which emitted a complete standalone program of its own.
  *
  * The per-operation codegen is ported from those wizards - notably PocketWizard's hardware-verified behaviour
  * (2026-07-27): interior clearing rings center-outward (an outline-only pass leaves the middle uncut),
@@ -40,6 +41,48 @@ namespace CNC.Controls
 
         private static double StockThickness() { return StartJobConfig.Section?.Thickness ?? 0d; }
         private static double SafeZ() { return StartJobConfig.Section?.SafeZ > 0d ? StartJobConfig.Section.SafeZ : 20d; }
+
+        // WorkOrder.Wcs: 0 = follow Setup's CURRENT selection live, 1-6 = pinned to that specific G54-G59
+        // slot regardless of Setup - see that field's own comment for why "follow" has to be resolved fresh
+        // rather than cached (Setup is a SHARED screen, also used by the plain Start Job tab, so its value can
+        // move on to a different job's WCS after this work order's own origin was actually established - a
+        // "pinned" work order deliberately survives that, a "follow" one deliberately doesn't). Clamped to
+        // 1-6 either way. Public so WorkOrderRules.Validate (WorkOrderModel.cs) and WorkOrderView's own
+        // Generate confirm dialog can resolve the SAME effective WCS a build would actually use.
+        public static int ResolveWcs(WorkOrder wo)
+        {
+            int wcs = wo?.Wcs ?? 0;
+            if (wcs == 0)
+                wcs = StartJobConfig.Section?.Wcs ?? 6;
+            return Math.Min(Math.Max(wcs, 1), 6);
+        }
+
+        public static string WcsCode(WorkOrder wo)
+        {
+            return "G" + (53 + ResolveWcs(wo)).ToString(CultureInfo.InvariantCulture);
+        }
+
+        // Resolved once per BuildProgram() call (ambient rather than threaded through every Build* method -
+        // this compiler already leans on StartJobConfig.Section the same way for SafeZ/StockThickness) so
+        // BuildSurfaceEntireSpoilboard, several calls deep, can still read it via WorkOrderWcs()/ScratchWcs()
+        // below without a signature change everywhere. Always the RESOLVED 1-6 value (ResolveWcs already
+        // applied) - "follow" is settled once, at the moment the program is actually built, not re-resolved
+        // mid-build.
+        private static int _wcs = 6;
+
+        private static string WorkOrderWcs()
+        {
+            return "G" + (53 + _wcs).ToString(CultureInfo.InvariantCulture);
+        }
+
+        // BuildSurfaceEntireSpoilboard borrows a WCS slot as scratch space for its own machine-referenced
+        // touch-off, on the assumption that Work Order's REAL WCS (WorkOrderWcs, above) is left untouched by
+        // it. Picks G55 in the one case that assumption would otherwise break (the operator set Work Order
+        // up on G54 itself) and G54 otherwise - either way, always a slot distinct from WorkOrderWcs().
+        private static string ScratchWcs()
+        {
+            return WorkOrderWcs() == "G54" ? "G55" : "G54";
+        }
 
         private static double Rpm(WorkOrderOperation op) { return op.SpindleRPM > 0d ? op.SpindleRPM : 0.70d * op.BitMaxRPM; }
 
@@ -309,7 +352,7 @@ namespace CNC.Controls
             if (!wo.Toolpaths.Any(t => t.IsIndirect))
                 return wo;
 
-            var resolved = new WorkOrder { GroupByTool = wo.GroupByTool, SkipFirstToolChange = wo.SkipFirstToolChange };
+            var resolved = new WorkOrder { GroupByTool = wo.GroupByTool, SkipFirstToolChange = wo.SkipFirstToolChange, Wcs = wo.Wcs };
             foreach (var tp in wo.Toolpaths)
             {
                 if (!tp.IsIndirect)
@@ -714,10 +757,10 @@ namespace CNC.Controls
         // this toolpath's Width/Depth/X/Y are ignored. No WCS covers "the whole envelope", so this is entirely
         // machine-referenced (G53): it touches off its own fresh Z0 (the board may not be flat - trusting
         // Setup's Z0 from wherever IT was touched off would be wrong here) by jogging to the surface, same
-        // MBOX-prompt idiom the retired standalone wizard used. Borrows G54 as scratch space to hold that
-        // touch-off (Work Order itself always runs in G59 - see BuildProgram - so G54 is otherwise untouched),
-        // then restores G59 before returning, since WorkOrderRules.Validate only WARNS this must be the sole
-        // enabled operation rather than enforcing it structurally.
+        // MBOX-prompt idiom the retired standalone wizard used. Borrows a scratch WCS slot (ScratchWcs - never
+        // the work order's own real one, WorkOrderWcs) to hold that touch-off, then restores the real one
+        // before returning, since WorkOrderRules.Validate only WARNS this must be the sole enabled operation
+        // rather than enforcing it structurally.
         private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderOperation op)
         {
             var lines = new List<string>();
@@ -728,6 +771,9 @@ namespace CNC.Controls
             double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
             double zTop = EnvMin(2) + AxisTravel(2) - inset;
             double z = -TrueDepth(op);
+            // G10 L2's P-number addresses a WCS by slot index (P1=G54 ... P6=G59), not by G-code - has to
+            // track ScratchWcs()'s own choice of slot.
+            int scratchP = ScratchWcs() == "G54" ? 1 : 2;
 
             lines.Add("(surface - entire spoilboard, machine-referenced)");
             lines.Add("G53 G0 Z" + F(zTop));
@@ -735,13 +781,15 @@ namespace CNC.Controls
             lines.Add("(WAITIDLE)");
             lines.Add("(MBOX, OKCANCEL, Jog to the HIGHEST point of the board [keyboard/jog moves X, Y and Z] and lower the bit until it just touches, then click OK to set work Z0 to that height. Click Cancel to abort.)");
             lines.Add("(WAITIDLE)");
-            lines.Add("G10 L20 P1 Z0");
+            // Same scratch slot as the X/Y anchor below - a hardcoded P1 here would write into G54's own Z
+            // whenever G55 is actually the scratch slot (the work order's real WCS being G54), corrupting it.
+            lines.Add(string.Format("G10 L20 P{0} Z0", scratchP));
             lines.Add("G53 G0 Z" + F(zTop));
             lines.Add("(WAITIDLE)");
             lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Click Cancel to abort.)");
             lines.Add("(WAITIDLE)");
-            lines.Add(string.Format("G10 L2 P1 X{0} Y{1}", F(ox), F(oy)));
-            lines.Add("G54");
+            lines.Add(string.Format("G10 L2 P{0} X{1} Y{2}", scratchP, F(ox), F(oy)));
+            lines.Add(ScratchWcs());
             lines.Add("G0 Z" + F(SafeZ()));
 
             // Tool change + spindle start happen HERE - after the machine-referenced park/touch-off is
@@ -769,7 +817,7 @@ namespace CNC.Controls
             lines.Add("G0 Z" + F(SafeZ()));
             if (rpm > 0d)
                 lines.Add("M5");
-            lines.Add("G59");   // restore the Work Order's own WCS for anything that follows
+            lines.Add(WorkOrderWcs());   // restore the Work Order's own WCS for anything that follows
             return lines;
         }
 
@@ -983,6 +1031,7 @@ namespace CNC.Controls
 
         public static List<string> BuildProgram(WorkOrder wo)
         {
+            _wcs = ResolveWcs(wo);
             wo = ResolveIndirect(wo);
             var lines = new List<string>();
             int opCount = wo.EnabledOperationCount;
@@ -997,7 +1046,10 @@ namespace CNC.Controls
                     opCount, wo.TotalOperationCount, wo.TotalOperationCount - opCount));
             // EXPR added alongside the #<_tlo_ref> save/load/restore below - named-parameter assignments in
             // the main streamed program (not just inside a called macro) need grblHAL's NGC expression support.
-            lines.Add("(PREREQ, connected, homed, noalarm, tlo, EXPR, G59)");
+            // The WCS condition names whichever slot THIS work order actually uses (WorkOrderWcs, set from
+            // wo.Wcs above) - used to hardcode G59, which failed the "is it set" check for anyone whose Setup
+            // established the origin on a different WCS.
+            lines.Add(string.Format("(PREREQ, connected, homed, noalarm, tlo, EXPR, {0})", WorkOrderWcs()));
 
             // Needed both for the header note and to seed the spindle state below.
             int firstTool = FirstToolNumber(wo);
@@ -1008,14 +1060,26 @@ namespace CNC.Controls
 
             lines.AddRange(ToolDeclarations(wo));
             lines.Add("G90 G94 G17 G21");
-            lines.Add("G59");
-            // Entire Spoilboard doesn't trust G59 at all (see BuildSurfaceEntireSpoilboard) - an ordinary,
-            // non-G53 "G0 Z{SafeZ}" here would move relative to whatever G59 currently holds, which could be
-            // unset/stale on exactly the machine state this operation exists to not depend on. Its own first
-            // line is already a machine-referenced G53 rapid, making this redundant at best for that case.
+            lines.Add(WorkOrderWcs());
+            // The program's OPENING retract has to be machine-referenced, not "G0 Z{SafeZ}" in the work
+            // coordinate system. SafeZ is a work-Z height, meaningful only once the tool is already near the
+            // job; as the very first move it is measured from the work Z origin, which on a typical job sits
+            // ~100mm BELOW machine top. Starting parked at G30 (machine Z near 0), "G0 Z20" is therefore a
+            // ~90mm PLUNGE, not a retract - confirmed on real hardware 2026-08-02, reported as the job
+            // "dipsy-doing" downward before the tool change went off to the toolsetter, and over a spoilboard
+            // with a low work Z origin it is a genuine collision risk rather than just an ugly move.
+            //
+            // Lift to machine top instead - unambiguous from any starting position, and the same first line
+            // MacroProcessor.EmitGotoG30 uses. X/Y are named explicitly (held at their current machine
+            // position) rather than writing a bare "G53 G0 Z0": see EmitGotoG30's comment - a firmware bug
+            // sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves it
+            // "unmoved", producing a false Alarm:2.
+            //
+            // Entire Spoilboard skips this entirely: it doesn't trust the work order's WCS at all (see
+            // BuildSurfaceEntireSpoilboard) and its own first line is already a machine-referenced G53 rapid.
             bool entireSpoilboardOnly = wo.Toolpaths.Any(t => t.EntireSpoilboard && wo.EnabledOperations(t).Any());
             if (!entireSpoilboardOnly)
-                lines.Add("G0 Z" + F(SafeZ()));
+                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
 
             // Load the machine-wide TLO-reference baseline (AppConfig.Base.TloRefBaseline, set once via
             // Machine Setup's "Reference TLO" step) as an INPUT to every M6 in this run, the same fix
@@ -1133,15 +1197,20 @@ namespace CNC.Controls
                 }
             }
 
-            lines.Add("G0 Z" + F(SafeZ()));
             // Park at G30 instead of leaving the machine sitting wherever the last operation finished - same
             // raw-machine-coordinate convention tc.macro/StartJobView already use for this (reading the stored
             // G30 position directly via #5181-3, not the bare G30 word) so a G92/WCS offset in effect at the
             // end of the job can't send this move somewhere unexpected. Confirmed as a real gap on real
             // hardware 2026-07-30 - the machine (and spindle, which AppendToolEnd already stopped on the last
             // operation, however that call came out) was left sitting directly over the just-cut material.
-            lines.Add("G53 G0 X#5181 Y#5182");
-            lines.Add("G53 G0 Z#5183");
+            //
+            // Use the shared EmitGotoG30 rather than hand-rolling it. The hand-rolled version here retracted
+            // with a work-coordinate "G0 Z{SafeZ}" and then traversed - which is NOT Safe Z: with a work Z
+            // origin ~113mm below machine top, "G0 Z20" left the tool ~93mm below machine top and it crossed
+            // the whole table at that height. Confirmed on real hardware 2026-08-02. It also wrote a bare
+            // "G53 G0 Z#5183" with X/Y unmoved, the exact shape of the false-Alarm:2 firmware bug EmitGotoG30
+            // names both axes to avoid.
+            MacroProcessor.EmitGotoG30(lines.Add);
             // Restore whatever #<_tlo_ref> held before this program touched it - same save/restore idiom
             // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never
             // reaches this line, so #<_tlo_ref> is left at the baseline this run loaded rather than the true
