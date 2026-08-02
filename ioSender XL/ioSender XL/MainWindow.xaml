@@ -266,12 +266,17 @@
                             <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
                         </cnccontrols:SignalsControl.LayoutTransform>
                     </cnccontrols:SignalsControl>
+                    <!-- The unit label that used to sit after the readout is gone - on this bar the room is
+                         better spent on digits, so the unit moved into the tooltip (issue #21). ToolTip is on
+                         the panel so it covers the "Feed:" label and the readout alike. MinWidth is sized for
+                         the 5 digits Format="####0" can produce, allowing for the NumericTextBox style's 8px
+                         horizontal padding + 1px border. -->
                     <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
+                        <StackPanel.ToolTip>
+                            <Binding Path="FeedrateUnit" Mode="OneWay" StringFormat="Current feed rate ({0})"/>
+                        </StackPanel.ToolTip>
                         <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
-                        <!-- MinWidth sized for the 5 digits Format="####0" can produce, allowing for the
-                             NumericTextBox style's 8px horizontal padding + 1px border (issue #21). -->
                         <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                        <Label Content="{Binding Path=FeedrateUnit, Mode=OneWay}" Padding="2,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 <!-- Right: feed / rapids override controls, given ~25% more room. -->
