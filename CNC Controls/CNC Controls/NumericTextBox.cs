@@ -194,11 +194,13 @@ namespace CNC.Controls
             {
                 // Free typing: digits/'.'/'-'/'"'/letters all accepted live (so "12.5mm" can be typed at
                 // all - rejecting "m" the instant it's typed the way the strict path below does would make
-                // that impossible) - only clearly-invalid characters are blocked. The real parse, including
-                // interpreting a trailing unit suffix, happens on commit (CommitLengthText - OnLostFocus/
-                // Enter), not per keystroke.
+                // that impossible) - only clearly-invalid characters are blocked. '/' and ' ' additionally
+                // allowed for an imperial fraction ("1/8\"") or mixed number ("1 1/8\"") - see
+                // NumericProperties.TryParseLength's own fraction handling, which is what actually interprets
+                // these on commit. The real parse, including interpreting a trailing unit suffix, happens on
+                // commit (CommitLengthText - OnLostFocus/Enter), not per keystroke.
                 char c = e.Text.Length > 0 ? e.Text[0] : '\0';
-                e.Handled = !(char.IsDigit(c) || c == '.' || c == '-' || c == '"' || char.IsLetter(c));
+                e.Handled = !(char.IsDigit(c) || c == '.' || c == '-' || c == '"' || c == '/' || c == ' ' || char.IsLetter(c));
                 base.OnPreviewTextInput(e);
                 return;
             }

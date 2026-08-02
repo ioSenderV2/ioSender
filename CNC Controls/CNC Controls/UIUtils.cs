@@ -172,10 +172,53 @@ namespace CNC.Controls
             if (numberPart.Length == 0 || numberPart == "-")
                 return false;
 
-            if (!double.TryParse(numberPart, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out double v))
+            if (!TryParseNumberOrFraction(numberPart, out double v))
                 return false;
 
             mm = ToCanonicalMm(v, unit);
+            return true;
+        }
+
+        // "12.5" / "-3" (plain double) or an imperial fraction: "1/8" (a bare fraction) or "1 1/8" (a whole
+        // number plus a fraction, the way a shop tape measure/fractional drill index is actually read out
+        // loud) - only meaningful for defaultUnit/an explicit "in"/"\"" suffix, but accepted regardless of
+        // which unit ends up in force since a decimal-only shop could just as easily type "1/2" meaning
+        // half of whatever unit the field is already in.
+        private static bool TryParseNumberOrFraction(string numberPart, out double v)
+        {
+            if (double.TryParse(numberPart, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out v))
+                return true;
+
+            bool negative = numberPart.StartsWith("-", StringComparison.Ordinal);
+            string rest = negative ? numberPart.Substring(1).TrimStart() : numberPart;
+
+            string wholePart = null;
+            string fractionPart;
+            int space = rest.IndexOf(' ');
+            if (space > 0)
+            {
+                wholePart = rest.Substring(0, space);
+                fractionPart = rest.Substring(space + 1).Trim();
+            }
+            else
+                fractionPart = rest;
+
+            int slash = fractionPart.IndexOf('/');
+            if (slash <= 0 || slash == fractionPart.Length - 1)
+                return false;   // not "n/d" shaped - not a fraction we understand
+
+            if (!double.TryParse(fractionPart.Substring(0, slash), NumberStyles.Float, CultureInfo.InvariantCulture, out double num)
+                || !double.TryParse(fractionPart.Substring(slash + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double den)
+                || den == 0d)
+                return false;
+
+            double whole = 0d;
+            if (wholePart != null && !double.TryParse(wholePart, NumberStyles.Float, CultureInfo.InvariantCulture, out whole))
+                return false;
+
+            v = whole + num / den;
+            if (negative)
+                v = -v;
             return true;
         }
     }
@@ -295,6 +338,36 @@ namespace CNC.Controls
                 return parent as T;
             else
                 return TryFindParent<T>(parent);
+        }
+
+        // Select the whole value the first time a plain TextBox gains focus (tab or click), so typing
+        // replaces it instead of requiring a manual select/clear first - the same behavior NumericTextBox
+        // already has built in (see that class's own comment), extracted here so an ordinary free-text
+        // TextBox (e.g. a Name field) can opt into it without becoming a NumericTextBox. Click focus lets
+        // WPF place the caret natively first, then selects on mouse-up (skipped for a drag-select, so a
+        // partial selection from dragging survives); keyboard/tab focus selects immediately.
+        public static void SelectAllOnFocus(TextBox box)
+        {
+            bool selectAllOnMouseUp = false;
+            box.GotKeyboardFocus += (s, e) =>
+            {
+                if (Mouse.LeftButton != MouseButtonState.Pressed)
+                    box.SelectAll();
+            };
+            box.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                if (!box.IsKeyboardFocusWithin)
+                    selectAllOnMouseUp = true;
+            };
+            box.PreviewMouseLeftButtonUp += (s, e) =>
+            {
+                if (selectAllOnMouseUp)
+                {
+                    selectAllOnMouseUp = false;
+                    if (box.SelectionLength == 0)
+                        box.SelectAll();
+                }
+            };
         }
 
         public static IEnumerable<T> FindFirstLogicalChildren<T>(DependencyObject depObj) where T : DependencyObject

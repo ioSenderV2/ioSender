@@ -58,7 +58,11 @@
             </Grid.RowDefinitions>
             <TextBlock x:Name="txtPanelHeader" Grid.Row="0" Text="Add a toolpath to get started" FontWeight="SemiBold" Margin="0,0,0,6"/>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Orientation="Vertical">
+                <!-- Cycle (not the default Continue, which lets Tab walk OUT of this panel once it runs out
+                     of focusable fields here - e.g. Tab on the grid pattern's last field, Y spacing, was
+                     landing in the main window's menu) - wraps back to the first focusable field in whichever
+                     of pnlToolpath/pnlOperation is actually visible instead of escaping the tab entirely. -->
+                <StackPanel Orientation="Vertical" KeyboardNavigation.TabNavigation="Cycle">
 
                     <!-- ===== Toolpath (geometry) ===== -->
                     <StackPanel x:Name="pnlToolpath" Visibility="Collapsed">

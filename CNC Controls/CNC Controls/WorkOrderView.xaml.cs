@@ -55,6 +55,10 @@ namespace CNC.Controls
             foreach (var kind in WorkOrderRules.AllPatterns)
                 cbxPattern.Items.Add(new ComboBoxItem { Content = WorkOrderRules.PatternLabel(kind), Tag = kind });
 
+            // Same select-on-focus behavior every NumericField already has - txtName is a plain TextBox
+            // (free-text, not numeric), so it doesn't get that for free.
+            UIUtils.SelectAllOnFocus(txtName);
+
             foreach (var f in AllFields())
                 System.ComponentModel.DependencyPropertyDescriptor
                     .FromProperty(NumericField.ValueProperty, typeof(NumericField))
@@ -559,6 +563,16 @@ namespace CNC.Controls
             // up-triggered open doesn't also fire and immediately re-toggle it.
             item.PreviewMouseRightButtonDown += (s, ev) =>
             {
+                // PreviewMouseRightButtonDown TUNNELS (root -> leaf), and an operation row's TreeViewItem
+                // sits INSIDE its parent toolpath row's TreeViewItem visually - so without this check, the
+                // toolpath's own handler (registered the same way) fires FIRST, on every right-click anywhere
+                // in its subtree, sets Handled=true, and the operation row's own handler below it in the
+                // tree never runs at all - right-clicking an operation always opened the toolpath's menu
+                // instead. Only actually handle it here if THIS item is the innermost TreeViewItem under the
+                // click (i.e. the click's real target), not an ancestor of it.
+                if (UIUtils.TryFindParent<TreeViewItem>(ev.OriginalSource as DependencyObject) != item)
+                    return;
+
                 ev.Handled = true;
                 item.IsSelected = true;
                 item.Focus();
@@ -1152,6 +1166,7 @@ namespace CNC.Controls
             // content itself in the same App.config write. See AppConfig.Base.WorkOrderDirty's own comment and
             // Activate(false), which prompts to save when leaving with this set.
             AppConfig.Settings.Base.WorkOrderDirty = true;
+            UpdateTitleBar();
             Persist();
         }
 
@@ -1782,12 +1797,52 @@ namespace CNC.Controls
         {
             if (!BuildProgram())
                 return;
+            // The .workorder file is the authoritative source the generated program is built from - keep it
+            // current on every Generate (not just gated behind AutoSaveWorkOrderOnExit, and regardless of
+            // PromptBeforeAutoSaveWorkOrder - Generate is already an explicit, deliberate action, not a
+            // background/leaving-the-tab moment) so the file on disk always matches what was actually output.
+            // Untitled (never named/saved at all) is left alone here - nothing to keep in sync with yet, and
+            // forcing a Save As on every Generate click for a work order still being drafted would be a
+            // bigger interruption than the problem this solves.
+            if (currentFilePath != null)
+                SaveToDisk();
             MacroProcessor.PublishGenerated("Work Order", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;
         }
 
         public static WorkOrder SectionConfig;
+
+        // App-exit safety net (MainWindow.Window_Closing) - separate from AutoSaveIfEnabled/Activate(false)
+        // because those are INSTANCE methods on the tab, and MainWindow only calls Activate(false) on
+        // whichever tab is CURRENTLY showing at shutdown. If the operator closes the app from a different
+        // tab, Work Order's own Activate(false) never runs, so an AutoSaveWorkOrderOnExit operator would
+        // still get no save-to-named-file even though they turned that setting on specifically to avoid
+        // needing to think about it. The live content itself is never actually at risk either way (Persist()
+        // already keeps it in the auto-persisted App.config section on every edit) - this only makes sure the
+        // NAMED FILE catches up too. Static and driven off AppConfig.Base (LastWorkOrderFilePath/
+        // WorkOrderDirty) rather than an instance's currentFilePath, since a WorkOrderView instance may not
+        // even exist if the tab was never opened this session. Always silent (ignores
+        // PromptBeforeAutoSaveWorkOrder) - a confirm dialog for a tab that isn't even on screen, on the way
+        // out the door, would be a surprise rather than a courtesy.
+        public static void AutoSaveOnAppExit()
+        {
+            if (!AppConfig.Settings.Base.AutoSaveWorkOrderOnExit || !AppConfig.Settings.Base.WorkOrderDirty)
+                return;
+            string path = AppConfig.Settings.Base.LastWorkOrderFilePath;
+            var wo = SectionConfig;
+            if (path == null || wo == null || wo.Toolpaths.Count == 0)
+                return;
+            try
+            {
+                var serializer = new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder));
+                using (var writer = new System.IO.StreamWriter(path))
+                    serializer.Serialize(writer, wo);
+                AppConfig.Settings.Base.WorkOrderDirty = false;
+                AppConfig.Settings.Save();
+            }
+            catch { /* best-effort on the way out - never block shutdown over a save failure */ }
+        }
 
         #region ConfigPanel<WorkOrder> overrides
 
@@ -1896,6 +1951,24 @@ namespace CNC.Controls
             return name;
         }
 
+        // If AutoSaveWorkOrderOnExit is on, saves the current work order the same way LEAVING the tab
+        // already would (Activate(false), above) - PromptBeforeAutoSaveWorkOrder still asks a plain Yes/No
+        // first if that sub-option is also on. Called before New/Load's own "discard/replace" check so an
+        // operator who's turned autosave on never sees that prompt for content that's about to be saved
+        // anyway - the button is just a different trigger than a tab switch for the exact same situation.
+        private void AutoSaveIfEnabled()
+        {
+            bool wouldLoseChanges = workOrder.Toolpaths.Count > 0
+                && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
+            if (!wouldLoseChanges || !AppConfig.Settings.Base.AutoSaveWorkOrderOnExit)
+                return;
+
+            bool doSave = !AppConfig.Settings.Base.PromptBeforeAutoSaveWorkOrder
+                || AppDialogs.Show("Save these work order changes now?", "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            if (doSave)
+                SaveToDisk();
+        }
+
         // Clears the tab to a blank, untitled work order - the top-level command Load/Save were missing a
         // counterpart for. No name prompt: an untitled work order is dirty by default (currentFilePath == null
         // - see AppConfig.Base.WorkOrderDirty), so Activate(false) already asks for a save (and therefore a
@@ -1903,7 +1976,15 @@ namespace CNC.Controls
         // for what might stay empty.
         private void MenuNew_Click(object sender, RoutedEventArgs e)
         {
-            if (workOrder.Toolpaths.Count > 0 &&
+            AutoSaveIfEnabled();
+
+            // Only worth confirming if there's something that would actually be LOST - a work order that's
+            // already saved to disk (currentFilePath set, WorkOrderDirty false) has nothing on this tab that
+            // isn't also sitting safely in that file, so starting fresh needs no gate. Same dirty check
+            // Activate(false) already uses for its own "unsaved changes" prompt.
+            bool wouldLoseChanges = workOrder.Toolpaths.Count > 0
+                && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
+            if (wouldLoseChanges &&
                 AppDialogs.Show(string.Format("Discard the current work order ({0} toolpath{1}) and start a new one?",
                         workOrder.Toolpaths.Count, workOrder.Toolpaths.Count == 1 ? "" : "s"),
                     "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -1933,26 +2014,33 @@ namespace CNC.Controls
             // mean New can never prompt, just that an empty new work order alone doesn't.
             AppConfig.Settings.Base.WorkOrderDirty = false;
             AppConfig.Settings.Save();
+            // OnWorkOrderChanged above already painted the title with a "*" (it runs while Dirty is
+            // momentarily true) - repaint now that it's back to false, or New would show a stale asterisk.
+            UpdateTitleBar();
         }
 
         // The tree panel's own title bar: the work order's name with no path or extension - "Toolpaths" said
         // nothing this panel doesn't already show by being full of toolpaths, where the name of the actual
         // job being composed is worth surfacing. Full path lives in the tooltip instead of cluttering the row.
+        // Trailing "*" mirrors the same AppConfig.Base.WorkOrderDirty flag the Load/New/leave-tab prompts
+        // gate on, live (called from OnWorkOrderChanged, not just Load/New/Save) - so "does this need saving"
+        // is visible at a glance instead of only discoverable by trying to Load/New and seeing whether it asks.
         private void UpdateTitleBar()
         {
+            string suffix = AppConfig.Settings.Base.WorkOrderDirty ? " *" : string.Empty;
             if (currentFilePath != null)
             {
-                txtWorkOrderName.Text = System.IO.Path.GetFileNameWithoutExtension(currentFilePath);
+                txtWorkOrderName.Text = System.IO.Path.GetFileNameWithoutExtension(currentFilePath) + suffix;
                 txtWorkOrderName.ToolTip = currentFilePath;
             }
             else if (!string.IsNullOrEmpty(pendingName))
             {
-                txtWorkOrderName.Text = pendingName;
+                txtWorkOrderName.Text = pendingName + suffix;
                 txtWorkOrderName.ToolTip = "Not yet saved";
             }
             else
             {
-                txtWorkOrderName.Text = "(untitled)";
+                txtWorkOrderName.Text = "(untitled)" + suffix;
                 txtWorkOrderName.ToolTip = "Not yet saved";
             }
         }
@@ -1983,9 +2071,16 @@ namespace CNC.Controls
             if (loaded == null)
                 return;
 
+            AutoSaveIfEnabled();
+
             // Loading REPLACES what's on the tab, and the tab is auto-persisted, so an unsaved composition is
-            // gone for good - worth a confirmation while there's something to lose.
-            if (workOrder.Toolpaths.Count > 0 &&
+            // gone for good - worth a confirmation while there's something to lose. A work order that's
+            // already saved (currentFilePath set, WorkOrderDirty false) has nothing here that isn't also
+            // sitting safely in that file already, so skip the prompt - same dirty check Activate(false)
+            // already uses for its own "unsaved changes" prompt.
+            bool wouldLoseChanges = workOrder.Toolpaths.Count > 0
+                && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
+            if (wouldLoseChanges &&
                 AppDialogs.Show(string.Format("Replace the current work order ({0} toolpath{1}) with the one in\n{2}?",
                         workOrder.Toolpaths.Count, workOrder.Toolpaths.Count == 1 ? "" : "s", System.IO.Path.GetFileName(dlg.FileName)),
                     "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -2013,6 +2108,10 @@ namespace CNC.Controls
             // any other content change - override it back to false here).
             AppConfig.Settings.Base.WorkOrderDirty = false;
             AppConfig.Settings.Save();
+            // OnWorkOrderChanged above already painted the title with a "*" (it runs while Dirty is
+            // momentarily true) - repaint now that it's back to false, or every Load would show a stale
+            // asterisk despite matching the file it was just loaded from.
+            UpdateTitleBar();
         }
 
         #endregion

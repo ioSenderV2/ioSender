@@ -1391,6 +1391,13 @@ namespace GCode_Sender
                 AppConfig.Settings.Save();
             }
 
+            // Safety net for AutoSaveWorkOrderOnExit when Work Order ISN'T the tab on screen at exit -
+            // CurrentView.Activate(false) below only reaches whichever tab IS active, and that path already
+            // handles Work Order's own save (respecting PromptBeforeAutoSaveWorkOrder) when it IS the active
+            // one - skip here so this doesn't step on that by silently saving first.
+            if (!(UIViewModel.CurrentView is CNC.Controls.WorkOrderView))
+                CNC.Controls.WorkOrderView.AutoSaveOnAppExit();
+
             UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
 
             if (UIViewModel.Console != null)
