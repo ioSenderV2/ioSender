@@ -199,6 +199,7 @@ namespace CNC.Controls
             // Feature panels (Camera/Probing/Viewer/Lathe) also self-add to model.ConfigControls from their own
             // views - usually after this Setup - so place present controls now and react to later additions.
             model.ConfigControls.Add(new BasicConfigControl());
+            model.ConfigControls.Add(new UiGeneralConfigControl());
             model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());

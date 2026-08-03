@@ -1,0 +1,30 @@
+<UserControl x:Class="CNC.Controls.UiGeneralConfigControl"
+             x:Uid="ctl_uiGeneralConfig"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+    <!-- Settings > User Interface > General. These moved off the Application page (2026-08-03), which
+         is otherwise about how ioSender talks to the CONTROLLER - these are about how the app itself
+         looks and behaves. The grbl auto-save pair stayed behind deliberately: it writes $ settings to
+         the machine, which is controller interaction, not interface preference. -->
+    <GroupBox x:Uid="grp_uiGeneral" Header="General" Margin="5">
+        <StackPanel Margin="5">
+            <CheckBox x:Uid="lbl_keepMdiFocus" Content="Keep MDI focus" Margin="5,0,0,0" IsChecked="{Binding Path=KeepMdiFocus, Mode=TwoWay}" ToolTip="Keeps the cursor in the MDI command box after you send a command, so you can type the next one without clicking back into it."/>
+            <CheckBox x:Uid="lbl_restoreWindowSize" Content="Restore last window size on startup" Margin="5,4,0,0" IsChecked="{Binding Path=KeepWindowSize, Mode=TwoWay}" ToolTip="Restore window size on next startup."/>
+            <CheckBox x:Uid="lbl_friendlyRunLabels" Content="Use &quot;Start&quot;/&quot;Pause&quot; instead of &quot;Cycle Start&quot;/&quot;Feed Hold&quot;" Margin="5,4,0,0" IsChecked="{Binding Path=UseFriendlyRunLabels, Mode=TwoWay}" ToolTip="Renames the run bar's Cycle Start and Feed Hold buttons to the friendlier Start/Pause. Check Run, Dry Run, and Simulate keep their own names either way."/>
+
+            <StackPanel Orientation="Horizontal" Margin="5,8,0,0">
+                <TextBlock x:Uid="lbl_uiScale" Text="UI scale" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."/>
+                <Slider x:Uid="sld_uiScale" x:Name="sliderUiScale" Width="160" Minimum="0.75" Maximum="2.0" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Path=UiScale, Mode=TwoWay}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Path=UiScale, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
+            </StackPanel>
+
+            <Separator Margin="5,10,5,6"/>
+            <CheckBox x:Uid="lbl_autoSaveSettings" Content="Auto-save settings on exit" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveSettings, Mode=TwoWay}" ToolTip="Save app settings automatically when leaving Settings or closing, instead of using the Save settings button. Does not affect grbl ($) settings - those have their own option on the Application page."/>
+            <CheckBox x:Uid="lbl_promptOnSave" Content="Prompt before auto-saving" Margin="25,4,0,0" IsChecked="{Binding Path=PromptOnSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveSettings}" ToolTip="Show a confirm/discard list of changed settings before auto-saving."/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>
