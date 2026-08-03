@@ -1,8 +1,8 @@
 {
     "version":  1,
-    "updated":  "2026-08-02 22:37:20",
+    "updated":  "2026-08-03 06:47:24",
     "checkpoint":  {
-                       "through":  "2026-08-02 20:20:18",
+                       "through":  "2026-08-03 06:47:18",
                        "files":  [
                                      {
                                          "name":  "05fc8774-a30b-4338-a2b7-3c229e6a64bd.jsonl",
@@ -262,7 +262,7 @@
                                      },
                                      {
                                          "name":  "ab5d4851-0677-4b1f-96ef-b8997caec921.jsonl",
-                                         "size":  1334125
+                                         "size":  4760938
                                      },
                                      {
                                          "name":  "ad85019b-8094-47e8-bee0-403d1da65677.jsonl",
@@ -3479,6 +3479,26 @@
                                  ],
                          "release":  "v2.37",
                          "source":  "migrated-transcript"
+                     },
+                     {
+                         "start":  "2026-08-02 20:20:43",
+                         "end":  "2026-08-03 06:47:18",
+                         "name":  "2026-08-02_2020_check-your-memory-we-just-wrapped-up-release",
+                         "turns":  217,
+                         "tokens":  257926533,
+                         "kbdMin":  140.5,
+                         "hasKbd":  true,
+                         "toc":  [
+                                     "17",
+                                     "20",
+                                     "21",
+                                     "22",
+                                     "203",
+                                     "207",
+                                     "208"
+                                 ],
+                         "release":  "v2.38",
+                         "source":  "boundary"
                      }
                  ]
 }
