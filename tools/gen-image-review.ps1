@@ -52,7 +52,7 @@ $Wanted = [ordered]@{
 
 # Files that exist and are referenced, but show UI that has since changed.
 $Reshoot = [ordered]@{
-    'machine-setup-overview.png'  = 'dead - shot before #208, and the step count went from eight to nine (#197 Calibration)'
+    # (empty - nothing currently needs reshooting)
 }
 
 # --- derive everything else ---------------------------------------------------------------------

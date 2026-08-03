@@ -1095,16 +1095,18 @@
     <h2>Machine Setup — commissioning a new controller <a class="anchor" href="#machine-setup">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the nine steps">
-      <figcaption>The Machine Setup overview and its nine guided steps.</figcaption>
+      <img src="img/machine-setup-overview.png" alt="Machine Setup on step 1, with all nine steps listed in the navigation tree">
+      <figcaption>Machine Setup on <strong>1 · Machine</strong>. All nine steps sit in the tree on the left,
+      each with its status dot — green here, meaning this machine is fully commissioned — and step 8 expanded
+      to its Stepper and Squareness pages.</figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
       <li>The numbered steps down the left (1–9, plus Overview) are the guided sequence — work top to bottom; nothing is sent to the controller until you press Apply. It's the same searchable navigation tree as <a href="#settings">Settings</a>, and each step carries a <strong>status dot</strong> — green done, orange needs attention, red not set — so you can see at a glance what's left.</li>
       <li><strong>Start from your machine</strong> — three dropdowns let you pick a known manufacturer/product/model (or Generic/custom) so the later steps start from sensible defaults instead of blank fields.</li>
       <li><strong>Firmware / Build</strong> — shows what's actually running on the connected controller right now; <strong>Check for Updates</strong> compares it against the latest published grblHAL build.</li>
-      <li><strong>Firmware update available</strong> (popup shown here) — appears when a newer build exists; <strong>Flash Firmware</strong> reprograms the board (this disconnects ioSender and needs the board's own RESET/PROGRAM button pressed within the time shown).</li>
-      <li><strong>Firmware information</strong> (popup shown here) — a read-only dump of the controller's reported firmware, version, build, axis count and enabled options — handy when reporting a problem.</li>
+      <li><strong>Check for Updates</strong> compares the running build against the latest published grblHAL build — here it reports <em>Up to date</em>. When a newer build does exist you get a <strong>Firmware update available</strong> prompt instead, and <strong>Flash Firmware</strong> reprograms the board (this disconnects ioSender and needs the board's own RESET/PROGRAM button pressed within the time shown).</li>
+      <li><strong>Firmware information</strong> (the <code>$I</code> window shown here) — a read-only dump of the controller's reported firmware, version, build, axis count and enabled options — handy when reporting a problem.</li>
       <li><strong>Forget machine / Reload / Preview / Apply</strong> (bottom right) — Apply is the only button that actually writes settings to the controller; Preview lets you review the resulting <code>$</code> settings first.</li>
     </ul>
     <p><strong>Machine Setup</strong> is a guided wizard that walks you through the settings a new machine
