@@ -204,3 +204,4 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_newWorkOrder:System.Windows.Frame
 ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Loa_d Work Order...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Switch to the Work Order tab and open a saved .workorder file.
 ioSender.g.en-US.resources:mainwindow.baml,txt_runFeedTip:System.Windows.Documents.Run.Text,Text,True,True,,Current feed rate
+ioSender.g.en-US.resources:mainwindow.baml,mnu_tools:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Tools
