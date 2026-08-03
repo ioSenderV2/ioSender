@@ -126,7 +126,11 @@ namespace CNC.Controls
                 var tf = new Typeface(navTree.FontFamily, navTree.FontStyle, weight, navTree.FontStretch);
                 var ft = new FormattedText(node.Label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
                                            tf, navTree.FontSize, Brushes.Black, dpi);
-                widest = System.Math.Max(widest, ft.Width + DepthOf(node) * IndentPerLevel);
+
+                // A graded row (Machine Setup) also carries the status dot and its margin ahead of the
+                // text - measuring the label alone under-sizes those rows and the scrollbar comes back.
+                double dot = node.StatusBrush != null ? StatusDotWidth : 0;
+                widest = System.Math.Max(widest, ft.Width + dot + DepthOf(node) * IndentPerLevel);
             }
 
             if (widest <= 0)
@@ -145,6 +149,7 @@ namespace CNC.Controls
         }
 
         private const double IndentPerLevel = 19.0;   // WPF's default TreeViewItem indent
+        private const double StatusDotWidth = 14.0;   // the 8px status Ellipse + its 6px right margin
 
         private int DepthOf(SettingsNavNode node)
         {

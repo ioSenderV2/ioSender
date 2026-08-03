@@ -54,3 +54,4 @@ CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageKeyboard:System.Strin
 CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageController:System.String.$Content,None,True,True,,Controller
 CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageJobLayout:System.String.$Content,None,True,True,,Job tab layout
 CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageTopTabs:System.String.$Content,None,True,True,,Top-level tabs
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageCalStepper:System.String.$Content,None,True,True,,Stepper

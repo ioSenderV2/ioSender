@@ -290,7 +290,9 @@ namespace CNC.Controls
         // selection hook intact, and ShowPage() just drives the underlying TabControls - so
         // Steps_SelectionChanged / Calibration_SelectionChanged keep firing exactly as before.
 
-        public const string CalibrationCategoryKey = "MachineSetup.Calibration";
+        // Must match the Calibration page's own Key exactly - the host looks the parent up by key, and a
+        // near-miss fails silently by dropping the children at top level instead of under the heading.
+        public const string CalibrationCategoryKey = "Tab.MachineSetup.Calibration";
 
         // The nav key of whatever step is selected right now, so the host can mirror a selection the
         // wizard made itself (GoToStep from the startup setup gate) back into the tree.
@@ -312,6 +314,12 @@ namespace CNC.Controls
                 return tabCalibration?.SelectedItem == tabCalSquareness
                      ? "Tab.MachineSetup.CalSquareness" : "Tab.MachineSetup.CalStepper";
             return null;
+        }
+
+        private static string Localized(string key, string fallback)
+        {
+            var s = LibStrings.FindResource(key);
+            return string.IsNullOrWhiteSpace(s) ? fallback : s;
         }
 
         // A step header is a plain string (Overview), the numbered colour-graded TextBlock, or - for every
@@ -349,7 +357,7 @@ namespace CNC.Controls
                 new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { Status = () => hdrFixtures.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { Status = () => hdrMacros.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.CalStepper", HeaderText(tabCalStepper), this)
+                new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper"), this)
                     { Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
                 new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
                     { Parent = CalibrationCategoryKey },

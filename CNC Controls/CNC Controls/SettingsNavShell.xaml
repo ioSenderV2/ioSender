@@ -40,9 +40,9 @@
                     <TextBox x:Uid="fld_settingsSearch" x:Name="searchBox" BorderThickness="0" Background="Transparent"
                              VerticalContentAlignment="Center" Padding="4,3" UndoLimit="0"
                              TextChanged="searchBox_TextChanged" KeyDown="searchBox_KeyDown"
-                             ToolTip="Filter the list of settings pages. Esc clears."/>
+                             ToolTip="Filter the list below. Esc clears."/>
                     <!-- Placeholder text, shown only while the box is empty and unfocused. -->
-                    <TextBlock x:Uid="lbl_settingsSearchHint" x:Name="searchHint" Text="Search settings"
+                    <TextBlock x:Uid="lbl_settingsSearchHint" x:Name="searchHint" Text="Search"
                                Foreground="#FF9AA0A6" Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
             </Border>
@@ -77,7 +77,7 @@
             <ScrollViewer x:Name="pageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                 <ContentPresenter x:Name="pageHost" Content="{Binding SelectedNode.Content, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
             </ScrollViewer>
-            <TextBlock x:Uid="lbl_settingsNoSelection" x:Name="emptyHint" Text="Select a settings page on the left."
+            <TextBlock x:Uid="lbl_settingsNoSelection" x:Name="emptyHint" Text="Select a page on the left."
                        Foreground="#FF9AA0A6" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="Collapsed"/>
         </Grid>
