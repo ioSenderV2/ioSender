@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>207 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>208 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -228,6 +228,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Check for Updates now queries GitHub's real /releases/latest for firmware instead of a hand-rolled rolling tag, so a successfully-flashed build is correctly recognized as up to date.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr187">187</a></td></tr>
 <tr><td>The two standalone stepper-calibration wizards are gone; calibration is now a step inside Machine Setup alongside squareness.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr197">197</a></td></tr>
 <tr><td>Three fixes to the fixture editor - Test position no longer drives back to a stale saved point, the 3D Probe / Touch Plate choice survives closing, and dismissing the dialog no longer minimizes the main window.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr206">206</a></td></tr>
+<tr><td>Both tabs now use a searchable category tree instead of tab strips - every config panel is its own page, and search matches the words on the page, not just page names.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr208">208</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -640,7 +641,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">205</td><td><a href="#pr205">Jog back-pressure shared with the gamepad, and its ack made visible</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+122</span> <span class="del">-42</span></td></tr>
 <tr><td class="n">206</td><td><a href="#pr206">Fixture dialog: probe choice persisted, Test uses the live position, no more minimize</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+163</span> <span class="del">-29</span></td></tr>
 <tr><td class="n">207</td><td><a href="#pr207">Setup step timing, shorter probe retreats, and two upload/session hangs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+174</span> <span class="del">-73</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (207 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1788</span> <span class="del">29</span> <span class="add">+204</span><br><span class="k">Lines:</span> <span class="add">+74135</span> <span class="del">-15441</span></td></tr>
+<tr><td class="n">208</td><td><a href="#pr208">Settings &amp; Machine Setup: searchable navigation tree replaces tab strips</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">45</span> <span class="del">0</span> <span class="add">+6</span><br><span class="k">Lines:</span> <span class="add">+1788</span> <span class="del">-309</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (208 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1833</span> <span class="del">29</span> <span class="add">+210</span><br><span class="k">Lines:</span> <span class="add">+75923</span> <span class="del">-15750</span></td></tr>
 </table>
 </div>
 
@@ -4105,6 +4107,32 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><ul><li><strong>Each hold-for-idle gate cost two seconds of nothing.</strong> The wait allowed time to observe motion <em>starting</em> before it could trust an idle report - but only a controller-side SD job acknowledges first and moves later; an ordinary burst has already finished moving by the time the gate is reached. The long allowance is now scoped to macros that actually start such a job. A Setup program passes three of these gates.</li><li><strong>A redundant lift after the tool-length reference</strong> descended to the park position only to climb straight back to machine top.</li><li><strong>Corner probe retreats drop from 20mm to 5mm.</strong> Twenty is far more than any real bed variance - on a T-slot extrusion bed even five would take some doing - so it just spent Z travel on every retreat between faces.</li><li><strong>The macro upload could hang the app outright.</strong> The per-packet wait had no guard against its worker faulting, which left the interface spinning with no way out - reliably reproduced against the largest of the macro files. It now fails cleanly and reports a failed transfer instead.</li><li><strong>A stuck internal flag survived until restart.</strong> The flag that reroutes controller responses during a file read was cleared only on the success path, so one fault left the app misreading everything the controller said for the rest of the session - the cause of the long-standing 'exit and restart, then it works first time' behaviour when updating the ATC macros. It is now restored unconditionally, in all four places that set it.</li></ul><p class="foot">The retreat clearance is a fixed value rather than a caller-supplied one: reading a parameter no caller had set aborted the run with an expression error.</p></div>
+</div>
+<!-- ===== #208 ===== -->
+<div class="pr">
+<h2 id="pr208"><span class="badge">#208</span>Settings and Machine Setup: a searchable index replaces the tab strips</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/SettingsNavShell.xaml.cs</td><td class="num add">329</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SettingsNavShell.xaml</td><td class="num add">89</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SettingsNavNode.cs</td><td class="num add">221</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/SettingsSearchIndex.cs</td><td class="num add">132</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/NullToVisibilityConverter.cs</td><td class="num add">27</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/ToolTipTextTemplateSelector.cs</td><td class="num add">28</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/GrblConfigView.xaml(.cs)</td><td class="num add">279</td><td class="num del">243</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml(.cs)</td><td class="num add">132</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupView.xaml(.cs)</td><td class="num add">91</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/MainPageEditor.xaml(.cs)</td><td class="num add">75</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/KeyMapEditor.xaml(.cs)</td><td class="num add">39</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls Camera/ConfigControl.xaml(.cs)</td><td class="num add">38</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/SettingsPanelRegistry.cs</td><td class="num add">74</td><td class="num del">1</td></tr>
+<tr><td class="mono">Config panels declaring their own placement (8 panels)</td><td class="num add">41</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml</td><td class="num add">25</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/LibStrings.xaml</td><td class="num add">16</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">140</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>Settings and Machine Setup were top-level tabs whose contents were themselves tab strips - about twenty destinations across two of them, and Machine Setup's Calibration step nested a third tab strip inside the second. Tabs stopped scaling: they compete for horizontal space, offer no grouping, and cannot be searched. Both now use one shared shell - a searchable category tree on the left, the selected page on the right, with the existing Save / Restart / Reset footer beneath.</p><p><b>Every config panel is its own page.</b> The App, Jogging and G Code tabs used to cram unrelated panels into two or three columns because there was nowhere else to put them; that cramming is gone. Camera splits further into <i>Camera</i> and <i>Demo recording (OBS)</i>. Machine Setup keeps its numbered steps and its green/orange/red grading, now shown as a status dot beside each step.</p><p><b>Search matches the words on the page</b>, not just page names - "backlash" finds Axis information, "OBS" finds Demo recording - with a match count, and a tooltip explaining any hit you cannot see on the page (much of the useful text lives in tooltips, so a match can read as wrong until it says <i>Matched tooltip: ...</i>). The index is built by walking the logical tree, so it never has to open a page: opening a Machine Setup step queries the controller's filesystem, and indexing must never talk to the machine.</p><p>Page labels are read from each panel's own already-localized group header, so they are correct in all seven languages without a single new string. Placement moved onto the panels themselves, retiring the hardcoded table in the settings host that had to match panels in other assemblies by full type name - a feature can now contribute a settings page without the host knowing it exists.</p><p>The Grbl page deliberately keeps its own group tree and $-search: that is live controller data, fetched on connect and absent entirely on classic grbl, so lifting it into the navigation tree would have made the tree change shape whenever the machine connected.</p><p>Sub-tab keyboard shortcuts are dropped - the badge and right-click bind menu lived on tab headers that no longer exist - and any already saved are removed on load. <b>Top-level tab shortcuts are unaffected.</b></p><p>Prompted by this work, long tooltips now wrap at a sensible width app-wide instead of running off as one line, and sit clear of the mouse pointer: WPF places them assuming a standard cursor, so an extra-large Windows pointer covered the first few characters.</p></div>
 </div>
 </section>
 
