@@ -1211,17 +1211,21 @@ namespace CNC.Controls
             MigrateTopLevelComponentsToMenus();
             EnforceMenuPlacement();
 
-            // 2026-08-03: the Settings and Machine Setup tab strips are gone - both are navigation trees
-            // now - so their SUB-tab shortcuts have no badge, no right-click bind menu, and nothing to
-            // bind from. Strip any already persisted against those ids so a saved profile does not carry
-            // dead bindings that silently consume a keystroke.
-            // The trailing dot matters: "Tab.Settings" and "Tab.MachineSetup" are the TOP-LEVEL tabs,
-            // which still have a real tab strip and keep their shortcuts. Only their children go.
-            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(
-                t => t?.Id != null && (t.Id.StartsWith("Tab.Settings.") || t.Id.StartsWith("Tab.MachineSetup."))) ?? 0;
+            // 2026-08-03: the retired Tools CONTAINER tab. Its three tools are top-level views of their own
+            // now (Tools menu windows by default), each keeping its old "Tab.Tools.<Tool>" shortcut id - but
+            // "Tab.Tools" itself addresses a tab that no longer exists and can never resolve again, so drop it.
+            // The trailing-dot test is what keeps the three children: only the bare container id goes.
+            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(t => t?.Id == "Tab.Tools") ?? 0;
             if (deadShortcuts > 0)
                 CNC.Core.DebugLog.Write("config", string.Format(
-                    "ApplyOneTimeFixups: removed {0} sub-tab shortcut(s) for the retired Settings/Machine Setup tab strips", deadShortcuts));
+                    "ApplyOneTimeFixups: removed {0} shortcut(s) for the retired Tools container tab", deadShortcuts));
+
+            // NOTE (2026-08-03, same day): an earlier version of this fixup also stripped every
+            // "Tab.Settings.*" / "Tab.MachineSetup.*" sub-tab shortcut, on the grounds that both tab strips
+            // had become navigation trees with nothing to bind from. That was wrong twice over - the Key
+            // Mappings editor still lists those targets, and both trees resolve the ids through their own
+            // ITabBindingHost.SelectSubTab (GrblConfigView / MachineSetupView) - so the bindings work and the
+            // fixup was quietly deleting them on the next load. Removed; do not reinstate.
 
             // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
             // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which

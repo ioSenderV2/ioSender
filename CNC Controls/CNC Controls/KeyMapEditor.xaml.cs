@@ -669,31 +669,48 @@ namespace CNC.Controls
             public TabTarget(string id, string label, string description) { Id = id; Label = label; Description = description; }
         }
 
-        // The bindable tabs, in display order within their group. Id is "Tab.<Name>" for a main-page tab and
-        // "Tab.Settings.<Name>" for a Settings sub-tab. This is the source of truth for the editor rows; the
-        // matching id -> tab dispatch lives in MainWindow.RegisterTabShortcuts / MainWindow_PreviewKeyDown.
+        // The bindable views, in display order within their group. Id is "Tab.<Name>" for a top-level view and
+        // "Tab.<Parent>.<Sub>" for a second-level tab inside one. This is the source of truth for the editor
+        // rows; the matching id -> view dispatch lives in MainWindow.registerTabShortcuts / dispatchTabShortcut.
+        //
+        // An id names a VIEW, not a place. Since 2026-08-03 a top-level view may sit on the main tab bar OR in
+        // the File/Tools menus (its own window), and the user can move it either way in Settings > Main Page -
+        // so the same binding has to work from wherever the view currently lives, and the ids deliberately did
+        // NOT get renamed when the views moved (a saved binding keys on the id; renaming would silently orphan
+        // every one of them). Hence the labels say "Settings", not "Settings tab".
         public static readonly TabTarget[] TabTargets = new[]
         {
-            new TabTarget("Tab.Settings",     "Settings tab",      "Switch to the Settings tab."),
-            new TabTarget("Tab.FeedsSpeeds",  "Feeds & Speeds tab", "Switch to the Feeds & Speeds tab."),
-            new TabTarget("Tab.StartJob",     "Setup tab",         "Switch to the Setup tab."),
-            new TabTarget("Tab.Job",          "Job tab",           "Switch to the Job tab."),
-            new TabTarget("Tab.Offsets",      "Offsets tab",       "Switch to the Offsets tab."),
-            new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
-            new TabTarget("Tab.Probing",      "Probing tab",       "Switch to the Probing tab."),
-            new TabTarget("Tab.Tools",        "Tools tab",         "Switch to the Tools tab."),
-            new TabTarget("Tab.WorkOrder",    "Work Order tab",    "Switch to the Work Order tab."),
-            new TabTarget("Tab.MachineSetup", "Machine Setup tab", "Switch to the Machine Setup tab."),
-            new TabTarget("Tab.HeightMap",    "Height Map tab",    "Switch to the Height Map tab."),
-            new TabTarget("Tab.LatheWizard",  "Lathe Tools tab",   "Switch to the Lathe Tools tab."),
+            new TabTarget("Tab.Settings",     "Settings",       "Show Settings, wherever it lives - main tab or File menu."),
+            new TabTarget("Tab.FeedsSpeeds",  "Feeds & Speeds", "Show Feeds & Speeds, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.StartJob",     "Setup",          "Show Setup, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.Job",          "Job",            "Show the Job view, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.Offsets",      "Offsets",        "Show Offsets, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.SDCard",       "SD Card",        "Show SD Card, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Probing",      "Probing",        "Show Probing, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.WorkOrder",    "Work Order",     "Show Work Order, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.MachineSetup", "Machine Setup",  "Show Machine Setup, wherever it lives - main tab or File menu."),
+            new TabTarget("Tab.HeightMap",    "Height Map",     "Show Height Map, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.LatheWizard",  "Lathe Tools",    "Show Lathe Tools, wherever it lives - main tab or Tools menu."),
 
-            new TabTarget("Tab.Settings.Grbl",     "Settings → Grbl",                  "Switch to Settings and show the Grbl sub-tab."),
-            new TabTarget("Tab.Settings.App",      "Settings → App",                   "Switch to Settings and show the App sub-tab."),
-            new TabTarget("Tab.Settings.Jogging",  "Settings → Jogging",               "Switch to Settings and show the Jogging sub-tab."),
-            new TabTarget("Tab.Settings.GCode",    "Settings → G Code",                "Switch to Settings and show the G Code sub-tab."),
-            new TabTarget("Tab.Settings.Keyboard", "Settings → Keyboard & Controller", "Switch to Settings and show the Keyboard & Controller sub-tab."),
-            new TabTarget("Tab.Settings.Macros",   "Settings → Macros",                "Switch to Settings and show the Macros sub-tab."),
-            new TabTarget("Tab.Settings.MainPage", "Settings → Main Page",             "Switch to Settings and show the Main Page sub-tab."),
+            // The three tools the dissolved Tools tab used to carry. Their ids keep the old "Tab.Tools." prefix
+            // so bindings made while they were sub-tabs still work; each is now a view in its own right (a
+            // Tools menu window by default), not a sub-tab of anything - so they sit in this group, not their
+            // own. The retired "Tab.Tools" container id itself is gone (AppConfig.ApplyOneTimeFixups strips it).
+            new TabTarget("Tab.Tools.ToolTable", "Tool table",     "Show the tool table, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Tools.Trinamic",  "Trinamic tuner", "Show the Trinamic tuner, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Tools.PID",       "PID tuner",      "Show the PID tuner, wherever it lives - main tab or Tools menu."),
+
+            // Settings is a navigation TREE now, not a tab strip - these ids are resolved by
+            // GrblConfigView.SelectSubTab, which maps the three category ids to that category's first visible
+            // page and looks the rest up by node key. They are live bindings, not leftovers.
+            new TabTarget("Tab.Settings.Grbl",     "Settings → Grbl",                  "Switch to Settings and show the Grbl page."),
+            new TabTarget("Tab.Settings.App",      "Settings → App",                   "Switch to Settings and show the Application pages."),
+            new TabTarget("Tab.Settings.Jogging",  "Settings → Jogging",               "Switch to Settings and show the Jogging pages."),
+            new TabTarget("Tab.Settings.GCode",    "Settings → G Code",                "Switch to Settings and show the G Code pages."),
+            new TabTarget("Tab.Settings.Keyboard", "Settings → Keyboard & Controller", "Switch to Settings and show the Keyboard & Controller page."),
+            new TabTarget("Tab.Settings.Macros",   "Settings → Macros",                "Switch to Settings and show the Macros page."),
+            new TabTarget("Tab.Settings.MainPage", "Settings → Job tab layout",        "Switch to Settings and show the Job tab layout page."),
+            new TabTarget("Tab.Settings.Tabs",     "Settings → Top-level tabs",        "Switch to Settings and show the Top-level tabs page, where a view is placed on the tab bar or in a menu."),
 
             new TabTarget("Tab.MachineSetup.Overview", "Machine Setup → Overview",           "Switch to Machine Setup and show the Overview step."),
             new TabTarget("Tab.MachineSetup.Machine",  "Machine Setup → Machine",            "Switch to Machine Setup and show the Machine step."),
@@ -708,10 +725,6 @@ namespace CNC.Controls
             new TabTarget("Tab.Probing.EdgeExternal", "Probing → Edge finder, external", "Switch to Probing and show the external Edge finder tab."),
             new TabTarget("Tab.Probing.EdgeInternal", "Probing → Edge finder, internal", "Switch to Probing and show the internal Edge finder tab."),
             new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
-
-            new TabTarget("Tab.Tools.ToolTable",         "Tools → Tool table",                   "Switch to Tools and show the Tool table tab."),
-            new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),
-            new TabTarget("Tab.Tools.PID",               "Tools → PID Tuner",                    "Switch to Tools and show the PID Tuner tab."),
 
             new TabTarget("Tab.OddJobs.Setup",        "Odd Jobs → Setup",        "Switch to Odd Jobs and show the Setup tab."),
             new TabTarget("Tab.OddJobs.SurfaceStock", "Odd Jobs → Surface Stock", "Switch to Odd Jobs and show the Surface Stock tab."),
@@ -735,18 +748,19 @@ namespace CNC.Controls
             if (r.IsZoomAction) { r.Set("UI zoom", 9); return; }
             if (r.IsTabSwitch)
             {
-                // "Tab.<Name>" is a main-page tab; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
+                // "Tab.<Name>" is a top-level view; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
+                // The three ex-Tools ids are the exception: they kept the nested form when the Tools container
+                // was dissolved, but they are top-level views now, so they group with the rest of the views.
                 string[] parts = (r.Model.Method ?? string.Empty).Split('.');
-                if (parts.Length < 3) { r.Set("Main Page tabs", 13); return; }
+                if (parts.Length < 3 || parts[1] == "Tools") { r.Set("Views", 13); return; }
                 switch (parts[1])
                 {
-                    case "Settings": r.Set("Settings tabs", 14); break;
-                    case "MachineSetup": r.Set("Machine Setup tabs", 15); break;
+                    case "Settings": r.Set("Settings pages", 14); break;
+                    case "MachineSetup": r.Set("Machine Setup steps", 15); break;
                     case "Probing": r.Set("Probing tabs", 16); break;
-                    case "Tools": r.Set("Tools tabs", 17); break;
                     case "OddJobs": r.Set("Odd Jobs tabs", 19); break;
                     case "LatheWizard": r.Set("Lathe Tools tabs", 18); break;
-                    default: r.Set("Settings tabs", 14); break;
+                    default: r.Set("Settings pages", 14); break;
                 }
                 return;
             }
@@ -786,12 +800,12 @@ namespace CNC.Controls
             { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { "Main Page tabs", "Jump straight to a main-page tab from anywhere in the app." },
-            { "Settings tabs", "Jump to the Settings tab and show a specific sub-tab." },
-            { "Machine Setup tabs", "Jump to Machine Setup and show a specific step." },
+            { "Views", "Jump straight to a view from anywhere in the app - it is shown wherever it currently lives, as a main tab or as a File/Tools menu window." },
+            { "Settings pages", "Jump to Settings and show a specific page." },
+            { "Machine Setup steps", "Jump to Machine Setup and show a specific step." },
             { "Probing tabs", "Jump to Probing and show a specific probing tab." },
-            { "Tools tabs", "Jump to Tools and show a specific tool tab." },
             { "Lathe Tools tabs", "Jump to Lathe Tools and show a specific wizard tab." },
+            { "Menu commands", "Run a main-menu command from the keyboard. Unbound by default; a command that is greyed out in the menu does nothing." },
             { "Other", "Additional actions." }
         };
 

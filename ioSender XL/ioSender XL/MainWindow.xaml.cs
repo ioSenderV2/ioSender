@@ -2921,7 +2921,10 @@ namespace GCode_Sender
         private readonly List<TabHotkey> tabHotkeys = new List<TabHotkey>();
         private bool tabShortcutsHooked = false;
 
-        // Main-page tab id -> ViewType. Settings sub-tab ids ("Tab.Settings.*") are dispatched separately.
+        // View id -> ViewType. A shortcut id names a VIEW, not a place: since the tab bar was cut back
+        // (2026-08-03) any of these may sit on the bar OR in the File/Tools menus, and the user can move it
+        // either way - so dispatch resolves the id to a TabItem first and falls back to the menu-hosted
+        // window. Sub-ids ("Tab.Settings.*") drill in from whichever of the two the parent turned out to be.
         private static readonly Dictionary<string, ViewType> tabViewIds = new Dictionary<string, ViewType>
         {
             { "Tab.Settings",     ViewType.GRBLConfig },
@@ -2931,11 +2934,20 @@ namespace GCode_Sender
             { "Tab.Offsets",      ViewType.Offsets },
             { "Tab.SDCard",       ViewType.SDCard },
             { "Tab.Probing",      ViewType.Probing },
-            { "Tab.Tools",        ViewType.Tools },
             { "Tab.WorkOrder",    ViewType.WorkOrder },
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },
+        };
+
+        // The three ex-Tools-tab tools. They are plain layout components (no ViewType, no ICNCView), so they
+        // resolve to a component key rather than a ViewType - see ViewHostWindow.OpenComponent. Their ids keep
+        // the old nested "Tab.Tools." form so bindings made while they were sub-tabs still work.
+        private static readonly Dictionary<string, string> componentViewIds = new Dictionary<string, string>
+        {
+            { "Tab.Tools.ToolTable", LayoutKeys.ToolTable },
+            { "Tab.Tools.Trinamic",  LayoutKeys.Trinamic },
+            { "Tab.Tools.PID",       LayoutKeys.PID },
         };
 
         // (Re)parse the saved tab-switch shortcuts. Called at startup (just after registerConsoleShortcut, which
@@ -2981,20 +2993,53 @@ namespace GCode_Sender
             if (hit == null)
                 return false;
 
-            // A nested "Tab.<Parent>.<Sub>" id selects the parent top-level tab, then drills into its inner
-            // sub-tab; a plain "Tab.<Name>" id just selects the top-level tab. The parent (or the tab itself)
-            // is resolved through tabViewIds; the inner selection is delegated to the view's ITabBindingHost.
-            int firstDot = hit.Id.IndexOf('.');
-            int secondDot = firstDot < 0 ? -1 : hit.Id.IndexOf('.', firstDot + 1);
-            string lookupId = secondDot > 0 ? hit.Id.Substring(0, secondDot) : hit.Id;
+            return showBoundView(hit.Id);
+        }
+
+        // Show whatever a tab-switch id names, wherever it currently lives. Returns true when something was
+        // actually shown (so the caller consumes the key); false leaves the key alone - which is what happens
+        // for a view removed for a missing capability, or a sub-tab that no longer exists.
+        //
+        // A nested "Tab.<Parent>.<Sub>" id resolves its PARENT here and then drills into the inner tab through
+        // the view's ITabBindingHost; a plain "Tab.<Name>" id just shows the view. The three ex-Tools ids are
+        // whole views despite their nested form, so they are matched before the parent split (see
+        // componentViewIds).
+        private bool showBoundView(string id)
+        {
+            string componentKey;
+            if (componentViewIds.TryGetValue(id, out componentKey))
+                return showComponentView(componentKey);
+
+            int firstDot = id.IndexOf('.');
+            int secondDot = firstDot < 0 ? -1 : id.IndexOf('.', firstDot + 1);
+            string lookupId = secondDot > 0 ? id.Substring(0, secondDot) : id;
 
             ViewType vt;
             if (!tabViewIds.TryGetValue(lookupId, out vt))
                 return false;
 
             TabItem tab = getTab(vt);
-            if (tab == null || !tab.IsEnabled)
-                return false;   // top-level tab removed (missing capability) or disabled -> do nothing
+
+            if (tab == null)
+            {
+                // Not on the tab bar - it lives in a menu (or was never placed anywhere). Open or re-focus its
+                // window, then drill in exactly as the tab path does. ViewHostWindow.Open caches the view
+                // instance, so ViewInstance() is the same control the window is showing.
+                var d = TabRegistry.DescriptorFor(vt);
+                if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                    return false;
+
+                if (secondDot > 0)
+                {
+                    var winHost = ViewHostWindow.ViewInstance(vt) as ITabBindingHost;
+                    if (winHost == null || !winHost.SelectSubTab(id))
+                        return false;   // window is up and focused either way; the inner target just isn't there
+                }
+                return true;
+            }
+
+            if (!tab.IsEnabled)
+                return false;   // on the bar but disabled (no connection yet) -> do nothing
 
             if (secondDot > 0)
             {
@@ -3002,12 +3047,32 @@ namespace GCode_Sender
                 // available. A binding to a sub-tab that has since been removed (e.g. a capability tool tab, or
                 // a disabled lathe/probing view) does nothing at all rather than half-switching to the parent.
                 var host = getView(tab) as ITabBindingHost;
-                if (host == null || !host.SelectSubTab(hit.Id))
+                if (host == null || !host.SelectSubTab(id))
                     return false;
             }
 
             tabMode.SelectedItem = tab;
             return true;
+        }
+
+        // A plain layout component (tool table / Trinamic / PID): on the bar it is a TabItem with no ICNCView,
+        // so getTab can't find it - match it by the TabItem's Tag, the key BuildTabs stamps on it. Falls back
+        // to its own host window, the same way a view does.
+        private bool showComponentView(string componentKey)
+        {
+            foreach (TabItem t in tabMode.Items)
+            {
+                if (!(t.Tag is string key) || key != componentKey)
+                    continue;
+                if (!t.IsEnabled)
+                    return false;
+                tabMode.SelectedItem = t;
+                return true;
+            }
+
+            var c = ComponentRegistry.Get(componentKey);
+            return c?.Create != null &&
+                   ViewHostWindow.OpenComponent(componentKey, c.Label, UIViewModel, AppConfig.Settings, this) != null;
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
