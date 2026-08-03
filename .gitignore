@@ -40,3 +40,9 @@ scene_debug.log
 
 # Git-Bash crash artifacts
 *.stackdump
+
+# Claude Code: per-turn state written by the turn-loop hooks (tools/claude-hooks/)
+.claude/turn-state.json
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
