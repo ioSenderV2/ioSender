@@ -1345,10 +1345,27 @@
       The Camera menu only appears once a device is bound: go to <strong>Settings → Application → Camera</strong>,
       pick a device from the dropdown and <strong>Connect</strong>.</div>
 
-    <div class="callout warn"><span class="k">Sub-tab keyboard shortcuts are gone</span><br>
-      Settings and Machine Setup used to let you bind a key to an individual sub-tab; those bindings lived on
-      tab headers that no longer exist, and any you had saved are dropped on load. <strong>Top-level tab
-      shortcuts are unaffected</strong> — binding a key to Settings, Job or Work Order still works.</div>
+    <div class="callout note"><span class="k">A shortcut follows its view</span><br>
+      A keyboard shortcut names a <em>view</em>, not a place. Bind a key to Probing and it works whether Probing
+      is a tab on the bar or an entry in the <strong>Tools</strong> menu — the same key shows it either way, so
+      moving a view around never costs you its shortcut. Settings and Machine Setup keep their per-page
+      shortcuts too: those now drive the navigation tree rather than a row of sub-tabs.</div>
+
+    <h3>Where each view lives</h3>
+    <p><strong>Settings → User Interface → Top-level tabs</strong> lists every view with a destination beside
+    it: <strong>Tab bar</strong>, <strong>File menu</strong>, <strong>Tools menu</strong>, or
+    <strong>Not shown</strong>. The main bar ships cut back to what you need while a job runs, with the rest in
+    the menus — but that's only a default. Put Probing back on the bar, move Offsets into a menu, hide what you
+    never touch. The ▲▼ buttons set the order within whichever destination a view is assigned to (left to right
+    on the bar, top to bottom in a menu). Changes apply on restart.</p>
+    <p>Settings, Machine Setup and Job can be moved between the bar and a menu but not hidden — ioSender puts
+    them back rather than let a layout lock you out.</p>
+
+    <h3>Menu commands on a key</h3>
+    <p>The <strong>Menu commands</strong> group in <strong>Keyboard</strong> covers the main-menu actions that
+    aren't views: Connect, Load Program, Load/New Work Order, Camera, and the Help entries. All start unbound.
+    A shortcut is refused whenever its menu entry is greyed out, so a key can never do something the menu
+    itself is currently refusing.</p>
 
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
