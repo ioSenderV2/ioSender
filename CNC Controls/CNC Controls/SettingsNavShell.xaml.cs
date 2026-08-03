@@ -317,11 +317,21 @@ namespace CNC.Controls
         // its own (a bare field next to a separate label), and then this reads exactly as it did before.
         private static string DescribeTip(SettingsSearchIndex.Tip tip, string q)
         {
-            // Short enough to show whole - far more readable than a window starting mid-sentence.
-            const int whole = 110;
-            var text = tip.Text.Length <= whole
-                     ? Flatten(tip.Text)
-                     : Snippet(tip.Text, tip.Text.IndexOf(q, System.StringComparison.OrdinalIgnoreCase), q.Length);
+            const int whole = 130;
+            int at = tip.Text.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
+            string text;
+
+            if (tip.Text.Length <= whole)
+                text = Flatten(tip.Text);
+            else if (at + q.Length <= whole)
+            {
+                // The hit is near the front, so keep the tooltip's own opening words and drop the tail.
+                // A tooltip explains itself from its first word; a window centred on the hit throws that
+                // away and starts mid-sentence, which is how this read before.
+                text = Flatten(tip.Text.Substring(0, whole)) + "...";
+            }
+            else
+                text = Snippet(tip.Text, at, q.Length);
 
             return string.IsNullOrEmpty(tip.Owner) ? text : tip.Owner + " - " + text;
         }
