@@ -92,6 +92,7 @@
     <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
+    <Compile Include="SettingsNavNode.cs" />
     <Compile Include="ConfigPanel.cs" />
     <Compile Include="StartJobConfig.cs" />
     <Compile Include="AtcMacros.cs" />
@@ -110,6 +111,9 @@
     </Compile>
     <Compile Include="GrblConfigView.xaml.cs">
       <DependentUpon>GrblConfigView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="SettingsNavShell.xaml.cs">
+      <DependentUpon>SettingsNavShell.xaml</DependentUpon>
     </Compile>
     <Compile Include="MachineSetupView.xaml.cs">
       <DependentUpon>MachineSetupView.xaml</DependentUpon>
@@ -423,6 +427,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="GrblConfigView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SettingsNavShell.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
