@@ -1091,6 +1091,18 @@ namespace CNC.Controls
         // change needs one, remove it again once testing on real saved App.config files is done.
         private void ApplyOneTimeFixups()
         {
+            // 2026-08-03: the Settings and Machine Setup tab strips are gone - both are navigation trees
+            // now - so their SUB-tab shortcuts have no badge, no right-click bind menu, and nothing to
+            // bind from. Strip any already persisted against those ids so a saved profile does not carry
+            // dead bindings that silently consume a keystroke.
+            // The trailing dot matters: "Tab.Settings" and "Tab.MachineSetup" are the TOP-LEVEL tabs,
+            // which still have a real tab strip and keep their shortcuts. Only their children go.
+            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(
+                t => t?.Id != null && (t.Id.StartsWith("Tab.Settings.") || t.Id.StartsWith("Tab.MachineSetup."))) ?? 0;
+            if (deadShortcuts > 0)
+                CNC.Core.DebugLog.Write("config", string.Format(
+                    "ApplyOneTimeFixups: removed {0} sub-tab shortcut(s) for the retired Settings/Machine Setup tab strips", deadShortcuts));
+
             // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
             // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
             // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of

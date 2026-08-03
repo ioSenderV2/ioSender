@@ -123,19 +123,12 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
-            // Make each step tab bindable to a key (badge + right-click menu). AttachTabBinding re-parents the
-            // existing header - for the six steps that is the named, colour-coded TextBlock (hdrMachine ...),
-            // which keeps working because RefreshStepColors holds it by field reference, not via TabItem.Header.
-            TabKeyBinder.AttachTabBinding(tabStepOverview, "Tab.MachineSetup.Overview");
-            TabKeyBinder.AttachTabBinding(tabStepMachine, "Tab.MachineSetup.Machine");
-            TabKeyBinder.AttachTabBinding(tabStepHome, "Tab.MachineSetup.Home");
-            TabKeyBinder.AttachTabBinding(tabStepAxis, "Tab.MachineSetup.Axis");
-            TabKeyBinder.AttachTabBinding(tabStepHoming, "Tab.MachineSetup.Homing");
-            TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
-            TabKeyBinder.AttachTabBinding(tabStepFixtures, "Tab.MachineSetup.Fixtures");
-            TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
-            TabKeyBinder.AttachTabBinding(tabStepCalibration, "Tab.MachineSetup.Calibration");
-            TabKeyBinder.AttachTabBinding(tabStepSimulator, "Tab.MachineSetup.Simulator");
+            // The step tabs used to be made bindable to a key here (TabKeyBinder.AttachTabBinding adds a
+            // shortcut badge and a right-click bind menu to the tab header). The step tab strip no longer
+            // renders - the steps are nodes in the navigation tree - so that UI was unreachable. Dropped
+            // deliberately (user, 2026-08-03); AppConfig.ApplyOneTimeFixups strips shortcuts already
+            // persisted against these ids. Top-level tabs, Probing and the Lathe wizards still have real
+            // tab strips and keep theirs.
 
             model = DataContext as GrblViewModel;
             DataContextChanged += (s, e) => { if (DataContext is GrblViewModel) model = (GrblViewModel)DataContext; };
