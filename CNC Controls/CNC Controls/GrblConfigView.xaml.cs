@@ -318,14 +318,14 @@ namespace CNC.Controls
                     {
                         Owner = c,
                         Order = OrderFor(c) + sub++,
-                        SearchText = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content ?? c)
+                        Harvest = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content ?? c)
                     });
             }
             else
                 made.Add(new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c)
                 {
                     Order = OrderFor(c),
-                    SearchText = SettingsSearchIndex.Harvest(c)
+                    Harvest = SettingsSearchIndex.Harvest(c)
                 });
 
             panelNodes[c] = made;
@@ -517,7 +517,7 @@ namespace CNC.Controls
 
                 // These editors are built on first show, so this is the first chance to index them.
                 // Until then they match on label only.
-                node.SearchText = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content);
+                node.Harvest = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content);
             }
         }
 

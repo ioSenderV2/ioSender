@@ -262,12 +262,24 @@ namespace CNC.Controls
                 }
 
                 bool onLabel = node.Label != null && node.Label.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0;
-                int at = node.SearchText == null ? -1 : node.SearchText.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
+                int atText = node.SearchText == null ? -1 : node.SearchText.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
+                int atTip = node.SearchTooltips == null ? -1 : node.SearchTooltips.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
 
                 node.MatchedLabel = onLabel;
-                node.MatchesSearch = onLabel || at >= 0;
-                // Explain a match the eye cannot find on the page (much of the index is tooltip text).
-                node.MatchContext = (!onLabel && at >= 0) ? Snippet(node.SearchText, at, q.Length) : null;
+                node.MatchesSearch = onLabel || atText >= 0 || atTip >= 0;
+
+                // Explain a match the eye cannot find on the page, and say which kind of text it hit -
+                // a tooltip hit is on the page but only on hover, which is what made it look wrong.
+                if (onLabel)
+                    node.MatchContext = null;
+                else if (atText >= 0)
+                    node.MatchContext = string.Format(Localized("SettingsMatchedText", "Matched text: {0}"),
+                                                      Snippet(node.SearchText, atText, q.Length));
+                else if (atTip >= 0)
+                    node.MatchContext = string.Format(Localized("SettingsMatchedTooltip", "Matched tooltip: {0}"),
+                                                      Snippet(node.SearchTooltips, atTip, q.Length));
+                else
+                    node.MatchContext = null;
             }
 
             // While filtering, open everything so matches deeper in the tree are actually on screen.
@@ -280,6 +292,13 @@ namespace CNC.Controls
 
             matchCount.Text = all ? string.Empty
                 : string.Format("{0} match{1}", MatchingPages(), MatchingPages() == 1 ? "" : "es");
+        }
+
+        // FindResource returns string.Empty (not null) for a key it does not have.
+        private static string Localized(string key, string fallback)
+        {
+            var s = CNC.Core.LibStrings.FindResource(key);
+            return string.IsNullOrWhiteSpace(s) ? fallback : s;
         }
 
         // A readable fragment of page text around the hit, for the row tooltip.

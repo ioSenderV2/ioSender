@@ -78,7 +78,7 @@ namespace CNC.Controls
                     StatusCheck = page.Status,
                     // Indexed from the step's OWN subtree, not from the wizard - every step shares the
                     // wizard as Content, so indexing that would make all twelve match every query.
-                    SearchText = SettingsSearchIndex.Harvest(page.IndexRoot)
+                    Harvest = SettingsSearchIndex.Harvest(page.IndexRoot)
                 };
 
                 if (string.IsNullOrEmpty(page.Parent))

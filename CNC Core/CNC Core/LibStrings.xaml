@@ -62,4 +62,6 @@
     <system:String x:Uid="str_settingsPageJobLayout" x:Key="SettingsPageJobLayout">Job tab layout</system:String>
     <system:String x:Uid="str_settingsPageTopTabs" x:Key="SettingsPageTopTabs">Top-level tabs</system:String>
     <system:String x:Uid="str_settingsPageCalStepper" x:Key="SettingsPageCalStepper">Stepper</system:String>
+    <system:String x:Uid="str_settingsMatchedText" x:Key="SettingsMatchedText">Matched text: {0}</system:String>
+    <system:String x:Uid="str_settingsMatchedTooltip" x:Key="SettingsMatchedTooltip">Matched tooltip: {0}</system:String>
 </ResourceDictionary>

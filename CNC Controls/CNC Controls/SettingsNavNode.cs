@@ -126,8 +126,20 @@ namespace CNC.Controls
             set { if (isSelected != value) { isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
-        // Free-text harvested from the page's own logical subtree (SettingsSearchIndex).
+        // Free-text harvested from the page's own logical subtree (SettingsSearchIndex), kept apart so a
+        // match can report which kind of text it hit.
         public string SearchText { get; set; }
+        public string SearchTooltips { get; set; }
+
+        // Convenience for the hosts: assign the harvest result and both halves are set.
+        public SettingsSearchIndex.Harvested Harvest
+        {
+            set
+            {
+                SearchText = value == null ? null : value.Text;
+                SearchTooltips = value == null ? null : value.Tooltips;
+            }
+        }
 
         // Why this node matched the current query, when it did NOT match on its label: the snippet of
         // page text that hit. Shown as the row's tooltip, because a lot of the indexed text lives in

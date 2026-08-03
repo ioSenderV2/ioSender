@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SettingsSearchIndex.cs - part of CNC Controls library
  *
  * Builds the free-text index behind the settings/machine-setup search box (phase 3 of
@@ -34,33 +34,43 @@ namespace CNC.Controls
         private const int MaxNodes = 4000;     // guard against a pathological tree
         private const int MaxChars = 8000;
 
-        public static string Harvest(object root)
+        // Visible page text and tooltip text are kept apart so a match can say WHICH it hit. A tooltip
+        // hit is the one worth explaining: the word is genuinely on the page but only appears on hover,
+        // so without saying so it reads as a wrong result.
+        public sealed class Harvested
         {
-            var sb = new StringBuilder();
-            var seen = new HashSet<string>();
-            int budget = MaxNodes;
-            Walk(root as DependencyObject, sb, seen, ref budget);
-            return sb.ToString();
+            public string Text = string.Empty;
+            public string Tooltips = string.Empty;
         }
 
-        private static void Walk(DependencyObject node, StringBuilder sb, HashSet<string> seen, ref int budget)
+        public static Harvested Harvest(object root)
         {
-            if (node == null || budget-- <= 0 || sb.Length >= MaxChars)
+            var text = new StringBuilder();
+            var tips = new StringBuilder();
+            var seen = new HashSet<string>();
+            int budget = MaxNodes;
+            Walk(root as DependencyObject, text, tips, seen, ref budget);
+            return new Harvested { Text = text.ToString(), Tooltips = tips.ToString() };
+        }
+
+        private static void Walk(DependencyObject node, StringBuilder text, StringBuilder tips, HashSet<string> seen, ref int budget)
+        {
+            if (node == null || budget-- <= 0 || text.Length >= MaxChars)
                 return;
 
-            Collect(node, sb, seen);
+            Collect(node, text, tips, seen);
 
             foreach (var child in LogicalTreeHelper.GetChildren(node))
             {
                 var dep = child as DependencyObject;
                 if (dep != null)
-                    Walk(dep, sb, seen, ref budget);
+                    Walk(dep, text, tips, seen, ref budget);
                 else
-                    Add(child as string, sb, seen);
+                    Add(child as string, text, seen);
             }
         }
 
-        private static void Collect(DependencyObject node, StringBuilder sb, HashSet<string> seen)
+        private static void Collect(DependencyObject node, StringBuilder sb, StringBuilder tips, HashSet<string> seen)
         {
             var tb = node as TextBlock;
             if (tb != null)
@@ -95,7 +105,7 @@ namespace CNC.Controls
             var fe = node as FrameworkElement;
             if (fe != null)
             {
-                Add(fe.ToolTip as string, sb, seen);
+                Add(fe.ToolTip as string, tips, seen);
 
                 // Items that are plain strings (combo/list choices) are legitimate search terms.
                 var items = node as ItemsControl;
