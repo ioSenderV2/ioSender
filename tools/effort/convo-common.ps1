@@ -313,7 +313,7 @@ function Read-Manifest([string]$OutDir) {
     return $m
 }
 
-function Write-Manifest([string]$OutDir, $Manifest) {
+function Write-Manifest([string]$OutDir, $Manifest, [string]$MirrorPath = $null) {
     if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
     $Manifest.updated = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     $Manifest.sessions = @($Manifest.sessions | Sort-Object { [datetime]$_.start })
@@ -322,6 +322,40 @@ function Write-Manifest([string]$OutDir, $Manifest) {
     # Keep a single rolling backup: the manifest is the durable record once transcripts age out.
     if (Test-Path $path) { Copy-Item $path "$path.bak" -Force }
     [System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($true)))
+    # ...and a mirror inside the repo, so the one irreplaceable file is versioned and off this disk.
+    # OutDir lives under Downloads, which is backed up by nothing.
+    if ($MirrorPath) { [System.IO.File]::WriteAllText($MirrorPath, $json, (New-Object System.Text.UTF8Encoding($true))) }
+}
+
+<#
+.SYNOPSIS
+  Commit the in-repo manifest mirror. Path-scoped, so it can never sweep up unrelated work.
+
+.DESCRIPTION
+  Deliberately does NOT push: the capture is the last thing before /clear, and the wrap-up's own
+  push-all (step 3) carries this commit at the START of the next session - by the time the next
+  capture's verify-pushed gate runs, the tree is clean and in sync again.
+#>
+function Publish-ManifestMirror {
+    param([string]$RepoDir, [string]$MirrorPath, [string]$SessionName)
+    if (-not $MirrorPath -or -not (Test-Path $MirrorPath)) { return }
+    try {
+        $status = & git -C $RepoDir status --porcelain -- $MirrorPath 2>$null
+        if (-not $status) { Write-Host "  mirror: unchanged, nothing to commit" -ForegroundColor DarkGray; return }
+        # Stage first: on the very first run the mirror is untracked, and a path-scoped commit
+        # silently matches nothing for a file git has never seen.
+        & git -C $RepoDir add -- $MirrorPath 2>&1 | Out-Null
+        $msg = "chore: session log $SessionName [skip release]"
+        & git -C $RepoDir commit -m $msg -- $MirrorPath 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $sha = (& git -C $RepoDir rev-parse --short HEAD 2>$null)
+            Write-Host ("  mirror: committed {0} (push happens with the next wrap-up)" -f $sha) -ForegroundColor DarkGray
+        } else {
+            Write-Host "  mirror: written but NOT committed - commit tools\effort\sessions.json by hand" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host ("  mirror: commit failed ({0}) - the file is written, commit it by hand" -f $_.Exception.Message) -ForegroundColor Yellow
+    }
 }
 
 function Get-CheckpointSizes($Manifest) {

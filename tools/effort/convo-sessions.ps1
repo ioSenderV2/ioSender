@@ -42,9 +42,12 @@ param(
     [string]$OverviewHtml = "$PSScriptRoot\..\..\Overview.html",
     [string]$Repo         = "ioSenderV2/ioSender",
     [string]$GhExe        = "$PSScriptRoot\..\gh.ps1",
+    [string]$MirrorPath   = "$PSScriptRoot\sessions.json",   # in-repo copy of the manifest ('' to skip)
+    [string]$RepoDir      = "$PSScriptRoot\..\..",
     [switch]$Once,              # accepted and ignored: kept so the old playbook command still works
     [switch]$Amend,             # extend the most recent session instead of starting a new one
     [switch]$WhatIfOnly,        # report what would be captured, write nothing
+    [switch]$NoCommit,          # write the mirror but leave it uncommitted
     [switch]$IncludeThinking    # also include Claude's internal "thinking" blocks (off by default)
 )
 
@@ -153,7 +156,7 @@ $manifest.checkpoint = [pscustomobject]@{
     through = $end.ToString('yyyy-MM-dd HH:mm:ss')
     files   = $scan.Files
 }
-Write-Manifest $OutDir $manifest
+Write-Manifest $OutDir $manifest $MirrorPath
 $idx = Write-IndexHtml $OutDir $manifest
 
 $verb = if ($amending) { 'Amended' } else { 'Captured' }
@@ -165,3 +168,7 @@ Write-Host ("  {0} - {1}  ({2})   {3} turns   {4} tokens{5}{6}" -f `
     $(if ($release) { "   release $release" } else { '' })) -ForegroundColor Green
 Write-Host ("  -> {0}" -f $out) -ForegroundColor DarkGray
 Write-Host ("  -> {0}  ({1} sessions)" -f $idx, $manifest.sessions.Count) -ForegroundColor DarkGray
+if ($MirrorPath) {
+    Write-Host ("  -> {0}" -f $MirrorPath) -ForegroundColor DarkGray
+    if (-not $NoCommit) { Publish-ManifestMirror -RepoDir $RepoDir -MirrorPath $MirrorPath -SessionName $name }
+}

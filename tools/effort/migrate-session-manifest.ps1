@@ -39,6 +39,7 @@ param(
     [string]$OverviewHtml     = "$PSScriptRoot\..\..\Overview.html",
     [string]$Repo             = "ioSenderV2/ioSender",
     [string]$GhExe            = "$PSScriptRoot\..\gh.ps1",
+    [string]$MirrorPath       = "$PSScriptRoot\sessions.json",
     [string]$CheckpointAt     = $null,
     [switch]$RewriteHtml,               # re-render session HTMLs that already exist on disk
     [switch]$WhatIfOnly,
@@ -254,7 +255,8 @@ $manifest.checkpoint = [pscustomobject]@{
     through = $checkpoint.ToString('yyyy-MM-dd HH:mm:ss')
     files   = $scan.Files
 }
-Write-Manifest $OutDir $manifest
+Write-Manifest $OutDir $manifest $MirrorPath
 $idx = Write-IndexHtml $OutDir $manifest
 Write-Host ("==> {0}" -f (Get-ManifestPath $OutDir)) -ForegroundColor Green
 Write-Host ("==> {0}" -f $idx) -ForegroundColor Green
+if ($MirrorPath) { Write-Host ("==> {0}  (in-repo mirror - commit it)" -f $MirrorPath) -ForegroundColor Green }
