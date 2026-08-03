@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblConfigView.xaml.cs - part of CNC Probing library
  *
  * v0.46 / 2025-06-05 / Io Engineering (Terje Io)
@@ -80,7 +80,7 @@ namespace CNC.Controls
         private const string CatGCode = "Cat.GCode";
         private const string CatInterface = "Cat.Interface";
 
-        private SettingsNavNode nodeGrbl, nodeSimulator, nodeKeys, nodeMacros, nodeMainPage;
+        private SettingsNavNode nodeGrbl, nodeSimulator, nodeKeyboard, nodeController, nodeMacros, nodeJobLayout, nodeTopTabs;
         private readonly Dictionary<UserControl, SettingsNavNode> panelNodes = new Dictionary<UserControl, SettingsNavNode>();
 
         // True only while the Settings view is the active top-level view. The inner TabControl raises an initial
@@ -226,8 +226,11 @@ namespace CNC.Controls
             };
 
             // The Main Page editor is only meaningful when the main-page/tab layout is user-editable.
-            if (!MainPanelRegistry.LayoutEnabled && nodeMainPage != null)
-                nodeMainPage.IsVisible = false;
+            if (!MainPanelRegistry.LayoutEnabled)
+            {
+                nodeJobLayout.IsVisible = false;
+                nodeTopTabs.IsVisible = false;
+            }
 
             nav.RefreshVisibility();
             nav.EnsureSelection();
@@ -266,10 +269,15 @@ namespace CNC.Controls
             var jogging = new SettingsNavNode(CatJogging, Localized("SettingsCatJogging", "Jogging"));
             var gcode = new SettingsNavNode(CatGCode, Localized("SettingsCatGCode", "G Code"));
 
+            // The two inline editors each carried their own tab strip; those tabs are nodes here instead.
+            // Both pages of an editor share the one editor instance as content and record it as Owner, so
+            // save-on-leave and reset-to-defaults still reach the editor rather than the bare page body.
             var iface = new SettingsNavNode(CatInterface, Localized("SettingsCatInterface", "User Interface"));
-            nodeKeys = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", "Keyboard & Controller"));
+            nodeKeyboard = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", Localized("SettingsPageKeyboard", "Keyboard")));
+            nodeController = iface.Add(new SettingsNavNode("Tab.Settings.Controller", Localized("SettingsPageController", "Controller")));
             nodeMacros = iface.Add(new SettingsNavNode("Tab.Settings.Macros", "Macros"));
-            nodeMainPage = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", "Main Page"));
+            nodeJobLayout = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout")));
+            nodeTopTabs = iface.Add(new SettingsNavNode("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs")));
 
             nav.Nodes.Add(controller);
             nav.Nodes.Add(application);
@@ -373,7 +381,7 @@ namespace CNC.Controls
             // which throws if it runs during the layout pass that generated the tree's containers.
             Dispatcher.BeginInvoke((System.Action)(() =>
             {
-                LeaveNode(from);
+                LeaveNode(from, to);
                 EnterNode(to);
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
@@ -397,13 +405,16 @@ namespace CNC.Controls
             EnsureEditorContent(node);
             UpdateFooterForNode(node);
 
+            // An editor backing several pages shows the matching one.
+            node.Behaviour<ISettingsPageProvider>()?.ShowPage(node.Key);
+
             if (node == nodeGrbl)
                 basicConfig.Activate(true);
             else if (node == nodeSimulator)
                 simConfig.Activate(true);
         }
 
-        private void LeaveNode(SettingsNavNode node)
+        private void LeaveNode(SettingsNavNode node, SettingsNavNode next = null)
         {
             if (node == null)
                 return;
@@ -412,8 +423,15 @@ namespace CNC.Controls
                 basicConfig.Activate(false);
             else if (node == nodeSimulator)
                 simConfig.Activate(false);
-            else if (node.Content is ISettingsEditorTab editor)
-                editor.Commit();   // Keyboard & Controller / Macros / Main Page: save-on-leave
+            else
+            {
+                // Save-on-leave. Moving BETWEEN two pages of the same editor (Keyboard -> Controller) is
+                // not leaving it, so don't persist and re-register hotkeys on an internal page switch.
+                var owner = node.Owner;
+                if (owner != null && next != null && ReferenceEquals(owner, next.Owner))
+                    return;
+                node.Behaviour<ISettingsEditorTab>()?.Commit();
+            }
         }
 
         // Build an editor page's content the first time it is shown.
@@ -422,16 +440,18 @@ namespace CNC.Controls
             if (node.Content != null)
                 return;
 
-            if (node == nodeKeys)
+            if (node == nodeKeyboard || node == nodeController)
             {
-                if (Grbl.GrblViewModel?.Keyboard != null)
+                if (Grbl.GrblViewModel?.Keyboard == null)
+                {
+                    Unavailable(node, "Key mappings are not available until a controller is connected.");
+                    return;
+                }
+                if (keyMapTab == null)
                 {
                     keyMapTab = new KeyMapEditor(Grbl.GrblViewModel);
-                    node.Content = keyMapTab;
+                    AttachPages(keyMapTab);
                 }
-                else
-                    node.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
-                        Text = "Key mappings are not available until a controller is connected." };
             }
             else if (node == nodeMacros)
             {
@@ -442,15 +462,40 @@ namespace CNC.Controls
                     node.Content = macrosTab;
                 }
                 else
-                    node.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
-                        Text = "Macros are not available." };
+                    Unavailable(node, "Macros are not available.");
             }
-            else if (node == nodeMainPage)
+            else if (node == nodeJobLayout || node == nodeTopTabs)
             {
-                mainPageTab = new MainPageEditor();
-                mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
-                node.Content = mainPageTab;
+                if (mainPageTab == null)
+                {
+                    mainPageTab = new MainPageEditor();
+                    mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
+                    AttachPages(mainPageTab);
+                }
             }
+        }
+
+        // Give every page an editor contributes the editor itself as content, keyed by the editor's own
+        // page keys. One editor instance backs several nodes - it is never taken apart, because its
+        // behaviour is hooked on the control (KeyMapEditor's PreviewKeyDown capture and its Loaded/Unloaded
+        // controller-dispatch pause would both stop firing if it left the visual tree).
+        private void AttachPages(ISettingsPageProvider provider)
+        {
+            foreach (var page in provider.GetPages())
+            {
+                var node = nav.FindByKey(page.Key);
+                if (node == null)
+                    continue;
+                node.Content = page.Content;
+                node.Owner = provider;
+                if (!string.IsNullOrWhiteSpace(page.Label))
+                    node.Label = page.Label;
+            }
+        }
+
+        private static void Unavailable(SettingsNavNode node, string why)
+        {
+            node.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap, Text = why };
         }
 
         #endregion
@@ -513,7 +558,8 @@ namespace CNC.Controls
             if (node == nodeGrbl)
                 return new ISettingsResettable[] { basicConfig };
 
-            return node?.Content is ISettingsResettable r ? new[] { r } : Enumerable.Empty<ISettingsResettable>();
+            var r = node?.Behaviour<ISettingsResettable>();
+            return r != null ? new[] { r } : Enumerable.Empty<ISettingsResettable>();
         }
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
@@ -521,7 +567,7 @@ namespace CNC.Controls
             var node = nav.SelectedNode;
             if (node == nodeGrbl)
                 basicConfig.SaveSettings();
-            else if (node?.Content is ISettingsEditorTab editor)
+            else if (node?.Behaviour<ISettingsEditorTab>() is ISettingsEditorTab editor)
                 editor.Commit();
             else if (AppConfig.Settings.Save())
                 Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");

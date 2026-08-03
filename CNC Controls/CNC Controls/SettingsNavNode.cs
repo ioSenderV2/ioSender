@@ -57,6 +57,18 @@ namespace CNC.Controls
 
         public ObservableCollection<SettingsNavNode> Children { get; private set; }
 
+        // The object that owns this page's behaviour, when it isn't the content itself. Several pages can
+        // share one owner: the key-map editor backs both Keyboard and Controller, so save-on-leave and
+        // reset-to-defaults must reach the editor, not the bare Grid sitting in Content.
+        public object Owner { get; set; }
+
+        // Owner first, then the content itself - so a page contributed by an editor and a page that IS a
+        // panel both resolve the same way.
+        public T Behaviour<T>() where T : class
+        {
+            return (Owner as T) ?? (Content as T);
+        }
+
         public bool IsCategory { get { return Children.Count > 0; } }
 
         // Capability gate: the host hides a page that does not apply (no camera fitted, the active

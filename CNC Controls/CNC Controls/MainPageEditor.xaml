@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.MainPageEditor"
+﻿<UserControl x:Class="CNC.Controls.MainPageEditor"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -8,11 +8,29 @@
         d:DesignHeight="560" d:DesignWidth="580">
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <!-- "Unavailable" used to be a third tab. It is not a place you go to configure something, it
+             answers "why can't I see X?" - so it is a button above the lists rather than a nav node. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,4">
+            <Button x:Uid="btn_unavailable" x:Name="btnUnavailable" Content="Unavailable..." MinWidth="110"
+                    Padding="8,2" Click="btnUnavailable_Click"
+                    ToolTip="Components this controller does not offer, and why."/>
+        </StackPanel>
+
+        <TabControl x:Name="tabs" Grid.Row="1">
+            <!-- The tab strip is templated away: these pages are nodes in the settings navigation tree
+                 now, and a tab strip inside that tree is the exact nesting the overhaul removes. The
+                 TabControl is kept as the switcher so the editor stays one control with its hooks
+                 (PreviewKeyDown / Loaded / Unloaded) intact - see GetPages(). -->
+            <TabControl.Template>
+                <ControlTemplate TargetType="TabControl">
+                    <ContentPresenter ContentSource="SelectedContent"/>
+                </ControlTemplate>
+            </TabControl.Template>
             <TabItem x:Uid="tab_panels" Header="Panels">
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
@@ -97,7 +115,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem x:Uid="tab_unavailable" Header="Unavailable">
+            <TabItem x:Uid="tab_unavailable" x:Name="unavailableTab" Header="Unavailable">
                 <Grid Margin="0,6,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -117,8 +135,8 @@
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Uid="txt_restartNote" Text="Changes are applied when you leave this tab and take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock x:Uid="txt_restartNote" x:Name="txtRestartNote" Text="Changes are applied when you leave this tab and take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
         </StackPanel>
     </Grid>
 </UserControl>

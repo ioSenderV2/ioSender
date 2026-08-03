@@ -22,8 +22,28 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class KeyMapEditor : UserControl, ISettingsEditorTab, ISettingsResettable
+    public partial class KeyMapEditor : UserControl, ISettingsEditorTab, ISettingsResettable, ISettingsPageProvider
     {
+        // The editor's Keyboard/Controller tab strip becomes two nav pages. The editor itself stays the
+        // content of BOTH pages - it is not taken apart - because its behaviour is hooked on the control:
+        // PreviewKeyDown drives shortcut capture, and Loaded/Unloaded pause controller dispatch so testing
+        // a gamepad button in here cannot move the machine. Handing out the two tab bodies on their own
+        // would have left the editor outside the visual tree and silently killed both.
+        // Its tab strip is templated away (see the XAML), so ShowPage just switches the selected item.
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            return tabs.Items.OfType<TabItem>()
+                       .Select((item, i) => new SettingsSubPage(
+                            i == 0 ? "Tab.Settings.Keyboard" : "Tab.Settings.Controller",
+                            item.Header as string ?? string.Empty, this))
+                       .ToList();
+        }
+
+        public void ShowPage(string key)
+        {
+            tabs.SelectedIndex = key == "Tab.Settings.Controller" ? 1 : 0;
+        }
+
         private readonly KeypressHandler keyboard;
         private readonly GrblViewModel model;
         private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();

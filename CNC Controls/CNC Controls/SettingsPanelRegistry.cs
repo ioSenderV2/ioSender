@@ -58,6 +58,35 @@ namespace CNC.Controls
         void Commit();
     }
 
+    // One page contributed by an editor that used to carry its own tab strip.
+    public sealed class SettingsSubPage
+    {
+        public string Key { get; }
+        public string Label { get; }
+        public System.Windows.FrameworkElement Content { get; }
+
+        public SettingsSubPage(string key, string label, System.Windows.FrameworkElement content)
+        {
+            Key = key;
+            Label = label;
+            Content = content;
+        }
+    }
+
+    // An editor that hosts its own tabs exposes them as separate nav pages instead, so the navigation
+    // tree never ends up with a tab strip inside it - which is the thing the overhaul exists to remove.
+    // The editor instance stays whole and keeps owning Commit()/ResetToDefaults() for all of its pages;
+    // the nav node records it as the page's Owner.
+    public interface ISettingsPageProvider
+    {
+        IEnumerable<SettingsSubPage> GetPages();
+
+        // Several pages can share one editor instance as their content (the editor keeps its own
+        // hooks on the control, so it must stay whole and in the visual tree). The host calls this on
+        // entering a page so the editor can show the matching section.
+        void ShowPage(string key);
+    }
+
     // A settings panel or editor tab implements this to opt in to the shared footer's "Reset to Default" button.
     // The host shows Reset only on tabs that contain at least one resettable, and calls ResetToDefaults() on each
     // when clicked - so each panel owns what "default" means for its own settings (App/G Code Config values, jog

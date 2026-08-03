@@ -9,6 +9,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -17,10 +18,57 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class MainPageEditor : UserControl, IRestartRequired, ISettingsEditorTab
+    public partial class MainPageEditor : UserControl, IRestartRequired, ISettingsEditorTab, ISettingsPageProvider
     {
         // Fires (once) when Commit() applied a layout/tab change, so the settings host lights up its Restart button.
         public event EventHandler<RestartRequiredEventArgs> RestartRequired;
+
+        // The Panels / Tabs tabs become two nav pages; "Unavailable" does not - it is a question
+        // ("why can't I see X?"), not a place you configure something, so it moved to a button.
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            return new List<SettingsSubPage>
+            {
+                new SettingsSubPage("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout"), this),
+                new SettingsSubPage("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs"), this)
+            };
+        }
+
+        public void ShowPage(string key)
+        {
+            tabs.SelectedIndex = key == "Tab.Settings.Tabs" ? 1 : 0;
+        }
+
+        // LibStrings.FindResource hands back string.Empty (not null) for a key it doesn't have, so these
+        // fall back to English until the two new labels get their locale rows.
+        private static string Localized(string key, string fallback)
+        {
+            var s = LibStrings.FindResource(key);
+            return string.IsNullOrWhiteSpace(s) ? fallback : s;
+        }
+
+        // The Unavailable list, detached from the tab strip on first use and shown in its own window so it
+        // is reachable from either page.
+        private void btnUnavailable_Click(object sender, RoutedEventArgs e)
+        {
+            var body = unavailableTab.Content as FrameworkElement;
+            if (body == null)
+                return;
+
+            unavailableTab.Content = null;
+            var host = new Window {
+                Title = "Unavailable components",
+                Owner = Window.GetWindow(this),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Width = 640,
+                Height = 420,
+                ShowInTaskbar = false,
+                Content = body
+            };
+            // Hand the list back to its holder, or the button only ever works once.
+            host.Closed += (s, ev) => { host.Content = null; unavailableTab.Content = body; };
+            host.ShowDialog();
+        }
 
         private const int MaxMainPanels = 8;
         private const int MaxLeftPanels = 6;
