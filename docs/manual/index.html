@@ -343,7 +343,7 @@
       <tr><td><strong>X beam / gantry</strong></td><td>The bridge that moves along Y and carries the Z axis left-to-right.</td></tr>
       <tr><td><strong>Z carriage</strong></td><td>Rides the gantry up and down; holds the spindle.</td></tr>
       <tr><td><strong>Spindle</strong></td><td>Spins the cutting bit — a trim router or a proper VFD-driven spindle.</td></tr>
-      <tr><td><strong>Spoilboard</strong></td><td>A flat, sacrificial surface on the bed. You can cut slightly into it, screw workholding into it, and it gives a known flat reference (often <a href="#tools">surfaced flat by the machine itself</a>).</td></tr>
+      <tr><td><strong>Spoilboard</strong></td><td>A flat, sacrificial surface on the bed. You can cut slightly into it, screw workholding into it, and it gives a known flat reference (often <a href="#work-order">surfaced flat by the machine itself</a>).</td></tr>
       <tr><td><strong>Stepper motors</strong></td><td>Turn electrical pulses into precise rotation. (Closed-loop steppers and servos add position feedback so they can't silently lose steps.)</td></tr>
     </table>
     <p>The motors' rotation is turned into straight-line motion by a <strong>drive mechanism</strong>, and the
@@ -489,9 +489,9 @@
       <figcaption>The manual touch-plate change (left) re-establishes Z against the stock on every swap and risks moving the XY origin. With a toolsetter (right) you probe the origin once; each tool change only re-measures length at a fixed location, so the part's origin is never disturbed.</figcaption>
     </figure>
     <div class="callout note"><span class="k">In ioSender</span><br>
-      <a href="#setup">Setup</a> sets the work origin with the probe, and the
-      <a href="#tools">Tools</a> / tool-change flow uses the toolsetter to re-measure length on each change —
-      so multi-tool jobs stay accurate without re-zeroing.</div>
+      <a href="#setup">Setup</a> sets the work origin with the probe, and the tool-change flow uses the
+      toolsetter to re-measure length on each change — so multi-tool jobs stay accurate without
+      re-zeroing.</div>
 
     <h3>What people actually make with a CNC</h3>
     <ul>
@@ -510,7 +510,7 @@
       ioSender window, then <a href="#connect">Connect</a> to your machine — the Novice track walks you
       through the rest in order (use the <em>Next</em> button below).</div>
 
-    <div class="xref">Related: <a href="#offsets">Work offsets (WCS)</a> · <a href="#settings">Settings (grbl)</a> · <a href="#setup">Setup</a> · <a href="#tools">Tools</a></div>
+    <div class="xref">Related: <a href="#offsets">Work offsets (WCS)</a> · <a href="#settings">Settings (grbl)</a> · <a href="#setup">Setup</a> · <a href="#work-order">Work Order</a></div>
   </section>
 
   <!-- ===================== GETTING STARTED ===================== -->
@@ -530,8 +530,8 @@
       <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run bar.</td></tr>
       <tr><td><a href="#work-order">Work Order</a></td><td>Compose a quick job (pockets, drills, contours…) without a CAM round-trip.</td></tr>
       <tr><td><a href="#machine-setup">Machine&nbsp;Setup</a></td><td>Guided first-time commissioning of a new controller.</td></tr>
-      <tr><td><a href="#tools">Tools</a></td><td>Tool table, spoilboard surfacing, gantry squaring, stepper calibration, Trinamic/PID.</td></tr>
-      <tr><td><a href="#settings">Settings</a></td><td>All grbl <code>$</code> settings plus the app's own preferences.</td></tr>
+      <tr><td><a href="#settings">Settings</a></td><td>All grbl <code>$</code> settings plus the app's own preferences, in a searchable navigation tree.</td></tr>
+      <tr><td><a href="#tools">Tools</a></td><td>Tool table, Trinamic and PID tuning — <em>only appears if your controller supports one of them</em>, so don't worry if you don't have this tab.</td></tr>
     </table>
 
     <h3>Your first five minutes</h3>
@@ -616,7 +616,14 @@
       <li><strong>Distance</strong> presets (smallest → largest) — how far one press moves.</li>
       <li><strong>Feed rate</strong> — how fast it jogs.</li>
       <li><strong>Continuous</strong> — hold to move, release to stop, instead of a fixed step.</li>
+      <li><strong>Centre button</strong> (the bullseye in the middle of the pad) — rapid to the centre of the
+      machine envelope at safe Z. While a jog is running it turns into a red stop sign that cancels it.</li>
+      <li><strong>Corner buttons</strong> (the four diagonals) — rapid to that corner of the machine envelope
+      at safe Z, held back 20&nbsp;mm from each limit so you never drive into a switch.</li>
     </ul>
+    <div class="callout note"><span class="k">The pad targets the machine, not the job</span><br>
+      Centre and the four corners are the <em>machine envelope</em> — they don't follow the loaded program's
+      bounding box. That way they mean the same thing whether or not a file is loaded.</div>
     <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
     continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
     of the distance shown as <em>Jog step</em> in the status bar.</p>
@@ -718,7 +725,7 @@
       high whine and dust mean you're rubbing; chatter marks mean too much engagement or not enough rigidity.
       Adjust the <strong>feed-rate override</strong> on the fly and note what worked for next time.</div>
 
-    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#tools">Tools (surface the spoilboard)</a> · <a href="#gcode-viewer">3D viewer</a></div>
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#work-order">Work Order (surface the spoilboard)</a> · <a href="#gcode-viewer">3D viewer</a></div>
   </section>
 
   <!-- ===================== ACCURACY & CALIBRATION (Machinist opener) ===================== -->
@@ -755,10 +762,12 @@
     <p>Each step assumes the previous one is done — calibrating out of order means re-doing work.</p>
     <ol>
       <li><strong>Steps/mm</strong> (<code>$100</code>–<code>$102</code>) — command a long known distance,
-      measure the actual travel, correct the number. Do X, Y, Z. ioSender's stepper-calibration and
-      scratch-line tools in <a href="#tools">Tools</a> automate the maths.</li>
+      measure the actual travel, correct the number. Do X, Y, Z.
+      <a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Stepper</a> automates the whole thing by
+      probing a reference block instead, so there's nothing to measure by hand.</li>
       <li><strong>Squaring &amp; tramming</strong> — get the gantry square to the axes
-      (<a href="#tools">Auto Square</a> uses a Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
+      (<a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Squareness</a> uses a
+      Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
       the spindle perpendicular to the bed (surface a test patch, read the scallops), and the frame square
       (measure the diagonals of a big rectangle).</li>
       <li><strong>Backlash</strong> — put a dial indicator on each axis, reverse direction, read the lost
@@ -782,7 +791,7 @@
       Closed-loop steppers and servos remove the "lost steps" failure mode, but they don't fix geometry — a
       machine that's out of square is out of square whether or not it can report position. You still calibrate.</div>
 
-    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#tools">Tools (Auto Square, stepper cal, Trinamic/PID)</a> · <a href="#offsets">Work offsets</a></div>
+    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#machine-setup">Machine&nbsp;Setup → Calibration</a> · <a href="#offsets">Work offsets</a></div>
   </section>
 
   <!-- ===================== THE JOB SCREEN ===================== -->
@@ -861,6 +870,11 @@
     <strong>Rapids</strong> and <strong>Spindle</strong> live (with a reset-to-default), and watch the
     <strong>run time</strong>. Overrides are how you dial in feeds by ear on the fly — see
     <a href="#clean-results">reading the cut</a>.</p>
+    <div class="callout note"><span class="k">Where did the feed rate's units go?</span><br>
+      The run bar's <strong>Feed:</strong> readout drops the mm/min · in/min label — on that bar the room is
+      better spent on digits — and states the unit in its tooltip instead. The full <em>Feed rate</em> panel
+      still shows its unit inline, and both readouts now grow to fit a five-digit rate rather than clipping
+      it.</div>
 
     <h3>Start from a toolpath</h3>
     <p>If you need to restart partway through — after a broken bit or a stopped job — you can begin from a
@@ -962,6 +976,14 @@
       Internal/Is-Circle feature on non-conductive stock with a Touch Plate shows a warning rather than a
       hard block — a custom-shaped touch plate can still reach those points.</div>
 
+    <div class="callout tip"><span class="k">Plate thickness always applies</span><br>
+      Picking a Touch Plate always applies its <strong>thickness and lip offsets</strong>, whatever the stock
+      is made of. That's the right test, because the probe circuit closes between the <em>bit</em> and the
+      <em>plate</em> — both metal — and never through the material underneath. So probing conductive stock
+      <em>with</em> a plate (thin aluminium sheet, say, too thin for a reliable direct stylus touch) is an
+      ordinary workflow and compensates correctly. Stock conductivity only drives the reliability warning
+      above.</div>
+
     <div class="callout warn"><span class="k">Behind the scenes</span><br>
       Setup writes a controller-side <code>start_job.macro</code> and performs an automatic 3D (or touch
       plate) probe as part of the sequence. It must land on the Job tab to bootstrap the controller
@@ -989,11 +1011,11 @@
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li><strong>Toolpaths</strong> — the geometry: line, circle, oval, square or rectangle. Add one, then
-      hang <strong>operations</strong> underneath it: pocket, contour, drill, bore, side finish, bottom
-      finish, chamfer. Geometry belongs to the toolpath; the operations act on it — that's why a counterbore
-      is just one circle carrying a shallow bore, a through drill and a chamfer on the same centreline,
-      rather than a special case.</li>
+      <li><strong>Toolpaths</strong> — the geometry: line, circle, oval, square, rectangle or
+      <strong>surface</strong>. Add one, then hang <strong>operations</strong> underneath it: pocket, contour,
+      drill, bore, side finish, bottom finish, chamfer. Geometry belongs to the toolpath; the operations act
+      on it — that's why a counterbore is just one circle carrying a shallow bore, a through drill and a
+      chamfer on the same centreline, rather than a special case.</li>
       <li><strong>Enable checkboxes</strong> per row — untick a toolpath or operation to leave it out of the
       next Generate; ticking/unticking a toolpath cascades to its operations, and back.</li>
       <li><strong>Feeds and speeds</strong> — a dialog proposes chipload-based feed/speed/depth-of-cut
@@ -1020,6 +1042,30 @@
     you back to Work Order and restores whatever program was loaded before the run, so re-running the Work
     Order never clobbers a file you had open.</p>
 
+    <h3>Surfacing the spoilboard</h3>
+    <p>Flattening the spoilboard is a <strong>Surface</strong> toolpath like any other operation — same tool
+    list, same feeds &amp; speeds advisor, same generate/run path, same dry run. Tick <strong>Entire
+    Spoilboard</strong> and it covers the whole bed.</p>
+    <div class="callout note"><span class="k">Entire Spoilboard ignores your origin on purpose</span><br>
+      It deliberately does <em>not</em> trust the work order's coordinate system: it touches off its own fresh
+      Z0 and works in machine coordinates, because the whole point of resurfacing is that the board is
+      <em>not</em> where you last thought it was. It borrows a scratch WCS slot and restores it afterwards, so
+      establishing that temporary origin never steps on your real one.</div>
+
+    <h3>Which coordinate system it runs in</h3>
+    <p>A work order carries its own <strong>WCS</strong> field. Leave it on <strong>Follow Setup</strong> and
+    it resolves live at Generate time to whatever <a href="#setup">Setup</a> is currently targeting; or pin it
+    to a specific <code>G54</code>–<code>G59</code> if this job always belongs to one fixture. Pinning matters
+    because Setup is shared with a plain loaded file — its live selection isn't something a work order saved
+    weeks ago can treat as a stable reference.</p>
+
+    <h3>Your own tools</h3>
+    <p>The tool list isn't fixed. Add your own cutters alongside the built-ins from the
+    <strong>Feeds &amp; Speeds</strong> dialog's tool editor — an added tool behaves identically to a built-in
+    one, including in the advisor and the tool-ordering pass. Operations record the tool by <em>name</em>, so
+    a saved work order stays readable, and reconciles itself on load if the list has changed underneath it
+    rather than silently binding to the wrong cutter.</p>
+
     <div class="callout note"><span class="k">One Setup, not one per program</span><br>
       Work Order doesn't have its own separate stock-setup step. It uses the same <a href="#setup">Setup</a>
       tab and cached origin/tool-length reference as everything else. Generate asks once — proceed on the
@@ -1031,7 +1077,11 @@
       spindle), that number is skipped in the Work Order's own numbering — check your macro setup before
       assuming T-numbers line up 1:1 with the tool list.</div>
 
-    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#job">The Job screen</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#tools">Tools</a></div>
+    <div class="callout tip"><span class="k">Dry Run really is dry</span><br>
+      Running a work order in <strong>Dry Run</strong> neutralizes the spindle, the same as dry-running a
+      loaded file. (It didn't always — a work order used to bypass that and could fire the spindle for real.)</div>
+
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#job">The Job screen</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
   </section>
 
   <!-- ===================== MACHINE SETUP ===================== -->
@@ -1040,12 +1090,12 @@
     <h2>Machine Setup — commissioning a new controller <a class="anchor" href="#machine-setup">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the eight steps">
-      <figcaption>The Machine Setup overview and its eight guided steps.</figcaption>
+      <img src="img/machine-setup-overview.png" alt="The Machine Setup overview page listing the nine steps">
+      <figcaption>The Machine Setup overview and its nine guided steps.</figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li>The row of numbered tabs across the top (1–8, plus Overview) is the guided sequence — work left to right; nothing is sent to the controller until you press Apply.</li>
+      <li>The numbered steps down the left (1–9, plus Overview) are the guided sequence — work top to bottom; nothing is sent to the controller until you press Apply. It's the same searchable navigation tree as <a href="#settings">Settings</a>, and each step carries a <strong>status dot</strong> — green done, orange needs attention, red not set — so you can see at a glance what's left.</li>
       <li><strong>Start from your machine</strong> — three dropdowns let you pick a known manufacturer/product/model (or Generic/custom) so the later steps start from sensible defaults instead of blank fields.</li>
       <li><strong>Firmware / Build</strong> — shows what's actually running on the connected controller right now; <strong>Check for Updates</strong> compares it against the latest published grblHAL build.</li>
       <li><strong>Firmware update available</strong> (popup shown here) — appears when a newer build exists; <strong>Flash Firmware</strong> reprograms the board (this disconnects ioSender and needs the board's own RESET/PROGRAM button pressed within the time shown).</li>
@@ -1060,10 +1110,10 @@
 
     <div class="callout note"><span class="k">The startup gate</span><br>
       If setup isn't finished, ioSender opens straight on the <em>first incomplete step</em> — so you can't
-      accidentally try to run a half-configured machine. Once all eight steps are done, it stops nagging.</div>
+      accidentally try to run a half-configured machine. Once all the steps are done, it stops nagging.</div>
 
-    <h3>The eight steps</h3>
-    <p>An <strong>Overview</strong> page lists them; each is a numbered tab you complete in order.</p>
+    <h3>The nine steps</h3>
+    <p>An <strong>Overview</strong> page lists them; each is a numbered entry in the tree that you complete in order.</p>
     <table class="reftab">
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
       <tr><td><strong>1 · Machine</strong></td><td>Start from your machine — pick your machine so the later steps begin from sensible defaults instead of blanks.</td><td>—</td></tr>
@@ -1073,14 +1123,41 @@
       <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
       <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
       <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
-      <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
+      <tr><td><strong>8 · Calibration</strong></td><td>Two sub-pages. <strong>Stepper</strong> corrects steps/mm without any manual measuring: for X/Y it probes a reference block of known size against a validated Corner Fence; for Z it probes a 1-2-3 gauge block's top in each of its three known orientations and least-squares fits a new Z steps/mm from all three readings. <strong>Squareness</strong> checks and corrects gantry squareness on a ganged (dual-motor) axis. Only the ganged axis is writable and the offset is a fine trim.</td><td><code>$100</code>–<code>$102</code> <code>$170+</code></td></tr>
+      <tr><td><strong>9 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
 
     <h3>Why the order matters</h3>
     <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
     machine knows its <strong>travel</strong> and homing direction (steps 2–3); probing routines (step 5) need
-    the axes configured; and the macros (step 7) assume a working, homeable machine. Working top-to-bottom
-    once gets you to a machine that homes, respects its own limits, and can probe.</p>
+    the axes configured; the macros (step 7) assume a working, homeable machine; and calibration (step 8)
+    probes a fixture you defined in step 6 with a probe you declared in step 5. Working top-to-bottom
+    once gets you to a machine that homes, respects its own limits, probes, and measures true.</p>
+
+    <h3>Defining a fixture (step 6)</h3>
+    <p>A fixture is a named piece of workholding — a specific vise, a corner fence, a dog-hole grid — plus a
+    captured machine-coordinate reference position that <a href="#setup">Setup</a> can probe against. The edit
+    dialog is deliberately <strong>non-modal</strong> so the jog pad stays live while you're defining one:</p>
+    <ul>
+      <li><strong>Set position</strong> captures wherever the machine currently is as the fixture's reference.</li>
+      <li><strong>Test</strong> rapids to the saved position and probes it. If you've since jogged somewhere
+      noticeably different, it asks first and defaults to adopting <em>where the machine actually is</em> —
+      otherwise pressing Test would silently undo your jog and re-run the identical failing probe. Nothing
+      moves until you answer.</li>
+      <li>The <strong>3D Probe / Touch Plate</strong> choice is remembered per fixture. A touch-plate fixture
+      reopens as a touch-plate fixture, so the next Set/Test can't quietly run with 3D-probe geometry and drop
+      the plate thickness and lip offset. A brand-new fixture defaults by which probes you actually declared
+      in step 5.</li>
+    </ul>
+    <div class="callout tip"><span class="k">If a probe search fails</span><br>
+      The recovery prompt tells you what went wrong and points you at <strong>Test</strong>. Jog closer to the
+      feature, then press Test — it will offer to adopt the new position and probe from there.</div>
+
+    <div class="callout note"><span class="k">Calibration lives here now</span><br>
+      Stepper calibration and squareness used to be standalone wizards on the Tools tab, disconnected from
+      the rest of commissioning. They're steps in this sequence instead — same guided order as homing, soft
+      limits and the TLO reference — so a machine gets set up in one pass. See
+      <a href="#accuracy-calibration">Accuracy &amp; calibration</a> for what the numbers mean.</div>
 
     <div class="callout warn"><span class="k">Have your facts ready</span><br>
       Steps 2–4 describe physical reality — which corner homes, how far each axis travels, your drive type and
@@ -1097,42 +1174,35 @@
   </section>
 
   <!-- ===================== TOOLS ===================== -->
-  <section class="topic" id="tools" data-title="Tools (surfacing, squaring, calibration)" data-level="int"
-           data-track="novice:0,intermediate:7,machinist:3" data-video="pending">
-    <h2>Tools — surfacing, squaring &amp; calibration <a class="anchor" href="#tools">#</a></h2>
+  <section class="topic" id="tools" data-title="Tools (hardware-specific)" data-level="int"
+           data-track="novice:0,intermediate:2,machinist:4">
+    <h2>Tools — the hardware-gated extras <a class="anchor" href="#tools">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
-    <figure>
-      <img src="img/tools-tab.png" alt="The Tools tab">
-      <figcaption>The Tools tab gathers the machine utilities (Stepper calibration (probe) shown).</figcaption>
-    </figure>
-    <p><strong>What you're looking at:</strong></p>
-    <ul>
-      <li>The five sub-tabs across the top are separate utilities — this shot shows <strong>Stepper calibration (probe)</strong>; the others cover Squareness, Surface spoilboard flattening, and two other stepper-calibration methods.</li>
-      <li><strong>Calibrate</strong> — choose whether you're calibrating the XY steppers or the Z stepper (against a 1-2-3 gauge block).</li>
-      <li><strong>Fixture</strong> — pick the validated fixture (here a Corner Fence named "Serving Platter") the probe will measure against.</li>
-      <li><strong>True width/height</strong> — the reference block's own precisely-known size; the probe compares its measured size against this to work out the real steps/mm.</li>
-      <li><strong>Measured / error / new-steps/mm</strong> — filled in after a probe run: what was actually measured, how far off it was from "true", and the corrected steps/mm value ready to save.</li>
-      <li><strong>Save steps/mm</strong> writes the corrected value to the controller (<code>$100</code>/<code>$101</code> for XY, <code>$102</code> for Z); <strong>Undo</strong> reverts it.</li>
-      <li>The numbered instructions (right) walk the exact physical steps for this fixture.</li>
-    </ul>
-    <p>The <strong>Tools</strong> tab gathers the machine utilities — the jobs you do <em>to</em> the machine
-    rather than <em>with</em> it. Each sub-tab carries its own "About…" guidance in the app.</p>
+    <p>The <strong>Tools</strong> tab holds the three utilities that depend on what your <em>controller</em>
+    supports, rather than on how you work:</p>
     <table class="reftab">
-      <tr><th>Tool</th><th>What it does</th></tr>
-      <tr><td><strong>Tool table</strong></td><td>Define your tools (number, diameter, length) so tool changes and offsets know each bit.</td></tr>
-      <tr><td><strong>Surface Spoilboard</strong></td><td>Generate a facing program to flatten the spoilboard (or stock) dead flat to the machine — the reference every job sits on.</td></tr>
-      <tr><td><strong>Auto Square</strong></td><td>Square a ganged (dual-motor) axis using a Phil&nbsp;Barrett offset (<code>$170+</code>). Only the ganged axis is writable; the offset is a fine trim.</td></tr>
-      <tr><td><strong>Stepper calibration (Manual)</strong></td><td>Dial in steps/mm by hand against a known move distance.</td></tr>
-      <tr><td><strong>Stepper calibration (scratch)</strong></td><td>Dial in steps/mm accurately over a long span (the scratch-line trick). Feeds <a href="#accuracy-calibration">Accuracy &amp; calibration</a>.</td></tr>
-      <tr><td><strong>Stepper calibration (probe)</strong></td><td>Calibrate an axis without any manual measuring: for X/Y it probes a validated Corner Fence fixture; for Z it probes a 1-2-3 gauge block's top in each of its three known orientations and least-squares fits a new Z steps/mm from all three readings. Parks at G30 between passes, with a settable Safe Z delta.</td></tr>
-      <tr><td><strong>Trinamic</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard) if your controller has them.</td></tr>
-      <tr><td><strong>PID</strong></td><td>Tune closed-loop / spindle PID where applicable.</td></tr>
+      <tr><th>Tool</th><th>What it does</th><th>Only if…</th></tr>
+      <tr><td><strong>Tool table</strong></td><td>Define your tools (number, diameter, length) so tool changes and offsets know each bit.</td><td>the firmware was built with a tool table (<code>N_TOOLS</code> non-zero)</td></tr>
+      <tr><td><strong>Trinamic</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard).</td><td>the board has TMC drivers</td></tr>
+      <tr><td><strong>PID</strong></td><td>Tune closed-loop / spindle PID.</td><td>the controller exposes a PID log</td></tr>
     </table>
-    <div class="callout note"><span class="k">Big programs run for real</span><br>
-      Generators like Surface Spoilboard can emit thousands of lines; ioSender routes those through the actual
-      job streamer, so surfacing runs smoothly instead of freezing the UI — each of these tools shares the same
-      Generate/Run button on the run bar at the bottom of the window rather than having its own.</div>
-    <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a> · <a href="#intro-to-cnc">Intro → bits</a></div>
+
+    <div class="callout note"><span class="k">No Tools tab? Nothing is wrong</span><br>
+      The tab hides itself when your controller supports <em>none</em> of the three — which is the common case
+      on a hobby machine — and shows just the relevant sub-tabs when it supports some. If you're looking for
+      it and it isn't there, your board simply has nothing to put in it.</div>
+
+    <h3>Where the rest of it went</h3>
+    <p>This tab used to be a catch-all for machine utilities. Everything that wasn't hardware-gated has moved
+    to where it's actually used, and the standalone wizards were deleted rather than kept in two places:</p>
+    <table class="reftab">
+      <tr><th>Used to be here</th><th>Now</th></tr>
+      <tr><td><strong>Surface Spoilboard</strong></td><td>A <strong>Surface</strong> toolpath in <a href="#work-order">Work Order</a> — same tool list, same feeds &amp; speeds advisor, same generate/run path and dry run as any other operation. Its <em>Entire Spoilboard</em> mode is a checkbox on the toolpath.</td></tr>
+      <tr><td><strong>Stepper calibration</strong> (manual / scratch / probe)</td><td><a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Stepper</a>. The manual and scratch methods are gone; the probe method is the one that survived.</td></tr>
+      <tr><td><strong>Auto Square</strong></td><td><a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Squareness</a>.</td></tr>
+    </table>
+
+    <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#work-order">Work Order</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a></div>
   </section>
 
   <!-- ===================== OFFSETS ===================== -->
@@ -1172,6 +1242,15 @@
     a value that differs from what it was at startup shows <span style="color:#1565C0">blue</span> — the same
     change-tracking convention as the <a href="#settings">Grbl settings tree</a>. Right-click a row for
     <strong>Restore to value at startup</strong>.</p>
+    <div class="callout warn"><span class="k">Go To needs a homed machine</span><br>
+      The <strong>Go To</strong> actions (including a <code>G30</code> park) are <em>machine</em>-coordinate
+      moves, so they're only as trustworthy as the machine-coordinate reference — and ioSender now refuses to
+      run one on an unhomed machine. This isn't theoretical: after an unexpected controller reboot grblHAL
+      came back reporting <em>Idle</em>, not Alarm, with <code>MPos:0,0,0</code> at wherever the tool happened
+      to be sitting. A <code>G30</code> then chased its stored coordinates as a blind displacement from that
+      false zero and rapided into the hard stops. Soft limits are no backstop here — they're only enforced
+      once homed. <strong>Home first.</strong></div>
+
     <div class="callout note"><span class="k">G28/G30/G92 confirm first</span><br>
       Because these three store <em>wherever the machine currently is</em> rather than a typed target
       (no rapid move is ever issued), editing their row asks for confirmation before committing — click
@@ -1196,38 +1275,53 @@
     <h2>Settings — grbl &amp; app <a class="anchor" href="#settings">#</a></h2>
     <div class="tags"><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/settings-grbl.png" alt="The Grbl settings tab with the search box">
-      <figcaption>The Grbl settings tab — searchable, with changed settings highlighted.</figcaption>
+      <img src="img/settings-grbl.png" alt="The Settings tab: the navigation tree on the left, the Grbl page on the right">
+      <figcaption>Settings — the searchable navigation tree (left) with the Grbl page selected.</figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li>The <strong>Search</strong> box (top) filters the tree live — a wildcard like <code>$39*</code> or free text like "jog" both work, with next/previous match arrows.</li>
-      <li>The tree (left) lists every <code>$</code> setting grouped by category; a setting whose value has changed since the app started is <strong>highlighted</strong> (shown here in orange/yellow) so you can spot what's different at a glance.</li>
-      <li>Selecting a setting shows its live control and a plain-English description on the right — no need to memorize what each numbered <code>$</code> setting means.</li>
-      <li><strong>Reload / Backup / Restore / Copy to simulator / Reset to Default</strong> (bottom) — Backup/Restore let you snapshot and roll back a whole settings set; Copy to simulator pushes the same settings into the bundled offline simulator so it matches your real machine.</li>
+      <li>The <strong>navigation tree</strong> (left) lists every settings page grouped into five categories. Pick a page; it opens on the right. There are no tab strips.</li>
+      <li>The <strong>Search</strong> box above the tree filters it live and reports a <strong>match count</strong>. It searches the <em>words on each page</em>, not just page names — "backlash" finds <em>Axis information</em>, "OBS" finds <em>Demo recording</em>.</li>
+      <li>The page area (right) shows one config panel at a time, with room to breathe — panels are no longer crammed two or three to a column.</li>
+      <li><strong>Save / Restart / Reset to Default</strong> (bottom) is a shared footer; which buttons appear depends on the page (Reset only shows where the page actually has resettable settings).</li>
+      <li>On the <strong>Grbl</strong> page specifically, the footer gains <strong>Reload / Backup / Restore / Copy to simulator</strong> — Backup/Restore snapshot and roll back a whole settings set; Copy to simulator pushes the same settings into the bundled offline simulator so it matches your real machine.</li>
     </ul>
-    <p><strong>Settings</strong> is one flat strip of tabs — the controller's settings plus ioSender's own
-    preferences, in one place:</p>
+    <p><strong>Settings</strong> holds the controller's settings plus ioSender's own preferences, in one
+    place. They're organised as a tree of five categories:</p>
     <table class="reftab">
-      <tr><th>Tab</th><th>Contains</th></tr>
-      <tr><td><strong>Grbl</strong></td><td>Every <code>$</code> setting the controller has, with a free-text search and <strong>change highlighting</strong> — settings changed from startup are marked, and you can right-click to revert one.</td></tr>
-      <tr><td><strong>App</strong></td><td>ioSender's own preferences — colours, behaviour, and the lathe-mode switch (see <a href="#lathe">Lathe</a>).</td></tr>
-      <tr><td><strong>Jogging</strong></td><td>Jog steps and feeds, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
-      <tr><td><strong>G Code</strong></td><td>How g-code is sent and interpreted.</td></tr>
-      <tr><td><strong>Keyboard &amp; Controller</strong></td><td>Key mappings and game-controller bindings.</td></tr>
-      <tr><td><strong>Macros</strong></td><td>Create and edit macros.</td></tr>
-      <tr><td><strong>Main Page</strong></td><td>Configure the main-window layout.</td></tr>
-      <tr><td><strong>Simulator</strong></td><td>Build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>) — also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
+      <tr><th>Category</th><th>Pages</th></tr>
+      <tr><td><strong>Controller</strong></td><td><strong>Grbl</strong> — every <code>$</code> setting the controller has, with its own group tree and <code>$</code>-search (see below). <strong>Simulator</strong> — build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>), also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
+      <tr><td><strong>Application</strong></td><td>ioSender's own preferences, one page per panel — colours and behaviour, the lathe-mode switch (see <a href="#lathe">Lathe</a>), <strong>Camera</strong>, and <strong>Demo recording (OBS)</strong>.</td></tr>
+      <tr><td><strong>Jogging</strong></td><td>Jog steps and feeds, the jog-pad UI options, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
+      <tr><td><strong>G Code</strong></td><td>How g-code is sent and interpreted, including the strip/filter options.</td></tr>
+      <tr><td><strong>User Interface</strong></td><td><strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
-    <div class="callout tip"><span class="k">Grbl tab vs Machine Setup</span><br>
+    <div class="callout tip"><span class="k">A match you can't see on the page</span><br>
+      A lot of ioSender's useful text lives in tooltips, so search will sometimes land you on a page where
+      nothing visible matches what you typed. When that happens the result says
+      <em>Matched tooltip: …</em> and quotes the text it hit, so a correct match never reads as a wrong one.</div>
+
+    <div class="callout note"><span class="k">Why the Grbl page keeps its own tree</span><br>
+      Inside the <strong>Grbl</strong> page you still get the familiar group tree and <code>$</code>-search —
+      a wildcard like <code>$39*</code> or free text like "jog", with next/previous match arrows, change
+      highlighting for settings altered since startup, and right-click to revert one. That's deliberately
+      <em>not</em> lifted into the navigation tree: those are live controller settings, fetched on connect and
+      absent entirely on classic grbl, so the tree would change shape whenever the machine connected.</div>
+
+    <div class="callout tip"><span class="k">Grbl page vs Machine Setup</span><br>
       <a href="#machine-setup">Machine Setup</a> is the <em>guided subset</em> that gets a new machine running;
-      the <strong>Grbl</strong> tab here is the <em>full</em> list for fine-tuning. It also keeps
+      the <strong>Grbl</strong> page here is the <em>full</em> list for fine-tuning. It also keeps
       <strong>backups / restore points</strong>, and the auto-save / prompt-on-save options control whether
       changes are written to the controller immediately or after confirmation.</div>
 
     <div class="callout note"><span class="k">Camera is opt-in</span><br>
-      The Camera menu only appears once a device is bound: go to <strong>Settings → App → Camera</strong>,
+      The Camera menu only appears once a device is bound: go to <strong>Settings → Application → Camera</strong>,
       pick a device from the dropdown and <strong>Connect</strong>.</div>
+
+    <div class="callout warn"><span class="k">Sub-tab keyboard shortcuts are gone</span><br>
+      Settings and Machine Setup used to let you bind a key to an individual sub-tab; those bindings lived on
+      tab headers that no longer exist, and any you had saved are dropped on load. <strong>Top-level tab
+      shortcuts are unaffected</strong> — binding a key to Settings, Job or Work Order still works.</div>
 
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
@@ -1307,7 +1401,7 @@
       Chip-load and surface-speed reference values per material come from published carbide bit charts
       (Onsrud/Amana/Vortex-style starting points), then clamped to what your connected controller can
       actually do. The optional AI pass is a second opinion for you to read, not a replacement for the table.</div>
-    <div class="xref">Related: <a href="#settings">Settings</a> · <a href="#tools">Tools</a></div>
+    <div class="xref">Related: <a href="#settings">Settings</a> · <a href="#work-order">Work Order</a></div>
   </section>
 
   <!-- ===================== SD CARD ===================== -->
@@ -1405,7 +1499,7 @@
       <li><strong>Calculate</strong> generates the actual turning program from these numbers, ready to load and run like any other g-code.</li>
     </ul>
     <p>ioSender also drives <strong>lathes</strong>. Turn on lathe mode under
-    <a href="#settings">Settings → App → Main</a> and the interface switches to a lathe layout — X becomes the
+    <a href="#settings">Settings → Application → Main</a> and the interface switches to a lathe layout — X becomes the
     diameter/radius axis and Z runs along the spindle.</p>
     <h3>The wizards</h3>
     <p>Rather than hand-writing turning g-code, fill in dimensions and let a wizard generate the program:</p>

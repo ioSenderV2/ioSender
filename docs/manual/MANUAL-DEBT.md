@@ -101,3 +101,59 @@ conductive-stock warning) are in and wired into `index.html`. Nothing left on th
 - Hardware verification is still in progress for several Work Order paths (bore clearing, counterbore→
   through-drill on one centreline, tabs-on-last-op, patterned bolt circles) and the touch-plate TLO path —
   once verified, the manual's "behind the scenes"/callout wording may need a confidence-level pass.
+
+---
+
+## Debt from v2.36 / v2.37 / v2.38 (#197–#208, shipped 2026-08-01 to 2026-08-03)
+
+The last UI-invalidating wave before the manual rewrite. The **Settings and Machine Setup tab strips are
+gone** (#208, replaced by one shared searchable navigation tree), **calibration moved into Machine Setup**
+(#197), **spoilboard surfacing became a Work Order toolpath** (#198), and the **Tools tab lost half its
+contents and now hides itself** (#204).
+
+### Text — DONE 2026-08-03
+- [x] `#settings` rewritten: nav tree + five categories (Controller / Application / Jogging / G Code /
+      User Interface) replaces the 8-row tab table; search-the-words-on-the-page with match count and the
+      "Matched tooltip:" explainer; Camera/Demo recording (OBS) split; why the Grbl page keeps its own
+      `$`-tree; sub-tab key bindings dropped (top-level unaffected).
+- [x] `#machine-setup`: eight steps → **nine** (new **8 · Calibration** with Stepper + Squareness
+      sub-pages); "row of numbered tabs" → nav tree with green/orange/red status dots; new
+      "Defining a fixture (step 6)" section covering the non-modal dialog, Test-offers-current-position,
+      and per-fixture probe memory (**this closes the long-deferred M4 fixture-dialog item**).
+- [x] `#tools` rewritten small per the user's call (2026-08-03: rewrite, don't delete — the tab is kept in
+      code for other users' hardware): only Tool table / Trinamic / PID, each with its gating condition, a
+      "no Tools tab? nothing is wrong" callout, and a where-did-the-rest-go table pointing at Work Order and
+      Machine Setup. Figure dropped — `tools-tab.png` is now orphaned (it showed a removed tool).
+- [x] `#work-order`: Surface toolpath + Entire Spoilboard (and why it ignores the work order's WCS on
+      purpose), the WCS field (Follow Setup / pinned G54–G59), user-addable custom tools + name-based
+      operation binding, Dry Run really neutralizes the spindle.
+- [x] `#setup`: new "Plate thickness always applies" callout — touch-plate compensation is no longer gated
+      on stock conductivity (#202), which was a real 12 mm Z error on hardware.
+- [x] `#jogging`: jog-pad centre (bullseye / stop sign) and four corner buttons with the 20 mm holdback,
+      plus the "targets the machine envelope, not the loaded program" note.
+- [x] `#offsets`: new "Go To needs a homed machine" warn callout (#201 — the false-zero G30 crash).
+- [x] `#job`: run bar dropped the feed unit label into a tooltip; both readouts size for five digits.
+- [x] `#accuracy-calibration`: repointed steps/mm and squaring at Machine Setup → Calibration (the standalone
+      manual/scratch wizards are deleted, not moved).
+- [x] `#getting-started` tab table: Tools row now says it only appears if the controller supports it;
+      Settings row mentions the nav tree.
+- [x] Swept every stale `#tools` cross-reference (intro spoilboard, toolsetter callout, clean-results,
+      accuracy xref, feeds-and-speeds xref) and `Settings → App` → `Settings → Application`.
+- [x] Verified: all `href="#…"` anchors resolve, `<section>` tags balanced 18/18.
+
+### Screenshots to reshoot/add — NOT DONE
+Needs `-testserver`, so it needs the user's explicit turn-by-turn go-ahead.
+- [ ] `settings-grbl.png` — **dead**, shot pre-nav-shell. Needs the tree + Grbl page.
+- [ ] **New: a settings-search shot** — search box with a match count and ideally a "Matched tooltip:" hit,
+      since that's the headline feature of #208 and the hardest to describe in words.
+- [ ] `machine-setup-overview.png` — **dead**, shot pre-nav-shell. Needs the nine steps with status dots.
+- [ ] **New: a Machine Setup → Calibration shot** — the step that absorbed the deleted wizards.
+- [ ] **New: a Work Order Surface toolpath shot** — ideally with Entire Spoilboard ticked.
+- [ ] `tools-tab.png` — now **orphaned** (no figure references it). Leave in `img/`, git keeps it
+      recoverable; only reshoot if a Tools figure is ever wanted again.
+
+### Known app bug found while auditing (NOT a manual bug)
+- [ ] Machine Setup's in-app **Overview** step list (`MachineSetupWizard.xaml`, `ov_s1`–`ov_s6`) stops at six
+      entries and is wrong from 6 onward — it says "6 · Controller macros" when step 6 is Fixture definitions
+      and 7 is Controller macros. Missing Fixture definitions, Calibration and Build simulator entirely.
+      Fixing it means 3 new `x:Uid` rows through `tools/locadd.py` across all 7 locales.
