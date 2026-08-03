@@ -444,7 +444,65 @@ namespace CNC.Controls
             if (fx == null || !fx.HasPosition || model == null)
                 return;
 
+            if (!ResolveTestPosition(fx))
+                return;
+
             RunTestPositionMacro(fx);
+        }
+
+        // How far the machine has to have moved from the saved position before Test offers to adopt it.
+        // Below this the corrective rapid is physically meaningless, so asking would just be noise.
+        private const double PositionMovedToleranceMm = 0.1d;
+
+        // Test position rapids to the SAVED position (fx.Coords) before probing anything. If the operator has
+        // jogged since saving - which is exactly what the failed-search recovery below asks them to do - that
+        // rapid silently undoes the jog and re-runs the identical failing probe from the identical place.
+        // Confirmed from a real hardware log 2026-08-02: saved Z -80.032, operator jogged to -87.033 (8mm over
+        // the touch plate), pressed Test, and it drove back UP to -78.236 and alarmed 4mm short of the plate -
+        // having followed the app's own on-screen instruction to jog closer and press Test again.
+        //
+        // So when the two disagree, ask, and default to the live position: the operator jogged there
+        // deliberately and it is the better datum. Nothing moves until they answer. Returns false to abort.
+        private bool ResolveTestPosition(Fixture fx)
+        {
+            string current = Fixtures.CurrentCoordsCsv(model);
+            if (current == null)
+                return true;   // position unknown - nothing to compare; the macro's own PREREQ will catch it
+
+            var now = new Position(current);
+            var saved = new Position(fx.Coords);
+
+            if (Math.Abs(now.X - saved.X) <= PositionMovedToleranceMm &&
+                Math.Abs(now.Y - saved.Y) <= PositionMovedToleranceMm &&
+                Math.Abs(now.Z - saved.Z) <= PositionMovedToleranceMm)
+                return true;
+
+            var answer = AppDialogs.Show(string.Format(
+                    "The machine has moved since this fixture position was saved.\n\n" +
+                    "Saved:      X{0}  Y{1}  Z{2}\n" +
+                    "Current:  X{3}  Y{4}  Z{5}\n\n" +
+                    "Test from the current position? This replaces the saved position with where the machine " +
+                    "is now - the same thing Set position would do.",
+                    saved.X.ToInvariantString("0.0##"), saved.Y.ToInvariantString("0.0##"), saved.Z.ToInvariantString("0.0##"),
+                    now.X.ToInvariantString("0.0##"), now.Y.ToInvariantString("0.0##"), now.Z.ToInvariantString("0.0##")),
+                "Test position", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes,
+                yesText: "Use current", noText: "Use saved");
+
+            if (answer != MessageBoxResult.Yes && answer != MessageBoxResult.No)
+                return false;
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                fx.Coords = current;
+                // Same reasoning as btnSetPosition_Click: a corner offset measured from the OLD reference is
+                // meaningless once that reference moves, and this is a genuine re-jog.
+                fx.CornerOffsetX = 0d;
+                fx.CornerOffsetY = 0d;
+                UpdatePositionDisplay();
+                UpdateTestPositionEnabled();
+            }
+
+            return true;
         }
 
         // The actual macro build-and-kickoff, split out from the button click so the auto-recovery path
@@ -672,7 +730,7 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("G53G0Z{0}", savedZ.ToInvariantString("0.0##")));
 
                 var started = new RunStarted();
-                var handler = WatchAsyncCompletion(() => PromptRetryCloserToSpoilboard(fx, savedZ), started);
+                var handler = WatchAsyncCompletion(PromptRetryCloserToSpoilboard, started);
                 bool ran = MacroProcessor.Run(model, "Test position recovery", b.ToString(), false);
                 if (ran)
                     started.Value = true;
@@ -686,35 +744,29 @@ namespace CNC.Controls
             timer.Start();
         }
 
-        // The machine is back at the saved Z and unlocked - explain why it failed and how to fix it, then (if
-        // the operator jogged CLOSER to the spoilboard - Z more negative - before clicking OK) update Coords to
-        // the new position and re-run Test position automatically. If Z didn't actually move closer, leave it
-        // there for them to jog and click Test position again themselves - guessing at a retry when nothing
-        // changed would just repeat the same failure.
-        private void PromptRetryCloserToSpoilboard(Fixture fx, double previousZ)
+        // The machine is back at the saved Z and unlocked - explain why it failed and what to do about it.
+        //
+        // This used to ask the operator to "jog closer ... then click OK to retry automatically" and then
+        // compare Z on the way out. That could never work: AppDialogs.Show is a blocking ShowDialog, so the
+        // on-screen jog pad is dead for as long as the prompt is up, and the compare therefore always saw an
+        // unchanged Z and fell through to "jog closer, then click Test position" - advice that was itself
+        // wrong, because Test rapids back to the saved position first and undoes the jog. A real hardware log
+        // (2026-08-02) caught the whole loop: fail, retract, dismiss, jog 7mm closer, press Test, drive
+        // straight back up, fail identically. Both halves are gone; the operator jogs freely once this is
+        // dismissed and ResolveTestPosition above offers to adopt the new position on the next Test.
+        private void PromptRetryCloserToSpoilboard()
         {
+            SetBusy(false);
+
             AppDialogs.Show(
                 "Test position failed - the probe search never made contact within 12mm below the saved Z. " +
-                "The alarm has been cleared and the machine returned to the saved Z. Check the probe (or, for " +
-                "Touch Plate, that a conductive object is actually staged at this position) and jog closer " +
-                "(within ~10mm above it) if needed, then click OK to retry automatically.",
+                "The alarm has been cleared and the machine returned to the saved Z.\n\n" +
+                "Check the probe (or, for Touch Plate, that a conductive object is actually staged at this " +
+                "position), then jog to within ~10mm above the surface and press Test position again - it " +
+                "will offer to use the new position.",
                 "Test position", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-            string coords = Fixtures.CurrentCoordsCsv(model);
-            double? newZ = coords == null ? (double?)null : new Position(coords).Z;
-
-            const double towardSpoilboardToleranceMm = 0.01d;   // guards against settle/read noise at an unchanged Z
-            if (newZ.HasValue && newZ.Value < previousZ - towardSpoilboardToleranceMm)
-            {
-                fx.Coords = coords;
-                UpdatePositionDisplay();
-                RunTestPositionMacro(fx);
-            }
-            else
-            {
-                SetBusy(false);
-                model.Message = "Test position not retried - jog closer to the spoilboard first, then click Test position.";
-            }
+            model.Message = "Test position failed - jog closer to the surface, then press Test position again.";
         }
 
         private void SelectKind(FixtureKind kind)
