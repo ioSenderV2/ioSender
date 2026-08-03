@@ -235,9 +235,11 @@ namespace CNC.Controls
             }
             else if (e.Key == Key.Enter)
             {
-                var first = FirstPage();
-                if (first != null)
-                    Select(first);
+                // Prefer a page whose NAME matched - a name hit is what the user most likely meant.
+                var best = AllNodes().FirstOrDefault(n => !n.IsCategory && n.IsShown && n.MatchedLabel)
+                        ?? FirstPage();
+                if (best != null)
+                    Select(best);
                 e.Handled = true;
             }
         }
@@ -252,11 +254,20 @@ namespace CNC.Controls
             foreach (var node in AllNodes())
             {
                 if (all)
+                {
                     node.MatchesSearch = true;
-                else
-                    node.MatchesSearch =
-                        (node.Label != null && node.Label.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0) ||
-                        (node.SearchText != null && node.SearchText.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0);
+                    node.MatchedLabel = false;
+                    node.MatchContext = null;
+                    continue;
+                }
+
+                bool onLabel = node.Label != null && node.Label.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                int at = node.SearchText == null ? -1 : node.SearchText.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
+
+                node.MatchedLabel = onLabel;
+                node.MatchesSearch = onLabel || at >= 0;
+                // Explain a match the eye cannot find on the page (much of the index is tooltip text).
+                node.MatchContext = (!onLabel && at >= 0) ? Snippet(node.SearchText, at, q.Length) : null;
             }
 
             // While filtering, open everything so matches deeper in the tree are actually on screen.
@@ -269,6 +280,18 @@ namespace CNC.Controls
 
             matchCount.Text = all ? string.Empty
                 : string.Format("{0} match{1}", MatchingPages(), MatchingPages() == 1 ? "" : "es");
+        }
+
+        // A readable fragment of page text around the hit, for the row tooltip.
+        private static string Snippet(string text, int at, int len)
+        {
+            const int pad = 45;
+            int from = System.Math.Max(0, at - pad);
+            int to = System.Math.Min(text.Length, at + len + pad);
+            var s = text.Substring(from, to - from).Replace((char)10, ' ').Replace((char)13, ' ').Trim();
+            while (s.Contains("  "))
+                s = s.Replace("  ", " ");
+            return (from > 0 ? "..." : "") + s + (to < text.Length ? "..." : "");
         }
 
         private int MatchingPages()

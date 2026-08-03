@@ -126,9 +126,21 @@ namespace CNC.Controls
             set { if (isSelected != value) { isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
-        // Free-text keywords harvested from the page's rendered visual tree (phase 3). Empty for now:
-        // Phase 0 searches labels only.
+        // Free-text harvested from the page's own logical subtree (SettingsSearchIndex).
         public string SearchText { get; set; }
+
+        // Why this node matched the current query, when it did NOT match on its label: the snippet of
+        // page text that hit. Shown as the row's tooltip, because a lot of the indexed text lives in
+        // tooltips - a match you cannot see on the page reads as a bug otherwise.
+        public string MatchContext
+        {
+            get { return matchContext; }
+            set { if (matchContext != value) { matchContext = value; OnPropertyChanged(nameof(MatchContext)); } }
+        }
+        private string matchContext;
+
+        // True when the query hit the node's own name - a stronger hit than page text.
+        public bool MatchedLabel { get; set; }
 
         // Sort key among siblings, declared by the panel (ISettingsPanelCategory.SettingsOrder).
         public int Order { get; set; }

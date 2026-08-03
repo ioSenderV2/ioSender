@@ -15,7 +15,7 @@
         <!-- A row is a label, optionally preceded by a status dot. Machine Setup grades its steps
              green/orange/red; Settings pages have no status and show no dot. -->
         <HierarchicalDataTemplate DataType="{x:Type local:SettingsNavNode}" ItemsSource="{Binding Children}">
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal" ToolTip="{Binding MatchContext}">
                 <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center"
                          Fill="{Binding StatusBrush}"
                          Visibility="{Binding StatusBrush, Converter={StaticResource NullToVis}}"/>
