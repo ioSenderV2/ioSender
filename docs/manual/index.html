@@ -1348,8 +1348,7 @@
     <div class="callout note"><span class="k">A shortcut follows its view</span><br>
       A keyboard shortcut names a <em>view</em>, not a place. Bind a key to Probing and it works whether Probing
       is a tab on the bar or an entry in the <strong>Tools</strong> menu — the same key shows it either way, so
-      moving a view around never costs you its shortcut. Settings and Machine Setup keep their per-page
-      shortcuts too: those now drive the navigation tree rather than a row of sub-tabs.</div>
+      moving a view around never costs you its shortcut.</div>
 
     <h3>Where each view lives</h3>
     <p><strong>Settings → User Interface → Top-level tabs</strong> lists every view with a destination beside
@@ -1361,11 +1360,14 @@
     <p>Settings, Machine Setup and Job can be moved between the bar and a menu but not hidden — ioSender puts
     them back rather than let a layout lock you out.</p>
 
-    <h3>Menu commands on a key</h3>
-    <p>The <strong>Menu commands</strong> group in <strong>Keyboard</strong> covers the main-menu actions that
-    aren't views: Connect, Load Program, Load/New Work Order, Camera, and the Help entries. All start unbound.
-    A shortcut is refused whenever its menu entry is greyed out, so a key can never do something the menu
-    itself is currently refusing.</p>
+    <h3>Binding a key to a tab or menu entry</h3>
+    <p><strong>Settings → User Interface → Keyboard</strong> has one group, <strong>Top Level Tabs</strong>,
+    holding every top-level destination: the views (Job, Setup, Offsets, Probing, Settings, Machine Setup, the
+    tool and tuner windows…) and the main-menu commands that aren't views (Connect, Load Program, Load/New Work
+    Order, Camera, and the Help entries). All start unbound. Sub-pages within a view — a particular Settings
+    page or Machine Setup step — are deliberately not bindable; shortcuts address top-level destinations only.</p>
+    <p>A shortcut for a menu command is refused whenever that entry is greyed out, so a key can never do
+    something the menu itself is currently refusing.</p>
 
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
