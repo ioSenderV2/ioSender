@@ -1310,16 +1310,18 @@
       <img src="img/settings-search.png" alt="The Settings search filtered to two matches for the term strip, with the Matched tooltip explainer hovering over the Main entry">
       <figcaption>Searching the words on every page, not just page names — "strip" narrows twenty-odd pages
       to <strong>2 matches</strong>. One is the obvious <em>GCode command stripping</em>; the other is
-      <em>Main</em>, where the word appears nowhere on the page. Hovering it explains why:
-      <em>Matched tooltip: …instead of stripping them…</em></figcaption>
+      <em>Main</em>, where the word appears nowhere on the page. Hovering it names the control responsible:
+      <em>Matched tooltip: Send comments — Stream G-code comments (in parentheses) to the controller instead
+      of stripping them…</em></figcaption>
     </figure>
 
     <div class="callout tip"><span class="k">A match you can't see on the page</span><br>
       A lot of ioSender's useful text lives in tooltips, so search will sometimes land you on a page where
       nothing visible matches what you typed — exactly what <em>Main</em> does in the shot above.
       <strong>Hover the matched entry's label in the tree</strong> and it tells you why it matched:
-      <em>Matched text: …</em> or <em>Matched tooltip: …</em>, quoting the words it actually hit. A correct
-      match never has to read as a wrong one.</div>
+      <em>Matched text: …</em> or <em>Matched tooltip: …</em>, quoting the words it hit and, for a tooltip,
+      naming the control they belong to. So the answer isn't just "it's on this page somewhere" — it's
+      "hover <em>Send comments</em>". A correct match never has to read as a wrong one.</div>
 
     <div class="callout note"><span class="k">Why the Grbl page keeps its own tree</span><br>
       Inside the <strong>Grbl</strong> page you still get the familiar group tree and <code>$</code>-search —
