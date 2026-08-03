@@ -41,8 +41,17 @@ namespace CNC.Controls
             DataContext = fixture;
             this.model = model;
 
-            rbFxProbe3d.Checked += (s, e) => { UpdateProbeCircleLabel(); UpdateProbeNote(); ClearValidationOnProbeChange(); };
-            rbFxProbeTouch.Checked += (s, e) => { UpdateProbeCircleLabel(); UpdateProbeNote(); ClearValidationOnProbeChange(); };
+            rbFxProbe3d.Checked += (s, e) => OnProbeSelectionChanged(ProbeType.ThreeDProbe);
+            rbFxProbeTouch.Checked += (s, e) => OnProbeSelectionChanged(ProbeType.TouchPlate);
+
+            // Restore THIS fixture's own probe selection instead of always landing on 3D Probe - reopening a
+            // touch-plate fixture in 3D-probe mode meant the next Set/Test silently ran with the wrong probe
+            // geometry (plate thickness/lip offset dropped) until the operator noticed and re-picked.
+            // UpdateFxProbeWarning below still overrides this when the chosen probe isn't actually defined.
+            if (fixture.ProbeType == ProbeType.TouchPlate)
+                rbFxProbeTouch.IsChecked = true;
+            else
+                rbFxProbe3d.IsChecked = true;
 
             SelectKind(fixture.Kind);
             UpdateFieldVisibility(fixture.Kind);
@@ -59,6 +68,22 @@ namespace CNC.Controls
         // False once the constructor's own initial radio-button wiring/defaults have settled - guards
         // ClearValidationOnProbeChange so it doesn't fire on the dialog simply opening.
         private bool _initializing = true;
+
+        // One place for "the operator picked a probe": refresh the probe-dependent UI, record the choice on the
+        // fixture so it survives closing the dialog, and invalidate a checkmark earned by the other probe.
+        // The record is skipped while _initializing so neither the restore above nor UpdateFxProbeWarning's
+        // availability fallback is mistaken for an operator decision and written back.
+        private void OnProbeSelectionChanged(ProbeType type)
+        {
+            UpdateProbeCircleLabel();
+            UpdateProbeNote();
+
+            var fx = DataContext as Fixture;
+            if (fx != null && !_initializing)
+                fx.ProbeType = type;
+
+            ClearValidationOnProbeChange();
+        }
 
         // A saved position validated under one probe was only ever probed by THAT probe - switching to the
         // other one (e.g. 3D probe went dead, switching to Touch Plate to revalidate) means nothing has
@@ -102,9 +127,19 @@ namespace CNC.Controls
         private void UpdateFxProbeWarning()
         {
             bool touchAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.TouchPlate);
+            bool probe3dAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
+
             rbFxProbeTouch.IsEnabled = touchAvailable;
-            if (!touchAvailable && rbFxProbeTouch.IsChecked == true)
+            // 3D Probe used to be permanently enabled and was the unconditional default, so a machine with only
+            // a touch plate defined still opened every new fixture in 3D-probe mode - nothing on screen said
+            // the selected probe didn't exist, and Set/Test then failed on a probe definition that was never
+            // there. Gate it the same way, and fall back to whichever one IS defined.
+            rbFxProbe3d.IsEnabled = probe3dAvailable;
+
+            if (!touchAvailable && probe3dAvailable)
                 rbFxProbe3d.IsChecked = true;
+            else if (!probe3dAvailable && touchAvailable)
+                rbFxProbeTouch.IsChecked = true;
         }
 
         // The probe definition Set/Test position should actually use, per the Probe: radio selection - every

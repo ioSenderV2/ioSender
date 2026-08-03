@@ -98,6 +98,7 @@ namespace CNC.Controls
         private double _maxOpening = 0d;
         private double _cornerOffsetX = 0d;
         private double _cornerOffsetY = 0d;
+        private ProbeType _probeType = ProbeType.ThreeDProbe;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public FixtureKind Kind { get { return _kind; } set { _kind = value; OnChanged(); OnChanged(nameof(KindName)); OnChanged(nameof(Implemented)); } }
@@ -121,6 +122,16 @@ namespace CNC.Controls
         // in practice - Coords is always jogged well clear of the corner).
         public double CornerOffsetX { get { return _cornerOffsetX; } set { _cornerOffsetX = value; OnChanged(); } }
         public double CornerOffsetY { get { return _cornerOffsetY; } set { _cornerOffsetY = value; OnChanged(); } }
+
+        // Which probe Set/Test position use for THIS fixture. Persisted rather than defaulting to 3D Probe on
+        // every open: the dialog reopened in 3D-probe mode even for a fixture set up with a touch plate, so the
+        // first Set/Test after reopening quietly ran with the wrong probe geometry until the operator noticed
+        // and re-picked. It also pairs with PositionValidated, which is only meaningful alongside the probe
+        // that actually validated it (see FixtureEditDialog.ClearValidationOnProbeChange) - without this, a
+        // reloaded fixture showed a green checkmark with no record of which probe earned it.
+        // Absent from an already-saved Fixtures.xml, so XmlSerializer leaves the ThreeDProbe default - which is
+        // exactly the behaviour those fixtures have today. No migration needed.
+        public ProbeType ProbeType { get { return _probeType; } set { _probeType = value; OnChanged(); } }
 
 
         // Friendly kind name for the list grid (derived, not persisted).
@@ -203,7 +214,7 @@ namespace CNC.Controls
 
         public void CopyFrom(Fixture o)
         {
-            Name = o.Name; Kind = o.Kind;
+            Name = o.Name; Kind = o.Kind; ProbeType = o.ProbeType;
             Coords = o.Coords; PositionValidated = o.PositionValidated;
             JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
             CornerOffsetX = o.CornerOffsetX; CornerOffsetY = o.CornerOffsetY;
