@@ -20,6 +20,18 @@ always `/clear`.
    for this push's commit completes and exits 0/1 on success/failure. **If it fails, stop and
    surface the failure** (link + a look at the log) instead of writing the summary as if everything
    shipped clean - don't silently proceed to steps 5/6 on a red build.
+3.55. **Pull the changelog stamp the CI just pushed** — `git fetch v2 && git merge --ff-only v2/master`.
+   **This step is not optional and its absence used to break the next push every single time a release
+   actually published.** `release.yml`'s final step is
+   `git commit -m "chore: stamp vN changelog entries [skip release]"` + `git push origin HEAD:master`,
+   so the moment 3.5 reports success your local branch is exactly one commit behind `v2/master`. Make the
+   3.6 commit without pulling that first and `push-all` is rejected on `v2/master` ("fetch first") - which
+   is how `a975fa8` (v2.36) and the v2.38 release both ended up needing a recovery merge.
+   `--ff-only` is deliberate: the stamp should be the only thing there, so if it refuses, something else
+   pushed and you want to look rather than auto-merge. In that case merge explicitly and say so in the
+   message (precedent: `a975fa8`) - do NOT rebase, since by this point step 3 has already pushed your
+   commits to `origin/integration`.
+
 3.6. **Bump the local dev-build version display** — once 3.5 succeeds, update `legacyVersion` in
    `ioSender XL\ioSender XL\MainWindow.xaml.cs` (~L66) to the version that was JUST published + 1, so
    local/dev builds show the upcoming version rather than a stale one. This constant is the fallback used
@@ -66,3 +78,10 @@ powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
 ## Notes
 
 - This is a one-shot at end-of-session, **not** a per-commit routine and **not** a git hook.
+- **A recovery merge does not spam the releases page.** `release.yml` runs on it, but its first step
+  computes the changelog delta and everything after is conditional on `hasChanges` - with the entries
+  already stamped it skips the build, the publish and the stamp commit. Verified on the v2.38 merge:
+  run succeeded, `Publish release v2.39` skipped, still exactly one release. So don't "fix" such a run,
+  and don't force `[skip release]` into a merge message to prevent it.
+- **The version bump commit is the LAST push of the session.** After 3.55 + 3.6, `push-all` again. That
+  second push is expected and is not a sign anything went wrong.
