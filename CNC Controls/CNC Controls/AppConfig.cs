@@ -1103,15 +1103,7 @@ namespace CNC.Controls
                 return;   // already migrated (or authored fresh) - leave the arrangement alone
 
             var tabs = root.Slot(LayoutKeys.SlotTabs);
-            var toMenu = new Dictionary<string, string>(StringComparer.Ordinal) {
-                { LayoutKeys.MachineSetup,   LayoutKeys.SlotMenuFile  },
-                { LayoutKeys.Settings,       LayoutKeys.SlotMenuFile  },
-                { LayoutKeys.SDCard,         LayoutKeys.SlotMenuTools },
-                { LayoutKeys.FeedsAndSpeeds, LayoutKeys.SlotMenuTools },
-                { LayoutKeys.Probing,        LayoutKeys.SlotMenuTools },
-                { LayoutKeys.HeightMap,      LayoutKeys.SlotMenuTools },
-                { LayoutKeys.LatheWizards,   LayoutKeys.SlotMenuTools },
-            };
+            var toMenu = DefaultMenuPlacement;
 
             var fileItems = new List<LayoutNode>();
             var toolsItems = new List<LayoutNode>();
@@ -1142,7 +1134,67 @@ namespace CNC.Controls
 
             root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuFile, fileItems.ToArray()));
             root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuTools, toolsItems.ToArray()));
+
+            // The retired Tools wrapper has no home in the new model - drop it from the legacy list too.
+            // Everything else is handled by EnforceMenuPlacement, which runs right after this and also
+            // covers profiles that were migrated before that invariant existed.
+            if (Base?.Tabs != null)
+                Base.Tabs.RemoveAll(t => t == LayoutKeys.Tools);
         }
+
+        /// <summary>
+        /// Keep the legacy flat tab list and the layout tree from contradicting each other. Runs every
+        /// load and is idempotent - unlike the one-shot migration above, which cannot help a profile
+        /// that has already been through it.
+        ///
+        /// Two invariants:
+        ///  1. A component sitting in a menu slot must NOT be in Base.Tabs. TabOrder.Apply rebuilds the
+        ///     tabs slot to contain exactly Base.Tabs' entries, so a leftover there puts the component
+        ///     back on the bar at every launch - which is what kept Feeds and Speeds pinned to the tab
+        ///     strip no matter how often it was removed in Edit Main Page.
+        ///  2. A component that belongs in a menu by default, and is in neither the tabs slot nor a
+        ///     menu slot, is unreachable - put it back in its default menu.
+        ///
+        /// Neither fights a deliberate choice: moving something back to the tabs in the editor puts it
+        /// in the tabs slot, where invariant 1 doesn't apply and invariant 2 is satisfied.
+        /// </summary>
+        private void EnforceMenuPlacement()
+        {
+            var root = Layout;
+            var fileSlot = root?.Slot(LayoutKeys.SlotMenuFile);
+            var toolsSlot = root?.Slot(LayoutKeys.SlotMenuTools);
+            if (fileSlot == null || toolsSlot == null)
+                return;   // not migrated yet - MigrateTopLevelComponentsToMenus owns that case
+
+            var inMenus = new HashSet<string>(
+                fileSlot.Items.Concat(toolsSlot.Items).Select(n => n.Component), StringComparer.Ordinal);
+
+            if (Base?.Tabs != null && Base.Tabs.Count > 0)
+                Base.Tabs.RemoveAll(t => inMenus.Contains(t));
+
+            foreach (var kv in DefaultMenuPlacement)
+            {
+                if (LayoutTree.Contains(root, kv.Key))
+                    continue;
+                (kv.Value == LayoutKeys.SlotMenuFile ? fileSlot : toolsSlot).Items.Add(new LayoutNode(kv.Key));
+            }
+        }
+
+        // Where a component lives unless the user has moved it. Shared by the one-shot migration and the
+        // every-load invariant above so the two can never disagree about a component's default home.
+        private static readonly Dictionary<string, string> DefaultMenuPlacement =
+            new Dictionary<string, string>(StringComparer.Ordinal) {
+                { LayoutKeys.MachineSetup,   LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.Settings,       LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.SDCard,         LayoutKeys.SlotMenuTools },
+                { LayoutKeys.FeedsAndSpeeds, LayoutKeys.SlotMenuTools },
+                { LayoutKeys.Probing,        LayoutKeys.SlotMenuTools },
+                { LayoutKeys.HeightMap,      LayoutKeys.SlotMenuTools },
+                { LayoutKeys.LatheWizards,   LayoutKeys.SlotMenuTools },
+                { LayoutKeys.ToolTable,      LayoutKeys.SlotMenuTools },
+                { LayoutKeys.Trinamic,       LayoutKeys.SlotMenuTools },
+                { LayoutKeys.PID,            LayoutKeys.SlotMenuTools },
+            };
 
         // One-time config fixups: converting/invalidating already-persisted data after a code change
         // that changes what a saved value MEANS (not a permanent back-compat shim - the fixup runs every
@@ -1152,6 +1204,7 @@ namespace CNC.Controls
         private void ApplyOneTimeFixups()
         {
             MigrateTopLevelComponentsToMenus();
+            EnforceMenuPlacement();
 
             // 2026-08-03: the Settings and Machine Setup tab strips are gone - both are navigation trees
             // now - so their SUB-tab shortcuts have no badge, no right-click bind menu, and nothing to
@@ -1215,20 +1268,14 @@ namespace CNC.Controls
                 toolsSlot.Items.RemoveAll(n => retiredToolsComponents.Contains(n.Component));
             }
 
-            // 2026-07-24: LayoutKeys.FeedsAndSpeeds (new top-level tab) was added to DefaultLayout.Build(),
-            // but same story as StepperCalProbe above - only seeds a FRESH profile. EnsureEssentials won't
-            // add it either (it's not in LayoutKeys.Essential - this tab isn't required for recovery, just
-            // new). Append it directly to the root tabs slot if an already-persisted tree doesn't have it -
-            // AND to the legacy flat Base.Tabs list (SetTabPresent's own dual-update pattern): TabOrder.Apply
-            // (called later, from a non-empty Base.Tabs) rebuilds the tree's tabs slot to contain EXACTLY
-            // Base.Tabs' entries, so a tree-only fix here would get silently dropped right back out the
-            // moment that runs - confirmed missing from both the main tab bar AND the Edit Main Page Tabs
-            // editor's available list on a real saved profile before this fix.
+            // 2026-07-24 (RETIRED 2026-08-03): this used to append LayoutKeys.FeedsAndSpeeds to the root
+            // tabs slot AND to Base.Tabs whenever the tree didn't contain it, to get the then-new tab
+            // onto already-persisted profiles. It ran on every load, so once the tabs/menu split made
+            // placement the USER's choice it became a bug: removing Feeds and Speeds in Edit Main Page
+            // put it straight back on the bar at the next launch, however many times you removed it.
+            // MigrateTopLevelComponentsToMenus now seeds it into the Tools menu (including for profiles
+            // that never had it), so nothing here needs to force it anywhere.
             var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
-            if (tabsSlot != null && !LayoutTree.Contains(layoutSection.Root, LayoutKeys.FeedsAndSpeeds))
-                tabsSlot.Items.Add(new LayoutNode(LayoutKeys.FeedsAndSpeeds));
-            if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.FeedsAndSpeeds))
-                Base.Tabs.Add(LayoutKeys.FeedsAndSpeeds);
 
             // 2026-07-26: same story again for LayoutKeys.OddJobs (new top-level tab) - append to both the
             // tree's tabs slot and the legacy flat Base.Tabs list, same reasoning as FeedsAndSpeeds above.
