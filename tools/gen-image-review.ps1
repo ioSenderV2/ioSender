@@ -46,7 +46,6 @@ if (-not $OutFile) { $OutFile = Join-Path $repoRoot 'docs\manual\_image-review.h
 # Shots the manual is waiting on. Keyed by the filename it will be saved as; the value is what the
 # shot has to show. These render as dashed placeholder cards until the file appears.
 $Wanted = [ordered]@{
-    'settings-search.png'          = 'the Settings search box with a term typed - match count visible, ideally a "Matched tooltip:" hit'
     'machine-setup-calibration.png'= 'Machine Setup > 8 - Calibration > Stepper: fixture pick, true/measured size, new steps/mm'
     'work-order-surface.png'       = 'a Work Order with a Surface toolpath selected, Entire Spoilboard ticked'
 }
