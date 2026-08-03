@@ -1046,6 +1046,11 @@
     <p>Flattening the spoilboard is a <strong>Surface</strong> toolpath like any other operation — same tool
     list, same feeds &amp; speeds advisor, same generate/run path, same dry run. Tick <strong>Entire
     Spoilboard</strong> and it covers the whole bed.</p>
+    <figure>
+      <div class="shot-todo">screenshot: a Work Order with a Surface toolpath selected, Entire Spoilboard ticked</div>
+      <figcaption>Spoilboard surfacing as an ordinary Work Order toolpath.</figcaption>
+    </figure>
+
     <div class="callout note"><span class="k">Entire Spoilboard ignores your origin on purpose</span><br>
       It deliberately does <em>not</em> trust the work order's coordinate system: it touches off its own fresh
       Z0 and works in machine coordinates, because the whole point of resurfacing is that the board is
@@ -1152,6 +1157,11 @@
     <div class="callout tip"><span class="k">If a probe search fails</span><br>
       The recovery prompt tells you what went wrong and points you at <strong>Test</strong>. Jog closer to the
       feature, then press Test — it will offer to adopt the new position and probe from there.</div>
+
+    <figure>
+      <div class="shot-todo">screenshot: Machine Setup → 8 · Calibration → Stepper, showing the fixture pick, true/measured size and the new steps/mm</div>
+      <figcaption>The Calibration step — probing a reference block instead of measuring by hand.</figcaption>
+    </figure>
 
     <div class="callout note"><span class="k">Calibration lives here now</span><br>
       Stepper calibration and squareness used to be standalone wizards on the Tools tab, disconnected from
@@ -1296,6 +1306,11 @@
       <tr><td><strong>G Code</strong></td><td>How g-code is sent and interpreted, including the strip/filter options.</td></tr>
       <tr><td><strong>User Interface</strong></td><td><strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
+    <figure>
+      <div class="shot-todo">screenshot: the Settings search box with a term typed, showing the match count and a "Matched tooltip:" hit</div>
+      <figcaption>Searching the words on every page — not just page names.</figcaption>
+    </figure>
+
     <div class="callout tip"><span class="k">A match you can't see on the page</span><br>
       A lot of ioSender's useful text lives in tooltips, so search will sometimes land you on a page where
       nothing visible matches what you typed. When that happens the result says
