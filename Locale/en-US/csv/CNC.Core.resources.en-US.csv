@@ -45,3 +45,12 @@ CNC.Core.g.en-US.resources:libstrings.baml,str_prbSecondary:System.String.$Conte
 CNC.Core.g.en-US.resources:libstrings.baml,str_prbToolSetter:System.String.$Content,None,True,True,,Toolsetter
 CNC.Core.g.en-US.resources:libstrings.baml,str_sdStreamComplete:System.String.$Content,None,True,True,,SD Card streaming {0}% complete
 CNC.Core.g.en-US.resources:libstrings.baml,str_serialPortError:System.String.$Content,None,True,True,,Unable to open serial port: {0}
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatController:System.String.$Content,None,True,True,,Controller
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatApplication:System.String.$Content,None,True,True,,Application
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatJogging:System.String.$Content,None,True,True,,Jogging
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatGCode:System.String.$Content,None,True,True,,G Code
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatInterface:System.String.$Content,None,True,True,,User Interface
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageKeyboard:System.String.$Content,None,True,True,,Keyboard
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageController:System.String.$Content,None,True,True,,Controller
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageJobLayout:System.String.$Content,None,True,True,,Job tab layout
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageTopTabs:System.String.$Content,None,True,True,,Top-level tabs

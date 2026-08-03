@@ -36,7 +36,6 @@ TARGETS = [
     # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/JobControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PortDialog.xaml', 'CNC.Controls.WPF'),
-    ('CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ToolView.xaml', 'CNC.Controls.WPF'),
@@ -49,6 +48,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/MachineSetupWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/FixtureEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/SettingsNavShell.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ErrorsAndAlarms.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
@@ -223,6 +223,9 @@ def main():
     grand = 0
     jobs = [(x, a, rows_for) for (x, a) in TARGETS] + [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS]
     for xaml, assembly, builder in jobs:
+        if not os.path.exists(os.path.join(REPO, xaml)):
+            print('  skip (missing): %s' % xaml)
+            continue
         rows = builder(xaml, assembly)
         for loc in LOCALES:
             path = os.path.join(REPO, 'Locale', loc, 'csv', '%s.resources.%s.csv' % (assembly, loc))

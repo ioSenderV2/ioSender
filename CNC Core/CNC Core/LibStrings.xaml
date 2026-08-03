@@ -49,4 +49,16 @@
     <system:String x:Uid="str_prbPrimary" x:Key="ProbePrimary">Primary</system:String>
     <system:String x:Uid="str_prbToolSetter" x:Key="ProbeToolSetter">Toolsetter</system:String>
     <system:String x:Uid="str_prbSecondary" x:Key="ProbeSecondary">Secondary</system:String>
+    <!-- Settings navigation tree (docs/Architecture-Settings-Nav-Overhaul.md). Panel pages take their
+         label from the panel's own GroupBox header; these are the category headings and the pages
+         contributed by the inline editors, which have no such header to read. -->
+    <system:String x:Uid="str_settingsCatController" x:Key="SettingsCatController">Controller</system:String>
+    <system:String x:Uid="str_settingsCatApplication" x:Key="SettingsCatApplication">Application</system:String>
+    <system:String x:Uid="str_settingsCatJogging" x:Key="SettingsCatJogging">Jogging</system:String>
+    <system:String x:Uid="str_settingsCatGCode" x:Key="SettingsCatGCode">G Code</system:String>
+    <system:String x:Uid="str_settingsCatInterface" x:Key="SettingsCatInterface">User Interface</system:String>
+    <system:String x:Uid="str_settingsPageKeyboard" x:Key="SettingsPageKeyboard">Keyboard</system:String>
+    <system:String x:Uid="str_settingsPageController" x:Key="SettingsPageController">Controller</system:String>
+    <system:String x:Uid="str_settingsPageJobLayout" x:Key="SettingsPageJobLayout">Job tab layout</system:String>
+    <system:String x:Uid="str_settingsPageTopTabs" x:Key="SettingsPageTopTabs">Top-level tabs</system:String>
 </ResourceDictionary>
