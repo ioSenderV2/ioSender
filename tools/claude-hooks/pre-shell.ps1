@@ -55,7 +55,10 @@ homing or reset call.
 
 # --- Gate 2: push / release. Pushing v2/master fires the release CI. ---
 if ($code -match '(?i)\bgit\s+push\b|push-all\.ps1|\bgh\s+release\s+create\b') {
-    if ($prompt -notmatch '(?i)\bpush\b|\brelease\b|\bship\b|\bpublish\b|wrap.?up|end.?of.?session') {
+    # Asking for a remote to be created, or for work to go to GitHub, is authorization just as much
+    # as the word "push" is - the gate exists to stop UNREQUESTED outbound work, not to quiz the
+    # user on vocabulary. (Added 2026-08-03: "create the repo as private" was blocked.)
+    if ($prompt -notmatch '(?i)\bpush\b|\brelease\b|\bship\b|\bpublish\b|wrap.?up|end.?of.?session|create.{0,20}\brepo|\bremote\b|\bgithub\b') {
         Deny-Tool @'
 BLOCKED: push/release is not part of a turn.
 

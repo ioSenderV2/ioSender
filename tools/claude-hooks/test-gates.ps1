@@ -60,6 +60,12 @@ Check 'requested but NO simulator'                   'DENY'  (Gate ".\build.ps1 
 Set-Prompt 'wrap up the session and push'
 Check 'push when asked'                              'allow' (Gate 'git push v2 integration')
 
+Set-Prompt 'Create the repo as private for now.'
+Check 'push when asked to create a repo'             'allow' (Gate 'git push -u origin main')
+
+Set-Prompt 'add a Foo column to the job list'
+Check 'push still blocked on an unrelated ask'       'DENY'  (Gate 'git push -u origin main')
+
 # ---------------------------------------------------------------- Stop gate
 Set-Prompt 'some change'
 Check 'stop: nothing edited'                         'allow' `
