@@ -2627,8 +2627,10 @@ namespace GCode_Sender
             // cached spoilboard value), but the ordering stays uniform across both program types.
             if (setTloRef)
             {
+                // No lift here: EmitTloReference already ends parked at G30, and the stock-top block below
+                // opens with its own "G53 G0 Z0". Lifting in both places meant descending to G30 Z and
+                // immediately climbing back to machine top, twice over.
                 EmitTloReference(L, p, touchPlate);
-                L("G53 G0 Z0");
             }
 
             // Clear G54 so the Z probe below runs in machine coordinates (same reasoning as pcorner.macro).

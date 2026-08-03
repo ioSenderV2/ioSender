@@ -299,6 +299,16 @@ namespace CNC.Controls
             var dryRunParser = (model.IsDryRunMode && !preferJobView) ? new GCodeParser() : null;
             dryRunParser?.Reset();
 
+            // Does this macro start a controller-side job ($F=<file> on an SD card)? Such a job acks
+            // immediately and only THEN begins moving, so WAITIDLE after one has to allow time to observe
+            // motion start before it can trust an Idle report. Nothing else does that - an ordinary burst has
+            // already finished moving by the time Flush(wait:true) returns - so the long allowance is scoped
+            // to the case that needs it instead of being charged to every (WAITIDLE) in every macro.
+            bool sdJobPossible = false;
+            foreach (var l in lines)
+                if (l.TrimStart().StartsWith("$F=", StringComparison.OrdinalIgnoreCase))
+                    sdJobPossible = true;
+
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
             foreach (var raw in lines)
             {
@@ -346,7 +356,7 @@ namespace CNC.Controls
                 if (IsDirective(raw, "WAITIDLE"))
                 {
                     Flush(model, buffer, true, preferJobView);
-                    if (!WaitForIdle(model))
+                    if (!WaitForIdle(model, sdJobPossible))
                     {
                         ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
                             "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -403,11 +413,32 @@ namespace CNC.Controls
         // bare "G53 G0 Z0") - a firmware bug sign-flips a homing-direction-inverted ($23) axis's parser base
         // after a G53 move that leaves it "unmoved", producing a false Alarm:2. 'L' emits one line (a caller's
         // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
+        private static int _g30Label = 0;
+
         public static void EmitGotoG30(System.Action<string> L)
         {
+            // Skip the whole thing when already parked. This used to be unconditional, so a program that
+            // starts at G30 - the normal case, the operator parks there to fit the probe - opened by lifting
+            // to machine top and dropping straight back down to the same place. Several generators call this
+            // more than once per program, so that round trip was paid repeatedly for nothing.
+            //
+            // Squared distance rather than three ABS tests: ABS[] appears nowhere in the existing macros so
+            // its grblHAL support is unproven here, while '*', OR and GT are all already exercised by
+            // pcorner.macro. 0.0025 = (0.05mm)^2 - below that the corrective move is meaningless anyway.
+            // Unique label per call. pcorner.macro keeps every o-word in the file distinct rather than reusing
+            // one for sequential blocks, so whether grblHAL tolerates reuse is untested - and several
+            // generators call this up to six times in a single program. Cycling 0-9 is comfortably more than
+            // any one program needs.
+            string o = "o97" + (_g30Label++ % 10).ToString(CultureInfo.InvariantCulture);
+
+            L("#<_g30_dx> = [#<_abs_x> - #5181]");
+            L("#<_g30_dy> = [#<_abs_y> - #5182]");
+            L("#<_g30_dz> = [#<_abs_z> - #5183]");
+            L(o + " IF [[[[#<_g30_dx> * #<_g30_dx>] + [#<_g30_dy> * #<_g30_dy>]] + [#<_g30_dz> * #<_g30_dz>]] GT 0.0025]");
             L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
             L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
             L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
+            L(o + " ENDIF");
         }
 
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
@@ -820,7 +851,16 @@ namespace CNC.Controls
         // The wait runs on the UI thread, so it pumps the dispatcher the same way the rest of
         // the app does (see Grbl.WaitForIdle) - background threads observe controller responses
         // while EventUtils.DoEvents keeps status reports (and the UI) flowing.
-        private static bool WaitForIdle(GrblViewModel model)
+        // How long to allow for motion to be observed STARTING before concluding it already finished. Only a
+        // controller-side job ($F=) can begin moving after its ack, and only then is the long allowance
+        // justified; for everything else Flush(wait:true) has already returned on a real Idle detection, so
+        // the full 2s was dead time charged to every (WAITIDLE) - three of them in a Start Job program, which
+        // is most of the multi-second stalls seen between steps. The short value still spans two status
+        // reports at the usual ~200ms cadence.
+        private const int ObserveMotionStartMs = 400;
+        private const int ObserveMotionStartSdMs = 2000;
+
+        private static bool WaitForIdle(GrblViewModel model, bool sdJobPossible = false)
         {
             DebugLog.Write("macro", string.Format("WaitForIdle: enter, StreamingState={0} GrblState={1}",
                 model.StreamingState, model.GrblState.State));
@@ -855,7 +895,9 @@ namespace CNC.Controls
             var sw = Stopwatch.StartNew();
             bool started = model.GrblState.State != GrblStates.Idle;
 
-            while (!started && sw.ElapsedMilliseconds < 2000)
+            int observeStartMs = sdJobPossible ? ObserveMotionStartSdMs : ObserveMotionStartMs;
+
+            while (!started && sw.ElapsedMilliseconds < observeStartMs)
             {
                 PumpForReport(model, token, 500);
 
@@ -870,7 +912,7 @@ namespace CNC.Controls
 
             if (!started)
             {
-                DebugLog.Write("macro", "WaitForIdle: never observed motion start within 2000ms - treating as already-finished");
+                DebugLog.Write("macro", string.Format("WaitForIdle: never observed motion start within {0}ms - treating as already-finished", observeStartMs));
                 return true;    // job finished (or produced no motion) before we could observe it running
             }
 

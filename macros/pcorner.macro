@@ -64,6 +64,13 @@
 ;                       Required (no safe default) - callers should pass 10 unless they have a specific reason
 ;                       not to; a caller that omits it gets 0 (grblHAL's default for an unset global), which
 ;                       is only as safe as the reference itself, no better.
+;   #<_ls_topmargin> = OPTIONAL clearance (mm) held above a probed corner top when travelling between the
+;                       probes of THIS corner and on to the next. 0/unset = 5. Was a hardcoded 20, which is
+;                       far more than any real spoilboard/stock variance: on a T-slot extrusion bed even 5mm
+;                       of variance would take some doing, so 20 just spent Z travel on every retreat. Raise
+;                       it if something between corners (a clamp, a tall fixture) needs clearing - though a
+;                       caller with a genuinely known safe height should pass #<_ls_maxz> instead, which
+;                       overrides the retreat entirely.
 ;   #<_ls_maxz>   = OPTIONAL machine Z of a known-safe travel height, already trusted by the caller (e.g.
 ;                       the vise's own centre-of-stock probe, run before any corner calls). When > 0, this
 ;                       replaces BOTH the REUSE-corner full retract to machine Z0 (o40 below - normally
@@ -113,6 +120,10 @@ O<pcorner> SUB
   #<mode>   = #<_ls_mode>        ; 0 = 3D probe, 1 = touch plate (see file header)
   #<maxz>   = #<_ls_maxz>        ; known-safe travel height (machine Z), 0/unset = no prior stock-top knowledge (see file header)
   #<appz>   = #<_ls_appz>        ; approach-only override for the FIRST height change below (see file header) - 0/unset = use #<maxz> same as every other height decision this call
+  #<topmargin> = #<_ls_topmargin>   ; clearance above a probed corner top for travel, 0/unset = 5 (see file header)
+  o13 IF [#<topmargin> LE 0]
+    #<topmargin> = 5
+  o13 ENDIF
   #<inside> = #<_ls_inside>      ; 0 = outside corner/edge (default), 1 = inside (see file header)
   #<faces>  = #<_ls_faces>       ; 0 = both faces (default), 1 = X face only, 2 = Y face only (see file header)
   #<edge_margin> = #<_ls_edgemargin>   ; extra face-probe descent clearance, caller-supplied (see file header)
@@ -290,7 +301,7 @@ O<pcorner> SUB
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
-  #<_safe_z> = [#<_z_top> + 20]     ; safe travel height now known: 20 mm above this corner's top
+  #<_safe_z> = [#<_z_top> + #<topmargin>]   ; safe travel height now known: #<topmargin> above this corner's top
   ; Repositioning within this corner (the X-face and Y-face retreats, and the exit retreat below) prefer the
   ; CALLER'S trusted #<maxz> (e.g. the operator-set Corner travel margin, or the vise's own centre probe) over
   ; freshly recomputing _safe_z - when the caller has one, it's a single, predictable height good for the
