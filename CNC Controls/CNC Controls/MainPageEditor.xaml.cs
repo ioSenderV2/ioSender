@@ -334,6 +334,12 @@ namespace CNC.Controls
         // load - writing only the tree would have the flat list overwrite it right back.
         private void ApplyPlacements(CNC.Controls.Config cfg)
         {
+            // Nothing to place means the registries were empty when this editor was built, NOT that the user
+            // asked for an empty app - writing the slots from it would wipe a perfectly good saved layout.
+            // Commit() runs on every tab-leave, so this would fire on merely opening and leaving the page.
+            if (Placements.Count == 0)
+                return;
+
             cfg.Tabs = Placements.Where(p => p.Placement == ViewPlacement.TabBar).Select(p => p.Name).ToList();
             cfg.HiddenViews = Placements.Where(p => p.Placement == ViewPlacement.Hidden).Select(p => p.Name).ToList();
 
