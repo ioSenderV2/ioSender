@@ -28,6 +28,13 @@
                  tooltips whose content is a UIElement rather than a string, and render them as their type
                  name. A tooltip that sets its own MaxWidth still wins - a local value beats a setter. -->
             <Setter Property="MaxWidth" Value="450"/>
+            <!-- Place relative to the cursor POINT and clear it by hand. WPF's default Mouse placement
+                 offsets by an assumed standard cursor size, so a Windows "extra large" pointer (normal on
+                 a high-DPI screen) overlaps the tooltip and hides its first characters. MousePoint plus an
+                 explicit offset is independent of whatever cursor size the user has chosen. -->
+            <Setter Property="Placement" Value="MousePoint"/>
+            <Setter Property="HorizontalOffset" Value="32"/>
+            <Setter Property="VerticalOffset" Value="28"/>
             <Setter Property="ContentTemplateSelector">
                 <Setter.Value>
                     <cnccontrols:ToolTipTextTemplateSelector>

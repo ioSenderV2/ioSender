@@ -12,9 +12,11 @@
         <local:KeyMapGroupStateConverter x:Key="GroupState"/>
         <Style TargetType="ToolTip">
             <Setter Property="MaxWidth" Value="200"/>
+            <!-- Offsets match the app-wide ToolTip style in App.xaml: enough to clear an "extra large"
+                 Windows pointer, which WPF's own placement does not account for. -->
             <Setter Property="Placement" Value="MousePoint"/>
-            <Setter Property="HorizontalOffset" Value="25"/>
-            <Setter Property="VerticalOffset" Value="0"/>
+            <Setter Property="HorizontalOffset" Value="32"/>
+            <Setter Property="VerticalOffset" Value="28"/>
             <Setter Property="ContentTemplate">
                 <Setter.Value>
                     <DataTemplate>
