@@ -177,7 +177,7 @@ namespace CNC.Controls
                 var s = savedActions?.FirstOrDefault(x => x.Id == z.Id);
                 if (s != null)
                     ShortcutKey.TryParse(s.Key, out b.Key, out b.Modifiers);   // TryParse leaves Key.None on an explicit empty (cleared) row
-                Add(new BindingRow(b, z.Label) { IsZoomAction = true, Description = z.Label });
+                Add(new BindingRow(b, z.Label) { IsZoomAction = true, ActionGroup = z.Group, Description = z.Description ?? z.Label });
             }
 
             BuildGroupStates();
@@ -745,7 +745,9 @@ namespace CNC.Controls
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             if (r.IsConsole) { r.Set("Program", 9); return; }
-            if (r.IsZoomAction) { r.Set("UI zoom", 9); return; }
+            // ActionKeyBinder rows carry their own group where they want one (the main-menu commands do);
+            // the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == ActionKeyBinder.MenuGroup ? 20 : 9); return; }
             if (r.IsTabSwitch)
             {
                 // "Tab.<Name>" is a top-level view; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
@@ -1057,6 +1059,7 @@ namespace CNC.Controls
             public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
             public bool IsZoomAction { get; set; }
+            public string ActionGroup { get; set; }   // ActionKeyBinder.ActionInfo.Group, when the entry names one
             public bool IsJog { get { return Model.IsJog; } }
 
             public string Category { get; private set; }

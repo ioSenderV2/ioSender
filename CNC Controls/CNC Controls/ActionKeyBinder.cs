@@ -28,7 +28,13 @@ namespace CNC.Controls
             public string Label;      // shown in the Keyboard & Controller row and capture prompt
             public Key DefaultKey;
             public ModifierKeys DefaultModifiers;
+            public string Group;      // outline group in the editor; null = "UI zoom" (see KeyMapEditor.Categorize)
+            public string Description; // row tooltip; null falls back to the label
         }
+
+        // Outline group for the main-menu commands. Named here rather than spelled out per entry so the
+        // catalog and KeyMapEditor.groupDescriptions can't drift apart.
+        public const string MenuGroup = "Menu commands";
 
         public static readonly ActionInfo[] Catalog = new ActionInfo[]
         {
@@ -49,6 +55,27 @@ namespace CNC.Controls
             new ActionInfo { Id = "ObsCamBStop",  Label = "OBS: Front Right camera - Stop recording",  DefaultKey = Key.F12, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "ObsAppStart",  Label = "OBS: App/screen capture - Start recording", DefaultKey = Key.F7,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "ObsAppStop",   Label = "OBS: App/screen capture - Stop recording",  DefaultKey = Key.F8,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
+
+            // Main-menu commands. All unbound by default (DefaultKey = None) - these are conveniences, and
+            // grabbing keys for them uninvited would collide with whatever the operator already uses. The
+            // handlers live in MainWindow, which registers each one against the SAME menu item it drives and
+            // refuses to act while that item is disabled, so a shortcut can never do what the menu won't.
+            // The views that used to be tabs are NOT here - they keep their "Tab.*" ids (KeyMapEditor.TabTargets)
+            // so a binding made while they were on the bar still works now that they are menu items.
+            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = MenuGroup, Description = "Open the connection dialog." },
+            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = MenuGroup, Description = "Open a g-code file." },
+            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = MenuGroup, Description = "Open a saved work order." },
+            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = MenuGroup, Description = "Start a new work order." },
+            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = MenuGroup, Description = "Open the camera window." },
+            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = MenuGroup, Description = "Open the online wiki in a browser." },
+            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = MenuGroup, Description = "Open the usage tips page in a browser." },
+            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = MenuGroup, Description = "Open the brief tour." },
+            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = MenuGroup, Description = "Open the video tutorials." },
+            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = MenuGroup, Description = "Open the error and alarm code reference." },
+            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = MenuGroup, Description = "Check GitHub for a newer ioSender release." },
+            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = MenuGroup, Description = "Swap back to the build installed before the last update." },
+            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = MenuGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
+            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = MenuGroup, Description = "Show the About window." },
         };
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();
@@ -92,6 +119,14 @@ namespace CNC.Controls
 
             Key key = e.Key == Key.System ? e.SystemKey : e.Key;
             ModifierKeys mods = Keyboard.Modifiers;
+
+            // A text-producing combo (no modifier, or Shift only for a capital/symbol) must not be stolen from
+            // a focused text box - bind "L" to Load Program and you would otherwise never type an L into the
+            // MDI again. Same guard, same reason, as MainWindow.dispatchTabShortcut. It never bit the original
+            // zoom/OBS entries because those all ship on Ctrl+Alt, but the menu commands are bound by hand.
+            if ((mods == ModifierKeys.None || mods == ModifierKeys.Shift)
+                 && Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                return false;
 
             foreach (var row in list)
             {

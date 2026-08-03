@@ -939,6 +939,8 @@ namespace GCode_Sender
             ActionKeyBinder.Register("Screenshot", Screenshot_Action);
 #endif
 
+            registerMenuActions();
+
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
                 // Delay loading until app is ready
@@ -2915,6 +2917,47 @@ namespace GCode_Sender
         }
 
         // --- tab-switch shortcuts ----------------------------------------------------------------
+
+        // Main-menu commands as bindable actions ("Menu commands" group in Keyboard & Controller). Every one
+        // is unbound out of the box; the point is that a command reachable only by mouse can be given a key.
+        //
+        // Each is registered against the very menu item it drives and invokes that item's own click handler,
+        // so there is exactly one implementation of "Load Program" and the shortcut cannot drift from it. The
+        // views that MOVED into these menus are not here - they keep their "Tab.*" ids (see showBoundView), so
+        // a key bound while a view was a tab still reaches it now that it is a menu entry.
+        private void registerMenuActions()
+        {
+            registerMenuAction("Menu.Connect", menuConnect, () => connectMenuItem_Click(null, null));
+            registerMenuAction("Menu.LoadProgram", menuLoadFile, () => LoadFile_Click(null, null));
+            registerMenuAction("Menu.LoadWorkOrder", menuLoadWorkOrder, () => LoadWorkOrder_Click(null, null));
+            registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
+            registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
+
+            // Help entries: always available (no per-item gate beyond the menu bar's own), so no item to pass.
+            registerMenuAction("Menu.Wiki", null, () => aboutWikiItem_Click(null, null));
+            registerMenuAction("Menu.UsageTips", null, () => tipsWikiItem_Click(null, null));
+            registerMenuAction("Menu.BriefTour", null, () => briefTour_Click(null, null));
+            registerMenuAction("Menu.VideoTutorials", null, () => videoTutorials_Click(null, null));
+            registerMenuAction("Menu.ErrorCodes", null, () => errorAndAlarms_Click(null, null));
+            registerMenuAction("Menu.CheckForUpdates", null, () => checkForUpdates_Click(null, null));
+            registerMenuAction("Menu.RollBack", null, () => rollbackVersion_Click(null, null));
+            registerMenuAction("Menu.OpenDataFolder", null, () => openConfigFolderMenuItem_Click(null, null));
+            registerMenuAction("Menu.About", null, () => aboutMenuItem_Click(null, null));
+        }
+
+        // Refuse the shortcut whenever the menu bar is disabled (menuMain's IsEnabled is bound to
+        // !IsJobRunning - the whole menu goes away mid-job) or the item itself is, so a key can never reach a
+        // command the menu is currently refusing. Returning false leaves the key unhandled for anything else.
+        private void registerMenuAction(string id, MenuItem item, System.Action invoke)
+        {
+            ActionKeyBinder.Register(id, k =>
+            {
+                if (menuMain?.IsEnabled != true || (item != null && !item.IsEnabled))
+                    return false;
+                invoke();
+                return true;
+            });
+        }
 
         // A parsed tab-switch binding: key + modifiers -> the tab id it selects (see KeyMapEditor.TabTargets).
         private class TabHotkey { public Key Key; public ModifierKeys Modifiers; public string Id; }
