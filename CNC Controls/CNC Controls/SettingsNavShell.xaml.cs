@@ -43,6 +43,11 @@ namespace CNC.Controls
         // leave/enter lifecycle it used to run on tab switches.
         public event System.EventHandler<SettingsNavEventArgs> SelectedNodeChanged;
 
+        // Raised synchronously when a page is selected whose content has not been built yet, so the host
+        // can materialize it before the pane is shown. Pages built on first show (the key-map / macros /
+        // main-page editors) would otherwise flash the "nothing selected" hint.
+        public event System.EventHandler<SettingsNavEventArgs> ContentRequested;
+
         public SettingsNavNode SelectedNode
         {
             get { return selectedNode; }
@@ -52,9 +57,11 @@ namespace CNC.Controls
                     return;
                 var from = selectedNode;
                 selectedNode = value;
-                // The right-hand pane binds through this property, so tell it to re-read.
-                pageHost.Content = selectedNode?.Content;
-                emptyHint.Visibility = selectedNode?.Content == null ? Visibility.Visible : Visibility.Collapsed;
+
+                if (selectedNode != null && selectedNode.Content == null)
+                    ContentRequested?.Invoke(this, new SettingsNavEventArgs { From = from, To = selectedNode });
+
+                RefreshContent();
                 SelectedNodeChanged?.Invoke(this, new SettingsNavEventArgs { From = from, To = selectedNode });
             }
         }
@@ -74,7 +81,7 @@ namespace CNC.Controls
         public bool SelectByKey(string key)
         {
             var node = FindByKey(key);
-            if (node == null || node.Content == null || !node.IsShown)
+            if (node == null || node.IsCategory || !node.IsShown)
                 return false;
             Select(node);
             return true;
@@ -106,14 +113,16 @@ namespace CNC.Controls
 
         // Pick the first selectable page - used on entry and whenever the current page is hidden by a
         // capability gate (the Simulator page while connected TO the simulator, say).
+        // A node is a PAGE when it has no children. Content may legitimately still be null - the editor
+        // pages are built on first show - so content must never be the test for what is selectable.
         public SettingsNavNode FirstPage()
         {
-            return AllNodes().FirstOrDefault(n => n.Content != null && n.IsShown);
+            return AllNodes().FirstOrDefault(n => !n.IsCategory && n.IsShown);
         }
 
         public void EnsureSelection()
         {
-            if (SelectedNode == null || !SelectedNode.IsShown || SelectedNode.Content == null)
+            if (SelectedNode == null || !SelectedNode.IsShown || SelectedNode.IsCategory)
                 Select(FirstPage());
         }
 
@@ -133,9 +142,10 @@ namespace CNC.Controls
             if (node == null)
                 return;
 
-            // A category is a heading. Expand it and move on to its first page rather than showing an
-            // empty right-hand pane.
-            if (node.Content == null)
+            // A category is a heading, not a destination - expand it instead of selecting it. This tests
+            // for CHILDREN, not for content: the editor pages have no content until first shown, and
+            // testing content here made every node under Interface unclickable.
+            if (node.IsCategory)
             {
                 node.IsExpanded = !node.IsExpanded;
                 return;

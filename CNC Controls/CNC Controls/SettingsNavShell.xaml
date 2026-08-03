@@ -17,7 +17,10 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="navColumn" Width="230" MinWidth="150"/>
+            <!-- MinWidth fits the longest node label at its indent level ("GCode command stripping",
+                 a child under a category) plus the expander and a vertical scrollbar, so no page name
+                 is ever truncated at the default width. -->
+            <ColumnDefinition x:Name="navColumn" Width="250" MinWidth="250"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" MinWidth="300"/>
         </Grid.ColumnDefinitions>

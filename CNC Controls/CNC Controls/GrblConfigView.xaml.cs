@@ -95,6 +95,7 @@ namespace CNC.Controls
         public GrblConfigView()
         {
             InitializeComponent();
+            nav.ContentRequested += (s, e) => EnsureEditorContent(e.To);
             nav.SelectedNodeChanged += nav_SelectedNodeChanged;
         }
 
@@ -265,7 +266,7 @@ namespace CNC.Controls
             var jogging = new SettingsNavNode(CatJogging, Localized("SettingsCatJogging", "Jogging"));
             var gcode = new SettingsNavNode(CatGCode, Localized("SettingsCatGCode", "G Code"));
 
-            var iface = new SettingsNavNode(CatInterface, Localized("SettingsCatInterface", "Interface"));
+            var iface = new SettingsNavNode(CatInterface, Localized("SettingsCatInterface", "User Interface"));
             nodeKeys = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", "Keyboard & Controller"));
             nodeMacros = iface.Add(new SettingsNavNode("Tab.Settings.Macros", "Macros"));
             nodeMainPage = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", "Main Page"));
@@ -450,10 +451,6 @@ namespace CNC.Controls
                 mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
                 node.Content = mainPageTab;
             }
-
-            // The shell already showed this node; push the just-built content into the pane.
-            if (node.Content != null && ReferenceEquals(nav.SelectedNode, node))
-                nav.RefreshContent();
         }
 
         #endregion
@@ -502,7 +499,7 @@ namespace CNC.Controls
         private bool SelectFirstIn(string categoryKey)
         {
             var cat = nav.FindByKey(categoryKey);
-            var page = cat?.Children.FirstOrDefault(n => n.Content != null && n.IsShown);
+            var page = cat?.Children.FirstOrDefault(n => !n.IsCategory && n.IsShown);
             if (page == null)
                 return false;
             nav.Select(page);
