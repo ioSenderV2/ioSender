@@ -93,7 +93,6 @@ namespace CNC.Controls
                 return;
 
             var d = AppConfig.GetFactoryDefaults();
-            cfg.Theme = d.Theme;
             cfg.ResetDelay = d.ResetDelay;
             cfg.PollInterval = d.PollInterval;
             cfg.MaxBufferSize = d.MaxBufferSize;
