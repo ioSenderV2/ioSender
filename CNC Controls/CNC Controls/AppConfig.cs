@@ -309,6 +309,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
+        private bool _showJogTargetButtons = true;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
@@ -405,6 +406,10 @@ namespace CNC.Controls
         // is set alongside it, same condition. Check Run/Dry Run/Simulate keep their own names either way -
         // those are modes worth understanding on their own terms, not a rename target.
         public bool UseFriendlyRunLabels { get; set; } = false;
+        // Jog pad's five "go to a place" buttons - the four corner targets and the centre bullseye
+        // (JogBaseControl). Default ON so nothing changes for an existing profile; unticking hides them and
+        // leaves the plain arrow pad. Notifies so the pad follows the checkbox live, no restart.
+        public bool ShowJogTargetButtons { get { return _showJogTargetButtons; } set { if (_showJogTargetButtons != value) { _showJogTargetButtons = value; OnPropertyChanged(); } } }
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;

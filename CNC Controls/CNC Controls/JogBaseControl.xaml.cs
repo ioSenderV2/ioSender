@@ -665,19 +665,16 @@ namespace CNC.Controls
             JogCommand((string)(sender as Button).Tag == "stop" ? "stop" : (string)(sender as Button).Content);
         }
 
-        // Centre button: while a jog is running it cancels the jog (the red stop sign shown then); when idle it
-        // rapids to the MACHINE envelope centre at safe Z (bullseye) - never the loaded program/stock's own
-        // bounding box, regardless of what happens to be loaded (see GoToCenter's own comment). The move
-        // always retracts Z to the top first and stays there (never plunges) - the same safe G53 jog pattern
-        // the 3D click-to-jog uses.
+        // Centre button (bullseye): rapids to the MACHINE envelope centre at safe Z - never the loaded
+        // program/stock's own bounding box, regardless of what happens to be loaded (see GoToCenter's own
+        // comment). The move always retracts Z to the top first and stays there (never plunges) - the same
+        // safe G53 jog pattern the 3D click-to-jog uses.
+        // It used to cancel an in-progress jog instead when one was running; that hidden second job came out
+        // 2026-08-03 (nothing on the button advertised it). GoToCenter's own idle check reports the state
+        // instead. Same removal on CornerButton_Click.
         private void CenterButton_Click(object sender, RoutedEventArgs e)
         {
-            GrblViewModel model = DataContext as GrblViewModel;
-
-            if (model != null && model.GrblState.State == GrblStates.Jog)
-                JogCommand("stop");
-            else
-                GoToCenter();
+            GoToCenter();
         }
 
         private void GoToCenter()
@@ -731,16 +728,9 @@ namespace CNC.Controls
 
         private void CornerButton_Click(object sender, RoutedEventArgs e)
         {
-            GrblViewModel model = DataContext as GrblViewModel;
-
-            if (model != null && model.GrblState.State == GrblStates.Jog)
-                JogCommand("stop");
-            else
-            {
-                string tag = (string)(sender as Button)?.Tag;
-                if (tag != null && tag.Length == 2)
-                    GoToCorner(tag[1] == 'R', tag[0] == 'T');
-            }
+            string tag = (string)(sender as Button)?.Tag;
+            if (tag != null && tag.Length == 2)
+                GoToCorner(tag[1] == 'R', tag[0] == 'T');
         }
 
         private void GoToCorner(bool xMax, bool yMax)

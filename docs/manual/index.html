@@ -617,13 +617,16 @@
       <li><strong>Feed rate</strong> — how fast it jogs.</li>
       <li><strong>Continuous</strong> — hold to move, release to stop, instead of a fixed step.</li>
       <li><strong>Centre button</strong> (the bullseye in the middle of the pad) — rapid to the centre of the
-      machine envelope at safe Z. While a jog is running it turns into a red stop sign that cancels it.</li>
+      machine envelope at safe Z.</li>
       <li><strong>Corner buttons</strong> (the four diagonals) — rapid to that corner of the machine envelope
       at safe Z, held back 20&nbsp;mm from each limit so you never drive into a switch.</li>
     </ul>
     <div class="callout note"><span class="k">The pad targets the machine, not the job</span><br>
       Centre and the four corners are the <em>machine envelope</em> — they don't follow the loaded program's
       bounding box. That way they mean the same thing whether or not a file is loaded.</div>
+    <p>If you'd rather have a plain arrow pad, untick <em>Show go-to buttons on the jog pad</em> in
+    <strong>Settings → User Interface → General</strong> — the centre and four corner buttons disappear and the
+    arrows stay exactly where they are.</p>
     <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
     continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
     of the distance shown as <em>Jog step</em> in the status bar.</p>
