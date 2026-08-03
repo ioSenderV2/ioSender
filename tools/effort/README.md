@@ -16,6 +16,7 @@ powershell -ExecutionPolicy Bypass -File tools\effort\effort-tracker.ps1
   the editor, this CLI).
 - Completed sessions append to `sessions.csv` (`start,end,minutes`). The in-progress session is mirrored to
   `sessions.current` each poll, so a crash / reboot / Ctrl+C still captures it (finalised on the next run).
+  Both are gitignored (regenerated locally) — unlike `sessions.json`, which is committed.
 - Auto-start at login: Task Scheduler → "At log on" → the command above (or a shortcut in `shell:startup`).
 
 ## Our conversation — `convo-sessions.ps1`
@@ -38,6 +39,11 @@ change): `sessions\<yyyy-MM-dd_HHmm>_<slug>.html` plus a record appended to `ses
 - **`sessions.json` is the durable archive.** Claude Code deletes transcripts after `cleanupPeriodDays`
   (default 30), so a session not captured at wrap-up can't be recovered. The manifest is append-only —
   records never fall off it.
+- **It's mirrored into the repo** at `tools/effort/sessions.json` and committed on each capture (path-scoped,
+  `[skip release]`, **not pushed** — the next wrap-up's `push-all` at step 3 carries it, so the following
+  capture's `verify-pushed` gate still sees a clean tree). `-MirrorPath ''` skips the mirror, `-NoCommit`
+  writes it without committing. This is the one file that can't be regenerated, and `~\Downloads` is backed
+  up by nothing.
 - **Incremental.** The checkpoint stores each transcript's size, so unchanged transcripts are never opened:
   ~4 files instead of 171, **~1 s instead of ~5 min**.
 - `-Amend` folds later turns into the session just written (same filename). `-WhatIfOnly` previews.

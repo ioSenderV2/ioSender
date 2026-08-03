@@ -30,6 +30,10 @@ Two things follow, and both are the point of the change:
   Code deletes those after `cleanupPeriodDays` (default 30) — so every rebuild silently dropped the
   sessions that had aged out. It was down to 157 rows against 197 HTMLs on disk before the migration
   recovered them (216 now).
+- **The manifest is mirrored into the repo** at `tools/effort/sessions.json` and committed on each capture
+  (path-scoped, `[skip release]`). It is deliberately **not pushed** — the wrap-up's own `push-all` (step 3)
+  carries it at the start of the next session, so the next capture's `verify-pushed` gate still finds a
+  clean, in-sync tree. `-MirrorPath ''` skips it; `-NoCommit` writes without committing.
 
 ## Step 0 — verify committed + pushed (gate)
 
@@ -85,4 +89,5 @@ then write the summary as trailing text; that pushes the summary to the next run
 - Transcript retention: Claude Code auto-deletes `.jsonl` older than `cleanupPeriodDays` (**default 30**),
   set in `~/.claude/settings.json`. `sessions.json` + the `sessions\` HTMLs are the durable archive past
   that window — **a session not captured at wrap-up is not recoverable later.**
-- `sessions.json` is rewritten with a rolling `.bak` on every capture.
+- `sessions.json` is rewritten with a rolling `.bak` on every capture, plus the committed in-repo mirror.
+  The session HTMLs themselves are **not** mirrored (hundreds of MB); only the manifest is.
