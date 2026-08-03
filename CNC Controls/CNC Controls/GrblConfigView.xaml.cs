@@ -81,7 +81,7 @@ namespace CNC.Controls
         private const string CatInterface = SettingsCategories.UserInterface;
 
         private SettingsNavNode nodeGrbl, nodeSimulator, nodeKeyboard, nodeController, nodeMacros, nodeJobLayout, nodeTopTabs;
-        private readonly Dictionary<UserControl, SettingsNavNode> panelNodes = new Dictionary<UserControl, SettingsNavNode>();
+        private readonly Dictionary<UserControl, List<SettingsNavNode>> panelNodes = new Dictionary<UserControl, List<SettingsNavNode>>();
 
         // True only while the Settings view is the active top-level view. The inner TabControl raises an initial
         // SelectionChanged for its default tab during eager startup layout (this view is built before the user ever
@@ -305,18 +305,33 @@ namespace CNC.Controls
             if (c.DataContext == null && profile != null)
                 c.DataContext = profile.Base;
 
-            var node = new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c);
-            node.IsVisible = c.Visibility == Visibility.Visible;
-            node.Order = OrderFor(c);
-            panelNodes[c] = node;
+            // A panel that hosts unrelated sections contributes one node per section (Camera + Demo
+            // recording), keyed and labelled by the panel itself; everything else is a single node
+            // labelled from its own GroupBox header.
+            var made = new List<SettingsNavNode>();
+            var provider = c as ISettingsPageProvider;
+            if (provider != null)
+            {
+                int sub = 0;
+                foreach (var page in provider.GetPages())
+                    made.Add(new SettingsNavNode(page.Key, page.Label, page.Content ?? c) { Owner = c, Order = OrderFor(c) + sub++ });
+            }
+            else
+                made.Add(new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c) { Order = OrderFor(c) });
+
+            panelNodes[c] = made;
 
             // Feature panels register whenever their own view is built, which is not a stable order, so
             // place by declared order instead of appending - otherwise the tree's contents depend on
             // which features happened to load first.
-            int at = category.Children.Count;
-            for (int i = 0; i < category.Children.Count; i++)
-                if (category.Children[i].Order > node.Order) { at = i; break; }
-            category.Insert(at, node);
+            foreach (var node in made)
+            {
+                node.IsVisible = c.Visibility == Visibility.Visible;
+                int at = category.Children.Count;
+                for (int i = 0; i < category.Children.Count; i++)
+                    if (category.Children[i].Order > node.Order) { at = i; break; }
+                category.Insert(at, node);
+            }
 
             nav.RefreshVisibility();
         }
@@ -359,9 +374,10 @@ namespace CNC.Controls
                     control.Visibility = Visibility.Collapsed;
             }
 
-            // A hidden panel must take its nav node with it, or the tree offers a page that renders blank.
+            // A hidden panel must take its nav node(s) with it, or the tree offers a page that renders blank.
             foreach (var kv in panelNodes)
-                kv.Value.IsVisible = kv.Key.Visibility == Visibility.Visible;
+                foreach (var node in kv.Value)
+                    node.IsVisible = kv.Key.Visibility == Visibility.Visible;
         }
 
         private void nav_SelectedNodeChanged(object sender, SettingsNavEventArgs e)

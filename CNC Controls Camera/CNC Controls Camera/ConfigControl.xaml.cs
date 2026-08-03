@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
@@ -48,11 +49,30 @@ namespace CNC.Controls.Camera
     /// <summary>
     /// Interaction logic for ConfigControl.xaml
     /// </summary>
-    public partial class ConfigControl : UserControl, ICameraConfig, ISettingsPanelCategory
+    public partial class ConfigControl : UserControl, ICameraConfig, ISettingsPanelCategory, ISettingsPageProvider
     {
         // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
         public string SettingsCategory { get { return SettingsCategories.Application; } }
         public int SettingsOrder { get { return 30; } }
+
+        // Two nodes, one control. The camera settings and the OBS demo-recording settings are unrelated
+        // to each other, so they are separate pages - but the control stays whole and in the visual tree
+        // because its Loaded handler refreshes the device-bind UI and the stored OBS password.
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            return new List<SettingsSubPage>
+            {
+                new SettingsSubPage("Settings.Camera", grpCamera.Header as string ?? "Camera", this),
+                new SettingsSubPage("Settings.Obs", grpObs.Header as string ?? "Demo recording (OBS)", this)
+            };
+        }
+
+        public void ShowPage(string key)
+        {
+            bool obs = key == "Settings.Obs";
+            grpCamera.Visibility = obs ? Visibility.Collapsed : Visibility.Visible;
+            grpObs.Visibility = obs ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         public ConfigControl()
         {
