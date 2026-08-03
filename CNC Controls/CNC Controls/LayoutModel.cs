@@ -52,9 +52,17 @@ namespace CNC.Controls
     // Stable component keys + slot names. Tab keys reuse the ViewType names (Phase 1 TabRegistry).
     public static class LayoutKeys
     {
-        // root container + its single slot
+        // root container + its slots. The main bar is no longer the only destination: a component may
+        // sit in the tab strip OR in one of the menus, and the TREE decides which (2026-08-03). The
+        // registry's Presentation/Menu only SEED this - so the split we shipped is a default the user
+        // can drag back the other way in Settings > Main Page.
         public const string Root = "MainWindow";
         public const string SlotTabs = "tabs";
+        public const string SlotMenuFile = "menuFile";
+        public const string SlotMenuTools = "menuTools";
+
+        // Every slot on the root that can hold a top-level component, in display order.
+        public static readonly string[] RootSlots = { SlotTabs, SlotMenuFile, SlotMenuTools };
 
         // top-level tabs (== ViewType names)
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
@@ -101,30 +109,34 @@ namespace CNC.Controls
         public static LayoutNode Build()
         {
             return new LayoutNode(LayoutKeys.Root,
+                // The main bar carries only what is used WHILE A JOB RUNS (2026-08-03). Everything else
+                // moved to the menus - but this is a default, not a rule: all three slots are drop
+                // targets in Settings > Main Page, so anything here can be dragged back to the tabs.
+                // Start Job then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
                 new LayoutSlot(LayoutKeys.SlotTabs,
-                    new LayoutNode(LayoutKeys.Settings),
-                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
-                    // Start Job (StartJob) then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
                     new LayoutNode(LayoutKeys.StartJob),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
-                    new LayoutNode(LayoutKeys.Offsets),
-                    new LayoutNode(LayoutKeys.SDCard),
-                    // Probing and Height Map are DEREGISTERED FROM THE DEFAULT LAYOUT ONLY (2026-07-26,
-                    // Start Job "Dynamic" mode folds their functionality in - see issue #10) - NOT removed from
-                    // TabRegistry, so they still show in Settings > Main Page > Tabs' Available column and can
-                    // be dragged back onto the main page by anyone who still wants the standalone tabs.
-                    // Tools is down to the three hardware-gated tools; it removes itself from the main bar
-                    // when the controller supports none of them (ToolsView.UnavailableReason).
-                    new LayoutNode(LayoutKeys.Tools,
-                        new LayoutSlot(LayoutKeys.SlotTools, new[] {
-                            LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
-                    // Setup lives on the Start Job tab now (job-flow unification, 2026-07-31) - Odd Jobs' own
-                    // slot only ever hosted the Work Order composer, so Work Order is promoted to a bare
-                    // top-level tab (same date) instead of a tab-inside-a-tab.
-                    new LayoutNode(LayoutKeys.WorkOrder),
+                    new LayoutNode(LayoutKeys.Offsets)),
+
+                new LayoutSlot(LayoutKeys.SlotMenuFile,
                     new LayoutNode(LayoutKeys.MachineSetup),
-                    new LayoutNode(LayoutKeys.LatheWizards)));
+                    new LayoutNode(LayoutKeys.Settings)),
+
+                // The Tools CONTAINER is gone: its three hardware-gated tools are listed directly here,
+                // one menu entry each, instead of being sub-tabs of a wrapper tab.
+                // Work Order is deliberately absent - it is reached by File > Load/New Work Order. It
+                // stays registered, so it shows in the editor's Available column and can be dragged
+                // back onto the tab strip (same precedent as Probing/Height Map before it).
+                new LayoutSlot(LayoutKeys.SlotMenuTools,
+                    new LayoutNode(LayoutKeys.SDCard),
+                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
+                    new LayoutNode(LayoutKeys.Probing),
+                    new LayoutNode(LayoutKeys.HeightMap),
+                    new LayoutNode(LayoutKeys.LatheWizards),
+                    new LayoutNode(LayoutKeys.ToolTable),
+                    new LayoutNode(LayoutKeys.Trinamic),
+                    new LayoutNode(LayoutKeys.PID)));
         }
     }
 

@@ -2056,20 +2056,26 @@ namespace GCode_Sender
         // and its own toolbar button first.
         private void NewWorkOrder_Click(object sender, RoutedEventArgs e)
         {
-            var tab = getTab(ViewType.WorkOrder);
-            if (tab == null)
-                return;
-            ui.tabMode.SelectedItem = tab;
-            (getView(tab) as WorkOrderView)?.New();
+            (OpenViewWindow(ViewType.WorkOrder) as WorkOrderView)?.New();
         }
 
         private void LoadWorkOrder_Click(object sender, RoutedEventArgs e)
         {
-            var tab = getTab(ViewType.WorkOrder);
-            if (tab == null)
-                return;
-            ui.tabMode.SelectedItem = tab;
-            (getView(tab) as WorkOrderView)?.Load();
+            (OpenViewWindow(ViewType.WorkOrder) as WorkOrderView)?.Load();
+        }
+
+        /// <summary>
+        /// Open (or re-focus) a menu-hosted view's window and hand back the hosted control, for the
+        /// callers that need to drive it afterwards (New/Load a work order, jump to a settings page).
+        /// Returns null if the view isn't registered in this build.
+        /// </summary>
+        public UserControl OpenViewWindow(ViewType view)
+        {
+            var d = TabRegistry.DescriptorFor(view);
+            if (d == null)
+                return null;
+            ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            return ViewHostWindow.ViewInstance(view);
         }
 
         private void connectMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2642,11 +2648,9 @@ namespace GCode_Sender
                 var d = TabRegistry.DescriptorByName(node.Component);
                 if (d == null)
                     continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
-                // Menu-hosted views may still be listed in an older persisted layout's tabs slot.
-                // ApplyOneTimeFixups strips them, but skip here too so a stale profile can never
-                // resurrect a tab for a view that now lives in a menu.
-                if (!d.IsTab)
-                    continue;
+                // No Presentation check here on purpose: the TREE is the placement authority. A view
+                // the registry defaults to a menu still becomes a tab if the user dragged it back to
+                // the tabs slot in Settings > Main Page.
                 var ctl = d.Create?.Invoke();
                 if (ctl == null)
                     continue;
@@ -2710,30 +2714,38 @@ namespace GCode_Sender
         // See tabMode.ReorderDragging's own comment (BuildTabs) for why this exists.
         private bool tabReorderDragging;
 
-        // Fill File/Tools with the registered MenuWindow views, plus the tools the dissolved Tools tab
-        // used to host. Runs after RegisterBuiltinTabs so a view declares itself once, in the registry,
-        // and appears in the right menu without an edit to MainWindow.xaml.
+        // Fill File/Tools from the layout tree's menu slots - the same tree that drives the tab strip,
+        // so the two placements are one decision the user can change in Settings > Main Page rather
+        // than something hardcoded here. A slot entry is either a registered view (TabDescriptor, gets
+        // the full Setup/Activate lifecycle) or a plain layout component (the former Tools tab's tools).
         private void BuildViewMenus()
         {
-            foreach (var d in TabRegistry.Descriptors.Where(x => !x.IsTab && x.Menu != ViewMenu.None)
-                                                     .OrderBy(x => x.Order))
-            {
-                var parent = d.Menu == ViewMenu.File ? menuFile : menuTools;
-                parent.Items.Add(NewViewMenuItem(d));
-            }
+            BuildMenuSlot(menuFile, LayoutKeys.SlotMenuFile);
+            BuildMenuSlot(menuTools, LayoutKeys.SlotMenuTools);
+        }
 
-            // The former Tools tab's own sub-tabs (tool table, Trinamic tuner, PID tuner) are registered
-            // as layout components rather than views, so they get a plain host window each.
-            menuTools.Items.Add(new Separator());
-            foreach (var key in new[] { LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })
+        private void BuildMenuSlot(MenuItem parent, string slotName)
+        {
+            var slot = AppConfig.Settings.Layout?.Slot(slotName);
+            if (slot == null)
+                return;
+
+            foreach (var node in slot.Items)
             {
-                var c = ComponentRegistry.Get(key);
-                if (c?.Create == null)
+                var d = TabRegistry.DescriptorByName(node.Component);
+                if (d != null)
+                {
+                    parent.Items.Add(NewViewMenuItem(d));
                     continue;
-                var item = new MenuItem { Header = c.Label, Uid = "mnu_" + key };
-                string k = key, label = c.Label;   // capture per-iteration for the closure
+                }
+
+                var c = ComponentRegistry.Get(node.Component);
+                if (c?.Create == null)
+                    continue;   // unknown/foreign key - skip, same as BuildTabs
+                var item = new MenuItem { Header = c.Label, Uid = "mnu_" + node.Component };
+                string k = node.Component, label = c.Label;   // capture per-iteration for the closure
                 item.Click += (s, e) => ViewHostWindow.OpenComponent(k, label, UIViewModel, AppConfig.Settings, this);
-                menuTools.Items.Add(item);
+                parent.Items.Add(item);
             }
         }
 

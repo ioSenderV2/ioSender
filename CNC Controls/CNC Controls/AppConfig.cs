@@ -1084,6 +1084,70 @@ namespace CNC.Controls
             return ok;
         }
 
+        /// <summary>
+        /// 2026-08-03: the main bar was cut back to the views used while a job runs; the rest moved to
+        /// the File/Tools menus, which are now layout slots of their own. A profile saved before that
+        /// has every component in the "tabs" slot and no menu slots at all, so without this it would
+        /// keep the old thirteen-tab bar and get empty menus.
+        ///
+        /// Runs ONCE per profile, detected by the menu slots being absent entirely. That matters: once
+        /// a user has dragged something back onto the tabs in Settings > Main Page, this must never
+        /// undo it - which is why the trigger is "no menu slots yet", not "component is in tabs".
+        /// </summary>
+        private void MigrateTopLevelComponentsToMenus()
+        {
+            var root = Layout;
+            if (root == null || root.Slot(LayoutKeys.SlotTabs) == null)
+                return;
+            if (root.Slot(LayoutKeys.SlotMenuFile) != null || root.Slot(LayoutKeys.SlotMenuTools) != null)
+                return;   // already migrated (or authored fresh) - leave the arrangement alone
+
+            var tabs = root.Slot(LayoutKeys.SlotTabs);
+            var toMenu = new Dictionary<string, string>(StringComparer.Ordinal) {
+                { LayoutKeys.MachineSetup,   LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.Settings,       LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.SDCard,         LayoutKeys.SlotMenuTools },
+                { LayoutKeys.FeedsAndSpeeds, LayoutKeys.SlotMenuTools },
+                { LayoutKeys.Probing,        LayoutKeys.SlotMenuTools },
+                { LayoutKeys.HeightMap,      LayoutKeys.SlotMenuTools },
+                { LayoutKeys.LatheWizards,   LayoutKeys.SlotMenuTools },
+            };
+
+            var fileItems = new List<LayoutNode>();
+            var toolsItems = new List<LayoutNode>();
+
+            // The retired Tools CONTAINER: promote whatever tools it still holds to Tools menu entries,
+            // keeping the user's own ordering of them, then drop the wrapper node.
+            var toolsNode = tabs.Items.FirstOrDefault(n => n.Component == LayoutKeys.Tools);
+            if (toolsNode != null)
+            {
+                var inner = toolsNode.Slot(LayoutKeys.SlotTools);
+                if (inner != null)
+                    foreach (var t in inner.Items)
+                        toolsItems.Add(new LayoutNode(t.Component));
+                tabs.Items.Remove(toolsNode);
+            }
+
+            foreach (var node in tabs.Items.ToList())
+            {
+                string slot;
+                if (!toMenu.TryGetValue(node.Component, out slot))
+                    continue;
+                (slot == LayoutKeys.SlotMenuFile ? fileItems : toolsItems).Add(node);
+                tabs.Items.Remove(node);
+            }
+
+            // Work Order was a tab and is now reached via File > Load/New Work Order. Drop it from the
+            // bar without adding a menu entry - it stays registered, so the editor's Available column
+            // still offers it to anyone who wants the tab back.
+            var wo = tabs.Items.FirstOrDefault(n => n.Component == LayoutKeys.WorkOrder);
+            if (wo != null)
+                tabs.Items.Remove(wo);
+
+            root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuFile, fileItems.ToArray()));
+            root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuTools, toolsItems.ToArray()));
+        }
+
         // One-time config fixups: converting/invalidating already-persisted data after a code change
         // that changes what a saved value MEANS (not a permanent back-compat shim - the fixup runs every
         // load, but is written to be a no-op once every file in the wild has actually been through it,
@@ -1091,6 +1155,8 @@ namespace CNC.Controls
         // change needs one, remove it again once testing on real saved App.config files is done.
         private void ApplyOneTimeFixups()
         {
+            MigrateTopLevelComponentsToMenus();
+
             // 2026-08-03: the Settings and Machine Setup tab strips are gone - both are navigation trees
             // now - so their SUB-tab shortcuts have no badge, no right-click bind menu, and nothing to
             // bind from. Strip any already persisted against those ids so a saved profile does not carry
