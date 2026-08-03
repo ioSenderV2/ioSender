@@ -274,11 +274,14 @@ namespace CNC.Controls
             // Both pages of an editor share the one editor instance as content and record it as Owner, so
             // save-on-leave and reset-to-defaults still reach the editor rather than the bare page body.
             var iface = new SettingsNavNode(CatInterface, Localized("SettingsCatInterface", "User Interface"));
-            nodeKeyboard = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", Localized("SettingsPageKeyboard", "Keyboard")));
-            nodeController = iface.Add(new SettingsNavNode("Tab.Settings.Controller", Localized("SettingsPageController", "Controller")));
-            nodeMacros = iface.Add(new SettingsNavNode("Tab.Settings.Macros", "Macros"));
-            nodeJobLayout = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout")));
-            nodeTopTabs = iface.Add(new SettingsNavNode("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs")));
+            // Explicit Orders so the panel-contributed pages sort against these rather than just
+            // appending: AddPanelNode places by Order, and these defaulted to 0, which put the General
+            // page (Order 0, contributed by UiGeneralConfigControl) last instead of first.
+            nodeKeyboard = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", Localized("SettingsPageKeyboard", "Keyboard")) { Order = 10 });
+            nodeController = iface.Add(new SettingsNavNode("Tab.Settings.Controller", Localized("SettingsPageController", "Controller")) { Order = 20 });
+            nodeMacros = iface.Add(new SettingsNavNode("Tab.Settings.Macros", "Macros") { Order = 30 });
+            nodeJobLayout = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout")) { Order = 40 });
+            nodeTopTabs = iface.Add(new SettingsNavNode("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs")) { Order = 50 });
 
             nav.Nodes.Add(controller);
             nav.Nodes.Add(application);
