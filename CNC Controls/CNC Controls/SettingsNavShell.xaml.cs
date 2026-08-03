@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SettingsNavShell.xaml.cs - part of CNC Controls library
  *
  * The navigable index that replaces the Settings / Machine Setup tab strips: a searchable tree of
@@ -12,10 +12,12 @@
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace CNC.Controls
 {
@@ -100,6 +102,63 @@ namespace CNC.Controls
         {
             foreach (var n in Nodes)
                 n.RefreshShown();
+            AutoSizeNav();
+        }
+
+        // Width the tree to its widest label so nothing truncates and no horizontal scrollbar appears.
+        // Measured rather than hardcoded: the labels come from each panel's own localized GroupBox header,
+        // so the longest one differs per locale (German runs far wider than English) and a magic number
+        // that fits today's English text would quietly truncate somewhere else.
+        private bool navWidthInitialized;
+
+        public void AutoSizeNav()
+        {
+            double dpi = 1.0;
+            try { dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip; } catch { }
+
+            double widest = 0;
+            foreach (var node in AllNodes())
+            {
+                if (!node.IsShown || string.IsNullOrEmpty(node.Label))
+                    continue;
+
+                var weight = node.IsCategory ? FontWeights.SemiBold : navTree.FontWeight;
+                var tf = new Typeface(navTree.FontFamily, navTree.FontStyle, weight, navTree.FontStretch);
+                var ft = new FormattedText(node.Label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                                           tf, navTree.FontSize, Brushes.Black, dpi);
+                widest = System.Math.Max(widest, ft.Width + DepthOf(node) * IndentPerLevel);
+            }
+
+            if (widest <= 0)
+                return;
+
+            // expander column + item padding + TreeView border + the vertical scrollbar the list will need
+            double chrome = IndentPerLevel + 8 + 2 + SystemParameters.VerticalScrollBarWidth;
+            double want = System.Math.Ceiling(widest + chrome);
+
+            navColumn.MinWidth = want;
+            if (!navWidthInitialized || navColumn.Width.Value < want)
+            {
+                navColumn.Width = new GridLength(want);
+                navWidthInitialized = true;
+            }
+        }
+
+        private const double IndentPerLevel = 19.0;   // WPF's default TreeViewItem indent
+
+        private int DepthOf(SettingsNavNode node)
+        {
+            foreach (var top in Nodes)
+            {
+                if (ReferenceEquals(top, node))
+                    return 0;
+                if (top.Children.Contains(node))
+                    return 1;
+                foreach (var child in top.Children)
+                    if (child.SelfAndDescendants().Contains(node))
+                        return 2;
+            }
+            return 1;
         }
 
         public void Select(SettingsNavNode node)

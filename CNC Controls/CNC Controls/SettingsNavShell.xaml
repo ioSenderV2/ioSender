@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.SettingsNavShell"
+﻿<UserControl x:Class="CNC.Controls.SettingsNavShell"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -17,10 +17,9 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <!-- MinWidth fits the longest node label at its indent level ("GCode command stripping",
-                 a child under a category) plus the expander and a vertical scrollbar, so no page name
-                 is ever truncated at the default width. -->
-            <ColumnDefinition x:Name="navColumn" Width="250" MinWidth="250"/>
+            <!-- Width/MinWidth are computed from the widest label at runtime - see AutoSizeNav().
+                 These are only the starting values before the first measure. -->
+            <ColumnDefinition x:Name="navColumn" Width="250" MinWidth="150"/>
             <ColumnDefinition Width="5"/>
             <ColumnDefinition Width="*" MinWidth="300"/>
         </Grid.ColumnDefinitions>
