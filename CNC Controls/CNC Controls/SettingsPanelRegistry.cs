@@ -104,6 +104,11 @@ namespace CNC.Controls
         // green/orange/red; that signal lived on the tab headers, which no longer render.
         public System.Func<System.Windows.Media.Brush> Status { get; set; }
 
+        // The subtree whose text feeds the search index. Defaults to Content, but MUST be set when
+        // several pages share one control as Content (the setup wizard backs twelve pages) - otherwise
+        // every one of them indexes the whole control and they all match every query identically.
+        public System.Windows.FrameworkElement IndexRoot { get; set; }
+
         public SettingsSubPage(string key, string label, System.Windows.FrameworkElement content)
         {
             Key = key;

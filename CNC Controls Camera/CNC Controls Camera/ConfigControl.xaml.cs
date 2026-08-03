@@ -62,8 +62,8 @@ namespace CNC.Controls.Camera
         {
             return new List<SettingsSubPage>
             {
-                new SettingsSubPage("Settings.Camera", grpCamera.Header as string ?? "Camera", this),
-                new SettingsSubPage("Settings.Obs", grpObs.Header as string ?? "Demo recording (OBS)", this)
+                new SettingsSubPage("Settings.Camera", grpCamera.Header as string ?? "Camera", this) { IndexRoot = grpCamera },
+                new SettingsSubPage("Settings.Obs", grpObs.Header as string ?? "Demo recording (OBS)", this) { IndexRoot = grpObs }
             };
         }
 

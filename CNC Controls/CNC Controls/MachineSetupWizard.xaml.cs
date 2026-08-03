@@ -341,21 +341,21 @@ namespace CNC.Controls
         {
             var pages = new List<SettingsSubPage>
             {
-                new SettingsSubPage("Tab.MachineSetup.Overview", HeaderText(tabStepOverview), this),
-                new SettingsSubPage("Tab.MachineSetup.Machine", HeaderText(tabStepMachine), this) { Status = () => hdrMachine.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Home", HeaderText(tabStepHome), this) { Status = () => hdrHome.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Axis", HeaderText(tabStepAxis), this) { Status = () => hdrAxis.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Homing", HeaderText(tabStepHoming), this) { Status = () => hdrHoming.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Probes", HeaderText(tabStepProbes), this) { Status = () => hdrProbes.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { Status = () => hdrFixtures.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { Status = () => hdrMacros.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Overview", HeaderText(tabStepOverview), this) { IndexRoot = tabStepOverview.Content as FrameworkElement },
+                new SettingsSubPage("Tab.MachineSetup.Machine", HeaderText(tabStepMachine), this) { IndexRoot = tabStepMachine.Content as FrameworkElement, Status = () => hdrMachine.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Home", HeaderText(tabStepHome), this) { IndexRoot = tabStepHome.Content as FrameworkElement, Status = () => hdrHome.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Axis", HeaderText(tabStepAxis), this) { IndexRoot = tabStepAxis.Content as FrameworkElement, Status = () => hdrAxis.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Homing", HeaderText(tabStepHoming), this) { IndexRoot = tabStepHoming.Content as FrameworkElement, Status = () => hdrHoming.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Probes", HeaderText(tabStepProbes), this) { IndexRoot = tabStepProbes.Content as FrameworkElement, Status = () => hdrProbes.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { IndexRoot = tabStepFixtures.Content as FrameworkElement, Status = () => hdrFixtures.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { IndexRoot = tabStepMacros.Content as FrameworkElement, Status = () => hdrMacros.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper"), this)
-                    { Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
+                    { IndexRoot = tabCalStepper.Content as FrameworkElement, Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
                 new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
-                    { Parent = CalibrationCategoryKey },
+                    { IndexRoot = tabCalSquareness.Content as FrameworkElement, Parent = CalibrationCategoryKey },
                 new SettingsSubPage("Tab.MachineSetup.Simulator", HeaderText(tabStepSimulator), this)
-                    { Status = () => hdrSimulator.Foreground, IsAvailable = () => tabStepSimulator.Visibility == Visibility.Visible }
+                    { IndexRoot = tabStepSimulator.Content as FrameworkElement, Status = () => hdrSimulator.Foreground, IsAvailable = () => tabStepSimulator.Visibility == Visibility.Visible }
             };
             return pages;
         }

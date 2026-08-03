@@ -266,6 +266,14 @@ namespace CNC.Controls
 
             RefreshVisibility();
             suppressSelection = false;
+
+            matchCount.Text = all ? string.Empty
+                : string.Format("{0} match{1}", MatchingPages(), MatchingPages() == 1 ? "" : "es");
+        }
+
+        private int MatchingPages()
+        {
+            return AllNodes().Count(n => !n.IsCategory && n.IsShown);
         }
 
         public void FocusSearch()

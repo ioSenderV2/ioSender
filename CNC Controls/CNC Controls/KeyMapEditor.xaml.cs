@@ -1,4 +1,4 @@
-/*
+﻿/*
  * KeyMapEditor.xaml.cs - part of CNC Controls library for Grbl
  *
  * Modal editor for keyboard mappings: jog keys and action shortcuts (including the
@@ -35,7 +35,8 @@ namespace CNC.Controls
             return tabs.Items.OfType<TabItem>()
                        .Select((item, i) => new SettingsSubPage(
                             i == 0 ? "Tab.Settings.Keyboard" : "Tab.Settings.Controller",
-                            item.Header as string ?? string.Empty, this))
+                            item.Header as string ?? string.Empty, this)
+                            { IndexRoot = item.Content as FrameworkElement })
                        .ToList();
         }
 

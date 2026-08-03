@@ -44,6 +44,10 @@
                     <!-- Placeholder text, shown only while the box is empty and unfocused. -->
                     <TextBlock x:Uid="lbl_settingsSearchHint" x:Name="searchHint" Text="Search"
                                Foreground="#FF9AA0A6" Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <!-- How many pages survived the filter, so an empty tree reads as "no matches"
+                         rather than "something broke". -->
+                    <TextBlock x:Name="matchCount" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Margin="0,0,8,0" Foreground="#FF606060" IsHitTestVisible="False"/>
                 </Grid>
             </Border>
 

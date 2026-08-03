@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MainPageEditor.xaml.cs - part of CNC Controls library for Grbl
  *
  * "Edit Main Page" dialog (ioSender XL): a configure-association / shuttle UI that
@@ -29,8 +29,10 @@ namespace CNC.Controls
         {
             return new List<SettingsSubPage>
             {
-                new SettingsSubPage("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout"), this),
+                new SettingsSubPage("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout"), this)
+                    { IndexRoot = (tabs.Items[0] as TabItem)?.Content as FrameworkElement },
                 new SettingsSubPage("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs"), this)
+                    { IndexRoot = (tabs.Items[1] as TabItem)?.Content as FrameworkElement }
             };
         }
 

@@ -314,10 +314,19 @@ namespace CNC.Controls
             {
                 int sub = 0;
                 foreach (var page in provider.GetPages())
-                    made.Add(new SettingsNavNode(page.Key, page.Label, page.Content ?? c) { Owner = c, Order = OrderFor(c) + sub++ });
+                    made.Add(new SettingsNavNode(page.Key, page.Label, page.Content ?? c)
+                    {
+                        Owner = c,
+                        Order = OrderFor(c) + sub++,
+                        SearchText = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content ?? c)
+                    });
             }
             else
-                made.Add(new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c) { Order = OrderFor(c) });
+                made.Add(new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c)
+                {
+                    Order = OrderFor(c),
+                    SearchText = SettingsSearchIndex.Harvest(c)
+                });
 
             panelNodes[c] = made;
 
@@ -505,6 +514,10 @@ namespace CNC.Controls
                 node.Owner = provider;
                 if (!string.IsNullOrWhiteSpace(page.Label))
                     node.Label = page.Label;
+
+                // These editors are built on first show, so this is the first chance to index them.
+                // Until then they match on label only.
+                node.SearchText = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content);
             }
         }
 
