@@ -21,6 +21,24 @@
                                     ScaleY="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"/>
                 </Setter.Value>
             </Setter>
+            <!-- Wrap long tooltips instead of letting them run out to a single unreadable line (many of
+                 this app's tooltips are full explanatory sentences). MaxWidth applies before the UiScale
+                 transform above, so the wrap point stays the same at every zoom level.
+                 The template is chosen by content type: applying it unconditionally would also catch the
+                 tooltips whose content is a UIElement rather than a string, and render them as their type
+                 name. A tooltip that sets its own MaxWidth still wins - a local value beats a setter. -->
+            <Setter Property="MaxWidth" Value="450"/>
+            <Setter Property="ContentTemplateSelector">
+                <Setter.Value>
+                    <cnccontrols:ToolTipTextTemplateSelector>
+                        <cnccontrols:ToolTipTextTemplateSelector.TextTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                            </DataTemplate>
+                        </cnccontrols:ToolTipTextTemplateSelector.TextTemplate>
+                    </cnccontrols:ToolTipTextTemplateSelector>
+                </Setter.Value>
+            </Setter>
         </Style>
         <!-- Camera-app record/stop glyph, not a colored button: a red circle (idle - press to start)
              swaps to a red square (recording - press to stop) via an IsChecked trigger. Both shapes

@@ -94,6 +94,7 @@
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />
     <Compile Include="SettingsSearchIndex.cs" />
+    <Compile Include="ToolTipTextTemplateSelector.cs" />
     <Compile Include="NullToVisibilityConverter.cs" />
     <Compile Include="ConfigPanel.cs" />
     <Compile Include="StartJobConfig.cs" />
