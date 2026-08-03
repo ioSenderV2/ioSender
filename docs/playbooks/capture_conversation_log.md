@@ -1,112 +1,47 @@
 # Capture the conversation log
 
-**When:** the final step of end-of-session wrap-up (see
-[end_of_session_wrapup.md](end_of_session_wrapup.md)), before the user `/clear`s.
+> **Extends: `claude-hub/playbooks/capture_conversation_log.md`** — read that for the whole
+> procedure (what gets captured, how the session boundary works, the modes, the ordering rule).
+> Only the ioSender-specific bits are below.
+
+**When:** the final step of end-of-session wrap-up ([end_of_session_wrapup.md](end_of_session_wrapup.md)),
+before the user `/clear`s.
 **Memory context:** `iosender-end-of-session-convolog.md`.
 
-Writes **this session** to a styled, self-contained, descriptively named HTML in
-`%USERPROFILE%\Downloads\ClaudeConv\sessions\`, appends one record to `sessions.json`, and re-renders
-`index.html`. Keeps user prompts + Claude prose only; strips tool calls, command output, diffs, thinking,
-IDE/opened-file and system-reminder/slash-command noise. Screenshots you paste into a prompt are embedded
-inline as `data:` URIs, so a session HTML keeps its visual context and stays self-contained (no image
-folder). Images Claude viewed via the Read tool are not included (they are tool-result turns).
+## Ready command
 
-**Messages typed while Claude is working** are included too, badged `queued`. They are not logged as
-`type=user` at all — Claude Code records them as `type=attachment` / `queued_command` with the text under
-`attachment.prompt[]` — so every one of them (964 across the archive) was silently missing from the logs
-until 2026-08-02. If you ever add another transcript reader, look for that shape.
+```powershell
+powershell -ExecutionPolicy Bypass -File c:\github\claude-hub\tools\convo-sessions.ps1
+```
 
-Filename: `<yyyy-MM-dd_HHmm>_<slug>.html` (sortable start-time prefix + slug from the session's first real
-prompt), e.g. `2026-07-08_0753_so-both-cameras-working-if-do-start-recording.html`. Start/stop times,
-duration, and turn count appear in both the header and the footer.
-
-## The session boundary is THIS COMMAND (changed 2026-08-02)
-
-Running the capture is what ends a session, so there is nothing to infer: **every turn after the previous
-capture belongs to this one.** The old 60-minute idle-gap heuristic is retired — **a long break never
-splits a session**, it is drawn in place as a `⏸ break · 1h 50m` marker inside the file.
-
-If a capture was ever *missed*, the window covers two real sittings. The transcript's own markers say where
-to cut, so the capture splits there rather than gluing them together:
-
-| marker | what it is | where it cuts |
-|---|---|---|
-| **end** | the capture actually being **run** — a tool call invoking the script, not prose mentioning it — and only if things went quiet (`-EndQuietMinutes`, 20) afterwards | after that turn |
-| **start** | `/clear`, or your own opening cue ("check your memory …") | **before** that turn, so the opening prompt stays with the session it opens |
-
-That second rule is load-bearing: cutting *after* a start marker is what used to strand a session's first
-couple of prompts at the tail of the previous file.
-
-Two things follow, and both are the point of the change:
-
-- **Only new transcripts are read.** The checkpoint in `sessions.json` records each transcript's size at
-  capture time, so an unchanged transcript is never opened. A capture now reads the ~4 files the sitting
-  touched instead of all 171 (**~1 s, down from ~5 min**).
-- **`sessions.json` is the durable record, and it is append-only.** Nothing re-derives history. This also
-  fixes real data loss: the index used to be rebuilt from scratch from surviving transcripts, and Claude
-  Code deletes those after `cleanupPeriodDays` (default 30) — so every rebuild silently dropped the
-  sessions that had aged out. It was down to 157 rows against 197 HTMLs on disk before the migration
-  recovered them (216 now).
-- **The manifest is mirrored into the repo** at `tools/effort/sessions.json` and committed on each capture
-  (path-scoped, `[skip release]`). It is deliberately **not pushed** — the wrap-up's own `push-all` (step 3)
-  carries it at the start of the next session, so the next capture's `verify-pushed` gate still finds a
-  clean, in-sync tree. `-MirrorPath ''` skips it; `-NoCommit` writes without committing.
+`-Project` defaults to `ioSender`, so there is nothing else to pass. It writes into
+`claude-hub\conversations\ioSender\`, re-renders that project's index plus the cross-project
+roll-up, and commits itself into `claude-hub` (no push).
 
 ## Step 0 — verify committed + pushed (gate)
 
-Run this FIRST. Capturing is the last thing before `/clear`, so don't do it on top of uncommitted or
-unpushed work. Read-only; it never commits or pushes.
+Run this FIRST, in **this** repo. Capturing is the last thing before `/clear`, so don't do it on
+top of uncommitted or unpushed work. Read-only.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\verify-pushed.ps1
 ```
 
-Mirrors `push-all.ps1`'s remote model (origin/integration + v2/master), fetches both (best-effort),
-and exits **1** listing anything dirty/unpushed, **0** when clean and in sync. If it fails: commit the
-outstanding changes, run `tools\push-all.ps1`, then re-run the gate. Only proceed to the Ready command
-once it prints `OK  clean + pushed`.
+Mirrors `push-all.ps1`'s remote model (origin/integration + v2/master) and exits **1** listing
+anything dirty/unpushed. If it fails: commit, run `tools\push-all.ps1`, re-run the gate. Only
+proceed once it prints `OK  clean + pushed`.
 
-## Ready command
+## What moved (2026-08-03)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
-```
+The tooling used to live at `tools/effort/` in this repo and write to
+`%USERPROFILE%\Downloads\ClaudeConv`. Both are gone:
 
-That's the whole step — it re-renders `index.html` itself. You no longer run `build-session-index.ps1`
-after it. (`-Once` is still accepted and ignored, so the old muscle-memory command still works.)
+- Tools → `claude-hub/tools/`. There is no copy here; there is deliberately only one.
+- Conversations → `claude-hub/conversations/ioSender/`, now versioned — the session HTMLs too,
+  not just the manifest, since an aged-out transcript makes the HTML equally irreplaceable.
+- The in-repo manifest **mirror** (`tools/effort/sessions.json`) is gone along with the mechanism
+  that needed it. Nothing to commit *here* on capture any more.
+- Effort-tracker data (`sessions.csv`) → `claude-hub/effort/`.
 
-## Modes
-
-- *(no switch)* — capture everything since the last checkpoint as one session. **This is the step.**
-- `-Amend` — ran it too early and kept working? Folds the extra turns into the session just written,
-  keeping its filename so the index link doesn't move.
-- `-WhatIfOnly` — report the window, turn count and filename that would be written; write nothing.
-- `-IncludeThinking` — also include Claude's internal thinking blocks (off by default).
-
-## Ordering: write the summary FIRST, then call the capture last in the same message
-
-Claude Code flushes an assistant message's text to the transcript **before** running a tool call in that
-same message, so text written earlier in the message than the capture call is already on disk and gets
-captured. So write the end-of-session summary as prose, then make the capture the final action of the
-same message — the summary lands in *this* session's log (verified 2026-07-08). Don't run the capture and
-then write the summary as trailing text; that pushes the summary to the next run.
-
-## Supporting scripts
-
-- **`build-session-index.ps1`** — re-renders `index.html` from `sessions.json` alone (no transcripts, <1 s).
-  Only needed after changing the table's styling/columns or hand-editing the manifest.
-- **`migrate-session-manifest.ps1`** — the **one-time** seed, already run on 2026-08-02 (177 sessions back
-  to 2026-06-07). It splits on the same markers; the 60-minute heuristic survives only for the era **before
-  2026-07-08**, when the capture procedure didn't exist yet and there are no markers to use. Don't run it
-  again; `-Force` rebuilds the manifest from scratch. The pre-2026-06-26 session HTMLs are irreplaceable
-  (their transcripts are long deleted) — it reads their footers and never overwrites them.
-- **`convo-logger.ps1`** — the original one-transcript-per-file logger. Superseded, kept for reference.
-
-## Notes
-
-- Source transcripts: `%USERPROFILE%\.claude\projects\c--github-ioSender\*.jsonl`.
-- Transcript retention: Claude Code auto-deletes `.jsonl` older than `cleanupPeriodDays` (**default 30**),
-  set in `~/.claude/settings.json`. `sessions.json` + the `sessions\` HTMLs are the durable archive past
-  that window — **a session not captured at wrap-up is not recoverable later.**
-- `sessions.json` is rewritten with a rolling `.bak` on every capture, plus the committed in-repo mirror.
-  The session HTMLs themselves are **not** mirrored (hundreds of MB); only the manifest is.
+Per-project settings now live in `claude-hub/conversations/ioSender/sessions.json` under `config`
+— that one file carries the config, the checkpoint and every session record.

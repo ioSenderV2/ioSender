@@ -37,9 +37,10 @@ always `/clear`.
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
 6. **THEN capture the conversation log** — → [capture_conversation_log.md](capture_conversation_log.md).
-   One command, ~1 s: it writes this session's HTML, appends its record to `sessions.json`, and
-   re-renders `ClaudeConv\index.html` (elapsed/kbd time/turns/tokens/TOC#/release per session, linking
-   to each saved conversation). **Running it is what defines the session boundary** — everything since
+   One command, ~1 s: it writes this session's HTML into `claude-hub\conversations\ioSender\`,
+   appends its record to that project's `sessions.json`, re-renders that index plus the
+   cross-project roll-up, and commits itself into `claude-hub` (no push).
+   **Running it is what defines the session boundary** — everything since
    the last capture is this session — so don't skip it, and don't run it twice (use `-Amend` if you
    captured early and kept working). No separate `build-session-index.ps1` step any more.
 
@@ -64,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
 ## Ready command (step 6)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
+powershell -ExecutionPolicy Bypass -File c:\github\claude-hub\tools\convo-sessions.ps1
 ```
 
 ## Notes
