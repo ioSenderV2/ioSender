@@ -4,17 +4,32 @@
 [end_of_session_wrapup.md](end_of_session_wrapup.md)), before the user `/clear`s.
 **Memory context:** `iosender-end-of-session-convolog.md`.
 
-Pools **every** Claude Code transcript for this project into one chronological stream, re-cuts it into
-sessions on idle-time gaps, and writes the **current** session to a styled, self-contained, descriptively
-**named** HTML in `%USERPROFILE%\Downloads\ClaudeConv\sessions\`. Keeps user prompts + Claude prose only;
-strips tool calls, command output, diffs, thinking, IDE/opened-file and system-reminder/slash-command noise.
-Screenshots you paste into a prompt are embedded inline as `data:` URIs (base64 from the transcript), so a
-session HTML keeps its visual context and stays self-contained (no image folder). Images Claude viewed via the
-Read tool are not included (they are tool-result turns).
+Writes **this session** to a styled, self-contained, descriptively named HTML in
+`%USERPROFILE%\Downloads\ClaudeConv\sessions\`, appends one record to `sessions.json`, and re-renders
+`index.html`. Keeps user prompts + Claude prose only; strips tool calls, command output, diffs, thinking,
+IDE/opened-file and system-reminder/slash-command noise. Screenshots you paste into a prompt are embedded
+inline as `data:` URIs, so a session HTML keeps its visual context and stays self-contained (no image
+folder). Images Claude viewed via the Read tool are not included (they are tool-result turns).
 
 Filename: `<yyyy-MM-dd_HHmm>_<slug>.html` (sortable start-time prefix + slug from the session's first real
 prompt), e.g. `2026-07-08_0753_so-both-cameras-working-if-do-start-recording.html`. Start/stop times,
 duration, and turn count appear in both the header and the footer.
+
+## The session boundary is THIS COMMAND (changed 2026-08-02)
+
+Running the capture is what ends a session, so there is nothing to infer: **every turn after the previous
+capture belongs to this one.** The old 60-minute idle-gap heuristic is retired.
+
+Two things follow, and both are the point of the change:
+
+- **Only new transcripts are read.** The checkpoint in `sessions.json` records each transcript's size at
+  capture time, so an unchanged transcript is never opened. A capture now reads the ~4 files the sitting
+  touched instead of all 171 (**~1 s, down from ~5 min**).
+- **`sessions.json` is the durable record, and it is append-only.** Nothing re-derives history. This also
+  fixes real data loss: the index used to be rebuilt from scratch from surviving transcripts, and Claude
+  Code deletes those after `cleanupPeriodDays` (default 30) — so every rebuild silently dropped the
+  sessions that had aged out. It was down to 157 rows against 197 HTMLs on disk before the migration
+  recovered them (216 now).
 
 ## Step 0 — verify committed + pushed (gate)
 
@@ -33,42 +48,41 @@ once it prints `OK  clean + pushed`.
 ## Ready command
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
+powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
 ```
 
-Immediately followed by regenerating the session index (`ClaudeConv\index.html` — elapsed/kbd time/turns/
-tokens/TOC#/release per session, linking to each saved conversation):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\build-session-index.ps1
-```
-
-## Why this script (not convo-logger.ps1)
-
-`convo-logger.ps1` maps one *transcript file* → one `<guid>.html` (the CLI's own session boundaries).
-`convo-sessions.ps1` ignores those: it **merges all transcripts** and re-splits on a time gap, so a `/clear`
-that started a fresh transcript minutes later stays ONE session, and a transcript left open across an
-overnight break splits into two. This is the official capture step now.
+That's the whole step — it re-renders `index.html` itself. You no longer run `build-session-index.ps1`
+after it. (`-Once` is still accepted and ignored, so the old muscle-memory command still works.)
 
 ## Modes
 
-- `-Once` — merge/split everything, write **only the most-recent (current) session**, then exit. **This is the step.** Always regenerates the current sitting fresh (idempotent, deterministic name).
-- (no switch) — rebuild **all** detected sessions to their own named HTML files.
-- `-Analyze` — print the inter-entry gap distribution + session counts at several thresholds; write nothing.
-- `-SessionGapMinutes N` — idle gap (minutes) that starts a new session (**default 60**).
+- *(no switch)* — capture everything since the last checkpoint as one session. **This is the step.**
+- `-Amend` — ran it too early and kept working? Folds the extra turns into the session just written,
+  keeping its filename so the index link doesn't move.
+- `-WhatIfOnly` — report the window, turn count and filename that would be written; write nothing.
+- `-IncludeThinking` — also include Claude's internal thinking blocks (off by default).
 
-## Ordering: write the summary FIRST, then call `-Once` last in the same message
+## Ordering: write the summary FIRST, then call the capture last in the same message
 
 Claude Code flushes an assistant message's text to the transcript **before** running a tool call in that
-same message, so text written earlier in the message than the `-Once` call is already on disk and gets
-captured. So write the end-of-session summary as prose, then make the `-Once` call the final action of the
+same message, so text written earlier in the message than the capture call is already on disk and gets
+captured. So write the end-of-session summary as prose, then make the capture the final action of the
 same message — the summary lands in *this* session's log (verified 2026-07-08). Don't run the capture and
 then write the summary as trailing text; that pushes the summary to the next run.
+
+## Supporting scripts
+
+- **`build-session-index.ps1`** — re-renders `index.html` from `sessions.json` alone (no transcripts, <1 s).
+  Only needed after changing the table's styling/columns or hand-editing the manifest.
+- **`migrate-session-manifest.ps1`** — the **one-time** seed, already run on 2026-08-02. It is the only
+  thing that still uses the 60-minute heuristic, and only for sessions that predate the boundary rule.
+  Don't run it again; `-Force` would rebuild the manifest from scratch.
+- **`convo-logger.ps1`** — the original one-transcript-per-file logger. Superseded, kept for reference.
 
 ## Notes
 
 - Source transcripts: `%USERPROFILE%\.claude\projects\c--github-ioSender\*.jsonl`.
-- Boundary default 60 min was picked from the observed gap distribution (99% of inter-entry gaps < ~9 min;
-  the real breaks cluster at 1 hr+). Re-tune with `-Analyze` / `-SessionGapMinutes`.
 - Transcript retention: Claude Code auto-deletes `.jsonl` older than `cleanupPeriodDays` (**default 30**),
-  set in `~/.claude/settings.json`. These `sessions\` HTMLs are the durable archive past that window.
+  set in `~/.claude/settings.json`. `sessions.json` + the `sessions\` HTMLs are the durable archive past
+  that window — **a session not captured at wrap-up is not recoverable later.**
+- `sessions.json` is rewritten with a rolling `.bak` on every capture.

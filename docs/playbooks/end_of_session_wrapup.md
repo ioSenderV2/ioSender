@@ -32,19 +32,20 @@ always `/clear`.
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
-6. **THEN capture the conversation log** — the `-Once` call, → [capture_conversation_log.md](capture_conversation_log.md) —
-   **immediately followed by regenerating the session index** (`tools\effort\build-session-index.ps1`),
-   so `ClaudeConv\index.html` (elapsed/kbd time/turns/tokens/TOC#/release per session, linking to each
-   saved conversation) stays current. Takes ~2 min (re-parses every transcript) - run it, don't skip it
-   for time.
+6. **THEN capture the conversation log** — → [capture_conversation_log.md](capture_conversation_log.md).
+   One command, ~1 s: it writes this session's HTML, appends its record to `sessions.json`, and
+   re-renders `ClaudeConv\index.html` (elapsed/kbd time/turns/tokens/TOC#/release per session, linking
+   to each saved conversation). **Running it is what defines the session boundary** — everything since
+   the last capture is this session — so don't skip it, and don't run it twice (use `-Amend` if you
+   captured early and kept working). No separate `build-session-index.ps1` step any more.
 
 ## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
 
 The capture reads the session transcript from disk. Claude Code flushes the assistant message's **text**
 to the transcript **before** it runs a tool call in that same message — so any text written *earlier in the
-message than the `-Once` call* is already on disk and gets captured. Therefore:
+message than the capture call* is already on disk and gets captured. Therefore:
 
-- **Write the full end-of-session summary as prose first, then make the `-Once` call the LAST action of the
+- **Write the full end-of-session summary as prose first, then make the capture the LAST action of the
   same message.** The summary lands in *this* session's log, not the next run's. (Verified 2026-07-08 with a
   marker-phrase test.)
 - The old flow ran the capture and *then* wrote the summary as trailing text — which pushed the summary to
@@ -59,8 +60,7 @@ powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
 ## Ready command (step 6)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
-powershell -ExecutionPolicy Bypass -File tools\effort\build-session-index.ps1
+powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
 ```
 
 ## Notes

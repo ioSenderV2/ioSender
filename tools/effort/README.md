@@ -18,30 +18,44 @@ powershell -ExecutionPolicy Bypass -File tools\effort\effort-tracker.ps1
   `sessions.current` each poll, so a crash / reboot / Ctrl+C still captures it (finalised on the next run).
 - Auto-start at login: Task Scheduler → "At log on" → the command above (or a shortcut in `shell:startup`).
 
-## Our conversation — `convo-logger.ps1`
+## Our conversation — `convo-sessions.ps1`
 Logs the **Claude Code conversation** (your prompts + my prose replies) to a per-session **HTML** file, with
 all the noise stripped — tool calls, command output, file diffs, and my internal "thinking". Markdown is
-lightly rendered (fenced code blocks, inline code, bold, headings). Source is the session transcript JSONL
-the CLI writes under `%USERPROFILE%\.claude\projects\<project>\<guid>.jsonl`.
+lightly rendered (fenced code blocks, inline code, bold, headings). Pasted screenshots are embedded as
+`data:` URIs so each file stays self-contained. Source is the session transcript JSONL the CLI writes under
+`%USERPROFILE%\.claude\projects\<project>\<guid>.jsonl`.
 
 ```
-# Regenerate the CURRENT session (the end-of-session capture step):
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-logger.ps1 -Once
-
-# Regenerate every PAST transcript once (one .html per session):
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-logger.ps1 -All
-
-# FOLLOW the live session in the background (like effort-tracker):
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-logger.ps1
+# The end-of-session capture step - the whole thing:
+powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1
 ```
 
-- Output folder defaults to `%USERPROFILE%\Downloads\ClaudeConv` (`-OutDir` to change); one styled, self-
-  contained `<session-guid>.html` per session (light/dark aware). Each run regenerates the target session's
-  HTML in full from the transcript, so it's always idempotent — no partial-append state.
-- Keeps only `type=user` prompts (minus `isMeta` / tool-result turns and slash-command wrappers) and the
-  `text` blocks of `type=assistant`. `-IncludeThinking` adds my thinking blocks if you want them.
-- `-Once` is the intended end-of-session step (run it after everything is committed/pushed/published, just
-  before you `/clear`). `-PollSeconds` (default 5) only matters in follow mode.
+**The session boundary is that command.** Running it ends a session, so everything logged since the previous
+run is this one — no idle-gap guessing. Output goes to `%USERPROFILE%\Downloads\ClaudeConv` (`-OutDir` to
+change): `sessions\<yyyy-MM-dd_HHmm>_<slug>.html` plus a record appended to `sessions.json` and a re-rendered
+`index.html`.
+
+- **`sessions.json` is the durable archive.** Claude Code deletes transcripts after `cleanupPeriodDays`
+  (default 30), so a session not captured at wrap-up can't be recovered. The manifest is append-only —
+  records never fall off it.
+- **Incremental.** The checkpoint stores each transcript's size, so unchanged transcripts are never opened:
+  ~4 files instead of 171, **~1 s instead of ~5 min**.
+- `-Amend` folds later turns into the session just written (same filename). `-WhatIfOnly` previews.
+  `-IncludeThinking` adds my thinking blocks. `-Once` is accepted and ignored (old habit still works).
+
+### `build-session-index.ps1`
+Re-renders `index.html` from `sessions.json` alone — no transcripts, instant. `convo-sessions.ps1` already
+does this on every capture, so you only need it after changing the table's columns/styling.
+
+### `migrate-session-manifest.ps1`
+**One-time**, already run 2026-08-02. Seeded the manifest with 216 sessions (2026-06-07 →) from three
+sources: surviving transcripts (exact), each session HTML's own footer (exact, and how 59 sessions that had
+already dropped off the index were recovered), and the old `index.html` (rounded, last resort). The retired
+60-minute gap heuristic survives only in here, only for sessions predating the boundary rule. Don't re-run.
+
+### `convo-logger.ps1`
+The original one-transcript-per-file logger (`<guid>.html`, the CLI's own boundaries). Superseded by
+`convo-sessions.ps1`; kept for reference.
 
 ## My tokens
 I can't read my own token usage in-conversation — for the **exact** number, run **`/cost`** in Claude Code.
