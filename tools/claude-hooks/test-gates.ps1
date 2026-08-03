@@ -14,9 +14,8 @@ $here  = $PSScriptRoot
 $ps    = 'powershell.exe'
 $flags = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File')
 
-# Preserve the real turn state - this test scribbles all over it.
-$statePath = Join-Path (Resolve-Path (Join-Path $here '..\..')).Path '.claude\turn-state.json'
-$backup    = if (Test-Path $statePath) { Get-Content $statePath -Raw } else { $null }
+# Never touch the running turn's state file - point the hooks at a scratch one instead.
+$env:IOSENDER_TURN_STATE = Join-Path ([System.IO.Path]::GetTempPath()) "iosender-turn-test-$PID.json"
 
 function Invoke-Hook([string]$Script, [hashtable]$Payload) {
     ($Payload | ConvertTo-Json -Compress -Depth 6) | & $ps @flags (Join-Path $here $Script)
@@ -71,10 +70,8 @@ Invoke-Hook 'post-tool.ps1' @{ tool_name = 'Edit'
 $stop = Invoke-Hook 'on-stop.ps1' @{}
 Check 'stop: edited file left uncommitted'           'DENY'  $(if ($stop) { 'DENY' } else { 'allow' })
 
-# ---------------------------------------------------------------- restore
-if ($null -ne $backup) {
-    [System.IO.File]::WriteAllText($statePath, $backup, (New-Object System.Text.UTF8Encoding($false)))
-} elseif (Test-Path $statePath) { Remove-Item $statePath -Force }
+# ---------------------------------------------------------------- clean up the scratch state
+if (Test-Path $env:IOSENDER_TURN_STATE) { Remove-Item $env:IOSENDER_TURN_STATE -Force }
 
 $results | Format-Table -AutoSize
 $failed = @($results | Where-Object Result -eq 'FAIL').Count

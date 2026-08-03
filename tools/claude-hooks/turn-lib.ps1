@@ -3,8 +3,13 @@
 
 $ErrorActionPreference = 'Stop'
 
-$script:RepoRoot  = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$script:StatePath = Join-Path $script:RepoRoot '.claude\turn-state.json'
+$script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+
+# IOSENDER_TURN_STATE redirects state to a scratch file so test-gates.ps1 can exercise the hooks
+# without destroying the running turn's own record (it did exactly that once - a backup/restore
+# dance around the live file is not good enough, the tests must never touch it at all).
+$script:StatePath = if ($env:IOSENDER_TURN_STATE) { $env:IOSENDER_TURN_STATE }
+                    else { Join-Path $script:RepoRoot '.claude\turn-state.json' }
 
 function Get-RepoRoot { $script:RepoRoot }
 
