@@ -1,165 +1,152 @@
 # Architecture spec — Settings / Machine Setup navigation overhaul
 
-**Status:** planned, not started. Decisions below were taken 2026-08-03.
-**Related:** `Architecture-Registration-Refactor.md` (this delivers its parked Phase 2 for config panels).
+**Status: DELIVERED (2026-08-03).** All four phases shipped. This document was written as a plan and has
+been corrected in place to describe what was actually built — where the plan turned out to be wrong, the
+plan is stated and then the correction, because the reasons are the useful part.
+**Related:** `Architecture-Registration-Refactor.md` (this delivered its parked Phase 2 for config panels).
 
 ## 1. The problem
 
-`Settings` and `Machine Setup` are top-level tabs whose contents are themselves tab strips:
+`Settings` and `Machine Setup` were top-level tabs whose contents were themselves tab strips:
 
 | Container | Nodes | Notes |
 |---|---|---|
 | `GrblConfigView` (Settings) | 8 | Grbl, App, Jogging, G Code, Keyboard & Controller, Macros, Main Page, Simulator |
-| `MachineSetupWizard` (Machine Setup) | 12 | Overview + steps 1-9, and step 8 (Calibration) is itself a nested `TabControl` |
+| `MachineSetupWizard` (Machine Setup) | 12 | Overview + steps 1-9, and step 8 (Calibration) was itself a nested `TabControl` |
 
 ~20 nodes across two tab strips, one already nesting tabs inside tabs. Tabs don't scale: they compete for
-horizontal space, give no room for grouping, can't be searched, and force a flat namespace. Every new
-feature makes it worse, and the nesting is the visible symptom of the model breaking down.
+horizontal space, give no room for grouping, can't be searched, and force a flat namespace.
 
-Modern settings UIs solve this with a navigable index: a searchable tree on the left, the selected page on
-the right.
+## 2. We generalized an in-app pattern, not an imported one
 
-## 2. We are generalizing an in-app pattern, not importing a new one
+**`GrblConfigControl` (the Grbl page) already was this design** — `treeView.ItemsSource =
+GrblSettingGroups.Groups`, a real search box with `$53` jump-to, `$5?` wildcard expansion, free-text match,
+an "n of m" readout and F3/F4 next/previous. Proven, localized, already in daily use. That was the single
+biggest risk reducer available and the overhaul was shaped around reusing it rather than inventing.
 
-**`GrblConfigControl` (the Grbl tab) already is this design** and is the largest settings surface we have:
+## 3. Decisions
 
-- `treeView.ItemsSource = GrblSettingGroups.Groups`, `HierarchicalDataTemplate` group -> settings
-- a real search box: `$53` jump-to-setting, `$5?` wildcard group expansion, free-text match over name and
-  value, an "n of m" readout, F3/F4 next/previous, auto-expand of matching groups
-- modified-value styling, per-group "revert to value at startup" context menus
+**D1 — Two top-level tabs, one shared shell.** Both remain top-level tabs; both host `SettingsNavShell`.
+Rejected merging them: the wizard's step order is instructional, and demoting it to a branch of a settings
+tree loses that.
 
-It is proven, localized, and users already use it. The overhaul promotes that pattern one level up so the
-other ~19 nodes live in the same shell. This is the single biggest risk reducer in the plan.
+**D2 — Every config panel is its own node** (user direction). Not "one node per old tab": the App, Jogging
+and G Code tabs each crammed unrelated panels into 2-3 columns, and that cramming is what stopped scaling.
+Camera later split further, into `Camera` + `Demo recording (OBS)`.
 
-The composition half is also already there: `model.ConfigControls` is a registry of feature-contributed
-config panels (Basic, OddJobs, Camera, Probing, Lathe, GCodeViewer, StripGCode). The only missing piece is
-that `GrblConfigView.TargetPanel()` decides placement with a hardcoded `switch`, including string-matching
-`"CNC.Controls.Camera.ConfigControl"` because `CNC Controls` cannot reference that assembly.
+**D3 — The Grbl page stays self-contained.** Its group tree is *data* — live controller values with
+modified-highlighting and revert-to-startup, fetched on connect — not navigation. Lifting those groups into
+the nav tree would have made the tree connection-dependent (~30 nodes appearing on connect, gone on
+disconnect) and broken on classic grbl, which reports no groups at all. Cost of the decision: two search
+boxes on screen when you are on the Grbl page. Accepted.
 
-## 3. Decisions taken (2026-08-03)
+**D4 — Labels are read from the panels, not authored.** Every config panel is a single `GroupBox` with an
+`x:Uid`'d Header that LocBaml has already localized by the time the panel is constructed, so a node reads
+its label off the panel it names. Correct in all 7 locales, no new CSV rows, and it cannot drift. Only the
+5 category headings and the pages contributed by editors needed real resources.
 
-**D1 - Two top-level tabs, one shared shell.** `Settings` and `Machine Setup` both remain top-level tabs and
-both host the same `SettingsNavShell`. Machine Setup keeps its numbered, ordered steps; Settings gets
-categories. Rejected merging them into one tab: the wizard's step order is instructional, and demoting it to
-a branch of a settings tree loses that. Each can also ship independently.
-
-**D2 - Search indexes rendered text.** When a page is first realized, walk its visual tree and index the
-actual rendered strings. No per-page keyword lists to maintain or translate, no drift, and because LocBaml
-has already swapped the text at BAML load, **search works in all 7 locales for free**. See section 6 for the
-realization problem this creates.
+**D5 — Sub-tab key bindings dropped** (user approved). The shortcut badge and right-click "Bind to Key"
+attach to a tab header; with no tab strip they were unreachable. `ApplyOneTimeFixups` strips shortcuts
+persisted against `Tab.Settings.*` / `Tab.MachineSetup.*`. **Top-level tab shortcuts are untouched** — they
+are wired separately in `MainWindow`, and the trailing dot in those prefixes is what protects them.
 
 ## 4. The shell
 
-```
-+-- search box -----------+---------------------------+
-|  TreeView (nodes)       |  ContentPresenter         |
-|                         |    = selected page        |
-+-------------------------+---------------------------+
-|  footer: [Reset to Default]        [Save] [Restart] |
-+-----------------------------------------------------+
-```
+Search box + category tree left, selected page right, the pre-existing Save / Restart / Reset footer
+beneath — *moved*, not rebuilt. `SettingsNavShell` owns navigation only; hosts wire behaviour through
+`SelectedNodeChanged`, exactly as they used to react to `SelectionChanged`.
 
-The footer is **moved, not rebuilt** - `GrblConfigView` already owns Save / Restart (pulsing when a
-restart-only change is pending) / Reset-to-Default with per-tab visibility, plus the Grbl-only sub-footer
-(Reload / Backup / Restore / Copy to simulator). Its per-tab visibility logic becomes per-node.
+Tree width is **measured**, not hardcoded (`AutoSizeNav`): `FormattedText` over every visible label in the
+tree's own typeface, plus indent depth, plus the status dot where present, plus expander/padding/scrollbar.
+Labels come from localized panel headers, so the longest one differs per locale — any fixed number that
+fits English truncates silently elsewhere.
 
-## 5. `SettingsPageDescriptor` + registry
+## 5. Placement is declared by the panel
 
-Mirrors the existing `TabDescriptor` / `TabRegistry` deliberately - same shape, same reasoning, so there is
-one registration idiom in the codebase rather than two.
+`ISettingsPanelCategory` (category + sort order) is implemented on the panel itself, so placement travels
+with it however it reaches the host. This retired **both** halves of the old hardcoded placement —
+`TargetPanel()` and `TabFor()` — including the full type-name string matching (`"CNC.Controls.Camera.
+ConfigControl"`) that `CNC Controls` needed for panels in assemblies it cannot reference. Nodes are
+inserted by declared order: feature panels register when their own view is first built, which is not a
+stable order, so appending made the tree depend on which features happened to load first.
 
-```
-Key                  stable id, persisted as the selected node (NOT an index)
-Label                x:Uid'd, localized
-Category / Parent    where it sits in the tree
-Order                sort within parent
-Create()             factory
-IsAvailable()        capability gate (Trinamic drivers present, PID log, camera, ...)
-IsResettable         opts the node into the footer's Reset button
-IndexForSearch       default true; false for pages too expensive/side-effecting to realize (section 6)
-```
+## 6. Editors and wizards keep their controls whole
 
-This **retires `TargetPanel()`**: each feature assembly registers its own descriptor and declares its own
-placement, so `CNC Controls` no longer needs to know the type names of panels in assemblies it cannot
-reference.
+Several pages share one control: the key-map editor backs 2, Camera 2, the setup wizard 12. **The obvious
+implementation — hand out each `TabItem`'s body as page content — is wrong and dangerously so.** Those
+controls hook their behaviour on the control: `KeyMapEditor.PreviewKeyDown` drives shortcut capture, and its
+`Loaded`/`Unloaded` pause controller dispatch so that testing a gamepad button cannot drive the machine.
+Handing out the bodies leaves the control outside the visual tree and silently kills both — no compile
+error, and the second one is a safety behaviour.
 
-## 6. Search design, and its one real hazard
+So each control stays whole and is the content of all its pages; its tab strip is templated down to a bare
+`ContentPresenter`, and `ISettingsPageProvider.ShowPage()` switches sections. `SettingsNavNode.Owner`
+records the owning control so save-on-leave and reset-to-defaults resolve to it, not to the page body.
+Save-on-leave skips when moving *between* pages of the same editor, which is not leaving it.
 
-Two tiers, unified in one result list:
+For Machine Setup this also means every existing selection hook still fires underneath — the macro-status
+refresh, the simulator refresh, the calibration sub-wizard activation — none of it reimplemented.
 
-1. **Model tier** - grbl settings, already searchable via `GrblSettingDetails` (id / name / value).
-2. **Harvest tier** - per page, a walk of the realized visual tree collecting `TextBlock.Text`,
-   `CheckBox`/`RadioButton.Content`, `GroupBox.Header`, `Label.Content` and tooltips into a keyword set
-   attributed to that node.
+Two signals had to be carried across explicitly, because both lived on tab headers that no longer render:
+the per-step **green/orange/red grading** (now a status dot, restated on `StepStatusChanged`) and the
+**sub-tab gates** (stepper calibration needs a 3D probe; the simulator step hides while connected to the
+simulator — now `IsAvailable` checks re-evaluated after `wizard.Activate()`).
 
-**The hazard: harvesting requires realization, and realization can have side effects.** Some config panels
-do real work when they load or activate - the simulator config, the camera panel, anything that reads from
-the controller on `Activate(true)`. Blindly constructing every page at startup to build a search index could
-trigger controller traffic or hardware init that the user never asked for. That would be a self-inflicted
-version of exactly the class of bug that has bitten this app before.
+## 7. Search — the plan was wrong twice
 
-Mitigation, in order:
+**Planned:** harvest each page's *visual* tree, with a background pass realizing every page to index it,
+and an `IndexForSearch = false` opt-out for pages too expensive or side-effecting to realize.
 
-- Index a page when it is **first shown**, always. Free, no side effects beyond what the user triggered.
-- For a full-coverage index, run a background pass at idle that **constructs pages without activating them**
-  (`Create()` + measure/arrange in a detached host, never `Activate(true)`).
-- Any page that still cannot tolerate that sets `IndexForSearch = false` and falls back to its label plus an
-  optional short keyword string. Expected to be a handful (Simulator, Camera).
-- Re-harvest on locale change.
+**Both halves failed on contact:**
 
-## 7. Taxonomy (starting point - it is data, revise freely)
+- **Shared controls.** Indexing "the page's control" gives all twelve wizard steps identical text, so every
+  query matches all of them. Each page hands in its own subtree (`SettingsSubPage.IndexRoot`) instead.
+- **Realization.** Realizing a Machine Setup step fires its selection hooks — including the macro-status
+  query that reads the controller's filesystem. **Indexing must never talk to the machine.**
 
-Settings:
+**As built:** walk the **logical** tree. Those objects exist from `InitializeComponent`, so nothing is
+measured, arranged or `Loaded` to read them, pages never opened are still searchable, and there is no
+background pass. The `IndexForSearch` opt-out was deleted rather than kept — it implied a hazard that no
+longer exists.
 
-- **Controller** -> Grbl, Simulator
-- **Interface** -> Main Page, Jogging, Keyboard & Controller, Macros
-- **Job & G-code** -> G Code, Viewer, Probing, Camera
-- **Application** -> general app settings
+Collected: headers, labels, checkbox/button captions, tooltips, plain-string combo items. **Not**
+TextBox/PasswordBox contents — those are the user's own values (paths, IPs, the OBS password), not search
+terms, and have no business in an index.
 
-Machine Setup: unchanged order, numbering preserved, Overview first, and step 8's nested `TabControl`
-flattens into two child nodes (Stepper calibration, Squareness).
+Visible text and tooltip text are indexed **separately**, because a tooltip hit is on the page but only on
+hover: searching "strip" matched the `Main` page via a *Send comments* tooltip, which read as a wrong
+result until the row could say `Matched tooltip: ...`. A name match beats a text match for Enter.
 
-**Open question for Phase 1 - does the grbl group tree lift into the nav tree?** Today the Grbl page owns its
-own internal tree, so adopting the shell naively gives a tree inside a tree - the same nesting smell we are
-removing, one level down. The better end state is lifting `GrblSettingGroups.Groups` in as child nodes under
-Controller, with the right panel showing one group's settings. That makes the nav tree ~40+ nodes, which is
-precisely what the search box is for. Confirm before Phase 1; it does not block Phase 0.
+## 8. Phases (all delivered)
 
-## 8. Phasing (each independently shippable to `integration`)
-
-**Phase 0 - the shell, proving itself.** Build `SettingsNavShell`, the descriptor and the registry. Host the
-existing 8 Settings tabs as pages with their content untouched. Small, reviewable diff; if the shell feels
-wrong it costs a day, not the project.
-
-**Phase 1 - registration + taxonomy.** Retire `TargetPanel()`, features self-register, apply the taxonomy,
-resolve the grbl-tree question above.
-
-**Phase 2 - Machine Setup onto the shell.** 12 nodes, numbering kept, Calibration flattened. Largest visible
-win; deliberately after the shell is proven.
-
-**Phase 3 - search.** Model tier + harvest tier + the realization strategy in section 6.
+| Phase | What | Commit |
+|---|---|---|
+| 0 | Shell + per-panel nodes, Settings tab strip retired | `01774be` |
+| 1 | `ISettingsPanelCategory`, placement retired from the host, localization | `7bf44aa`, `aed0d94` |
+| 2 | Machine Setup onto the shell, status dots, sub-tab gates | `a9d71ee` |
+| 3 | Logical-tree search, match count, match explanation | `e0a5d2c` |
 
 ## 9. Cross-cutting
 
-**Localization.** Every node gets an `x:Uid` and a row in all 7 `Locale/<loc>/csv/*.csv` via
-`tools/locadd.py`, in the same change that adds the node - English fallback means skipping it fails
-silently and accumulates.
+**Localization.** Panel pages cost nothing (D4). The 5 category headings and 5 editor/step page labels are
+real resources in `CNC.Core`'s `LibStrings.xaml` with rows in all 7 CSVs.
 
-**Persistence / migration - this now matters.** `StretchTabControl PersistKey="Settings"` persists a selected
-tab *index*; the shell persists a node *key*. There is a real second user (Phil) with a saved profile, so
-this needs a one-time fixup in `AppConfig.ApplyOneTimeFixups` mapping old index -> new key, not a silent
-break onto a blank panel. Top-level `Config.Tabs` layout entries are unaffected - both tabs survive, which
-is a further point in favour of D1.
+`tools/locadd.py` was **broken and silently so** — it still listed `SurfaceSpoilboardWizard.xaml`, deleted
+in the Tools-tab retirement, and died on the missing file before reaching anything else, so every `x:Uid`
+added since that deletion had gone un-backfilled. Fixed; a missing target now warns and skips.
 
-**Keyboard.** Ctrl+F focuses search; F3/F4 keep their existing next/previous-match meaning; the tree is
-arrow-navigable; the selected node survives a controller reconnect.
+**Migration.** `ApplyOneTimeFixups` strips the retired sub-tab shortcuts (D5). The old
+`StretchTabControl PersistKey="Settings"` tab-order entry simply falls out of use — ordering is declared
+now, not user-reordered.
 
-## 10. Risks
+**Tooltips (app-wide, prompted by this work).** Long tooltips wrap at 450px, and are placed at
+`MousePoint` with a 32/28 offset: WPF's default `Mouse` placement offsets by an *assumed* standard cursor
+size, so an "extra large" Windows pointer covered the first characters. The wrap template is selected by
+content type, since a blanket `ContentTemplate` would render element-content tooltips as their type name.
 
-| Risk | Mitigation |
-|---|---|
-| Realizing pages for the index causes controller/hardware side effects | Section 6: lazy-first, construct-without-activate, per-page opt-out |
-| Machine Setup loses its "do these in order" teaching | Numbering and Overview preserved; wizard semantics are why D1 kept it separate |
-| One giant unreviewable diff | Four phases, each shippable; Phase 0 deliberately changes no page content |
-| Saved profiles open on a blank panel | One-time fixup, tested against a real profile |
-| Search finds nothing useful on non-grbl pages | Harvest tier (D2) rather than hand-maintained keywords |
+## 10. What this cost
+
+- Two search boxes on the Grbl page (D3).
+- Sub-tab key binding, removed with approval (D5).
+- `KeyMapEditor` still declares its own implicit `ToolTip` style, shadowing the app-wide one; left alone so
+  a wrapping change would not silently alter its deliberate `MousePoint` placement.
