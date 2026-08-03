@@ -44,6 +44,9 @@ param(
     [string]$GhExe        = "$PSScriptRoot\..\gh.ps1",
     [string]$MirrorPath   = "$PSScriptRoot\sessions.json",   # in-repo copy of the manifest ('' to skip)
     [string]$RepoDir      = "$PSScriptRoot\..\..",
+    [int]$GapMarkerMinutes  = 45,   # idle this long is drawn as a break INSIDE the session, not split on
+    [int]$MinSessionMinutes = 30,   # ignore a 'start' marker this soon after the last cut
+    [int]$EndQuietMinutes   = 20,   # quiet needed after a capture run for it to count as a wrap-up
     [switch]$Once,              # accepted and ignored: kept so the old playbook command still works
     [switch]$Amend,             # extend the most recent session instead of starting a new one
     [switch]$WhatIfOnly,        # report what would be captured, write nothing
@@ -100,56 +103,78 @@ if ($turns.Count -eq 0) {
     return
 }
 
-$start  = $turns[0].When
+# Normally this is exactly ONE session - the capture run is the boundary. But if a capture was
+# missed and you /clear'd in between, the window covers two real sittings; the transcript's own
+# markers say where to cut, so split rather than glue them into one misleading file. A long break
+# never splits - it is drawn inside the session instead.
+$groups = @(Split-TurnsIntoSessions -Turns $all -MinSessionMinutes $MinSessionMinutes -EndQuietMinutes $EndQuietMinutes)
+if ($groups.Count -eq 0) { $groups = @(,$turns) }
 $end    = $turns[-1].When
 $tokens = [int64]0
 foreach ($t in $all) { $tokens += [int64]$t.Tokens }
 
 if ($WhatIfOnly) {
-    $firstPrompt = ($turns | Where-Object { $_.Who -eq 'You' } | Select-Object -First 1).Text
-    Write-Host ("Would capture: {0} -> {1} ({2}), {3} turns, {4} tokens" -f `
-        $start.ToString('yyyy-MM-dd HH:mm'), $end.ToString('HH:mm'), (Format-Duration ($end - $start)), $turns.Count, (Format-Tokens $tokens)) -ForegroundColor Green
-    Write-Host ("Name would be: {0}_{1}" -f $start.ToString('yyyy-MM-dd_HHmm'), (Get-Slug $firstPrompt)) -ForegroundColor Green
+    if ($groups.Count -gt 1) { Write-Host ("A capture looks to have been missed - splitting into {0} sessions on the transcript's markers." -f $groups.Count) -ForegroundColor Yellow }
+    foreach ($g in $groups) {
+        $fp = ($g | Where-Object { $_.Who -eq 'You' } | Select-Object -First 1).Text
+        Write-Host ("Would capture: {0} -> {1} ({2}), {3} turns" -f `
+            $g[0].When.ToString('yyyy-MM-dd HH:mm'), $g[-1].When.ToString('HH:mm'), (Format-Duration ($g[-1].When - $g[0].When)), $g.Count) -ForegroundColor Green
+        Write-Host ("  name: {0}_{1}" -f $g[0].When.ToString('yyyy-MM-dd_HHmm'), (Get-Slug $fp)) -ForegroundColor Green
+    }
+    Write-Host ("Total {0} tokens across the window." -f (Format-Tokens $tokens)) -ForegroundColor DarkGray
     return
 }
-
-# ---- name it --------------------------------------------------------------------------------
-if ($amending) {
-    $name = $prior.name       # keep the existing filename so the index link doesn't move
-} else {
-    $firstPrompt = ($turns | Where-Object { $_.Who -eq 'You' } | Select-Object -First 1).Text
-    $base = "{0}_{1}" -f $start.ToString('yyyy-MM-dd_HHmm'), (Get-Slug $firstPrompt)
-    $taken = @{}
-    foreach ($s in $recorded) { $taken[[string]$s.name] = $true }
-    $name = $base
-    $k = 2
-    while ($taken.ContainsKey($name) -or (Test-Path (Join-Path $sessionsDir "$name.html"))) { $name = "$base-$k"; $k++ }
+if ($groups.Count -gt 1) {
+    Write-Host ("A capture looks to have been missed - splitting into {0} sessions on the transcript's markers." -f $groups.Count) -ForegroundColor Yellow
 }
 
-# ---- metrics --------------------------------------------------------------------------------
-$effortRows = Import-EffortRows $EffortCsv
-$kbdMin     = Get-KbdMinutes -Start $start -End $end -EffortRows $effortRows
-$hasKbd     = ($effortRows.Count -gt 0 -and @($effortRows | Where-Object { $_.End -ge $start -and $_.Start -le $end }).Count -gt 0)
-$toc        = Get-TocHits $turns (Import-TocNumbers $OverviewHtml)
-$release    = Get-ReleaseHit $start $end (Get-ReleaseTimes $Repo $GhExe)
-
-# ---- write the session HTML -----------------------------------------------------------------
-$title = "Conversation - {0}" -f $start.ToString('MMM d, HH:mm')
-$html  = Build-SessionHtml $turns $title $start $end
-$out   = Join-Path $sessionsDir ($name + '.html')
-[System.IO.File]::WriteAllText($out, $html, (New-Object System.Text.UTF8Encoding($true)))
-$fi = Get-Item $out
-$fi.CreationTime  = $start
-$fi.LastWriteTime = $start
-
-# ---- record it ------------------------------------------------------------------------------
-$record = New-SessionRecord -Start $start -End $end -Name $name -Turns $turns.Count `
-                            -Tokens $tokens -KbdMin $kbdMin -HasKbd $hasKbd `
-                            -Toc $toc -Release $release -Source 'boundary'
+# ---- shared metric inputs --------------------------------------------------------------------
+$effortRows   = Import-EffortRows $EffortCsv
+$tocNumbers   = Import-TocNumbers $OverviewHtml
+$releaseTimes = Get-ReleaseTimes $Repo $GhExe
 
 $list = New-Object System.Collections.Generic.List[object]
 foreach ($s in $recorded) { if (-not ($amending -and $s.name -eq $prior.name)) { $list.Add($s) } }
-$list.Add($record)
+$taken = @{}
+foreach ($s in $list) { $taken[[string]$s.name] = $true }
+
+$written = New-Object System.Collections.Generic.List[object]
+$gi = 0
+foreach ($g in $groups) {
+    $gi++
+    $gStart = $g[0].When
+    $gEnd   = $g[-1].When
+
+    # name it - the first group keeps the amended session's filename so its index link doesn't move
+    if ($amending -and $gi -eq 1) {
+        $name = $prior.name
+    } else {
+        $firstPrompt = ($g | Where-Object { $_.Who -eq 'You' } | Select-Object -First 1).Text
+        $base = "{0}_{1}" -f $gStart.ToString('yyyy-MM-dd_HHmm'), (Get-Slug $firstPrompt)
+        $name = $base
+        $k = 2
+        while ($taken.ContainsKey($name) -or (Test-Path (Join-Path $sessionsDir "$name.html"))) { $name = "$base-$k"; $k++ }
+    }
+    $taken[$name] = $true
+
+    # tokens belong to the group's own window
+    $gTok = [int64]0
+    foreach ($t in $all) { if ($t.When -ge $gStart -and $t.When -le $gEnd) { $gTok += [int64]$t.Tokens } }
+    $kbdMin = Get-KbdMinutes -Start $gStart -End $gEnd -EffortRows $effortRows
+    $hasKbd = ($effortRows.Count -gt 0 -and @($effortRows | Where-Object { $_.End -ge $gStart -and $_.Start -le $gEnd }).Count -gt 0)
+
+    $title = "Conversation - {0}" -f $gStart.ToString('MMM d, HH:mm')
+    $out   = Join-Path $sessionsDir ($name + '.html')
+    [System.IO.File]::WriteAllText($out, (Build-SessionHtml $g $title $gStart $gEnd $GapMarkerMinutes), (New-Object System.Text.UTF8Encoding($true)))
+    $fi = Get-Item $out
+    $fi.CreationTime  = $gStart
+    $fi.LastWriteTime = $gStart
+
+    $list.Add((New-SessionRecord -Start $gStart -End $gEnd -Name $name -Turns $g.Count `
+        -Tokens $gTok -KbdMin $kbdMin -HasKbd $hasKbd `
+        -Toc (Get-TocHits $g $tocNumbers) -Release (Get-ReleaseHit $gStart $gEnd $releaseTimes) -Source 'boundary'))
+    $written.Add([pscustomobject]@{ Name = $name; Start = $gStart; End = $gEnd; Turns = $g.Count; Tokens = $gTok; Out = $out })
+}
 $manifest.sessions = $list.ToArray()
 
 $manifest.checkpoint = [pscustomobject]@{
@@ -160,15 +185,16 @@ Write-Manifest $OutDir $manifest $MirrorPath
 $idx = Write-IndexHtml $OutDir $manifest
 
 $verb = if ($amending) { 'Amended' } else { 'Captured' }
-Write-Host ("{0}: {1}" -f $verb, $name) -ForegroundColor Green
-Write-Host ("  {0} - {1}  ({2})   {3} turns   {4} tokens{5}{6}" -f `
-    $start.ToString('yyyy-MM-dd HH:mm'), $end.ToString('HH:mm'), (Format-Duration ($end - $start)), `
-    $turns.Count, (Format-Tokens $tokens), `
-    $(if ($toc.Count -gt 0) { "   TOC " + (($toc | ForEach-Object { "#$_" }) -join ' ') } else { '' }), `
-    $(if ($release) { "   release $release" } else { '' })) -ForegroundColor Green
-Write-Host ("  -> {0}" -f $out) -ForegroundColor DarkGray
+foreach ($w in $written) {
+    Write-Host ("{0}: {1}" -f $verb, $w.Name) -ForegroundColor Green
+    Write-Host ("  {0} - {1}  ({2})   {3} turns   {4} tokens" -f `
+        $w.Start.ToString('yyyy-MM-dd HH:mm'), $w.End.ToString('HH:mm'), (Format-Duration ($w.End - $w.Start)), `
+        $w.Turns, (Format-Tokens $w.Tokens)) -ForegroundColor Green
+    Write-Host ("  -> {0}" -f $w.Out) -ForegroundColor DarkGray
+    $verb = 'Captured'
+}
 Write-Host ("  -> {0}  ({1} sessions)" -f $idx, $manifest.sessions.Count) -ForegroundColor DarkGray
 if ($MirrorPath) {
     Write-Host ("  -> {0}" -f $MirrorPath) -ForegroundColor DarkGray
-    if (-not $NoCommit) { Publish-ManifestMirror -RepoDir $RepoDir -MirrorPath $MirrorPath -SessionName $name }
+    if (-not $NoCommit) { Publish-ManifestMirror -RepoDir $RepoDir -MirrorPath $MirrorPath -SessionName $written[$written.Count-1].Name }
 }

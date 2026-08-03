@@ -34,7 +34,11 @@
 param(
     [string]$ProjectDir       = "$env:USERPROFILE\.claude\projects\c--github-ioSender",
     [string]$OutDir           = "$env:USERPROFILE\Downloads\ClaudeConv",
-    [int]$SessionGapMinutes   = 60,     # the retired heuristic, used ONLY for pre-boundary history
+    [int]$MinSessionMinutes   = 30,     # ignore a 'start' marker this soon after the last cut
+    [int]$EndQuietMinutes     = 20,     # quiet needed after a capture run for it to count as a wrap-up
+    [int]$GapMarkerMinutes    = 45,     # idle this long is drawn as a break INSIDE the session
+    [string]$MarkerEraStart   = $null,  # default: the first real capture run found in the transcripts
+    [int]$LegacyGapMinutes    = 60,     # old heuristic, applied ONLY before the marker era
     [string]$EffortCsv        = "$PSScriptRoot\sessions.csv",
     [string]$OverviewHtml     = "$PSScriptRoot\..\..\Overview.html",
     [string]$Repo             = "ioSenderV2/ioSender",
@@ -86,19 +90,19 @@ $all  = @($scan.Turns | Where-Object { $_.When -le $cutoff })
 $prose = @($all | Where-Object { $_.Who -ne '' })
 Write-Host ("      {0} turns across {1} transcripts" -f $prose.Count, @($scan.Files).Count) -ForegroundColor DarkGray
 
-$tSessions = New-Object System.Collections.Generic.List[object]
-if ($prose.Count -gt 0) {
-    $cur = New-Object System.Collections.Generic.List[object]
-    $cur.Add($prose[0])
-    for ($i=1; $i -lt $prose.Count; $i++) {
-        if (($prose[$i].When - $prose[$i-1].When).TotalMinutes -ge $SessionGapMinutes) {
-            $tSessions.Add($cur.ToArray()); $cur = New-Object System.Collections.Generic.List[object]
-        }
-        $cur.Add($prose[$i])
-    }
-    $tSessions.Add($cur.ToArray())
-}
-Write-Host ("      -> {0} sessions at the {1}-min boundary" -f $tSessions.Count, $SessionGapMinutes) -ForegroundColor DarkGray
+# Split on the transcript's OWN markers (capture runs / /clear / "check your memory"), never on the
+# clock. $all - not $prose - because the markers live on turns that carry no prose of their own.
+$mk = @($all | Where-Object { $_.Marker })
+# The capture procedure starts at the first real capture run (2026-07-08). Before it there are no
+# markers to use, so that era falls back to the old idle-gap method - as agreed.
+$ends = @($mk | Where-Object { $_.Marker -eq 'end' })
+$eraStart = if ($MarkerEraStart) { [datetime]$MarkerEraStart } elseif ($ends.Count -gt 0) { $ends[0].When } else { [datetime]::MaxValue }
+$tSessions = Split-TurnsIntoSessions -Turns $all -MinSessionMinutes $MinSessionMinutes `
+                -EndQuietMinutes $EndQuietMinutes -MarkerEraStart $eraStart -LegacyGapMinutes $LegacyGapMinutes
+Write-Host ("      marker era starts {0}; before that, the old {1}-min gap method" -f `
+    $eraStart.ToString('yyyy-MM-dd HH:mm'), $LegacyGapMinutes) -ForegroundColor DarkGray
+Write-Host ("      -> {0} sessions from {1} markers ({2} end / {3} start)" -f `
+    $tSessions.Count, $mk.Count, $ends.Count, @($mk | Where-Object { $_.Marker -eq 'start' }).Count) -ForegroundColor DarkGray
 
 foreach ($s in $tSessions) {
     $start = $s[0].When
@@ -124,7 +128,7 @@ foreach ($s in $tSessions) {
         $out = Join-Path $sessionsDir ($name + '.html')
         if ($RewriteHtml -or -not (Test-Path $out)) {
             $title = "Conversation - {0}" -f $start.ToString('MMM d, HH:mm')
-            [System.IO.File]::WriteAllText($out, (Build-SessionHtml $s $title $start $end), (New-Object System.Text.UTF8Encoding($true)))
+            [System.IO.File]::WriteAllText($out, (Build-SessionHtml $s $title $start $end $GapMarkerMinutes), (New-Object System.Text.UTF8Encoding($true)))
             $fi = Get-Item $out; $fi.CreationTime = $start; $fi.LastWriteTime = $start
         }
     }
@@ -133,7 +137,13 @@ $fromTranscripts = $accepted.Count
 Write-Host ("      accepted {0}" -f $fromTranscripts) -ForegroundColor Green
 
 # ============================================================ source 2: orphaned session HTMLs
-Write-Host "[2/3] Session HTMLs - the artifact written at the time, exact to the second..." -ForegroundColor Cyan
+Write-Host "[2/3] Session HTMLs - only where the transcripts no longer reach..." -ForegroundColor Cyan
+# Inside transcript coverage the transcripts are authoritative: they are complete AND now split on the
+# real markers. The HTMLs there are stale artifacts of the old clock-splitting - some are fragments,
+# some span two real sessions - so admitting them would just reinstate the boundaries we are fixing.
+$firstTranscriptTurn = if ($all.Count -gt 0) { $all[0].When } else { [datetime]::MaxValue }
+Write-Host ("      transcripts reach back to {0}; only HTMLs starting before that are considered" -f `
+    $firstTranscriptTurn.ToString('yyyy-MM-dd HH:mm')) -ForegroundColor DarkGray
 $fromHtml = 0
 $fmt = 'dddd, MMMM d yyyy  HH:mm:ss'
 foreach ($f in @(Get-ChildItem $sessionsDir -Filter *.html -ErrorAction SilentlyContinue)) {
@@ -152,22 +162,28 @@ foreach ($f in @(Get-ChildItem $sessionsDir -Filter *.html -ErrorAction Silently
         $end = $start
     }
     if ($start -gt $cutoff) { continue }
+    if ($start -ge $firstTranscriptTurn) { continue }   # transcripts cover this - they win
 
     $takenNames[$name] = $true
     $ov = Find-OverlapIndex $start $end
     if ($ov -ge 0) {
-        # Same sitting, two artifacts. Keep the one with more turns and widen the window to the union;
-        # the token figure survives from the transcript side even though it only covers part of it.
+        # Same sitting, two artifacts - this is a session straddling the transcript-retention edge:
+        # its early hours survive only in the HTML written at the time, its later hours only in the
+        # transcript. ALWAYS widen to the union so the early part isn't silently dropped; link the
+        # artifact with more turns. Neither file holds the whole sitting - the window says so.
         $a = $accepted[$ov]
-        if ($turns -le [int]$a.turns) { continue }
         $uStart = if ($start -lt [datetime]$a.start) { $start } else { [datetime]$a.start }
         $uEnd   = if ($end   -gt [datetime]$a.end)   { $end }   else { [datetime]$a.end }
+        $better = ($turns -gt [int]$a.turns)
         $kbdM   = Get-KbdMinutes -Start $uStart -End $uEnd -EffortRows $effortRows
         $hasK   = ($effortRows.Count -gt 0 -and @($effortRows | Where-Object { $_.End -ge $uStart -and $_.Start -le $uEnd }).Count -gt 0)
-        $accepted[$ov] = New-SessionRecord -Start $uStart -End $uEnd -Name $name -Turns $turns `
+        $accepted[$ov] = New-SessionRecord -Start $uStart -End $uEnd `
+            -Name $(if ($better) { $name } else { $a.name }) `
+            -Turns ([math]::Max($turns, [int]$a.turns)) `
             -Tokens ([int64]$a.tokens) -KbdMin $kbdM -HasKbd $hasK -Toc @($a.toc) `
             -Release (Get-ReleaseHit $uStart $uEnd $releaseTimes) -Source 'migrated-merged'
-        Write-Host ("      merged: {0} ({1} turns) supersedes {2} ({3})" -f $name, $turns, $a.name, $a.turns) -ForegroundColor DarkYellow
+        Write-Host ("      merged across the retention edge: {0} ({1} turns) + {2} ({3}) -> {4} - {5}" -f `
+            $name, $turns, $a.name, $a.turns, $uStart.ToString('MM-dd HH:mm'), $uEnd.ToString('HH:mm')) -ForegroundColor DarkYellow
         continue
     }
 

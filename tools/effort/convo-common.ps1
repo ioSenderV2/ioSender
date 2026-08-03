@@ -79,7 +79,42 @@ function Get-TurnImages($entry) {
     return $imgs.ToArray()
 }
 
-# One transcript line -> @{ Who; When; Ts; Text; Images; Tokens } or $null.
+<#
+.SYNOPSIS
+  Detect a real session-boundary marker on a transcript entry. Returns 'end', 'start' or $null.
+
+.DESCRIPTION
+  We do not have to guess where sessions begin and end - the transcript says so:
+
+    'end'   - the end-of-session capture actually being RUN (a tool_use whose command invokes
+              convo-sessions.ps1 / convo-logger.ps1). Prose mentioning the script does not count,
+              which matters in any session that works ON the capture tooling.
+    'start' - a /clear, or the user's own opening cue ("check your memory ...", user 2026-08-02).
+
+  An 'end' marker closes the session it sits in; a 'start' marker opens the next one before the
+  turn it sits on. That distinction is what stops the opening prompt being eaten - the bug that
+  made a session's first turns land in the PREVIOUS file.
+#>
+function Get-LineMarker($o) {
+    if ($o.type -eq 'assistant') {
+        $c = $o.message.content
+        if ($c -isnot [string] -and $null -ne $c) {
+            foreach ($b in $c) {
+                if ($b.type -eq 'tool_use' -and "$($b.input.command)" -match 'convo-sessions\.ps1|convo-logger\.ps1') { return 'end' }
+            }
+        }
+        return $null
+    }
+    if ($o.type -ne 'user') { return $null }
+    $c = $o.message.content
+    $txt = if ($c -is [string]) { $c } elseif ($null -ne $c) { (($c | Where-Object { $_.type -eq 'text' } | ForEach-Object { $_.text }) -join "`n") } else { '' }
+    if ($txt -match 'command-name>\s*/clear') { return 'start' }
+    $plain = ($txt -replace '(?s)<[^>]+>','').Trim()
+    if ($plain.Length -lt 300 -and $plain -match '(?i)\b(check|read)\b[^.!?]{0,40}\bmemor(y|ies)\b') { return 'start' }
+    return $null
+}
+
+# One transcript line -> @{ Who; When; Ts; Text; Images; Tokens; Marker } or $null.
 # Tokens is the assistant entry's own usage total (0 for user turns); kept on the turn so callers
 # never need a second pass over the same file just to total usage.
 function ConvertFrom-Line([string]$line, [bool]$IncludeThinking = $false) {
@@ -87,9 +122,30 @@ function ConvertFrom-Line([string]$line, [bool]$IncludeThinking = $false) {
     if ($line -eq '') { return $null }
     try { $o = $line | ConvertFrom-Json } catch { return $null }
     $t = $o.type
+
+    # A message typed WHILE Claude is working is not logged as type=user at all - it is queued and
+    # recorded as type=attachment / attachment.type=queued_command, with the text under
+    # attachment.prompt[]. Every one of these was silently dropped until 2026-08-02. They are real
+    # user turns (origin.kind=human) and often the most important ones - mid-course corrections.
+    if ($t -eq 'attachment') {
+        if (-not $o.timestamp) { return $null }
+        $a = $o.attachment
+        if ($null -eq $a -or $a.type -ne 'queued_command') { return $null }
+        if ($a.origin -and $a.origin.kind -and $a.origin.kind -ne 'human') { return $null }
+        $qtext = (@($a.prompt | Where-Object { $_.type -eq 'text' } | ForEach-Object { [string]$_.text }) -join "`n")
+        $qtext = Format-UserText $qtext
+        if ([string]::IsNullOrWhiteSpace($qtext)) { return $null }
+        try { $qwhen = ([datetime]$o.timestamp).ToLocalTime() } catch { return $null }
+        return [pscustomobject]@{
+            Who = 'You'; When = $qwhen; Ts = $qwhen.ToString('yyyy-MM-dd HH:mm:ss')
+            Text = $qtext; Images = @(); Tokens = 0; Marker = $null; Queued = $true
+        }
+    }
+
     if ($t -ne 'user' -and $t -ne 'assistant') { return $null }
     if (-not $o.timestamp) { return $null }
     try { $when = ([datetime]$o.timestamp).ToLocalTime() } catch { return $null }
+    $marker = Get-LineMarker $o
 
     $tokens = 0
     if ($t -eq 'assistant' -and $o.message -and $o.message.usage) {
@@ -118,7 +174,7 @@ function ConvertFrom-Line([string]$line, [bool]$IncludeThinking = $false) {
 
     $who = ''
     if ($null -ne $text) { $who = if ($t -eq 'user') { 'You' } else { 'Claude' } }
-    if ($who -eq '' -and $tokens -eq 0) { return $null }
+    if ($who -eq '' -and $tokens -eq 0 -and $null -eq $marker) { return $null }
 
     return [pscustomobject]@{
         Who    = $who
@@ -127,7 +183,77 @@ function ConvertFrom-Line([string]$line, [bool]$IncludeThinking = $false) {
         Text   = $(if ($null -eq $text) { '' } else { $text })
         Images = $images
         Tokens = $tokens
+        Marker = $marker
+        Queued = $false
     }
+}
+
+<#
+.SYNOPSIS
+  Cut a chronological turn stream into real sessions using the transcript's own boundary markers.
+  NO clock-time splitting: a long break inside a session stays inside it.
+
+.DESCRIPTION
+  Replaces the 60-minute idle-gap heuristic, which was fragmenting genuine sessions - a 2.5 h dinner
+  break split one 2026-08-02 session into two files and orphaned its opening prompts into the
+  previous one.
+
+    * an 'end' marker (the capture being run) closes the current session AFTER that turn;
+    * a 'start' marker (/clear, or "check your memory") opens a new session BEFORE that turn, so the
+      opening prompt stays with the session it opens;
+    * a 'start' within -MinSessionMinutes of the last cut is ignored, so the /clear that naturally
+      follows a capture does not cut twice and leave a stub session in between.
+#>
+function Split-TurnsIntoSessions {
+    param(
+        [object[]]$Turns,
+        [int]$MinSessionMinutes = 30,        # ignore a 'start' this soon after the last cut
+        [int]$EndQuietMinutes   = 20,        # quiet needed after a capture for it to count as a wrap-up
+        [datetime]$MarkerEraStart = [datetime]::MinValue,
+        [int]$LegacyGapMinutes  = 60         # the old heuristic, for turns before MarkerEraStart only
+    )
+    $sessions = New-Object System.Collections.Generic.List[object]
+    $cur = New-Object System.Collections.Generic.List[object]
+    $lastCut  = [datetime]::MinValue
+    $prevWhen = [datetime]::MinValue
+
+    for ($i = 0; $i -lt $Turns.Count; $i++) {
+        $t = $Turns[$i]
+
+        if ($t.When -lt $MarkerEraStart) {
+            # Before the capture procedure existed (2026-07-08) there is no marker to use, so fall back
+            # to the old idle-gap split - the only signal available for that era.
+            if ($cur.Count -gt 0 -and $prevWhen -gt [datetime]::MinValue -and `
+                ($t.When - $prevWhen).TotalMinutes -ge $LegacyGapMinutes) {
+                $sessions.Add($cur.ToArray()); $cur = New-Object System.Collections.Generic.List[object]
+                $lastCut = $t.When
+            }
+            if ($t.Who -ne '') { $cur.Add($t); $prevWhen = $t.When }
+            continue
+        }
+
+        if ($t.Marker -eq 'start' -and $cur.Count -gt 0 -and ($t.When - $lastCut).TotalMinutes -ge $MinSessionMinutes) {
+            $sessions.Add($cur.ToArray()); $cur = New-Object System.Collections.Generic.List[object]
+            $lastCut = $t.When
+        }
+        if ($t.Who -ne '') { $cur.Add($t); $prevWhen = $t.When }
+
+        if ($t.Marker -eq 'end' -and $cur.Count -gt 0) {
+            # A capture run only ENDS a session if the session actually stopped there. Running the
+            # script and carrying straight on is a test invocation, not a wrap-up - which is exactly
+            # what any session that works ON this tooling looks like (20 of them on 2026-07-08).
+            $next = $null
+            for ($j = $i + 1; $j -lt $Turns.Count; $j++) { if ($Turns[$j].Who -ne '' -or $Turns[$j].Marker) { $next = $Turns[$j]; break } }
+            $isWrapUp = ($null -eq $next) -or ($next.Marker -eq 'start') -or `
+                        (($next.When - $t.When).TotalMinutes -ge $EndQuietMinutes)
+            if ($isWrapUp) {
+                $sessions.Add($cur.ToArray()); $cur = New-Object System.Collections.Generic.List[object]
+                $lastCut = $t.When
+            }
+        }
+    }
+    if ($cur.Count -gt 0) { $sessions.Add($cur.ToArray()) }
+    return $sessions
 }
 
 <#
@@ -180,7 +306,24 @@ function Get-NewTurns {
     if (-not $Quiet) {
         Write-Host ("Transcripts: {0} scanned, {1} skipped (unchanged since checkpoint)" -f $scanned, $skipped) -ForegroundColor DarkGray
     }
-    return @{ Turns = @($turns | Sort-Object When); Files = $sizes.ToArray() }
+    $sorted = @($turns | Sort-Object When)
+
+    # A queued message is normally recorded ONLY as the attachment, but if it also gets replayed as a
+    # regular user turn we would print it twice. Drop a queued copy that has an identical non-queued
+    # twin within 10 minutes.
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($t in $sorted) {
+        if ($t.Queued) {
+            $dupe = $false
+            foreach ($o2 in $sorted) {
+                if (-not $o2.Queued -and $o2.Who -eq 'You' -and $o2.Text -eq $t.Text -and `
+                    [math]::Abs(($o2.When - $t.When).TotalMinutes) -le 10) { $dupe = $true; break }
+            }
+            if ($dupe) { continue }
+        }
+        $out.Add($t)
+    }
+    return @{ Turns = $out.ToArray(); Files = $sizes.ToArray() }
 }
 
 # ---------------------------------------------------------------- session HTML
@@ -226,7 +369,7 @@ function Format-Duration([timespan]$d) {
     return "{0:0}m" -f $d.TotalMinutes
 }
 
-function Build-SessionHtml([object[]]$turns, [string]$Title, [datetime]$Start, [datetime]$End) {
+function Build-SessionHtml([object[]]$turns, [string]$Title, [datetime]$Start, [datetime]$End, [int]$GapMarkerMinutes = 45) {
     $durStr   = Format-Duration ($End - $Start)
     $startStr = $Start.ToString('dddd, MMMM d yyyy  HH:mm:ss')
     $endStr   = $End.ToString('dddd, MMMM d yyyy  HH:mm:ss')
@@ -257,6 +400,11 @@ function Build-SessionHtml([object[]]$turns, [string]$Title, [datetime]$Start, [
   .ts { font-size:11px; color:#8a8f98; font-variant-numeric:tabular-nums; }
   .content { white-space:pre-wrap; word-wrap:break-word; }
   .paste { display:block; max-width:100%; height:auto; margin:10px 0 2px; border-radius:8px; border:1px solid #dfe1e5; }
+  .queued { font-weight:600; font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+            background:#e3ebfa; color:#3b5b9a; border-radius:999px; padding:1px 6px; margin-left:6px; }
+  .gap { display:flex; align-items:center; text-align:center; margin:22px 0; color:#8a8f98; font-size:12px; }
+  .gap::before, .gap::after { content:""; flex:1; border-top:1px dashed #c9ccd1; }
+  .gap span { padding:0 12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
   code { background:#eaecef; border-radius:4px; padding:1px 5px; font:13px/1.4 Consolas,Menlo,monospace; }
   pre.code { background:#0d1117; color:#e6edf3; padding:12px 14px; border-radius:8px; overflow-x:auto;
              white-space:pre; margin:8px 0; font:13px/1.45 Consolas,Menlo,monospace; }
@@ -267,6 +415,8 @@ function Build-SessionHtml([object[]]$turns, [string]$Title, [datetime]$Start, [
     .turn { background:#191b1f; border-color:#2a2d33; }
     .turn.you { background:#16233b; border-color:#274472; }
     .paste { border-color:#2a2d33; }
+    .gap::before, .gap::after { border-top-color:#3a3d44; }
+    .queued { background:#24324d; color:#9dbaf0; }
     .you .who { color:#7aa7ff; } .claude .who { color:#d0a3ff; }
     code { background:#2a2d33; }
   }
@@ -274,9 +424,21 @@ function Build-SessionHtml([object[]]$turns, [string]$Title, [datetime]$Start, [
 <header><h1>$Title</h1><div class="meta">$meta</div></header>
 <main>
 "@)
+    $prev = $null
     foreach ($t in $turns) {
+        # A break is shown, not split on: the whole session belongs in one file.
+        if ($null -ne $prev) {
+            $idle = $t.When - $prev.When
+            if ($idle.TotalMinutes -ge $GapMarkerMinutes) {
+                [void]$sb.Append(("<div class=`"gap`"><span>&#9210; break &middot; {0} &middot; resumed {1}</span></div>`n" -f `
+                    (Format-Duration $idle), $t.When.ToString('ddd HH:mm')))
+            }
+        }
+        $prev = $t
         $cls = if ($t.Who -eq 'You') { 'you' } else { 'claude' }
-        [void]$sb.Append("<section class=`"turn $cls`"><div class=`"turnhead`"><span class=`"who`">$($t.Who)</span><span class=`"ts`">$($t.Ts)</span></div>")
+        $who = $t.Who
+        if ($t.Queued) { $who += ' <span class="queued" title="typed while Claude was working">queued</span>' }
+        [void]$sb.Append("<section class=`"turn $cls`"><div class=`"turnhead`"><span class=`"who`">$who</span><span class=`"ts`">$($t.Ts)</span></div>")
         [void]$sb.Append((ConvertTo-TurnHtml $t.Text))
         if ($t.Images -and $t.Images.Count -gt 0) {
             foreach ($src in $t.Images) { [void]$sb.Append("<img class=`"paste`" src=`"$src`" alt=`"pasted image`">") }
@@ -323,8 +485,11 @@ function Write-Manifest([string]$OutDir, $Manifest, [string]$MirrorPath = $null)
     if (Test-Path $path) { Copy-Item $path "$path.bak" -Force }
     [System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($true)))
     # ...and a mirror inside the repo, so the one irreplaceable file is versioned and off this disk.
-    # OutDir lives under Downloads, which is backed up by nothing.
-    if ($MirrorPath) { [System.IO.File]::WriteAllText($MirrorPath, $json, (New-Object System.Text.UTF8Encoding($true))) }
+    # OutDir lives under Downloads, which is backed up by nothing. LF, no BOM: the repo is eol=lf,
+    # and CRLF here makes git warn about renormalising on every single capture.
+    if ($MirrorPath) {
+        [System.IO.File]::WriteAllText($MirrorPath, ($json -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    }
 }
 
 <#
