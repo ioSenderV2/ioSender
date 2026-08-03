@@ -314,13 +314,26 @@ namespace CNC.Controls
             return null;
         }
 
-        // A step header is either a plain string (Overview) or the numbered, colour-graded TextBlock.
+        // A step header is a plain string (Overview), the numbered colour-graded TextBlock, or - for every
+        // step that is bindable to a key - a TabHeaderControl WRAPPING one of those, because
+        // AttachTabBinding re-parents the original header into a wrapper carrying the shortcut badge and
+        // the right-click bind menu. Casting to TextBlock/string therefore came back empty for exactly the
+        // bound steps, which is why only the two calibration sub-tabs (not bindable) had labels.
+        // TabHeaderControl.ToString() returns its label for precisely this case.
         private static string HeaderText(TabItem tab)
         {
+            if (tab == null)
+                return string.Empty;
+
             var tb = tab.Header as TextBlock;
             if (tb != null)
                 return tb.Text;
-            return tab.Header as string ?? string.Empty;
+
+            var str = tab.Header as string;
+            if (!string.IsNullOrEmpty(str))
+                return str;
+
+            return tab.Header == null ? string.Empty : tab.Header.ToString();
         }
 
         public IEnumerable<SettingsSubPage> GetPages()
