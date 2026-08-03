@@ -413,32 +413,24 @@ namespace CNC.Controls
         // bare "G53 G0 Z0") - a firmware bug sign-flips a homing-direction-inverted ($23) axis's parser base
         // after a G53 move that leaves it "unmoved", producing a false Alarm:2. 'L' emits one line (a caller's
         // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
-        private static int _g30Label = 0;
-
         public static void EmitGotoG30(System.Action<string> L)
         {
-            // Skip the whole thing when already parked. This used to be unconditional, so a program that
-            // starts at G30 - the normal case, the operator parks there to fit the probe - opened by lifting
-            // to machine top and dropping straight back down to the same place. Several generators call this
-            // more than once per program, so that round trip was paid repeatedly for nothing.
+            // DO NOT wrap these in an o-word conditional. Tried 2026-08-02 to skip the lift-and-drop when
+            // already parked at G30; on real hardware the program streamed to completion - the g-code activity
+            // window scrolled normally - and the machine never moved at all, for the whole run.
             //
-            // Squared distance rather than three ABS tests: ABS[] appears nowhere in the existing macros so
-            // its grblHAL support is unproven here, while '*', OR and GT are all already exercised by
-            // pcorner.macro. 0.0025 = (0.05mm)^2 - below that the corrective move is meaningless anyway.
-            // Unique label per call. pcorner.macro keeps every o-word in the file distinct rather than reusing
-            // one for sequential blocks, so whether grblHAL tolerates reuse is untested - and several
-            // generators call this up to six times in a single program. Cycling 0-9 is comfortably more than
-            // any one program needs.
-            string o = "o97" + (_g30Label++ % 10).ToString(CultureInfo.InvariantCulture);
-
-            L("#<_g30_dx> = [#<_abs_x> - #5181]");
-            L("#<_g30_dy> = [#<_abs_y> - #5182]");
-            L("#<_g30_dz> = [#<_abs_z> - #5183]");
-            L(o + " IF [[[[#<_g30_dx> * #<_g30_dx>] + [#<_g30_dy> * #<_g30_dy>]] + [#<_g30_dz> * #<_g30_dz>]] GT 0.0025]");
+            // Cause: o-word FLOW CONTROL has never been streamed to a controller by this app. Every IF/WHILE
+            // here lives inside a .macro FILE on the controller (pcorner, tc, ...), which grblHAL can seek
+            // within; all 13 o-word sites in generated code are "O<name> CALL" into one of those files. A
+            // streamed program isn't seekable, so the IF was swallowed - and took the rest of the program's
+            // motion with it.
+            //
+            // If the redundant round trip is worth removing, decide it in C# at generate time - the caller
+            // already knows the live position via GrblViewModel.MachinePosition - and just don't emit these
+            // lines. Never by asking the controller to branch mid-stream.
             L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
             L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
             L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
-            L(o + " ENDIF");
         }
 
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
