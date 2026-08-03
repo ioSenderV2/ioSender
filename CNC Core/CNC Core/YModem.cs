@@ -171,20 +171,35 @@ namespace CNC.Core
 
             response = NAK;
 
-            new Thread(() =>
-            {
             // Generous per-packet ACK timeouts: writing each block to a used/fragmented flash filesystem
             // (littlefs garbage collection) can take several seconds, and too short a wait makes the transfer
             // retry/abort mid-file - leaving a truncated, hard-to-delete file. 10s to open, 5s per data block.
-            wait = WaitFor.SingleEvent<int>(
-                cancellationToken,
-                s => GetByte(s),
-                a => Comms.com.ByteReceived += a,
-                a => Comms.com.ByteReceived -= a,
-                packetNum == 0 ? 10000 : 5000, () => Comms.com.WriteBytes(crc, 2));
-            }).Start();
+            int ackTimeout = packetNum == 0 ? 10000 : 5000;
 
-            while (wait == null)
+            // IsBackground so a worker still parked in SingleEvent can't keep the process alive on close - a
+            // foreground worker here is exactly what wedged shutdown before (see AtcMacros.ReadControllerFile,
+            // which this now mirrors). The try/catch matters just as much: without it, an exception inside
+            // SingleEvent left 'wait' null forever and the DoEvents loop below span the UI thread with no way
+            // out - an unrecoverable hang needing exit/restart, reported against a tc.macro upload.
+            new Thread(() =>
+            {
+                try
+                {
+                    wait = WaitFor.SingleEvent<int>(
+                        cancellationToken,
+                        s => GetByte(s),
+                        a => Comms.com.ByteReceived += a,
+                        a => Comms.com.ByteReceived -= a,
+                        ackTimeout, () => Comms.com.WriteBytes(crc, 2));
+                }
+                catch { wait = false; }
+            }) { IsBackground = true }.Start();
+
+            // Hard wall-clock cap on top of the worker's own timeout, so even a worker that never returns at
+            // all cannot hang the UI. Falling out with 'response' still NAK reads as a failed packet, which
+            // Upload's retry/abort logic already handles - the transfer fails cleanly instead of wedging.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (wait == null && sw.ElapsedMilliseconds < ackTimeout + 2000)
                 EventUtils.DoEvents();
 
             switch (response)

@@ -611,17 +611,25 @@ namespace CNC.Controls
 
                         Comms.com.PurgeQueue();
 
+                        // try/catch + IsBackground + a wall-clock cap, same as YModem.Send and
+                        // AtcMacros.ReadControllerFile: an exception inside AckResponse used to leave 'res'
+                        // null forever, spinning the UI thread in the DoEvents loop below with no way out.
                         new Thread(() =>
                         {
-                            res = WaitFor.AckResponse<string>(
-                                cancellationToken,
-                                null,
-                                a => model.OnResponseReceived += a,
-                                a => model.OnResponseReceived -= a,
-                                300, () => Comms.com.WriteCommand(GrblConstants.CMD_FS_PWD));
-                        }).Start();
+                            try
+                            {
+                                res = WaitFor.AckResponse<string>(
+                                    cancellationToken,
+                                    null,
+                                    a => model.OnResponseReceived += a,
+                                    a => model.OnResponseReceived -= a,
+                                    300, () => Comms.com.WriteCommand(GrblConstants.CMD_FS_PWD));
+                            }
+                            catch { res = false; }
+                        }) { IsBackground = true }.Start();
 
-                        while (res == null)
+                        var pwdSw = System.Diagnostics.Stopwatch.StartNew();
+                        while (res == null && pwdSw.ElapsedMilliseconds < 2000)
                             EventUtils.DoEvents();
                     }
 
