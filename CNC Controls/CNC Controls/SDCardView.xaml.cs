@@ -299,24 +299,31 @@ namespace CNC.Controls
                 Comms.com.PurgeQueue();
 
                 model.SuspendProcessing = true;
-                model.Message = string.Format((string)FindResource("Downloading"), (string)currentFile["Name"]);
-
-                GCode.File.AddBlock((string)currentFile["Name"], CNC.Core.Action.New);
-
-                new Thread(() =>
+                // try/finally - see AtcMacros.ReadControllerFile: a stuck SuspendProcessing reroutes all
+                // incoming data away from the parser and only an app RESTART clears it.
+                try
                 {
-                    res = WaitFor.AckResponse<string>(
-                        cancellationToken,
-                        response => AddBlock(response),
-                        a => model.OnResponseReceived += a,
-                        a => model.OnResponseReceived -= a,
-                        400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
-                }).Start();
+                    model.Message = string.Format((string)FindResource("Downloading"), (string)currentFile["Name"]);
 
-                while (res == null)
-                    EventUtils.DoEvents();
+                    GCode.File.AddBlock((string)currentFile["Name"], CNC.Core.Action.New);
 
-                model.SuspendProcessing = false;
+                    new Thread(() =>
+                    {
+                        res = WaitFor.AckResponse<string>(
+                            cancellationToken,
+                            response => AddBlock(response),
+                            a => model.OnResponseReceived += a,
+                            a => model.OnResponseReceived -= a,
+                            400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
+                    }) { IsBackground = true }.Start();
+
+                    while (res == null)
+                        EventUtils.DoEvents();
+                }
+                finally
+                {
+                    model.SuspendProcessing = false;
+                }
 
                 GCode.File.AddBlock(string.Empty, CNC.Core.Action.End);
             }
@@ -376,25 +383,32 @@ namespace CNC.Controls
             {
                 Comms.com.PurgeQueue();
                 model.SuspendProcessing = true;
-                model.Message = string.Format((string)FindResource("Downloading"), (string)row["Name"]);
-
-                new Thread(() =>
+                // try/finally - see AtcMacros.ReadControllerFile: a stuck SuspendProcessing reroutes all
+                // incoming data away from the parser and only an app RESTART clears it.
+                try
                 {
-                    res = WaitFor.AckResponse<string>(
-                        ct,
-                        // Filter realtime status reports too - see AtcMacros.ReadControllerFile for why (poll
-                        // thread keeps running during SuspendProcessing and a "<...>" reply landing mid-dump
-                        // corrupts the read content).
-                        response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[") && !response.StartsWith("<")) sb.AppendLine(response); },
-                        a => model.OnResponseReceived += a,
-                        a => model.OnResponseReceived -= a,
-                        400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(row)));
-                }).Start();
+                    model.Message = string.Format((string)FindResource("Downloading"), (string)row["Name"]);
 
-                while (res == null)
-                    EventUtils.DoEvents();
+                    new Thread(() =>
+                    {
+                        res = WaitFor.AckResponse<string>(
+                            ct,
+                            // Filter realtime status reports too - see AtcMacros.ReadControllerFile for why (poll
+                            // thread keeps running during SuspendProcessing and a "<...>" reply landing mid-dump
+                            // corrupts the read content).
+                            response => { if (response != "ok" && !response.StartsWith("error") && !response.StartsWith("[") && !response.StartsWith("<")) sb.AppendLine(response); },
+                            a => model.OnResponseReceived += a,
+                            a => model.OnResponseReceived -= a,
+                            400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(row)));
+                    }) { IsBackground = true }.Start();
 
-                model.SuspendProcessing = false;
+                    while (res == null)
+                        EventUtils.DoEvents();
+                }
+                finally
+                {
+                    model.SuspendProcessing = false;
+                }
             }
 
             model.Message = string.Empty;

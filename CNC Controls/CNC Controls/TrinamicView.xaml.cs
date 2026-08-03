@@ -232,21 +232,29 @@ namespace CNC.Controls
             model.Poller.SetState(0);
             model.SuspendProcessing = true;
 
-            new Thread(() =>
+            // try/finally - see AtcMacros.ReadControllerFile. A stuck SuspendProcessing reroutes all incoming
+            // data away from the parser, and a stopped Poller leaves the app blind, for the rest of the
+            // SESSION: neither is cleared by anything short of a restart.
+            try
             {
-                res = WaitFor.AckResponse<string>(
-                    cancellationToken,
-                    response => ProcessStatus(response),
-                    a => model.OnResponseReceived += a,
-                    a => model.OnResponseReceived -= a,
-                    800, () => Comms.com.WriteCommand("M122" + axis));
-            }).Start();
+                new Thread(() =>
+                {
+                    res = WaitFor.AckResponse<string>(
+                        cancellationToken,
+                        response => ProcessStatus(response),
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        800, () => Comms.com.WriteCommand("M122" + axis));
+                }) { IsBackground = true }.Start();
 
-            while (res == null)
-                EventUtils.DoEvents();
-
-            model.SuspendProcessing = false;
-            model.Poller.SetState(AppConfig.Settings.Base.PollInterval);
+                while (res == null)
+                    EventUtils.DoEvents();
+            }
+            finally
+            {
+                model.SuspendProcessing = false;
+                model.Poller.SetState(AppConfig.Settings.Base.PollInterval);
+            }
         }
 
         private void OnDataContextPropertyChanged(object sender, PropertyChangedEventArgs e)

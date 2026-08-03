@@ -420,6 +420,14 @@ namespace CNC.Controls
             Comms.com.PurgeQueue();
             model.SuspendProcessing = true;
 
+            // try/finally around EVERYTHING below: SuspendProcessing reroutes ALL incoming data away from the
+            // normal parser (GrblViewModel line ~1432, an early return), so leaving it set breaks the app until
+            // it is RESTARTED - it is plain session state, nothing clears it. The DoEvents pump below can throw
+            // (any WPF exception raised while pumping surfaces here), and a bare "SuspendProcessing = false" at
+            // the end is then skipped. That matches the reported symptom exactly: the ATC update misbehaves,
+            // exit + restart, and the very same update works first time.
+            try
+            {
             // IsBackground so an unresponsive controller (WaitFor never returns) can't keep the process alive and
             // hang ioSender on close - a foreground worker here is exactly what wedged shutdown before.
             new System.Threading.Thread(() =>
@@ -451,8 +459,12 @@ namespace CNC.Controls
                 "[AtcMacros] ReadControllerFile: '{0}' -> res={1} after {2}ms, rawResponses=[{3}], result='{4}' (len={5}), GrblState now={6}/{7}",
                 cmd, res, sw.ElapsedMilliseconds, string.Join(" | ", rawResponses), sb.ToString().Trim(), sb.Length,
                 model.GrblState.State, model.GrblState.Substate));
+            }
+            finally
+            {
+                model.SuspendProcessing = false;
+            }
 
-            model.SuspendProcessing = false;
             return sb.ToString();
         }
 
