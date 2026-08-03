@@ -2664,7 +2664,25 @@ namespace GCode_Sender
             {
                 var d = TabRegistry.DescriptorByName(node.Component);
                 if (d == null)
-                    continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                {
+                    // Not a registered VIEW - it may still be a plain layout component (the tool table,
+                    // Trinamic and PID tuners the dissolved Tools tab carried). Those default to Tools-menu
+                    // windows, but the tree is the placement authority for them too, so honour a user who
+                    // put one back on the bar. They have no ICNCView contract, hence the plain header and
+                    // no shortcut badge - the key binding still finds them by Tag (see showComponentView).
+                    var comp = ComponentRegistry.Get(node.Component);
+                    var compCtl = comp?.Create?.Invoke();
+                    if (compCtl == null)
+                        continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                    (compCtl as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
+                    tabMode.Items.Add(new TabItem {
+                        Content = compCtl,
+                        Header = comp.Label,
+                        Tag = node.Component,
+                        Uid = "tab_" + node.Component
+                    });
+                    continue;
+                }
                 // No Presentation check here on purpose: the TREE is the placement authority. A view
                 // the registry defaults to a menu still becomes a tab if the user dragged it back to
                 // the tabs slot in Settings > Main Page.

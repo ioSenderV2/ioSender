@@ -483,9 +483,17 @@ namespace CNC.Controls
         // Tabs: ordered ViewType names of the main TabControl tabs that should be shown, in display order.
         // Empty (the default) means "show all available tabs in their built-in order" - no reordering/hiding.
         private List<string> _tabs = new List<string>();
+        // HiddenViews: component keys the user has deliberately placed NOWHERE - not on the tab bar, not in a
+        // menu (Settings > Main Page > Top-level tabs). It has to be recorded explicitly, because "in no slot"
+        // is also what a brand-new component looks like, and EnforceMenuPlacement puts THOSE into their
+        // default menu so they can't go missing. Without this list, hiding a menu-defaulted view was
+        // impossible - it came straight back on the next load.
+        private List<string> _hiddenViews = new List<string>();
 
         [XmlIgnore]
         public List<string> MainPanels { get { return _mainPanels; } set { _mainPanels = value ?? new List<string>(); } }
+        [XmlIgnore]
+        public List<string> HiddenViews { get { return _hiddenViews; } set { _hiddenViews = value ?? new List<string>(); } }
         [XmlIgnore]
         public List<string> Tabs { get { return _tabs; } set { _tabs = value ?? new List<string>(); } }
         [XmlIgnore]
@@ -514,6 +522,11 @@ namespace CNC.Controls
         {
             get { return string.Join(",", _tabs); }
             set { _tabs = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
+        public string HiddenViewsKeys
+        {
+            get { return string.Join(",", _hiddenViews); }
+            set { _hiddenViews = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
 
         // One-shot: the Height Map tab was introduced after tab layouts started persisting, so an existing
@@ -1177,10 +1190,14 @@ namespace CNC.Controls
             if (Base?.Tabs != null && Base.Tabs.Count > 0)
                 Base.Tabs.RemoveAll(t => inMenus.Contains(t));
 
+            var hidden = new HashSet<string>(Base?.HiddenViews ?? new List<string>(), StringComparer.Ordinal);
+
             foreach (var kv in DefaultMenuPlacement)
             {
                 if (LayoutTree.Contains(root, kv.Key))
                     continue;
+                if (hidden.Contains(kv.Key))
+                    continue;   // placed nowhere ON PURPOSE - invariant 2 must not undo a deliberate choice
                 (kv.Value == LayoutKeys.SlotMenuFile ? fileSlot : toolsSlot).Items.Add(new LayoutNode(kv.Key));
             }
         }

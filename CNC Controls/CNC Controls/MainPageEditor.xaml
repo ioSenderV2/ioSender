@@ -87,10 +87,12 @@
             </TabItem>
 
             <TabItem x:Uid="tab_tabs" Header="Tabs">
+                <!-- One row per view, each choosing where it lives: the main tab bar, the File menu, the
+                     Tools menu, or nowhere. Replaces the old shown/hidden shuttle (2026-08-03), which could
+                     only express the tab bar and so had no way to say "put this in a menu" - or to hide
+                     anything that defaults to one. Row order is the display order WITHIN each destination. -->
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -99,18 +101,29 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Uid="txt_hiddenTabs" Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstTabsAvail" x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-
-                    <TextBlock x:Uid="txt_shownTabs" Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstTabsShown" x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <TextBlock x:Uid="txt_viewPlacement" Grid.Column="0" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,4"
+                               Text="Where each view appears. Order within a destination is top to bottom (left to right on the tab bar). Applied on restart."/>
+                    <ListBox x:Uid="lstPlacement" x:Name="lstPlacement" Grid.Column="0" Grid.Row="1"
+                             HorizontalContentAlignment="Stretch" SelectionChanged="Selection_Changed">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" Margin="2,0,8,0"/>
+                                    <ComboBox Grid.Column="1" Width="120" ItemsSource="{Binding Choices}"
+                                              DisplayMemberPath="Label" SelectedValuePath="Placement"
+                                              SelectedValue="{Binding Placement, Mode=TwoWay}"
+                                              ToolTip="{Binding PlacementTooltip}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabShow" x:Uid="btn_tabShow" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
-                        <Button x:Name="btnTabHide" x:Uid="btn_tabHide" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabUp" x:Uid="btn_tabUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move left (earlier)"/>
-                        <Button x:Name="btnTabDown" x:Uid="btn_tabDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move right (later)"/>
+                        <Button x:Name="btnTabUp" x:Uid="btn_tabUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move earlier (further left / higher up)"/>
+                        <Button x:Name="btnTabDown" x:Uid="btn_tabDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move later (further right / lower down)"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
