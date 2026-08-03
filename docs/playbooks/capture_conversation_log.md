@@ -11,6 +11,11 @@ IDE/opened-file and system-reminder/slash-command noise. Screenshots you paste i
 inline as `data:` URIs, so a session HTML keeps its visual context and stays self-contained (no image
 folder). Images Claude viewed via the Read tool are not included (they are tool-result turns).
 
+**Messages typed while Claude is working** are included too, badged `queued`. They are not logged as
+`type=user` at all — Claude Code records them as `type=attachment` / `queued_command` with the text under
+`attachment.prompt[]` — so every one of them (964 across the archive) was silently missing from the logs
+until 2026-08-02. If you ever add another transcript reader, look for that shape.
+
 Filename: `<yyyy-MM-dd_HHmm>_<slug>.html` (sortable start-time prefix + slug from the session's first real
 prompt), e.g. `2026-07-08_0753_so-both-cameras-working-if-do-start-recording.html`. Start/stop times,
 duration, and turn count appear in both the header and the footer.
@@ -18,7 +23,19 @@ duration, and turn count appear in both the header and the footer.
 ## The session boundary is THIS COMMAND (changed 2026-08-02)
 
 Running the capture is what ends a session, so there is nothing to infer: **every turn after the previous
-capture belongs to this one.** The old 60-minute idle-gap heuristic is retired.
+capture belongs to this one.** The old 60-minute idle-gap heuristic is retired — **a long break never
+splits a session**, it is drawn in place as a `⏸ break · 1h 50m` marker inside the file.
+
+If a capture was ever *missed*, the window covers two real sittings. The transcript's own markers say where
+to cut, so the capture splits there rather than gluing them together:
+
+| marker | what it is | where it cuts |
+|---|---|---|
+| **end** | the capture actually being **run** — a tool call invoking the script, not prose mentioning it — and only if things went quiet (`-EndQuietMinutes`, 20) afterwards | after that turn |
+| **start** | `/clear`, or your own opening cue ("check your memory …") | **before** that turn, so the opening prompt stays with the session it opens |
+
+That second rule is load-bearing: cutting *after* a start marker is what used to strand a session's first
+couple of prompts at the tail of the previous file.
 
 Two things follow, and both are the point of the change:
 
@@ -78,9 +95,11 @@ then write the summary as trailing text; that pushes the summary to the next run
 
 - **`build-session-index.ps1`** — re-renders `index.html` from `sessions.json` alone (no transcripts, <1 s).
   Only needed after changing the table's styling/columns or hand-editing the manifest.
-- **`migrate-session-manifest.ps1`** — the **one-time** seed, already run on 2026-08-02. It is the only
-  thing that still uses the 60-minute heuristic, and only for sessions that predate the boundary rule.
-  Don't run it again; `-Force` would rebuild the manifest from scratch.
+- **`migrate-session-manifest.ps1`** — the **one-time** seed, already run on 2026-08-02 (177 sessions back
+  to 2026-06-07). It splits on the same markers; the 60-minute heuristic survives only for the era **before
+  2026-07-08**, when the capture procedure didn't exist yet and there are no markers to use. Don't run it
+  again; `-Force` rebuilds the manifest from scratch. The pre-2026-06-26 session HTMLs are irreplaceable
+  (their transcripts are long deleted) — it reads their footers and never overwrites them.
 - **`convo-logger.ps1`** — the original one-transcript-per-file logger. Superseded, kept for reference.
 
 ## Notes

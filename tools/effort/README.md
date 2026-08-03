@@ -36,6 +36,14 @@ run is this one — no idle-gap guessing. Output goes to `%USERPROFILE%\Download
 change): `sessions\<yyyy-MM-dd_HHmm>_<slug>.html` plus a record appended to `sessions.json` and a re-rendered
 `index.html`.
 
+- **A break never splits a session** — it's drawn in place as a `⏸ break · 1h 50m` marker.
+- **A missed capture doesn't glue two sittings together** — the transcript's own markers (a capture actually
+  being *run*, a `/clear`, or your "check your memory" opener) say where to cut. A `start` marker cuts
+  *before* its turn so the opening prompt stays with the session it opens.
+- **Messages typed while Claude is working are included**, badged `queued`. They're logged as
+  `type=attachment`/`queued_command`, not `type=user` — which is why 964 of them were missing until
+  2026-08-02.
+
 - **`sessions.json` is the durable archive.** Claude Code deletes transcripts after `cleanupPeriodDays`
   (default 30), so a session not captured at wrap-up can't be recovered. The manifest is append-only —
   records never fall off it.
@@ -54,10 +62,11 @@ Re-renders `index.html` from `sessions.json` alone — no transcripts, instant. 
 does this on every capture, so you only need it after changing the table's columns/styling.
 
 ### `migrate-session-manifest.ps1`
-**One-time**, already run 2026-08-02. Seeded the manifest with 216 sessions (2026-06-07 →) from three
-sources: surviving transcripts (exact), each session HTML's own footer (exact, and how 59 sessions that had
-already dropped off the index were recovered), and the old `index.html` (rounded, last resort). The retired
-60-minute gap heuristic survives only in here, only for sessions predating the boundary rule. Don't re-run.
+**One-time**, already run 2026-08-02. Seeded the manifest with 177 sessions (2026-06-07 →) from three
+sources: surviving transcripts (exact, split on the markers), each session HTML's own footer (exact — how 59
+sessions that had already dropped off the index were recovered), and the old `index.html` (rounded, last
+resort). The 60-minute gap heuristic survives only in here, and only for the era **before 2026-07-08** when
+the capture procedure didn't exist and there are no markers. Don't re-run.
 
 ### `convo-logger.ps1`
 The original one-transcript-per-file logger (`<guid>.html`, the CLI's own boundaries). Superseded by
