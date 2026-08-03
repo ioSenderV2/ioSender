@@ -348,6 +348,9 @@
     <Compile Include="SidebarItem.cs" />
     <Compile Include="MainPanelRegistry.cs" />
     <Compile Include="TabRegistry.cs" />
+    <Compile Include="ViewHostWindow.xaml.cs">
+      <DependentUpon>ViewHostWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="PanelFlyout.xaml.cs">
       <DependentUpon>PanelFlyout.xaml</DependentUpon>
     </Compile>
@@ -506,6 +509,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ConsoleWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ViewHostWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

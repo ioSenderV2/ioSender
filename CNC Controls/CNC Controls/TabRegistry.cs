@@ -31,10 +31,27 @@ namespace CNC.Controls
         }
     }
 
-    // A registrable main-window tab. The host instantiates Create() into a TabItem, runs the
-    // optional Configure() hook (e.g. to wire an event), and uses the placement flags to drive
-    // initial enable state and the "always reachable" protection - replacing the scattered
-    // hardcoded ViewType lists the host used to carry.
+    // How a registered view reaches the user. Introduced 2026-08-03 when the main bar was cut back to
+    // the three views used while a job is actually running; everything else is opened from the menus
+    // and hosted in its own window (ViewHostWindow) rather than occupying permanent tab-strip width.
+    public enum ViewPresentation
+    {
+        MainTab,    // a permanent tab in the main bar
+        MenuWindow  // a menu entry that opens the view in its own top-level window
+    }
+
+    // Which top-level menu a MenuWindow view is listed under. None = the host places it by hand.
+    public enum ViewMenu
+    {
+        None,
+        File,
+        Tools
+    }
+
+    // A registrable main-window view. The host instantiates Create(), runs the optional Configure()
+    // hook (e.g. to wire an event), and uses the placement flags to drive initial enable state and
+    // the "always reachable" protection - replacing the scattered hardcoded ViewType lists the host
+    // used to carry. Presentation/Menu decide whether it becomes a tab or a menu-opened window.
     public class TabDescriptor
     {
         public ViewType ViewType { get; }
@@ -43,13 +60,19 @@ namespace CNC.Controls
         public int Order { get; }                    // display order; lower first
         public bool EnabledWhenDisconnected { get; } // initial IsEnabled before a controller connects
         public bool AlwaysVisible { get; }           // never hidden by a saved tab layout (e.g. Settings, Machine Setup)
+        public ViewPresentation Presentation { get; }
+        public ViewMenu Menu { get; }                // only meaningful when Presentation == MenuWindow
         public Func<UserControl> Create { get; }
         public Action<UserControl> Configure { get; }
+
+        public bool IsTab { get { return Presentation == ViewPresentation.MainTab; } }
 
         public TabDescriptor(ViewType viewType, string label, Func<UserControl> create,
                              int order = 1000, bool enabledWhenDisconnected = false,
                              bool alwaysVisible = false, Action<UserControl> configure = null,
-                             string name = null)
+                             string name = null,
+                             ViewPresentation presentation = ViewPresentation.MainTab,
+                             ViewMenu menu = ViewMenu.None)
         {
             ViewType = viewType;
             Label = label;
@@ -59,6 +82,8 @@ namespace CNC.Controls
             AlwaysVisible = alwaysVisible;
             Configure = configure;
             Name = name ?? viewType.ToString();
+            Presentation = presentation;
+            Menu = menu;
         }
     }
 

@@ -730,6 +730,7 @@ namespace GCode_Sender
             // before anything that resolves a tab via getTab()/getView() below.
             RegisterBuiltinTabs();
             BuildTabs();
+            BuildViewMenus();
 
             // Tell the operator (not just the log) if ConfigStore had to discard a section on load - see
             // ConfigStore.LoadWarnings / AppConfig.LastLoadWarnings' own comments. Once per launch; shown
@@ -2584,21 +2585,36 @@ namespace GCode_Sender
             // offline g-code load/preview; Settings/Tools/Machine Setup are config/setup work. The operational
             // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
             // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 10, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds & Speeds"), () => new FeedsAndSpeedsView(), 20, enabledWhenDisconnected: true));
+            // --- the main tab bar: the three views used while a job is actually being run ---
             TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,
-                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
-            // Not alwaysVisible: every tool it still hosts is hardware-gated, so ToolsView gates itself and
-            // the main-bar prune drops the tab outright on a controller that supports none of them.
-            TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 85, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 110, enabledWhenDisconnected: false));
+
+            // --- File menu: the two configuration destinations ---
+            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine"), () => new MachineSetupView(), 10, enabledWhenDisconnected: true, alwaysVisible: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 20, enabledWhenDisconnected: true, alwaysVisible: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+
+            // --- Tools menu. Work Order is reached by its own File > Load/New entries, so it is a
+            //     MenuWindow with no menu of its own (ViewMenu.None) - the host opens it directly.
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 85, enabledWhenDisconnected: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.None));
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 10, enabledWhenDisconnected: false,
+                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds and Speeds"), () => new FeedsAndSpeedsView(), 20, enabledWhenDisconnected: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // Probing and Height Map are on borrowed time (2026-08-03) - listed under Tools for now,
+            // deliberately without further investment.
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 40, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 50, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 60, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // ToolsView is dissolved: its three children (tool table, Trinamic tuner, PID tuner) are
+            // listed directly in the Tools menu by BuildViewMenus, so the wrapper tab is gone.
         }
 
         // Localized tab label via LibStrings, falling back to the English literal if the resource is missing
@@ -2626,6 +2642,11 @@ namespace GCode_Sender
                 var d = TabRegistry.DescriptorByName(node.Component);
                 if (d == null)
                     continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                // Menu-hosted views may still be listed in an older persisted layout's tabs slot.
+                // ApplyOneTimeFixups strips them, but skip here too so a stale profile can never
+                // resurrect a tab for a view that now lives in a menu.
+                if (!d.IsTab)
+                    continue;
                 var ctl = d.Create?.Invoke();
                 if (ctl == null)
                     continue;
@@ -2688,6 +2709,63 @@ namespace GCode_Sender
 
         // See tabMode.ReorderDragging's own comment (BuildTabs) for why this exists.
         private bool tabReorderDragging;
+
+        // Fill File/Tools with the registered MenuWindow views, plus the tools the dissolved Tools tab
+        // used to host. Runs after RegisterBuiltinTabs so a view declares itself once, in the registry,
+        // and appears in the right menu without an edit to MainWindow.xaml.
+        private void BuildViewMenus()
+        {
+            foreach (var d in TabRegistry.Descriptors.Where(x => !x.IsTab && x.Menu != ViewMenu.None)
+                                                     .OrderBy(x => x.Order))
+            {
+                var parent = d.Menu == ViewMenu.File ? menuFile : menuTools;
+                parent.Items.Add(NewViewMenuItem(d));
+            }
+
+            // The former Tools tab's own sub-tabs (tool table, Trinamic tuner, PID tuner) are registered
+            // as layout components rather than views, so they get a plain host window each.
+            menuTools.Items.Add(new Separator());
+            foreach (var key in new[] { LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })
+            {
+                var c = ComponentRegistry.Get(key);
+                if (c?.Create == null)
+                    continue;
+                var item = new MenuItem { Header = c.Label, Uid = "mnu_" + key };
+                string k = key, label = c.Label;   // capture per-iteration for the closure
+                item.Click += (s, e) => ViewHostWindow.OpenComponent(k, label, UIViewModel, AppConfig.Settings, this);
+                menuTools.Items.Add(item);
+            }
+        }
+
+        private MenuItem NewViewMenuItem(TabDescriptor d)
+        {
+            var item = new MenuItem
+            {
+                Header = d.Label,
+                // Built in code, so no authored x:Uid - set one from the stable registry key so the UI
+                // test server can address these the same way it addresses the authored menu items.
+                Uid = "mnu_view" + d.Name,
+                Tag = d.Name,
+                IsEnabled = d.EnabledWhenDisconnected
+            };
+            item.Click += (s, e) => ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            return item;
+        }
+
+        // Enable/disable the menu-hosted views on the connect transition, the same way
+        // UpdateConnectionGatedTabs does for the tabs that remain in the bar.
+        private void UpdateConnectionGatedMenuItems(bool connected)
+        {
+            foreach (var menu in new[] { menuFile, menuTools })
+                foreach (var obj in menu.Items)
+                {
+                    if (!(obj is MenuItem item) || !(item.Tag is string key))
+                        continue;
+                    var d = TabRegistry.DescriptorByName(key);
+                    if (d != null)
+                        item.IsEnabled = d.EnabledWhenDisconnected || connected;
+                }
+        }
 
         // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main
         // Page" Tabs editor can list them. Ordering/visibility is now driven by the layout tree (BuildTabs),

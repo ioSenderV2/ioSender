@@ -45,14 +45,22 @@
              window X / Alt+F4 (both routed through Window_Closing) quit the app. -->
         <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
-            <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load File..." Click="LoadFile_Click"
-                      ToolTip="Load a single g-code file."/>
-            <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
-                      ToolTip="Switch to the Work Order tab and start composing a new one."/>
-            <MenuItem x:Uid="mnu_loadWorkOrder" x:Name="menuLoadWorkOrder" Header="Loa_d Work Order..." Click="LoadWorkOrder_Click"
-                      ToolTip="Switch to the Work Order tab and open a saved .workorder file."/>
-            <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">
-                <MenuItem x:Uid="mnu_open" Header="_Open" Click="CameraOpen_Click"/>
+            <!-- File / Tools carry a static skeleton here; the view entries (Machine, Settings, SD Card,
+                 Feeds and Speeds, ...) are appended from the tab registry by BuildViewMenus, so a
+                 registered view declares itself once and never needs an edit to this markup. -->
+            <MenuItem x:Uid="mnu_file" x:Name="menuFile" Header="_File">
+                <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load Program..." Click="LoadFile_Click"
+                          ToolTip="Load a single g-code file."/>
+                <MenuItem x:Uid="mnu_loadWorkOrder" x:Name="menuLoadWorkOrder" Header="Loa_d Work Order..." Click="LoadWorkOrder_Click"
+                          ToolTip="Open a saved .workorder file."/>
+                <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
+                          ToolTip="Start composing a new work order."/>
+                <Separator x:Name="menuFileViewSeparator"/>
+                <!-- Machine + Settings appended here -->
+            </MenuItem>
+            <MenuItem x:Uid="mnu_tools" x:Name="menuTools" Header="_Tools">
+                <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera" Click="CameraOpen_Click"/>
+                <!-- SD Card, Feeds and Speeds, the former Tools tab's tools, ... appended here -->
             </MenuItem>
             <MenuItem x:Uid="mnu_help" x:Name="menuHelp" Header="_Help">
                 <MenuItem x:Uid="mnu_wiki" Header="_Wiki" Click="aboutWikiItem_Click"/>
