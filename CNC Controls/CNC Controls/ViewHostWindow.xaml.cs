@@ -72,7 +72,14 @@ namespace CNC.Controls
                 Title = descriptor.Label,
                 Owner = owner,
                 // Addressable by the UI test server, and unique per view.
-                Uid = "win_" + descriptor.Name
+                Uid = "win_" + descriptor.Name,
+                // MUST be set before the content is attached. As tabs these views inherited the main
+                // window's DataContext (the GrblViewModel) down the visual tree, and several read their
+                // model from it rather than from Setup() - MachineSetupWizard.Activate NREs on
+                // model.Axes without it. DataContext inheritance does NOT cross a Window boundary, and
+                // Owner does not propagate it, so hand it over explicitly. Same idiom MainWindow
+                // already uses for the About and Console windows.
+                DataContext = owner?.DataContext
             };
             win._viewType = descriptor.ViewType;
             win._view = ctl as ICNCView;
@@ -128,7 +135,9 @@ namespace CNC.Controls
                 (ctl as ICNCView)?.Setup(model, profile);
             }
 
-            var win = new ViewHostWindow { Title = label, Owner = owner, Uid = "win_" + key };
+            // DataContext before content, for the same reason as Open() above.
+            var win = new ViewHostWindow { Title = label, Owner = owner, Uid = "win_" + key,
+                                           DataContext = owner?.DataContext };
             win._componentKey = key;
             win.host.Content = ctl;
             _openComponents[key] = win;
