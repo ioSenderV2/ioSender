@@ -117,6 +117,7 @@ namespace CNC.Controls
                     new LayoutNode(LayoutKeys.StartJob),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
+                    new LayoutNode(LayoutKeys.WorkOrder),
                     new LayoutNode(LayoutKeys.Offsets)),
 
                 new LayoutSlot(LayoutKeys.SlotMenuFile,
@@ -125,9 +126,8 @@ namespace CNC.Controls
 
                 // The Tools CONTAINER is gone: its three hardware-gated tools are listed directly here,
                 // one menu entry each, instead of being sub-tabs of a wrapper tab.
-                // Work Order is deliberately absent - it is reached by File > Load/New Work Order. It
-                // stays registered, so it shows in the editor's Available column and can be dragged
-                // back onto the tab strip (same precedent as Probing/Height Map before it).
+                // Work Order is a TAB (above), not a menu entry: File > Load/New Work Order still work,
+                // they just select the tab rather than opening a window - see ShowWorkOrder().
                 new LayoutSlot(LayoutKeys.SlotMenuTools,
                     new LayoutNode(LayoutKeys.SDCard),
                     new LayoutNode(LayoutKeys.FeedsAndSpeeds),

@@ -2056,12 +2056,29 @@ namespace GCode_Sender
         // and its own toolbar button first.
         private void NewWorkOrder_Click(object sender, RoutedEventArgs e)
         {
-            (OpenViewWindow(ViewType.WorkOrder) as WorkOrderView)?.New();
+            ShowWorkOrder()?.New();
         }
 
         private void LoadWorkOrder_Click(object sender, RoutedEventArgs e)
         {
-            (OpenViewWindow(ViewType.WorkOrder) as WorkOrderView)?.Load();
+            ShowWorkOrder()?.Load();
+        }
+
+        /// <summary>
+        /// Bring the Work Order composer up, wherever the layout puts it. Work Order ships as a tab, but
+        /// the tabs/menu split is the user's to change in Settings > Main Page - so these menu entries
+        /// must not assume either: select the tab when there is one, open the host window when there
+        /// isn't. Any caller that needs to drive a relocatable view should follow this shape.
+        /// </summary>
+        private WorkOrderView ShowWorkOrder()
+        {
+            var tab = getTab(ViewType.WorkOrder);
+            if (tab != null)
+            {
+                tabMode.SelectedItem = tab;
+                return getView(tab) as WorkOrderView;
+            }
+            return OpenViewWindow(ViewType.WorkOrder) as WorkOrderView;
         }
 
         /// <summary>
@@ -2594,6 +2611,7 @@ namespace GCode_Sender
             // --- the main tab bar: the three views used while a job is actually being run ---
             TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
 
             // --- File menu: the two configuration destinations ---
@@ -2602,10 +2620,7 @@ namespace GCode_Sender
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 20, enabledWhenDisconnected: true, alwaysVisible: true,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
 
-            // --- Tools menu. Work Order is reached by its own File > Load/New entries, so it is a
-            //     MenuWindow with no menu of its own (ViewMenu.None) - the host opens it directly.
-            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 85, enabledWhenDisconnected: true,
-                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.None));
+            // --- Tools menu ---
             TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 10, enabledWhenDisconnected: false,
                 configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));

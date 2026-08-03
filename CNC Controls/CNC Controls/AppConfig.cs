@@ -1137,12 +1137,8 @@ namespace CNC.Controls
                 tabs.Items.Remove(node);
             }
 
-            // Work Order was a tab and is now reached via File > Load/New Work Order. Drop it from the
-            // bar without adding a menu entry - it stays registered, so the editor's Available column
-            // still offers it to anyone who wants the tab back.
-            var wo = tabs.Items.FirstOrDefault(n => n.Component == LayoutKeys.WorkOrder);
-            if (wo != null)
-                tabs.Items.Remove(wo);
+            // Work Order stays on the bar (user, 2026-08-03) - File > Load/New Work Order select the
+            // tab rather than opening a window. Nothing to move.
 
             root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuFile, fileItems.ToArray()));
             root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuTools, toolsItems.ToArray()));
