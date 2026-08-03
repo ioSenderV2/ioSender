@@ -1,82 +1,90 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}\\tools\\claude-hooks\\on-prompt.ps1"
-            ],
-            "timeout": 20,
-            "statusMessage": "Starting turn"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}\\tools\\claude-hooks\\pre-shell.ps1"
-            ],
-            "timeout": 20,
-            "statusMessage": "Checking turn-loop hard rules"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash|PowerShell|Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}\\tools\\claude-hooks\\post-tool.ps1"
-            ],
-            "timeout": 20
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}\\tools\\claude-hooks\\on-stop.ps1"
-            ],
-            "timeout": 30,
-            "statusMessage": "Checking the turn is finished"
-          }
-        ]
-      }
-    ]
-  }
+    "$schema":  "https://json.schemastore.org/claude-code-settings.json",
+    "hooks":  {
+                  "UserPromptSubmit":  [
+                                           {
+                                               "hooks":  [
+                                                             {
+                                                                 "type":  "command",
+                                                                 "command":  "powershell.exe",
+                                                                 "args":  [
+                                                                              "-NoProfile",
+                                                                              "-ExecutionPolicy",
+                                                                              "Bypass",
+                                                                              "-File",
+                                                                              "C:\\github\\claude-hub\\hooks\\on-prompt.ps1",
+                                                                              "-ProjectRoot",
+                                                                              "${CLAUDE_PROJECT_DIR}"
+                                                                          ],
+                                                                 "timeout":  20,
+                                                                 "statusMessage":  "Starting turn"
+                                                             }
+                                                         ]
+                                           }
+                                       ],
+                  "PreToolUse":  [
+                                     {
+                                         "matcher":  "Bash|PowerShell",
+                                         "hooks":  [
+                                                       {
+                                                           "type":  "command",
+                                                           "command":  "powershell.exe",
+                                                           "args":  [
+                                                                        "-NoProfile",
+                                                                        "-ExecutionPolicy",
+                                                                        "Bypass",
+                                                                        "-File",
+                                                                        "C:\\github\\claude-hub\\hooks\\pre-shell.ps1",
+                                                                        "-ProjectRoot",
+                                                                        "${CLAUDE_PROJECT_DIR}"
+                                                                    ],
+                                                           "timeout":  20,
+                                                           "statusMessage":  "Checking turn-loop rules"
+                                                       }
+                                                   ]
+                                     }
+                                 ],
+                  "PostToolUse":  [
+                                      {
+                                          "matcher":  "Bash|PowerShell|Edit|Write|NotebookEdit",
+                                          "hooks":  [
+                                                        {
+                                                            "type":  "command",
+                                                            "command":  "powershell.exe",
+                                                            "args":  [
+                                                                         "-NoProfile",
+                                                                         "-ExecutionPolicy",
+                                                                         "Bypass",
+                                                                         "-File",
+                                                                         "C:\\github\\claude-hub\\hooks\\post-tool.ps1",
+                                                                         "-ProjectRoot",
+                                                                         "${CLAUDE_PROJECT_DIR}"
+                                                                     ],
+                                                            "timeout":  20
+                                                        }
+                                                    ]
+                                      }
+                                  ],
+                  "Stop":  [
+                               {
+                                   "hooks":  [
+                                                 {
+                                                     "type":  "command",
+                                                     "command":  "powershell.exe",
+                                                     "args":  [
+                                                                  "-NoProfile",
+                                                                  "-ExecutionPolicy",
+                                                                  "Bypass",
+                                                                  "-File",
+                                                                  "C:\\github\\claude-hub\\hooks\\on-stop.ps1",
+                                                                  "-ProjectRoot",
+                                                                  "${CLAUDE_PROJECT_DIR}"
+                                                              ],
+                                                     "timeout":  30,
+                                                     "statusMessage":  "Checking the turn is finished"
+                                                 }
+                                             ]
+                               }
+                           ]
+              }
 }
