@@ -32,9 +32,6 @@ namespace CNC.Controls
             public string Description; // row tooltip; null falls back to the label
         }
 
-        // Outline group for the main-menu commands. Named here rather than spelled out per entry so the
-        // catalog and KeyMapEditor.groupDescriptions can't drift apart.
-        public const string MenuGroup = "Menu commands";
 
         public static readonly ActionInfo[] Catalog = new ActionInfo[]
         {
@@ -62,20 +59,20 @@ namespace CNC.Controls
             // refuses to act while that item is disabled, so a shortcut can never do what the menu won't.
             // The views that used to be tabs are NOT here - they keep their "Tab.*" ids (KeyMapEditor.TabTargets)
             // so a binding made while they were on the bar still works now that they are menu items.
-            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = MenuGroup, Description = "Open the connection dialog." },
-            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = MenuGroup, Description = "Open a g-code file." },
-            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = MenuGroup, Description = "Open a saved work order." },
-            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = MenuGroup, Description = "Start a new work order." },
-            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = MenuGroup, Description = "Open the camera window." },
-            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = MenuGroup, Description = "Open the online wiki in a browser." },
-            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = MenuGroup, Description = "Open the usage tips page in a browser." },
-            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = MenuGroup, Description = "Open the brief tour." },
-            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = MenuGroup, Description = "Open the video tutorials." },
-            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = MenuGroup, Description = "Open the error and alarm code reference." },
-            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = MenuGroup, Description = "Check GitHub for a newer ioSender release." },
-            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = MenuGroup, Description = "Swap back to the build installed before the last update." },
-            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = MenuGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
-            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = MenuGroup, Description = "Show the About window." },
+            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = KeyMapEditor.TopLevelGroup, Description = "Open the connection dialog." },
+            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.TopLevelGroup, Description = "Open a g-code file." },
+            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.TopLevelGroup, Description = "Open a saved work order." },
+            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.TopLevelGroup, Description = "Start a new work order." },
+            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.TopLevelGroup, Description = "Open the camera window." },
+            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.TopLevelGroup, Description = "Open the online wiki in a browser." },
+            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.TopLevelGroup, Description = "Open the usage tips page in a browser." },
+            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.TopLevelGroup, Description = "Open the brief tour." },
+            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.TopLevelGroup, Description = "Open the video tutorials." },
+            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.TopLevelGroup, Description = "Open the error and alarm code reference." },
+            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.TopLevelGroup, Description = "Check GitHub for a newer ioSender release." },
+            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.TopLevelGroup, Description = "Swap back to the build installed before the last update." },
+            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.TopLevelGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
+            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = KeyMapEditor.TopLevelGroup, Description = "Show the About window." },
         };
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();

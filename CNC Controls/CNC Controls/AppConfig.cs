@@ -1228,21 +1228,24 @@ namespace CNC.Controls
             MigrateTopLevelComponentsToMenus();
             EnforceMenuPlacement();
 
-            // 2026-08-03: the retired Tools CONTAINER tab. Its three tools are top-level views of their own
-            // now (Tools menu windows by default), each keeping its old "Tab.Tools.<Tool>" shortcut id - but
-            // "Tab.Tools" itself addresses a tab that no longer exists and can never resolve again, so drop it.
-            // The trailing-dot test is what keeps the three children: only the bare container id goes.
-            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(t => t?.Id == "Tab.Tools") ?? 0;
+            // 2026-08-03: keyboard shortcuts address TOP-LEVEL destinations only - the tab strip and the
+            // menus (KeyMapEditor.TabTargets). Every second-level target was withdrawn, so drop any binding
+            // saved against one: the dispatcher would still resolve several of them, and a key that fires
+            // while being invisible in the editor is worse than one that is simply gone.
+            //
+            // "Tab.Tools" (the dissolved container tab) goes with them; its three CHILDREN do not - they are
+            // top-level views now and keep their nested-looking ids, which is why this tests the specific
+            // prefixes rather than "does the id contain two dots".
+            //
+            // An earlier version of this fixup, written the same morning, stripped only "Tab.Settings.*" and
+            // "Tab.MachineSetup.*" while the editor still OFFERED those targets - so it silently deleted
+            // bindings the user could still make. Whatever this list strips must stay out of TabTargets.
+            string[] retiredPrefixes = { "Tab.Settings.", "Tab.MachineSetup.", "Tab.Probing.", "Tab.OddJobs.", "Tab.LatheWizard." };
+            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(
+                t => t?.Id != null && (t.Id == "Tab.Tools" || retiredPrefixes.Any(p => t.Id.StartsWith(p, StringComparison.Ordinal)))) ?? 0;
             if (deadShortcuts > 0)
                 CNC.Core.DebugLog.Write("config", string.Format(
-                    "ApplyOneTimeFixups: removed {0} shortcut(s) for the retired Tools container tab", deadShortcuts));
-
-            // NOTE (2026-08-03, same day): an earlier version of this fixup also stripped every
-            // "Tab.Settings.*" / "Tab.MachineSetup.*" sub-tab shortcut, on the grounds that both tab strips
-            // had become navigation trees with nothing to bind from. That was wrong twice over - the Key
-            // Mappings editor still lists those targets, and both trees resolve the ids through their own
-            // ITabBindingHost.SelectSubTab (GrblConfigView / MachineSetupView) - so the bindings work and the
-            // fixup was quietly deleting them on the next load. Removed; do not reinstate.
+                    "ApplyOneTimeFixups: removed {0} shortcut(s) for withdrawn second-level tab targets", deadShortcuts));
 
             // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
             // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which

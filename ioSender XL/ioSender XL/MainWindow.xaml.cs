@@ -3061,10 +3061,13 @@ namespace GCode_Sender
         // actually shown (so the caller consumes the key); false leaves the key alone - which is what happens
         // for a view removed for a missing capability, or a sub-tab that no longer exists.
         //
-        // A nested "Tab.<Parent>.<Sub>" id resolves its PARENT here and then drills into the inner tab through
-        // the view's ITabBindingHost; a plain "Tab.<Name>" id just shows the view. The three ex-Tools ids are
-        // whole views despite their nested form, so they are matched before the parent split (see
-        // componentViewIds).
+        // A plain "Tab.<Name>" id shows the view. The three ex-Tools ids are whole views despite their nested
+        // form, so they are matched before the parent split (see componentViewIds).
+        //
+        // The nested "Tab.<Parent>.<Sub>" path below is now a SAFETY NET, not a feature: second-level targets
+        // were withdrawn from KeyMapEditor.TabTargets on 2026-08-03 (top-level destinations only) and
+        // ApplyOneTimeFixups strips saved ones. It stays so that a binding written by an older build - or one
+        // that outlives the fixup somehow - still lands somewhere sensible instead of half-switching.
         private bool showBoundView(string id)
         {
             string componentKey;

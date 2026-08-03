@@ -700,72 +700,34 @@ namespace CNC.Controls
             new TabTarget("Tab.Tools.Trinamic",  "Trinamic tuner", "Show the Trinamic tuner, wherever it lives - main tab or Tools menu."),
             new TabTarget("Tab.Tools.PID",       "PID tuner",      "Show the PID tuner, wherever it lives - main tab or Tools menu."),
 
-            // Settings is a navigation TREE now, not a tab strip - these ids are resolved by
-            // GrblConfigView.SelectSubTab, which maps the three category ids to that category's first visible
-            // page and looks the rest up by node key. They are live bindings, not leftovers.
-            new TabTarget("Tab.Settings.Grbl",     "Settings → Grbl",                  "Switch to Settings and show the Grbl page."),
-            new TabTarget("Tab.Settings.App",      "Settings → App",                   "Switch to Settings and show the Application pages."),
-            new TabTarget("Tab.Settings.Jogging",  "Settings → Jogging",               "Switch to Settings and show the Jogging pages."),
-            new TabTarget("Tab.Settings.GCode",    "Settings → G Code",                "Switch to Settings and show the G Code pages."),
-            new TabTarget("Tab.Settings.Keyboard", "Settings → Keyboard & Controller", "Switch to Settings and show the Keyboard & Controller page."),
-            new TabTarget("Tab.Settings.Macros",   "Settings → Macros",                "Switch to Settings and show the Macros page."),
-            new TabTarget("Tab.Settings.MainPage", "Settings → Job tab layout",        "Switch to Settings and show the Job tab layout page."),
-            new TabTarget("Tab.Settings.Tabs",     "Settings → Top-level tabs",        "Switch to Settings and show the Top-level tabs page, where a view is placed on the tab bar or in a menu."),
-
-            new TabTarget("Tab.MachineSetup.Overview", "Machine Setup → Overview",           "Switch to Machine Setup and show the Overview step."),
-            new TabTarget("Tab.MachineSetup.Machine",  "Machine Setup → Machine",            "Switch to Machine Setup and show the Machine step."),
-            new TabTarget("Tab.MachineSetup.Home",     "Machine Setup → Home position",      "Switch to Machine Setup and show the Home position step."),
-            new TabTarget("Tab.MachineSetup.Axis",     "Machine Setup → Axis information",   "Switch to Machine Setup and show the Axis information step."),
-            new TabTarget("Tab.MachineSetup.Homing",   "Machine Setup → Homing & limits",    "Switch to Machine Setup and show the Homing & limits step."),
-            new TabTarget("Tab.MachineSetup.Probes",   "Machine Setup → Probe definitions",  "Switch to Machine Setup and show the Probe definitions step."),
-            new TabTarget("Tab.MachineSetup.Macros",   "Machine Setup → Controller macros",  "Switch to Machine Setup and show the Controller macros step."),
-            new TabTarget("Tab.MachineSetup.Calibration", "Machine Setup → Calibration",     "Switch to Machine Setup and show the Calibration step."),
-
-            new TabTarget("Tab.Probing.ToolOffset",   "Probing → Tool length offset",    "Switch to Probing and show the Tool length offset tab."),
-            new TabTarget("Tab.Probing.EdgeExternal", "Probing → Edge finder, external", "Switch to Probing and show the external Edge finder tab."),
-            new TabTarget("Tab.Probing.EdgeInternal", "Probing → Edge finder, internal", "Switch to Probing and show the internal Edge finder tab."),
-            new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
-
-            new TabTarget("Tab.OddJobs.Setup",        "Odd Jobs → Setup",        "Switch to Odd Jobs and show the Setup tab."),
-            new TabTarget("Tab.OddJobs.SurfaceStock", "Odd Jobs → Surface Stock", "Switch to Odd Jobs and show the Surface Stock tab."),
-            new TabTarget("Tab.OddJobs.DrillBore",    "Odd Jobs → Drill/Bore Hole", "Switch to Odd Jobs and show the Drill/Bore Hole tab."),
-            new TabTarget("Tab.OddJobs.Counterbore",  "Odd Jobs → Counterbore",  "Switch to Odd Jobs and show the Counterbore tab."),
-            new TabTarget("Tab.OddJobs.Pocket",       "Odd Jobs → Pocket",       "Switch to Odd Jobs and show the Pocket tab."),
-            new TabTarget("Tab.OddJobs.Contour",      "Odd Jobs → Contour/Slot", "Switch to Odd Jobs and show the Contour/Slot tab."),
-
-            new TabTarget("Tab.LatheWizard.Turning",   "Lathe Tools → Turning",   "Switch to Lathe Tools and show the Turning tab."),
-            new TabTarget("Tab.LatheWizard.Parting",   "Lathe Tools → Parting",   "Switch to Lathe Tools and show the Parting tab."),
-            new TabTarget("Tab.LatheWizard.Facing",    "Lathe Tools → Facing",    "Switch to Lathe Tools and show the Facing tab."),
-            new TabTarget("Tab.LatheWizard.Threading", "Lathe Tools → Threading", "Switch to Lathe Tools and show the Threading tab."),
+            // NOTHING BELOW THE TOP LEVEL. Every second-level target - Settings pages, Machine Setup steps,
+            // Probing / Lathe Tools / Odd Jobs tabs - was removed on 2026-08-03 at the user's direction: this
+            // list is the top-level tab strip and the menus, one flat set, and nothing else. Adding a sub-page
+            // target back would also reintroduce the group-per-parent clutter that motivated the removal.
+            // AppConfig.ApplyOneTimeFixups strips any that were already saved - a binding that still fires
+            // while being invisible here is worse than one that is gone.
         };
 
         // ---- categories (outline groups) ------------------------------------------------------
+
+        /// <summary>The single group holding every top-level destination - tab strip entries and menu
+        /// entries alike. ActionKeyBinder's main-menu catalog entries name it too, so the two halves of the
+        /// list can't drift into separate groups.</summary>
+        public const string TopLevelGroup = "Top Level Tabs";
+        private const int TopLevelOrder = 13;
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             if (r.IsConsole) { r.Set("Program", 9); return; }
-            // ActionKeyBinder rows carry their own group where they want one (the main-menu commands do);
-            // the original zoom/OBS entries predate that field and default to "UI zoom".
-            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == ActionKeyBinder.MenuGroup ? 20 : 9); return; }
-            if (r.IsTabSwitch)
-            {
-                // "Tab.<Name>" is a top-level view; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
-                // The three ex-Tools ids are the exception: they kept the nested form when the Tools container
-                // was dissolved, but they are top-level views now, so they group with the rest of the views.
-                string[] parts = (r.Model.Method ?? string.Empty).Split('.');
-                if (parts.Length < 3 || parts[1] == "Tools") { r.Set("Views", 13); return; }
-                switch (parts[1])
-                {
-                    case "Settings": r.Set("Settings pages", 14); break;
-                    case "MachineSetup": r.Set("Machine Setup steps", 15); break;
-                    case "Probing": r.Set("Probing tabs", 16); break;
-                    case "OddJobs": r.Set("Odd Jobs tabs", 19); break;
-                    case "LatheWizard": r.Set("Lathe Tools tabs", 18); break;
-                    default: r.Set("Settings pages", 14); break;
-                }
-                return;
-            }
+            // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
+            // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
+            // One group for everything reachable from the top-level tab strip or the menus - the views
+            // (TabTargets) and the main-menu commands (ActionKeyBinder, handled above) sit together, because
+            // to the operator they are one list of destinations and whether a given one is currently a tab or
+            // a menu entry is their own layout choice, not a category.
+            if (r.IsTabSwitch) { r.Set(TopLevelGroup, TopLevelOrder); return; }
 
             string m = r.Model.Method ?? string.Empty;
 
@@ -802,12 +764,7 @@ namespace CNC.Controls
             { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { "Views", "Jump straight to a view from anywhere in the app - it is shown wherever it currently lives, as a main tab or as a File/Tools menu window." },
-            { "Settings pages", "Jump to Settings and show a specific page." },
-            { "Machine Setup steps", "Jump to Machine Setup and show a specific step." },
-            { "Probing tabs", "Jump to Probing and show a specific probing tab." },
-            { "Lathe Tools tabs", "Jump to Lathe Tools and show a specific wizard tab." },
-            { "Menu commands", "Run a main-menu command from the keyboard. Unbound by default; a command that is greyed out in the menu does nothing." },
+            { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },
             { "Other", "Additional actions." }
         };
 
