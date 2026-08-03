@@ -21,6 +21,32 @@ using System.Windows.Controls;
 
 namespace CNC.Controls
 {
+    // The settings navigation categories. Public so a panel in any assembly can name the category it
+    // belongs to without the settings host having to know the panel's type.
+    public static class SettingsCategories
+    {
+        public const string Controller = "Cat.Controller";
+        public const string Application = "Cat.Application";
+        public const string Jogging = "Cat.Jogging";
+        public const string GCode = "Cat.GCode";
+        public const string UserInterface = "Cat.Interface";
+    }
+
+    // A config panel declares where it belongs in the settings tree, and how it sorts among its
+    // siblings. Implement it on the panel itself, so placement travels with the panel however it
+    // reaches the host - registered through SettingsPanelRegistry, auto-discovered via
+    // ISettingsPanelProvider, or added straight to UIViewModel.ConfigControls by a feature view.
+    //
+    // This is what retires the last of the hardcoded placement: the host used to carry a switch that
+    // matched panels in other assemblies by full type name ("CNC.Controls.Camera.ConfigControl"),
+    // because CNC Controls cannot reference them. A panel that doesn't implement this still lands in
+    // Application, so nothing has to be updated in lockstep.
+    public interface ISettingsPanelCategory
+    {
+        string SettingsCategory { get; }
+        int SettingsOrder { get; }
+    }
+
     // One registrable Settings:App panel. Order sorts the registry-contributed panels among
     // themselves (built-ins are added first by AppConfigView); lower Order shows higher.
     public sealed class SettingsPanelDescriptor

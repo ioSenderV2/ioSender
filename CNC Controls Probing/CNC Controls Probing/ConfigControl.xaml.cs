@@ -44,8 +44,12 @@ namespace CNC.Controls.Probing
     /// <summary>
     /// Interaction logic for ConfigControl.xaml
     /// </summary>
-    public partial class ConfigControl : UserControl
+    public partial class ConfigControl : UserControl, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.Application; } }
+        public int SettingsOrder { get { return 40; } }
+
         public ConfigControl()
         {
             InitializeComponent();

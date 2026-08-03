@@ -48,8 +48,12 @@ namespace CNC.Controls.Camera
     /// <summary>
     /// Interaction logic for ConfigControl.xaml
     /// </summary>
-    public partial class ConfigControl : UserControl, ICameraConfig
+    public partial class ConfigControl : UserControl, ICameraConfig, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.Application; } }
+        public int SettingsOrder { get { return 30; } }
+
         public ConfigControl()
         {
             InitializeComponent();

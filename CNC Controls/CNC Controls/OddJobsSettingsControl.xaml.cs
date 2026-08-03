@@ -1,4 +1,4 @@
-/*
+﻿/*
  * OddJobsSettingsControl.xaml.cs - part of CNC Controls library
  *
  * Settings:App panel for Odd Jobs - the Work Order autosave-on-exit pair (mirrors the existing "Auto-save
@@ -21,8 +21,12 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class OddJobsSettingsControl : UserControl, ISettingsResettable
+    public partial class OddJobsSettingsControl : UserControl, ISettingsResettable, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.Application; } }
+        public int SettingsOrder { get { return 20; } }
+
         public OddJobsSettingsControl()
         {
             InitializeComponent();

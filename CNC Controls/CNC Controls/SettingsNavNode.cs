@@ -130,9 +130,17 @@ namespace CNC.Controls
         // Phase 0 searches labels only.
         public string SearchText { get; set; }
 
+        // Sort key among siblings, declared by the panel (ISettingsPanelCategory.SettingsOrder).
+        public int Order { get; set; }
+
         public SettingsNavNode Add(SettingsNavNode child)
         {
-            Children.Add(child);
+            return Insert(Children.Count, child);
+        }
+
+        public SettingsNavNode Insert(int index, SettingsNavNode child)
+        {
+            Children.Insert(System.Math.Max(0, System.Math.Min(index, Children.Count)), child);
             OnPropertyChanged(nameof(IsCategory));
             OnPropertyChanged(nameof(IsShown));
             return child;

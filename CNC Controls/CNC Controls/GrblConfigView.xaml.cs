@@ -73,12 +73,12 @@ namespace CNC.Controls
         private readonly GrblConfigControl basicConfig = new GrblConfigControl();
         private readonly SimulatorConfigView simConfig = new SimulatorConfigView();
 
-        // Category keys. Pages are keyed by the stable ids the tab-switch shortcuts already use.
-        private const string CatController = "Cat.Controller";
-        private const string CatApplication = "Cat.Application";
-        private const string CatJogging = "Cat.Jogging";
-        private const string CatGCode = "Cat.GCode";
-        private const string CatInterface = "Cat.Interface";
+        // Category keys live in SettingsCategories so panels in any assembly can name them.
+        private const string CatController = SettingsCategories.Controller;
+        private const string CatApplication = SettingsCategories.Application;
+        private const string CatJogging = SettingsCategories.Jogging;
+        private const string CatGCode = SettingsCategories.GCode;
+        private const string CatInterface = SettingsCategories.UserInterface;
 
         private SettingsNavNode nodeGrbl, nodeSimulator, nodeKeyboard, nodeController, nodeMacros, nodeJobLayout, nodeTopTabs;
         private readonly Dictionary<UserControl, SettingsNavNode> panelNodes = new Dictionary<UserControl, SettingsNavNode>();
@@ -307,33 +307,32 @@ namespace CNC.Controls
 
             var node = new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c);
             node.IsVisible = c.Visibility == Visibility.Visible;
+            node.Order = OrderFor(c);
             panelNodes[c] = node;
-            category.Add(node);
+
+            // Feature panels register whenever their own view is built, which is not a stable order, so
+            // place by declared order instead of appending - otherwise the tree's contents depend on
+            // which features happened to load first.
+            int at = category.Children.Count;
+            for (int i = 0; i < category.Children.Count; i++)
+                if (category.Children[i].Order > node.Order) { at = i; break; }
+            category.Insert(at, node);
+
             nav.RefreshVisibility();
         }
 
-        // Which category a config panel belongs to. Feature panels live in assemblies CNC Controls
-        // cannot reference, so they are still matched by full type name.
-        private string CategoryFor(UserControl c)
+        // The panel says where it belongs (ISettingsPanelCategory). The host no longer knows any panel
+        // type - the switch this replaced had to match panels in other assemblies by full type name,
+        // because CNC Controls cannot reference them. A panel that declares nothing lands in Application.
+        private static string CategoryFor(UserControl c)
         {
-            if (c is JogUiConfigControl || c is JogConfigControl)
-                return CatJogging;
-            if (c is StripGCodeConfigControl)
-                return CatGCode;
-            if (c is BasicConfigControl || c is OddJobsSettingsControl)
-                return CatApplication;
+            var declared = (c as ISettingsPanelCategory)?.SettingsCategory;
+            return string.IsNullOrEmpty(declared) ? SettingsCategories.Application : declared;
+        }
 
-            switch (c.GetType().FullName)
-            {
-                case "CNC.Controls.Viewer.ConfigControl":
-                    return CatGCode;
-                case "CNC.Controls.Camera.ConfigControl":
-                case "CNC.Controls.Probing.ConfigControl":
-                case "CNC.Controls.Lathe.ConfigControl":
-                    return CatApplication;
-            }
-
-            return CatApplication;
+        private static int OrderFor(UserControl c)
+        {
+            return (c as ISettingsPanelCategory)?.SettingsOrder ?? 1000;
         }
 
         // Central runtime visibility (mirrors the old AppConfigView.Activate): hide keyboard-jog config when the

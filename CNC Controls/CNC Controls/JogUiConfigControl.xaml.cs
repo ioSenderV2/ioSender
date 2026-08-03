@@ -44,8 +44,12 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for JogUiConfigControl.xaml
     /// </summary>
-    public partial class JogUiConfigControl : UserControl, ISettingsResettable
+    public partial class JogUiConfigControl : UserControl, ISettingsResettable, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.Jogging; } }
+        public int SettingsOrder { get { return 0; } }
+
         public JogUiConfigControl()
         {
             InitializeComponent();
