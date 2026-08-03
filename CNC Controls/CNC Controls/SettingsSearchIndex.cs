@@ -23,6 +23,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -34,26 +35,36 @@ namespace CNC.Controls
         private const int MaxNodes = 4000;     // guard against a pathological tree
         private const int MaxChars = 8000;
 
+        // One tooltip, kept with the control that owns it. Tooltips are indexed per control rather than
+        // concatenated because a tooltip hit has to be explained ("Matched tooltip: ..."), and an
+        // explanation reads far better when it can name what the text belongs to - "Send comments" - than
+        // when it can only quote a window of characters that starts mid-sentence.
+        public sealed class Tip
+        {
+            public string Owner;    // null when no name is derivable; the caller then quotes text alone
+            public string Text;
+        }
+
         // Visible page text and tooltip text are kept apart so a match can say WHICH it hit. A tooltip
         // hit is the one worth explaining: the word is genuinely on the page but only appears on hover,
         // so without saying so it reads as a wrong result.
         public sealed class Harvested
         {
             public string Text = string.Empty;
-            public string Tooltips = string.Empty;
+            public List<Tip> Tooltips = new List<Tip>();
         }
 
         public static Harvested Harvest(object root)
         {
             var text = new StringBuilder();
-            var tips = new StringBuilder();
+            var tips = new List<Tip>();
             var seen = new HashSet<string>();
             int budget = MaxNodes;
             Walk(root as DependencyObject, text, tips, seen, ref budget);
-            return new Harvested { Text = text.ToString(), Tooltips = tips.ToString() };
+            return new Harvested { Text = text.ToString(), Tooltips = tips };
         }
 
-        private static void Walk(DependencyObject node, StringBuilder text, StringBuilder tips, HashSet<string> seen, ref int budget)
+        private static void Walk(DependencyObject node, StringBuilder text, List<Tip> tips, HashSet<string> seen, ref int budget)
         {
             if (node == null || budget-- <= 0 || text.Length >= MaxChars)
                 return;
@@ -70,7 +81,7 @@ namespace CNC.Controls
             }
         }
 
-        private static void Collect(DependencyObject node, StringBuilder sb, StringBuilder tips, HashSet<string> seen)
+        private static void Collect(DependencyObject node, StringBuilder sb, List<Tip> tips, HashSet<string> seen)
         {
             var tb = node as TextBlock;
             if (tb != null)
@@ -105,7 +116,7 @@ namespace CNC.Controls
             var fe = node as FrameworkElement;
             if (fe != null)
             {
-                Add(fe.ToolTip as string, tips, seen);
+                AddTip(fe, tips, seen);
 
                 // Items that are plain strings (combo/list choices) are legitimate search terms.
                 var items = node as ItemsControl;
@@ -113,6 +124,61 @@ namespace CNC.Controls
                     foreach (var item in items.Items)
                         Add(item as string, sb, seen);
             }
+        }
+
+        private static void AddTip(FrameworkElement fe, List<Tip> tips, HashSet<string> seen)
+        {
+            var text = fe.ToolTip as string;
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            text = text.Trim();
+            if (text.Length > 200)
+                text = text.Substring(0, 200);
+            if (!seen.Add(text))
+                return;
+
+            tips.Add(new Tip { Owner = OwnerName(fe), Text = text });
+        }
+
+        // What to call the control a tooltip belongs to. Only names that the control genuinely carries -
+        // there is deliberately no "nearest preceding TextBlock" guess, because a field/label pair has no
+        // real link and a wrong name is worse than none. Returning null is a supported outcome: the caller
+        // falls back to quoting the tooltip text on its own, exactly as before.
+        private static string OwnerName(FrameworkElement fe)
+        {
+            // GroupBox/Expander/TabItem: the header names the group.
+            var headered = fe as HeaderedContentControl;
+            if (headered != null && headered.Header is string)
+                return Clean(headered.Header as string);
+
+            var headeredItems = fe as HeaderedItemsControl;
+            if (headeredItems != null && headeredItems.Header is string)
+                return Clean(headeredItems.Header as string);
+
+            // CheckBox/Button/RadioButton: the caption IS the label, so this is the common good case.
+            var content = fe as ContentControl;
+            if (content != null && content.Content is string)
+                return Clean(content.Content as string);
+
+            // The field controls in this codebase (NumericField, CoordValueSetControl, DROBaseControl...)
+            // carry their caption in a Label property rather than Content.
+            var prop = fe.GetType().GetProperty("Label", typeof(string));
+            if (prop != null && prop.CanRead)
+                return Clean(prop.GetValue(fe, null) as string);
+
+            return Clean(AutomationProperties.GetName(fe));
+        }
+
+        private static string Clean(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+
+            // Field captions are written with their trailing colon ("Reset delay:"); it reads as
+            // punctuation noise once the name is followed by a dash and the quoted text.
+            name = name.Trim().TrimEnd(':').Trim();
+            return name.Length == 0 || name.Length > 60 ? null : name;
         }
 
         private static void Add(string text, StringBuilder sb, HashSet<string> seen)

@@ -263,10 +263,10 @@ namespace CNC.Controls
 
                 bool onLabel = node.Label != null && node.Label.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0;
                 int atText = node.SearchText == null ? -1 : node.SearchText.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
-                int atTip = node.SearchTooltips == null ? -1 : node.SearchTooltips.IndexOf(q, System.StringComparison.OrdinalIgnoreCase);
+                var tip = MatchingTip(node, q);
 
                 node.MatchedLabel = onLabel;
-                node.MatchesSearch = onLabel || atText >= 0 || atTip >= 0;
+                node.MatchesSearch = onLabel || atText >= 0 || tip != null;
 
                 // Explain a match the eye cannot find on the page, and say which kind of text it hit -
                 // a tooltip hit is on the page but only on hover, which is what made it look wrong.
@@ -275,9 +275,9 @@ namespace CNC.Controls
                 else if (atText >= 0)
                     node.MatchContext = string.Format(Localized("SettingsMatchedText", "Matched text: {0}"),
                                                       Snippet(node.SearchText, atText, q.Length));
-                else if (atTip >= 0)
+                else if (tip != null)
                     node.MatchContext = string.Format(Localized("SettingsMatchedTooltip", "Matched tooltip: {0}"),
-                                                      Snippet(node.SearchTooltips, atTip, q.Length));
+                                                      DescribeTip(tip, q));
                 else
                     node.MatchContext = null;
             }
@@ -299,6 +299,39 @@ namespace CNC.Controls
         {
             var s = CNC.Core.LibStrings.FindResource(key);
             return string.IsNullOrWhiteSpace(s) ? fallback : s;
+        }
+
+        // The first tooltip on the page whose text contains the query.
+        private static SettingsSearchIndex.Tip MatchingTip(SettingsNavNode node, string q)
+        {
+            if (node.SearchTooltips == null)
+                return null;
+
+            return node.SearchTooltips.FirstOrDefault(
+                t => t.Text != null && t.Text.IndexOf(q, System.StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        // Name the control the tooltip belongs to, then quote it - "Send comments - Stream G-code comments
+        // (in parentheses)...". Naming it is what turns the explanation from a floating fragment into
+        // something you can go and find on the page. Owner is null when the control carries no caption of
+        // its own (a bare field next to a separate label), and then this reads exactly as it did before.
+        private static string DescribeTip(SettingsSearchIndex.Tip tip, string q)
+        {
+            // Short enough to show whole - far more readable than a window starting mid-sentence.
+            const int whole = 110;
+            var text = tip.Text.Length <= whole
+                     ? Flatten(tip.Text)
+                     : Snippet(tip.Text, tip.Text.IndexOf(q, System.StringComparison.OrdinalIgnoreCase), q.Length);
+
+            return string.IsNullOrEmpty(tip.Owner) ? text : tip.Owner + " - " + text;
+        }
+
+        private static string Flatten(string text)
+        {
+            var s = text.Replace((char)10, ' ').Replace((char)13, ' ').Trim();
+            while (s.Contains("  "))
+                s = s.Replace("  ", " ");
+            return s;
         }
 
         // A readable fragment of page text around the hit, for the row tooltip.

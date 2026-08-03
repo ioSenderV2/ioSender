@@ -129,7 +129,7 @@ namespace CNC.Controls
         // Free-text harvested from the page's own logical subtree (SettingsSearchIndex), kept apart so a
         // match can report which kind of text it hit.
         public string SearchText { get; set; }
-        public string SearchTooltips { get; set; }
+        public System.Collections.Generic.List<SettingsSearchIndex.Tip> SearchTooltips { get; set; }
 
         // Convenience for the hosts: assign the harvest result and both halves are set.
         public SettingsSearchIndex.Harvested Harvest
