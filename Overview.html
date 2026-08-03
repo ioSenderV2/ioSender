@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>202 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>207 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -187,6 +187,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The run bar's "Cycle Start" button is now just "Run"; a small dropdown next to it replaces the old right-click menu for choosing Dry Run / Check Run</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr161">161</a></td></tr>
 <tr><td>The status message no longer enlarges then shrinks 10s after every update (which shifted the whole window layout) - the font is now permanently large and a new message instead flashes the bar background light green (or light red for an error/alarm) for 5s.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr163">163</a></td></tr>
 <tr><td>The always-visible pinned-position flyouts (G28/G30/G59.3/etc.) no longer overlap the top tab labels; their vertical offset is now measured from the tab strip's real rendered height instead of a hand-tuned guess.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr170">170</a></td></tr>
+<tr><td>The Feed rate panel could only show a couple of digits of a 4-5 digit feed; the run bar trades its static unit label for a tooltip.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr203">203</a></td></tr>
+<tr><td>Mashing a D-pad direction or the run bar jog pad could leave the controller answering nothing at all; the guard against that now covers every input and can actually see its acknowledgement.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr205">205</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -225,6 +227,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Settings > App > Camera > Demo recording (OBS) gets a Validate button that connects to OBS now and confirms each configured source name actually exists.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr183">183</a></td></tr>
 <tr><td>Check for Updates now queries GitHub's real /releases/latest for firmware instead of a hand-rolled rolling tag, so a successfully-flashed build is correctly recognized as up to date.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr187">187</a></td></tr>
 <tr><td>The two standalone stepper-calibration wizards are gone; calibration is now a step inside Machine Setup alongside squareness.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr197">197</a></td></tr>
+<tr><td>Three fixes to the fixture editor - Test position no longer drives back to a stale saved point, the 3D Probe / Touch Plate choice survives closing, and dismissing the dialog no longer minimizes the main window.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr206">206</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -287,6 +290,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The fixed built-in tool enum is retired for a single editable tool list you can add your own tools to.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr199">199</a></td></tr>
 <tr><td>A run of real-hardware bugs: rapids from a false origin, traverses at cutting height, a dry run that did not protect, and alarms that did not abort.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr201">201</a></td></tr>
 <tr><td>Probing conductive stock with a real touch plate silently dropped the plate thickness and lip compensation &mdash; 12&nbsp;mm of Z error.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr202">202</a></td></tr>
+<tr><td>Stepper calibration, Squareness and Surface spoilboard leave the Tools tab for where they already live; the tab itself disappears when the controller supports none of what remains.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr204">204</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -299,6 +303,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The Machine Setup ATC-macro check now catches a 0-byte or truncated tc/pcorner/pvisecorner.macro on the controller - it used to read as Installed since only the file NAME was checked, not its size, so M6 T8 silently ran the firmware's default tool change instead of the macro.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr123">123</a></td></tr>
 <tr><td>SD Card tab queries its own mount status on activate instead of bailing out to "No card" before the controller has actually reported one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr168">168</a></td></tr>
 <tr><td>Machine Setup's macro-provisioning gate no longer false-trips when a realtime status report interleaves with the checksum read.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr175">175</a></td></tr>
+<tr><td>Dead time between Setup steps removed, corner retreats cut from 20mm to 5mm, and the ATC macro update no longer wedges the app until it is restarted.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr207">207</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -629,7 +634,12 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">200</td><td><a href="#pr200">App.config first-run processing &amp; per-section isolation</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+115</span> <span class="del">-6</span></td></tr>
 <tr><td class="n">201</td><td><a href="#pr201">Fix batch &mdash; Go To, park height, dry run, alarm aborts, jog pad</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+632</span> <span class="del">-107</span></td></tr>
 <tr><td class="n">202</td><td><a href="#pr202">Touch-plate offsets vs conductive stock; Work Order WCS</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+98</span> <span class="del">-32</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (202 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1749</span> <span class="del">27</span> <span class="add">+203</span><br><span class="k">Lines:</span> <span class="add">+73578</span> <span class="del">-14196</span></td></tr>
+<tr><td class="n">203</td><td><a href="#pr203">Feed rate readout width + unit in tooltip</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+31</span> <span class="del">-5</span></td></tr>
+<tr><td class="n">204</td><td><a href="#pr204">Tools tab consolidation - relocated tools removed, hides when empty</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">2</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+67</span> <span class="del">-1096</span></td></tr>
+<tr><td class="n">205</td><td><a href="#pr205">Jog back-pressure shared with the gamepad, and its ack made visible</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+122</span> <span class="del">-42</span></td></tr>
+<tr><td class="n">206</td><td><a href="#pr206">Fixture dialog: probe choice persisted, Test uses the live position, no more minimize</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+163</span> <span class="del">-29</span></td></tr>
+<tr><td class="n">207</td><td><a href="#pr207">Setup step timing, shorter probe retreats, and two upload/session hangs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+174</span> <span class="del">-73</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (207 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1788</span> <span class="del">29</span> <span class="add">+204</span><br><span class="k">Lines:</span> <span class="add">+74135</span> <span class="del">-15441</span></td></tr>
 </table>
 </div>
 
@@ -4024,6 +4034,76 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">13</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Two independent fixes that both came out of running a work order end to end on the machine.</p><ul><li><strong>Touch-plate compensation was gated on stock conductivity.</strong> Plate thickness and lip offsets applied only when <code>touchPlate &amp;&amp; !stockConductive</code>. That is the wrong test: the circuit for a touch-plate probe closes between the <em>bit</em> and the <em>plate</em>, both metal, and never through the stock underneath &mdash; so what the stock is made of has no bearing on whether a plate was physically used. Probing conductive stock <em>with</em> a real plate is an ordinary workflow (thin aluminium sheet, too thin for a reliable direct stylus touch), and it silently produced zero compensation. Confirmed on real hardware: work Z0 landed exactly one plate thickness (12&nbsp;mm) high, and X/Y landed on the plate's own lip edge instead of the stock's. Now driven by whether a touch plate was actually selected, in all three program generators. Stock conductivity still drives the reliability warning it was always meant to drive.</li><li><strong>A work order chooses its own coordinate system.</strong> The compiler hardcoded G59. A work order now carries a WCS field: <em>Follow Setup</em> resolves live at generate time, or it can be pinned to G54&ndash;G59. Setup is shared with the plain Start Job tab, so its live selection is not something a saved work order can treat as a stable reference.</li><li><strong>Entire Spoilboard no longer writes to the wrong slot.</strong> It emitted <code>G10 L20 P1 Z0</code> regardless of which scratch WCS it had actually chosen &mdash; which could have overwritten a real G54 origin when the work order's own WCS was G54.</li></ul><p class="foot">Z error dropped from 12&nbsp;mm to within 1&ndash;2&nbsp;mm on retest; the remainder was a stale machine-wide TLO reference, recalibrated separately.</p></div>
+</div>
+<!-- ===== #203 ===== -->
+<div class="pr">
+<h2 id="pr203"><span class="badge">#203</span>Feed rate readout stops clipping; run bar shows its unit in the tooltip</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FeedControl.xaml</td><td class="num add">10</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FeedControl.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">13</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Reported against V2.32: the <em>Feed rate</em> panel's readout only showed about two digits. The box was a hard <code>Width="50"</code> with its unit label absolutely positioned beside it, and once the control style's 8px horizontal padding and 1px border came out of that only ~32px of text area was left - <code>Format="####0"</code> renders five digits but they had nowhere to go and clipped.</p><ul><li><strong>Readout and unit share a layout panel</strong> now instead of the label being pinned at a fixed offset, and the box has a minimum width sized for the digits it can actually produce - growing rather than clipping beyond that.</li><li><strong>Run bar drops the static unit label.</strong> On that bar the room is better spent on digits, so the unit moved into a tooltip covering the whole <em>Feed:</em> group. The wording lives in a localizable run rather than a binding format string, so it translates like every other tooltip.</li></ul><p class="foot">The tooling that generates locale rows learned inline runs at the same time, which backfilled rows for several probing descriptions that had been silently English-only.</p></div>
+</div>
+<!-- ===== #204 ===== -->
+<div class="pr">
+<h2 id="pr204"><span class="badge">#204</span>Tools tab holds only the hardware-gated tools, and hides when none apply</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ToolsView.xaml.cs</td><td class="num add">34</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml.cs</td><td class="num add">0</td><td class="num del">611</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml</td><td class="num add">0</td><td class="num del">97</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">12</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">15</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LibStrings.xaml</td><td class="num add">0</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">0</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">3</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">0</td><td class="num del">336</td></tr>
+</table>
+<div class="desc"><p>Three of the six things the Tools tab registered had already moved elsewhere and were pure duplication: <strong>Stepper calibration (probe)</strong> and <strong>Squareness</strong> live in Machine Setup's Calibration step, and <strong>Surface spoilboard</strong> became a Work Order Surface toolpath. All three are deregistered, and the standalone spoilboard wizard is deleted now that the Work Order toolpath - including Entire Spoilboard - fully replaces it.</p><ul><li><strong>What remains is Tool table, Trinamic tuner and PID tuner</strong>, none of which moved anywhere, and all three of which were already gated on the controller actually having a tool table / TMC drivers / a PID log.</li><li><strong>The tab now gates itself on its own children</strong> rather than re-testing their prerequisites, and loses its always-visible flag - so the existing connect-time prune drops the whole tab on a controller that supports none of them, and keeps it with just the relevant sub-tabs on one that does.</li><li><strong>Persisted layouts are migrated</strong>: the retired components join the one-time Tools-slot fixup, so an existing profile has them stripped rather than carrying dead entries.</li></ul><p class="foot">Also swept 336 locale rows orphaned by the deleted wizard, and renamed the internal tab-identity value that Work Order had quietly inherited from it.</p></div>
+</div>
+<!-- ===== #205 ===== -->
+<div class="pr">
+<h2 id="pr205"><span class="badge">#205</span>Rapid single-step jogging can no longer wedge the controller</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/JogGate.cs</td><td class="num add">78</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">16</td><td class="num del">41</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerMapper.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">11</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">9</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Sending a second jog before the first has been acknowledged can wedge the controller completely - no response to anything, including a bare <code>$I</code>, until a power cycle. A guard against that already existed, and had two holes.</p><ul><li><strong>The Xbox controller was never covered.</strong> The guard was private to the on-screen jog panels; the gamepad's D-pad builds and sends its own jog line, so rapid presses reproduced the original wedge unmitigated. The guard now lives in the core alongside everything else that talks to the machine, and both inputs share it.</li><li><strong>It could never be acknowledged while jogging.</strong> Responses were suppressed for the whole time the controller reported the Jog state - but the first jog puts it in that state, so that jog's acknowledgement and every later one was swallowed. The guard then fell through to its timeout and eventually emitted an unacknowledged jog anyway: exactly what it exists to prevent, just slower. That also explains why only <em>rapid</em> jogging triggered it - jog slowly enough to fall back to idle between moves and the acknowledgement arrived normally.</li></ul><p>Responses are delivered unconditionally now, with the Jog filter moved to the one consumer that needed it - the job streamer's acknowledgement accounting, where a stray jog response would otherwise be counted against an outstanding command.</p><p class="foot">Analog stick jogging deliberately stays outside the guard - overlapping sends are how that loop achieves continuous motion.</p></div>
+</div>
+<!-- ===== #206 ===== -->
+<div class="pr">
+<h2 id="pr206"><span class="badge">#206</span>Fixture definition dialog: keeps its probe choice, offers where you are standing, stops minimizing the app</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">119</td><td class="num del">28</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">12</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UIUtils.cs</td><td class="num add">29</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">3</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><ul><li><strong>Test position offers the current machine position.</strong> Test rapids to the <em>saved</em> position before probing, so jogging closer and pressing Test silently undid the jog and re-ran the identical failing probe - which is precisely what the failed-search recovery was telling the operator to do. Test now compares live against saved and, past a small tolerance, asks; the default adopts where the machine actually is, exactly as Set position would. Nothing moves until that is answered.</li><li><strong>The recovery prompt loses an auto-retry that could never fire.</strong> It asked the operator to jog closer and click OK, but it is a modal dialog - the jog pad is dead while it is up, so the position comparison on the way out always saw no change. It now just explains the failure and points at Test, which handles it.</li><li><strong>The probe selection is remembered per fixture.</strong> The 3D Probe / Touch Plate radio reset on every open, so reopening a touch-plate fixture silently ran the next Set/Test with 3D-probe geometry - plate thickness and lip offset dropped - until the operator noticed. A new fixture with nothing to restore now defaults by which probes are actually defined, rather than always landing on 3D Probe even on a machine that has none.</li><li><strong>Closing the dialog no longer minimizes the main window</strong>, a side effect of it being non-modal so that jogging stays reachable while it is open.</li></ul><p class="foot">Existing fixture definitions are unaffected - the stored probe type is absent from an older file and defaults to what those fixtures already do.</p></div>
+</div>
+<!-- ===== #207 ===== -->
+<div class="pr">
+<h2 id="pr207"><span class="badge">#207</span>Setup runs without the multi-second stalls; ATC macro update no longer needs a restart</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">38</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/YModem.cs</td><td class="num add">26</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">63</td><td class="num del">41</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AtcMacros.cs</td><td class="num add">13</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TrinamicView.xaml.cs</td><td class="num add">22</td><td class="num del">14</td></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">9</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><ul><li><strong>Each hold-for-idle gate cost two seconds of nothing.</strong> The wait allowed time to observe motion <em>starting</em> before it could trust an idle report - but only a controller-side SD job acknowledges first and moves later; an ordinary burst has already finished moving by the time the gate is reached. The long allowance is now scoped to macros that actually start such a job. A Setup program passes three of these gates.</li><li><strong>A redundant lift after the tool-length reference</strong> descended to the park position only to climb straight back to machine top.</li><li><strong>Corner probe retreats drop from 20mm to 5mm.</strong> Twenty is far more than any real bed variance - on a T-slot extrusion bed even five would take some doing - so it just spent Z travel on every retreat between faces.</li><li><strong>The macro upload could hang the app outright.</strong> The per-packet wait had no guard against its worker faulting, which left the interface spinning with no way out - reliably reproduced against the largest of the macro files. It now fails cleanly and reports a failed transfer instead.</li><li><strong>A stuck internal flag survived until restart.</strong> The flag that reroutes controller responses during a file read was cleared only on the success path, so one fault left the app misreading everything the controller said for the rest of the session - the cause of the long-standing 'exit and restart, then it works first time' behaviour when updating the ATC macros. It is now restored unconditionally, in all four places that set it.</li></ul><p class="foot">The retreat clearance is a fixed value rather than a caller-supplied one: reading a parameter no caller had set aborted the run with an expression error.</p></div>
 </div>
 </section>
 
