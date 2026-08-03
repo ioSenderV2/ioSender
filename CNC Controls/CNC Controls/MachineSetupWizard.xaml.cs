@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MachineSetupWizard.xaml.cs - part of CNC Controls library
  *
  * Machine Setup Wizard: a single-page configuration of the machine-description grbl settings
@@ -110,7 +110,7 @@ namespace CNC.Controls
 
     #endregion
 
-    public partial class MachineSetupWizard : UserControl, IGrblConfigTab
+    public partial class MachineSetupWizard : UserControl, IGrblConfigTab, ISettingsPageProvider
     {
         private GrblViewModel model = null;
         private bool _subscribed = false;
@@ -284,6 +284,86 @@ namespace CNC.Controls
 
         // Drill into a setup step from a "Tab.MachineSetup.*" keyboard shortcut (via the host's ITabBindingHost).
         // Returns false (no change) when the step tab is not present.
+        // ---- navigation pages (docs/Architecture-Settings-Nav-Overhaul.md) ----------------------
+        // The wizard's step tabs (and the Calibration step's own two sub-tabs) are nodes in the Machine
+        // Setup tree now. The wizard is NOT taken apart: it stays one control with every x:Name and every
+        // selection hook intact, and ShowPage() just drives the underlying TabControls - so
+        // Steps_SelectionChanged / Calibration_SelectionChanged keep firing exactly as before.
+
+        public const string CalibrationCategoryKey = "MachineSetup.Calibration";
+
+        // The nav key of whatever step is selected right now, so the host can mirror a selection the
+        // wizard made itself (GoToStep from the startup setup gate) back into the tree.
+        public string SelectedStepKey()
+        {
+            var tab = tabSteps?.SelectedItem as TabItem;
+            if (tab == null)
+                return null;
+            if (tab == tabStepOverview) return "Tab.MachineSetup.Overview";
+            if (tab == tabStepMachine) return "Tab.MachineSetup.Machine";
+            if (tab == tabStepHome) return "Tab.MachineSetup.Home";
+            if (tab == tabStepAxis) return "Tab.MachineSetup.Axis";
+            if (tab == tabStepHoming) return "Tab.MachineSetup.Homing";
+            if (tab == tabStepProbes) return "Tab.MachineSetup.Probes";
+            if (tab == tabStepFixtures) return "Tab.MachineSetup.Fixtures";
+            if (tab == tabStepMacros) return "Tab.MachineSetup.Macros";
+            if (tab == tabStepSimulator) return "Tab.MachineSetup.Simulator";
+            if (tab == tabStepCalibration)
+                return tabCalibration?.SelectedItem == tabCalSquareness
+                     ? "Tab.MachineSetup.CalSquareness" : "Tab.MachineSetup.CalStepper";
+            return null;
+        }
+
+        // A step header is either a plain string (Overview) or the numbered, colour-graded TextBlock.
+        private static string HeaderText(TabItem tab)
+        {
+            var tb = tab.Header as TextBlock;
+            if (tb != null)
+                return tb.Text;
+            return tab.Header as string ?? string.Empty;
+        }
+
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            var pages = new List<SettingsSubPage>
+            {
+                new SettingsSubPage("Tab.MachineSetup.Overview", HeaderText(tabStepOverview), this),
+                new SettingsSubPage("Tab.MachineSetup.Machine", HeaderText(tabStepMachine), this) { Status = () => hdrMachine.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Home", HeaderText(tabStepHome), this) { Status = () => hdrHome.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Axis", HeaderText(tabStepAxis), this) { Status = () => hdrAxis.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Homing", HeaderText(tabStepHoming), this) { Status = () => hdrHoming.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Probes", HeaderText(tabStepProbes), this) { Status = () => hdrProbes.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { Status = () => hdrFixtures.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { Status = () => hdrMacros.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.CalStepper", HeaderText(tabCalStepper), this)
+                    { Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
+                new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
+                    { Parent = CalibrationCategoryKey },
+                new SettingsSubPage("Tab.MachineSetup.Simulator", HeaderText(tabStepSimulator), this)
+                    { Status = () => hdrSimulator.Foreground, IsAvailable = () => tabStepSimulator.Visibility == Visibility.Visible }
+            };
+            return pages;
+        }
+
+        public void ShowPage(string key)
+        {
+            // Calibration's children select the Calibration step AND the matching sub-tab. Order matters:
+            // set the sub-tab first, so entering the step activates the right wizard rather than the
+            // previously selected one and then immediately switching.
+            if (key == "Tab.MachineSetup.CalStepper" || key == "Tab.MachineSetup.CalSquareness")
+            {
+                tabCalibration.SelectedItem = key == "Tab.MachineSetup.CalStepper" ? tabCalStepper : tabCalSquareness;
+                tabSteps.SelectedItem = tabStepCalibration;
+                return;
+            }
+            SelectSubTab(key);
+        }
+
+        // Raised whenever the per-step grading is recomputed, so the navigation tree can restate the
+        // status dots it took over from the (no longer rendered) tab headers.
+        public event EventHandler StepStatusChanged;
+
         public bool SelectSubTab(string id)
         {
             TabItem target;
@@ -341,6 +421,8 @@ namespace CNC.Controls
             SetStepColor(hdrMacros, StepStatusOf(7));
             SetStepColor(hdrCalibration, StepState.Complete);
             SetStepColor(hdrSimulator, StepState.Complete);
+
+            StepStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         // Colour only the tab's header text (not the tab body, which would make the descriptive text

@@ -93,6 +93,7 @@
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />
+    <Compile Include="NullToVisibilityConverter.cs" />
     <Compile Include="ConfigPanel.cs" />
     <Compile Include="StartJobConfig.cs" />
     <Compile Include="AtcMacros.cs" />

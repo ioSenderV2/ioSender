@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.MachineSetupWizard"
+﻿<UserControl x:Class="CNC.Controls.MachineSetupWizard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -48,6 +48,16 @@
 
         <!-- Body: one tab per setup step -->
         <local:StretchTabControl x:Name="tabSteps" Grid.Row="0" Background="Transparent" SelectionChanged="Steps_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+            <!-- Tab strip templated away: the steps are nodes in the Machine Setup navigation tree now.
+                 The TabControl stays as the switcher so every existing selection hook still fires
+                 (Steps_SelectionChanged refreshes macro/simulator state and activates the calibration
+                 sub-wizards) and every x:Name in the code-behind still resolves. -->
+            <TabControl.Template>
+                <ControlTemplate TargetType="TabControl">
+                    <ContentPresenter ContentSource="SelectedContent"/>
+                </ControlTemplate>
+            </TabControl.Template>
+
 
             <!-- Overview -->
             <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Read this first: what each setup step below configures.">
@@ -418,6 +428,16 @@
             <TabItem x:Uid="tabstep_calibration" x:Name="tabStepCalibration" ToolTip="Stepper calibration and frame squareness.">
                 <TabItem.Header><TextBlock x:Uid="step_calibration" x:Name="hdrCalibration" Text="8 · Calibration"/></TabItem.Header>
                 <local:StretchTabControl x:Name="tabCalibration" Background="Transparent" SelectionChanged="Calibration_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+                <!-- Tab strip templated away: the steps are nodes in the Machine Setup navigation tree now.
+                     The TabControl stays as the switcher so every existing selection hook still fires
+                     (Steps_SelectionChanged refreshes macro/simulator state and activates the calibration
+                     sub-wizards) and every x:Name in the code-behind still resolves. -->
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <ContentPresenter ContentSource="SelectedContent"/>
+                    </ControlTemplate>
+                </TabControl.Template>
+
                     <TabItem x:Uid="tabstep_calStepper" x:Name="tabCalStepper" ToolTip="Correct steps/mm by probing a reference block of known size against a validated Corner Fence.">
                         <TabItem.Header><TextBlock x:Uid="step_calStepper" Text="Stepper calibration"/></TabItem.Header>
                         <local:StepperCalibrationProbeWizard x:Name="calStepperWizard"/>

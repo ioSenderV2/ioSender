@@ -8,10 +8,19 @@
              d:DesignHeight="500" d:DesignWidth="900">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- Registered here in the same edit as its first use: a missing x:Key for a converter is a
+             runtime-only XamlParseException, which builds clean and crashes on next launch. -->
+        <local:NullToVisibilityConverter x:Key="NullToVis"/>
 
-        <!-- Category row: not selectable itself, just a heading with its pages beneath. -->
+        <!-- A row is a label, optionally preceded by a status dot. Machine Setup grades its steps
+             green/orange/red; Settings pages have no status and show no dot. -->
         <HierarchicalDataTemplate DataType="{x:Type local:SettingsNavNode}" ItemsSource="{Binding Children}">
-            <TextBlock Text="{Binding Label}" Margin="0,2" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center"
+                         Fill="{Binding StatusBrush}"
+                         Visibility="{Binding StatusBrush, Converter={StaticResource NullToVis}}"/>
+                <TextBlock Text="{Binding Label}" Margin="0,2" VerticalAlignment="Center"/>
+            </StackPanel>
         </HierarchicalDataTemplate>
     </UserControl.Resources>
 

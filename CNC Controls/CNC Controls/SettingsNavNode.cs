@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SettingsNavNode.cs - part of CNC Controls library
  *
  * One node in the Settings / Machine Setup navigation tree (see
@@ -132,6 +132,30 @@ namespace CNC.Controls
 
         // Sort key among siblings, declared by the panel (ISettingsPanelCategory.SettingsOrder).
         public int Order { get; set; }
+
+        // Optional status colour shown as a dot beside the label. Null = no dot, which is every
+        // Settings page; Machine Setup uses it to grade its steps green/orange/red. A dot rather than
+        // coloured label text: it survives the selection highlight and does not fight the theme.
+        public System.Windows.Media.Brush StatusBrush
+        {
+            get { return statusBrush; }
+            set { if (!ReferenceEquals(statusBrush, value)) { statusBrush = value; OnPropertyChanged(nameof(StatusBrush)); } }
+        }
+        private System.Windows.Media.Brush statusBrush;
+
+        // Re-evaluated capability gate supplied by a page provider.
+        public System.Func<bool> AvailabilityCheck { get; set; }
+        public System.Func<System.Windows.Media.Brush> StatusCheck { get; set; }
+
+        public void RefreshFromProvider()
+        {
+            if (AvailabilityCheck != null)
+                IsVisible = AvailabilityCheck();
+            if (StatusCheck != null)
+                StatusBrush = StatusCheck();
+            foreach (var c in Children)
+                c.RefreshFromProvider();
+        }
 
         public SettingsNavNode Add(SettingsNavNode child)
         {

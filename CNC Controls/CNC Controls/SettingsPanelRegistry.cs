@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SettingsPanelRegistry.cs - part of CNC Controls library
  *
  * Registration for Settings:App panels (Phase 0.5 of the registration architecture refactor,
@@ -90,6 +90,19 @@ namespace CNC.Controls
         public string Key { get; }
         public string Label { get; }
         public System.Windows.FrameworkElement Content { get; }
+
+        // Key of the category this page sits under, when the provider wants its own grouping
+        // (Machine Setup nests Stepper calibration / Squareness under Calibration). Null = top level.
+        public string Parent { get; set; }
+
+        // Re-evaluated by the host whenever it refreshes, so a page can come and go with the machine's
+        // capabilities (no simulator page while connected TO the simulator; no stepper calibration
+        // without a 3D probe configured).
+        public System.Func<bool> IsAvailable { get; set; }
+
+        // Optional per-page status colour, read on refresh. Machine Setup grades its steps
+        // green/orange/red; that signal lived on the tab headers, which no longer render.
+        public System.Func<System.Windows.Media.Brush> Status { get; set; }
 
         public SettingsSubPage(string key, string label, System.Windows.FrameworkElement content)
         {
