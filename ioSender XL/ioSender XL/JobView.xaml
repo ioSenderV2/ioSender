@@ -73,7 +73,11 @@
                     <RowDefinition Height="Auto" x:Name="joggerRow"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"/>
+                <!-- joggerRow is Auto, so collapsing the pad takes its height to zero and the panel columns
+                     below get it - no separate row handling needed. Toggled by Settings > User Interface >
+                     Job tab layout; the run bar's compact jog is unaffected. -->
+                <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"
+                                        Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ShowJobJogPad, Converter={StaticResource IsVisibleConverter}}"/>
                 <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
                      balanced by height (see BuildMainPanels), so they fit instead of a rigid split. Each column
                      is a ScrollViewer so an over-tall stack scrolls instead of clipping (worse at high DPI). -->

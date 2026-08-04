@@ -310,6 +310,7 @@ namespace CNC.Controls
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _showJogTargetButtons = true;
+        private bool _showJobJogPad = true;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
@@ -410,6 +411,12 @@ namespace CNC.Controls
         // (JogBaseControl). Default ON so nothing changes for an existing profile; unticking hides them and
         // leaves the plain arrow pad. Notifies so the pad follows the checkbox live, no restart.
         public bool ShowJogTargetButtons { get { return _showJogTargetButtons; } set { if (_showJogTargetButtons != value) { _showJogTargetButtons = value; OnPropertyChanged(); } } }
+        // The Job tab's full jog pad (JobView's jogControl - the arrow pad spanning both right-hand columns
+        // above the panel stacks). Default ON. Off collapses it and hands the height to the panel columns;
+        // the run bar's own compact jog stays either way, which is the point - it is enough for some
+        // operators, and the pad is the single largest thing competing with the program view for width.
+        // Notifies, so the checkbox takes effect immediately rather than on the layout editor's usual restart.
+        public bool ShowJobJogPad { get { return _showJobJogPad; } set { if (_showJobJogPad != value) { _showJobJogPad = value; OnPropertyChanged(); } } }
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
