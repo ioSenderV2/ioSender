@@ -631,14 +631,39 @@ namespace CNC.Controls
         }
 
         // Persist the user's machine pick so it is restored next run (only for real user selections).
-        private void SaveSelectedMachine()
+        // The three dropdowns as the "Manufacturer|Product|Model" identity stored in LastMachine, or null when
+        // the picture is incomplete.
+        private string SelectedMachineId()
         {
             var mfr = cbxManufacturer.SelectedItem as MachineManufacturer;
             var prod = cbxProduct.SelectedItem as MachineProduct;
             var mdl = cbxModel.SelectedItem as MachineModel;
-            if (mfr == null || prod == null || mdl == null || AppConfig.Settings.Base == null)
+            return (mfr == null || prod == null || mdl == null) ? null : mfr.Name + "|" + prod.Name + "|" + mdl.Name;
+        }
+
+        /// <summary>
+        /// A machine is picked whose identity is not what LastMachine already holds - i.e. Apply still has
+        /// something to commit even if no $ setting would change.
+        ///
+        /// This distinction is the whole of a first-run deadlock found 2026-08-03. Apply used to be gated
+        /// purely on pending SETTINGS, and Apply_Click returned early on zero changes before it reached
+        /// SaveSelectedMachine - which is the only place LastMachine is ever written. On a machine whose
+        /// controller is already configured correctly, picking it produces no changes at all, so Apply stayed
+        /// greyed, the identity was never recorded, and the startup setup gate (which asks for exactly that
+        /// identity) re-armed on every launch with no way out.
+        /// </summary>
+        private bool MachineIdentityUnsaved()
+        {
+            string id = SelectedMachineId();
+            return id != null && id != (AppConfig.Settings.Base?.LastMachine ?? string.Empty);
+        }
+
+        private void SaveSelectedMachine()
+        {
+            string id = SelectedMachineId();
+            if (id == null || AppConfig.Settings.Base == null)
                 return;
-            AppConfig.Settings.Base.LastMachine = mfr.Name + "|" + prod.Name + "|" + mdl.Name;
+            AppConfig.Settings.Base.LastMachine = id;
             AppConfig.Settings.Save();
         }
 
@@ -718,6 +743,12 @@ namespace CNC.Controls
             if (_restoringSelection)
                 return;
             ApplyPreset(cbxModel.SelectedItem as MachineModel);
+
+            // Refresh Apply directly rather than relying on ApplyPreset's field edits to raise
+            // PropertyChanged: when the preset matches the controller exactly, NOTHING changes and no
+            // notification fires - which is precisely the case where picking the machine is the only thing
+            // Apply has left to commit. Without this the button stays greyed on the very machine that needs it.
+            UpdateApplyState();
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
@@ -977,7 +1008,11 @@ namespace CNC.Controls
                 return;
             }
             BuildReview();
-            btnApply.IsEnabled = btnPreview.IsEnabled = Changes.Count > 0;
+            // Preview is about pending WRITES, so it stays tied to the change set. Apply also commits the
+            // machine identity, so it must stay live when that is all there is to commit - see
+            // MachineIdentityUnsaved for the deadlock that came of conflating the two.
+            btnPreview.IsEnabled = Changes.Count > 0;
+            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved();
         }
 
         // Preview the pending changes in a dialog (replaces the old inline expander).
@@ -1530,6 +1565,21 @@ namespace CNC.Controls
 
             if (Changes.Count == 0)
             {
+                // Nothing to WRITE - but the machine identity itself may still be uncommitted, and recording
+                // it is what satisfies the first-run setup gate. A controller that already holds exactly the
+                // right settings is the normal case for anyone setting ioSender up against a machine that was
+                // already working, so refusing outright here stranded them (see MachineIdentityUnsaved).
+                if (MachineIdentityUnsaved())
+                {
+                    SaveSelectedMachine();
+                    txtStatus.Text = "Machine recorded - the controller already had these settings.";
+                    if (model != null)
+                        model.Message = "Machine setup: machine recorded (settings already matched).";
+                    UpdateApplyState();
+                    SetupApplied?.Invoke();
+                    return;
+                }
+
                 txtStatus.Text = "Nothing changed.";
                 if (model != null)
                     model.Message = "Machine setup: nothing changed.";

@@ -90,7 +90,9 @@ namespace CNC.Controls
                 win._view.Setup(model, profile);
 
             _open[descriptor.ViewType] = win;
+            win.SizeToWorkArea();
             win.Show();
+            win.ReleaseContentSizing();
             win._view?.Activate(true, descriptor.ViewType);
             return win;
         }
@@ -99,6 +101,28 @@ namespace CNC.Controls
         public static bool IsOpen(ViewType view)
         {
             return _open.ContainsKey(view);
+        }
+
+        // Let the hosted view decide the window size, but never larger than the screen it has to fit on.
+        //
+        // The window used to be a fixed 1000x720. These views were written to fill a tab in a maximized
+        // window, so anything that needed more than that was simply cut off - on Machine Setup that meant the
+        // Apply/Preview row sat outside the window entirely, with no way to reach it (reported 2026-08-03).
+        // A window's size is the content's business; the only thing this end owns is the ceiling.
+        private void SizeToWorkArea()
+        {
+            var wa = SystemParameters.WorkArea;
+            MaxWidth = wa.Width * 0.95d;
+            MaxHeight = wa.Height * 0.95d;
+        }
+
+        // Once the first layout has settled, hand sizing back to the user. Leaving SizeToContent on pins the
+        // window to its content for ever, so the border and the maximize button do nothing.
+        private void ReleaseContentSizing()
+        {
+            SizeToContent = SizeToContent.Manual;
+            MaxWidth = double.PositiveInfinity;
+            MaxHeight = double.PositiveInfinity;
         }
 
         // Windows hosting a plain layout component rather than a registered ICNCView - the tools the
@@ -141,7 +165,9 @@ namespace CNC.Controls
             win._componentKey = key;
             win.host.Content = ctl;
             _openComponents[key] = win;
+            win.SizeToWorkArea();
             win.Show();
+            win.ReleaseContentSizing();
             return win;
         }
 

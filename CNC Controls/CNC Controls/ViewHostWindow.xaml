@@ -6,7 +6,7 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         MinWidth="480" MinHeight="360"
-        Width="1000" Height="720">
+        SizeToContent="WidthAndHeight">
     <!-- Generic host for a registered ICNCView opened from the main menu. The view itself is dropped
          into this ContentControl by ViewHostWindow.Open(); nothing view-specific belongs here. -->
     <ContentControl x:Uid="ctl_viewHostContent" x:Name="host"/>
