@@ -215,10 +215,15 @@ namespace GCode_Sender
                 for (int i = 0; i < mainPanels.Count; i++)
                 {
                     double height = PanelHeight(mainPanels[i], width);
+                    // Spill when MOST of the panel would not fit, not when it fails to fit entirely. The
+                    // strict test sent Goto to the second column for missing by 0.4px (measured: 526.0 into
+                    // 525.6) and left a 143px hole behind it - which reads as "there was plenty of room",
+                    // because there very nearly was. The column scrolls, so a panel hanging slightly over the
+                    // bottom is a far better outcome than a gap here and a panel stranded over there.
+                    //
                     // i > 0: the first panel always goes in the first column even if it is taller than the
-                    // viewport on its own - the ScrollViewer handles that, and moving it right would only
-                    // leave the first column empty instead.
-                    if (i > 0 && used + height > available) { split = i; break; }
+                    // viewport on its own - moving it right would only leave the first column empty instead.
+                    if (i > 0 && used + height / 2d > available) { split = i; break; }
                     used += height;
                 }
             }
