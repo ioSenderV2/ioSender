@@ -75,7 +75,12 @@
                 </Grid.RowDefinitions>
                 <!-- joggerRow is Auto, so collapsing the pad takes its height to zero and the panel columns
                      below get it - no separate row handling needed. Toggled by Settings > User Interface >
-                     Job tab layout; the run bar's compact jog is unaffected. -->
+                     Job tab layout.
+                     Hiding it costs no FUNCTION, and not just because a Collapsed element still raises Loaded:
+                     the run bar hosts the very same JogBaseControl class (MainWindow.xaml's jogPad,
+                     ArrowsOnly), JogBaseControl.keyboardMappingsOk is a STATIC one-shot so whichever instance
+                     loads first registers the Ctrl+Shift jog handlers for both, and JogData is a static
+                     singleton so the distance/feed providers either instance installs are equivalent. -->
                 <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"
                                         Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ShowJobJogPad, Converter={StaticResource IsVisibleConverter}}"/>
                 <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
