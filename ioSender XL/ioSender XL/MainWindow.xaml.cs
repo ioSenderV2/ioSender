@@ -1241,6 +1241,34 @@ namespace GCode_Sender
             m.PropertyChanged += handler;
         }
 
+        /// <summary>
+        /// Bring Machine Setup up wherever the layout puts it - the tab when it is on the bar, its own window
+        /// when it is a File-menu entry (the default since 2026-08-03) - and hand back the view so the caller
+        /// can drive it. Null only if it could not be shown at all.
+        ///
+        /// Every caller here used to do getTab(ViewType.MachineSetup) and quietly do nothing when that came
+        /// back null, which it always does for a menu-hosted view. The startup gate then showed its "let's
+        /// finish setting up your machine" prompt and left the operator on the Job screen - and since the
+        /// wizard was never reached, no step could be completed, so FirstIncompleteStep stayed non-zero and
+        /// the gate fired again on every single launch. Same shape as ShowWorkOrder; see its comment.
+        /// </summary>
+        private CNC.Controls.MachineSetupView ShowMachineSetupView()
+        {
+            TabItem tab = getTab(ViewType.MachineSetup);
+            if (tab != null)
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;
+                return getView(tab) as CNC.Controls.MachineSetupView;
+            }
+
+            var d = TabRegistry.DescriptorFor(ViewType.MachineSetup);
+            if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                return null;
+
+            return ViewHostWindow.ViewInstance(ViewType.MachineSetup) as CNC.Controls.MachineSetupView;
+        }
+
         private void ShowMachineSetup(int step)
         {
             _machineSetupForced = true;
@@ -1248,13 +1276,7 @@ namespace GCode_Sender
             CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
             CNC.Controls.MachineSetupWizard.SetupApplied += OnMachineSetupApplied;
 
-            TabItem tab = getTab(ViewType.MachineSetup);
-            if (tab != null)
-            {
-                tab.IsEnabled = true;
-                tabMode.SelectedItem = tab;
-                (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
-            }
+            ShowMachineSetupView()?.GoToStep(step);
 
             AppDialogs.Show(this,
                 "Let's finish setting up your machine.\n\nWork through the steps - the normal screen opens once all are complete.",
@@ -1269,13 +1291,7 @@ namespace GCode_Sender
         // reference of its own to call an instance method on other than the shared MainWindow.ui.
         internal void GoToMachineSetupStep(int step)
         {
-            TabItem tab = getTab(ViewType.MachineSetup);
-            if (tab != null)
-            {
-                tab.IsEnabled = true;
-                tabMode.SelectedItem = tab;
-                (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
-            }
+            ShowMachineSetupView()?.GoToStep(step);
         }
 
         // Apply fired: re-check the setup steps. Still gaps -> lead to the next one and stay; all complete
@@ -1285,8 +1301,7 @@ namespace GCode_Sender
             int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
             if (step != 0)
             {
-                Dispatcher.BeginInvoke(new System.Action(() =>
-                    (getView(getTab(ViewType.MachineSetup)) as CNC.Controls.MachineSetupView)?.GoToStep(step)));
+                Dispatcher.BeginInvoke(new System.Action(() => ShowMachineSetupView()?.GoToStep(step)));
                 return;
             }
 
