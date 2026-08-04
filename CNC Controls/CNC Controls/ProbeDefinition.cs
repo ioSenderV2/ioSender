@@ -214,7 +214,10 @@ namespace CNC.Controls
                         return (ProbeDefinitionList)xs.Deserialize(fs);
                 }
             }
-            catch { }
+            // A throw here (corrupt or locked file) returned null silently, which downstream reads as
+            // "nothing to import" - identical to the file not existing. Log it, or a failed import
+            // looks exactly like a fresh install with no library to carry over.
+            catch (System.Exception ex) { CNC.Core.DebugLog.Write("probes", "ReadLegacyFile failed, treating as no library to import - " + ex.Message); }
             return null;
         }
 

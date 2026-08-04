@@ -670,10 +670,20 @@ namespace CNC.Controls
                     Arguments = "-self-relaunch",
                     UseShellExecute = false
                 };
-                System.Diagnostics.Process.Start(psi);
+                // Logged because a failed relaunch is otherwise indistinguishable from the user quitting:
+                // the app exits, the log just stops, and nothing says a restart was even attempted
+                // (confirmed 2026-08-03 - a relaunch failed to come back and left no evidence at all).
+                CNC.Core.DebugLog.Write("app", string.Format("Restart: relaunching \"{0}\" {1}", psi.FileName, psi.Arguments));
+                var relaunched = System.Diagnostics.Process.Start(psi);
+                CNC.Core.DebugLog.Write("app", string.Format("Restart: started pid {0} - shutting this instance down", relaunched == null ? -1 : relaunched.Id));
                 Application.Current.Shutdown();
             }
-            catch { _restarting = false; }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
+            catch (Exception ex)
+            {
+                // Relaunch failed - leave the app open; changes are saved and apply on next manual restart.
+                CNC.Core.DebugLog.Write("app", "Restart: relaunch FAILED, app staying open - " + ex.Message);
+                _restarting = false;
+            }
         }
 
         #endregion
