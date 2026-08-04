@@ -126,7 +126,15 @@ namespace CNC.Controls
 
         public static ObservableCollection<ProbeDefinition> Items
         {
-            get { if (_items == null) Load(); return _items; }
+            get
+            {
+                if (_items == null)
+                {
+                    CNC.Core.DebugLog.Write("probes", "Items read before the Probes section loaded - falling back to Load()");
+                    Load();
+                }
+                return _items;
+            }
         }
 
         private static string FilePath
@@ -166,6 +174,7 @@ namespace CNC.Controls
         // Snapshot for the App.config "Probes" section serializer.
         public static ProbeDefinitionList Export()
         {
+            CNC.Core.DebugLog.Write("probes", string.Format("Export: writing {0} definition(s)", _items?.Count ?? -1));
             return new ProbeDefinitionList { Items = new List<ProbeDefinition>(Items) };
         }
 
@@ -181,12 +190,15 @@ namespace CNC.Controls
             // MachineSetupWizard.FirstIncompleteStep) - a new operator can go straight into Start Job/Odd Jobs
             // Setup, which prompts them once to review these generic numbers against their actual hardware
             // (see AppConfig.Settings.Base.ProbeDefinitionsReviewed) rather than blocking on it up front.
-            if (_items.Count == 0)
+            bool seeded = _items.Count == 0;
+            if (seeded)
             {
                 _items.Add(new ProbeDefinition { Name = "3D probe", ProbeType = ProbeType.ThreeDProbe });
                 _items.Add(new ProbeDefinition { Name = "Touch plate", ProbeType = ProbeType.TouchPlate });
             }
             Renumber(_items);
+            CNC.Core.DebugLog.Write("probes", string.Format(
+                "SetItems: incoming={0} seeded={1} now={2}", list?.Items?.Count ?? -1, seeded, _items.Count));
         }
 
         // One-time importer: read the legacy standalone ProbeDefinitions.xml if present, so an existing library
