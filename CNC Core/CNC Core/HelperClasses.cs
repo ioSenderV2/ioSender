@@ -44,10 +44,23 @@ namespace CNC.Core
         // overwhelming common case): CheckAccess is a simple thread-id compare.
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
+            // Nobody listening => nothing to raise, and above all nothing to MARSHAL. The hop below is
+            // synchronous (UiContext.Send blocks until the UI thread runs it, ~30 us), and an object still
+            // being CONSTRUCTED on a worker thread has no subscribers yet - PropertyChanged is only wired
+            // when the object reaches a binding. Loading a 220k-line program builds 220k GCodeBlocks off
+            // the UI thread, each raising ~4 of these from its constructor/setters: ~1M blocking round
+            // trips, measured at 33.4 s of a 34.5 s parse (2026-08-04). BackgroundLoad exists precisely to
+            // keep that work off the UI thread, and this was serialising all of it back through it.
+            // Captured into a local first for the usual raise-vs-unsubscribe race - the same guarantee the
+            // ?.Invoke below already relied on.
+            var handler = PropertyChanged;
+            if (handler == null)
+                return;
+
             if (!UiContext.IsCurrent)
-                UiContext.Send(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+                UiContext.Send(() => handler(this, new PropertyChangedEventArgs(propertyName)));
             else
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+                handler(this, new PropertyChangedEventArgs(propertyName));
         }
 
         #region INotifyDataErrorInfo members
