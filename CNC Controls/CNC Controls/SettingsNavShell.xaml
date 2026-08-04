@@ -78,7 +78,13 @@
 
         <!-- Right: the selected page -->
         <Grid Grid.Column="2" Margin="6">
-            <ScrollViewer x:Name="pageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <!-- Horizontal scrolling DISABLED on purpose. Enabled, a ScrollViewer measures its content with
+                 infinite width, so the page lays out at its own natural width and never stretches to the
+                 viewport: widening the window just revealed more of a fixed-width page, and anything
+                 right-aligned in it (Machine Setup's Apply/Preview row) stayed off to the right where it
+                 could not be reached. Disabled constrains the page to the viewport, so it stretches and
+                 wraps and right-aligned content tracks the window edge. -->
+            <ScrollViewer x:Name="pageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ContentPresenter x:Name="pageHost" Content="{Binding SelectedNode.Content, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
             </ScrollViewer>
             <TextBlock x:Uid="lbl_settingsNoSelection" x:Name="emptyHint" Text="Select a page on the left."

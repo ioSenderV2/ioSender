@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ViewHostWindow.xaml.cs - part of CNC Controls library for Grbl
  *
  * Hosts a registered ICNCView in its own top-level window, for the views that moved off the main tab
@@ -92,7 +92,6 @@ namespace CNC.Controls
             _open[descriptor.ViewType] = win;
             win.SizeToWorkArea();
             win.Show();
-            win.ReleaseContentSizing();
             win._view?.Activate(true, descriptor.ViewType);
             return win;
         }
@@ -103,26 +102,19 @@ namespace CNC.Controls
             return _open.ContainsKey(view);
         }
 
-        // Let the hosted view decide the window size, but never larger than the screen it has to fit on.
+        // Open at a usable fraction of the screen rather than a hardcoded size.
         //
-        // The window used to be a fixed 1000x720. These views were written to fill a tab in a maximized
-        // window, so anything that needed more than that was simply cut off - on Machine Setup that meant the
-        // Apply/Preview row sat outside the window entirely, with no way to reach it (reported 2026-08-03).
-        // A window's size is the content's business; the only thing this end owns is the ceiling.
+        // It was a fixed 1000x720, which cut off any view that wanted more (Machine Setup's Apply row ended up
+        // outside the window). SizeToContent was tried instead and was WORSE: the settings shell builds its
+        // pages lazily on first show, so at Show() time there was nothing to measure and the window opened
+        // tiny. Neither the author of the view nor the window can know the right size here, so take a
+        // generous share of the work area and let the user resize from there - the content stretches to fit
+        // it, now that the page scroller no longer measures at infinite width.
         private void SizeToWorkArea()
         {
             var wa = SystemParameters.WorkArea;
-            MaxWidth = wa.Width * 0.95d;
-            MaxHeight = wa.Height * 0.95d;
-        }
-
-        // Once the first layout has settled, hand sizing back to the user. Leaving SizeToContent on pins the
-        // window to its content for ever, so the border and the maximize button do nothing.
-        private void ReleaseContentSizing()
-        {
-            SizeToContent = SizeToContent.Manual;
-            MaxWidth = double.PositiveInfinity;
-            MaxHeight = double.PositiveInfinity;
+            Width = System.Math.Max(MinWidth, System.Math.Min(1200d, wa.Width * 0.85d));
+            Height = System.Math.Max(MinHeight, System.Math.Min(900d, wa.Height * 0.85d));
         }
 
         // Windows hosting a plain layout component rather than a registered ICNCView - the tools the
@@ -167,7 +159,6 @@ namespace CNC.Controls
             _openComponents[key] = win;
             win.SizeToWorkArea();
             win.Show();
-            win.ReleaseContentSizing();
             return win;
         }
 
