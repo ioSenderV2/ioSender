@@ -86,6 +86,7 @@ namespace CNC.Controls
             grdGCode.DataContext = list;
             ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.HasOutline ?? false));
             RefreshSourceHighlight();
+            RefreshDataColumnWidth();   // swapping the bound collection is a row change like any other
         }
 
         // Block column = a continuous program line-number sequence: jump to an explicit N word when a line carries
@@ -261,21 +262,78 @@ namespace CNC.Controls
                 ApplyGrouping(_program == null && (DataContext as GrblViewModel).HasOutline);
             }
             RefreshSourceHighlight();
+
+            // Rows can appear WITHOUT a file load: Work Order's Run pushes its generated program straight
+            // into the bound collection, and the wizards call SetProgram. Neither toggles IsLoading, so the
+            // recalculation below never ran on those paths and the Data column stayed a stub until the user
+            // nudged a column splitter. ItemContainerGenerator raises this however the items change and
+            // whichever collection is bound, so this one hook covers the file load, the Work Order handoff,
+            // SetProgram, and the empty-at-startup case that the Loaded call alone could never fix.
+            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => RefreshDataColumnWidth();
+
+            // While the grid is empty the Data column carries an explicit pixel width (see
+            // RefreshDataColumnWidth), and a pixel width does not follow a resize the way Star would - so
+            // recompute it when the list changes size. Once rows exist the column is back on Star and this
+            // costs one no-op dispatcher hop per resize.
+            grdGCode.SizeChanged += (s, ea) => RefreshDataColumnWidth();
+
             RefreshDataColumnWidth();
         }
+
+        private bool _widthRefreshPending = false;
 
         // Known WPF DataGrid quirk: a Width="*" column (the Data column here) can compute far narrower than
         // its actual share on a layout pass with no/few realized rows - especially combined with row
         // virtualization - and only corrects itself once something forces a star-width recalculation (e.g.
         // the user dragging a column splitter). Toggling the width off Star and back forces that
-        // recalculation. Called on control Loaded AND every time a file finishes loading (IsLoading ->
-        // false below) - at UserControl_Loaded time the grid is still empty (no file loaded yet), so that
-        // alone isn't enough; the recalculation has to run again once real rows exist to measure against.
+        // recalculation.
+        //
+        // Deferred to Loaded priority because WHEN it runs is the whole point: run it inline and it measures
+        // the same not-yet-realized grid that caused the problem in the first place, which is exactly why the
+        // UserControl_Loaded call never fixed the collapsed-at-startup case. Posting it behind the layout
+        // pass means there are real rows and a real viewport width to measure against.
+        //
+        // The pending flag collapses a burst (ItemsChanged can fire repeatedly for one logical change) into a
+        // single recalculation instead of queueing one dispatcher operation per notification.
         private void RefreshDataColumnWidth()
         {
-            var dataColumn = grdGCode.Columns[2];
-            dataColumn.Width = new DataGridLength(0);
-            dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            if (_widthRefreshPending)
+                return;
+            _widthRefreshPending = true;
+
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                _widthRefreshPending = false;
+                var dataColumn = grdGCode.Columns[2];
+
+                // Star width is distributed across the CELLS panel, so with no rows there is nothing to
+                // distribute over and the columns keep whatever they resolved to on the very first pass -
+                // which is the pass where the grid's own ActualWidth is still 0, i.e. their MinWidths.
+                // Measured 2026-08-04: grid 1092.9 wide, ScrollViewer Extent 0.0, columns stuck at
+                // 60/30/20. Re-toggling Star could never fix that; it re-runs the same distribution over
+                // the same nothing. So when the grid is empty, do the arithmetic here - the viewport width
+                // really is known by this point - and hand the column back to Star as soon as rows exist.
+                double avail = grdGCode.ActualWidth;
+                bool empty = grdGCode.Items.Count == 0;
+
+                if (empty && avail > 0)
+                {
+                    double used = 0;
+                    for (int i = 0; i < grdGCode.Columns.Count - 1; i++)
+                        used += grdGCode.Columns[i].ActualWidth;
+
+                    // Leave room for the vertical scrollbar / grid lines so the last column never forces a
+                    // horizontal scrollbar into existence.
+                    double target = avail - used - 4;
+                    if (target > dataColumn.MinWidth)
+                        dataColumn.Width = new DataGridLength(target);
+                }
+                else
+                {
+                    dataColumn.Width = new DataGridLength(0);
+                    dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+                }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

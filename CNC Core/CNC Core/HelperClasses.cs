@@ -44,15 +44,23 @@ namespace CNC.Core
         // overwhelming common case): CheckAccess is a simple thread-id compare.
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
-            // Nobody listening => nothing to raise, and above all nothing to MARSHAL. The hop below is
-            // synchronous (UiContext.Send blocks until the UI thread runs it, ~30 us), and an object still
-            // being CONSTRUCTED on a worker thread has no subscribers yet - PropertyChanged is only wired
-            // when the object reaches a binding. Loading a 220k-line program builds 220k GCodeBlocks off
-            // the UI thread, each raising ~4 of these from its constructor/setters: ~1M blocking round
-            // trips, measured at 33.4 s of a 34.5 s parse (2026-08-04). BackgroundLoad exists precisely to
-            // keep that work off the UI thread, and this was serialising all of it back through it.
+            // Nobody listening => nothing to raise, and above all nothing to MARSHAL. UiContext.Send
+            // below is SYNCHRONOUS - it blocks until the UI thread runs the callback (~30 us) - and an
+            // object still being CONSTRUCTED on a worker thread has no subscribers yet: PropertyChanged is
+            // only wired when the object reaches a binding. Loading a 220k-line program builds 220k
+            // GCodeBlocks off the UI thread (GCode.BackgroundLoad -> Task.Run -> ParseFileLines), each
+            // raising ~4 of these from its constructor and setters (LineNum and Data both call
+            // RefreshDisplay, which raises DataDisplay + BlockDisplay; Data raises its own) - roughly a
+            // MILLION blocking round trips, measured 2026-08-04 at 33.4 s of a 34.5 s parse. Skipping the
+            // hop when there is no handler took that load from 32.0 s to 2.6 s.
+            //
+            // BackgroundLoad exists precisely to keep that work off the UI thread; without this guard it
+            // was serialising all of it straight back through the UI thread - which is also why the load
+            // took the same ~32 s in Debug and Release: the cost was cross-thread latency, not CPU.
+            //
+            // Raising an event with no subscribers is a no-op, so returning early cannot change behaviour.
             // Captured into a local first for the usual raise-vs-unsubscribe race - the same guarantee the
-            // ?.Invoke below already relied on.
+            // ?.Invoke calls below already relied on.
             var handler = PropertyChanged;
             if (handler == null)
                 return;
