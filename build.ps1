@@ -211,11 +211,11 @@ function Get-NewestScreenshotTime {
     if ($f) { $f.LastWriteTime } else { [datetime]::MinValue }
 }
 
-if ($Shot -and -not $DefaultConfig) { throw "-Shot files the capture when a session ends, so it needs -DefaultConfig (that is the run that waits for you to quit)." }
+if ($Shot -and $Scratch) { throw "-Shot runs the app; -Scratch is a verify-only build. Pass one." }
+if ($Shot) { $shotBaseline = Get-NewestScreenshotTime }
 
 if ($DefaultConfig) {
     if ($Scratch) { throw "-DefaultConfig runs the app; -Scratch is a verify-only build. Pass one." }
-    if ($Shot) { $shotBaseline = Get-NewestScreenshotTime }
     # Refuse rather than overwrite: a stash present here means an earlier session died before its
     # restore, and that file is the only copy of the real settings.
     if (Test-Path $stashedCfg) { throw "$stashedCfg already exists - an earlier session did not restore. Move it back to App.config yourself, then re-run." }
@@ -295,10 +295,14 @@ if ($Launch -or $DefaultConfig) {
 
             $proc = if ($finalArgs) { Start-Process $exe -ArgumentList ($quotedArgs -join ' ') -PassThru } else { Start-Process $exe -PassThru }
 
-            if ($DefaultConfig) {
-                # Quitting the app IS the end of the session - block here so the restore below runs
-                # the moment ioSender exits, with no second command to remember.
-                Write-Host "==> Running on a default config. Quit ioSender to end the session and get your own settings back." -ForegroundColor Cyan
+            if ($DefaultConfig -or $Shot) {
+                # Quitting the app IS the end of the session - block here so the restore (and/or the
+                # screenshot filing) below runs the moment ioSender exits, with no second command to
+                # remember. -Shot alone waits too: some screens can only be shot from YOUR config -
+                # a fixture, for one, is a validated known position and so never exists on a default
+                # config - and those runs still need the capture filed when you quit.
+                if ($DefaultConfig) { Write-Host "==> Running on a default config. Quit ioSender to end the session and get your own settings back." -ForegroundColor Cyan }
+                else { Write-Host "==> Waiting for you to quit ioSender, then filing the screenshot." -ForegroundColor Cyan }
                 $proc.WaitForExit()
 
                 # Settings' "Restart" is a SELF-relaunch (GrblConfigView.DoRestart): the app starts a
@@ -360,15 +364,16 @@ finally {
         Move-Item $stashedCfg $liveCfg -Force
         Write-Host "==> Your App.config is back." -ForegroundColor Green
         if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
+    }
 
-        # File the capture only if one was actually taken during the session - see -Shot's help.
-        if ($Shot) {
-            if ((Get-NewestScreenshotTime) -gt $shotBaseline) {
-                & (Join-Path $root 'tools\copy-latest-screenshot.ps1') -Name $Shot
-            }
-            else {
-                Write-Host "==> No screenshot taken this session - docs\manual\img\$Shot is unchanged." -ForegroundColor Yellow
-            }
+    # Outside the restore block on purpose: -Shot works with or without -DefaultConfig, and files
+    # only a capture taken after the launch - see -Shot's help.
+    if ($Shot) {
+        if ((Get-NewestScreenshotTime) -gt $shotBaseline) {
+            & (Join-Path $root 'tools\copy-latest-screenshot.ps1') -Name $Shot
+        }
+        else {
+            Write-Host "==> No screenshot taken this run - docs\manual\img\$Shot is unchanged." -ForegroundColor Yellow
         }
     }
 }
