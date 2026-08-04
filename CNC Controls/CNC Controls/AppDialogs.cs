@@ -32,8 +32,40 @@ namespace CNC.Controls
         public static void RegisterCorePrompts()
         {
             UserPrompt.Handler = (message, caption, buttons, icon, defaultResult, id) =>
-                ToPromptResult(Show(message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
-                                    ToMessageBoxResult(defaultResult), id));
+            {
+                var owner = OwnerWindow();
+                return ToPromptResult(owner != null
+                    ? Show(owner, message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
+                           ToMessageBoxResult(defaultResult), id)
+                    : Show(message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
+                           ToMessageBoxResult(defaultResult), id));
+            };
+        }
+
+        /// <summary>
+        /// The window a dialog should be owned by, or null if the main window is not shown yet (the owner
+        /// overload requires a non-null window, so callers fall back to the ownerless one).
+        /// An owned dialog centres on its owner and is forced ABOVE it. That second part is the point:
+        /// without an owner a modal box can end up BEHIND a Topmost window - the floating run-control panel
+        /// is Topmost and is up for the whole of a macro run - and a hidden modal box blocks the app and
+        /// looks exactly like a hang. Hence preferring a visible Topmost auxiliary window over the main one.
+        /// Moved up from MacroProcessor so every prompt gets it, including the ones CNC.Core raises through
+        /// UserPrompt (which went to the ownerless overload until now).
+        /// </summary>
+        public static Window OwnerWindow()
+        {
+            if (Application.Current == null)
+                return null;
+
+            Window main = Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
+                ? Application.Current.MainWindow
+                : null;
+
+            foreach (Window w in Application.Current.Windows)
+                if (w != main && w.IsVisible && w.Topmost)
+                    return w;
+
+            return main;
         }
 
         private static MessageBoxButton ToMessageBoxButton(PromptButtons b)

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MacroProcessor.cs - part of CNC Controls library
  *
  * Runs a macro, interpreting the parenthesised ioSender macro directives before the
@@ -628,33 +628,11 @@ namespace CNC.Controls
                 MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         }
 
-        // The window macro dialogs (MBOX, prompts, error/abort notices) should be owned by, so they
-        // center on and stay above ioSender instead of popping up as an independent top-level window
-        // that can fall behind the main window. Returns null if the main window is not (yet) shown.
-        private static Window OwnerWindow()
-        {
-            if (Application.Current == null)
-                return null;
-
-            Window main = Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
-                ? Application.Current.MainWindow
-                : null;
-
-            // Prefer a visible Topmost auxiliary window (e.g. the floating run-control panel) as the dialog
-            // owner: an owned dialog is forced ABOVE its owner, so this keeps message boxes from being hidden
-            // behind a Topmost window - a hidden modal box blocks the app and looks exactly like a hang.
-            foreach (Window w in Application.Current.Windows)
-                if (w != main && w.IsVisible && w.Topmost)
-                    return w;
-
-            return main;
-        }
-
         // MessageBox.Show with the main window as owner when available (the owner overload requires a
         // non-null window, so fall back to the ownerless overload before the main window exists).
         private static MessageBoxResult ShowMessage(string text, string caption, MessageBoxButton buttons, MessageBoxImage icon)
         {
-            var owner = OwnerWindow();
+            var owner = AppDialogs.OwnerWindow();
             return owner != null ? AppDialogs.Show(owner, text, caption, buttons, icon)
                                  : AppDialogs.Show(text, caption, buttons, icon);
         }
@@ -764,7 +742,7 @@ namespace CNC.Controls
                 MinWidth = 300
             };
 
-            win.Owner = OwnerWindow();
+            win.Owner = AppDialogs.OwnerWindow();
             win.WindowStartupLocation = win.Owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
 
             var root = new StackPanel { Margin = new Thickness(12) };
@@ -1090,8 +1068,8 @@ namespace CNC.Controls
                 ShowInTaskbar = false,
                 ShowActivated = false,   // don't steal focus -> keyboard jogging stays live on the main window
                 Topmost = true,
-                Owner = OwnerWindow(),
-                WindowStartupLocation = OwnerWindow() != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
+                Owner = AppDialogs.OwnerWindow(),
+                WindowStartupLocation = AppDialogs.OwnerWindow() != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
             };
 
             var root = new StackPanel { Margin = new Thickness(16), MaxWidth = 480 };
