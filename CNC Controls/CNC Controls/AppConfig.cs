@@ -1209,6 +1209,42 @@ namespace CNC.Controls
             }
         }
 
+        /// <summary>
+        /// A component may appear at most ONCE across the three root slots - it is a placement, and a thing
+        /// cannot be in two places. Keeps the first occurrence (so the user's own ordering of the real one
+        /// survives) and drops the rest.
+        ///
+        /// Added 2026-08-03 after a retired fixup was found appending a duplicate Work Order tab on every
+        /// launch (see the OddJobs note in ApplyOneTimeFixups). The generator is gone, but a profile that ran
+        /// those builds carries the duplicates in its saved tree and would keep showing them for ever - this
+        /// repairs it in place rather than making the user delete their config. Cheap and idempotent, so it
+        /// stays as a standing invariant: a future placement bug gets cleaned up instead of accumulating.
+        /// </summary>
+        private void DeduplicateTopLevelPlacements()
+        {
+            var root = Layout;
+            if (root == null)
+                return;
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int removed = 0;
+
+            foreach (var slotName in LayoutKeys.RootSlots)
+            {
+                var slot = root.Slot(slotName);
+                if (slot == null)
+                    continue;
+                removed += slot.Items.RemoveAll(n => n?.Component == null || !seen.Add(n.Component));
+            }
+
+            if (removed > 0)
+            {
+                _migratedFormat = true;   // persist the repair so it is done once, not re-done every launch
+                CNC.Core.DebugLog.Write("config", string.Format(
+                    "ApplyOneTimeFixups: dropped {0} duplicate top-level placement(s)", removed));
+            }
+        }
+
         // Where a component lives unless the user has moved it. Shared by the one-shot migration and the
         // every-load invariant above so the two can never disagree about a component's default home.
         private static readonly Dictionary<string, string> DefaultMenuPlacement =
@@ -1313,12 +1349,18 @@ namespace CNC.Controls
             // that never had it), so nothing here needs to force it anywhere.
             var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
 
-            // 2026-07-26: same story again for LayoutKeys.OddJobs (new top-level tab) - append to both the
-            // tree's tabs slot and the legacy flat Base.Tabs list, same reasoning as FeedsAndSpeeds above.
-            if (tabsSlot != null && !LayoutTree.Contains(layoutSection.Root, LayoutKeys.OddJobs))
-                tabsSlot.Items.Add(new LayoutNode(LayoutKeys.OddJobs));
-            if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.OddJobs))
-                Base.Tabs.Add(LayoutKeys.OddJobs);
+            // 2026-07-26 (RETIRED 2026-08-03): this appended LayoutKeys.OddJobs to the tabs slot whenever the
+            // tree didn't contain one - the same "get a new tab onto existing profiles" idiom as the
+            // FeedsAndSpeeds block above, and retired for a worse version of the same reason.
+            //
+            // Once OddJobs itself was retired, NOTHING ever put an OddJobs node in the tree, so the guard was
+            // permanently true and this planted one on every single load - and the promotion fixup below then
+            // found that fresh node and swapped it for a WorkOrder. Net result: one extra Work Order tab per
+            // launch, for ever. Observed 2026-08-03 as three Work Order tabs on a config two launches old.
+            //
+            // The lesson generalises: an "add it if the tree lacks it" fixup for a component that nothing else
+            // creates is not idempotent, it is a generator. Anything of this shape needs a persisted one-shot
+            // flag (see HeightMapTabMigrated) or it must not exist.
 
             // 2026-07-26 (later still): LayoutKeys.OddJobs went from a leaf (the fixup just above, added
             // earlier this session before the tab had sub-tabs) to a container with its own "oddjobs" slot -
@@ -1381,6 +1423,10 @@ namespace CNC.Controls
                     File.Delete(staleMarker);
             }
             catch { }
+
+            // LAST, deliberately: several fixups above move or add top-level nodes, so this is the point at
+            // which the tree is final and a stray duplicate can be cleaned up.
+            DeduplicateTopLevelPlacements();
         }
 
         // 2026-08-02: the Work Order built-in tools moved from a hardcoded OddJobsTool enum into a seeded
@@ -1773,8 +1819,13 @@ namespace CNC.Controls
             {
                 Base.HeightMapTabMigrated = true;
 
+                // Tree-wide Contains, not "is it in the tabs slot": since the tabs/menu split, Height Map's
+                // DEFAULT home is the Tools menu, so a brand-new profile has it placed perfectly well and the
+                // old tabs-slot-only test read that as missing and put a second one on the bar. "Not on the
+                // tab strip" has not meant "absent" since menus became placement slots of their own - the
+                // same trap EnforceMenuPlacement's invariant 2 is written around.
                 var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
-                if (tabsSlot != null && tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.HeightMap) < 0)
+                if (tabsSlot != null && !LayoutTree.Contains(layoutSection?.Root, LayoutKeys.HeightMap))
                 {
                     int after = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.Probing);
                     tabsSlot.Items.Insert(after >= 0 ? after + 1 : tabsSlot.Items.Count, new LayoutNode(LayoutKeys.HeightMap));

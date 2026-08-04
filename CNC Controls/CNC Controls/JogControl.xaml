@@ -9,8 +9,12 @@
              mc:Ignorable="d"
              FocusVisualStyle="{x:Null}"
              d:DesignHeight="255" Width="Auto">
-    <GroupBox x:Uid="grp_uijog" Header="Jogging" HeaderTemplate="{StaticResource JogHeaderTemplate}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="Auto"
+    <!-- The box stretches to the full width it is given (both right-hand panel columns on the Job tab) while
+         its CONTENT stays left-aligned, so the pad's frame lines up with the panels underneath it instead of
+         stopping short at its own content width - which read as "the pad is in column 3" (user, 2026-08-03). -->
+    <GroupBox x:Uid="grp_uijog" Header="Jogging" HeaderTemplate="{StaticResource JogHeaderTemplate}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Width="Auto"
+              HorizontalContentAlignment="Left"
               ToolTip="Move the machine along each axis. Pick a step distance/feed preset, or hold for continuous jog.">
-        <local:JogBaseControl x:Name="jogBase"/>
+        <local:JogBaseControl x:Name="jogBase" HorizontalAlignment="Left"/>
     </GroupBox>
 </UserControl>
