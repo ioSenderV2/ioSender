@@ -355,7 +355,6 @@
     <Compile Include="SimulatorConfigView.xaml.cs">
       <DependentUpon>SimulatorConfigView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="GrblFilesystems.cs" />
     <Compile Include="TearableTab.cs" />
     <Compile Include="PipeServer.cs" />
     <Compile Include="ButtonClickSound.cs" />

@@ -1,5 +1,5 @@
 /*
- * GrblFilesystems.cs - part of CNC Controls library
+ * GrblFilesystems.cs - part of CNC Core library
  *
  * Discovery and helpers for the controller's mounted filesystems (grblHAL $FI),
  * so the SD Card view can present SD + LittleFS in one combined browser.
@@ -44,7 +44,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace CNC.Controls
+namespace CNC.Core
 {
     // One mounted filesystem as reported by grblHAL's $FI command.
     public class FsMount
@@ -60,7 +60,7 @@ namespace CNC.Controls
 
     // Pure (no I/O, no WPF) parsing/formatting helpers for the filesystem browser, so they
     // can be unit tested without a controller or the UI stack. The live $FI/$F querying that
-    // uses these lives in GrblSDCard (SDCardView.xaml.cs), which has the Comms dependency.
+    // uses these lives in GrblSDCard (GrblSDCard.cs), which has the Comms dependency.
     public static class GrblFilesystems
     {
         // [FS:<name>@<path> size <bytes>, free <bytes>]   (size / free are optional and order-tolerant)
