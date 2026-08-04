@@ -309,7 +309,7 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
-        private bool _showJogTargetButtons = true;
+        private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
@@ -408,8 +408,10 @@ namespace CNC.Controls
         // those are modes worth understanding on their own terms, not a rename target.
         public bool UseFriendlyRunLabels { get; set; } = false;
         // Jog pad's five "go to a place" buttons - the four corner targets and the centre bullseye
-        // (JogBaseControl). Default ON so nothing changes for an existing profile; unticking hides them and
-        // leaves the plain arrow pad. Notifies so the pad follows the checkbox live, no restart.
+        // (JogBaseControl). Default OFF (user, 2026-08-03): they drive the machine across the table at
+        // rapid, so the pad ships as a plain arrow pad and the operator opts in once they know what the
+        // buttons do. Notifies so the pad follows the checkbox live, no restart.
+        // Only affects NEW profiles - a saved config keeps whatever it already has.
         public bool ShowJogTargetButtons { get { return _showJogTargetButtons; } set { if (_showJogTargetButtons != value) { _showJogTargetButtons = value; OnPropertyChanged(); } } }
         // The Job tab's full jog pad (JobView's jogControl - the arrow pad spanning both right-hand columns
         // above the panel stacks). Default ON. Off collapses it and hands the height to the panel columns;
