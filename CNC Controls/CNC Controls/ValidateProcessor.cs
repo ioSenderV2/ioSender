@@ -96,14 +96,11 @@ namespace CNC.Controls
                 return true;
             }
 
-            // Load the passed bounded moves into the program buffer (does NOT start them) so the user
-            // can Cycle Start and watch the toolpath run in 3D via the normal job path. BuildSafeJob
-            // returns an empty list when no motion test passed, so there is nothing to count here.
-            var job = validator.BuildSafeJob(model);
-            bool loaded = validator.LoadProgram(GCode.File, job, "Validate - passed moves") > 0;
-
-            string status = (validator.Aborted ? "Completed (stopped early)" : "Completed")
-                          + (loaded ? string.Format(" - passed moves loaded, press {0} to view in 3D.", RunLabels.CycleStart) : ".");
+            // Nothing is loaded into the program buffer. Validation used to build a runnable "passed moves"
+            // program out of the motion tests and leave it ready for Cycle Start; it drove a real machine
+            // into its front right corner at full speed and was removed (see ControllerValidator). Check
+            // mode is where this feature exercises the controller - the results window is the deliverable.
+            string status = validator.Aborted ? "Completed (stopped early)." : "Completed.";
 
             // Enable "View Summary" on the (non-modal) panel - the user opens the full report when ready.
             progress.SetCompleted(status, () => ShowResults(validator));

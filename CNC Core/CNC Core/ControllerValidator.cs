@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ControllerValidator.cs - part of CNC Core library
  *
  * "Validate controller" - exercises the connected grblHAL controller's G-code command set
@@ -82,7 +82,6 @@ namespace CNC.Core
     public class ControllerValidator
     {
         private const int AckTimeout = 4000;    // ms to wait for a single line's ok/error
-        private const int VisualizeFeed = 6000;  // mm/min feed for the loaded "passed moves" visualization job
 
         // Motion-test geometry, set by ComputeGeometry() before each run. The motion tests use moves
         // large enough to show a real toolpath in the 3D viewer, but bounded to the homed soft-limit
@@ -92,7 +91,6 @@ namespace CNC.Core
         private int _rotary = 10;        // rotary move size, degrees
         private int _feed = 500;         // feed for G1/G2/G3
         private string _anchor = null;   // "G53 G0 X.. Y.. Z.." to the envelope centre, or null
-        private double[] _center = null; // per-axis envelope-centre machine coord (NaN if no travel)
 
         // Bedrock modal set-up applied after entering check mode and re-applied after every
         // recovery reset. Every line here must be universally supported (so it never itself
@@ -511,27 +509,6 @@ namespace CNC.Core
             return IsPositiveSpace(axis) ? travel / 2.0 : -travel / 2.0;
         }
 
-        // Is this MACHINE coordinate inside the axis's soft-limit envelope? An axis with no configured
-        // travel ($13x = 0) has no soft limit to violate, so anything goes.
-        // The visualisation job below commands REAL motion at F6000. Soft limits catch a bad target on a
-        // machine that has them enabled ($20) - a machine without them has nothing between a mis-framed
-        // coordinate and the hard stops, so the job is checked here rather than trusted.
-        // This checks move ENDPOINTS, not swept arc extents. That is sufficient rather than lucky: every
-        // move is a spoke of at most _scale from the envelope centre and _scale is capped at a quarter of
-        // the SMALLEST axis travel, so an endpoint sits within [tr/4, 3tr/4] of the envelope; the widest
-        // sweep here (the full circle G2 X0 Y0 I-s J0, which reaches 2s past the centre) still lands
-        // exactly on the boundary in the worst case, never outside it.
-        private static bool WithinEnvelope(int axis, double machineCoord)
-        {
-            double tr = AxisTravel(axis);
-            if (tr <= 0.0)
-                return true;
-
-            return IsPositiveSpace(axis)
-                ? machineCoord >= 0.0 && machineCoord <= tr
-                : machineCoord <= 0.0 && machineCoord >= -tr;
-        }
-
         // Size the motion-test moves to the machine: big enough to see in the 3D view (~100 mm) but
         // bounded to ~a quarter of the smallest travel so a centred excursion always stays in soft
         // limits. Build the G53 anchor that parks the planned position at the envelope centre.
@@ -547,10 +524,6 @@ namespace CNC.Core
             _scale = minTravel <= 0.0 ? 10.0 : System.Math.Max(2.0, System.Math.Min(100.0, minTravel * 0.25));
             _feed = (int)System.Math.Max(100.0, _scale * 12.0);
 
-            _center = new double[GrblInfo.NumAxes];
-            for (int i = 0; i < GrblInfo.NumAxes; i++)
-                _center[i] = double.NaN;
-
             var sb = new StringBuilder("G53 G0");
             bool any = false;
             for (int i = 0; i < System.Math.Min(3, GrblInfo.NumAxes); i++)
@@ -558,168 +531,22 @@ namespace CNC.Core
                 double tr = AxisTravel(i);
                 if (tr > 0.0)
                 {
-                    _center[i] = EnvelopeCentre(i, tr);
-                    sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i]));
+                    sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(EnvelopeCentre(i, tr)));
                     any = true;
                 }
             }
             _anchor = any ? sb.ToString() : null;
         }
 
-        /// <summary>
-        /// Assemble a SAFE, runnable program from the motion features that passed, for the user to Cycle
-        /// Start and watch in 3D. Only the bounded "spoke" moves (Motion + Rotary categories) are included,
-        /// each kept inside soft limits by the same G53 re-anchor to the work-area centre used during the
-        /// test. Predefined-position tests (G28/G30), machine-coord moves and all non-motion ops (spindle,
-        /// coolant, tool change, overrides) are excluded - running those as real motion could be unsafe.
-        /// Returns an EMPTY list when no motion test passed, so a caller can tell "nothing to show" from a
-        /// real program without counting prefix lines.
-        /// </summary>
-        public List<string> BuildSafeJob(GrblViewModel model)
-        {
-            // The geometry below is computed in MACHINE coordinates, because that is the frame the
-            // soft-limit envelope is expressed in - but the job runs in the WORK frame (it sets G54/G90),
-            // so every coordinate is translated on the way out by subtracting the work offset.
-            // This used to emit the machine numbers directly, on the stated assumption that "the work
-            // offset is ~zero, which it is for a homed machine with G54 at machine origin". That is not
-            // the validate norm at all: on a machine reporting WCO 90.759,-696.144,-108.492 the very
-            // first move asked for machine Y = -MaxTravelY/2 - 696.1 and threw Alarm:2 without moving.
-            var workOffset = new double[GrblInfo.NumAxes];
-            for (int i = 0; i < workOffset.Length; i++)
-                workOffset[i] = model != null && i < model.WorkPositionOffset.Values.Length
-                              ? model.WorkPositionOffset.Values[i] : 0.0;
-
-            bool inEnvelope = true;
-
-            var lines = new List<string>();
-            // ABSOLUTE (G90) variant of the prefix. The test streams relative (G91) moves re-anchored with
-            // G53 machine coords; the 3D emulator renders that offset from the live tool position, so the
-            // toolpath and the head don't line up. Re-emitting the same geometry as plain absolute moves in
-            // the work system makes the drawn path and the head agree. (Assumes the work offset is ~zero,
-            // which it is for a homed machine with G54 at machine origin - the validate norm.)
-            lines.Add("G21"); lines.Add("G94"); lines.Add("G17"); lines.Add("G54"); lines.Add("G49"); lines.Add("G90");
-            // Run the visualisation fast: drop the per-move F500 (see StripFeed) and set one high modal feed.
-            // grbl clamps it to each axis max rate, so it is safe on real hardware and traces quickly on the sim.
-            lines.Add("F" + VisualizeFeed);
-            int prefixCount = lines.Count;
-
-            string absAnchor = BuildAbsoluteAnchor(workOffset, ref inEnvelope);   // "G0 X.. Y.. Z.." to the envelope centre
-
-            for (int i = 0; i < Tests.Count; i++)
-            {
-                var t = Tests[i];
-                if (!t.Passed || (t.Category != "Motion" && t.Category != "Rotary axes"))
-                    continue;
-                if (absAnchor != null && i > 0 && Tests[i - 1].Helper && Tests[i - 1].Code == _anchor)
-                    lines.Add(absAnchor);
-                lines.Add(ToAbsolute(StripFeed(t.Code), workOffset, ref inEnvelope));   // relative-from-centre -> absolute
-            }
-
-            // Nothing but the prefix means no motion test passed - there is no toolpath to show. The old
-            // "job.Count > ModalPrefix.Length" test the caller used could never catch this: the prefix
-            // written here is SEVEN lines (six modal + the feed) against a six-line ModalPrefix, so it was
-            // always true and an empty run still reported "passed moves loaded".
-            if (lines.Count == prefixCount)
-                return new List<string>();
-
-            if (absAnchor != null)
-                lines.Add(absAnchor);                        // park back at centre when the run ends
-
-            // Any target outside the envelope means the frame is wrong, not that one move is unlucky -
-            // emit nothing rather than hand the operator a program that alarms at best and crashes into a
-            // hard stop at worst. Losing the 3D preview is the cheap failure here.
-            if (!inEnvelope)
-                return new List<string>();
-
-            return lines;
-        }
-
-        // "G0 X<cx> Y<cy> Z<cz>" rapid to the envelope centre, in WORK coordinates, or null if no travel.
-        private string BuildAbsoluteAnchor(double[] workOffset, ref bool inEnvelope)
-        {
-            if (_center == null)
-                return null;
-            var sb = new StringBuilder("G0");
-            bool any = false;
-            for (int i = 0; i < _center.Length; i++)
-                if (!double.IsNaN(_center[i]))
-                {
-                    if (!WithinEnvelope(i, _center[i]))
-                        inEnvelope = false;
-                    sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i] - workOffset[i]));
-                    any = true;
-                }
-            return any ? sb.ToString() : null;
-        }
-
-        // Convert one relative (G91) test move into an absolute (G90) move: each axis word becomes
-        // centre + relative; arc-centre offsets (I/J/K), radius (R) and the motion word (Gn) pass through
-        // unchanged (they are frame-independent). Axes without a known centre (e.g. rotary, no travel) are
-        // emitted as-is, which is correct when the axis starts at zero.
-        private static readonly System.Text.RegularExpressions.Regex WordRx =
-            new System.Text.RegularExpressions.Regex(@"([A-Za-z])\s*([-+]?[0-9]*\.?[0-9]+)");
-
-        private string ToAbsolute(string relCode, double[] workOffset, ref bool inEnvelope)
-        {
-            var sb = new StringBuilder();
-            foreach (System.Text.RegularExpressions.Match m in WordRx.Matches(relCode))
-            {
-                char letter = char.ToUpperInvariant(m.Groups[1].Value[0]);
-                int axis = AxisLetterToIndex(letter);
-                if (sb.Length > 0) sb.Append(' ');
-                if (axis >= 0 && _center != null && axis < _center.Length && !double.IsNaN(_center[axis]))
-                {
-                    double rel = double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    double machineTarget = _center[axis] + rel;
-                    if (!WithinEnvelope(axis, machineTarget))
-                        inEnvelope = false;
-                    sb.Append(letter).Append(Num(machineTarget - workOffset[axis]));
-                }
-                else
-                    sb.Append(letter).Append(m.Groups[2].Value);   // Gn / I / J / K / R / centre-less axis
-            }
-            return sb.ToString();
-        }
-
-        private static int AxisLetterToIndex(char letter)
-        {
-            switch (letter)
-            {
-                case 'X': return 0; case 'Y': return 1; case 'Z': return 2;
-                case 'A': return 3; case 'B': return 4; case 'C': return 5;
-                case 'U': return 6; case 'V': return 7; case 'W': return 8;
-                default: return -1;
-            }
-        }
-
-        // Remove a trailing feed word ("... F500") so the move uses the job's fast modal feed instead.
-        private static string StripFeed(string code)
-        {
-            int f = code.IndexOf(" F");
-            return f >= 0 ? code.Substring(0, f) : code;
-        }
-
-        /// <summary>
-        /// Load a set of g-code lines into a program (and, for the loaded job, the 3D view) as a runnable
-        /// program - the same New/Add/End path g-code generators use. Returns the line count loaded.
-        /// The program is passed in rather than taken from a global: Core has no "the loaded program"
-        /// singleton (see GCodeProgram), so the host supplies the one it wants filled.
-        /// </summary>
-        public int LoadProgram(GCodeProgram program, List<string> lines, string name)
-        {
-            if (program == null || lines == null || lines.Count == 0)
-                return 0;
-
-            try
-            {
-                program.AddBlock(name, Action.New);
-                foreach (var line in lines)
-                    program.AddBlock(line);
-                program.AddBlock("", Action.End);
-                return lines.Count;
-            }
-            catch { return 0; }
-        }
+        // NOTE: this class used to also assemble a runnable "Validate - passed moves" program from the
+        // motion tests that passed, and the host loaded it ready for Cycle Start. That is GONE, deliberately.
+        // It commanded real motion at rapid and was wrong three separate ways, each hidden behind the last:
+        // the envelope centre assumed every axis ran negative; the program declared G54/G90 but was filled
+        // with MACHINE coordinates; and it never established an arc distance mode, inheriting whatever
+        // G90.1/G91.1 the run happened to leave behind - so its own G2/G3 lines could be reinterpreted
+        // against an absolute arc centre. The last of those put a real machine into its front right corner
+        // at full speed. Reporting which g-code a controller accepts does not require driving the machine,
+        // so this class no longer generates motion of any kind outside check mode.
 
         // Build the capability-tailored test. Gated blocks are emitted only when the controller
         // reports the matching capability so unsupported features are not tested (and so cannot be
