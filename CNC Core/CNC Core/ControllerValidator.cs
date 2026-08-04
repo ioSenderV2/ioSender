@@ -493,6 +493,20 @@ namespace CNC.Core
         // The travel for an axis ($13x), as a positive magnitude (0 if not configured).
         private static double AxisTravel(int axis) { return System.Math.Abs(GrblSettings.GetDouble((GrblSetting)((int)GrblSetting.MaxTravelBase + axis))); }
 
+        // Which side of machine zero an axis's travel lies on. THE SAME RULE THE JOG CLAMP USES
+        // (JogController.BuildCommand) - deliberately, because that one is proven on real machines:
+        // with $22 bit 3 (ForceSetOrigin) an axis homing toward its $23 direction runs 0..+MaxTravel,
+        // every other case runs 0..-MaxTravel.
+        // Getting this wrong is not cosmetic. It used to assume every axis was negative, so on a machine
+        // that homes ANY axis to the min end the very first anchor targeted a coordinate outside the
+        // envelope and check mode - which DOES enforce soft limits - threw Alarm:2 before a single
+        // feature was tested. Observed on a machine reporting MPos X:+751 with Y/Z negative.
+        private static double EnvelopeCentre(int axis, double travel)
+        {
+            bool positive = GrblInfo.ForceSetOrigin && GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis));
+            return positive ? travel / 2.0 : -travel / 2.0;
+        }
+
         // Size the motion-test moves to the machine: big enough to see in the 3D view (~100 mm) but
         // bounded to ~a quarter of the smallest travel so a centred excursion always stays in soft
         // limits. Build the G53 anchor that parks the planned position at the envelope centre.
@@ -519,7 +533,7 @@ namespace CNC.Core
                 double tr = AxisTravel(i);
                 if (tr > 0.0)
                 {
-                    _center[i] = -tr / 2.0;
+                    _center[i] = EnvelopeCentre(i, tr);
                     sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i]));
                     any = true;
                 }
