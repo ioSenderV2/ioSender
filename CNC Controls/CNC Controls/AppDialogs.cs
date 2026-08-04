@@ -46,9 +46,14 @@ namespace CNC.Controls
         /// The window a dialog should be owned by, or null if the main window is not shown yet (the owner
         /// overload requires a non-null window, so callers fall back to the ownerless one).
         /// An owned dialog centres on its owner and is forced ABOVE it. That second part is the point:
-        /// without an owner a modal box can end up BEHIND a Topmost window - the floating run-control panel
-        /// is Topmost and is up for the whole of a macro run - and a hidden modal box blocks the app and
-        /// looks exactly like a hang. Hence preferring a visible Topmost auxiliary window over the main one.
+        /// without an owner a modal box can end up BEHIND a Topmost window, and a hidden modal box blocks
+        /// the app and looks exactly like a hang. Hence preferring a visible Topmost auxiliary window over
+        /// the main one. The live case is MacroProcessor's own hold prompt, which is deliberately Topmost so
+        /// it stays visible while the operator jogs - a message raised while one is up (an alarm abort, a
+        /// failed WAITIDLE, a load error) would otherwise open behind it. (The commit that moved this here
+        /// cited the floating run-control panel instead; that panel was retired when the run control moved to
+        /// the fixed bottom bar - MacroProcessor.RunControlPanel is now declared, never set and never
+        /// invoked. The hazard is real, the example was stale.)
         /// Moved up from MacroProcessor so every prompt gets it, including the ones CNC.Core raises through
         /// UserPrompt (which went to the ownerless overload until now).
         /// </summary>
