@@ -121,7 +121,7 @@ namespace CNC.Controls
             // the single point every load funnels through (GCodeJob.FileChanged), so callers (e.g. touch-plate
             // probing's edge-radius compensation, CarveView's 3D carve simulation) never need to re-scan the
             // program themselves.
-            GCodeProgramComments.Refresh();
+            GCodeProgramComments.Refresh(Data);
 
             if (Model != null)
             {

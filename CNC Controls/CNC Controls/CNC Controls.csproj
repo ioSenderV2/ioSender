@@ -93,7 +93,6 @@
     <Compile Include="LayoutModel.cs" />
     <Compile Include="LayoutSection.cs" />
     <Compile Include="Fixture.cs" />
-    <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />

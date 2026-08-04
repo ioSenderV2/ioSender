@@ -426,13 +426,13 @@ namespace CNC.Controls.Probing
                     LatchDistance = value.LatchDistance;
                     // Touch plate: a fixed "bit diameter" doesn't belong to the PLATE, it belongs to whatever
                     // tool happens to be in the spindle - so prefer the loaded program's own (TOOL T=n D=d ...)
-                    // comment for the CURRENT tool (CNC.Controls.GCodeProgramComments, refreshed on Load
+                    // comment for the CURRENT tool (CNC.Core.GCodeProgramComments, refreshed on Load
                     // File/Load Folder) over the stored value, which is now just a fallback for when that's
                     // unavailable (no program loaded, or its comments don't mention this tool number).
                     double? liveDiameter = null;
                     if (value.ProbeType == ProbeType.TouchPlate && _grblmodel != null &&
                         int.TryParse(_grblmodel.Tool, out int currentTool))
-                        liveDiameter = CNC.Controls.GCodeProgramComments.DiameterFor(currentTool);
+                        liveDiameter = CNC.Core.GCodeProgramComments.DiameterFor(currentTool);
                     ProbeDiameter = liveDiameter ?? value.ProbeDiameter;
                     XYClearance = value.XYClearance;
                     ProbeOffsetX = value.ProbeOffsetX;

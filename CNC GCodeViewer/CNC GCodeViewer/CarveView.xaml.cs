@@ -38,7 +38,7 @@ namespace CNC.Controls.Viewer
         private const int ShapeFlat = 0, ShapeBall = 1, ShapeVbit = 2;
 
         // Cutter geometry per tool number and declared stock size now come from the shared
-        // CNC.Controls.GCodeProgramComments parser (rebuilt once per completed Load File/Load Folder) instead
+        // CNC.Core.GCodeProgramComments parser (rebuilt once per completed Load File/Load Folder) instead
         // of a private copy of the same (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) / (STOCK X=.. Y=.. Z=..)
         // regexes - drives the carve radius + cone and the stock block size.
         private double defaultToolRadius = 3d;
@@ -346,7 +346,7 @@ namespace CNC.Controls.Viewer
                             case Commands.M61:
                                 if (a.Token is GCToolSelect ts)
                                 {
-                                    var ti = CNC.Controls.GCodeProgramComments.For(ts.Tool);
+                                    var ti = CNC.Core.GCodeProgramComments.For(ts.Tool);
                                     if (ti.HasValue)
                                     {
                                         curRad = Math.Max(ti.Value.Diameter / 2d, 0.1d);
@@ -412,7 +412,7 @@ namespace CNC.Controls.Viewer
             Grow(b);
         }
 
-        // Both tool geometry and declared stock size now come from the shared CNC.Controls.GCodeProgramComments
+        // Both tool geometry and declared stock size now come from the shared CNC.Core.GCodeProgramComments
         // parser (already rebuilt by the time this runs - it's refreshed synchronously on the same Load
         // File/Load Folder completion this view's poll-on-render eventually notices), no local re-scan needed.
         // defaultToolRadius is the lowest-numbered tool's radius (used before the first tool change and for
@@ -423,13 +423,13 @@ namespace CNC.Controls.Viewer
             defaultToolShape = ShapeFlat;
             defaultToolAngle = 0d;
 
-            var stock = CNC.Controls.GCodeProgramComments.Stock;
+            var stock = CNC.Core.GCodeProgramComments.Stock;
             stockX = stock?.X ?? 0d;
             stockY = stock?.Y ?? 0d;
             stockZ = stock?.Z ?? 0d;
 
             int lowest = int.MaxValue;
-            foreach (var kv in CNC.Controls.GCodeProgramComments.All)
+            foreach (var kv in CNC.Core.GCodeProgramComments.All)
                 if (kv.Key < lowest)
                 {
                     lowest = kv.Key;
