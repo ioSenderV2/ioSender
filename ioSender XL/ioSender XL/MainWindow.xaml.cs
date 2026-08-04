@@ -63,7 +63,7 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
-        private const string legacyVersion = "2.39";
+        private const string legacyVersion = "2.40";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
 
