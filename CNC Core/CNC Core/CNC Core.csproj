@@ -57,10 +57,9 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="websocket-sharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
-    </Reference>
+    <!-- websocket-sharp is GONE from Core: WebsocketStream now uses System.Net.WebSockets.ClientWebSocket,
+         which is in the framework on both net462 and net8.0. CNC.Controls keeps its own reference for
+         ObsBridge (OBS Studio's protocol, client functionality). Don't add it back here. -->
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />

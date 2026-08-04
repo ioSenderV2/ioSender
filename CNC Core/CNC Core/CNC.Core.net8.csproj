@@ -23,11 +23,11 @@
     <BaseOutputPath>bin\net8probe\</BaseOutputPath>
     <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
     <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0067</NoWarn>   <!-- pre-existing unused-variable noise -->
-    <!-- USEWEBSOCKET is NOT defined: websocket-sharp is an unmaintained net462-only binary, so the
-         WebsocketStream body stays out. That is the one remaining portability debt in CNC.Core, and
-         unlike ObsBridge (which moved to CNC.Controls, being client functionality) it is a genuine
-         server concern - a controller transport - so it needs a real fix: System.Net.WebSockets. -->
-    <DefineConstants>TRACE</DefineConstants>
+    <!-- USEWEBSOCKET IS defined here, and that is the point: WebsocketStream was ported off
+         websocket-sharp (an unmaintained net462-only binary) onto System.Net.WebSockets.ClientWebSocket,
+         so the controller's websocket transport now compiles for net8.0 like the rest of Core. It was
+         the last portability debt. If this ever has to come back out, the port regressed. -->
+    <DefineConstants>TRACE;USEWEBSOCKET</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

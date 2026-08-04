@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Proves the ported WebsocketStream RUNS, not just that it compiles - the lesson this branch has now
+    learned twice (WPF-free + green cross-target compile, and Core still crashed on line 1 of a headless
+    run; DllImport compiles on any target and only fails when called).
+
+    WebsocketStream was ported off websocket-sharp onto System.Net.WebSockets.ClientWebSocket. That swap
+    changes the read path from an event callback to an explicit receive loop and the write path from a
+    synchronous Send to a blocked SendAsync, so the things worth testing are framing, partial-message
+    reassembly, write lengths, and the reconnect wiring.
+
+    This host stands up a real websocket server on loopback (HttpListener) and drives the real
+    WebsocketStream against it. No controller and no network hardware needed - which matters, because
+    grblHAL's websocket transport needs a networked controller that is not always to hand.
+
+    dotnet run (project tools/websocket-probe)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>websocketprobe</AssemblyName>
+    <RootNamespace>WebsocketProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+  </ItemGroup>
+
+</Project>
