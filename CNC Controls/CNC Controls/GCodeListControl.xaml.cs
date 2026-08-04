@@ -86,6 +86,7 @@ namespace CNC.Controls
             grdGCode.DataContext = list;
             ApplyGrouping(_program == null && ((DataContext as GrblViewModel)?.HasOutline ?? false));
             RefreshSourceHighlight();
+            RefreshDataColumnWidth();   // swapping the bound collection is a row change like any other
         }
 
         // Block column = a continuous program line-number sequence: jump to an explicit N word when a line carries
@@ -261,21 +262,46 @@ namespace CNC.Controls
                 ApplyGrouping(_program == null && (DataContext as GrblViewModel).HasOutline);
             }
             RefreshSourceHighlight();
+
+            // Rows can appear WITHOUT a file load: Work Order's Run pushes its generated program straight
+            // into the bound collection, and the wizards call SetProgram. Neither toggles IsLoading, so the
+            // recalculation below never ran on those paths and the Data column stayed a stub until the user
+            // nudged a column splitter. ItemContainerGenerator raises this however the items change and
+            // whichever collection is bound, so this one hook covers the file load, the Work Order handoff,
+            // SetProgram, and the empty-at-startup case that the Loaded call alone could never fix.
+            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => RefreshDataColumnWidth();
+
             RefreshDataColumnWidth();
         }
+
+        private bool _widthRefreshPending = false;
 
         // Known WPF DataGrid quirk: a Width="*" column (the Data column here) can compute far narrower than
         // its actual share on a layout pass with no/few realized rows - especially combined with row
         // virtualization - and only corrects itself once something forces a star-width recalculation (e.g.
         // the user dragging a column splitter). Toggling the width off Star and back forces that
-        // recalculation. Called on control Loaded AND every time a file finishes loading (IsLoading ->
-        // false below) - at UserControl_Loaded time the grid is still empty (no file loaded yet), so that
-        // alone isn't enough; the recalculation has to run again once real rows exist to measure against.
+        // recalculation.
+        //
+        // Deferred to Loaded priority because WHEN it runs is the whole point: run it inline and it measures
+        // the same not-yet-realized grid that caused the problem in the first place, which is exactly why the
+        // UserControl_Loaded call never fixed the collapsed-at-startup case. Posting it behind the layout
+        // pass means there are real rows and a real viewport width to measure against.
+        //
+        // The pending flag collapses a burst (ItemsChanged can fire repeatedly for one logical change) into a
+        // single recalculation instead of queueing one dispatcher operation per notification.
         private void RefreshDataColumnWidth()
         {
-            var dataColumn = grdGCode.Columns[2];
-            dataColumn.Width = new DataGridLength(0);
-            dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            if (_widthRefreshPending)
+                return;
+            _widthRefreshPending = true;
+
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                _widthRefreshPending = false;
+                var dataColumn = grdGCode.Columns[2];
+                dataColumn.Width = new DataGridLength(0);
+                dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
