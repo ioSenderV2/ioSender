@@ -1,4 +1,4 @@
-﻿/*
+/*
  * MainWindow.xaml.cs - part of ioSender
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -342,7 +342,7 @@ namespace GCode_Sender
                     if (e.PropertyName == nameof(GrblViewModel.FileName))
                         OnJobFileChanged((DataContext as GrblViewModel)?.FileName);
                     else if (e.PropertyName == nameof(GrblViewModel.GrblState))
-                        UpdateConnectionGatedTabs();   // enable operational tabs on connect, disable on disconnect
+                        UpdateConnectionGatedViews();  // enable operational tabs AND menu entries on connect
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
@@ -900,7 +900,7 @@ namespace GCode_Sender
             BuildMacroMenuItems();
 
             // Set the initial connection-gated tab state (Start Job etc. disabled until connect).
-            UpdateConnectionGatedTabs();
+            UpdateConnectionGatedViews();
 
             // Land on the Job (GRBL) tab. It is always enabled, and its Activate runs the controller handshake
             // (Controller.Restart -> OnBooted -> InitSystem -> $I: EXPR/ENUMS/ATC/WCSROT) and manages status
@@ -2567,7 +2567,13 @@ namespace GCode_Sender
         // Enable/disable the connection-gated tabs (descriptor EnabledWhenDisconnected == false) as the controller
         // connects/disconnects. Only acts on a change of connection so it doesn't fight the JobRunning enable rules
         // during a job (a job never spans a connect transition). Idempotent; safe to call from the state handler.
-        private void UpdateConnectionGatedTabs()
+        // Named "views", not "tabs": a connection-gated view can live on the tab bar OR in a menu, and the
+        // two must flip together. They did not - UpdateConnectionGatedMenuItems existed but had no caller,
+        // so SD Card / Probing / Height Map / Lathe Tools were built disabled (IsEnabled =
+        // EnabledWhenDisconnected) and nothing ever switched them on: greyed out and unclickable with the
+        // machine connected and idle (confirmed on hardware 2026-08-04). Calling it from here is what keeps
+        // the two paths from drifting apart again.
+        private void UpdateConnectionGatedViews()
         {
             bool connected = Comms.com != null && Comms.com.IsOpen;
             if (connected == _connGatedTabsOn)
@@ -2583,6 +2589,8 @@ namespace GCode_Sender
                 if (d != null && !d.EnabledWhenDisconnected)
                     tab.IsEnabled = connected;
             }
+
+            UpdateConnectionGatedMenuItems(connected);
         }
 
         public static void ShowView(bool show, ViewType view)
@@ -2635,7 +2643,7 @@ namespace GCode_Sender
             // enabledWhenDisconnected: which tabs are usable before a controller connects. Job stays on for
             // offline g-code load/preview; Settings/Tools/Machine Setup are config/setup work. The operational
             // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
-            // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
+            // disabled until connect and re-enabled by UpdateConnectionGatedViews on the connect transition.
             // --- the main tab bar: the three views used while a job is actually being run ---
             TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
@@ -2831,7 +2839,7 @@ namespace GCode_Sender
         }
 
         // Enable/disable the menu-hosted views on the connect transition, the same way
-        // UpdateConnectionGatedTabs does for the tabs that remain in the bar.
+        // UpdateConnectionGatedViews does for the tabs that remain in the bar. Called from there, never alone.
         private void UpdateConnectionGatedMenuItems(bool connected)
         {
             foreach (var menu in new[] { menuFile, menuTools })
