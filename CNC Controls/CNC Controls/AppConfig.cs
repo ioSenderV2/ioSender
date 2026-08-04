@@ -2047,7 +2047,23 @@ namespace CNC.Controls
             // The stream classes take a portable SynchronizationContext, not a Dispatcher (CNC.Core is
             // being made WPF-free for a .NET 8 server). DispatcherSynchronizationContext is exactly the
             // dispatcher's own context, so replies still marshal to this UI thread as they always did.
-            var syncContext = new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher);
+            //
+            // Input, NOT the default Normal - this is a SAFETY property, not a tuning knob.
+            // A DispatcherSynchronizationContext posts at DispatcherPriority.Normal (9); WPF delivers user
+            // input at Input (5). A job dense enough to keep the reply stream saturated therefore starves
+            // every click and keypress for as long as it runs - INCLUDING Feed Hold. Confirmed on real
+            // hardware 2026-08-04: a 6282-line chamfer job held the planner full (Bf:0) for 25 s straight,
+            // the operator pressed Feed Hold seconds in, and the hold byte did not reach the controller
+            // until 0.85 s AFTER the job had already finished and the reply flood drained. Reproduced
+            // exactly in a dispatcher harness: with replies at Normal an Input-priority callback never ran
+            // across 3000 replies; at Input it ran after the first one.
+            // The latency this costs at the machine is nil - the planner buffer is what absorbs sender
+            // scheduling, and it was 100 blocks ahead for that entire run.
+            // Input (5) is deliberately still ABOVE Background (4): EventUtils.DoEvents pushes a frame that
+            // exits at Background, so replies must outrank that or the blocking handshakes stop being
+            // pumped - the priority trap that broke connect in 2938371.
+            var syncContext = new System.Windows.Threading.DispatcherSynchronizationContext(
+                dispatcher, System.Windows.Threading.DispatcherPriority.Input);
 
             EnsureSimulatorRunning();   // launch the bundled simulator first if the saved target is it
 #if USEWEBSOCKET
