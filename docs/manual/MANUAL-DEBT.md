@@ -192,14 +192,23 @@ console off **Esc** onto **F12**.
       rules + search-owner naming (written when #212/#209 shipped), `#jogging` go-to-buttons checkbox,
       and the **F12** console key in `#job`.
 
-### Screenshots to reshoot/add — NOT DONE
-Placeholders are in the page, so they show as grey boxes until shot.
-- [ ] **New: the main window with the Tools menu open** (`#getting-started`) — four-tab strip visible
-      behind it, menu listing Camera / SD Card / Feeds and Speeds / Probing / Height Map / Lathe Tools.
-- [ ] **New: Settings → User Interface → Top-level tabs** (`#settings`) — the placement rows with a
-      destination dropdown open (Tab bar / File menu / Tools menu / Not shown).
-- [ ] Carried over from the #197–#208 batch, still owed: **Work Order Surface toolpath** (`#work-order`)
-      and **Machine Setup → 8 · Calibration → Stepper** (`#machine-setup`).
+### Screenshots — mostly DONE 2026-08-04
+Shot with `build.ps1 -default-config -Shot <name>`, so they match a fresh install rather than this
+box's saved layout; the script files the capture when you quit the app.
+- [x] `main-window-tools-menu.png` (`#getting-started`) — Tools menu open over the tab strip. Setup sits
+      *behind* the open menu (unavoidable: the menu drops from directly above it), and the menu is short
+      because Camera needs a bound device and the tool/tuner entries need a controller that has them —
+      both now said in the caption rather than pretended away.
+- [x] `settings-top-level-tabs.png` (`#settings`) — placement rows with the Offsets dropdown open on all
+      four destinations. Doubles as proof Settings opens in its own window.
+- [x] `work-order-composition.png` (`#work-order`) — **replaces the planned Surface shot as the lead
+      figure**, per the user: a real five-toolpath, fifteen-operation work order says far more than a
+      spoilboard pass. The old `work-order.png` moved down to sit beside Generate.
+- [x] `machine-setup-calibration.png` (`#machine-setup`) — **Z stepper via a 1-2-3 block, NOT a fixture.**
+      The planned caption was wrong: a default config has no fixture *by design* (a fixture is a validated
+      known position), and Z stepper calibration never needed one.
+- [ ] **Still owed: Work Order Surface toolpath** with Entire Spoilboard ticked (`#work-order`) — its
+      placeholder is still in the page, under "Surfacing the spoilboard".
 - [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
       the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
       window chrome in the shot doesn't misrepresent where they live.
