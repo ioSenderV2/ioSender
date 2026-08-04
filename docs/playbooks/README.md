@@ -14,9 +14,8 @@ matching memory file keeps its context and just points here.
 | [add_changelog_entry.md](add_changelog_entry.md) | Add a `#N` entry to the Overview.html changelog (the 4 places + HTML skeleton) |
 | [regenerate_overview_pdf.md](regenerate_overview_pdf.md) | Rebuild Overview.pdf from Overview.html (headless Edge, fresh profile) |
 | [end_of_session_wrapup.md](end_of_session_wrapup.md) | The full end-of-session sequence, in order |
-| [capture_conversation_log.md](capture_conversation_log.md) | Export this session's conversation to styled HTML |
-| [build_commit_test_loop.md](build_commit_test_loop.md) | The kill→debug+launch→release-verify→commit loop |
-| [turn_workflow_loop.md](turn_workflow_loop.md) | The default per-turn loop: prompt→iterate→build+launch→user tests (no `-testserver` on real HW)→commit; push deferred to end-of-session |
+| [capture_conversation_log.md](capture_conversation_log.md) | Export this session's conversation to styled HTML — **extends the shared playbook in `claude-hub`**, where the tooling now lives |
+| [turn_workflow_loop.md](turn_workflow_loop.md) | **The turn loop — canonical, hook-enforced.** prompt→plan→implement→commit as you go→final build+launch→hand off. The single source of truth; nothing else describes this loop |
 | [headless_build.md](headless_build.md) | Build (and optionally launch) with build.ps1, no VS GUI |
 | [publish_manual_site.md](publish_manual_site.md) | Push docs/manual to the live gh-pages site |
 | [wire_in_video.md](wire_in_video.md) | Attach a produced video to a manual topic + repoint Help |
@@ -35,7 +34,7 @@ matching memory file keeps its context and just points here.
 - **Paths** are relative to the repo root `c:\github\ioSender` unless absolute.
 - Replace `<...>` placeholders before running.
 - Scripts referenced here (`build.ps1`, `tools/locadd.py`, `docs/manual/publish-pages.ps1`,
-  `tools/effort/convo-sessions.ps1`, `docs/demo-videos/README.md`) live in the repo and are the
+  `docs/demo-videos/README.md`) live in the repo and are the
   authoritative implementation — the playbook is the invocation guide + gotchas.
 - The mechanical procedures are now one-command scripts (playbook = invocation note):
   `tools/push-all.ps1` (push to both remotes), `tools/regen-overview-pdf.ps1` (PDF regen),

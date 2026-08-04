@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MachineSetupWizard.xaml.cs - part of CNC Controls library
  *
  * Machine Setup Wizard: a single-page configuration of the machine-description grbl settings
@@ -16,6 +16,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -109,7 +110,7 @@ namespace CNC.Controls
 
     #endregion
 
-    public partial class MachineSetupWizard : UserControl, IGrblConfigTab
+    public partial class MachineSetupWizard : UserControl, IGrblConfigTab, ISettingsPageProvider
     {
         private GrblViewModel model = null;
         private bool _subscribed = false;
@@ -122,18 +123,12 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
-            // Make each step tab bindable to a key (badge + right-click menu). AttachTabBinding re-parents the
-            // existing header - for the six steps that is the named, colour-coded TextBlock (hdrMachine ...),
-            // which keeps working because RefreshStepColors holds it by field reference, not via TabItem.Header.
-            TabKeyBinder.AttachTabBinding(tabStepOverview, "Tab.MachineSetup.Overview");
-            TabKeyBinder.AttachTabBinding(tabStepMachine, "Tab.MachineSetup.Machine");
-            TabKeyBinder.AttachTabBinding(tabStepHome, "Tab.MachineSetup.Home");
-            TabKeyBinder.AttachTabBinding(tabStepAxis, "Tab.MachineSetup.Axis");
-            TabKeyBinder.AttachTabBinding(tabStepHoming, "Tab.MachineSetup.Homing");
-            TabKeyBinder.AttachTabBinding(tabStepProbes, "Tab.MachineSetup.Probes");
-            TabKeyBinder.AttachTabBinding(tabStepFixtures, "Tab.MachineSetup.Fixtures");
-            TabKeyBinder.AttachTabBinding(tabStepMacros, "Tab.MachineSetup.Macros");
-            TabKeyBinder.AttachTabBinding(tabStepSimulator, "Tab.MachineSetup.Simulator");
+            // The step tabs used to be made bindable to a key here (TabKeyBinder.AttachTabBinding adds a
+            // shortcut badge and a right-click bind menu to the tab header). The step tab strip no longer
+            // renders - the steps are nodes in the navigation tree - so that UI was unreachable. Dropped
+            // deliberately (user, 2026-08-03); AppConfig.ApplyOneTimeFixups strips shortcuts already
+            // persisted against these ids. Top-level tabs, Probing and the Lathe wizards still have real
+            // tab strips and keep theirs.
 
             model = DataContext as GrblViewModel;
             DataContextChanged += (s, e) => { if (DataContext is GrblViewModel) model = (GrblViewModel)DataContext; };
@@ -146,6 +141,8 @@ namespace CNC.Controls
 
             // Step 6 hosts the fixture library inline, same pattern as Probes. Starts empty (no prepopulation).
             grdFixtures.ItemsSource = Fixtures.Items;
+
+            UpdateTloRefValueDisplay();
 
             // Colour the step tabs from the start - incomplete steps show red immediately, before any load.
             RefreshStepColors();
@@ -181,7 +178,15 @@ namespace CNC.Controls
 
         // Per-step completeness for the startup setup gate. Returns the first step (1-6) not yet satisfied,
         // or 0 when fully set up. All checks read live controller/app state populated on connect ($$, $I).
-        public static int FirstIncompleteStep()
+        // hardGateOnly=true is the STARTUP gate's own check (MainWindow.ForceMachineSetupIfNeeded) - only
+        // steps 1-4 (machine identity/homing/axis/limits) block the app from opening at all, since the
+        // machine genuinely can't be jogged or run anything without them. Steps 5 (probe definitions, now
+        // seeded with generic defaults on a fresh install - ProbeDefinitions.SetItems) and 7 (ATC macros)
+        // are real requirements too, but only for probing/ATC-dependent work specifically - they're deferred
+        // to a readiness check when Start Job or Odd Jobs Setup is actually opened (StartJobView's own
+        // check), not forced on every startup. Every OTHER caller (tab coloring, IsSetupComplete, etc.) keeps
+        // checking all steps via the false default.
+        public static int FirstIncompleteStep(bool hardGateOnly = false)
         {
             // Can't judge the machine until the controller has reported version + settings ($I/$$). Returning
             // 0 (complete) here means a not-yet-ready / transient state never fires the setup gate.
@@ -206,6 +211,9 @@ namespace CNC.Controls
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1 &&
                 GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) != 1)
                 return 4;
+
+            if (hardGateOnly)
+                return 0;
 
             // 5 - Probe definitions: at least one defined (Load Stock / probing need it).
             if (ProbeDefinitions.Items.Count == 0)
@@ -269,6 +277,107 @@ namespace CNC.Controls
 
         // Drill into a setup step from a "Tab.MachineSetup.*" keyboard shortcut (via the host's ITabBindingHost).
         // Returns false (no change) when the step tab is not present.
+        // ---- navigation pages (docs/Architecture-Settings-Nav-Overhaul.md) ----------------------
+        // The wizard's step tabs (and the Calibration step's own two sub-tabs) are nodes in the Machine
+        // Setup tree now. The wizard is NOT taken apart: it stays one control with every x:Name and every
+        // selection hook intact, and ShowPage() just drives the underlying TabControls - so
+        // Steps_SelectionChanged / Calibration_SelectionChanged keep firing exactly as before.
+
+        // Must match the Calibration page's own Key exactly - the host looks the parent up by key, and a
+        // near-miss fails silently by dropping the children at top level instead of under the heading.
+        public const string CalibrationCategoryKey = "Tab.MachineSetup.Calibration";
+
+        // The nav key of whatever step is selected right now, so the host can mirror a selection the
+        // wizard made itself (GoToStep from the startup setup gate) back into the tree.
+        public string SelectedStepKey()
+        {
+            var tab = tabSteps?.SelectedItem as TabItem;
+            if (tab == null)
+                return null;
+            if (tab == tabStepOverview) return "Tab.MachineSetup.Overview";
+            if (tab == tabStepMachine) return "Tab.MachineSetup.Machine";
+            if (tab == tabStepHome) return "Tab.MachineSetup.Home";
+            if (tab == tabStepAxis) return "Tab.MachineSetup.Axis";
+            if (tab == tabStepHoming) return "Tab.MachineSetup.Homing";
+            if (tab == tabStepProbes) return "Tab.MachineSetup.Probes";
+            if (tab == tabStepFixtures) return "Tab.MachineSetup.Fixtures";
+            if (tab == tabStepMacros) return "Tab.MachineSetup.Macros";
+            if (tab == tabStepSimulator) return "Tab.MachineSetup.Simulator";
+            if (tab == tabStepCalibration)
+                return tabCalibration?.SelectedItem == tabCalSquareness
+                     ? "Tab.MachineSetup.CalSquareness" : "Tab.MachineSetup.CalStepper";
+            return null;
+        }
+
+        private static string Localized(string key, string fallback)
+        {
+            var s = LibStrings.FindResource(key);
+            return string.IsNullOrWhiteSpace(s) ? fallback : s;
+        }
+
+        // A step header is a plain string (Overview), the numbered colour-graded TextBlock, or - for every
+        // step that is bindable to a key - a TabHeaderControl WRAPPING one of those, because
+        // AttachTabBinding re-parents the original header into a wrapper carrying the shortcut badge and
+        // the right-click bind menu. Casting to TextBlock/string therefore came back empty for exactly the
+        // bound steps, which is why only the two calibration sub-tabs (not bindable) had labels.
+        // TabHeaderControl.ToString() returns its label for precisely this case.
+        private static string HeaderText(TabItem tab)
+        {
+            if (tab == null)
+                return string.Empty;
+
+            var tb = tab.Header as TextBlock;
+            if (tb != null)
+                return tb.Text;
+
+            var str = tab.Header as string;
+            if (!string.IsNullOrEmpty(str))
+                return str;
+
+            return tab.Header == null ? string.Empty : tab.Header.ToString();
+        }
+
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            var pages = new List<SettingsSubPage>
+            {
+                new SettingsSubPage("Tab.MachineSetup.Overview", HeaderText(tabStepOverview), this) { IndexRoot = tabStepOverview.Content as FrameworkElement },
+                new SettingsSubPage("Tab.MachineSetup.Machine", HeaderText(tabStepMachine), this) { IndexRoot = tabStepMachine.Content as FrameworkElement, Status = () => hdrMachine.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Home", HeaderText(tabStepHome), this) { IndexRoot = tabStepHome.Content as FrameworkElement, Status = () => hdrHome.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Axis", HeaderText(tabStepAxis), this) { IndexRoot = tabStepAxis.Content as FrameworkElement, Status = () => hdrAxis.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Homing", HeaderText(tabStepHoming), this) { IndexRoot = tabStepHoming.Content as FrameworkElement, Status = () => hdrHoming.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Probes", HeaderText(tabStepProbes), this) { IndexRoot = tabStepProbes.Content as FrameworkElement, Status = () => hdrProbes.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { IndexRoot = tabStepFixtures.Content as FrameworkElement, Status = () => hdrFixtures.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { IndexRoot = tabStepMacros.Content as FrameworkElement, Status = () => hdrMacros.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
+                new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper"), this)
+                    { IndexRoot = tabCalStepper.Content as FrameworkElement, Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
+                new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
+                    { IndexRoot = tabCalSquareness.Content as FrameworkElement, Parent = CalibrationCategoryKey },
+                new SettingsSubPage("Tab.MachineSetup.Simulator", HeaderText(tabStepSimulator), this)
+                    { IndexRoot = tabStepSimulator.Content as FrameworkElement, Status = () => hdrSimulator.Foreground, IsAvailable = () => tabStepSimulator.Visibility == Visibility.Visible }
+            };
+            return pages;
+        }
+
+        public void ShowPage(string key)
+        {
+            // Calibration's children select the Calibration step AND the matching sub-tab. Order matters:
+            // set the sub-tab first, so entering the step activates the right wizard rather than the
+            // previously selected one and then immediately switching.
+            if (key == "Tab.MachineSetup.CalStepper" || key == "Tab.MachineSetup.CalSquareness")
+            {
+                tabCalibration.SelectedItem = key == "Tab.MachineSetup.CalStepper" ? tabCalStepper : tabCalSquareness;
+                tabSteps.SelectedItem = tabStepCalibration;
+                return;
+            }
+            SelectSubTab(key);
+        }
+
+        // Raised whenever the per-step grading is recomputed, so the navigation tree can restate the
+        // status dots it took over from the (no longer rendered) tab headers.
+        public event EventHandler StepStatusChanged;
+
         public bool SelectSubTab(string id)
         {
             TabItem target;
@@ -282,6 +391,7 @@ namespace CNC.Controls
                 case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
                 case "Tab.MachineSetup.Fixtures": target = tabStepFixtures; break;
                 case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
+                case "Tab.MachineSetup.Calibration": target = tabStepCalibration; break;
                 case "Tab.MachineSetup.Simulator": target = tabStepSimulator; break;
                 default: target = null; break;
             }
@@ -323,7 +433,10 @@ namespace CNC.Controls
             SetStepColor(hdrProbes, StepStatusOf(5));
             SetStepColor(hdrFixtures, StepState.Complete);
             SetStepColor(hdrMacros, StepStatusOf(7));
+            SetStepColor(hdrCalibration, StepState.Complete);
             SetStepColor(hdrSimulator, StepState.Complete);
+
+            StepStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         // Colour only the tab's header text (not the tab body, which would make the descriptive text
@@ -420,6 +533,7 @@ namespace CNC.Controls
                 }
                 UpdateLimitState();
                 UpdateApplyState();
+                UpdateCalibrationStepAvailability();
                 // Deferred (2026-07-19 - "Machine Setup tab permanently unresponsive" investigation): this
                 // Activate(true) runs from MainWindow.TabMode_SelectionChanged, DURING the tab-switch's own
                 // layout pass (the newly-selected tab's content is being measured/arranged right now).
@@ -517,14 +631,39 @@ namespace CNC.Controls
         }
 
         // Persist the user's machine pick so it is restored next run (only for real user selections).
-        private void SaveSelectedMachine()
+        // The three dropdowns as the "Manufacturer|Product|Model" identity stored in LastMachine, or null when
+        // the picture is incomplete.
+        private string SelectedMachineId()
         {
             var mfr = cbxManufacturer.SelectedItem as MachineManufacturer;
             var prod = cbxProduct.SelectedItem as MachineProduct;
             var mdl = cbxModel.SelectedItem as MachineModel;
-            if (mfr == null || prod == null || mdl == null || AppConfig.Settings.Base == null)
+            return (mfr == null || prod == null || mdl == null) ? null : mfr.Name + "|" + prod.Name + "|" + mdl.Name;
+        }
+
+        /// <summary>
+        /// A machine is picked whose identity is not what LastMachine already holds - i.e. Apply still has
+        /// something to commit even if no $ setting would change.
+        ///
+        /// This distinction is the whole of a first-run deadlock found 2026-08-03. Apply used to be gated
+        /// purely on pending SETTINGS, and Apply_Click returned early on zero changes before it reached
+        /// SaveSelectedMachine - which is the only place LastMachine is ever written. On a machine whose
+        /// controller is already configured correctly, picking it produces no changes at all, so Apply stayed
+        /// greyed, the identity was never recorded, and the startup setup gate (which asks for exactly that
+        /// identity) re-armed on every launch with no way out.
+        /// </summary>
+        private bool MachineIdentityUnsaved()
+        {
+            string id = SelectedMachineId();
+            return id != null && id != (AppConfig.Settings.Base?.LastMachine ?? string.Empty);
+        }
+
+        private void SaveSelectedMachine()
+        {
+            string id = SelectedMachineId();
+            if (id == null || AppConfig.Settings.Base == null)
                 return;
-            AppConfig.Settings.Base.LastMachine = mfr.Name + "|" + prod.Name + "|" + mdl.Name;
+            AppConfig.Settings.Base.LastMachine = id;
             AppConfig.Settings.Save();
         }
 
@@ -604,6 +743,12 @@ namespace CNC.Controls
             if (_restoringSelection)
                 return;
             ApplyPreset(cbxModel.SelectedItem as MachineModel);
+
+            // Refresh Apply directly rather than relying on ApplyPreset's field edits to raise
+            // PropertyChanged: when the preset matches the controller exactly, NOTHING changes and no
+            // notification fires - which is precisely the case where picking the machine is the only thing
+            // Apply has left to commit. Without this the button stays greyed on the very machine that needs it.
+            UpdateApplyState();
         }
 
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
@@ -863,7 +1008,11 @@ namespace CNC.Controls
                 return;
             }
             BuildReview();
-            btnApply.IsEnabled = btnPreview.IsEnabled = Changes.Count > 0;
+            // Preview is about pending WRITES, so it stays tied to the change set. Apply also commits the
+            // machine identity, so it must stay live when that is all there is to commit - see
+            // MachineIdentityUnsaved for the deadlock that came of conflating the two.
+            btnPreview.IsEnabled = Changes.Count > 0;
+            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved();
         }
 
         // Preview the pending changes in a dialog (replaces the old inline expander).
@@ -931,6 +1080,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Save();
                 grdProbes.SelectedItem = def;
                 RefreshStepColors();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -954,6 +1104,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // type may have changed
                 ProbeDefinitions.Save();
                 grdProbes.Items.Refresh();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -967,6 +1118,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);
                 ProbeDefinitions.Save();
                 RefreshStepColors();
+                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -990,12 +1142,19 @@ namespace CNC.Controls
         {
             var def = new Fixture();
             var dlg = new FixtureEditDialog(def, model) { Owner = Window.GetWindow(this) };
-            if (dlg.ShowDialog() == true)
+            // Non-modal (Show, not ShowDialog) - Set/Test position needs the main window's jog pad and
+            // keyboard jogging reachable while this is open, which a modal dialog blocks entirely. The
+            // ShowDialog()-return-value idiom becomes a Closed handler instead.
+            dlg.Closed += (s, ev) =>
             {
-                Fixtures.Items.Add(def);
-                Fixtures.Save();
-                grdFixtures.SelectedItem = def;
-            }
+                if (dlg.Saved)
+                {
+                    Fixtures.Items.Add(def);
+                    Fixtures.Save();
+                    grdFixtures.SelectedItem = def;
+                }
+            };
+            dlg.Show();
         }
 
         private void FixtureEdit_Click(object sender, RoutedEventArgs e)
@@ -1012,12 +1171,17 @@ namespace CNC.Controls
 
             var edit = sel.Clone();
             var dlg = new FixtureEditDialog(edit, model) { Owner = Window.GetWindow(this) };
-            if (dlg.ShowDialog() == true)
+            // Non-modal - see FixtureAdd_Click's own comment.
+            dlg.Closed += (s, ev) =>
             {
-                sel.CopyFrom(edit);
-                Fixtures.Save();
-                grdFixtures.Items.Refresh();
-            }
+                if (dlg.Saved)
+                {
+                    sel.CopyFrom(edit);
+                    Fixtures.Save();
+                    grdFixtures.Items.Refresh();
+                }
+            };
+            dlg.Show();
         }
 
         private void FixtureDelete_Click(object sender, RoutedEventArgs e)
@@ -1043,6 +1207,68 @@ namespace CNC.Controls
 
             if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepSimulator)
                 Dispatcher.BeginInvoke((System.Action)RefreshSimulatorStep, System.Windows.Threading.DispatcherPriority.Background);
+
+            // Calibration step: activate/deactivate whichever of its two sub-tabs (stepper cal / squareness)
+            // is currently selected, mirroring how ToolsView used to Activate() its own sub-tabs. Deferred for
+            // the same reason as the macro/simulator refreshes above - these wizards pump the dispatcher.
+            if (e.OriginalSource == tabSteps)
+            {
+                if (e.RemovedItems.Count == 1 && e.RemovedItems[0] == tabStepCalibration)
+                {
+                    calibrationStepActive = false;
+                    ActivateSelectedCalibrationChild(false);
+                }
+                if (tabSteps.SelectedItem == tabStepCalibration)
+                {
+                    calibrationStepActive = true;
+                    UpdateCalibrationStepAvailability();
+                    Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
+                }
+            }
+        }
+
+        // True only while the Calibration step itself is the selected outer step - guards Calibration_
+        // SelectionChanged from activating a sub-tab on startup/layout before the user has ever navigated here.
+        private bool calibrationStepActive = false;
+
+        private void ActivateSelectedCalibrationChild(bool activate)
+        {
+            var tab = tabCalibration?.SelectedItem as TabItem;
+            if (tab == tabCalStepper)
+                calStepperWizard.Activate(activate);
+            else if (tab == tabCalSquareness)
+                calSquarenessWizard.Activate(activate);
+        }
+
+        // Switching between Stepper calibration / Squareness within the Calibration step - deactivate the
+        // outgoing sub-tab, activate the incoming one. Ignored while the Calibration step itself isn't the
+        // active outer step (this event also bubbles up to Steps_SelectionChanged, which filters it out there
+        // via e.OriginalSource, same pattern as the macros/simulator checks above).
+        private void Calibration_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.OriginalSource != tabCalibration || !calibrationStepActive)
+                return;
+
+            if (e.RemovedItems.Count == 1)
+            {
+                var removed = e.RemovedItems[0] as TabItem;
+                if (removed == tabCalStepper)
+                    calStepperWizard.Activate(false);
+                else if (removed == tabCalSquareness)
+                    calSquarenessWizard.Activate(false);
+            }
+            Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Stepper calibration (probe) needs a real 3D probe to do anything useful - grey its sub-tab out
+        // (not just its own Generate/Save buttons) when none is configured. Re-checked whenever the
+        // Calibration step is shown and whenever a probe is added/edited/deleted, so it reflects changes
+        // made on the Probe definitions step in the same session (mirrors ToolsView's old
+        // UpdateStepperCalProbeAvailability).
+        private void UpdateCalibrationStepAvailability()
+        {
+            if (tabCalStepper != null)
+                tabCalStepper.IsEnabled = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 
         private void RefreshMacroStatus()
@@ -1073,6 +1299,112 @@ namespace CNC.Controls
             }
             else
                 AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already
+        // uses for LS_X/LS_Y.
+        private static readonly System.Text.RegularExpressions.Regex rxTloRefZ =
+            new System.Text.RegularExpressions.Regex(@"TLOREF_Z\s*=\s*(-?\d+(?:\.\d+)?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private void UpdateTloRefValueDisplay()
+        {
+            double v = AppConfig.Settings.Base.TloRefBaseline;
+            txtTloRefValue.Text = v == 0d ? "Never referenced" : string.Format("Baseline: {0:0.0##} mm", v);
+        }
+
+        // Machine-wide TLO baseline (see the XAML comment on this section) - probes the puck exactly like
+        // tc.macro's own non-T8 (rigid tool, toolsetter input) branch, or its T8 (self-triggering 3D probe,
+        // main input) branch when the checkbox says a 3D probe is what's actually mounted right now - then
+        // stores the RAW machine-Z touch point as the baseline every job will load into #<_tlo_ref> at its own
+        // start. Uses the "Tool setter" probe definition's own feeds, not tc.macro's hardcoded F500/F25,
+        // matching every other probe move already threaded through a ProbeDefinition in this app.
+        private void ReferenceTlo_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter);
+            if (p == null)
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Define a Tool setter probe first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            bool probeInSpindle = chkTloRef3dProbe.IsChecked == true;
+            string searchF = p.ProbeFeedRate.ToInvariantString("0.0##"), latchF = p.LatchFeedRate.ToInvariantString("0.0##");
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - reference TLO at the puck)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm, ATC=1, G30, G59.3)");
+            b.AppendLine("G21 G90 G94 G17");
+            b.AppendLine("G49");
+            b.AppendLine("G53 G0 Z-5");
+            b.AppendLine("G59.3");
+            b.AppendLine("G0 X0 Y0");
+            b.AppendLine("G0 Z0");
+            // Main probe input (Q0) if a self-triggering 3D probe is actually in the spindle, else the
+            // toolsetter input (Q1) for a rigid/cutting tool relying on continuity through the puck - same
+            // convention tc.macro's own T8-vs-not branch uses.
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, probeInSpindle ? 0 : 1));
+            b.AppendLine("G91");
+            b.AppendLine(string.Format("G38.2 Z-90 F{0}", searchF));
+            b.AppendLine("G0 Z2");
+            b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
+            b.AppendLine("#<_probe_z> = #5063");
+            b.AppendLine("G0 Z10");
+            b.AppendLine("G90");
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
+            b.AppendLine("G53 G0 Z-5");
+            b.AppendLine("G53 G0 X#5181 Y#5182");
+            b.AppendLine("G53 G0 Z#5183");
+
+            double? captured = null;
+            PropertyChangedEventHandler zHandler = (s, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
+                    return;
+                var m = rxTloRefZ.Match(model.Message);
+                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+                    captured = v;
+            };
+            model.PropertyChanged += zHandler;
+
+            bool started = false;
+            PropertyChangedEventHandler doneHandler = null;
+            doneHandler = (s, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                if (!started)
+                {
+                    started = true;
+                    return;
+                }
+                var st = model.StreamingState;
+                if (st == StreamingState.Idle || st == StreamingState.NoFile || st == StreamingState.Stop)
+                {
+                    model.PropertyChanged -= doneHandler;
+                    model.PropertyChanged -= zHandler;
+                    bool alarmed = model.GrblState.State == GrblStates.Alarm;
+                    if (!alarmed && captured.HasValue)
+                    {
+                        AppConfig.Settings.Base.TloRefBaseline = captured.Value;
+                        AppConfig.Settings.Save();
+                        UpdateTloRefValueDisplay();
+                        model.Message = "TLO baseline referenced.";
+                    }
+                    else
+                        model.Message = "Reference TLO failed or alarmed - baseline not changed.";
+                }
+            };
+            model.PropertyChanged += doneHandler;
+
+            if (!MacroProcessor.Run(model, "Reference TLO", b.ToString(), true))
+            {
+                model.PropertyChanged -= doneHandler;
+                model.PropertyChanged -= zHandler;
+            }
         }
 
         // ---- Step 8: build a simulator matching this machine ----
@@ -1233,6 +1565,26 @@ namespace CNC.Controls
 
             if (Changes.Count == 0)
             {
+                // Nothing to WRITE - but the machine identity itself may still be uncommitted, and recording
+                // it is what satisfies the first-run setup gate. A controller that already holds exactly the
+                // right settings is the normal case for anyone setting ioSender up against a machine that was
+                // already working, so refusing outright here stranded them (see MachineIdentityUnsaved).
+                if (MachineIdentityUnsaved())
+                {
+                    SaveSelectedMachine();
+                    txtStatus.Text = "Machine recorded - the controller already had these settings.";
+                    if (model != null)
+                        model.Message = "Machine setup: machine recorded (settings already matched).";
+                    UpdateApplyState();
+                    // Explicitly, for the same reason Apply needed enabling by hand on this path: no setting
+                    // changed, so no PropertyChanged fires, so nothing else would repaint step 1's indicator -
+                    // it stayed red after being satisfied. RefreshStepColors raises StepStatusChanged, which
+                    // is what the navigation tree's dots listen to.
+                    RefreshStepColors();
+                    SetupApplied?.Invoke();
+                    return;
+                }
+
                 txtStatus.Text = "Nothing changed.";
                 if (model != null)
                     model.Message = "Machine setup: nothing changed.";
@@ -1580,6 +1932,9 @@ namespace CNC.Controls
             };
             close.Click += (s, ev) => win.Close();
             win.Closed += (s, ev) => _fwInfoWindow = null;
+            // Same non-modal + owned + ShowInTaskbar=false combination as FixtureEditDialog, so the same
+            // owner-minimized-on-close symptom applies here - see UIUtils.ActivateOwnerOnClose.
+            UIUtils.ActivateOwnerOnClose(win);
 
             _fwInfoWindow = win;
             win.Show();   // non-modal

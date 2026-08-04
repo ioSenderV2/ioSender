@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.MainPageEditor"
+﻿<UserControl x:Class="CNC.Controls.MainPageEditor"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -8,11 +8,29 @@
         d:DesignHeight="560" d:DesignWidth="580">
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <!-- "Unavailable" used to be a third tab. It is not a place you go to configure something, it
+             answers "why can't I see X?" - so it is a button above the lists rather than a nav node. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,4">
+            <Button x:Uid="btn_unavailable" x:Name="btnUnavailable" Content="Unavailable..." MinWidth="110"
+                    Padding="8,2" Click="btnUnavailable_Click"
+                    ToolTip="Components this controller does not offer, and why."/>
+        </StackPanel>
+
+        <TabControl x:Name="tabs" Grid.Row="1">
+            <!-- The tab strip is templated away: these pages are nodes in the settings navigation tree
+                 now, and a tab strip inside that tree is the exact nesting the overhaul removes. The
+                 TabControl is kept as the switcher so the editor stays one control with its hooks
+                 (PreviewKeyDown / Loaded / Unloaded) intact - see GetPages(). -->
+            <TabControl.Template>
+                <ControlTemplate TargetType="TabControl">
+                    <ContentPresenter ContentSource="SelectedContent"/>
+                </ControlTemplate>
+            </TabControl.Template>
             <TabItem x:Uid="tab_panels" Header="Panels">
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
@@ -23,6 +41,7 @@
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -30,38 +49,47 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Uid="txt_available" Grid.Column="0" Grid.Row="0" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstAvailable" x:Name="lstAvailable" Grid.Column="0" Grid.Row="1" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <!-- The jog pad is not one of the assignable panels: it spans both right-hand columns above
+                         them and needs ~510px, so it has never flowed through the shuttle below. It is still
+                         part of this page's job - what the Job tab is made of - hence a plain on/off here.
+                         Unlike the panel assignments, this one applies immediately, no restart. -->
+                    <CheckBox x:Uid="lbl_showJobJogPad" Grid.Column="0" Grid.Row="0" Grid.ColumnSpan="4" Margin="0,0,0,8"
+                              Content="Show the jog pad on the Job tab"
+                              IsChecked="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJobJogPad, Mode=TwoWay}"
+                              ToolTip="The full arrow pad across the top of the two right-hand columns. Unticking it gives that height back to the panels; the run bar's own compact jog controls are unaffected."/>
 
-                    <TextBlock x:Uid="txt_rightOf3d" Grid.Column="2" Grid.Row="0" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstMain" x:Name="lstMain" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-                    <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                    <TextBlock x:Uid="txt_available" Grid.Column="0" Grid.Row="1" Text="Available (unassigned)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Uid="lstAvailable" x:Name="lstAvailable" Grid.Column="0" Grid.Row="2" Grid.RowSpan="5" Margin="0,0,0,0" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+
+                    <TextBlock x:Uid="txt_rightOf3d" Grid.Column="2" Grid.Row="1" Text="Right of 3D View (top → bottom, max 6)" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ListBox x:Uid="lstMain" x:Name="lstMain" Grid.Column="2" Grid.Row="2" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="2" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToMain" x:Uid="btn_toMain" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToMain_Click" ToolTip="Add to right of 3D view"/>
                         <Button x:Name="btnFromMain" x:Uid="btn_fromMain" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromMain_Click" ToolTip="Remove"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
+                    <StackPanel Grid.Column="3" Grid.Row="2" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnMainUp" x:Uid="btn_mainUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnMainUp_Click" ToolTip="Move up"/>
                         <Button x:Name="btnMainDown" x:Uid="btn_mainDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnMainDown_Click" ToolTip="Move down"/>
                     </StackPanel>
 
-                    <TextBlock x:Uid="txt_leftOf3d" Grid.Column="2" Grid.Row="2" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                    <ListBox x:Uid="lstLeft" x:Name="lstLeft" Grid.Column="2" Grid.Row="3" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-                    <StackPanel Grid.Column="1" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                    <TextBlock x:Uid="txt_leftOf3d" Grid.Column="2" Grid.Row="3" Text="Left of 3D View (top → bottom)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <ListBox x:Uid="lstLeft" x:Name="lstLeft" Grid.Column="2" Grid.Row="4" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="4" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToLeft" x:Uid="btn_toLeft" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToLeft_Click" ToolTip="Add to left of 3D view"/>
                         <Button x:Name="btnFromLeft" x:Uid="btn_fromLeft" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromLeft_Click" ToolTip="Remove"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Grid.Row="3" VerticalAlignment="Center" Margin="6,0">
+                    <StackPanel Grid.Column="3" Grid.Row="4" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnLeftUp" x:Uid="btn_leftUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnLeftUp_Click" ToolTip="Move up"/>
                         <Button x:Name="btnLeftDown" x:Uid="btn_leftDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnLeftDown_Click" ToolTip="Move down"/>
                     </StackPanel>
 
-                    <TextBlock x:Uid="txt_flyouts" Grid.Column="2" Grid.Row="4" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                    <ListBox x:Uid="lstFlyouts" x:Name="lstFlyouts" Grid.Column="2" Grid.Row="5" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-                    <StackPanel Grid.Column="1" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
+                    <TextBlock x:Uid="txt_flyouts" Grid.Column="2" Grid.Row="5" Text="Flyouts (sidebar)" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                    <ListBox x:Uid="lstFlyouts" x:Name="lstFlyouts" Grid.Column="2" Grid.Row="6" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <StackPanel Grid.Column="1" Grid.Row="6" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnToFlyout" x:Uid="btn_toFlyout" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnToFlyout_Click" ToolTip="Add as flyout"/>
                         <Button x:Name="btnFromFlyout" x:Uid="btn_fromFlyout" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnFromFlyout_Click" ToolTip="Remove flyout"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Grid.Row="5" VerticalAlignment="Center" Margin="6,0">
+                    <StackPanel Grid.Column="3" Grid.Row="6" VerticalAlignment="Center" Margin="6,0">
                         <Button x:Name="btnFlyUp" x:Uid="btn_flyUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnFlyUp_Click" ToolTip="Move up"/>
                         <Button x:Name="btnFlyDown" x:Uid="btn_flyDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnFlyDown_Click" ToolTip="Move down"/>
                     </StackPanel>
@@ -69,10 +97,12 @@
             </TabItem>
 
             <TabItem x:Uid="tab_tabs" Header="Tabs">
+                <!-- One row per view, each choosing where it lives: the main tab bar, the File menu, the
+                     Tools menu, or nowhere. Replaces the old shown/hidden shuttle (2026-08-03), which could
+                     only express the tab bar and so had no way to say "put this in a menu" - or to hide
+                     anything that defaults to one. Row order is the display order WITHIN each destination. -->
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -81,23 +111,34 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Uid="txt_hiddenTabs" Grid.Column="0" Grid.Row="0" Text="Hidden tabs" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstTabsAvail" x:Name="lstTabsAvail" Grid.Column="0" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
-
-                    <TextBlock x:Uid="txt_shownTabs" Grid.Column="2" Grid.Row="0" Text="Shown tabs (top → bottom = left → right)" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ListBox x:Uid="lstTabsShown" x:Name="lstTabsShown" Grid.Column="2" Grid.Row="1" DisplayMemberPath="Label" SelectionChanged="Selection_Changed"/>
+                    <TextBlock x:Uid="txt_viewPlacement" Grid.Column="0" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,4"
+                               Text="Where each view appears. Order within a destination is top to bottom (left to right on the tab bar). Applied on restart."/>
+                    <ListBox x:Uid="lstPlacement" x:Name="lstPlacement" Grid.Column="0" Grid.Row="1"
+                             HorizontalContentAlignment="Stretch" SelectionChanged="Selection_Changed">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" Margin="2,0,8,0"/>
+                                    <ComboBox Grid.Column="1" Width="120" ItemsSource="{Binding Choices}"
+                                              DisplayMemberPath="Label" SelectedValuePath="Placement"
+                                              SelectedValue="{Binding Placement, Mode=TwoWay}"
+                                              ToolTip="{Binding PlacementTooltip}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                     <StackPanel Grid.Column="1" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabShow" x:Uid="btn_tabShow" Content="&gt;" MinWidth="30" Margin="0,2" Click="btnTabShow_Click" ToolTip="Show this tab"/>
-                        <Button x:Name="btnTabHide" x:Uid="btn_tabHide" Content="&lt;" MinWidth="30" Margin="0,2" Click="btnTabHide_Click" ToolTip="Hide this tab"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Grid.Row="1" VerticalAlignment="Center" Margin="6,0">
-                        <Button x:Name="btnTabUp" x:Uid="btn_tabUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move left (earlier)"/>
-                        <Button x:Name="btnTabDown" x:Uid="btn_tabDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move right (later)"/>
+                        <Button x:Name="btnTabUp" x:Uid="btn_tabUp" Content="▲" MinWidth="26" Margin="0,2" Click="btnTabUp_Click" ToolTip="Move earlier (further left / higher up)"/>
+                        <Button x:Name="btnTabDown" x:Uid="btn_tabDown" Content="▼" MinWidth="26" Margin="0,2" Click="btnTabDown_Click" ToolTip="Move later (further right / lower down)"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
 
-            <TabItem x:Uid="tab_unavailable" Header="Unavailable">
+            <TabItem x:Uid="tab_unavailable" x:Name="unavailableTab" Header="Unavailable">
                 <Grid Margin="0,6,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -117,8 +158,8 @@
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <TextBlock x:Uid="txt_restartNote" Text="Changes are applied when you leave this tab and take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock x:Uid="txt_restartNote" x:Name="txtRestartNote" Text="Changes are applied when you leave this tab and take effect after restart." VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#FF57606A"/>
         </StackPanel>
     </Grid>
 </UserControl>

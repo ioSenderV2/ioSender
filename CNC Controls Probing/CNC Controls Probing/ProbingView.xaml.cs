@@ -104,10 +104,32 @@ namespace CNC.Controls.Probing
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            if (!keyboardMappingsOk && DataContext is GrblViewModel)
-            {
-                grbl = (DataContext as GrblViewModel);
+            EnsureInitialized();
+        }
 
+        // Per-INSTANCE setup, split out of Loaded for two reasons, both of which crashed this view once it
+        // became a menu-hosted window rather than a tab (2026-08-04, NullReferenceException at
+        // tab_SelectionChanged):
+        //
+        //  - Timing: the inner TabControl selects its first tab while the host Window is being measured for
+        //    the first time (Window.Show -> MeasureOverride -> GenerateChildren -> SelectionChanged), which
+        //    happens BEFORE Loaded fires. So the handler ran with a null model. It now calls this first.
+        //  - Lifetime: all of this used to sit behind the STATIC keyboardMappingsOk flag. As a tab there was
+        //    only ever one instance, so nobody noticed; a menu entry builds a fresh view on every open, and
+        //    the second one would have skipped model creation entirely and crashed the same way. Only the
+        //    keyboard registration - which really is app-wide-once - stays behind that flag.
+        //
+        // Idempotent per instance (model != null is the guard) and a no-op until the DataContext is the
+        // GrblViewModel it needs.
+        private void EnsureInitialized()
+        {
+            if (model != null || !(DataContext is GrblViewModel))
+                return;
+
+            grbl = (DataContext as GrblViewModel);
+
+            if (!keyboardMappingsOk)
+            {
                 keyboardMappingsOk = true;
 
                 // Keyboard is the portable JogController unless the host registered the WPF handler
@@ -118,28 +140,33 @@ namespace CNC.Controls.Probing
                     keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
                     keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
                 }
-
-                // Probing parameters come from the shared probe library (Settings: App > Edit Probe
-                // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
-                if (ProbeDefinitions.Items.Count == 0)
-                {
-                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ThreeDProbe });
-                    ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ToolSetter });
-                    ProbeDefinitions.Renumber();
-                    ProbeDefinitions.Save();
-                }
-
-                DataContext = model = new ProbingViewModel(DataContext as GrblViewModel);
-
-                // The dropdown lists probe definitions, filtered per tab by type: the tool setter only on
-                // Tool length; the workpiece-probing tabs (edge/centre/rotation) show 3D probe / edge finder
-                // / touch plate. Refreshed on tab change.
-                probeView = new CollectionViewSource { Source = model.ProbeDefs };
-                probeView.Filter += ProbeView_Filter;
-                cbxProbe.ItemsSource = probeView.View;
-
-                grbl.OnCameraProbe += addCameraPosition;
             }
+
+            // Probing parameters come from the shared probe library (Settings: App > Edit Probe
+            // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
+            if (ProbeDefinitions.Items.Count == 0)
+            {
+                ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ThreeDProbe });
+                ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ToolSetter });
+                ProbeDefinitions.Renumber();
+                ProbeDefinitions.Save();
+            }
+
+            DataContext = model = new ProbingViewModel(grbl);
+
+            // The dropdown lists probe definitions, filtered per tab by type: the tool setter only on
+            // Tool length; the workpiece-probing tabs (edge/centre/rotation) show 3D probe / edge finder
+            // / touch plate. Refreshed on tab change.
+            probeView = new CollectionViewSource { Source = model.ProbeDefs };
+            probeView.Filter += ProbeView_Filter;
+            cbxProbe.ItemsSource = probeView.View;
+
+            grbl.OnCameraProbe += addCameraPosition;
+
+            // The selection that fired before this ran got skipped, so apply it now that there IS a model -
+            // otherwise the tab you are looking at is never told it is the active one.
+            if (tab.SelectedItem is TabItem selected)
+                ApplyTabSelection(selected, null);
         }
 
         private static bool ProbeValidForTab(ProbeDefinition p, ProbingType type)
@@ -420,29 +447,42 @@ namespace CNC.Controls.Probing
         {
             if (Equals(e.OriginalSource, sender))
             {
-                if (e.AddedItems.Count == 1)
-                {
-                    var view = getView(e.AddedItems[0] as TabItem);
-                    model.Positions.Clear();
-                    if (!model.AllowMeasure && model.CoordinateMode == ProbingViewModel.CoordMode.Measure)
-                        model.CoordinateMode = ProbingViewModel.CoordMode.G10;
-                    model.AllowMeasure = false;
-                    model.ProbingType = view.ProbingType;
-                    probeView?.View.Refresh();   // re-filter the probe list for the new tab
-                    EnsureValidProbe();
-                    model.Message = string.Empty;
-                    model.PreviewEnable = false;
+                // Fires during the host window's first measure pass, before Loaded - see EnsureInitialized.
+                EnsureInitialized();
 
-                    if (GrblInfo.IsGrblHAL)
-                        Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL);
-
-                    if(e.RemovedItems.Count == 1)
-                        getView(e.RemovedItems[0] as TabItem).Activate(false);
-
-                    view.Activate(true);
-                }
+                if (e.AddedItems.Count == 1 && model != null)
+                    ApplyTabSelection(e.AddedItems[0] as TabItem,
+                                      e.RemovedItems.Count == 1 ? e.RemovedItems[0] as TabItem : null);
                 e.Handled = true;
             }
+        }
+
+        // Point the view model and the probe list at the newly selected tab, and hand activation over.
+        // Called from tab_SelectionChanged and, for the selection that landed before there was a model,
+        // from EnsureInitialized. Requires model != null - both callers check.
+        private void ApplyTabSelection(TabItem added, TabItem removed)
+        {
+            var view = getView(added);
+            if (view == null)
+                return;
+
+            model.Positions.Clear();
+            if (!model.AllowMeasure && model.CoordinateMode == ProbingViewModel.CoordMode.Measure)
+                model.CoordinateMode = ProbingViewModel.CoordMode.G10;
+            model.AllowMeasure = false;
+            model.ProbingType = view.ProbingType;
+            probeView?.View.Refresh();   // re-filter the probe list for the new tab
+            EnsureValidProbe();
+            model.Message = string.Empty;
+            model.PreviewEnable = false;
+
+            if (GrblInfo.IsGrblHAL)
+                Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL);
+
+            if (removed != null)
+                getView(removed)?.Activate(false);
+
+            view.Activate(true);
         }
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -112,15 +112,15 @@ namespace CNC.Controls
 
             // Dry-run mode is a per-run, deliberately-armed toggle (see GrblViewModel.IsDryRunMode) - it must
             // never silently carry over onto a DIFFERENT program the operator just loaded. This is the single
-            // point both Load File/Load Folder funnel through (see the comment below), so it can't be missed
-            // by loading via a different route.
+            // point every load funnels through (see the comment below), so it can't be missed by loading via
+            // a different route.
             if (Model != null)
                 Model.IsDryRunMode = false;
 
-            // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File/Load
-            // Folder - this is the single point both funnel through (GCodeJob.FileChanged), so callers (e.g.
-            // touch-plate probing's edge-radius compensation, CarveView's 3D carve simulation) never need to
-            // re-scan the program themselves.
+            // Rebuild the shared (TOOL ...)/(STOCK ...) comment lookup once per completed Load File - this is
+            // the single point every load funnels through (GCodeJob.FileChanged), so callers (e.g. touch-plate
+            // probing's edge-radius compensation, CarveView's 3D carve simulation) never need to re-scan the
+            // program themselves.
             GCodeProgramComments.Refresh();
 
             if (Model != null)
@@ -313,10 +313,75 @@ namespace CNC.Controls
             Model.Blocks = Blocks;
         }
 
+        // --- Job-level push/pop -------------------------------------------------------------------------
+        // Lets a producer (Work Order's Run) temporarily replace the loaded job with its own generated
+        // program - showing in the Job tab's real docked list (ProgramPanel) and jobProgramView exactly
+        // like any loaded file, since both ultimately read this SAME shared instance - then restore exactly
+        // what was loaded before once it's done. Pop restores from an in-memory snapshot, NOT a re-Load()
+        // from disk - a naive re-Load of a ~220k-line file took 30+ seconds on real hardware (2026-07-31);
+        // see GCodeJob.TakeSnapshot's own comment for exactly what is/isn't captured. The restore itself is
+        // one BulkObservableCollection.ReplaceAll call (a single Reset notification) rather than a per-block
+        // Add loop, which froze the app entirely on a large file (2026-08-01, see PrepareRestore's comment).
+        private readonly Stack<GCodeJob.Snapshot> _pushedSnapshots = new Stack<GCodeJob.Snapshot>();
+
+        public void Push()
+        {
+            _pushedSnapshots.Push(Program.TakeSnapshot());
+        }
+
+        public void Pop()
+        {
+            if (_pushedSnapshots.Count == 0)
+                return;
+            var snapshot = _pushedSnapshots.Pop();
+
+            Program.PrepareRestore(snapshot);   // sets filename/BoundingBox/HasSections - no events, blocks untouched yet
+            ((BulkObservableCollection<GCodeBlock>)Program.Blocks).ReplaceAll(snapshot.Blocks);
+
+            // Set HasOutline before RaiseFileChanged, not after: FileChanged reconnects jobProgramView
+            // (MainWindow.OnJobFileChanged -> SetProgram(null) -> ApplyGrouping) SYNCHRONOUSLY, which reads
+            // Model.HasOutline at that exact moment - by the time RaiseFileChanged returns it's already too
+            // late. Setting it any EARLIER than this (before ReplaceAll above) let GCodeListControl's own
+            // HasOutline-changed handler call ApplyGrouping against still-stale (pre-restore) block data.
+            if (Model != null)
+                Model.HasOutline = Program.HasSections;
+
+            Program.RaiseFileChanged();
+
+            if (Model != null)
+                Model.Blocks = Blocks;
+        }
+
+        // Load already-built G-code text (not from disk) as the job - the same completion pipeline as Load
+        // File (FileChanged fires: Model.FileName/limits update, the simulator header push runs, the
+        // docked list and jobProgramView both pick it up), just fed from a string instead of a file. `name`
+        // is cosmetic - becomes the docked list's title; there is no actual file at that path.
+        public void LoadText(string name, string program)
+        {
+            if (Model != null)
+                Model.HasOutline = false;
+
+            var lines = (program ?? string.Empty).Replace("\r", string.Empty).Split('\n');
+            AddBlock(name, Core.Action.New);
+            for (int i = 0; i < lines.Length - 1; i++)
+                AddBlock(lines[i], Core.Action.Add);
+            AddBlock(lines[lines.Length - 1], Core.Action.End);
+        }
+
         public void Open()
         {
             string filename = string.Empty;
-            OpenFileDialog file = new OpenFileDialog();
+            // Explicit InitialDirectory, not left blank: with no directory set at all, this dialog falls
+            // back to Windows' shared "last folder used in this process" - which Work Order's Load/Save
+            // dialogs (WorkOrderView) explicitly pin to the Work Orders folder every time. Without its own
+            // remembered folder, Load File would silently start opening in the Work Orders folder right
+            // after a Load/Save Work Order (net462's Microsoft.Win32.OpenFileDialog has no ClientGuid to
+            // give dialogs independent identities the way later frameworks do - this is the available fix).
+            string lastFolder = AppConfig.Settings.Base.LastGCodeFolder;
+            OpenFileDialog file = new OpenFileDialog
+            {
+                InitialDirectory = !string.IsNullOrEmpty(lastFolder) && Directory.Exists(lastFolder) ? lastFolder : string.Empty
+            };
 
             string conversionFilter = string.Empty; //conversionTypes == string.Empty ? string.Empty : string.Format("Other files ({0})|{0}|", FileUtils.ExtensionsToFilter(conversionTypes));
 
@@ -330,49 +395,54 @@ namespace CNC.Controls
                 filename = file.FileName;
             }
 
-            if(filename != string.Empty)
+            if (filename != string.Empty)
+            {
                 Load(filename);
+                AppConfig.Settings.Base.LastGCodeFolder = System.IO.Path.GetDirectoryName(filename);
+                AppConfig.Settings.Save();
+            }
 
             Model.Blocks = Blocks;
         }
 
-        // Read + parse a (potentially huge) program on a background thread so the rest of the UI stays responsive,
-        // flushing parsed blocks onto the UI thread in batches so rows appear as the files are read. Only the
-        // program view(s) show a Wait cursor (Model.IsLoading) while it runs. 'parse' runs on the worker thread -
-        // it must route blocks through Program.BlockConsumer (done automatically by AddBlock/ParseFileLines) and
-        // finish with Program.ComputeLimits(); 'onDone' runs on the UI thread after the final flush (raise
-        // FileChanged, set Model.Blocks, ...).
+        // Read + parse a (potentially huge) program on a background thread so the rest of the UI stays
+        // responsive - and so the LIVE, DataGrid-bound Blocks collection is never touched until parsing is
+        // completely done. 'parse' runs on the worker thread and writes into a private, unbound buffer (no
+        // ObservableCollection, no dispatcher hops, no per-item notifications - the program view has no
+        // reason to be involved while a file is still being read off disk); it must finish with
+        // Program.ComputeLimits(). 'onDone' runs on the UI thread after ONE bulk bind (raise FileChanged, set
+        // Model.Blocks, ...). This used to flush in batches of 4000 via periodic dispatcher.Invoke calls, each
+        // batch still hundreds/thousands of individual ObservableCollection.Add() notifications on the live
+        // grid - confirmed as real, measurable load-time cost on a 220k-line file (2026-08-01); a single
+        // BulkObservableCollection.ReplaceAll at the end fires exactly one Reset instead.
         private async void BackgroundLoad(System.Action parse, System.Action onDone)
         {
-            var dispatcher = System.Windows.Application.Current.Dispatcher;
-            var buffer = new List<GCodeBlock>(8192);
-            const int BatchSize = 4000;
+            var buffer = new List<GCodeBlock>(65536);
 
             if (Model != null)
                 Model.IsLoading = true;
 
-            // Worker-thread sink: buffer parsed blocks, marshalling a batch to the UI thread whenever it fills.
-            // dispatcher.Invoke (synchronous) gives natural backpressure so the buffer can't run away on a huge file.
-            Program.BlockConsumer = b =>
-            {
-                buffer.Add(b);
-                if (buffer.Count >= BatchSize)
-                {
-                    var batch = buffer.ToArray();
-                    buffer.Clear();
-                    dispatcher.Invoke((System.Action)(() => { foreach (var x in batch) Program.Blocks.Add(x); }));
-                }
-            };
+            // Worker-thread sink: just accumulate. No dispatcher marshalling at all until parsing is done.
+            Program.BlockConsumer = b => buffer.Add(b);
 
             try
             {
+                // Timing instrumentation (2026-08-01) - the "bind once" change unexpectedly measured SLOWER
+                // (50s vs the original 30s) on a 220k-line file; splitting the phases pins down where the
+                // time actually goes before changing anything else further blind.
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 await System.Threading.Tasks.Task.Run(parse);
+                CNC.Core.DebugLog.Write("load", string.Format("read+parse+ComputeLimits: {0} ms ({1} blocks)", sw.ElapsedMilliseconds, buffer.Count));
 
-                // Final flush - we resume here on the UI thread, so add straight to the bound collection.
-                foreach (var x in buffer)
-                    Program.Blocks.Add(x);
+                // Resumed on the UI thread (the awaited Task.Run's continuation captures the calling
+                // SynchronizationContext) - bind everything in one shot.
+                sw.Restart();
+                ((BulkObservableCollection<GCodeBlock>)Program.Blocks).ReplaceAll(buffer);
+                CNC.Core.DebugLog.Write("load", string.Format("ReplaceAll (UI bind): {0} ms", sw.ElapsedMilliseconds));
 
+                sw.Restart();
                 onDone?.Invoke();
+                CNC.Core.DebugLog.Write("load", string.Format("onDone (FileChanged/HasOutline/simulator push/...): {0} ms", sw.ElapsedMilliseconds));
             }
             catch (Exception e)
             {
@@ -425,9 +495,9 @@ namespace CNC.Controls
                 if (ok[0])
                 {
                     Program.RaiseFileChanged();
-                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers the same way
-                    // Load Folder's stitching does (GCodeJob.ParseFileLines calls BeginSection on a match) -
-                    // an ordinary file with no such markers leaves this false, same as before.
+                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers
+                    // (GCodeJob.ParseFileLines calls BeginSection on a match) - an ordinary file with no such
+                    // markers leaves this false.
                     Model.HasOutline = Program.HasSections;
                     Model.Blocks = Blocks;
                 }

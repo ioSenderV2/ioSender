@@ -25,17 +25,19 @@
         <Style x:Key="StatusButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="90" />
             <Setter Property="Focusable" Value="False" />
         </Style>
         <Style x:Key="ResetButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="LightBlue" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="90" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderThickness="1" BorderBrush="#FF707070" >
+                        <Border x:Name="Border" CornerRadius="10" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderThickness="1" BorderBrush="#FF707070" >
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>

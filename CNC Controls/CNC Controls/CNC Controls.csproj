@@ -89,6 +89,7 @@
     </Compile>
     <Compile Include="AppDialogs.cs" />
     <Compile Include="AppConfig.cs" />
+    <Compile Include="RunLabels.cs" />
     <Compile Include="DialogScaling.cs" />
     <Compile Include="ComponentAvailability.cs" />
     <Compile Include="ComponentRegistry.cs" />
@@ -101,6 +102,10 @@
     <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
+    <Compile Include="SettingsNavNode.cs" />
+    <Compile Include="SettingsSearchIndex.cs" />
+    <Compile Include="ToolTipTextTemplateSelector.cs" />
+    <Compile Include="NullToVisibilityConverter.cs" />
     <Compile Include="ConfigPanel.cs" />
     <Compile Include="StartJobConfig.cs" />
     <Compile Include="AtcMacros.cs" />
@@ -108,17 +113,38 @@
     <Compile Include="BasicConfigControl.xaml.cs">
       <DependentUpon>BasicConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OddJobsSettingsControl.xaml.cs">
+      <DependentUpon>OddJobsSettingsControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="KbdDefaultSpeedControl.xaml.cs">
+      <DependentUpon>KbdDefaultSpeedControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="GrblConfigControl.xaml.cs">
       <DependentUpon>GrblConfigControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="GrblConfigView.xaml.cs">
       <DependentUpon>GrblConfigView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SettingsNavShell.xaml.cs">
+      <DependentUpon>SettingsNavShell.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MachineSetupView.xaml.cs">
       <DependentUpon>MachineSetupView.xaml</DependentUpon>
     </Compile>
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OddJobsGeometry.cs" />
+    <Compile Include="OddJobsStockCanvas.cs" />
+    <Compile Include="WorkOrderModel.cs" />
+    <Compile Include="WorkOrderCompiler.cs" />
+    <Compile Include="OddJobsToolMemory.cs" />
+    <Compile Include="CustomTool.cs" />
+    <Compile Include="WorkOrderView.xaml.cs">
+      <DependentUpon>WorkOrderView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OddJobsFeedsSpeedsDialog.xaml.cs">
+      <DependentUpon>OddJobsFeedsSpeedsDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="FeedsAndSpeedsView.xaml.cs">
       <DependentUpon>FeedsAndSpeedsView.xaml</DependentUpon>
@@ -164,6 +190,9 @@
     </Compile>
     <Compile Include="FixtureEditDialog.xaml.cs">
       <DependentUpon>FixtureEditDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="CustomToolEditDialog.xaml.cs">
+      <DependentUpon>CustomToolEditDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProbeMotionParamsDialog.xaml.cs">
       <DependentUpon>ProbeMotionParamsDialog.xaml</DependentUpon>
@@ -288,6 +317,12 @@
     <Compile Include="MacroExecuteControl.xaml.cs">
       <DependentUpon>MacroExecuteControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="MacroPinnedListControl.xaml.cs">
+      <DependentUpon>MacroPinnedListControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MacroCreateDialog.xaml.cs">
+      <DependentUpon>MacroCreateDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MacroToolbarControl.xaml.cs">
       <DependentUpon>MacroToolbarControl.xaml</DependentUpon>
     </Compile>
@@ -338,6 +373,12 @@
     <Compile Include="SidebarItem.cs" />
     <Compile Include="MainPanelRegistry.cs" />
     <Compile Include="TabRegistry.cs" />
+    <Compile Include="ViewHostWindow.xaml.cs">
+      <DependentUpon>ViewHostWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UiGeneralConfigControl.xaml.cs">
+      <DependentUpon>UiGeneralConfigControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="PanelFlyout.xaml.cs">
       <DependentUpon>PanelFlyout.xaml</DependentUpon>
     </Compile>
@@ -377,15 +418,6 @@
     <Compile Include="MachineCatalog.cs" />
     <Compile Include="MachineSetupWizard.xaml.cs">
       <DependentUpon>MachineSetupWizard.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="StepperCalibrationWizard.xaml.cs">
-      <DependentUpon>StepperCalibrationWizard.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="StepperCalibrationScratchWizard.xaml.cs">
-      <DependentUpon>StepperCalibrationScratchWizard.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="SurfaceSpoilboardWizard.xaml.cs">
-      <DependentUpon>SurfaceSpoilboardWizard.xaml</DependentUpon>
     </Compile>
     <Compile Include="AutoSquareWizard.xaml.cs">
       <DependentUpon>AutoSquareWizard.xaml</DependentUpon>
@@ -432,11 +464,23 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="SettingsNavShell.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MachineSetupView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ToolsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="WorkOrderView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OddJobsFeedsSpeedsDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -484,7 +528,23 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="OddJobsSettingsControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="KbdDefaultSpeedControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ConsoleWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ViewHostWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UiGeneralConfigControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -513,6 +573,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="FixtureEditDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="CustomToolEditDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -609,6 +673,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MacroExecuteControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroPinnedListControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MacroCreateDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -750,18 +822,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="StepperCalibrationWizard.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="StepperCalibrationScratchWizard.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="SurfaceSpoilboardWizard.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="AutoSquareWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -824,6 +884,7 @@
     <!-- ATC support macros, embedded for auto-provisioning (AtcMacros.cs). LogicalName = bare file name. -->
     <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
     <None Include="app.config" />
     <None Include="Properties\Settings.settings">

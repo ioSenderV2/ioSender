@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.MachineSetupWizard"
+﻿<UserControl x:Class="CNC.Controls.MachineSetupWizard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -42,26 +42,31 @@
 
     <Grid Margin="10" d:DataContext="{d:DesignInstance Type=local:MachineSetupWizard}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,8">
-            <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
-            <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray"
-                       Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
-            <Separator Margin="0,4"/>
-        </StackPanel>
-
         <!-- Body: one tab per setup step -->
-        <local:StretchTabControl x:Name="tabSteps" Grid.Row="1" Background="Transparent" SelectionChanged="Steps_SelectionChanged">
+        <local:StretchTabControl x:Name="tabSteps" Grid.Row="0" Background="Transparent" SelectionChanged="Steps_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+            <!-- Tab strip templated away: the steps are nodes in the Machine Setup navigation tree now.
+                 The TabControl stays as the switcher so every existing selection hook still fires
+                 (Steps_SelectionChanged refreshes macro/simulator state and activates the calibration
+                 sub-wizards) and every x:Name in the code-behind still resolves. -->
+            <TabControl.Template>
+                <ControlTemplate TargetType="TabControl">
+                    <ContentPresenter ContentSource="SelectedContent"/>
+                </ControlTemplate>
+            </TabControl.Template>
+
 
             <!-- Overview -->
             <TabItem x:Uid="step_overview" x:Name="tabStepOverview" Header="Overview" ToolTip="Read this first: what each setup step below configures.">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
+                        <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0"
+                                   Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
+                        <Separator Margin="0,8,0,4"/>
                         <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
                         <TextBlock x:Uid="ov_body" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:"/>
@@ -289,13 +294,14 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."/>
+                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Start Job and the probing tabs."/>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"
@@ -315,6 +321,24 @@
                         <Button x:Uid="pdl_edit" x:Name="btnProbeEdit" Content="Edit" Click="ProbeEdit_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                         <Button x:Uid="pdl_delete" x:Name="btnProbeDelete" Content="Delete" Click="ProbeDelete_Click" Margin="0,0,0,4" MinHeight="26" IsEnabled="False"/>
                     </StackPanel>
+
+                    <!-- Machine-wide TLO baseline (AppConfig.Settings.Base.TloRefBaseline) - referenced ONCE here
+                         against the toolsetter puck, a fixed physical object, so every job's own tool-length
+                         reference (and Test position's corner-locate) can trust "work Z0 under TLO" as the same
+                         real height regardless of which tool is currently mounted, with no cached spoilboard
+                         value needed anywhere. Re-run this any time (new puck, machine re-leveled, etc.) -
+                         it's just a fresh probe, not a one-time-ever setup step. -->
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock x:Uid="txt_tloRefDesc" TextWrapping="Wrap" Margin="0,0,0,6"
+                                       Text="Tool-length reference baseline - probed once against the toolsetter puck, reused by every job so 'work Z0' means the same real height no matter which tool is mounted. Whatever's in the spindle now touches the puck; check the box first if that's the 3D probe itself."/>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox x:Uid="chk_tloRef3d" x:Name="chkTloRef3dProbe" Content="3D probe is in the spindle now" VerticalAlignment="Center"/>
+                                <Button x:Uid="btn_tloRef" x:Name="btnReferenceTlo" Content="Reference TLO" Click="ReferenceTlo_Click" Margin="20,0,0,0" Padding="10,2" MinHeight="26"/>
+                                <TextBlock x:Name="txtTloRefValue" VerticalAlignment="Center" Margin="14,0,0,0" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </TabItem>
 
@@ -361,7 +385,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" x:Uid="txt_ctrlMacrosDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Start Job corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
+                               Text="Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Setup corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."/>
                     <DataGrid x:Uid="grdMacros" x:Name="grdMacros" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="All">
                         <DataGrid.Columns>
@@ -397,11 +421,39 @@
                 </Grid>
             </TabItem>
 
-            <!-- 8. Build a simulator matching this machine (optional, non-gating - like Fixtures). One button:
+            <!-- 8. Calibration (optional, non-gating - like Fixtures/Build simulator). Stepper calibration
+                 (probe method - the only method kept; the manual and scratch methods were dropped as not
+                 worth supporting once probing against a known reference block proved out) and squareness,
+                 folded in from the retired Tools tab. -->
+            <TabItem x:Uid="tabstep_calibration" x:Name="tabStepCalibration" ToolTip="Stepper calibration and frame squareness.">
+                <TabItem.Header><TextBlock x:Uid="step_calibration" x:Name="hdrCalibration" Text="8 · Calibration"/></TabItem.Header>
+                <local:StretchTabControl x:Name="tabCalibration" Background="Transparent" SelectionChanged="Calibration_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+                <!-- Tab strip templated away: the steps are nodes in the Machine Setup navigation tree now.
+                     The TabControl stays as the switcher so every existing selection hook still fires
+                     (Steps_SelectionChanged refreshes macro/simulator state and activates the calibration
+                     sub-wizards) and every x:Name in the code-behind still resolves. -->
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <ContentPresenter ContentSource="SelectedContent"/>
+                    </ControlTemplate>
+                </TabControl.Template>
+
+                    <TabItem x:Uid="tabstep_calStepper" x:Name="tabCalStepper" ToolTip="Correct steps/mm by probing a reference block of known size against a validated Corner Fence.">
+                        <TabItem.Header><TextBlock x:Uid="step_calStepper" Text="Stepper calibration"/></TabItem.Header>
+                        <local:StepperCalibrationProbeWizard x:Name="calStepperWizard"/>
+                    </TabItem>
+                    <TabItem x:Uid="tabstep_calSquareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness.">
+                        <TabItem.Header><TextBlock x:Uid="step_calSquareness" Text="Squareness"/></TabItem.Header>
+                        <local:AutoSquareWizard x:Name="calSquarenessWizard"/>
+                    </TabItem>
+                </local:StretchTabControl>
+            </TabItem>
+
+            <!-- 9. Build a simulator matching this machine (optional, non-gating - like Fixtures). One button:
                  by now every option a simulator build needs is already known from this machine's own $I/$$,
                  so there's nothing left to pick. -->
             <TabItem x:Uid="tabstep_simulator" x:Name="tabStepSimulator" ToolTip="Build a grblHAL simulator matching this machine's configuration.">
-                <TabItem.Header><TextBlock x:Uid="step_simulator" x:Name="hdrSimulator" Text="8 · Build simulator"/></TabItem.Header>
+                <TabItem.Header><TextBlock x:Uid="step_simulator" x:Name="hdrSimulator" Text="9 · Build simulator"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -419,7 +471,7 @@
         </local:StretchTabControl>
 
         <!-- Footer -->
-        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+        <DockPanel Grid.Row="1" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnForget" x:Uid="btn_forget" Content="Forget machine" Padding="14,0" Margin="0,0,6,0" Click="Forget_Click"

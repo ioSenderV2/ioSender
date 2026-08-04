@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SettingsPanelRegistry.cs - part of CNC Controls library
  *
  * Registration for Settings:App panels (Phase 0.5 of the registration architecture refactor,
@@ -21,6 +21,32 @@ using System.Windows.Controls;
 
 namespace CNC.Controls
 {
+    // The settings navigation categories. Public so a panel in any assembly can name the category it
+    // belongs to without the settings host having to know the panel's type.
+    public static class SettingsCategories
+    {
+        public const string Controller = "Cat.Controller";
+        public const string Application = "Cat.Application";
+        public const string Jogging = "Cat.Jogging";
+        public const string GCode = "Cat.GCode";
+        public const string UserInterface = "Cat.Interface";
+    }
+
+    // A config panel declares where it belongs in the settings tree, and how it sorts among its
+    // siblings. Implement it on the panel itself, so placement travels with the panel however it
+    // reaches the host - registered through SettingsPanelRegistry, auto-discovered via
+    // ISettingsPanelProvider, or added straight to UIViewModel.ConfigControls by a feature view.
+    //
+    // This is what retires the last of the hardcoded placement: the host used to carry a switch that
+    // matched panels in other assemblies by full type name ("CNC.Controls.Camera.ConfigControl"),
+    // because CNC Controls cannot reference them. A panel that doesn't implement this still lands in
+    // Application, so nothing has to be updated in lockstep.
+    public interface ISettingsPanelCategory
+    {
+        string SettingsCategory { get; }
+        int SettingsOrder { get; }
+    }
+
     // One registrable Settings:App panel. Order sorts the registry-contributed panels among
     // themselves (built-ins are added first by AppConfigView); lower Order shows higher.
     public sealed class SettingsPanelDescriptor
@@ -56,6 +82,53 @@ namespace CNC.Controls
     public interface ISettingsEditorTab
     {
         void Commit();
+    }
+
+    // One page contributed by an editor that used to carry its own tab strip.
+    public sealed class SettingsSubPage
+    {
+        public string Key { get; }
+        public string Label { get; }
+        public System.Windows.FrameworkElement Content { get; }
+
+        // Key of the category this page sits under, when the provider wants its own grouping
+        // (Machine Setup nests Stepper calibration / Squareness under Calibration). Null = top level.
+        public string Parent { get; set; }
+
+        // Re-evaluated by the host whenever it refreshes, so a page can come and go with the machine's
+        // capabilities (no simulator page while connected TO the simulator; no stepper calibration
+        // without a 3D probe configured).
+        public System.Func<bool> IsAvailable { get; set; }
+
+        // Optional per-page status colour, read on refresh. Machine Setup grades its steps
+        // green/orange/red; that signal lived on the tab headers, which no longer render.
+        public System.Func<System.Windows.Media.Brush> Status { get; set; }
+
+        // The subtree whose text feeds the search index. Defaults to Content, but MUST be set when
+        // several pages share one control as Content (the setup wizard backs twelve pages) - otherwise
+        // every one of them indexes the whole control and they all match every query identically.
+        public System.Windows.FrameworkElement IndexRoot { get; set; }
+
+        public SettingsSubPage(string key, string label, System.Windows.FrameworkElement content)
+        {
+            Key = key;
+            Label = label;
+            Content = content;
+        }
+    }
+
+    // An editor that hosts its own tabs exposes them as separate nav pages instead, so the navigation
+    // tree never ends up with a tab strip inside it - which is the thing the overhaul exists to remove.
+    // The editor instance stays whole and keeps owning Commit()/ResetToDefaults() for all of its pages;
+    // the nav node records it as the page's Owner.
+    public interface ISettingsPageProvider
+    {
+        IEnumerable<SettingsSubPage> GetPages();
+
+        // Several pages can share one editor instance as their content (the editor keeps its own
+        // hooks on the control, so it must stay whole and in the visual tree). The host calls this on
+        // entering a page so the editor can show the matching section.
+        void ShowPage(string key);
     }
 
     // A settings panel or editor tab implements this to opt in to the shared footer's "Reset to Default" button.

@@ -7,9 +7,9 @@
  * firmware G28 write; the position lives only in this fixture's own definition (see Fixtures.CurrentCoordsCsv).
  * For the edge-probing kinds there are no separate offset fields to fill in: the schematic's clearance circle
  * (sized to the current 3D probe's body diameter) is a jog target - position the probe tip inside it, clear of
- * both corner faces, AND within ~10 mm above the spoilboard (the spoilboard probe's search is capped to 12 mm
- * below this point - see pcorner.macro), then click Set position. pcorner.macro derives every probe move from
- * that one point plus the live probe definition, not from anything stored per-fixture.
+ * both corner faces, then click Set position. pcorner.macro derives every probe move from that one point plus
+ * the live probe definition, not from anything stored per-fixture. Test position's own Z-safety no longer
+ * depends on how close Coords sits to the spoilboard - see RunTestPositionMacro's own comment.
  *
  */
 
@@ -18,7 +18,6 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -31,27 +30,86 @@ namespace CNC.Controls
         private readonly GrblViewModel model;
         private bool _probing;   // true while RunViseCornerProbe's async streamed run is in flight
 
-        // Picks up Test position's (PRINT, SPOIL_Z=..) line - same (PRINT, TAG=value) idiom StartJobView.
-        // rxResult already parses for LS_X/LS_Y - controller print/debug comments arrive as Message updates.
-        private static readonly Regex rxSpoilZ = new Regex(@"SPOIL_Z\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-        private double? _capturedSpoilZ;
-
         public FixtureEditDialog(Fixture fixture, GrblViewModel model)
         {
             InitializeComponent();
             DialogScaling.Apply(this);
+            // Shown non-modally (see Saved's comment) with ShowInTaskbar="False", the combination that leaves
+            // the main window minimized on close - see UIUtils.ActivateOwnerOnClose. Done here rather than at
+            // the two MachineSetupWizard call sites so it can't be forgotten by a third one.
+            UIUtils.ActivateOwnerOnClose(this);
             DataContext = fixture;
             this.model = model;
 
-            rbFxProbe3d.Checked += (s, e) => UpdateProbeCircleLabel();
-            rbFxProbeTouch.Checked += (s, e) => UpdateProbeCircleLabel();
+            rbFxProbe3d.Checked += (s, e) => OnProbeSelectionChanged(ProbeType.ThreeDProbe);
+            rbFxProbeTouch.Checked += (s, e) => OnProbeSelectionChanged(ProbeType.TouchPlate);
+
+            // Restore THIS fixture's own probe selection instead of always landing on 3D Probe - reopening a
+            // touch-plate fixture in 3D-probe mode meant the next Set/Test silently ran with the wrong probe
+            // geometry (plate thickness/lip offset dropped) until the operator noticed and re-picked.
+            // UpdateFxProbeWarning below still overrides this when the chosen probe isn't actually defined.
+            if (fixture.ProbeType == ProbeType.TouchPlate)
+                rbFxProbeTouch.IsChecked = true;
+            else
+                rbFxProbe3d.IsChecked = true;
 
             SelectKind(fixture.Kind);
             UpdateFieldVisibility(fixture.Kind);
             UpdateFxProbeWarning();
             UpdateProbeCircleLabel();
+            UpdateProbeNote();
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
+            // From here on, a Checked event means the OPERATOR changed the probe selection, not dialog
+            // startup wiring its default - see ClearValidationOnProbeChange's own comment.
+            _initializing = false;
+        }
+
+        // False once the constructor's own initial radio-button wiring/defaults have settled - guards
+        // ClearValidationOnProbeChange so it doesn't fire on the dialog simply opening.
+        private bool _initializing = true;
+
+        // One place for "the operator picked a probe": refresh the probe-dependent UI, record the choice on the
+        // fixture so it survives closing the dialog, and invalidate a checkmark earned by the other probe.
+        // The record is skipped while _initializing so neither the restore above nor UpdateFxProbeWarning's
+        // availability fallback is mistaken for an operator decision and written back.
+        private void OnProbeSelectionChanged(ProbeType type)
+        {
+            UpdateProbeCircleLabel();
+            UpdateProbeNote();
+
+            var fx = DataContext as Fixture;
+            if (fx != null && !_initializing)
+                fx.ProbeType = type;
+
+            ClearValidationOnProbeChange();
+        }
+
+        // A saved position validated under one probe was only ever probed by THAT probe - switching to the
+        // other one (e.g. 3D probe went dead, switching to Touch Plate to revalidate) means nothing has
+        // actually confirmed the NEW probe can reach this position yet, so the checkmark saying otherwise is
+        // now a lie until Test position runs again for real.
+        private void ClearValidationOnProbeChange()
+        {
+            if (_initializing)
+                return;
+            var fx = DataContext as Fixture;
+            if (fx != null && fx.PositionValidated)
+            {
+                fx.PositionValidated = false;
+                UpdatePositionDisplay();
+                UpdateTestPositionEnabled();
+            }
+        }
+
+        // The red warning banner at the bottom - was hardcoded to the 3D-probe wording regardless of which
+        // probe is actually selected, which stopped being true the moment Touch Plate became selectable for
+        // every fixture kind (not just Vise).
+        private void UpdateProbeNote()
+        {
+            txtProbeNote.Text = rbFxProbeTouch.IsChecked == true
+                ? "A conductive object (e.g. a touch plate) must be staged at the saved position before Test position - it senses contact by electrical continuity, not a mechanical probe. Set position itself is a raw jog-capture and needs no probe."
+                : "The 3D probe must be installed before Test position. Set position itself is a raw jog-capture and needs no probe.";
         }
 
         // "Test position" only makes sense for a kind that probes the spoilboard (see pcorner.macro's DISCOVER
@@ -63,20 +121,31 @@ namespace CNC.Controls
             btnTestPosition.IsEnabled = !_probing && fx != null && fx.HasPosition && FixtureKinds.ProbesSpoilboard(fx.Kind);
         }
 
-        // Vise-only probe picker (jaw metal is always conductive - Touch Plate needs no thickness offset here,
-        // unlike Start Job's stock, which may or may not be conductive). Touch Plate is only selectable when a
-        // touch-plate probe is actually defined - falls back to 3D Probe if the definition disappears while it
-        // was selected, same rule StartJobView.UpdateProbeWarning follows.
+        // Touch Plate is only selectable when a touch-plate probe is actually defined - falls back to 3D
+        // Probe if the definition disappears while it was selected, same rule StartJobView.UpdateProbeWarning
+        // follows. Applies to every fixture kind now, not just Vise - see UpdateFieldVisibility's own comment.
         private void UpdateFxProbeWarning()
         {
             bool touchAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.TouchPlate);
+            bool probe3dAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
+
             rbFxProbeTouch.IsEnabled = touchAvailable;
-            if (!touchAvailable && rbFxProbeTouch.IsChecked == true)
+            // 3D Probe used to be permanently enabled and was the unconditional default, so a machine with only
+            // a touch plate defined still opened every new fixture in 3D-probe mode - nothing on screen said
+            // the selected probe didn't exist, and Set/Test then failed on a probe definition that was never
+            // there. Gate it the same way, and fall back to whichever one IS defined.
+            rbFxProbe3d.IsEnabled = probe3dAvailable;
+
+            if (!touchAvailable && probe3dAvailable)
                 rbFxProbe3d.IsChecked = true;
+            else if (!probe3dAvailable && touchAvailable)
+                rbFxProbeTouch.IsChecked = true;
         }
 
-        // The probe definition Set/Test position should actually use, per the Probe: radio selection (vise
-        // only - other kinds don't run a probe at Set time and always use the 3D probe for Test position).
+        // The probe definition Set/Test position should actually use, per the Probe: radio selection - every
+        // fixture kind now (see UpdateFieldVisibility's own comment). Set position itself still never runs a
+        // probe for the edge-probing kinds (a raw jog-capture); this only matters for Test position and, for
+        // CornerFence, the corner-locate pass inside it.
         private ProbeDefinition FixtureActiveProbe()
         {
             return rbFxProbeTouch.IsChecked == true
@@ -202,12 +271,11 @@ namespace CNC.Controls
             }
 
             fx.Coords = coords;
-            // A stale CornerOffsetX/Y/SpoilboardZ is meaningless once the reference it was measured from moves -
-            // clear it here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
+            // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it
+            // here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
             // setter's own comment for why that broke on real hardware).
             fx.CornerOffsetX = 0d;
             fx.CornerOffsetY = 0d;
-            fx.SpoilboardZ = 0d;
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
         }
@@ -215,14 +283,29 @@ namespace CNC.Controls
         // Cancel closes the dialog regardless (IsCancel="True") - the vise corner probe (RunViseCornerProbe)
         // streams asynchronously and isn't owned by this window, so closing mid-probe would otherwise leave it
         // running unsupervised while WatchAsyncCompletion's callback waits to touch a disposed window. Feed
-        // Hold only (never Stop/Reset here) - see the streamer-thread wedge notes: Stop/Reset during an
-        // in-flight move can leave grblHAL unrecoverable without a controller power-cycle, but Hold is safe.
-        // This pauses the motion; it does NOT abort the stream or resume it - the operator does that themselves
-        // from the main window's run controls once this dialog is gone.
+        // Hold first (never Reset while still in-flight here) - see the streamer-thread wedge notes: Reset
+        // during an in-flight MOVE can leave grblHAL unrecoverable without a controller power-cycle, but Hold
+        // is safe and brings the machine to a full stop. Once actually stopped, follow with a real Reset -
+        // "resume from the main window later" doesn't make sense once this dialog (the only thing tracking
+        // what was running) is gone, so leaving it merely paused just strands the operator in an unexplained
+        // Hold state - confirmed as confusing on real hardware 2026-07-30. Same delay idiom as
+        // JobControl.ResetAndUnlock (give the controller time to actually land in Hold before Reset).
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
             if (_probing)
+            {
                 Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_FEED_HOLD));
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                timer.Tick += (s, e2) =>
+                {
+                    timer.Stop();
+                    Comms.com.WriteByte((byte)GrblConstants.CMD_RESET);
+                };
+                timer.Start();
+            }
+            // IsCancel's built-in auto-close (and its Window.DialogResult=false) only fires for a window
+            // shown via ShowDialog() - this one is now shown with Show(), so Cancel has to close it itself.
+            Close();
         }
 
         // Vise Set position: the jogged position (within the schematic's circle, OVER the jaw, near its
@@ -282,7 +365,7 @@ namespace CNC.Controls
             b.AppendLine(string.Format("#<_lv_clear> = {0}", clearance.ToInvariantString("0.0##")));
             b.AppendLine(string.Format("#<_lv_searchf> = {0}", probe.ProbeFeedRate.ToInvariantString("0.0##")));
             b.AppendLine(string.Format("#<_lv_latchf> = {0}", probe.LatchFeedRate.ToInvariantString("0.0##")));
-            b.AppendLine(string.Format("#<_lv_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_lv_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d).ToInvariantString("0.0##")));
             b.AppendLine(string.Format("#<_lv_refx> = {0}", x));
             b.AppendLine(string.Format("#<_lv_refy> = {0}", y));
             b.AppendLine(string.Format("#<_lv_refz> = {0}", z));
@@ -396,6 +479,72 @@ namespace CNC.Controls
             if (fx == null || !fx.HasPosition || model == null)
                 return;
 
+            if (!ResolveTestPosition(fx))
+                return;
+
+            RunTestPositionMacro(fx);
+        }
+
+        // How far the machine has to have moved from the saved position before Test offers to adopt it.
+        // Below this the corrective rapid is physically meaningless, so asking would just be noise.
+        private const double PositionMovedToleranceMm = 0.1d;
+
+        // Test position rapids to the SAVED position (fx.Coords) before probing anything. If the operator has
+        // jogged since saving - which is exactly what the failed-search recovery below asks them to do - that
+        // rapid silently undoes the jog and re-runs the identical failing probe from the identical place.
+        // Confirmed from a real hardware log 2026-08-02: saved Z -80.032, operator jogged to -87.033 (8mm over
+        // the touch plate), pressed Test, and it drove back UP to -78.236 and alarmed 4mm short of the plate -
+        // having followed the app's own on-screen instruction to jog closer and press Test again.
+        //
+        // So when the two disagree, ask, and default to the live position: the operator jogged there
+        // deliberately and it is the better datum. Nothing moves until they answer. Returns false to abort.
+        private bool ResolveTestPosition(Fixture fx)
+        {
+            string current = Fixtures.CurrentCoordsCsv(model);
+            if (current == null)
+                return true;   // position unknown - nothing to compare; the macro's own PREREQ will catch it
+
+            var now = new Position(current);
+            var saved = new Position(fx.Coords);
+
+            if (Math.Abs(now.X - saved.X) <= PositionMovedToleranceMm &&
+                Math.Abs(now.Y - saved.Y) <= PositionMovedToleranceMm &&
+                Math.Abs(now.Z - saved.Z) <= PositionMovedToleranceMm)
+                return true;
+
+            var answer = AppDialogs.Show(string.Format(
+                    "The machine has moved since this fixture position was saved.\n\n" +
+                    "Saved:      X{0}  Y{1}  Z{2}\n" +
+                    "Current:  X{3}  Y{4}  Z{5}\n\n" +
+                    "Test from the current position? This replaces the saved position with where the machine " +
+                    "is now - the same thing Set position would do.",
+                    saved.X.ToInvariantString("0.0##"), saved.Y.ToInvariantString("0.0##"), saved.Z.ToInvariantString("0.0##"),
+                    now.X.ToInvariantString("0.0##"), now.Y.ToInvariantString("0.0##"), now.Z.ToInvariantString("0.0##")),
+                "Test position", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes,
+                yesText: "Use current", noText: "Use saved");
+
+            if (answer != MessageBoxResult.Yes && answer != MessageBoxResult.No)
+                return false;
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                fx.Coords = current;
+                // Same reasoning as btnSetPosition_Click: a corner offset measured from the OLD reference is
+                // meaningless once that reference moves, and this is a genuine re-jog.
+                fx.CornerOffsetX = 0d;
+                fx.CornerOffsetY = 0d;
+                UpdatePositionDisplay();
+                UpdateTestPositionEnabled();
+            }
+
+            return true;
+        }
+
+        // The actual macro build-and-kickoff, split out from the button click so the auto-recovery path
+        // (RecoverFromFailedSpoilboardSearch/PromptRetryCloserToSpoilboard below) can re-run it from Coords'
+        // new value without going through the button.
+        private void RunTestPositionMacro(Fixture fx)
+        {
             var probe = FixtureActiveProbe();
             if (probe == null)
             {
@@ -409,8 +558,29 @@ namespace CNC.Controls
             string x = pos.X.ToInvariantString("0.0##"), y = pos.Y.ToInvariantString("0.0##"), z = pos.Z.ToInvariantString("0.0##");
             string searchF = probe.ProbeFeedRate.ToInvariantString("0.0##"), latchF = probe.LatchFeedRate.ToInvariantString("0.0##");
 
+            // Bounded search depth below the SAVED Z (fx.Coords.Z - wherever the operator jogged to and clicked
+            // Set), not a blind dive toward the machine's own Z floor. Retracting to machine Z0 first and
+            // searching almost the full travel (the prior design here) threw away the one piece of real
+            // information we have - the operator's own careful jog height above the plate/stock - forcing an
+            // unbounded worst-case search that isn't actually safer, just less informed. This is the same
+            // ~12mm cap the pre-redesign version used (10mm expected jog clearance + 2mm buffer); it doesn't
+            // reintroduce a cached Zspoil dependency since the anchor is a FRESH live jog every time, never a
+            // stored value.
+            const double searchDepthMm = 12d;
+
+            // Machine's own Z soft-limit floor - only used below as pcorner.macro's internal fail-safe cap
+            // (_ls_zfloor/_bottom), never as this method's own search target anymore.
+            // +10d margin, not +1d: hardware run 2026-07-30 tripped Alarm:2 (soft limit) with only 1mm of
+            // margin - $132 travel apparently doesn't leave a full 1mm of headroom at the reported figure
+            // (homing pulloff/backlash eats into it).
+            double zFloor = GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d;
+
+            bool edgeProbing = FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented;
+
             var b = new StringBuilder();
-            b.AppendLine("(Test position - spoilboard probe search, 12 mm cap matching pcorner.macro's DISCOVER phase)");
+            b.AppendLine(edgeProbing
+                ? "(Test position - locate the true corner)"
+                : "(Test position - probe down from the saved Z)");
             // EXPR (grblHAL NGC expressions) is only actually exercised by the corner-locate O<pcorner> CALL
             // below (edge-probing kinds), but requiring it up front for every kind is harmless - keeps this in
             // sync with Start Job's own PREREQ for the same macro.
@@ -418,28 +588,24 @@ namespace CNC.Controls
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
             b.AppendLine("G10 L2 P1 X0 Y0 Z0");   // clear G54 - absolute Z probe below runs in machine coords, same as pcorner.macro
-            // Safe-Z travel to the saved reference: rapid (G0) retract to machine Z0, rapid XY, rapid drop to
-            // the saved Z - the same staged Z0/XY/Z pattern and G53G0 rapids GotoBaseControl.SafeGotoMachine
-            // uses for every other "go to a saved position" button in the app (found on real hardware to be
-            // needed here too - the earlier G1 F1000 feed-rate version crawled to XY instead of rapiding).
-            // Only the G38.2 probe searches below (already feed-limited to searchF/latchF) actually touch
-            // anything - this travel never reaches the target surface, so a rapid here is no less safe than
-            // any other Goto button's rapid.
-            b.AppendLine("G53G0Z0");
-            b.AppendLine(string.Format("G53G0X{0}Y{1}", x, y));
-            b.AppendLine(string.Format("G53G0Z{0}", z));
-            b.AppendLine(string.Format("G38.2 Z[{0} - 12] F{1}", z, searchF));
-            b.AppendLine("G91 G1 Z2 F1000");
-            b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
-            b.AppendLine("#<_tp_z> = #5063");
-            b.AppendLine("G91 G1 Z10 F1000");
-            b.AppendLine("G90");
-            b.AppendLine(string.Format("#<_tp_margin> = [{0} - #<_tp_z>]", z));
-            b.AppendLine("(PRINT, Test position OK - spoilboard is #<_tp_margin> mm below the saved Z (cap is 12 mm).)");
-            // Machine-readable echo of the raw probed Z, same (PRINT, TAG=value) idiom StartJobView.rxResult
-            // already parses for LS_X/LS_Y - picked up below via Model_PropertyChanged so it can be stored as
-            // Fixture.SpoilboardZ (edge-probing kinds only, see below).
-            b.AppendLine("(PRINT, SPOIL_Z=#<_tp_z>)");
+            // Explicit main-probe-input select (Q0 - both 3D probe and Touch Plate use it, only Tool Setter
+            // uses Q1, see GrblCommand.ProbeSelect's own callers) - not just relying on whatever was already
+            // active. A prior interrupted tool-change leaves Q1 selected (tc.macro's own comment on this
+            // exact hazard), which would silently send this Z probe to the toolsetter input instead.
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            b.AppendLine(string.Format("G53G0X{0}Y{1}Z{2}", x, y, z));
+
+            if (!edgeProbing)
+            {
+                // Non-edge-probing kinds never call pcorner below, so THIS is the only Z touch Test position
+                // ever makes - probe down searchDepthMm from the saved Z to confirm the probe actually reaches.
+                b.AppendLine(string.Format("G38.2 Z[{0}-{1}] F{2}", z, searchDepthMm.ToInvariantString("0.0##"), searchF));
+                b.AppendLine("G91 G1 Z2 F1000");
+                b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
+                b.AppendLine("G91 G1 Z10 F1000");
+                b.AppendLine("G90");
+                b.AppendLine("(PRINT, Test position OK - found a safe travel height.)");
+            }
 
             // Edge-probing kinds only (CornerFence today): also locate the true stock corner, ONCE, via a real
             // pcorner.macro DISCOVER pass (same wide-clearance search Start Job's own corner-1 probe used to run
@@ -448,39 +614,58 @@ namespace CNC.Controls
             // it as Fixture.CornerOffsetX/Y (relative to Coords). The fence is bolted down, so this only needs
             // doing once - Start Job then points its own single corner-1 probe straight at this stored anchor
             // instead of locating it fresh every run. See the "double probe of corner 1" backlog item.
-            if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented)
+            if (edgeProbing)
             {
-                double topClearance = probe.MinStandoff + 9d;   // same wide clearance Start Job's DISCOVER pass uses
-                const double thicknessAssumedMm = 6d;           // small on purpose - lands the face search near the top, safely inside any real stock
-                b.AppendLine("(--- locate the true corner (edge-probing kinds only) ---)");
+                // pcorner.macro's #<_ls_topx>/#<_ls_topy> exist to move an OUTSIDE-the-stock reference inward
+                // over solid material before the top probe (see its own file header). That doesn't apply here:
+                // the operator jogged directly to/near the corner, not to a point outside both faces, so the
+                // reference is already exactly where the top probe needs to be.
+                double topClearance = 0d;
+                // pcorner.macro now ALSO uses #<_ls_thickness> to size the pre-probe approach height
+                // (#<_bottom> + thickness + plateoffset + 10 - see its own comment), not just the (now-dead)
+                // face-search-depth role this comment used to describe. Test position has no real per-job
+                // stock thickness to draw from (it may run before any stock is even placed), so this stays a
+                // conservative worst-case assumption (matching the approach height's old blind "assume <=1in"
+                // constant) rather than the old deliberately-small 6mm - that value would have UNDER-sized
+                // the approach clearance the moment #<_ls_thickness> stopped being inert.
+                const double thicknessAssumedMm = 25.4d;
+                b.AppendLine("(--- locate the true corner ---)");
                 b.AppendLine("#<_ls_corner> = 1");   // FrontLeft - the only origin StartJobView.SelectedCorner ever uses
                 b.AppendLine(string.Format("#<_ls_refx> = {0}", x));
                 b.AppendLine(string.Format("#<_ls_refy> = {0}", y));
                 b.AppendLine(string.Format("#<_ls_rad> = {0}", (probe.ProbeDiameter / 2d).ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_spacer> = 0");
                 b.AppendLine(string.Format("#<_ls_thickness> = {0}", thicknessAssumedMm.ToInvariantString("0.0##")));
-                b.AppendLine("#<_ls_mode> = 0");
-                b.AppendLine("#<_ls_plateoffset> = 0");
+                // Threaded from the ACTUALLY selected probe now, not hardcoded to the 3D probe - a fence's
+                // own corner-locate needs the same touch-plate offsets Start Job's real run applies
+                // (StartJobView.BuildProgram), or a fence validated with a touch plate reports a corner
+                // shifted by the plate's own lip/thickness. #<_ls_mode> itself has no effect on THIS call
+                // (REUSE, #<_ls_startz> below - pcorner.macro only branches on mode inside its DISCOVER-only
+                // blocks) but is still set correctly in case that ever changes.
+                bool touchPlate = probe.ProbeType == ProbeType.TouchPlate;
+                b.AppendLine(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
+                b.AppendLine(string.Format("#<_ls_plateoffset> = {0}", (touchPlate ? probe.PlateThickness : 0d).ToInvariantString("0.0##")));
+                b.AppendLine(string.Format("#<_ls_lipoffset> = {0}", (touchPlate ? probe.LipWidth : 0d).ToInvariantString("0.0##")));
+                b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
                 b.AppendLine("#<_ls_spoilx> = 0");
                 b.AppendLine("#<_ls_spoily> = 0");
                 b.AppendLine(string.Format("#<_ls_topx> = {0}", topClearance.ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_topy> = {0}", topClearance.ToInvariantString("0.0##")));
-                b.AppendLine(string.Format("#<_ls_spoilz> = {0}", z));
                 b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
                 b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
-                b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
-                // REUSE mode (startz < 9000), NOT DISCOVER (9999): the spoilboard search just above already
-                // found the spoilboard, so pcorner.macro's own internal spoilboard probe (DISCOVER's o20 block)
-                // would be a second, redundant one - confirmed on real hardware (Test position visibly probed
-                // the spoilboard twice before ever reaching the corner). REUSE needs #<_bottom> pre-set (the
-                // global pcorner's REUSE path reads for its seek-depth cap) - #<_ls_startz> itself is never
-                // read for its VALUE, only compared against 9000, so any REUSE-range literal works; this
-                // block never explicitly set it before, so it silently inherited whatever a PRIOR pcorner call
-                // on the controller left behind (Start Job's own corner-1 call leaves 9999 = DISCOVER) - that
-                // stale global, not a deliberate choice, is what put this in DISCOVER mode.
-                b.AppendLine("#<_bottom> = #<_tp_z>");   // the spoilboard search above already found this; spacer unknown at fixture-test time (0)
+                b.AppendLine(string.Format("#<_ls_zfloor> = {0}", zFloor.ToInvariantString("0.0##")));
+                // REUSE mode (startz < 9000), NOT DISCOVER (9999): pcorner.macro's own internal spoilboard
+                // probe (DISCOVER's o20 block) would be redundant. #<_ls_maxz> is fed straight from the
+                // OPERATOR'S OWN saved Z - they jogged there deliberately as a safe height (same trust Set
+                // position already relies on), so there's no need to re-derive it with a separate probe first -
+                // pcorner's own o45 probe below is the only Z touch this call makes. #<_bottom> (its seek-depth
+                // cap) is bound to searchDepthMm below that same saved Z, not the machine floor - the same tight
+                // bound the old standalone probe used to enforce, just applied to pcorner's probe instead of a
+                // redundant one of our own. Confirmed on real hardware 2026-07-30 - probing the same XY twice
+                // made no sense once #<_ls_topx>/#<_ls_topy> stopped moving the reference anywhere.
+                b.AppendLine(string.Format("#<_bottom> = [{0}-{1}]", z, searchDepthMm.ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_startz> = 0");
-                b.AppendLine("#<_ls_maxz> = 0");
+                b.AppendLine(string.Format("#<_ls_maxz> = [{0}+2]", z));
                 b.AppendLine("#<_ls_appz> = 9999");
                 b.AppendLine(string.Format("O<pcorner> CALL [#<_ls_rad>]"));
                 // Park AT the true corner itself (not an inset/outset point) - CornerOffsetX/Y must be the raw
@@ -502,34 +687,29 @@ namespace CNC.Controls
             UpdatePositionDisplay();
             SetBusy(true);
 
-            _capturedSpoilZ = null;
-            PropertyChangedEventHandler spoilZHandler = (s, pe) =>
-            {
-                if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
-                    return;
-                var m = rxSpoilZ.Match(model.Message);
-                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
-                    _capturedSpoilZ = v;
-            };
-            model.PropertyChanged += spoilZHandler;
-
             var started = new RunStarted();
-            var handler = WatchAsyncCompletion(() => { model.PropertyChanged -= spoilZHandler; OnTestPositionDone(fx); }, started);
+            var handler = WatchAsyncCompletion(() => OnTestPositionDone(fx), started);
             bool ran = MacroProcessor.Run(model, "Test fixture position", b.ToString(), true);
             if (ran)
                 started.Value = true;
             else
             {
                 model.PropertyChanged -= handler;
-                model.PropertyChanged -= spoilZHandler;
                 SetBusy(false);
             }
         }
 
+        // grblHAL alarm substates for a G38.2 probe search that ran its full commanded travel without ever
+        // contacting anything (as opposed to a hard/soft limit, comms loss, etc.) - see ProbingView's own
+        // (commented-out) handling of the same 2 substates.
+        private const int AlarmSubstateProbeFailInitial = 4;
+        private const int AlarmSubstateProbeFailContact = 5;
+
         // Runs once Test position's async streamed probe has genuinely finished.
         private void OnTestPositionDone(Fixture fx)
         {
-            fx.PositionValidated = model.GrblState.State != GrblStates.Alarm;
+            bool alarmed = model.GrblState.State == GrblStates.Alarm;
+            fx.PositionValidated = !alarmed;
             // Edge-probing kinds: the macro above parked the machine at the tight corner anchor as its very
             // last move, so the CURRENT machine position now IS that anchor - same "read back after the macro
             // parks there" idiom OnViseCornerProbeDone uses for Set position. Store it relative to Coords (the
@@ -539,12 +719,21 @@ namespace CNC.Controls
                 var refPos = new Position(fx.Coords);
                 fx.CornerOffsetX = model.MachinePosition.X - refPos.X;
                 fx.CornerOffsetY = model.MachinePosition.Y - refPos.Y;
-                // Captured off the (PRINT, SPOIL_Z=..) line via spoilZHandler above - lets Start Job reuse this
-                // spoilboard search instead of repeating it every job (StartJobView.BuildProgram).
-                if (_capturedSpoilZ.HasValue)
-                    fx.SpoilboardZ = _capturedSpoilZ.Value;
             }
             UpdatePositionDisplay();
+
+            // The bounded 12mm search below the saved Z (RunTestPositionMacro) came up empty - the operator
+            // wasn't actually within reach of the plate/stock from where they jogged and clicked Set. Still
+            // recover automatically (unlock +
+            // retract to the saved Z) and offer to retry, rather than just reporting failure and leaving the
+            // operator to unlock/jog/retry by hand. Stays busy (no SetBusy(false) here) until that whole
+            // recovery flow settles - see RecoverFromFailedSpoilboardSearch.
+            if (alarmed && (model.GrblState.Substate == AlarmSubstateProbeFailInitial || model.GrblState.Substate == AlarmSubstateProbeFailContact))
+            {
+                RecoverFromFailedSpoilboardSearch(fx);
+                return;
+            }
+
             SetBusy(false);
             // The macro's own (PRINT, Test position OK - ...) message gets clobbered by JobControl's generic
             // "<Program> ready - press Run to run" banner (SetActiveProgramReady) - Test position reuses
@@ -552,6 +741,67 @@ namespace CNC.Controls
             // of the Idle transition, before this deferred callback runs. Re-assert a clear final message here,
             // same as OnViseCornerProbeDone already does for Set position.
             model.Message = fx.PositionValidated ? "Test position OK - validated." : "Test position failed or alarmed - not validated.";
+        }
+
+        // Unlock the probe-fail alarm ($X - no full reset needed, nothing actually faulted) and retract to the
+        // saved reference Z, then (once that retract genuinely finishes) prompt the operator to jog closer and
+        // retry. A short delay after $X lets the controller's Idle state actually land before the retract macro
+        // starts - same reasoning as JobControl.ResetAndUnlock's own post-unlock delay.
+        private void RecoverFromFailedSpoilboardSearch(Fixture fx)
+        {
+            double savedZ = new Position(fx.Coords).Z;
+            model.Message = "Test position failed - the search never made contact. Unlocking and retracting...";
+            model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+
+                var b = new StringBuilder();
+                b.AppendLine("(Test position recovery - retract to the saved Z after a failed spoilboard search)");
+                b.AppendLine("(PREREQ, connected, homed, noalarm)");
+                b.AppendLine("G21 G90");
+                b.AppendLine(string.Format("G53G0Z{0}", savedZ.ToInvariantString("0.0##")));
+
+                var started = new RunStarted();
+                var handler = WatchAsyncCompletion(PromptRetryCloserToSpoilboard, started);
+                bool ran = MacroProcessor.Run(model, "Test position recovery", b.ToString(), false);
+                if (ran)
+                    started.Value = true;
+                else
+                {
+                    model.PropertyChanged -= handler;
+                    SetBusy(false);
+                    model.Message = "Test position failed - could not retract automatically. Jog clear by hand.";
+                }
+            };
+            timer.Start();
+        }
+
+        // The machine is back at the saved Z and unlocked - explain why it failed and what to do about it.
+        //
+        // This used to ask the operator to "jog closer ... then click OK to retry automatically" and then
+        // compare Z on the way out. That could never work: AppDialogs.Show is a blocking ShowDialog, so the
+        // on-screen jog pad is dead for as long as the prompt is up, and the compare therefore always saw an
+        // unchanged Z and fell through to "jog closer, then click Test position" - advice that was itself
+        // wrong, because Test rapids back to the saved position first and undoes the jog. A real hardware log
+        // (2026-08-02) caught the whole loop: fail, retract, dismiss, jog 7mm closer, press Test, drive
+        // straight back up, fail identically. Both halves are gone; the operator jogs freely once this is
+        // dismissed and ResolveTestPosition above offers to adopt the new position on the next Test.
+        private void PromptRetryCloserToSpoilboard()
+        {
+            SetBusy(false);
+
+            AppDialogs.Show(
+                "Test position failed - the probe search never made contact within 12mm below the saved Z. " +
+                "The alarm has been cleared and the machine returned to the saved Z.\n\n" +
+                "Check the probe (or, for Touch Plate, that a conductive object is actually staged at this " +
+                "position), then jog to within ~10mm above the surface and press Test position again - it " +
+                "will offer to use the new position.",
+                "Test position", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            model.Message = "Test position failed - jog closer to the surface, then press Test position again.";
         }
 
         private void SelectKind(FixtureKind kind)
@@ -593,12 +843,16 @@ namespace CNC.Controls
             Show(drwCornerStyle, edges);
             Show(drwKnownPosition, !edges);
 
-            // Jaw width/Max opening/probe picker are vise-only - drawing dimensions and probe choice,
-            // meaningless for an edge-probing kind (its Set position is a raw jog-capture, no probe run).
+            // Jaw width/Max opening are vise-only drawing dimensions - meaningless for an edge-probing kind.
             bool isVise = kind == FixtureKind.MachinistVise;
             Show(fldJawWidth, isVise);
             Show(fldMaxOpening, isVise);
-            Show(pnlFxProbeType, isVise);
+            // The probe picker used to be vise-only too, on the reasoning that an edge-probing kind's Set
+            // position is a raw jog-capture with no probe run - true, but Test position DOES run a probe for
+            // every kind (RunTestPositionMacro, gated on FixtureKinds.ProbesSpoilboard which is unconditionally
+            // true), so a Corner Fence etc. needs the same choice. A dead 3D probe with no way to switch a
+            // fence's own fixture to Touch Plate for revalidation was the real-world case that found this.
+            Show(pnlFxProbeType, true);
 
             txtNotImplemented.Visibility = FixtureKinds.Implemented(kind) ? Visibility.Collapsed : Visibility.Visible;
         }
@@ -608,9 +862,16 @@ namespace CNC.Controls
             el.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // Set (not Window.DialogResult - that throws unless the window was shown via ShowDialog) now that
+        // this dialog is opened with Show(), not ShowDialog(): non-modal, so Set/Test position can be run
+        // while the main window's jog pad and keyboard jogging stay reachable, instead of jogging being
+        // impossible for the whole time this dialog is open. Callers check this from the dialog's own
+        // Closed event instead of a ShowDialog() return value.
+        public bool Saved { get; private set; }
+
         private void btnOk_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = true;
+            Saved = true;
             Close();
         }
     }

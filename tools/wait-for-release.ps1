@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Wait for the "Rolling release" GitHub Actions run triggered by the just-pushed commit to finish.
   Playbook: docs/playbooks/end_of_session_wrapup.md (step 3.5).
@@ -21,7 +21,10 @@ param(
     [string]$Repo = 'ioSenderV2/ioSender',
     [string]$Workflow = 'release.yml',
     [int]$TimeoutSeconds = 300,
-    [int]$PollSeconds = 15
+    [int]$PollSeconds = 15,
+    # The release workflow pushes a changelog-stamp commit to master; this script fast-forwards onto it
+    # so the next push isn't rejected. -NoPull opts out (e.g. checking a release from another worktree).
+    [switch]$NoPull
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,6 +54,38 @@ if (-not $run) {
 
 if ($run.conclusion -eq 'success') {
     Write-Host "OK  Rolling release succeeded: $($run.url)" -ForegroundColor Green
+
+    # release.yml's last step commits the changelog version stamps and pushes them straight to master,
+    # so the moment this run reports success the local branch is one commit behind v2/master. Pull it
+    # here rather than leaving it to whoever is following the wrap-up: forgetting means the NEXT push
+    # (the legacyVersion bump) is rejected with "fetch first", which is how v2.36 and v2.38 both ended
+    # up needing a recovery merge.
+    if (-not $NoPull) {
+        Write-Host "Pulling the changelog stamp the release just pushed ..." -ForegroundColor Cyan
+        & git -C $repoRoot fetch v2 --quiet 2>&1 | Out-Null
+
+        $behind = (& git -C $repoRoot rev-list --count HEAD..v2/master 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "WARN  could not read v2/master - pull it by hand before the version bump." -ForegroundColor Yellow
+        }
+        elseif ([int]$behind -eq 0) {
+            Write-Host "OK  already up to date with v2/master (nothing was stamped)." -ForegroundColor Green
+        }
+        else {
+            # --ff-only on purpose: the stamp commit should be the ONLY thing there. If this refuses,
+            # something else pushed to master and that deserves a look, not an automatic merge.
+            & git -C $repoRoot merge --ff-only v2/master 2>&1 | Write-Host
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "OK  fast-forwarded $behind commit(s) from v2/master." -ForegroundColor Green
+            }
+            else {
+                Write-Host "STOP  v2/master has diverged - it is not just the changelog stamp." -ForegroundColor Red
+                Write-Host "      Look at 'git log HEAD..v2/master' and merge deliberately (do NOT rebase:" -ForegroundColor Red
+                Write-Host "      your commits are already on origin/integration)." -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
     exit 0
 }
 else {

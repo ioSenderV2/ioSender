@@ -45,3 +45,15 @@ CNC.Core.g.en-US.resources:libstrings.baml,str_prbSecondary:System.String.$Conte
 CNC.Core.g.en-US.resources:libstrings.baml,str_prbToolSetter:System.String.$Content,None,True,True,,Toolsetter
 CNC.Core.g.en-US.resources:libstrings.baml,str_sdStreamComplete:System.String.$Content,None,True,True,,SD Card streamelés {0}% kész
 CNC.Core.g.en-US.resources:libstrings.baml,str_serialPortError:System.String.$Content,None,True,True,,Nem lehet megnyitni a soros portot: {0}
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatController:System.String.$Content,None,True,True,,Controller
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatApplication:System.String.$Content,None,True,True,,Application
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatJogging:System.String.$Content,None,True,True,,Jogging
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatGCode:System.String.$Content,None,True,True,,G Code
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsCatInterface:System.String.$Content,None,True,True,,User Interface
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageKeyboard:System.String.$Content,None,True,True,,Keyboard
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageController:System.String.$Content,None,True,True,,Controller
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageJobLayout:System.String.$Content,None,True,True,,Job tab layout
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageTopTabs:System.String.$Content,None,True,True,,Top-level tabs
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsPageCalStepper:System.String.$Content,None,True,True,,Stepper
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsMatchedText:System.String.$Content,None,True,True,,Matched text: {0}
+CNC.Core.g.en-US.resources:libstrings.baml,str_settingsMatchedTooltip:System.String.$Content,None,True,True,,Matched tooltip: {0}

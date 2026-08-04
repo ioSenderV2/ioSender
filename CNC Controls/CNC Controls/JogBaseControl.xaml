@@ -76,56 +76,88 @@
         </StackPanel>
         <StackPanel x:Name="arrowPanel" Orientation="Horizontal" Margin="115,10,5,0" Width="Auto" Height="Auto">
             <StackPanel Orientation="Horizontal" Width="Auto" Height="Auto" Visibility="{Binding Path=LatheModeEnabled, Converter={StaticResource IsNotVisibleConverter}}">
-                <StackPanel VerticalAlignment="Center">
-                    <local:JogButton Content="X-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                </StackPanel>
-                <StackPanel VerticalAlignment="Center" Margin="5,0">
-                    <local:JogButton Content="Y+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                    <!-- Centre button: bullseye = "go to centre at safe Z" when idle; red stop sign = "stop jog" while
-                         jogging. Icon + tooltip swap off GrblState via IsJoggingConverter (no code-behind needed). -->
-                    <Button x:Uid="btn_jogCenter" Margin="0,5" Click="CenterButton_Click" ToolTip="Go to centre at safe Z">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource JogButtonStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
-                                        <Setter Property="ToolTip" Value="Stop jog"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <Grid>
-                            <!-- Stop sign kept in the tree but intentionally hidden: panel/keyboard jogs are
-                                 momentary (they stop the instant the button/key is released), so flashing a stop
-                                 affordance here would be misleading. The button still cancels an in-progress move
-                                 when clicked; the blank face during a jog is the honest state. -->
-                            <Viewbox Width="34" Height="34" Visibility="Collapsed">
-                                <Grid Width="100" Height="100">
-                                    <Polygon Points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" Fill="#FFD32F2F" Stroke="#FFB71C1C" StrokeThickness="4" StrokeLineJoin="Round"/>
-                                </Grid>
-                            </Viewbox>
-                            <Viewbox Width="34" Height="34">
-                                <Viewbox.Style>
-                                    <Style TargetType="Viewbox">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GrblState, Converter={StaticResource IsJoggingConverter}}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Viewbox.Style>
-                                <Grid Width="100" Height="100">
-                                    <Ellipse Width="98" Height="98" Fill="#FFD32F2F"/>
-                                    <Ellipse Width="64" Height="64" Fill="White"/>
-                                    <Ellipse Width="30" Height="30" Fill="#FFD32F2F"/>
-                                </Grid>
-                            </Viewbox>
-                        </Grid>
+                <Grid VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="60"/>
+                        <RowDefinition Height="60"/>
+                        <RowDefinition Height="60"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Corner buttons: rapid to the corresponding machine corner (20 mm held back from each
+                         travel limit) at safe Z - same safe G53 jog pattern as the centre bullseye. Icon is an
+                         L-bracket at the button's own corner (the two short 90-deg lines) with a short tail
+                         pointing back toward the pad centre, so each icon visually points at where it goes.
+                         These four and the centre bullseye are the "go to a place" buttons hidden together by
+                         Settings > User Interface > General > Show go-to buttons on the jog pad. Collapsing
+                         them leaves the arrow pad exactly where it is - the grid's rows/columns are a fixed
+                         60 px, so the empty corner cells still hold their space. -->
+                    <Button Grid.Row="0" Grid.Column="0" x:Uid="btn_jogCornerTL" Tag="TL" Style="{StaticResource JogButtonStyle}" Click="CornerButton_Click" ToolTip="Go to back-left corner at safe Z"
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleConverter}}">
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <Line X1="2" Y1="2" X2="32" Y2="2" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="2" Y1="2" X2="2" Y2="32" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="2" Y1="2" X2="45" Y2="45" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
                     </Button>
-                    <local:JogButton Content="Y-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                </StackPanel>
-                <StackPanel VerticalAlignment="Center">
-                    <local:JogButton Content="X+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                </StackPanel>
+                    <Button Grid.Row="0" Grid.Column="2" x:Uid="btn_jogCornerTR" Tag="TR" Style="{StaticResource JogButtonStyle}" Click="CornerButton_Click" ToolTip="Go to back-right corner at safe Z"
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleConverter}}">
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <Line X1="98" Y1="2" X2="68" Y2="2" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="98" Y1="2" X2="98" Y2="32" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="98" Y1="2" X2="55" Y2="45" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+
+                    <local:JogButton Grid.Row="0" Grid.Column="1" Content="Y+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
+                    <local:JogButton Grid.Row="1" Grid.Column="0" Content="X-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
+                    <local:JogButton Grid.Row="1" Grid.Column="2" Content="X+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
+                    <local:JogButton Grid.Row="2" Grid.Column="1" Content="Y-" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
+
+                    <!-- Centre button: bullseye = "go to centre at safe Z", one job only. It used to double as a
+                         stop-jog while a jog was running (blank face + "Stop jog" tooltip) - removed 2026-08-03 as
+                         non-obvious: nothing on the button said so. Releasing the key/button, Feed Hold and Reset
+                         all still stop a jog. -->
+                    <Button Grid.Row="1" Grid.Column="1" x:Uid="btn_jogCenter" Style="{StaticResource JogButtonStyle}" Click="CenterButton_Click" ToolTip="Go to centre at safe Z"
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleConverter}}">
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <Ellipse Width="98" Height="98" Fill="#FFD32F2F"/>
+                                <Ellipse Width="64" Height="64" Fill="White"/>
+                                <Ellipse Width="30" Height="30" Fill="#FFD32F2F"/>
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+
+                    <Button Grid.Row="2" Grid.Column="0" x:Uid="btn_jogCornerBL" Tag="BL" Style="{StaticResource JogButtonStyle}" Click="CornerButton_Click" ToolTip="Go to front-left corner at safe Z"
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleConverter}}">
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <Line X1="2" Y1="98" X2="32" Y2="98" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="2" Y1="98" X2="2" Y2="68" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="2" Y1="98" X2="45" Y2="55" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+                    <Button Grid.Row="2" Grid.Column="2" x:Uid="btn_jogCornerBR" Tag="BR" Style="{StaticResource JogButtonStyle}" Click="CornerButton_Click" ToolTip="Go to front-right corner at safe Z"
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleConverter}}">
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <Line X1="98" Y1="98" X2="68" Y2="98" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="98" Y1="98" X2="98" Y2="68" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="98" Y1="98" X2="55" Y2="55" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+                </Grid>
                 <StackPanel Style="{StaticResource ZAxisVisibleStyle}" VerticalAlignment="Center" Margin="5,0,0,0">
                     <local:JogButton Content="Z+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
                     <local:JogButton Content="Z-" Style="{StaticResource JogButtonStyle}" Margin="0,70,0,0" VerticalAlignment="Top" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>

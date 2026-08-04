@@ -39,3 +39,180 @@ The menu bar, toolbar row, program view, console, and camera access all changed.
 ### Not yet built (will add MORE debt when done)
 - Help → Support **Check for updates** (deferred feature).
 - **Macro-name flyout** replacing the removed macro toolbar (deferred idea).
+
+---
+
+## Debt from the job-flow redesign (#190–#195, shipped 2026-07-26 to 2026-07-31)
+
+Big one: "Start Job" was renamed to **Setup** and unified into one shared tab (no longer duplicated/G59-pinned
+for Odd Jobs); Odd Jobs was retired and its Work Order composer promoted to a **top-level Work Order tab**;
+Work Order's Run now hands its generated program to the real Job-tab program list (with a Source: File/
+Generated badge + Edit-jump-back button) instead of a floating preview; Setup gained a Dynamic
+fixture/Geometry panel (folds in the Probing-tab pickers + Height Map), Material-driven conductive-probing
+rules, and touch-plate TLO support.
+
+### Text — DONE 2026-07-31
+- [x] `#start-job` topic renamed to `#setup`, all internal links repointed, body rewritten for the unified
+      Setup tab (Fixture/Probe/Geometry/Stock incl. Material/Actions incl. G54–G59/G92 + height map fold-in,
+      conductive-stock callout, "no completion gate" note).
+- [x] New `#work-order` topic added (toolpaths/operations tree, Generate/tool-ordering, Run → Job-tab handoff,
+      Source/Edit badge, "one Setup not one per program" callout, T-number reservation callout).
+- [x] `#job` topic's "Loading a program" list gained Work Order as a third source; mentions the
+      Source (File/Generated) badge and Edit button.
+- [x] Getting-started tab table + "first five minutes" list updated to include Work Order.
+
+### Screenshots to reshoot/add
+- [x] `start-job-panel.png` → reshot 2026-08-01, current Setup tab (normal fixture, Material/Stock/Actions visible).
+- [x] **New: a Work Order screenshot** → `work-order.png`, added 2026-08-01, shows the toolpath/operations
+      tree (Contour/Pocket/Oval 1/Counterbore) plus the tool-order popover and compiled g-code. Wired into
+      the `#work-order` topic in place of the shot-todo placeholder.
+- [x] `job-runscreen.png` → reshot TWICE 2026-08-01. First pass caught a real product bug while sourcing the
+      shot: Work Order's run showed status in a separate floating panel (`_macroRunView`, not the docked Job
+      tab list) with a dead status column - fixed same session (`MacroProcessor.Run` gained an opt-in
+      `preferJobView` flag; `RunStreamedJobInPlace` now builds the Work Order burst directly into
+      `GCode.File` instead of a disconnected transient copy, so `ProgramPanel`'s own docked
+      `GCodeListControl` - permanently bound to `GCode.File.Data` - gets the live `ok`/`*` writes for free).
+      Final reshot confirms it working: docked list shows live status, no floating panel, no Edit button
+      (there never really was a "Source: File/Generated badge" as first described - corrected in the manual
+      text along with the now-removed floating-panel/Edit-button claims).
+
+### Screenshots batch — FULLY DONE 2026-08-01
+All three planned shots (`start-job-panel.png`, `work-order.png`, `job-runscreen.png`) plus the optional
+bonus (`setup-dynamic-geometry.png` - Dynamic fixture + Geometry panel, doubles as a live example of the
+conductive-stock warning) are in and wired into `index.html`. Nothing left on this batch.
+
+- [x] Bonus find, not originally tracked: `offsets-table.png` was also stale (showed an old run-bar control)
+      - reshot 2026-08-01, current tab strip/run bar. Same filename, no `index.html` change needed.
+- [x] **Superseded by a bigger decision, same day:** the user decided to remove the `#probing` and
+      `#heightmap` topics from the manual ENTIRELY (2026-08-01), not just re-caption them - both tabs are
+      still registered in `TabRegistry.cs` (`ViewType.Probing`/`ViewType.HeightMap`, not `alwaysVisible`) and
+      kept in the codebase "for the short term", but are no longer part of the user's own layout or the
+      recommended workflow (Setup's Dynamic fixture covers ad-hoc probing; Setup's "Probe height map" action
+      covers surface compensation). Both `<section>` blocks removed from `index.html`, every cross-reference
+      link to `#probing`/`#heightmap` elsewhere in the manual cleaned up (Intro, Getting Started, Clean
+      Results, Accuracy & Calibration, Setup, Offsets, Machine Setup - ~14 spots total), tag balance verified
+      (`<section>`/`<ul>`/`<figure>` counts all matched after the edit). `probing-tabs.png` and
+      `heightmap.png` are now orphaned image files - left in `docs/manual/img/` (git history keeps them
+      recoverable) rather than deleted, flagged orphaned in `_image-review.html`. If either tab comes back
+      into the recommended workflow later, these topics can be restored from git history (`git log --
+      docs/manual/index.html`) rather than rewritten from scratch.
+
+### Not yet built (will add MORE debt when done)
+- Hardware verification is still in progress for several Work Order paths (bore clearing, counterbore→
+  through-drill on one centreline, tabs-on-last-op, patterned bolt circles) and the touch-plate TLO path —
+  once verified, the manual's "behind the scenes"/callout wording may need a confidence-level pass.
+
+---
+
+## Debt from v2.36 / v2.37 / v2.38 (#197–#208, shipped 2026-08-01 to 2026-08-03)
+
+The last UI-invalidating wave before the manual rewrite. The **Settings and Machine Setup tab strips are
+gone** (#208, replaced by one shared searchable navigation tree), **calibration moved into Machine Setup**
+(#197), **spoilboard surfacing became a Work Order toolpath** (#198), and the **Tools tab lost half its
+contents and now hides itself** (#204).
+
+### Text — DONE 2026-08-03
+- [x] `#settings` rewritten: nav tree + five categories (Controller / Application / Jogging / G Code /
+      User Interface) replaces the 8-row tab table; search-the-words-on-the-page with match count and the
+      "Matched tooltip:" explainer; Camera/Demo recording (OBS) split; why the Grbl page keeps its own
+      `$`-tree; sub-tab key bindings dropped (top-level unaffected).
+- [x] `#machine-setup`: eight steps → **nine** (new **8 · Calibration** with Stepper + Squareness
+      sub-pages); "row of numbered tabs" → nav tree with green/orange/red status dots; new
+      "Defining a fixture (step 6)" section covering the non-modal dialog, Test-offers-current-position,
+      and per-fixture probe memory (**this closes the long-deferred M4 fixture-dialog item**).
+- [x] `#tools` rewritten small per the user's call (2026-08-03: rewrite, don't delete — the tab is kept in
+      code for other users' hardware): only Tool table / Trinamic / PID, each with its gating condition, a
+      "no Tools tab? nothing is wrong" callout, and a where-did-the-rest-go table pointing at Work Order and
+      Machine Setup. Figure dropped — `tools-tab.png` is now orphaned (it showed a removed tool).
+- [x] `#work-order`: Surface toolpath + Entire Spoilboard (and why it ignores the work order's WCS on
+      purpose), the WCS field (Follow Setup / pinned G54–G59), user-addable custom tools + name-based
+      operation binding, Dry Run really neutralizes the spindle.
+- [x] `#setup`: new "Plate thickness always applies" callout — touch-plate compensation is no longer gated
+      on stock conductivity (#202), which was a real 12 mm Z error on hardware.
+- [x] `#jogging`: jog-pad centre (bullseye / stop sign) and four corner buttons with the 20 mm holdback,
+      plus the "targets the machine envelope, not the loaded program" note.
+- [x] `#offsets`: new "Go To needs a homed machine" warn callout (#201 — the false-zero G30 crash).
+- [x] `#job`: run bar dropped the feed unit label into a tooltip; both readouts size for five digits.
+- [x] `#accuracy-calibration`: repointed steps/mm and squaring at Machine Setup → Calibration (the standalone
+      manual/scratch wizards are deleted, not moved).
+- [x] `#getting-started` tab table: Tools row now says it only appears if the controller supports it;
+      Settings row mentions the nav tree.
+- [x] Swept every stale `#tools` cross-reference (intro spoilboard, toolsetter callout, clean-results,
+      accuracy xref, feeds-and-speeds xref) and `Settings → App` → `Settings → Application`.
+- [x] Verified: all `href="#…"` anchors resolve, `<section>` tags balanced 18/18.
+
+### Screenshots to reshoot/add — NOT DONE
+Needs `-testserver`, so it needs the user's explicit turn-by-turn go-ahead.
+- [ ] `settings-grbl.png` — **dead**, shot pre-nav-shell. Needs the tree + Grbl page.
+- [ ] **New: a settings-search shot** — search box with a match count and ideally a "Matched tooltip:" hit,
+      since that's the headline feature of #208 and the hardest to describe in words.
+- [ ] `machine-setup-overview.png` — **dead**, shot pre-nav-shell. Needs the nine steps with status dots.
+- [ ] **New: a Machine Setup → Calibration shot** — the step that absorbed the deleted wizards.
+- [ ] **New: a Work Order Surface toolpath shot** — ideally with Entire Spoilboard ticked.
+- [ ] `tools-tab.png` — now **orphaned** (no figure references it). Leave in `img/`, git keeps it
+      recoverable; only reshoot if a Tools figure is ever wanted again.
+
+### Known app bug found while auditing (NOT a manual bug)
+- [ ] Machine Setup's in-app **Overview** step list (`MachineSetupWizard.xaml`, `ov_s1`–`ov_s6`) stops at six
+      entries and is wrong from 6 onward — it says "6 · Controller macros" when step 6 is Fixture definitions
+      and 7 is Controller macros. Missing Fixture definitions, Calibration and Build simulator entirely.
+      Fixing it means 3 new `x:Uid` rows through `tools/locadd.py` across all 7 locales.
+
+---
+
+## Debt from v2.39 (#209–#214, shipped 2026-08-03)
+
+The **tabs-to-menus move**. The main bar was cut back to what a running job needs — Setup, Job, Work
+Order, Offsets — and everything else went to the **File** and **Tools** menus, opening in its own
+window (#210). The **Tools container tab is gone entirely**: its three hardware-gated tools are
+individual Tools-menu entries. On top of that: interface preferences gathered under **User Interface →
+General** (#211), a shortcut now names a *view* not a place plus the **Top-level tabs placement
+editor** (#212), the jog pad's go-to buttons became optional (#213), and #214's fix batch moved the
+console off **Esc** onto **F12**.
+
+### Text — DONE 2026-08-04
+- [x] `#getting-started` "The main window at a glance": the six-row tab table (which still listed
+      Machine Setup, Settings and Tools as tabs) split into a **four-tab table** plus a **menu-bar
+      table** for Connect / File / Tools / Help, and a callout that the split is a default — Top-level
+      tabs moves anything anywhere, and a shortcut follows its view.
+- [x] `#tools`: no longer "the Tools tab holds three utilities" — three separate Tools-menu entries
+      under Camera, with the real labels (Tool table, **Trinamic tuner**, **PID Tuner**). The
+      "No Tools tab?" callout became "Nothing under Camera in the Tools menu?".
+- [x] Locations corrected: Machine Setup = **File → Machine**, Settings = **File → Settings** (both in
+      their own window), SD Card and Feeds and Speeds = **Tools →**, and `#connect` now says the
+      handshake enables the *views* a controller supports, not "the tabs".
+- [x] `#settings` category table: **User Interface gained the General page** (#211) with what actually
+      moved onto it, and **Application → Main** is described as controller comms rather than "colours,
+      behaviour" — those left in #211.
+- [x] `#lathe`: dropped "turn on lathe mode under Settings → Application → Main" — there is no such
+      switch; lathe mode follows the controller reporting `LATHE` in `$I`. Wizards are at
+      **Tools → Lathe Tools**.
+- [x] Verified after the pass: every `href="#…"` resolves, 18 topic sections balanced.
+- [x] Already current before this pass, checked not assumed: `#settings` placement editor + shortcut
+      rules + search-owner naming (written when #212/#209 shipped), `#jogging` go-to-buttons checkbox,
+      and the **F12** console key in `#job`.
+
+### Screenshots — mostly DONE 2026-08-04
+Shot with `build.ps1 -default-config -Shot <name>`, so they match a fresh install rather than this
+box's saved layout; the script files the capture when you quit the app.
+- [x] `main-window-tools-menu.png` (`#getting-started`) — Tools menu open over the tab strip. Setup sits
+      *behind* the open menu (unavoidable: the menu drops from directly above it), and the menu is short
+      because Camera needs a bound device and the tool/tuner entries need a controller that has them —
+      both now said in the caption rather than pretended away.
+- [x] `settings-top-level-tabs.png` (`#settings`) — placement rows with the Offsets dropdown open on all
+      four destinations. Doubles as proof Settings opens in its own window.
+- [x] `work-order-composition.png` (`#work-order`) — **replaces the planned Surface shot as the lead
+      figure**, per the user: a real five-toolpath, fifteen-operation work order says far more than a
+      spoilboard pass. The old `work-order.png` moved down to sit beside Generate.
+- [x] `machine-setup-calibration.png` (`#machine-setup`) — **Z stepper via a 1-2-3 block, NOT a fixture.**
+      The planned caption was wrong: a default config has no fixture *by design* (a fixture is a validated
+      known position), and Z stepper calibration never needed one.
+- [x] `work-order-surface.png` (`#work-order`) — a Surface toolpath with the **Feeds and Speeds dialog
+      open**, which turned out to be worth more than the planned framing: it is the manual's only shot of
+      the advisor, so the caption covers material, chip load and the ±10% nudge. *Entire Spoilboard* sits
+      behind the dialog, so the caption says so rather than letting the figure imply it.
+
+**No screenshot placeholders remain in the page.**
+- [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
+      the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
+      window chrome in the shot doesn't misrepresent where they live.

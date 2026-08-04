@@ -1,4 +1,4 @@
-ioSender.g.en-US.resources:mainwindow.baml,lbl_jogStep:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance for keyboard step jog (with &lt;CTRL&gt; modifier).
+﻿ioSender.g.en-US.resources:mainwindow.baml,lbl_jogStep:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance for keyboard step jog (with &lt;CTRL&gt; modifier).
 ioSender.g.en-US.resources:mainwindow.baml,mnu_about:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_About
 ioSender.g.en-US.resources:mainwindow.baml,mnu_briefTour:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,A _brief tour
 ioSender.g.en-US.resources:mainwindow.baml,mnu_camera:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Camera
@@ -114,16 +114,16 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.F
 ioSender.g.en-US.resources:mainwindow.baml,btn_copyMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the full status message to the clipboard
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load Folder...
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a folder of per-operation g-code files as one combined program.
-ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load File...
-ioSender.g.en-US.resources:programpanel.baml,btn_loadFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.
+ioSender.g.en-US.resources:programpanel.baml,txt_noProgramHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,No program loaded - use Load File in the menu.
 ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#x2715;
 ioSender.g.en-US.resources:programpanel.baml,btn_closeFileHdr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Close the loaded program.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_connect:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Co_nnect...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Load File...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFile:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load a single g-code file.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Application _data folder
 ioSender.g.en-US.resources:mainwindow.baml,mnu_support:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Support
 ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Check for updates...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_checkForUpdates:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check if a newer version of ioSender is available on GitHub.
-ioSender.g.en-US.resources:mainwindow.baml,btnProgramView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show/hide the program view over the work area.
 ioSender.g.en-US.resources:mainwindow.baml,btnTimeLapse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Run if you don't; auto-OFF at job end."
 ioSender.g.en-US.resources:startjobview.baml,ls_lblFixture:System.Windows.Controls.ContentControl.Content,Label,True,True,,Fixture:
 ioSender.g.en-US.resources:startjobview.baml,txtFxInstanceName:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Type a name and Set to save the current machine position as a fixture instance.
@@ -164,3 +164,39 @@ ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.Control
 ioSender.g.en-US.resources:startjobview.baml,ls_setorigin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"On (default): the generated program commits the probed/measured position as this WCS's origin (and its rotation, if Set work rotation from skew is on). Off: still probes/measures and reports the numbers, but leaves the selected WCS untouched."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_installFusionAddin:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Install ioSenderV2 Fusion Addin...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_installFusionAddin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Symlink the ioSenderV2 Fusion 360 add-in into Fusion's AddIns folder. Future ioSenderV2 updates need no reinstall - only shown when Fusion 360 is installed for this user.
+ioSender.g.en-US.resources:startjobview.baml,ls_material:System.Windows.Controls.ContentControl.Content,Label,True,True,,Material:
+ioSender.g.en-US.resources:startjobview.baml,cbxMaterial:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Stock material - used by the Odd Jobs job wizards' Feeds and Speeds recommendation.
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_safez:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Shared safe retract height every Odd Jobs job wizard's program uses between passes/tool changes.
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Label,None,False,True,,Keep-out inset:
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_keepout:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Perimeter clearance to stay clear of - typically clamps/screws holding the stock down around its edge. Shown as a dotted red line on the drawing; used by the Odd Jobs job wizards' own toolpaths."
+ioSender.g.en-US.resources:startjobview.baml,ls_grpGeometry:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Geometry
+ioSender.g.en-US.resources:startjobview.baml,ls_geomExternal:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,External
+ioSender.g.en-US.resources:startjobview.baml,ls_geomInternal:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Internal
+ioSender.g.en-US.resources:startjobview.baml,ls_geomIsCircle:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Is Circle
+ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:CNC.Controls.NumericField.Label,None,False,True,,Passes:
+ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."
+ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probe height map
+ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Label,None,False,True,,Grid X:
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grid spacing along X for the height-map probe (mm between probed points).
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:CNC.Controls.NumericField.Label,None,False,True,,Grid Y:
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:startjobview.baml,ls_hmGridY:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grid spacing along Y for the height-map probe (mm between probed points).
+ioSender.g.en-US.resources:startjobview.baml,ls_grpDynamic:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Dynamic probe point
+ioSender.g.en-US.resources:startjobview.baml,ls_centerSolid:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Solid boss
+ioSender.g.en-US.resources:startjobview.baml,ls_centerHole:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Hole
+ioSender.g.en-US.resources:startjobview.baml,ls_holeRound:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Round
+ioSender.g.en-US.resources:startjobview.baml,ls_holeNotRound:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Not round
+ioSender.g.en-US.resources:startjobview.baml,ls_holeNotRound:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Not implemented in this prototype - non-round hole probing needs more probe points than the round case handles today.
+ioSender.g.en-US.resources:startjobview.baml,ls_geomInternal:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Touch Plate probing of internal (hole) geometry normally needs conductive stock touched directly - a custom plate shaped to reach inside a hole can still work on non-conductive stock, but a standard flat plate can't."
+ioSender.g.en-US.resources:startjobview.baml,ls_geomIsCircle:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Touch Plate probing of a round boss normally needs conductive stock touched directly - the plate can't wrap the curved surface. A custom plate may still work on non-conductive stock.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_newWorkOrder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_New Work Order...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_newWorkOrder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Switch to the Work Order tab and start composing a new one.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Loa_d Work Order...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Switch to the Work Order tab and open a saved .workorder file.
+ioSender.g.en-US.resources:mainwindow.baml,txt_runFeedTip:System.Windows.Documents.Run.Text,Text,True,True,,Current feed rate
+ioSender.g.en-US.resources:mainwindow.baml,mnu_tools:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Tools

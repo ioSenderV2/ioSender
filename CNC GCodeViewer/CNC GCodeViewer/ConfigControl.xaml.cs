@@ -45,8 +45,12 @@ namespace CNC.Controls.Viewer
     /// <summary>
     /// Interaction logic for ConfigControl.xaml
     /// </summary>
-    public partial class ConfigControl : UserControl, IRestartRequired
+    public partial class ConfigControl : UserControl, IRestartRequired, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.GCode; } }
+        public int SettingsOrder { get { return 10; } }
+
         public event EventHandler<RestartRequiredEventArgs> RestartRequired;
 
         public ConfigControl()

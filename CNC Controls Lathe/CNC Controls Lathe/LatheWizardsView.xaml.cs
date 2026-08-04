@@ -135,10 +135,21 @@ namespace CNC.Controls.Lathe
             {
                 if (e.AddedItems.Count == 1)
                 {
-                    if (e.RemovedItems.Count == 1)
-                        getView(e.RemovedItems[0] as TabItem).Activate(false);
+                    var leaving = e.RemovedItems.Count == 1 ? getView(e.RemovedItems[0] as TabItem) : null;
+                    var entering = getView(e.AddedItems[0] as TabItem);
 
-                    getView(e.AddedItems[0] as TabItem).Activate(true);
+                    // Deferred, not called inline. Selection fires from inside a layout pass - for a
+                    // menu-hosted view the very first one, during Window.Show's measure - and WPF runs
+                    // layout with dispatcher processing disabled. TurningWizard.Activate reaches
+                    // GrblParserState.Get, which pumps a nested message loop (EventUtils.DoEvents), and
+                    // PushFrame throws "Cannot perform this operation while dispatcher processing is
+                    // suspended" (crash 2026-08-04, opening Lathe Tools from the Tools menu). One
+                    // dispatcher pass later, layout is finished and pumping is legal again.
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        leaving?.Activate(false);
+                        entering?.Activate(true);
+                    }), System.Windows.Threading.DispatcherPriority.Background);
                 }
                 e.Handled = true;
             }

@@ -126,7 +126,15 @@ namespace CNC.Controls
 
         public static ObservableCollection<ProbeDefinition> Items
         {
-            get { if (_items == null) Load(); return _items; }
+            get
+            {
+                if (_items == null)
+                {
+                    CNC.Core.DebugLog.Write("probes", "Items read before the Probes section loaded - falling back to Load()");
+                    Load();
+                }
+                return _items;
+            }
         }
 
         private static string FilePath
@@ -166,6 +174,7 @@ namespace CNC.Controls
         // Snapshot for the App.config "Probes" section serializer.
         public static ProbeDefinitionList Export()
         {
+            CNC.Core.DebugLog.Write("probes", string.Format("Export: writing {0} definition(s)", _items?.Count ?? -1));
             return new ProbeDefinitionList { Items = new List<ProbeDefinition>(Items) };
         }
 
@@ -176,7 +185,20 @@ namespace CNC.Controls
             if (list?.Items != null)
                 foreach (var d in list.Items)
                     _items.Add(d);
+            // Fresh install (no Probes section at all yet): ship a typical 3D probe + touch plate rather than
+            // an empty library, so the Machine Setup gate no longer has to force a stop over this (step 5 in
+            // MachineSetupWizard.FirstIncompleteStep) - a new operator can go straight into Start Job/Odd Jobs
+            // Setup, which prompts them once to review these generic numbers against their actual hardware
+            // (see AppConfig.Settings.Base.ProbeDefinitionsReviewed) rather than blocking on it up front.
+            bool seeded = _items.Count == 0;
+            if (seeded)
+            {
+                _items.Add(new ProbeDefinition { Name = "3D probe", ProbeType = ProbeType.ThreeDProbe });
+                _items.Add(new ProbeDefinition { Name = "Touch plate", ProbeType = ProbeType.TouchPlate });
+            }
             Renumber(_items);
+            CNC.Core.DebugLog.Write("probes", string.Format(
+                "SetItems: incoming={0} seeded={1} now={2}", list?.Items?.Count ?? -1, seeded, _items.Count));
         }
 
         // One-time importer: read the legacy standalone ProbeDefinitions.xml if present, so an existing library
@@ -192,7 +214,10 @@ namespace CNC.Controls
                         return (ProbeDefinitionList)xs.Deserialize(fs);
                 }
             }
-            catch { }
+            // A throw here (corrupt or locked file) returned null silently, which downstream reads as
+            // "nothing to import" - identical to the file not existing. Log it, or a failed import
+            // looks exactly like a fresh install with no library to carry over.
+            catch (System.Exception ex) { CNC.Core.DebugLog.Write("probes", "ReadLegacyFile failed, treating as no library to import - " + ex.Message); }
             return null;
         }
 

@@ -84,7 +84,7 @@ namespace CNC.Controls
         {
             var c = (FeedControl)d;
             bool on = (bool)e.NewValue;
-            c.cvFeedRate.Visibility = c.lblFeedRrate.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+            c.readoutPanel.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
             c.readoutRow.Height = on ? new GridLength(0) : GridLength.Auto;
             c.readoutRow.MinHeight = on ? 0 : 30;
         }

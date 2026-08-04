@@ -63,9 +63,20 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
-        private const string legacyVersion = "2.31";
+        private const string legacyVersion = "2.41";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
+
+        /// <summary>
+        /// The vertical flyout tab strip (sidebarCanvas's stacked labels). Exposed because the flyout PANELS
+        /// open leftward out of that 22px canvas (Canvas.Right=22, ClipToBounds=False, ZIndex 1) and so float
+        /// over whatever the Job view has in its right-most panel column - JobView keeps that column clear of
+        /// them by measuring against this. Null until the window is built.
+        /// </summary>
+        public static FrameworkElement SidebarFlyoutStrip
+        {
+            get { return ui == null ? null : ui.sidebarTabs; }
+        }
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
 
@@ -204,10 +215,31 @@ namespace GCode_Sender
             // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
             // use ?.Invoke, so they no-op). Feed Hold / Stop are always reachable from the fixed bar.
 
-            // Every producer (Load/Load Folder and each wizard) owns its ProgramView and connects it; host the
+            // Every producer (Load File and each wizard) owns its ProgramView and connects it; host the
             // connected view in the overlay with its own title bar. Wizards (AutoShow) pop it open as Generate
             // feedback; the loaded job connects quietly. On disconnect, revert to the view beneath (job, or none).
             CNC.Controls.ProgramView.ActiveChanged += OnOverlayActiveChanged;
+
+            // A generated program whose source lives on another tab (e.g. Work Order) shows an Edit button;
+            // ProgramView/CNC Controls has no reference to MainWindow's tab strip, so it raises this instead
+            // of switching tabs itself.
+            CNC.Controls.ProgramView.EditRequested += view =>
+            {
+                if (!view.EditTargetTab.HasValue)
+                    return;
+                var tab = getTab(view.EditTargetTab.Value);
+                if (tab != null)
+                    ui.tabMode.SelectedItem = tab;
+            };
+
+            // Work Order's Run hands its generated program off to the Job tab and back again - same
+            // tab-switch mechanism as EditRequested above.
+            CNC.Controls.MacroProcessor.SwitchToTab = viewType =>
+            {
+                var tab = getTab(viewType);
+                if (tab != null)
+                    ui.tabMode.SelectedItem = tab;
+            };
 
             // When the active view collapses to its 3-line run view, size the overlay popup to content (top-
             // aligned) instead of stretching full height, so the popup itself shrinks - not just the grid.
@@ -215,7 +247,7 @@ namespace GCode_Sender
 
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, onDone);
+            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, preferJobView, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, preferJobView, onDone);
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
             // instance must not become a pipe listener either, or a later normal launch would silently
@@ -305,7 +337,7 @@ namespace GCode_Sender
             mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
-            // A real file/folder load creates the job's own program view and connects it (ProgramView refactor):
+            // A real file load creates the job's own program view and connects it (ProgramView refactor):
             // the overlay hosts it like any tool's view, and Cycle Start streams the freshly loaded file.
             if (DataContext is GrblViewModel gvm)
                 gvm.PropertyChanged += (s, e) =>
@@ -313,7 +345,7 @@ namespace GCode_Sender
                     if (e.PropertyName == nameof(GrblViewModel.FileName))
                         OnJobFileChanged((DataContext as GrblViewModel)?.FileName);
                     else if (e.PropertyName == nameof(GrblViewModel.GrblState))
-                        UpdateConnectionGatedTabs();   // enable operational tabs on connect, disable on disconnect
+                        UpdateConnectionGatedViews();  // enable operational tabs AND menu entries on connect
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
@@ -576,12 +608,6 @@ namespace GCode_Sender
             }), DispatcherPriority.Input);
         }
 
-        private void ProgramView_Toggled(object sender, RoutedEventArgs e)
-        {
-            _programOverlay = btnProgramView.IsChecked == true;
-            UpdateOverlay();
-        }
-
         // Program view and console log share one overlay over the work area, side by side. Each column is
         // shown (and given equal width) only when its trigger is active; the host collapses when neither is.
         private void UpdateOverlay()
@@ -592,11 +618,11 @@ namespace GCode_Sender
         }
 
 
-        // The loaded job's own program view (ProgramView refactor): Load File / Load Folder create+connect it so
-        // the overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
+        // The loaded job's own program view (ProgramView refactor): Load File creates+connects it so the
+        // overlay hosts the job uniformly, alongside the wizards - no more "the fallback == the job" special
         // case. It renders via SetProgram(null) (the null == loaded-job convention) so it keeps the live streamed
-        // collection, the mint source highlight and folder outline grouping; AutoShow is off so a load doesn't
-        // pop the overlay open.
+        // collection, the mint source highlight and toolpath outline grouping; AutoShow is off so a load
+        // doesn't pop the overlay open.
         private CNC.Controls.ProgramView jobProgramView;
 
         // A plain streamed macro (not a tool that owns its own view) runs in this dedicated view, so it shows in
@@ -637,19 +663,18 @@ namespace GCode_Sender
         }
 
         // A program is just a list of G-code blocks; build one from generated text so a wizard program renders
-        // in the same program view as a file/folder (no raw-text special case).
+        // in the same program view as a loaded file (no raw-text special case).
         // Host the connected ProgramView in the popup ONLY when it's genuinely transient (AutoShow - a wizard's
         // Generate output, or a plain macro run). The loaded job's own view (jobProgramView, AutoShow=false)
         // already has a persistent home in the docked Job-tab panel (ProgramPanel), so this popup must never
-        // show it a second time - the "Program" button is disabled whenever there's nothing showable here.
+        // show it a second time. No manual toggle any more - it shows/hides purely by AutoShow, since the
+        // wizard's Generate output resets on tab-leave and program-exit anyway.
         private void OnOverlayActiveChanged()
         {
             var active = CNC.Controls.ProgramView.Active;
             bool showable = active != null && active.AutoShow;
 
             overlayActiveHost.Content = showable ? active : null;
-            btnProgramView.IsEnabled = showable;
-            btnProgramView.IsChecked = showable;   // AutoShow pops the popup open as Generate feedback
             _programOverlay = showable;
 
             ApplyOverlayCompact();
@@ -711,10 +736,28 @@ namespace GCode_Sender
 
         private void CompleteStartup()
         {
+            // Odd Jobs no longer has its own "Setup" sub-tab (job-flow unification, 2026-07-31) - Setup is
+            // the Start Job tab now, one shared screen for both. See AppConfig's layout-migration fixup for
+            // dropping the retired sub-tab entry from any profile that still has it.
+
             // Build the main tabs from the registry (Phase 1: MainWindow is a container). Must run
             // before anything that resolves a tab via getTab()/getView() below.
             RegisterBuiltinTabs();
             BuildTabs();
+            BuildViewMenus();
+
+            // Tell the operator (not just the log) if ConfigStore had to discard a section on load - see
+            // ConfigStore.LoadWarnings / AppConfig.LastLoadWarnings' own comments. Once per launch; shown
+            // here (not the constructor) so it lands after the main window has actually painted.
+            if (AppConfig.LastLoadWarnings?.Count > 0)
+            {
+                AppDialogs.Show(this,
+                    "Some saved settings could not be loaded and were reset to their defaults (the rest of your "
+                    + "configuration loaded normally):\n\n" + string.Join("\n", AppConfig.LastLoadWarnings)
+                    + "\n\nThis usually means a value was saved by a version this build no longer recognises.",
+                    "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppConfig.LastLoadWarnings = null;
+            }
 
             // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
             // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -
@@ -780,7 +823,7 @@ namespace GCode_Sender
 
             UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
 
-            xx.ItemsSource = UIViewModel.SidebarItems;
+            sidebarTabs.ItemsSource = UIViewModel.SidebarItems;
 
             // Build sidebar flyouts from the user's FlyoutItems list (Edit Main Page dialog).
             var seenFlyouts = new System.Collections.Generic.HashSet<string>();
@@ -857,8 +900,10 @@ namespace GCode_Sender
                 showPinned.Start();
             }
 
+            BuildMacroMenuItems();
+
             // Set the initial connection-gated tab state (Start Job etc. disabled until connect).
-            UpdateConnectionGatedTabs();
+            UpdateConnectionGatedViews();
 
             // Land on the Job (GRBL) tab. It is always enabled, and its Activate runs the controller handshake
             // (Controller.Restart -> OnBooted -> InitSystem -> $I: EXPR/ENUMS/ATC/WCSROT) and manages status
@@ -907,6 +952,8 @@ namespace GCode_Sender
 #if DEBUG
             ActionKeyBinder.Register("Screenshot", Screenshot_Action);
 #endif
+
+            registerMenuActions();
 
             if (!string.IsNullOrEmpty(AppConfig.Settings.FileName))
             {
@@ -957,6 +1004,12 @@ namespace GCode_Sender
 
         // On first run (no machine saved) wait for the controller to report version + settings, then bring the
         // Machine Setup Wizard to the foreground. Polls so it works regardless of connect/settings-read timing.
+        // Soft gate (see the design conversation this came from): only steps 1-4 (machine identity/homing/
+        // axis/limits) - the machine genuinely can't be jogged or run anything without those - ever force
+        // this dialog open at startup. Probe definitions and ATC macros (steps 5/7) are real requirements
+        // too, but only for probing/ATC-dependent work specifically, so they're deferred to a readiness
+        // check when Start Job/Odd Jobs Setup is actually opened (StartJobView's own check) instead of
+        // blocking every session on a machine that's otherwise perfectly usable.
         private void ForceMachineSetupIfNeeded()
         {
             if (_machineSetupForced)
@@ -980,7 +1033,7 @@ namespace GCode_Sender
                 }
                 // Skip the gate when connected to the simulator - it's not a real machine to set up.
                 bool sim = Comms.com != null && Comms.com.IsOpen && AppConfig.Settings.Base.StartSimulator;
-                int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep(hardGateOnly: true);
                 if (step == 0 || sim)
                 {
                     RevealMainWindow();   // setup complete (or simulator): straight to the normal UI
@@ -1000,7 +1053,7 @@ namespace GCode_Sender
                     confirm.Stop();
                     if (GrblSettings.IsLoaded)
                     {
-                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
+                        int step2 = CNC.Controls.MachineSetupWizard.FirstIncompleteStep(hardGateOnly: true);
                         // TEMP DIAGNOSTIC (2026-07-19) - see above. step2==0 means the settle re-check
                         // caught a transient race (as designed); step2!=0 means it's still incomplete after
                         // settling, i.e. NOT just the known post-reset stale-listing race.
@@ -1019,7 +1072,7 @@ namespace GCode_Sender
         // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
         // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
         // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, System.Action onDone)
+        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, bool preferJobView, System.Action onDone)
         {
             if (code == null || code.Length == 0)
             {
@@ -1027,7 +1080,21 @@ namespace GCode_Sender
                 return;
             }
 
-            var prog = new CNC.Controls.GCode(m);                        // transient - does not mutate the job/Model
+            // preferJobView (Work Order, which already made itself the loaded job via GCode.File.Push/LoadText
+            // before streaming) opts OUT of the "never touch the Job tab" rule below and builds this burst
+            // straight into GCode.File itself instead of a disconnected transient copy. The Job tab's actual
+            // docked list (ProgramPanel's own GCodeListControl, in ProgramPanel.xaml) is permanently bound to
+            // GCode.File.Data (its own Loaded handler falls back to it and nothing ever redirects it away) -
+            // an EARLIER attempt at this fix routed the live burst into jobProgramView instead (a SEPARATE
+            // ProgramView instance, not the one ProgramPanel actually displays) and the docked status column
+            // never updated, confirmed on real hardware 2026-08-01. Rebuilding directly into GCode.File means
+            // the same collection ProgramPanel is already watching receives the live "ok"/"*"/"@" writes.
+            // Single-burst assumption: Work Order's compiled program has no (MBOX)/(WAITIDLE), so
+            // MacroProcessor.Run always flushes it as ONE burst - Action.New here replaces GCode.File's
+            // content wholesale, which would be wrong for a hypothetical FUTURE multi-burst preferJobView
+            // caller (each burst would wipe the previous one's). Fine for Work Order today; revisit if
+            // preferJobView ever gets a second caller that streams more than one burst.
+            var prog = preferJobView ? GCode.File : new CNC.Controls.GCode(m);   // else: transient, does not mutate the job/Model
             prog.AddBlock(name, CNC.Core.Action.New);
             for (int i = 0; i < code.Length - 1; i++)
                 prog.AddBlock(code[i], CNC.Core.Action.Add);
@@ -1037,16 +1104,20 @@ namespace GCode_Sender
             // Mark the ACTUAL streamed program in a ProgramView so the live per-line markers ("@"/"ok") and scroll
             // track the run. A tool that owns its view (a wizard) marks its own; a plain macro - no tool view, or
             // only the loaded-job view is active - gets a dedicated run view, so a run never overwrites the job.
-            var connected = CNC.Controls.ProgramView.Active;
-            if (connected != null && connected != jobProgramView)
-                connected.SetProgram(prog.Data);
-            else
+            // preferJobView needs none of this - prog IS GCode.File, already shown by the docked view.
+            if (!preferJobView)
             {
-                EnsureMacroRunView();
-                _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
-                _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
-                _macroRunView.SetProgram(prog.Data);
-                _macroRunView.Connect();
+                var connected = CNC.Controls.ProgramView.Active;
+                if (connected != null && connected != jobProgramView)
+                    connected.SetProgram(prog.Data);
+                else
+                {
+                    EnsureMacroRunView();
+                    _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
+                    _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
+                    _macroRunView.SetProgram(prog.Data);
+                    _macroRunView.Connect();
+                }
             }
             RestoreSourceOnEnd(m, prog, isFinalBurst, onDone);   // revert to the job source when THIS burst ends, then signal completion
 
@@ -1084,6 +1155,7 @@ namespace GCode_Sender
         private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
         {
             bool started = false;
+            bool jobFinished = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
             {
@@ -1094,6 +1166,15 @@ namespace GCode_Sender
                     st, started, m.GrblState.State));
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
+                // JobFinished is only ever raised on a genuine program end (M30/M2, see JobControl's
+                // StreamingHandler.Call(StreamingState.JobFinished, ...) call sites) - a Feed Hold + Stop
+                // instead routes through StreamingState.Stop on its way back to Idle. Both eventually land on
+                // the SAME terminal Idle/NoFile state below, so without this distinction a Feed Hold + Stop
+                // was indistinguishable from a clean finish and wrongly discarded the generated program
+                // (Run bar reverted to "Generate" mid-job with no way to resume) - confirmed on real
+                // hardware 2026-07-27 on the Odd Jobs Pocket tool.
+                if (st == StreamingState.JobFinished)
+                    jobFinished = true;
                 // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
                 // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
                 // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
@@ -1142,10 +1223,10 @@ namespace GCode_Sender
                         // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
                         // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
                         // the operator re-generates for the next job rather than re-running a stale program.
-                        // Left alone on error/halt (same condition as the program-view dismiss above) so the
-                        // operator can still inspect/re-run the SAME generated program after fixing whatever
-                        // interrupted it, without redoing Generate.
-                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode)
+                        // Left alone on error/halt (same condition as the program-view dismiss above), AND on
+                        // a Feed Hold + Stop (jobFinished false - see its own comment above) so the operator
+                        // can still inspect/RESUME the SAME generated program, without redoing Generate.
+                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode && jobFinished)
                             CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
                     }
                     // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
@@ -1163,6 +1244,34 @@ namespace GCode_Sender
             m.PropertyChanged += handler;
         }
 
+        /// <summary>
+        /// Bring Machine Setup up wherever the layout puts it - the tab when it is on the bar, its own window
+        /// when it is a File-menu entry (the default since 2026-08-03) - and hand back the view so the caller
+        /// can drive it. Null only if it could not be shown at all.
+        ///
+        /// Every caller here used to do getTab(ViewType.MachineSetup) and quietly do nothing when that came
+        /// back null, which it always does for a menu-hosted view. The startup gate then showed its "let's
+        /// finish setting up your machine" prompt and left the operator on the Job screen - and since the
+        /// wizard was never reached, no step could be completed, so FirstIncompleteStep stayed non-zero and
+        /// the gate fired again on every single launch. Same shape as ShowWorkOrder; see its comment.
+        /// </summary>
+        private CNC.Controls.MachineSetupView ShowMachineSetupView()
+        {
+            TabItem tab = getTab(ViewType.MachineSetup);
+            if (tab != null)
+            {
+                tab.IsEnabled = true;
+                tabMode.SelectedItem = tab;
+                return getView(tab) as CNC.Controls.MachineSetupView;
+            }
+
+            var d = TabRegistry.DescriptorFor(ViewType.MachineSetup);
+            if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                return null;
+
+            return ViewHostWindow.ViewInstance(ViewType.MachineSetup) as CNC.Controls.MachineSetupView;
+        }
+
         private void ShowMachineSetup(int step)
         {
             _machineSetupForced = true;
@@ -1170,17 +1279,22 @@ namespace GCode_Sender
             CNC.Controls.MachineSetupWizard.SetupApplied -= OnMachineSetupApplied;
             CNC.Controls.MachineSetupWizard.SetupApplied += OnMachineSetupApplied;
 
-            TabItem tab = getTab(ViewType.MachineSetup);
-            if (tab != null)
-            {
-                tab.IsEnabled = true;
-                tabMode.SelectedItem = tab;
-                (getView(tab) as CNC.Controls.MachineSetupView)?.GoToStep(step);
-            }
+            ShowMachineSetupView()?.GoToStep(step);
 
             AppDialogs.Show(this,
                 "Let's finish setting up your machine.\n\nWork through the steps - the normal screen opens once all are complete.",
                 "Machine setup", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Jump to a Machine Setup step by CHOICE, not the startup gate - e.g. Start Job/Odd Jobs Setup's own
+        // readiness popup sending the operator to review probe definitions or fixtures. Unlike ShowMachineSetup
+        // (the forced-gate path), this does NOT set _machineSetupForced or wire the Apply-driven "stay here
+        // until every step is complete" loop - the operator can navigate away freely, same as opening the tab
+        // by hand. Internal (not private): StartJobView is in this same assembly and has no MainWindow
+        // reference of its own to call an instance method on other than the shared MainWindow.ui.
+        internal void GoToMachineSetupStep(int step)
+        {
+            ShowMachineSetupView()?.GoToStep(step);
         }
 
         // Apply fired: re-check the setup steps. Still gaps -> lead to the next one and stay; all complete
@@ -1190,8 +1304,7 @@ namespace GCode_Sender
             int step = CNC.Controls.MachineSetupWizard.FirstIncompleteStep();
             if (step != 0)
             {
-                Dispatcher.BeginInvoke(new System.Action(() =>
-                    (getView(getTab(ViewType.MachineSetup)) as CNC.Controls.MachineSetupView)?.GoToStep(step)));
+                Dispatcher.BeginInvoke(new System.Action(() => ShowMachineSetupView()?.GoToStep(step)));
                 return;
             }
 
@@ -1224,6 +1337,28 @@ namespace GCode_Sender
         }
 
         // Persist a flyout's pin state so it reopens (pinned) on next launch.
+        // "Add to menu" macros (Settings: Macros > Create dialog's "Add to main menu" checkbox): each
+        // becomes its own top-level menu item, appended after Help. Built once at startup, same as
+        // FlyoutItems/MainPanels - a newly ticked/unticked macro takes effect on next launch.
+        private void BuildMacroMenuItems()
+        {
+            int insertAt = menuMain.Items.IndexOf(menuHelp) + 1;
+            foreach (var macro in AppConfig.Settings.Macros)
+            {
+                if (!macro.AddToMenu)
+                    continue;
+
+                var item = new MenuItem { Header = (macro.Name ?? string.Empty).Replace("_", "__"), Tag = macro };
+                item.Click += (s, e) =>
+                {
+                    var m = (CNC.GCode.Macro)((MenuItem)s).Tag;
+                    if (MacroProcessor.Run(DataContext as GrblViewModel, m.Name, m.Code, m.ConfirmOnExecute))
+                        AppConfig.Settings.RecordMacroRun(m.Id);
+                };
+                menuMain.Items.Insert(insertAt++, item);
+            }
+        }
+
         private void MainPanelFlyout_PinnedChanged(IPinnableFlyout flyout)
         {
             var pinned = AppConfig.Settings.Base.PinnedFlyouts;
@@ -1287,6 +1422,13 @@ namespace GCode_Sender
                 }
                 AppConfig.Settings.Save();
             }
+
+            // Safety net for AutoSaveWorkOrderOnExit when Work Order ISN'T the tab on screen at exit -
+            // CurrentView.Activate(false) below only reaches whichever tab IS active, and that path already
+            // handles Work Order's own save (respecting PromptBeforeAutoSaveWorkOrder) when it IS the active
+            // one - skip here so this doesn't step on that by silently saving first.
+            if (!(UIViewModel.CurrentView is CNC.Controls.WorkOrderView))
+                CNC.Controls.WorkOrderView.AutoSaveOnAppExit();
 
             UIViewModel.CurrentView.Activate(false, ViewType.Shutdown);
 
@@ -1935,6 +2077,55 @@ namespace GCode_Sender
             menuConnect.Header = connected ? "Reco_nnect..." : "Co_nnect...";
         }
 
+        private void LoadFile_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.Open();
+        }
+
+        // Main-menu entry points for the Work Order tab (2026-07-31), same idea as Load File above: jump
+        // straight to the tab and run its New/Load action, rather than making the operator find the tab
+        // and its own toolbar button first.
+        private void NewWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            ShowWorkOrder()?.New();
+        }
+
+        private void LoadWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            ShowWorkOrder()?.Load();
+        }
+
+        /// <summary>
+        /// Bring the Work Order composer up, wherever the layout puts it. Work Order ships as a tab, but
+        /// the tabs/menu split is the user's to change in Settings > Main Page - so these menu entries
+        /// must not assume either: select the tab when there is one, open the host window when there
+        /// isn't. Any caller that needs to drive a relocatable view should follow this shape.
+        /// </summary>
+        private WorkOrderView ShowWorkOrder()
+        {
+            var tab = getTab(ViewType.WorkOrder);
+            if (tab != null)
+            {
+                tabMode.SelectedItem = tab;
+                return getView(tab) as WorkOrderView;
+            }
+            return OpenViewWindow(ViewType.WorkOrder) as WorkOrderView;
+        }
+
+        /// <summary>
+        /// Open (or re-focus) a menu-hosted view's window and hand back the hosted control, for the
+        /// callers that need to drive it afterwards (New/Load a work order, jump to a settings page).
+        /// Returns null if the view isn't registered in this build.
+        /// </summary>
+        public UserControl OpenViewWindow(ViewType view)
+        {
+            var d = TabRegistry.DescriptorFor(view);
+            if (d == null)
+                return null;
+            ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            return ViewHostWindow.ViewInstance(view);
+        }
+
         private void connectMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
@@ -2272,8 +2463,9 @@ namespace GCode_Sender
             Topmost = false;
         }
 
-        // (fileSave/Open/OpenFolder/Close menu handlers removed in the menu overhaul - Load/Load Folder/Close
-        //  are now on the program-view header and Save is in its right-click menu, all via the static GCode.File.)
+        // (fileSave/Open/OpenFolder/Close menu handlers removed in the menu overhaul - Load File is its own
+        //  top-level menu item, Close is on the program-view header, and Save is in its right-click menu, all
+        //  via the static GCode.File. Load Folder itself was retired entirely - see GCodeJob.HasSections.)
 
         private void TabMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -2292,6 +2484,17 @@ namespace GCode_Sender
             bool onJob = nextView != null && nextView.ViewType == ViewType.GRBL;
             if (!tabReorderDragging)
                 sidebarCanvas.Visibility = onJob ? Visibility.Visible : Visibility.Collapsed;
+
+            // Never activate/deactivate views mid-reorder-drag. Reordering does Items.Remove/Insert, which
+            // raises SelectionChanged SYNCHRONOUSLY while the moved TabItem is unparented - and an unparented
+            // TabItem has no inherited DataContext, so a view activated in that window sees DataContext == null.
+            // That crashed the app with a NullReferenceException in SDCardView.Activate (crash report
+            // 2026-07-29 14:47:29Z), and SDCardView is not special - any view whose Activate touches
+            // DataContext was exposed. The drag also fired this on EVERY tick, activating a different view
+            // each time, which is the real source of the repaint churn the drag-clip was introduced to mask.
+            // On drop, the settled selection raises this once more and the right view activates normally.
+            if ((sender as StretchTabControl)?.IsReordering == true)
+                return;
 
             if ((DataContext as GrblViewModel).IsReady &&
                 UIViewModel.CurrentView != null && nextView != null && nextView != UIViewModel.CurrentView)
@@ -2367,7 +2570,13 @@ namespace GCode_Sender
         // Enable/disable the connection-gated tabs (descriptor EnabledWhenDisconnected == false) as the controller
         // connects/disconnects. Only acts on a change of connection so it doesn't fight the JobRunning enable rules
         // during a job (a job never spans a connect transition). Idempotent; safe to call from the state handler.
-        private void UpdateConnectionGatedTabs()
+        // Named "views", not "tabs": a connection-gated view can live on the tab bar OR in a menu, and the
+        // two must flip together. They did not - UpdateConnectionGatedMenuItems existed but had no caller,
+        // so SD Card / Probing / Height Map / Lathe Tools were built disabled (IsEnabled =
+        // EnabledWhenDisconnected) and nothing ever switched them on: greyed out and unclickable with the
+        // machine connected and idle (confirmed on hardware 2026-08-04). Calling it from here is what keeps
+        // the two paths from drifting apart again.
+        private void UpdateConnectionGatedViews()
         {
             bool connected = Comms.com != null && Comms.com.IsOpen;
             if (connected == _connGatedTabsOn)
@@ -2383,6 +2592,8 @@ namespace GCode_Sender
                 if (d != null && !d.EnabledWhenDisconnected)
                     tab.IsEnabled = connected;
             }
+
+            UpdateConnectionGatedMenuItems(connected);
         }
 
         public static void ShowView(bool show, ViewType view)
@@ -2434,20 +2645,36 @@ namespace GCode_Sender
             // (ComponentAvailability). Tabs that only need a live controller stay available and act on connect.
             // enabledWhenDisconnected: which tabs are usable before a controller connects. Job stays on for
             // offline g-code load/preview; Settings/Tools/Machine Setup are config/setup work. The operational
-            // tabs (Start Job, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
-            // disabled until connect and re-enabled by UpdateConnectionGatedTabs on the connect transition.
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 10, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds & Speeds"), () => new FeedsAndSpeedsView(), 20, enabledWhenDisconnected: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabStartJob", "Start Job"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true));
+            // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
+            // disabled until connect and re-enabled by UpdateConnectionGatedViews on the connect transition.
+            // --- the main tab bar: the three views used while a job is actually being run ---
+            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 60, enabledWhenDisconnected: false,
-                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected));
-            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 70, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.Tools, TabLabel("TabTools", "Tools"), () => new ToolsView(), 80, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine Setup"), () => new MachineSetupView(), 90, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 100, enabledWhenDisconnected: false));
-            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 110, enabledWhenDisconnected: false));
+
+            // --- File menu: the two configuration destinations ---
+            TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine"), () => new MachineSetupView(), 10, enabledWhenDisconnected: true, alwaysVisible: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+            TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 20, enabledWhenDisconnected: true, alwaysVisible: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+
+            // --- Tools menu ---
+            TabRegistry.Register(new TabDescriptor(ViewType.SDCard, TabLabel("TabSDCard", "SD Card"), () => new SDCardView(), 10, enabledWhenDisconnected: false,
+                configure: ctl => ((SDCardView)ctl).FileSelected += SDCardView_FileSelected,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.FeedsAndSpeeds, TabLabel("TabFeedsSpeeds", "Feeds and Speeds"), () => new FeedsAndSpeedsView(), 20, enabledWhenDisconnected: true,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // Probing and Height Map are on borrowed time (2026-08-03) - listed under Tools for now,
+            // deliberately without further investment.
+            TabRegistry.Register(new TabDescriptor(ViewType.Probing, TabLabel("TabProbing", "Probing"), () => new CNC.Controls.Probing.ProbingView(), 40, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.HeightMap, TabLabel("TabHeightMap", "Height Map"), () => new HeightMapView(), 50, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 60, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // ToolsView is dissolved: its three children (tool table, Trinamic tuner, PID tuner) are
+            // listed directly in the Tools menu by BuildViewMenus, so the wrapper tab is gone.
         }
 
         // Localized tab label via LibStrings, falling back to the English literal if the resource is missing
@@ -2474,7 +2701,28 @@ namespace GCode_Sender
             {
                 var d = TabRegistry.DescriptorByName(node.Component);
                 if (d == null)
-                    continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                {
+                    // Not a registered VIEW - it may still be a plain layout component (the tool table,
+                    // Trinamic and PID tuners the dissolved Tools tab carried). Those default to Tools-menu
+                    // windows, but the tree is the placement authority for them too, so honour a user who
+                    // put one back on the bar. They have no ICNCView contract, hence the plain header and
+                    // no shortcut badge - the key binding still finds them by Tag (see showComponentView).
+                    var comp = ComponentRegistry.Get(node.Component);
+                    var compCtl = comp?.Create?.Invoke();
+                    if (compCtl == null)
+                        continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                    (compCtl as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
+                    tabMode.Items.Add(new TabItem {
+                        Content = compCtl,
+                        Header = comp.Label,
+                        Tag = node.Component,
+                        Uid = "tab_" + node.Component
+                    });
+                    continue;
+                }
+                // No Presentation check here on purpose: the TREE is the placement authority. A view
+                // the registry defaults to a menu still becomes a tab if the user dragged it back to
+                // the tabs slot in Settings > Main Page.
                 var ctl = d.Create?.Invoke();
                 if (ctl == null)
                     continue;
@@ -2537,6 +2785,76 @@ namespace GCode_Sender
 
         // See tabMode.ReorderDragging's own comment (BuildTabs) for why this exists.
         private bool tabReorderDragging;
+
+        // Fill File/Tools from the layout tree's menu slots - the same tree that drives the tab strip,
+        // so the two placements are one decision the user can change in Settings > Main Page rather
+        // than something hardcoded here. A slot entry is either a registered view (TabDescriptor, gets
+        // the full Setup/Activate lifecycle) or a plain layout component (the former Tools tab's tools).
+        private void BuildViewMenus()
+        {
+            BuildMenuSlot(menuFile, LayoutKeys.SlotMenuFile);
+            BuildMenuSlot(menuTools, LayoutKeys.SlotMenuTools);
+        }
+
+        private void BuildMenuSlot(MenuItem parent, string slotName)
+        {
+            var slot = AppConfig.Settings.Layout?.Slot(slotName);
+            if (slot == null)
+                return;
+
+            foreach (var node in slot.Items)
+            {
+                var d = TabRegistry.DescriptorByName(node.Component);
+                if (d != null)
+                {
+                    parent.Items.Add(NewViewMenuItem(d));
+                    continue;
+                }
+
+                var c = ComponentRegistry.Get(node.Component);
+                if (c?.Create == null)
+                    continue;   // unknown/foreign key - skip, same as BuildTabs
+                var item = new MenuItem { Header = c.Label, Uid = "mnu_" + node.Component };
+                string k = node.Component, label = c.Label;   // capture per-iteration for the closure
+                item.Click += (s, e) => ViewHostWindow.OpenComponent(k, label, UIViewModel, AppConfig.Settings, this);
+                parent.Items.Add(item);
+                trackMenuShortcut(item, componentViewIds.FirstOrDefault(kv => kv.Value == k).Key);
+            }
+        }
+
+        private MenuItem NewViewMenuItem(TabDescriptor d)
+        {
+            var item = new MenuItem
+            {
+                Header = d.Label,
+                // Built in code, so no authored x:Uid - set one from the stable registry key so the UI
+                // test server can address these the same way it addresses the authored menu items.
+                Uid = "mnu_view" + d.Name,
+                Tag = d.Name,
+                IsEnabled = d.EnabledWhenDisconnected
+            };
+            item.Click += (s, e) => ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            // Show the view's shortcut here too. It is the SAME "Tab.<Name>" id a tab header badges, because
+            // the binding names the view rather than its current home - so the key a user set while this was
+            // a tab is the key this menu entry now advertises.
+            trackMenuShortcut(item, tabViewIds.FirstOrDefault(kv => kv.Value == d.ViewType).Key);
+            return item;
+        }
+
+        // Enable/disable the menu-hosted views on the connect transition, the same way
+        // UpdateConnectionGatedViews does for the tabs that remain in the bar. Called from there, never alone.
+        private void UpdateConnectionGatedMenuItems(bool connected)
+        {
+            foreach (var menu in new[] { menuFile, menuTools })
+                foreach (var obj in menu.Items)
+                {
+                    if (!(obj is MenuItem item) || !(item.Tag is string key))
+                        continue;
+                    var d = TabRegistry.DescriptorByName(key);
+                    if (d != null)
+                        item.IsEnabled = d.EnabledWhenDisconnected || connected;
+                }
+        }
 
         // Publish the tabs currently present (after InitSystem's capability filtering) so the "Edit Main
         // Page" Tabs editor can list them. Ordering/visibility is now driven by the layout tree (BuildTabs),
@@ -2660,24 +2978,117 @@ namespace GCode_Sender
 
         // --- tab-switch shortcuts ----------------------------------------------------------------
 
+        // Main-menu commands as bindable actions ("Menu commands" group in Keyboard & Controller). Every one
+        // is unbound out of the box; the point is that a command reachable only by mouse can be given a key.
+        //
+        // Each is registered against the very menu item it drives and invokes that item's own click handler,
+        // so there is exactly one implementation of "Load Program" and the shortcut cannot drift from it. The
+        // views that MOVED into these menus are not here - they keep their "Tab.*" ids (see showBoundView), so
+        // a key bound while a view was a tab still reaches it now that it is a menu entry.
+        private void registerMenuActions()
+        {
+            registerMenuAction("Menu.Connect", menuConnect, () => connectMenuItem_Click(null, null));
+            registerMenuAction("Menu.LoadProgram", menuLoadFile, () => LoadFile_Click(null, null));
+            registerMenuAction("Menu.LoadWorkOrder", menuLoadWorkOrder, () => LoadWorkOrder_Click(null, null));
+            registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
+            registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
+
+            // Help entries are always available, so the per-item enable gate is a formality - but they are
+            // passed anyway so each one can show its bound key in the menu (see trackMenuShortcut).
+            registerMenuAction("Menu.Wiki", menuWiki, () => aboutWikiItem_Click(null, null));
+            registerMenuAction("Menu.UsageTips", menuUsageTips, () => tipsWikiItem_Click(null, null));
+            registerMenuAction("Menu.BriefTour", menuBriefTour, () => briefTour_Click(null, null));
+            registerMenuAction("Menu.VideoTutorials", menuVideoTutorials, () => videoTutorials_Click(null, null));
+            registerMenuAction("Menu.ErrorCodes", menuErrorsAndAlarms, () => errorAndAlarms_Click(null, null));
+            registerMenuAction("Menu.CheckForUpdates", menuCheckForUpdates, () => checkForUpdates_Click(null, null));
+            registerMenuAction("Menu.RollBack", menuRollbackVersion, () => rollbackVersion_Click(null, null));
+            registerMenuAction("Menu.OpenDataFolder", menuOpenConfigFolder, () => openConfigFolderMenuItem_Click(null, null));
+            registerMenuAction("Menu.About", menuAbout, () => aboutMenuItem_Click(null, null));
+        }
+
+        // Refuse the shortcut whenever the menu bar is disabled (menuMain's IsEnabled is bound to
+        // !IsJobRunning - the whole menu goes away mid-job) or the item itself is, so a key can never reach a
+        // command the menu is currently refusing. Returning false leaves the key unhandled for anything else.
+        private void registerMenuAction(string id, MenuItem item, System.Action invoke)
+        {
+            ActionKeyBinder.Register(id, k =>
+            {
+                if (menuMain?.IsEnabled != true || (item != null && !item.IsEnabled))
+                    return false;
+                invoke();
+                return true;
+            });
+
+            trackMenuShortcut(item, id);
+        }
+
+        // Menu items that can carry a keyboard shortcut, paired with the id it is stored under. Two stores
+        // feed this - Config.TabShortcuts for the view entries, Config.ActionShortcuts for the menu commands -
+        // and the display side does not care which, so they are held in one list.
+        private readonly List<KeyValuePair<MenuItem, string>> shortcutMenuItems = new List<KeyValuePair<MenuItem, string>>();
+        private bool menuShortcutTextHooked = false;
+
+        private void trackMenuShortcut(MenuItem item, string id)
+        {
+            if (item == null || string.IsNullOrEmpty(id))
+                return;
+
+            shortcutMenuItems.Add(new KeyValuePair<MenuItem, string>(item, id));
+
+            if (!menuShortcutTextHooked)
+            {
+                // Same event the tab-header badges refresh on (AppConfig.NotifyTabShortcutsChanged, raised by
+                // KeyMapEditor.Commit and by TabKeyBinder's right-click bind/clear), so a menu entry and a tab
+                // header can never disagree about what a view is bound to.
+                AppConfig.TabShortcutsChanged += refreshMenuShortcutText;
+                menuShortcutTextHooked = true;
+            }
+            refreshMenuShortcutText();
+        }
+
+        // Show each tracked item's binding in the menu's gesture column - the menu is where a user looks to
+        // find out what a command's key is, and until this it advertised nothing even when one was bound.
+        private void refreshMenuShortcutText()
+        {
+            foreach (var pair in shortcutMenuItems)
+                pair.Key.InputGestureText = (pair.Value.StartsWith("Menu.", StringComparison.Ordinal)
+                                                ? ActionKeyBinder.CurrentDisplay(pair.Value)
+                                                : TabKeyBinder.CurrentDisplay(pair.Value))
+                                            ?? string.Empty;
+        }
+
         // A parsed tab-switch binding: key + modifiers -> the tab id it selects (see KeyMapEditor.TabTargets).
         private class TabHotkey { public Key Key; public ModifierKeys Modifiers; public string Id; }
         private readonly List<TabHotkey> tabHotkeys = new List<TabHotkey>();
         private bool tabShortcutsHooked = false;
 
-        // Main-page tab id -> ViewType. Settings sub-tab ids ("Tab.Settings.*") are dispatched separately.
+        // View id -> ViewType. A shortcut id names a VIEW, not a place: since the tab bar was cut back
+        // (2026-08-03) any of these may sit on the bar OR in the File/Tools menus, and the user can move it
+        // either way - so dispatch resolves the id to a TabItem first and falls back to the menu-hosted
+        // window. Sub-ids ("Tab.Settings.*") drill in from whichever of the two the parent turned out to be.
         private static readonly Dictionary<string, ViewType> tabViewIds = new Dictionary<string, ViewType>
         {
             { "Tab.Settings",     ViewType.GRBLConfig },
+            { "Tab.FeedsSpeeds",  ViewType.FeedsAndSpeeds },
             { "Tab.StartJob",     ViewType.StartJob },
             { "Tab.Job",          ViewType.GRBL },
             { "Tab.Offsets",      ViewType.Offsets },
             { "Tab.SDCard",       ViewType.SDCard },
             { "Tab.Probing",      ViewType.Probing },
-            { "Tab.Tools",        ViewType.Tools },
+            { "Tab.WorkOrder",    ViewType.WorkOrder },
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },
+        };
+
+        // The three ex-Tools-tab tools. They are plain layout components (no ViewType, no ICNCView), so they
+        // resolve to a component key rather than a ViewType - see ViewHostWindow.OpenComponent. Their ids keep
+        // the old nested "Tab.Tools." form so bindings made while they were sub-tabs still work.
+        private static readonly Dictionary<string, string> componentViewIds = new Dictionary<string, string>
+        {
+            { "Tab.Tools.ToolTable", LayoutKeys.ToolTable },
+            { "Tab.Tools.Trinamic",  LayoutKeys.Trinamic },
+            { "Tab.Tools.PID",       LayoutKeys.PID },
         };
 
         // (Re)parse the saved tab-switch shortcuts. Called at startup (just after registerConsoleShortcut, which
@@ -2723,20 +3134,56 @@ namespace GCode_Sender
             if (hit == null)
                 return false;
 
-            // A nested "Tab.<Parent>.<Sub>" id selects the parent top-level tab, then drills into its inner
-            // sub-tab; a plain "Tab.<Name>" id just selects the top-level tab. The parent (or the tab itself)
-            // is resolved through tabViewIds; the inner selection is delegated to the view's ITabBindingHost.
-            int firstDot = hit.Id.IndexOf('.');
-            int secondDot = firstDot < 0 ? -1 : hit.Id.IndexOf('.', firstDot + 1);
-            string lookupId = secondDot > 0 ? hit.Id.Substring(0, secondDot) : hit.Id;
+            return showBoundView(hit.Id);
+        }
+
+        // Show whatever a tab-switch id names, wherever it currently lives. Returns true when something was
+        // actually shown (so the caller consumes the key); false leaves the key alone - which is what happens
+        // for a view removed for a missing capability, or a sub-tab that no longer exists.
+        //
+        // A plain "Tab.<Name>" id shows the view. The three ex-Tools ids are whole views despite their nested
+        // form, so they are matched before the parent split (see componentViewIds).
+        //
+        // The nested "Tab.<Parent>.<Sub>" path below is now a SAFETY NET, not a feature: second-level targets
+        // were withdrawn from KeyMapEditor.TabTargets on 2026-08-03 (top-level destinations only) and
+        // ApplyOneTimeFixups strips saved ones. It stays so that a binding written by an older build - or one
+        // that outlives the fixup somehow - still lands somewhere sensible instead of half-switching.
+        private bool showBoundView(string id)
+        {
+            string componentKey;
+            if (componentViewIds.TryGetValue(id, out componentKey))
+                return showComponentView(componentKey);
+
+            int firstDot = id.IndexOf('.');
+            int secondDot = firstDot < 0 ? -1 : id.IndexOf('.', firstDot + 1);
+            string lookupId = secondDot > 0 ? id.Substring(0, secondDot) : id;
 
             ViewType vt;
             if (!tabViewIds.TryGetValue(lookupId, out vt))
                 return false;
 
             TabItem tab = getTab(vt);
-            if (tab == null || !tab.IsEnabled)
-                return false;   // top-level tab removed (missing capability) or disabled -> do nothing
+
+            if (tab == null)
+            {
+                // Not on the tab bar - it lives in a menu (or was never placed anywhere). Open or re-focus its
+                // window, then drill in exactly as the tab path does. ViewHostWindow.Open caches the view
+                // instance, so ViewInstance() is the same control the window is showing.
+                var d = TabRegistry.DescriptorFor(vt);
+                if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                    return false;
+
+                if (secondDot > 0)
+                {
+                    var winHost = ViewHostWindow.ViewInstance(vt) as ITabBindingHost;
+                    if (winHost == null || !winHost.SelectSubTab(id))
+                        return false;   // window is up and focused either way; the inner target just isn't there
+                }
+                return true;
+            }
+
+            if (!tab.IsEnabled)
+                return false;   // on the bar but disabled (no connection yet) -> do nothing
 
             if (secondDot > 0)
             {
@@ -2744,12 +3191,32 @@ namespace GCode_Sender
                 // available. A binding to a sub-tab that has since been removed (e.g. a capability tool tab, or
                 // a disabled lathe/probing view) does nothing at all rather than half-switching to the parent.
                 var host = getView(tab) as ITabBindingHost;
-                if (host == null || !host.SelectSubTab(hit.Id))
+                if (host == null || !host.SelectSubTab(id))
                     return false;
             }
 
             tabMode.SelectedItem = tab;
             return true;
+        }
+
+        // A plain layout component (tool table / Trinamic / PID): on the bar it is a TabItem with no ICNCView,
+        // so getTab can't find it - match it by the TabItem's Tag, the key BuildTabs stamps on it. Falls back
+        // to its own host window, the same way a view does.
+        private bool showComponentView(string componentKey)
+        {
+            foreach (TabItem t in tabMode.Items)
+            {
+                if (!(t.Tag is string key) || key != componentKey)
+                    continue;
+                if (!t.IsEnabled)
+                    return false;
+                tabMode.SelectedItem = t;
+                return true;
+            }
+
+            var c = ComponentRegistry.Get(componentKey);
+            return c?.Create != null &&
+                   ViewHostWindow.OpenComponent(componentKey, c.Label, UIViewModel, AppConfig.Settings, this) != null;
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)

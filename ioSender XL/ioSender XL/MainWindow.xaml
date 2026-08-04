@@ -39,30 +39,47 @@
             <ScaleTransform ScaleX="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"
                             ScaleY="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.UiScale}"/>
         </DockPanel.LayoutTransform>
-        <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load/Load
-             Folder/Save/Close live on the program view, Open Console is a double-click on the Console tab,
-             and Transform is in the program list's right-click menu. Exit is dropped - the window X / Alt+F4
-             (both routed through Window_Closing) quit the app. -->
+        <!-- Menu-overhaul: the File menu is dissolved. Connect/Reconnect is now a top-level item; Load File is
+             its own top-level item, Save/Close live on the program view, Open Console is a double-click on
+             the Console tab, and Transform is in the program list's right-click menu. Exit is dropped - the
+             window X / Alt+F4 (both routed through Window_Closing) quit the app. -->
         <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
-            <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera">
-                <MenuItem x:Uid="mnu_open" Header="_Open" Click="CameraOpen_Click"/>
+            <!-- File / Tools carry a static skeleton here; the view entries (Machine, Settings, SD Card,
+                 Feeds and Speeds, ...) are appended from the tab registry by BuildViewMenus, so a
+                 registered view declares itself once and never needs an edit to this markup. -->
+            <MenuItem x:Uid="mnu_file" x:Name="menuFile" Header="_File">
+                <MenuItem x:Uid="mnu_loadFile" x:Name="menuLoadFile" Header="_Load Program..." Click="LoadFile_Click"
+                          ToolTip="Load a single g-code file."/>
+                <MenuItem x:Uid="mnu_loadWorkOrder" x:Name="menuLoadWorkOrder" Header="Loa_d Work Order..." Click="LoadWorkOrder_Click"
+                          ToolTip="Open a saved .workorder file."/>
+                <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
+                          ToolTip="Start composing a new work order."/>
+                <Separator x:Name="menuFileViewSeparator"/>
+                <!-- Machine + Settings appended here -->
+            </MenuItem>
+            <MenuItem x:Uid="mnu_tools" x:Name="menuTools" Header="_Tools">
+                <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera" Click="CameraOpen_Click"/>
+                <!-- SD Card, Feeds and Speeds, the former Tools tab's tools, ... appended here -->
             </MenuItem>
             <MenuItem x:Uid="mnu_help" x:Name="menuHelp" Header="_Help">
-                <MenuItem x:Uid="mnu_wiki" Header="_Wiki" Click="aboutWikiItem_Click"/>
-                <MenuItem x:Uid="mnu_usageTips" Header="Usage _tips" Click="tipsWikiItem_Click"/>
-                <MenuItem x:Uid="mnu_briefTour" Header="A _brief tour" Click="briefTour_Click"/>
-                <MenuItem x:Uid="mnu_videoTutorials" Header="_Video tutorials" Click="videoTutorials_Click"/>
-                <MenuItem x:Uid="mnu_errorsAndAlarms" Header="_Error and alarm codes" Click="errorAndAlarms_Click"/>
+                <!-- x:Name on each: registerMenuActions pairs the item with its bindable "Menu.*" action id,
+                     both to gate the shortcut on the item's own IsEnabled and to write the bound key back
+                     into InputGestureText so the menu advertises it (refreshMenuShortcutText). -->
+                <MenuItem x:Uid="mnu_wiki" x:Name="menuWiki" Header="_Wiki" Click="aboutWikiItem_Click"/>
+                <MenuItem x:Uid="mnu_usageTips" x:Name="menuUsageTips" Header="Usage _tips" Click="tipsWikiItem_Click"/>
+                <MenuItem x:Uid="mnu_briefTour" x:Name="menuBriefTour" Header="A _brief tour" Click="briefTour_Click"/>
+                <MenuItem x:Uid="mnu_videoTutorials" x:Name="menuVideoTutorials" Header="_Video tutorials" Click="videoTutorials_Click"/>
+                <MenuItem x:Uid="mnu_errorsAndAlarms" x:Name="menuErrorsAndAlarms" Header="_Error and alarm codes" Click="errorAndAlarms_Click"/>
                 <Separator/>
                 <MenuItem x:Uid="mnu_support" x:Name="menuSupport" Header="_Support">
-                    <MenuItem x:Uid="mnu_checkForUpdates" Header="_Check for updates..." Click="checkForUpdates_Click" ToolTip="Check if a newer version of ioSender is available on GitHub."/>
-                    <MenuItem x:Uid="mnu_rollbackVersion" Header="_Roll back to previous version..." Click="rollbackVersion_Click" ToolTip="Swap back to the ioSender build installed before the last update. Only goes back one version - it does not work if you have not updated at least once."/>
-                    <MenuItem x:Uid="mnu_openConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
+                    <MenuItem x:Uid="mnu_checkForUpdates" x:Name="menuCheckForUpdates" Header="_Check for updates..." Click="checkForUpdates_Click" ToolTip="Check if a newer version of ioSender is available on GitHub."/>
+                    <MenuItem x:Uid="mnu_rollbackVersion" x:Name="menuRollbackVersion" Header="_Roll back to previous version..." Click="rollbackVersion_Click" ToolTip="Swap back to the ioSender build installed before the last update. Only goes back one version - it does not work if you have not updated at least once."/>
+                    <MenuItem x:Uid="mnu_openConfigFolder" x:Name="menuOpenConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
                     <MenuItem x:Uid="mnu_installFusionAddin" x:Name="menuInstallFusionAddin" Header="_Install ioSenderV2 Fusion Addin..." Click="installFusionAddin_Click" ToolTip="Symlink the ioSenderV2 Fusion 360 add-in into Fusion's AddIns folder. Future ioSenderV2 updates need no reinstall - only shown when Fusion 360 is installed for this user." Visibility="Collapsed"/>
                     <MenuItem x:Uid="mnu_generateResetTestCase" Header="Generate _reset test case..." Click="generateResetTestCase_Click" ToolTip="Write a .nc file that calls an O-word subroutine several times, for reproducing controller-wedge-on-Reset bugs." Visibility="Collapsed"/>
                 </MenuItem>
-                <MenuItem x:Uid="mnu_about" Header="_About" Click="aboutMenuItem_Click"/>
+                <MenuItem x:Uid="mnu_about" x:Name="menuAbout" Header="_About" Click="aboutMenuItem_Click"/>
             </MenuItem>
         </Menu>
         <!-- Menu-overhaul: the toolbar row (file-action icons + quick-run macro buttons) was removed. The
@@ -191,12 +208,9 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
                             <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
-                            <ToggleButton x:Uid="btnProgramView" Grid.Column="4" x:Name="btnProgramView" Content="Program" Height="36" Padding="12,0" VerticalAlignment="Top" Focusable="False" IsEnabled="False" ToolTip="Show/hide the program view over the work area." Checked="ProgramView_Toggled" Unchecked="ProgramView_Toggled"/>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -243,7 +257,10 @@
                                      visibility gate as Timelapse, set alongside it in MainWindow.xaml.cs). -->
                                 <ToggleButton x:Uid="btnAllRecord" x:Name="btnAllRecord" MinWidth="36" Margin="6,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="OBS Control - All: click to start/stop every camera together" Style="{StaticResource RecordToggleStyle}" Checked="AllRecord_Toggled" Unchecked="AllRecord_Toggled"/>
                             </StackPanel>
-                            <cnccontrols:JogPresetSelector Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <cnccontrols:KbdDefaultSpeedControl Margin="0,0,16,0"/>
+                                <cnccontrols:JogPresetSelector/>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),
@@ -260,10 +277,21 @@
                             <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
                         </cnccontrols:SignalsControl.LayoutTransform>
                     </cnccontrols:SignalsControl>
+                    <!-- The unit label that used to sit after the readout is gone - on this bar the room is
+                         better spent on digits, so the unit moved into the tooltip (issue #21). ToolTip is on
+                         the panel so it covers the "Feed:" label and the readout alike. MinWidth is sized for
+                         the 5 digits Format="####0" can produce, allowing for the NumericTextBox style's 8px
+                         horizontal padding + 1px border.
+                         The tooltip is a composed TextBlock rather than a Binding+StringFormat on purpose:
+                         LocBaml can only reach literal values, so a StringFormat's prose would be permanently
+                         English. Splitting it lets the wording live in an x:Uid'd Run (localized like every
+                         other tooltip) while the unit stays live off FeedrateUnit. -->
                     <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
+                        <StackPanel.ToolTip>
+                            <TextBlock><Run x:Uid="txt_runFeedTip" Text="Current feed rate"/><Run Text=" ("/><Run Text="{Binding Path=FeedrateUnit, Mode=OneWay}"/><Run Text=")"/></TextBlock>
+                        </StackPanel.ToolTip>
                         <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
-                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="52" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                        <Label Content="{Binding Path=FeedrateUnit, Mode=OneWay}" Padding="2,0,0,0" VerticalAlignment="Center"/>
+                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 <!-- Right: feed / rapids override controls, given ~25% more room. -->
@@ -282,7 +310,7 @@
              measures the real TabPanel part inside tabMode's template and keeps this Margin in sync via
              SizeChanged, so this XAML value is only the fallback shown before that runs once at startup. -->
         <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,38,0,0">
-            <ItemsControl x:Name="xx" Width="22" VerticalAlignment="Stretch">
+            <ItemsControl x:Name="sidebarTabs" Width="22" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top" Width="22"/>
@@ -375,7 +403,7 @@
              MinWidth/MaxWidth before, which ran over half the client area on a narrower window. -->
         <Border x:Name="overlayProgram" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="0,60,0,0"
                 Visibility="Collapsed" Background="White" BorderBrush="#FF888888" BorderThickness="1" Panel.ZIndex="2">
-            <!-- Hosts whichever tool's own ProgramView is connected (Load File/Folder, or a wizard's Generate
+            <!-- Hosts whichever tool's own ProgramView is connected (Load File, or a wizard's Generate
                  output) - each carries its own title bar. Nothing shows here (and the "Program" button is
                  disabled) when nothing is connected; the loaded job's own docked list (ProgramPanel, in the
                  Job tab) is the persistent view of that content, so this popup never duplicates it. -->

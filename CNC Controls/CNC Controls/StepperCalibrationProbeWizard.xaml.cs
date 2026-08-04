@@ -535,7 +535,7 @@ namespace CNC.Controls
                 return;
             }
             // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses.
-            if (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d)
+            if (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d)
             {
                 txtWarnings.Text = "This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.";
                 return;
@@ -708,9 +708,15 @@ namespace CNC.Controls
 
             b.AppendLine(string.Format("#<_ls_rad> = {0}", r.ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_spacer> = 0");
-            b.AppendLine("#<_ls_thickness> = 0");   // unused by pcorner.macro since the fixed-5mm depth change - kept for the global's sake
+            // pcorner.macro uses this to size the pre-probe approach height (#<_bottom> + thickness +
+            // plateoffset + 10) - this wizard has no real known thickness for the reference block, so stay
+            // conservative (matching the approach height's own worst-case "assume <=1in" fallback) rather
+            // than 0, which would under-size the clearance now that the global is actually used again.
+            b.AppendLine("#<_ls_thickness> = 25.4");
             b.AppendLine("#<_ls_mode> = 0");
             b.AppendLine("#<_ls_plateoffset> = 0");
+            b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
+            b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
             b.AppendLine("#<_ls_spoilx> = 0");
             b.AppendLine("#<_ls_spoily> = 0");
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
@@ -729,9 +735,14 @@ namespace CNC.Controls
             b.AppendLine("(WAITIDLE)");
             b.AppendLine("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
 
-            // Corner 1 (origin, FrontLeft) - REUSE mode, cached spoilboard Z + corner offset (no locate pass).
-            b.AppendLine("(--- corner 1 (origin) ---)");
-            b.AppendLine(string.Format("#<_bottom> = {0}", fx.SpoilboardZ.ToInvariantString("0.0##")));
+            // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
+            // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
+            // design conversation this replaced - a raw machine-Z spoilboard cache is only valid for the exact
+            // tool length that captured it, unsound the moment a different bit is in the spindle) - a wider
+            // seek-depth cap than a tight cached estimate, but still a real, probe-guarded search, not a bare
+            // rapid, so a dead/mis-wired probe still alarms instead of ploughing into the reference block.
+            b.AppendLine(string.Format("#<_bottom> = {0}",
+                (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
             b.AppendLine(string.Format("#<_ls_refy> = {0}", refY));

@@ -65,10 +65,61 @@ namespace CNC.Controls
             // ContextMenu set on the TabItem is found by WPF's ancestor lookup from anywhere inside the tab
             // body, not just its header - every caller already assigns tab.Header (a TabHeaderControl) before
             // calling this, so scoping it there confines the menu to an actual right-click on the tab label.
-            if (tab.Header is FrameworkElement header)
+            FrameworkElement header = tab.Header as FrameworkElement;
+            if (header != null)
                 header.ContextMenu = menu;
             else
                 tab.ContextMenu = menu;
+
+            // WPF's own ContextMenuService opens on right-button UP by default - open it ourselves on right-
+            // button DOWN instead (matches every other right-click menu in this app) and swallow both the
+            // down (so nothing else double-handles it) and the following up (so the framework's default
+            // up-triggered open doesn't ALSO fire and immediately re-toggle the menu we just opened).
+            //
+            // Attached to the TAB ITEM, not the header element: the main nav's custom TabItem template
+            // (MainWindow.xaml's MainNavTabItemStyle) centers the header ContentPresenter inside a full-width
+            // "pill" Border, so the header element itself is only as wide as its own text - a right-click
+            // anywhere in the rest of the pill's (much wider) area would never reach a handler attached there.
+            // A TabItem's OWN visual tree is just its header template - the selected tab's page CONTENT is
+            // hosted by the TabControl's template elsewhere, not inside the TabItem - so a routed mouse event
+            // attached directly to the TabItem instance only ever fires for clicks on the tab label/pill,
+            // never for clicks in the page body (unlike the ContextMenu PROPERTY's ancestor lookup, which
+            // walks the LOGICAL tree and would have included the content - the reason header.ContextMenu was
+            // used above instead of tab.ContextMenu).
+            tab.PreviewMouseRightButtonDown += (s, e) =>
+            {
+                // Bail out - don't handle, don't open - when the click landed in the tab's own CONTENT rather
+                // than its header. Content is only logically parented under the TabItem (see the comment
+                // above), but a right-click's PreviewMouseRightButtonDown TUNNELS from the root down, and in
+                // this app's own StretchTabControl the selected tab's content sits in the same visual route as
+                // its TabItem - so without this check, EVERY right-click anywhere in the tab's body (a
+                // right-click context menu inside a nested control, say) would be swallowed here before it
+                // ever reached that control's own handler. Same class of bug, same fix, as
+                // UnitToggleMenu.IsDescendant.
+                if (tab.Content is DependencyObject content && IsDescendant(e.OriginalSource as DependencyObject, content))
+                    return;
+
+                menu.PlacementTarget = header ?? (FrameworkElement)tab;
+                menu.IsOpen = true;
+                e.Handled = true;
+            };
+            tab.PreviewMouseRightButtonUp += (s, e) =>
+            {
+                if (tab.Content is DependencyObject content && IsDescendant(e.OriginalSource as DependencyObject, content))
+                    return;
+                e.Handled = true;
+            };
+        }
+
+        private static bool IsDescendant(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                    return true;
+                node = VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node);
+            }
+            return false;
         }
 
         // Friendly name for a tab id (from the editor catalog), for dialog prompts.
@@ -212,7 +263,15 @@ namespace CNC.Controls
         {
             this.tabId = tabId;
 
-            var grid = new Grid();
+            // Fill the FULL tab width (StretchTabControl assigns each TabItem an explicit Width to spread the
+            // strip) rather than shrinking to the label's own text - and give it an actual (if invisible)
+            // Background, since a WPF element with no Background at all is not hit-test visible in its own
+            // blank space. Without both of these, a right-click (or the left-click that selects the tab) only
+            // lands where the text/badge glyphs themselves are painted, not the padding around them.
+            HorizontalAlignment = HorizontalAlignment.Stretch;
+            Background = Brushes.Transparent;
+
+            var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 

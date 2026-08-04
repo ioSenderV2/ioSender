@@ -45,8 +45,18 @@ namespace CNC.Controls
 {
     public partial class SignalControl : UserControl
     {
-        static readonly Brush HiFill = Brushes.Red, LabelSet = Brushes.Black;
+        static readonly Brush LabelSet = Brushes.Black;
         Brush LabelOff, EllOff;
+
+        // Most signals are alarm/limit-style (red = "triggered", a thing to notice/worry about) - the
+        // default. A handful (e.g. TLO ref'd) are the OPPOSITE: set = good/ready, so red would read
+        // backwards. Per-instance override, defaulting to the historical red for every existing caller.
+        public static readonly DependencyProperty SetColorProperty = DependencyProperty.Register(nameof(SetColor), typeof(Brush), typeof(SignalControl), new PropertyMetadata(Brushes.Red));
+        public Brush SetColor
+        {
+            get { return (Brush)GetValue(SetColorProperty); }
+            set { SetValue(SetColorProperty, value); }
+        }
 
         public SignalControl()
         {
@@ -67,7 +77,7 @@ namespace CNC.Controls
         {
             var c = d as SignalControl;
             bool set = (bool)e.NewValue;
-            c.ellSignal.Fill = set ? HiFill : c.EllOff;              // red disc behind a triggered signal
+            c.ellSignal.Fill = set ? c.SetColor : c.EllOff;          // colored disc behind a triggered signal
             c.txtSignal.Foreground = set ? LabelSet : c.LabelOff;    // bold black letter on top when set
             c.txtSignal.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
         }

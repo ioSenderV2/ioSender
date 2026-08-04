@@ -43,13 +43,11 @@ namespace CNC.Controls
     {
         None = 0,
         Base,
-        StepperCalibration,
-        StepperCalibrationScratch,
         StepperCalibrationProbe,
         Trinamic,
         PidTuning,
         MachineSetup,
-        SurfaceSpoilboard,
+        WorkOrder,
         AutoSquare,
         Simulator
     }

@@ -2,7 +2,7 @@
  * ProgramView.xaml.cs - a standalone, streamer-connectable program view.
  *
  * Part of the ProgramView refactor (docs/Architecture-ProgramView-Refactor.md): replaces the single shared
- * program overlay with a reusable object. Each Load File / Load Folder / wizard Generate creates its own
+ * program overlay with a reusable object. Each Load File / wizard Generate creates its own
  * instance; instances exist independently. The streamer is allocated to a view by an explicit Connect/Disconnect
  * push/pop stack - the connected view (stack top) is what Cycle Start runs.
  *
@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -22,6 +23,14 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
+    // What produced this program - File (Load File/Folder) or Generated (a wizard/Work Order Generate).
+    // Lets a producer opt this instance into source-specific affordances (currently: the Edit button below).
+    public enum ProgramSource
+    {
+        File,
+        Generated
+    }
+
     public partial class ProgramView : UserControl
     {
         public ProgramView()
@@ -29,6 +38,26 @@ namespace CNC.Controls
             InitializeComponent();
             DataContextChanged += (s, e) => HookModel(e.NewValue as GrblViewModel);
             UpdateTitleHint();
+            titleBar.ToolTip = DefaultTitleTooltip;
+        }
+
+        public ProgramSource Source { get; set; } = ProgramSource.File;
+
+        // Set by a producer whose generated program has an editable source elsewhere (e.g. the Work Order
+        // tab's toolpath list) - shows the title-bar Edit button, which raises EditRequested rather than
+        // reaching into MainWindow directly (ProgramView/CNC Controls has no reference to it).
+        private ViewType? _editTargetTab;
+        public ViewType? EditTargetTab
+        {
+            get { return _editTargetTab; }
+            set { _editTargetTab = value; UpdateEditButtonVisibility(); }
+        }
+
+        public static event System.Action<ProgramView> EditRequested;
+
+        private void BtnEdit_Click(object sender, RoutedEventArgs e)
+        {
+            EditRequested?.Invoke(this);
         }
 
         // The program this view owns and renders. Set by the producer (Load/Generate); the same block objects
@@ -99,6 +128,11 @@ namespace CNC.Controls
             }
         }
 
+        private void UpdateEditButtonVisibility()
+        {
+            btnEdit.Visibility = EditTargetTab.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         // When this view Connect()s, whether the host overlay should auto-pop into view. Wizards leave it true
         // (Generate = "show me what I just made"); the loaded job sets it false - loading a file shouldn't fling
         // the overlay open over the work area (the persistent Job-tab list already shows it).
@@ -109,6 +143,8 @@ namespace CNC.Controls
             Blocks = blocks;
             gcodeList.SetProgram(blocks);
             Compact = false;   // a freshly generated/loaded program opens in full; Cycle Start shrinks it
+            txtRunStatus.Visibility = Visibility.Collapsed;   // stale from whatever the last connected run was
+            UpdateTitleTooltip(-1);
         }
 
         // --- Compact (3-line) run view --------------------------------------------------------------------
@@ -160,8 +196,117 @@ namespace CNC.Controls
             // Cycle Start on this (connected) view -> auto-shrink to the 3-line run view.
             if (e.PropertyName == nameof(GrblViewModel.IsJobRunning)
                  && (sender as GrblViewModel)?.IsJobRunning == true && IsConnected)
+            {
                 Compact = true;
+                UpdateRunStatus();
+            }
+
+            if (e.PropertyName == nameof(GrblViewModel.BlockExecuting) && IsConnected)
+                UpdateRunStatus();
         }
+
+        // "What's running right now" sticky status - the nearest (TOOL T=..) and (TOOLPATH ..) comments AT OR
+        // BEFORE the currently executing line, so an operator glancing at a running job (Pocket, Counterbore,
+        // ...) can tell which physical tool number is asked-for and which named operation ("Bottom finishing
+        // pass - ball end") is currently cutting, without scrolling the (possibly huge) full program to find
+        // the nearest header comment - those scroll out of the 3-line compact view within a few lines of any
+        // section starting. (TOOL ...) reuses the SAME format the Fusion ioSenderBatchPost post-processor
+        // emits (see GCodeProgramComments) so it plugs into the same parser; (TOOLPATH ...) is this app's own
+        // convention for a plain-English per-operation header, emitted by the Odd Jobs job wizards.
+        private static readonly Regex rxToolComment =
+            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)[^)]*\)", RegexOptions.IgnoreCase);
+        private static readonly Regex rxToolpathComment =
+            new Regex(@"\(\s*TOOLPATH\s+(.+?)\)\s*$", RegexOptions.IgnoreCase);
+
+        private void UpdateRunStatus()
+        {
+            int exec = _model?.BlockExecuting ?? -1;
+            if (exec < 0 || Blocks == null || Blocks.Count == 0)
+            {
+                txtRunStatus.Visibility = Visibility.Collapsed;
+                UpdateTitleTooltip(-1);   // nothing running yet - the tooltip lists the whole program
+                return;
+            }
+
+            string tool = null, toolpath = null;
+            int upTo = Math.Min(exec, Blocks.Count - 1);
+            for (int i = 0; i <= upTo; i++)
+            {
+                string line = Blocks[i]?.Data;
+                if (string.IsNullOrEmpty(line))
+                    continue;
+                var mt = rxToolComment.Match(line);
+                if (mt.Success)
+                    tool = string.Format("T{0} - {1}mm {2}", mt.Groups[1].Value, mt.Groups[2].Value, mt.Groups[3].Value);
+                var mp = rxToolpathComment.Match(line);
+                if (mp.Success)
+                    toolpath = mp.Groups[1].Value.Trim();
+            }
+
+            if (tool == null && toolpath == null)
+            {
+                txtRunStatus.Visibility = Visibility.Collapsed;
+                UpdateTitleTooltip(upTo);
+                return;
+            }
+
+            txtRunStatus.Text = tool != null && toolpath != null ? tool + "  |  " + toolpath : (tool ?? toolpath);
+            txtRunStatus.Visibility = Visibility.Visible;
+            UpdateTitleTooltip(upTo);
+        }
+
+        // Title-bar tooltip: what's left to run. The (TOOLPATH ..) section currently executing heads the list
+        // (marked, since "remaining" only makes sense relative to something), followed by the ones still to
+        // come. The sticky status line above only ever shows the CURRENT section, so without this there was no
+        // way to see what a long work order still has in store - the headers themselves scroll out of the
+        // 3-line compact view immediately.
+        private void UpdateTitleTooltip(int executingIndex)
+        {
+            if (Blocks == null || Blocks.Count == 0)
+            {
+                titleBar.ToolTip = DefaultTitleTooltip;
+                return;
+            }
+
+            var upcoming = new List<string>();
+            string current = null;
+            for (int i = 0; i < Blocks.Count; i++)
+            {
+                var m = rxToolpathComment.Match(Blocks[i]?.Data ?? string.Empty);
+                if (!m.Success)
+                    continue;
+
+                string name = m.Groups[1].Value.Trim();
+                // Drop the "- N lines" tail AppendSection adds; it's noise in a to-do list.
+                int dash = name.LastIndexOf(" - ", StringComparison.Ordinal);
+                if (dash > 0 && name.EndsWith("lines)", StringComparison.OrdinalIgnoreCase))
+                    name = name.Substring(0, dash);
+
+                if (i <= executingIndex)
+                    current = name;         // keep overwriting: the last one at-or-before is the live section
+                else
+                    upcoming.Add(name);
+            }
+
+            if (current == null && upcoming.Count == 0)
+            {
+                titleBar.ToolTip = DefaultTitleTooltip;
+                return;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            if (current != null)
+                sb.Append("► ").Append(current).Append("   (running)");
+            foreach (var name in upcoming)
+                sb.Append(sb.Length > 0 ? "\n" : string.Empty).Append("    ").Append(name);
+            if (upcoming.Count == 0 && current != null)
+                sb.Append("\n    (last toolpath)");
+
+            sb.Append("\n\n").Append(DefaultTitleTooltip);
+            titleBar.ToolTip = sb.ToString();
+        }
+
+        private const string DefaultTitleTooltip = "Click to collapse to a 3-line run view / expand.";
 
         // Build a program from raw NGC text (one block per line; a line starting with '(' is a comment). The
         // Block-column line numbers are assigned for display by GCodeListControl.SetProgram.

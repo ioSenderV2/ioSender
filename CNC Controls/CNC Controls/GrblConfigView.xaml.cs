@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblConfigView.xaml.cs - part of CNC Probing library
  *
  * v0.46 / 2025-06-05 / Io Engineering (Terje Io)
@@ -63,13 +63,25 @@ namespace CNC.Controls
         private string settingsSnapshot;    // serialized Config captured when the view is entered (for autosave/diff)
         private readonly HashSet<object> restartHooked = new HashSet<object>();
 
-        // Inline editor tabs (built lazily on first show).
+        // Inline editor pages (built lazily on first show).
         private KeyMapEditor keyMapTab;
         private MacroManagerDialog macrosTab;
         private MainPageEditor mainPageTab;
 
-        // Camera + Probing share one vertical column on the App tab (both are short panels).
-        private StackPanel _camProbeColumn;
+        // The two panels that used to be declared in XAML as tab content. They are ordinary pages now,
+        // but the rest of this file still talks to them by name.
+        private readonly GrblConfigControl basicConfig = new GrblConfigControl();
+        private readonly SimulatorConfigView simConfig = new SimulatorConfigView();
+
+        // Category keys live in SettingsCategories so panels in any assembly can name them.
+        private const string CatController = SettingsCategories.Controller;
+        private const string CatApplication = SettingsCategories.Application;
+        private const string CatJogging = SettingsCategories.Jogging;
+        private const string CatGCode = SettingsCategories.GCode;
+        private const string CatInterface = SettingsCategories.UserInterface;
+
+        private SettingsNavNode nodeGrbl, nodeSimulator, nodeKeyboard, nodeController, nodeMacros, nodeJobLayout, nodeTopTabs;
+        private readonly Dictionary<UserControl, List<SettingsNavNode>> panelNodes = new Dictionary<UserControl, List<SettingsNavNode>>();
 
         // True only while the Settings view is the active top-level view. The inner TabControl raises an initial
         // SelectionChanged for its default tab during eager startup layout (this view is built before the user ever
@@ -83,27 +95,8 @@ namespace CNC.Controls
         public GrblConfigView()
         {
             InitializeComponent();
-            SetupTabBinding();
-        }
-
-        // Wrap each Settings sub-tab header with a live shortcut badge and a right-click "Bind to Key" menu, so
-        // a sub-tab can be bound straight from its header. The label is read back from the already-localized
-        // Header string set in XAML, so localization is preserved.
-        private void SetupTabBinding()
-        {
-            bindSubTab(tabGrbl, "Tab.Settings.Grbl");
-            bindSubTab(tabApp, "Tab.Settings.App");
-            bindSubTab(tabJogging, "Tab.Settings.Jogging");
-            bindSubTab(tabGCode, "Tab.Settings.GCode");
-            bindSubTab(tabKeys, "Tab.Settings.Keyboard");
-            bindSubTab(tabMacros, "Tab.Settings.Macros");
-            bindSubTab(tabMainPage, "Tab.Settings.MainPage");
-            bindSubTab(tabSimulator, "Tab.Settings.Simulator");
-        }
-
-        private void bindSubTab(TabItem tab, string tabId)
-        {
-            TabKeyBinder.AttachTabBinding(tab, tabId);
+            nav.ContentRequested += (s, e) => EnsureEditorContent(e.To);
+            nav.SelectedNodeChanged += nav_SelectedNodeChanged;
         }
 
         #region Methods and properties required by CNCView interface
@@ -123,13 +116,21 @@ namespace CNC.Controls
                 settingsSnapshot = SerializeConfig(AppConfig.Settings.Base);
                 ApplyPanelVisibility();
                 UpdateSimulatorTabVisibility();
-                var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
-                EnterTab(cur);
+
+                // Settle the selection with navigation events suppressed. On first entry the selection
+                // moves null -> first page, and letting that raise SelectedNodeChanged would enter the
+                // page twice - once from the event, once from the explicit EnterNode below (a doubled
+                // basicConfig.Activate(true), i.e. a second settings read from the controller).
+                _viewActive = false;
+                nav.RefreshVisibility();
+                nav.EnsureSelection();
+                _viewActive = true;
+
+                EnterNode(nav.SelectedNode);
             }
             else
             {
-                var cur = tabConfig.SelectedItem as TabItem ?? tabConfig.Items[0] as TabItem;
-                LeaveTab(cur);
+                LeaveNode(nav.SelectedNode);
 
                 // Once a restart is under way the replacement instance is already launching and its splash is
                 // topmost, so ANY MessageBox this dying instance shows would be hidden behind that splash and only
@@ -181,17 +182,25 @@ namespace CNC.Controls
             this.model = model;
             grblmodel = DataContext as GrblViewModel;
 
-            _camProbeColumn = new StackPanel { Orientation = Orientation.Vertical };
+            BuildNavTree();
 
-            // App-config panels bind to the Config object.
-            pnlAppLeft.DataContext = pnlAppRight.DataContext = profile.Base;
-            pnlJoggingLeft.DataContext = pnlJoggingRight.DataContext = profile.Base;
-            pnlGCodeLeft.DataContext = pnlGCodeRight.DataContext = profile.Base;
+            // App-config panels bind to the Config object. Each panel is its own page now, so the
+            // DataContext goes on the categories that hold them rather than on column StackPanels.
+            foreach (var key in new[] { CatApplication, CatJogging, CatGCode })
+            {
+                var cat = nav.FindByKey(key);
+                if (cat != null)
+                    foreach (var n in cat.Children)
+                        if (n.Content != null)
+                            n.Content.DataContext = profile.Base;
+            }
 
             // Build the built-in panels, then drain any feature-contributed panels registered via the registry.
             // Feature panels (Camera/Probing/Viewer/Lathe) also self-add to model.ConfigControls from their own
-            // views - usually after this Setup - so bucket present controls now and react to later additions.
+            // views - usually after this Setup - so place present controls now and react to later additions.
             model.ConfigControls.Add(new BasicConfigControl());
+            model.ConfigControls.Add(new UiGeneralConfigControl());
+            model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());
             model.ConfigControls.Add(new StripGCodeConfigControl());
@@ -205,26 +214,31 @@ namespace CNC.Controls
 
             foreach (var c in model.ConfigControls)
             {
-                Bucket(c);
+                AddPanelNode(c, profile);
                 HookRestart(c);
             }
             model.ConfigControls.CollectionChanged += (s, e) => {
                 if (e.NewItems != null)
                     foreach (var c in e.NewItems.OfType<UserControl>())
                     {
-                        Bucket(c);
+                        AddPanelNode(c, profile);
                         HookRestart(c);
                     }
             };
 
             // The Main Page editor is only meaningful when the main-page/tab layout is user-editable.
             if (!MainPanelRegistry.LayoutEnabled)
-                tabConfig.Items.Remove(tabMainPage);
+            {
+                nodeJobLayout.IsVisible = false;
+                nodeTopTabs.IsVisible = false;
+            }
 
-            UpdateFooterForTab(tabConfig.SelectedItem as TabItem);
+            nav.RefreshVisibility();
+            nav.EnsureSelection();
+            UpdateFooterForNode(nav.SelectedNode);
             AppConfig.Settings.Base.PropertyChanged += (s, e) => {
                 if (e.PropertyName == nameof(Config.AutoSaveSettings) || e.PropertyName == nameof(Config.AutoSaveGrblSettings))
-                    UpdateFooterForTab(tabConfig.SelectedItem as TabItem);
+                    UpdateFooterForNode(nav.SelectedNode);
             };
         }
 
@@ -234,51 +248,119 @@ namespace CNC.Controls
         {
         }
 
-        #region Tab bucketing and per-tab lifecycle
+        #region Nav tree and per-page lifecycle
 
-        // Place a config panel into the tab that owns its category. Built-ins are matched by concrete type;
-        // feature panels live in other assemblies (CNC Controls can't reference them) so they're matched by
-        // full type name. Unknown panels default to the App tab.
-        private void Bucket(UserControl c)
+        // The fixed skeleton. Config panels attach themselves to a category as they arrive (AddPanelNode).
+        // LibStrings.FindResource returns string.Empty (NOT null) for a key that isn't in the locale
+        // dictionary, so ?? would happily hand back a blank label. The category strings have no CSV rows
+        // yet - they land with the localization pass - so fall back on the English text meanwhile.
+        private static string Localized(string key, string fallback)
         {
-            var panel = TargetPanel(c);
-            if (panel == null)
-                return;
-
-            // Place the shared Camera/Probing column into the App tab's right column the first time it's needed.
-            if (ReferenceEquals(panel, _camProbeColumn) && !pnlAppRight.Children.Contains(_camProbeColumn))
-                pnlAppRight.Children.Add(_camProbeColumn);
-
-            if (c.Parent is Panel prev && !ReferenceEquals(prev, panel))
-                prev.Children.Remove(c);
-
-            if (!panel.Children.Contains(c))
-                panel.Children.Add(c);
+            var s = LibStrings.FindResource(key);
+            return string.IsNullOrWhiteSpace(s) ? fallback : s;
         }
 
-        private Panel TargetPanel(UserControl c)
+        private void BuildNavTree()
         {
-            if (c is BasicConfigControl)
-                return pnlAppLeft;
-            if (c is JogUiConfigControl)
-                return pnlJoggingLeft;
-            if (c is JogConfigControl)
-                return pnlJoggingRight;
-            if (c is StripGCodeConfigControl)
-                return pnlGCodeLeft;
+            var controller = new SettingsNavNode(CatController, Localized("SettingsCatController", "Controller"));
+            nodeGrbl = controller.Add(new SettingsNavNode("Tab.Settings.Grbl", "Grbl", basicConfig));
+            nodeSimulator = controller.Add(new SettingsNavNode("Tab.Settings.Simulator", "Simulator", simConfig));
 
-            switch (c.GetType().FullName)
+            var application = new SettingsNavNode(CatApplication, Localized("SettingsCatApplication", "Application"));
+            var jogging = new SettingsNavNode(CatJogging, Localized("SettingsCatJogging", "Jogging"));
+            var gcode = new SettingsNavNode(CatGCode, Localized("SettingsCatGCode", "G Code"));
+
+            // The two inline editors each carried their own tab strip; those tabs are nodes here instead.
+            // Both pages of an editor share the one editor instance as content and record it as Owner, so
+            // save-on-leave and reset-to-defaults still reach the editor rather than the bare page body.
+            var iface = new SettingsNavNode(CatInterface, Localized("SettingsCatInterface", "User Interface"));
+            // Explicit Orders so the panel-contributed pages sort against these rather than just
+            // appending: AddPanelNode places by Order, and these defaulted to 0, which put the General
+            // page (Order 0, contributed by UiGeneralConfigControl) last instead of first.
+            nodeKeyboard = iface.Add(new SettingsNavNode("Tab.Settings.Keyboard", Localized("SettingsPageKeyboard", "Keyboard")) { Order = 10 });
+            nodeController = iface.Add(new SettingsNavNode("Tab.Settings.Controller", Localized("SettingsPageController", "Controller")) { Order = 20 });
+            nodeMacros = iface.Add(new SettingsNavNode("Tab.Settings.Macros", "Macros") { Order = 30 });
+            nodeJobLayout = iface.Add(new SettingsNavNode("Tab.Settings.MainPage", Localized("SettingsPageJobLayout", "Job tab layout")) { Order = 40 });
+            nodeTopTabs = iface.Add(new SettingsNavNode("Tab.Settings.Tabs", Localized("SettingsPageTopTabs", "Top-level tabs")) { Order = 50 });
+
+            nav.Nodes.Add(controller);
+            nav.Nodes.Add(application);
+            nav.Nodes.Add(jogging);
+            nav.Nodes.Add(gcode);
+            nav.Nodes.Add(iface);
+        }
+
+        // Give a config panel its own node under the category that owns it. This replaces the old
+        // TargetPanel()/TabFor() switch pair - the label comes from the panel's own localized GroupBox
+        // header, so a new panel needs no entry here and no new locale rows.
+        private void AddPanelNode(UserControl c, AppConfig profile)
+        {
+            if (c == null || panelNodes.ContainsKey(c))
+                return;
+
+            var category = nav.FindByKey(CategoryFor(c));
+            if (category == null)
+                return;
+
+            // The panel was previously parented by a column StackPanel; it is a page's whole content now.
+            if (c.Parent is Panel prev)
+                prev.Children.Remove(c);
+
+            if (c.DataContext == null && profile != null)
+                c.DataContext = profile.Base;
+
+            // A panel that hosts unrelated sections contributes one node per section (Camera + Demo
+            // recording), keyed and labelled by the panel itself; everything else is a single node
+            // labelled from its own GroupBox header.
+            var made = new List<SettingsNavNode>();
+            var provider = c as ISettingsPageProvider;
+            if (provider != null)
             {
-                case "CNC.Controls.Viewer.ConfigControl":
-                    return pnlGCodeRight;
-                case "CNC.Controls.Camera.ConfigControl":
-                case "CNC.Controls.Probing.ConfigControl":
-                    return _camProbeColumn;   // Camera + Probing share one column, docked into pnlAppRight
-                case "CNC.Controls.Lathe.ConfigControl":
-                    return pnlAppLeft;
+                int sub = 0;
+                foreach (var page in provider.GetPages())
+                    made.Add(new SettingsNavNode(page.Key, page.Label, page.Content ?? c)
+                    {
+                        Owner = c,
+                        Order = OrderFor(c) + sub++,
+                        Harvest = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content ?? c)
+                    });
+            }
+            else
+                made.Add(new SettingsNavNode(c.GetType().FullName, SettingsNavNode.LabelFrom(c, c.GetType().Name), c)
+                {
+                    Order = OrderFor(c),
+                    Harvest = SettingsSearchIndex.Harvest(c)
+                });
+
+            panelNodes[c] = made;
+
+            // Feature panels register whenever their own view is built, which is not a stable order, so
+            // place by declared order instead of appending - otherwise the tree's contents depend on
+            // which features happened to load first.
+            foreach (var node in made)
+            {
+                node.IsVisible = c.Visibility == Visibility.Visible;
+                int at = category.Children.Count;
+                for (int i = 0; i < category.Children.Count; i++)
+                    if (category.Children[i].Order > node.Order) { at = i; break; }
+                category.Insert(at, node);
             }
 
-            return pnlAppLeft;
+            nav.RefreshVisibility();
+        }
+
+        // The panel says where it belongs (ISettingsPanelCategory). The host no longer knows any panel
+        // type - the switch this replaced had to match panels in other assemblies by full type name,
+        // because CNC Controls cannot reference them. A panel that declares nothing lands in Application.
+        private static string CategoryFor(UserControl c)
+        {
+            var declared = (c as ISettingsPanelCategory)?.SettingsCategory;
+            return string.IsNullOrEmpty(declared) ? SettingsCategories.Application : declared;
+        }
+
+        private static int OrderFor(UserControl c)
+        {
+            return (c as ISettingsPanelCategory)?.SettingsOrder ?? 1000;
         }
 
         // Central runtime visibility (mirrors the old AppConfigView.Activate): hide keyboard-jog config when the
@@ -294,6 +376,7 @@ namespace CNC.Controls
                 {
                     if (GrblSettings.GetString(grblHALSetting.JogStepSpeed) != null)
                         control.Visibility = Visibility.Collapsed;
+
                     else
                     {
                         control.Visibility = Visibility.Visible;
@@ -303,35 +386,31 @@ namespace CNC.Controls
                 else if (control is ICameraConfig && model.Camera != null && !model.Camera.HasCamera)
                     control.Visibility = Visibility.Collapsed;
             }
+
+            // A hidden panel must take its nav node(s) with it, or the tree offers a page that renders blank.
+            foreach (var kv in panelNodes)
+                foreach (var node in kv.Value)
+                    node.IsVisible = kv.Key.Visibility == Visibility.Visible;
         }
 
-        private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void nav_SelectedNodeChanged(object sender, SettingsNavEventArgs e)
         {
-            // KeyMap and Main Page host their own inner TabControls - ignore their bubbled selection changes.
-            if (!Equals(e.OriginalSource, sender))
-                return;
-
-            e.Handled = true;
-
-            // Ignore selection churn while the Settings view isn't the active top-level view - most importantly the
-            // initial SelectionChanged raised during eager startup layout, which used to fire a premature
-            // Activate mid-handshake. The top-level Activate(true) EnterTab()s the current tab when we're genuinely
-            // shown; this handler only needs to service real user tab switches thereafter. See _viewActive.
+            // Ignore selection churn while the Settings view isn't the active top-level view - most importantly
+            // the initial selection made during eager startup layout, which used to fire a premature Activate
+            // mid-handshake. The top-level Activate(true) enters the current page when we're genuinely shown;
+            // this handler only needs to service real user navigation thereafter. See _viewActive.
             if (!_viewActive)
                 return;
 
-            if (e.AddedItems.Count != 1)
-                return;
-
-            var removed = e.RemovedItems.Count == 1 ? e.RemovedItems[0] as TabItem : null;
-            var added = e.AddedItems[0] as TabItem;
+            var from = e.From;
+            var to = e.To;
 
             // Defer: a child's activation may pump the dispatcher (DoEvents while waiting on the controller),
-            // which throws if it runs during the layout pass that generated this TabControl's items.
+            // which throws if it runs during the layout pass that generated the tree's containers.
             Dispatcher.BeginInvoke((System.Action)(() =>
             {
-                LeaveTab(removed);
-                EnterTab(added);
+                LeaveNode(from, to);
+                EnterNode(to);
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
@@ -341,69 +420,114 @@ namespace CNC.Controls
         private void UpdateSimulatorTabVisibility()
         {
             bool hide = SimulatorManager.IsSimulatorConnection();
-            tabSimulator.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
-            if (hide && tabConfig.SelectedItem == tabSimulator)
-                tabConfig.SelectedItem = tabGrbl;
+            nodeSimulator.IsVisible = !hide;
+            if (hide && ReferenceEquals(nav.SelectedNode, nodeSimulator))
+                nav.Select(nodeGrbl);
         }
 
-        private void EnterTab(TabItem tab)
+        private void EnterNode(SettingsNavNode node)
         {
-            if (tab == null)
+            if (node == null)
                 return;
 
-            UpdateFooterForTab(tab);
-            EnsureEditorTab(tab);
+            EnsureEditorContent(node);
+            UpdateFooterForNode(node);
 
-            if (tab == tabGrbl)
+            // An editor backing several pages shows the matching one.
+            node.Behaviour<ISettingsPageProvider>()?.ShowPage(node.Key);
+
+            if (node == nodeGrbl)
                 basicConfig.Activate(true);
-            else if (tab == tabSimulator)
+            else if (node == nodeSimulator)
                 simConfig.Activate(true);
         }
 
-        private void LeaveTab(TabItem tab)
+        private void LeaveNode(SettingsNavNode node, SettingsNavNode next = null)
         {
-            if (tab == null)
+            if (node == null)
                 return;
 
-            if (tab == tabGrbl)
+            if (node == nodeGrbl)
                 basicConfig.Activate(false);
-            else if (tab == tabSimulator)
+            else if (node == nodeSimulator)
                 simConfig.Activate(false);
-            else if (tab.Content is ISettingsEditorTab editor)
-                editor.Commit();   // Keyboard & Controller / Macros / Main Page: save-on-leave
+            else
+            {
+                // Save-on-leave. Moving BETWEEN two pages of the same editor (Keyboard -> Controller) is
+                // not leaving it, so don't persist and re-register hotkeys on an internal page switch.
+                var owner = node.Owner;
+                if (owner != null && next != null && ReferenceEquals(owner, next.Owner))
+                    return;
+                node.Behaviour<ISettingsEditorTab>()?.Commit();
+            }
         }
 
-        // Build an editor tab's content the first time it is shown.
-        private void EnsureEditorTab(TabItem tab)
+        // Build an editor page's content the first time it is shown.
+        private void EnsureEditorContent(SettingsNavNode node)
         {
-            if (tab == tabKeys && keyMapTab == null && tab.Content == null)
+            if (node.Content != null)
+                return;
+
+            if (node == nodeKeyboard || node == nodeController)
             {
-                if (Grbl.GrblViewModel?.Keyboard != null)
+                if (Grbl.GrblViewModel?.Keyboard == null)
+                {
+                    Unavailable(node, "Key mappings are not available until a controller is connected.");
+                    return;
+                }
+                if (keyMapTab == null)
                 {
                     keyMapTab = new KeyMapEditor(Grbl.GrblViewModel);
-                    tab.Content = keyMapTab;
+                    AttachPages(keyMapTab);
                 }
-                else
-                    tab.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
-                        Text = "Key mappings are not available until a controller is connected." };
             }
-            else if (tab == tabMacros && macrosTab == null && tab.Content == null)
+            else if (node == nodeMacros)
             {
                 if (AppConfig.Settings.Macros != null)
                 {
                     macrosTab = new MacroManagerDialog(AppConfig.Settings.Macros);
-                    tab.Content = macrosTab;
+                    macrosTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
+                    node.Content = macrosTab;
                 }
                 else
-                    tab.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap,
-                        Text = "Macros are not available." };
+                    Unavailable(node, "Macros are not available.");
             }
-            else if (tab == tabMainPage && mainPageTab == null && tab.Content == null)
+            else if (node == nodeJobLayout || node == nodeTopTabs)
             {
-                mainPageTab = new MainPageEditor();
-                mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
-                tab.Content = mainPageTab;
+                if (mainPageTab == null)
+                {
+                    mainPageTab = new MainPageEditor();
+                    mainPageTab.RestartRequired += (s, ev) => EnableRestart(ev.Message);
+                    AttachPages(mainPageTab);
+                }
             }
+        }
+
+        // Give every page an editor contributes the editor itself as content, keyed by the editor's own
+        // page keys. One editor instance backs several nodes - it is never taken apart, because its
+        // behaviour is hooked on the control (KeyMapEditor's PreviewKeyDown capture and its Loaded/Unloaded
+        // controller-dispatch pause would both stop firing if it left the visual tree).
+        private void AttachPages(ISettingsPageProvider provider)
+        {
+            foreach (var page in provider.GetPages())
+            {
+                var node = nav.FindByKey(page.Key);
+                if (node == null)
+                    continue;
+                node.Content = page.Content;
+                node.Owner = provider;
+                if (!string.IsNullOrWhiteSpace(page.Label))
+                    node.Label = page.Label;
+
+                // These editors are built on first show, so this is the first chance to index them.
+                // Until then they match on label only.
+                node.Harvest = SettingsSearchIndex.Harvest(page.IndexRoot ?? page.Content);
+            }
+        }
+
+        private static void Unavailable(SettingsNavNode node, string why)
+        {
+            node.Content = new TextBlock { Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap, Text = why };
         }
 
         #endregion
@@ -413,24 +537,24 @@ namespace CNC.Controls
         // One shared footer, its buttons shown per the active tab (see the applicability table): the Grbl tools
         // sub-row only on Grbl; Save hidden when that tab's autosave is on; Reset to Default only where a panel
         // opts in via ISettingsResettable.
-        private void UpdateFooterForTab(TabItem tab)
+        private void UpdateFooterForNode(SettingsNavNode node)
         {
-            if (tab == null)
+            if (node == null)
                 return;
 
-            grblTools.Visibility = tab == tabGrbl ? Visibility.Visible : Visibility.Collapsed;
-            btnSave.Visibility = SaveApplies(tab) ? Visibility.Visible : Visibility.Collapsed;
-            btnReset.Visibility = ResettablesFor(tab).Any() ? Visibility.Visible : Visibility.Collapsed;
+            grblTools.Visibility = node == nodeGrbl ? Visibility.Visible : Visibility.Collapsed;
+            btnSave.Visibility = SaveApplies(node) ? Visibility.Visible : Visibility.Collapsed;
+            btnReset.Visibility = ResettablesFor(node).Any() ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // Save is offered unless the tab's autosave (which persists on leave) is on: grbl-settings autosave for the
-        // Grbl tab, app-settings autosave for everything else.
-        private bool SaveApplies(TabItem tab)
+        // Save is offered unless the page's autosave (which persists on leave) is on: grbl-settings autosave for
+        // the Grbl page, app-settings autosave for everything else.
+        private bool SaveApplies(SettingsNavNode node)
         {
             var cfg = AppConfig.Settings.Base;
             if (cfg == null)
                 return true;
-            return tab == tabGrbl ? !cfg.AutoSaveGrblSettings : !cfg.AutoSaveSettings;
+            return node == nodeGrbl ? !cfg.AutoSaveGrblSettings : !cfg.AutoSaveSettings;
         }
 
         // Select a Settings sub-tab by its bindable tab-switch id ("Tab.Settings.Grbl" / "Tab.Settings.App").
@@ -438,70 +562,44 @@ namespace CNC.Controls
         // are ignored (the Main Page sub-tab, for one, may be removed - see tabConfig.Items.Remove(tabMainPage)).
         public bool SelectSubTab(string id)
         {
-            TabItem target;
+            // The old ids addressed tabs; "App", "Jogging" and "GCode" are categories now, so they
+            // resolve to that category's first visible page rather than failing.
             switch (id)
             {
-                case "Tab.Settings.Grbl": target = tabGrbl; break;
-                case "Tab.Settings.App": target = tabApp; break;
-                case "Tab.Settings.Jogging": target = tabJogging; break;
-                case "Tab.Settings.GCode": target = tabGCode; break;
-                case "Tab.Settings.Keyboard": target = tabKeys; break;
-                case "Tab.Settings.Macros": target = tabMacros; break;
-                case "Tab.Settings.MainPage": target = tabMainPage; break;
-                case "Tab.Settings.Simulator": target = tabSimulator; break;
-                default: target = null; break;
+                case "Tab.Settings.App": return SelectFirstIn(CatApplication);
+                case "Tab.Settings.Jogging": return SelectFirstIn(CatJogging);
+                case "Tab.Settings.GCode": return SelectFirstIn(CatGCode);
             }
+            return nav.SelectByKey(id);
+        }
 
-            if (target == null || !tabConfig.Items.Contains(target))
+        private bool SelectFirstIn(string categoryKey)
+        {
+            var cat = nav.FindByKey(categoryKey);
+            var page = cat?.Children.FirstOrDefault(n => !n.IsCategory && n.IsShown);
+            if (page == null)
                 return false;
-
-            tabConfig.SelectedItem = target;
+            nav.Select(page);
             return true;
         }
 
-        // The map from a config panel to the tab it lives on (parallels TargetPanel).
-        private TabItem TabFor(UserControl c)
+        // One panel per page, so this is now just "does this page opt in?" - the old version had to
+        // gather every visible panel sharing a tab.
+        private IEnumerable<ISettingsResettable> ResettablesFor(SettingsNavNode node)
         {
-            if (c is BasicConfigControl)
-                return tabApp;
-            if (c is JogUiConfigControl || c is JogConfigControl)
-                return tabJogging;
-            if (c is StripGCodeConfigControl)
-                return tabGCode;
-
-            switch (c.GetType().FullName)
-            {
-                case "CNC.Controls.Viewer.ConfigControl":
-                    return tabGCode;
-                case "CNC.Controls.Camera.ConfigControl":
-                case "CNC.Controls.Probing.ConfigControl":
-                case "CNC.Controls.Lathe.ConfigControl":
-                    return tabApp;
-            }
-            return tabApp;
-        }
-
-        // The resettable panels/editors on a tab: the Grbl control itself ($RST=$), the visible app-config panels
-        // that opt in, or an editor tab that opts in (key bindings). Empty => the tab has no Reset button.
-        private IEnumerable<ISettingsResettable> ResettablesFor(TabItem tab)
-        {
-            if (tab == tabGrbl)
+            if (node == nodeGrbl)
                 return new ISettingsResettable[] { basicConfig };
 
-            if (tab == tabApp || tab == tabJogging || tab == tabGCode)
-                return model == null ? Enumerable.Empty<ISettingsResettable>()
-                    : model.ConfigControls.Where(c => TabFor(c) == tab && c.Visibility == Visibility.Visible)
-                                          .OfType<ISettingsResettable>().ToList();
-
-            return tab.Content is ISettingsResettable r ? new[] { r } : Enumerable.Empty<ISettingsResettable>();
+            var r = node?.Behaviour<ISettingsResettable>();
+            return r != null ? new[] { r } : Enumerable.Empty<ISettingsResettable>();
         }
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            var tab = tabConfig.SelectedItem as TabItem;
-            if (tab == tabGrbl)
+            var node = nav.SelectedNode;
+            if (node == nodeGrbl)
                 basicConfig.SaveSettings();
-            else if (tab?.Content is ISettingsEditorTab editor)
+            else if (node?.Behaviour<ISettingsEditorTab>() is ISettingsEditorTab editor)
                 editor.Commit();
             else if (AppConfig.Settings.Save())
                 Grbl.GrblViewModel.Message = LibStrings.FindResource("SettingsSaved");
@@ -509,8 +607,7 @@ namespace CNC.Controls
 
         private void btnReset_Click(object sender, RoutedEventArgs e)
         {
-            var tab = tabConfig.SelectedItem as TabItem;
-            foreach (var r in ResettablesFor(tab).ToList())
+            foreach (var r in ResettablesFor(nav.SelectedNode).ToList())
                 r.ResetToDefaults();
         }
 
@@ -573,10 +670,20 @@ namespace CNC.Controls
                     Arguments = "-self-relaunch",
                     UseShellExecute = false
                 };
-                System.Diagnostics.Process.Start(psi);
+                // Logged because a failed relaunch is otherwise indistinguishable from the user quitting:
+                // the app exits, the log just stops, and nothing says a restart was even attempted
+                // (confirmed 2026-08-03 - a relaunch failed to come back and left no evidence at all).
+                CNC.Core.DebugLog.Write("app", string.Format("Restart: relaunching \"{0}\" {1}", psi.FileName, psi.Arguments));
+                var relaunched = System.Diagnostics.Process.Start(psi);
+                CNC.Core.DebugLog.Write("app", string.Format("Restart: started pid {0} - shutting this instance down", relaunched == null ? -1 : relaunched.Id));
                 Application.Current.Shutdown();
             }
-            catch { _restarting = false; }   // relaunch failed - leave the app open; changes are saved and apply on next manual restart
+            catch (Exception ex)
+            {
+                // Relaunch failed - leave the app open; changes are saved and apply on next manual restart.
+                CNC.Core.DebugLog.Write("app", "Restart: relaunch FAILED, app staying open - " + ex.Message);
+                _restarting = false;
+            }
         }
 
         #endregion

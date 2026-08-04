@@ -426,26 +426,9 @@ namespace CNC.Core
         // not a history; the streamed program itself is never saved to disk otherwise.
         public static string GeneratedFolder { get { return System.IO.Path.Combine(ConfigPath, "Generated"); } }
 
-        // Best-effort day-based retention shared by the App.config and Grbl settings backups.
-        public static void PruneBackups(int days = 10)
-        {
-            try
-            {
-                if (!System.IO.Directory.Exists(BackupsFolder))
-                    return;
-                DateTime cutoff = DateTime.Now.AddDays(-days);
-                foreach (string file in System.IO.Directory.GetFiles(BackupsFolder))
-                {
-                    try
-                    {
-                        if (System.IO.File.GetLastWriteTime(file) < cutoff)
-                            System.IO.File.Delete(file);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-        }
+        // Odd Jobs work orders saved by name (Save.../Load... on the Work Order tab). Distinct from the single
+        // live work order kept in App.config, which is just "what the tab was left showing".
+        public static string WorkOrdersFolder { get { return System.IO.Path.Combine(ConfigPath, "WorkOrders"); } }
 
         static Resources()
         {
@@ -3755,7 +3738,8 @@ namespace CNC.Core
 
         // Timestamped restore point of the settings as read at connect - one per successful connect,
         // shared Backups folder with the App.config startup backups; full settings dump in the Backup
-        // format so Restore reuses LoadFile(). Retention is day-based (Resources.PruneBackups).
+        // format so Restore reuses LoadFile(). Folder placement and per-folder retention are handled by
+        // RotatingFileStore - the same scheme the debug/console/crash logs use.
         public static string SnapshotFolder { get { return Resources.BackupsFolder; } }
 
         // Write a restore point of the settings just read from the controller; best-effort, never blocks connect.
@@ -3766,43 +3750,43 @@ namespace CNC.Core
 
             try
             {
-                Directory.CreateDirectory(SnapshotFolder);
-                string name = string.Format("{0}_Grbl.txt", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                string dayDir = RotatingFileStore.PrepareDayDirectory(SnapshotFolder, "Grbl", retentionCount: 10);
+                string path = System.IO.Path.Combine(dayDir, "Grbl_" + RotatingFileStore.Stamp() + ".txt");
 
-                using (var sw = new StreamWriter(System.IO.Path.Combine(SnapshotFolder, name)))
+                using (var sw = new StreamWriter(path))
                 {
                     foreach (string s in Export())
                         sw.WriteLine(s);
                 }
 
-                Resources.PruneBackups();
+                RotatingFileStore.UpdateLatestLink(SnapshotFolder, "latest_Grbl.txt", path);
             }
             catch { }   // snapshots are a convenience; failure must not affect connect
         }
 
-        // Restore points (newest first) for the Restore picker.
+        // Restore points (newest first) for the Restore picker - scanned across all day-of-week
+        // subfolders so the picker shows the whole rolling week's history, not just today's.
         public static List<SettingsSnapshot> GetSnapshots()
         {
             var list = new List<SettingsSnapshot>();
 
             try
             {
-                if (!Directory.Exists(SnapshotFolder))
-                    return list;
-
-                foreach (var path in Directory.GetFiles(SnapshotFolder, "*_Grbl.txt"))
+                foreach (var dir in RotatingFileStore.ExistingDayDirectories(SnapshotFolder))
                 {
-                    string stamp = System.IO.Path.GetFileNameWithoutExtension(path);
-                    stamp = stamp.Substring(0, stamp.Length - "_Grbl".Length);
-
-                    if (!DateTime.TryParseExact(stamp, "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
-                        saved = File.GetLastWriteTime(path);
-
-                    list.Add(new SettingsSnapshot
+                    foreach (var path in Directory.GetFiles(dir, "Grbl_*.txt"))
                     {
-                        FilePath = path,
-                        Saved = saved
-                    });
+                        string stamp = System.IO.Path.GetFileNameWithoutExtension(path).Substring("Grbl_".Length);
+
+                        if (!DateTime.TryParseExact(stamp, RotatingFileStore.TimestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
+                            saved = File.GetLastWriteTime(path);
+
+                        list.Add(new SettingsSnapshot
+                        {
+                            FilePath = path,
+                            Saved = saved
+                        });
+                    }
                 }
             }
             catch { }

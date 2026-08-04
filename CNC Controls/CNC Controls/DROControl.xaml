@@ -16,50 +16,130 @@
                     <local:LatheModeToStringConverter x:Key="LatheModeConverter" />
                     <local:LogicalNotConverter x:Key="BooleanConverter" />
                     <local:BoolToVisibleConverter x:Key="IsVisibleConverter" />
+                    <local:WcsHeaderSuffixConverter x:Key="WcsHeaderSuffixConverter" />
+                    <local:WcsOffsetTooltipConverter x:Key="WcsOffsetTooltipConverter" />
                 </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HeaderTemplate="{StaticResource PositionHeaderTemplate}" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
+    <!-- Own header template (not the shared PositionHeaderTemplate other position panels use) so it can
+         append the active work coordinate system - "DRO (G54)" - once a controller has reported one
+         (GrblViewModel.WorkCoordinateSystem), making it clear which WCS Zero/typed values write into without
+         checking the separate Offsets flyout. The localized "DRO" text itself (Header="DRO", several locales
+         have a real translation, not just the literal word) is untouched - only the suffix is dynamic. -->
+    <GroupBox x:Uid="grp_dro" x:Name="grpDRO" Header="DRO" HorizontalAlignment="Center" VerticalAlignment="Top" MinWidth="216"
               ToolTip="Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.">
+        <GroupBox.HeaderTemplate>
+            <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="9" Height="9" Fill="{StaticResource PositionBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="{Binding}"/>
+                    <TextBlock Text="{Binding Path=DataContext.WorkCoordinateSystem, RelativeSource={RelativeSource AncestorType=GroupBox}, Converter={StaticResource WcsHeaderSuffixConverter}}"/>
+                </StackPanel>
+            </DataTemplate>
+        </GroupBox.HeaderTemplate>
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,5,0,5">
             <Label x:Name="lblXMode" Content="{Binding Path=LatheMode, Mode=OneWay, Converter={StaticResource LatheModeConverter}}" Visibility="{Binding Path=LatheModeEnabled, Mode=OneWay, Converter={StaticResource IsVisibleConverter}}" HorizontalContentAlignment="Right" Margin="20,0,65,0"/>
             <local:DROBaseControl x:Name="axisX" Label="X"
                 Value="{Binding Path=Position.X, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)X], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="X">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.X" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisY" Label="Y" Style="{StaticResource YAxisVisibleStyle}"
                 Value="{Binding Path=Position.Y, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)Y], Mode=OneWay}"
-             />
+             >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Y">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.Y" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisZ" Label="Z" Style="{StaticResource ZAxisVisibleStyle}"
                 Value="{Binding Path=Position.Z, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)Z], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Z">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.Z" Mode="OneWay"/>
+                        <Binding Path="ToolOffset.Z" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisA" Label="{Binding Path=AxisLetter.A, Mode=OneWay}" Style="{StaticResource AAxisVisibleStyle}"
                 Value="{Binding Path=Position.A, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)A], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="A">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.A" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisB" Label="{Binding Path=AxisLetter.B, Mode=OneWay}" Style="{StaticResource BAxisVisibleStyle}"
                 Value="{Binding Path=Position.B, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)B], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="B">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.B" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisC" Label="{Binding Path=AxisLetter.C, Mode=OneWay}" Style="{StaticResource CAxisVisibleStyle}"
                 Value="{Binding Path=Position.C, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)C], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="C">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.C" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisU" Label="U" Style="{StaticResource UAxisVisibleStyle}"
                 Value="{Binding Path=Position.U, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)U], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="U">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.U" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisV" Label="V" Style="{StaticResource VAxisVisibleStyle}"
                 Value="{Binding Path=Position.V, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)V], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="V">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.V" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <local:DROBaseControl x:Name="axisW" Label="W" Style="{StaticResource WAxisVisibleStyle}"
                 Value="{Binding Path=Position.W, Mode=TwoWay}"
                 IsScaled="{Binding Path=AxisScaled[(gcode:AxisFlags)W], Mode=OneWay}"
-            />
+            >
+                <local:DROBaseControl.ToolTip>
+                    <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="W">
+                        <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
+                        <Binding Path="WorkPositionOffset.W" Mode="OneWay"/>
+                    </MultiBinding>
+                </local:DROBaseControl.ToolTip>
+            </local:DROBaseControl>
             <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" MinWidth="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"
                     ToolTip="Set the work coordinate to 0 on all axes at the current position."/>
         </StackPanel>

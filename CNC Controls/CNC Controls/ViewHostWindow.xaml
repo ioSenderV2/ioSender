@@ -1,0 +1,12 @@
+<Window x:Class="CNC.Controls.ViewHostWindow"
+        x:Uid="win_viewHost"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Path=Title, RelativeSource={RelativeSource Self}}"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        MinWidth="480" MinHeight="360">
+    <!-- Generic host for a registered ICNCView opened from the main menu. The view itself is dropped
+         into this ContentControl by ViewHostWindow.Open(); nothing view-specific belongs here. -->
+    <ContentControl x:Uid="ctl_viewHostContent" x:Name="host"/>
+</Window>

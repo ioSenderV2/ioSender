@@ -82,6 +82,24 @@ namespace GCode_Sender
 
         #endregion
 
+        // Public entry point for Start Job's "Probe height map" checkbox (Dynamic mode, see StartJobView) -
+        // reuses THIS tab's own probing engine + Apply logic rather than re-deriving them, per the "reuse
+        // existing engines" convention. Blocking: StartProbing's Program.Execute pumps synchronously, the
+        // same as every other Probing-engine caller in this codebase (CenterFinderControl etc.) - fine to
+        // call from Start Job's own post-run continuation. area is in the WORK coordinates Start Job just set.
+        public void RunHeightMapAndApply(GrblViewModel m, double minX, double minY, double maxX, double maxY, double gridX, double gridY)
+        {
+            model = m;
+            RefreshProbes();
+            HeightMap.MinX = minX; HeightMap.MaxX = maxX;
+            HeightMap.MinY = minY; HeightMap.MaxY = maxY;
+            HeightMap.GridSizeX = Math.Max(gridX, 1d);
+            HeightMap.GridSizeY = Math.Max(gridY, 1d);
+            StartProbing();
+            if (HeightMap.HasHeightMap)
+                Apply_Click(null, null);
+        }
+
         // Create (once) the Probing engine view model bound to the live controller model.
         private ProbingViewModel EnsureProbing()
         {

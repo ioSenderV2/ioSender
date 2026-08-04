@@ -1,4 +1,4 @@
-# End-of-session wrap-up
+﻿# End-of-session wrap-up
 
 **When:** work for the session is done and the user is about to `/clear`.
 **Memory context:** `iosender-end-of-session-convolog.md`.
@@ -20,6 +20,10 @@ always `/clear`.
    for this push's commit completes and exits 0/1 on success/failure. **If it fails, stop and
    surface the failure** (link + a look at the log) instead of writing the summary as if everything
    shipped clean - don't silently proceed to steps 5/6 on a red build.
+   On success it also **fast-forwards onto the changelog stamp the release just pushed** - `release.yml`
+   ends by committing the version stamps and pushing them to master, so without this the next push (3.6)
+   is rejected with "fetch first". Nothing to do by hand; if it reports that master has *diverged* (more
+   than the stamp), stop and look rather than merging blind.
 3.6. **Bump the local dev-build version display** — once 3.5 succeeds, update `legacyVersion` in
    `ioSender XL\ioSender XL\MainWindow.xaml.cs` (~L66) to the version that was JUST published + 1, so
    local/dev builds show the upcoming version rather than a stale one. This constant is the fallback used
@@ -32,19 +36,21 @@ always `/clear`.
    → [publish_manual_site.md](publish_manual_site.md).
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
-6. **THEN capture the conversation log** — the `-Once` call, → [capture_conversation_log.md](capture_conversation_log.md) —
-   **immediately followed by regenerating the session index** (`tools\effort\build-session-index.ps1`),
-   so `ClaudeConv\index.html` (elapsed/kbd time/turns/tokens/TOC#/release per session, linking to each
-   saved conversation) stays current. Takes ~2 min (re-parses every transcript) - run it, don't skip it
-   for time.
+6. **THEN capture the conversation log** — → [capture_conversation_log.md](capture_conversation_log.md).
+   One command, ~1 s: it writes this session's HTML into `claude-hub\conversations\ioSender\`,
+   appends its record to that project's `sessions.json`, re-renders that index plus the
+   cross-project roll-up, and commits itself into `claude-hub` (no push).
+   **Running it is what defines the session boundary** — everything since
+   the last capture is this session — so don't skip it, and don't run it twice (use `-Amend` if you
+   captured early and kept working). No separate `build-session-index.ps1` step any more.
 
 ## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
 
 The capture reads the session transcript from disk. Claude Code flushes the assistant message's **text**
 to the transcript **before** it runs a tool call in that same message — so any text written *earlier in the
-message than the `-Once` call* is already on disk and gets captured. Therefore:
+message than the capture call* is already on disk and gets captured. Therefore:
 
-- **Write the full end-of-session summary as prose first, then make the `-Once` call the LAST action of the
+- **Write the full end-of-session summary as prose first, then make the capture the LAST action of the
   same message.** The summary lands in *this* session's log, not the next run's. (Verified 2026-07-08 with a
   marker-phrase test.)
 - The old flow ran the capture and *then* wrote the summary as trailing text — which pushed the summary to
@@ -59,10 +65,16 @@ powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
 ## Ready command (step 6)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\effort\convo-sessions.ps1 -Once
-powershell -ExecutionPolicy Bypass -File tools\effort\build-session-index.ps1
+powershell -ExecutionPolicy Bypass -File c:\github\claude-hub\tools\convo-sessions.ps1
 ```
 
 ## Notes
 
 - This is a one-shot at end-of-session, **not** a per-commit routine and **not** a git hook.
+- **The version bump commit is the LAST push of the session.** After 3.6, `push-all` again. That second
+  push is expected and is not a sign anything went wrong.
+- **A push that carries no unstamped changelog entries does not spam the releases page.** `release.yml`
+  runs on it, but its first step computes the changelog delta and every later step is conditional on
+  `hasChanges` - so it skips the build, the publish and the stamp. Verified on 2026-08-03: the run for
+  the v2.38 recovery merge succeeded with `Publish release v2.39` **skipped**, leaving exactly one
+  release with its tag and asset untouched. Don't try to "fix" such a run.

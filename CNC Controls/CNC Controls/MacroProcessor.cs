@@ -62,6 +62,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
+using CNC.GCode;
 
 namespace CNC.Controls
 {
@@ -75,7 +76,7 @@ namespace CNC.Controls
 
         // The active program's run action: a tool registers its "generate-and-run" here when its tab is shown and
         // clears it when the tab is left. Cycle Start, when idle, runs this instead of streaming the loaded job -
-        // so one Cycle Start runs whatever program is active (file/folder on the Grbl tab, or a wizard on its tab)
+        // so one Cycle Start runs whatever program is active (the loaded file on the Job tab, or a wizard on its tab)
         // and tools no longer need their own Run button. Null = no tool active: Cycle Start streams the job.
         // Setting it raises ActiveProgramChanged so program views can re-mark which one is the configured source.
         private static System.Action _activeRun;
@@ -102,6 +103,23 @@ namespace CNC.Controls
             get { return _supportsGenerateMode; }
             set { _supportsGenerateMode = value; ActiveProgramChanged?.Invoke(); }
         }
+
+        // Opt-in for a Generate-first tab whose generated program IS a real cutting program worth Dry
+        // Running/Check Running (Odd Jobs' job wizards - Pocket etc), as opposed to the setup/probing-macro
+        // tabs (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard) where those modes don't mean
+        // anything. False (dropdown stays hidden, same as before this existed) unless a tab sets it alongside
+        // SupportsGenerateMode. Only takes effect once IsProgramGenerated is true - see UpdateRunButtonLabel.
+        public static bool AllowRunModesWhenGenerated;
+
+        // Opt-in "Generate and Run" mode-dropdown entry for a Generate-first tab whose own Generate/Run
+        // steps are routine enough (re-run often with the same answers) to be worth a one-click unattended
+        // path - Start Job is the first (its own confirmation dialogs + the generated program's (MBOX) probe-
+        // install prompts add up to 3 clicks every single run). ActiveGenerateAndRun is the tab's own
+        // combined "build the program, then MacroProcessor.Run(..., unattended: true) it" action - the tab
+        // itself decides which of ITS OWN confirmations are routine-safe to skip (see StartJobView.
+        // GenerateAndRun) vs genuine safety gates that must still prompt even here.
+        public static bool SupportsGenerateAndRun;
+        public static System.Action ActiveGenerateAndRun;
 
         // Live "are this tab's current inputs enough to generate" gate - the tab re-sets this on every input
         // change (the same checks that used to drive its own Generate button's IsEnabled).
@@ -137,22 +155,45 @@ namespace CNC.Controls
         public static string ActiveProgramName;
 
         // Hook to stream a generated program with full flow control (Feed Hold/Stop live) WITHOUT touching the
-        // loaded job: args are (model, name, lines, onDone). Set by the shell (ioSender XL). EVERY streamed run
-        // goes through this - a tool that owns a ProgramView streams into it, a plain macro gets its own run
-        // view - so a run never overwrites the loaded program or hijacks the Job tab. Cycle Start is deferred to
-        // a background dispatcher tick (see the implementation), so this call returns before the burst actually
-        // starts - onDone is invoked once it reaches a true terminal state, letting StreamProgram optionally
-        // wait for it (see Flush's 'wait' parameter) instead of racing the next burst against this one.
+        // loaded job: args are (model, name, lines, isFinalBurst, preferJobView, onDone). Set by the shell
+        // (ioSender XL). EVERY streamed run goes through this - a tool that owns a ProgramView streams into it,
+        // a plain macro gets its own run view - so a run never overwrites the loaded program or hijacks the Job
+        // tab. Cycle Start is deferred to a background dispatcher tick (see the implementation), so this call
+        // returns before the burst actually starts - onDone is invoked once it reaches a true terminal state,
+        // letting StreamProgram optionally wait for it (see Flush's 'wait' parameter) instead of racing the next
+        // burst against this one.
         // isFinalBurst (added alongside the wait plumbing below): true only for the macro's own fire-and-forget
         // closing burst (Flush's wait=false call) - the host uses it to tell "the whole macro just finished" apart
         // from "one more mid-macro burst just finished, more is coming right behind it".
-        public static System.Action<GrblViewModel, string, string[], bool, System.Action> RunStreamedJobInPlace;
+        // preferJobView (2026-08-01): opt-in escape hatch from the "never hijack the Job tab" rule above, for
+        // the one case where hijacking it is exactly the point - Work Order already made itself the loaded job
+        // via GCode.File.Push/LoadText before streaming, so its own burst should show live status in the real
+        // docked Job-tab list instead of a separate floating view. False for every other caller (Setup,
+        // calibration, fixture tools, ...) - those must keep the "don't touch the Job tab" guarantee.
+        public static System.Action<GrblViewModel, string, string[], bool, bool, System.Action> RunStreamedJobInPlace;
+
+        // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
+        // its generated program off to the Job tab ("one mental model of running a program" regardless of
+        // source), then switches BACK to Work Order once the Job tab's borrowed program is done with (a
+        // failed prereq, or the run's own true terminal - see WorkOrderView.Run/WatchForRunEnd). Switching
+        // straight back also sidesteps a WPF quirk found 2026-08-01: the Job tab's docked list didn't
+        // visually repaint its outline grouping after GCode.Pop restored a large file WHILE that tab stayed
+        // in view - but a genuine tab switch always forces a correct repaint, so leaving (and not looking at
+        // the stale frame) beats fighting to force one in place.
+        public static System.Action<ViewType> SwitchToTab;
 
         // Name given to the in-memory program when a flush is streamed (set per run).
         private static string _streamName = "Macro";
 
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false)
+        /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
+        /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
+        /// auto-answered OK/Yes) and take an unanswered (PROMPT param, default, ...) input's own default
+        /// rather than asking. For a "Generate and Run" action that a tab offers explicitly (see
+        /// MacroProcessor.SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures and
+        /// alarm-abort checks still apply and still stop the run; this only skips prompts that exist purely
+        /// to ask "are you sure" / "ready?", not safety gates.</param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, bool preferJobView = false)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -225,7 +266,10 @@ namespace CNC.Controls
             // run" box would be redundant - only show that when there are no input prompts to gate on.
             if (fields.Count > 0)
             {
-                if (!ShowPromptDialog(name, fields))
+                // Unattended: no operator to ask - each field just keeps the macro's own declared default
+                // (PromptField.Value is already seeded with it by ParsePromptField) rather than showing the
+                // dialog.
+                if (!unattended && !ShowPromptDialog(name, fields))
                     return false;   // cancelled
 
                 // Assign the globals on the controller before the body runs (so $F=<file> jobs can read
@@ -233,8 +277,37 @@ namespace CNC.Controls
                 foreach (var field in fields)
                     buffer.Append(field.Param).Append('=').Append(field.Value).Append('\n');
             }
-            else if (confirm && !ConfirmRun(name))
+            else if (confirm && !unattended && !ConfirmRun(name))
                 return false;
+
+            // Dry-run/verify mode: neutralise spindle-on (M3/M4), coolant-on (M7/M8) and tool-change (M6)
+            // lines. Only needed here when preferJobView is FALSE: a preferJobView run (Work Order) ends up
+            // as the real, non-transient GCode.File source - RunStreamedJobInPlace hands it to
+            // RunControl.Run(0, false), which lands in JobControl.Run's ordinary Source.IsLoaded branch and
+            // gets FULL protection there (StreamPump's own HasSpindleOrCoolantOn/HasToolChange check, from
+            // the real parser, PLUS the G92 Z-offset clearance this streamer doesn't even provide) - so
+            // neutralising here too was pure redundant double-handling on the exact same lines, not defense
+            // in depth (confirmed while diagnosing a real hardware incident - see git history). Every OTHER
+            // caller (Start Job, Auto Square, Stepper Calibration, Fixture probes) streams as a TRANSIENT
+            // source, which StreamPump's own check explicitly EXCLUDES by design (dry-run must never leak
+            // into a probing/wizard macro just because a loaded-job test left it armed - see
+            // JobControl.Run's own comment) - for those, THIS is the only protection that exists, so it must
+            // still run. Uses the real parser (not a regex) so a comment that happens to mention "M3" can't
+            // cause a false positive - but only best-effort: a line the parser can't handle (some macro
+            // directive/expression syntax this streamer tolerates that a strict parse might not) is left
+            // exactly as it would have been before this existed, never blocked or altered.
+            var dryRunParser = (model.IsDryRunMode && !preferJobView) ? new GCodeParser() : null;
+            dryRunParser?.Reset();
+
+            // Does this macro start a controller-side job ($F=<file> on an SD card)? Such a job acks
+            // immediately and only THEN begins moving, so WAITIDLE after one has to allow time to observe
+            // motion start before it can trust an Idle report. Nothing else does that - an ordinary burst has
+            // already finished moving by the time Flush(wait:true) returns - so the long allowance is scoped
+            // to the case that needs it instead of being charged to every (WAITIDLE) in every macro.
+            bool sdJobPossible = false;
+            foreach (var l in lines)
+                if (l.TrimStart().StartsWith("$F=", StringComparison.OrdinalIgnoreCase))
+                    sdJobPossible = true;
 
             // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
             foreach (var raw in lines)
@@ -245,10 +318,13 @@ namespace CNC.Controls
                 if (IsDirective(raw, "PROMPT"))
                 {
                     // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
-                    if (Body(raw, "PROMPT").Trim().Length == 0)
+                    if (Body(raw, "PROMPT").Trim().Length == 0 && !unattended)
                     {
-                        Flush(model, buffer, true);
-                        if (AbortedByAlarm(model, name))
+                        // Snapshot BEFORE Flush - see AbortedByAlarm's own comment on why sampling the
+                        // CURRENT state after the burst already ran isn't enough.
+                        long alarmBefore = model.AlarmEventCounter;
+                        Flush(model, buffer, true, preferJobView);
+                        if (AbortedByAlarm(model, name, alarmBefore))
                             return false;
                         if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
                                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
@@ -259,24 +335,28 @@ namespace CNC.Controls
 
                 if (IsDirective(raw, "MBOX"))
                 {
-                    Flush(model, buffer, true);
+                    // Snapshot BEFORE Flush - see AbortedByAlarm's own comment.
+                    long alarmBefore = model.AlarmEventCounter;
+                    Flush(model, buffer, true, preferJobView);
                     // A burst just flushed above may have alarmed (e.g. a probe search that never triggered)
                     // without WaitForIdle in the picture at all - Flush only waits for the burst to reach SOME
                     // terminal StreamingState, it doesn't check WHICH one. Without this, the macro sailed
                     // straight on to the next (MBOX) as if nothing had gone wrong (confirmed on real hardware
                     // 2026-07-21: a failed spoilboard probe alarmed, then the very next prompt still popped up
                     // asking to position the gauge block, with the controller sitting in Alarm the whole time).
-                    if (AbortedByAlarm(model, name))
+                    // Alarm-abort is checked even when unattended - this only skips the "are you ready" hold,
+                    // never a real safety gate.
+                    if (AbortedByAlarm(model, name, alarmBefore))
                         return false;
-                    if (!ShowMBox(name, raw))
+                    if (!unattended && !ShowMBox(name, raw))
                         return false;   // Cancel / No - stop here
                     continue;
                 }
 
                 if (IsDirective(raw, "WAITIDLE"))
                 {
-                    Flush(model, buffer, true);
-                    if (!WaitForIdle(model))
+                    Flush(model, buffer, true, preferJobView);
+                    if (!WaitForIdle(model, sdJobPossible))
                     {
                         ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
                             "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -285,9 +365,10 @@ namespace CNC.Controls
                     continue;
                 }
 
-                buffer.Append(SanitizeComment(ApplySubstitutions(raw, fields))).Append('\n');
+                string line = SanitizeComment(ApplySubstitutions(raw, fields));
+                buffer.Append(DryRunNeutralize(dryRunParser, line)).Append('\n');
             }
-            Flush(model, buffer, false);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
+            Flush(model, buffer, false, preferJobView);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
 
             return true;
         }
@@ -334,6 +415,19 @@ namespace CNC.Controls
         // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
         public static void EmitGotoG30(System.Action<string> L)
         {
+            // DO NOT wrap these in an o-word conditional. Tried 2026-08-02 to skip the lift-and-drop when
+            // already parked at G30; on real hardware the program streamed to completion - the g-code activity
+            // window scrolled normally - and the machine never moved at all, for the whole run.
+            //
+            // Cause: o-word FLOW CONTROL has never been streamed to a controller by this app. Every IF/WHILE
+            // here lives inside a .macro FILE on the controller (pcorner, tc, ...), which grblHAL can seek
+            // within; all 13 o-word sites in generated code are "O<name> CALL" into one of those files. A
+            // streamed program isn't seekable, so the IF was swallowed - and took the rest of the program's
+            // motion with it.
+            //
+            // If the redundant round trip is worth removing, decide it in C# at generate time - the caller
+            // already knows the live position via GrblViewModel.MachinePosition - and just don't emit these
+            // lines. Never by asking the controller to branch mid-stream.
             L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
             L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
             L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
@@ -373,6 +467,50 @@ namespace CNC.Controls
             return result;
         }
 
+        // Dry Run mode's spindle/coolant/tool-change suppression for THIS streamer - see the (WAITIDLE)
+        // header comment's own note above. parser is null when Dry Run isn't armed (the common case), so
+        // this is then a single null-check per line, not a parse. Best-effort when armed: a line the parser
+        // throws on (some macro syntax this streamer otherwise tolerates without ever inspecting it) is
+        // passed through unmodified rather than aborting the run - same as before this existed.
+        private static string DryRunNeutralize(GCodeParser parser, string line)
+        {
+            if (parser == null || line.Length == 0 || line[0] == '(')   // pure comment/directive - nothing to neutralise
+                return line;
+
+            try
+            {
+                int tokenStart = parser.Tokens.Count;
+                string toParse = line;
+                // quiet:true is a DIFFERENT, lighter mode (see GCodeParser.ParseBlock's own early-out) that
+                // validates a line is well-formed WITHOUT actually parsing words into Tokens at all - fine
+                // for JobControl's own modal-state-only use of it, but useless here: this needs the REAL
+                // tokens to inspect for M3/M4/M6/M7/M8, so it must be quiet:false. Root cause of a real
+                // hardware incident - the spindle turning on during an armed Dry Run - confirmed via
+                // [WO-DIAG] logging: IsDryRunMode really was True the whole way through and dryRunParser was
+                // genuinely non-null, but every ParseBlock(quiet:true) call below silently produced zero
+                // tokens, so this loop never matched anything and every line passed through unchanged.
+                if (!parser.ParseBlock(ref toParse, false))
+                    return line;
+
+                for (int i = tokenStart; i < parser.Tokens.Count; i++)
+                {
+                    var t = parser.Tokens[i];
+                    if (t is GCSpindleState && (t.Command == Commands.M3 || t.Command == Commands.M4))
+                        return "()";
+                    if (t is GCCoolantState && (t.Command == Commands.M7 || t.Command == Commands.M8))
+                        return "()";
+                    if (t.Command == Commands.M6)
+                        return "()";
+                }
+            }
+            catch
+            {
+                /* fail open - stream the line exactly as it would have been sent before Dry Run awareness existed */
+            }
+
+            return line;
+        }
+
         // Send the accumulated g-code. EVERY burst - however small - goes through the flow-controlled job
         // streamer, never the MDI path: MDI has no character-counting flow control, so a burst sent that way
         // can overrun the controller's serial buffer (hanging it), blocks the UI thread while it goes out
@@ -389,7 +527,7 @@ namespace CNC.Controls
         // MBOX/WAITIDLE/prompt gate) MUST pass wait=true so this burst genuinely finishes first - restoring the
         // strict ordering the old MDI queue gave for free. The macro's FINAL burst passes wait=false (fire and
         // forget) so a "Run" click doesn't block until the physical job completes.
-        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait)
+        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait, bool preferJobView = false)
         {
             if (buffer.Length == 0)
                 return;
@@ -423,18 +561,19 @@ namespace CNC.Controls
             if (RunStreamedJobInPlace == null)
             {
                 // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
-                ShowMessage("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.",
+                ShowMessage(string.Format("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and {0} / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.", RunLabels.FeedHold),
                     "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            StreamProgram(model, lines, wait);
+            StreamProgram(model, lines, wait, preferJobView);
         }
 
-        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView, WITHOUT touching
-        // the loaded job. A run flushes several bursts (a park move, then each O<...> CALL); every one takes this
-        // path, so a run never overwrites the loaded program or hijacks the Job tab.
-        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait)
+        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView. By default
+        // WITHOUT touching the loaded job - a run flushes several bursts (a park move, then each O<...> CALL);
+        // every one takes this path, so a run never overwrites the loaded program or hijacks the Job tab.
+        // preferJobView opts a caller OUT of that guarantee - see RunStreamedJobInPlace's own comment.
+        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait, bool preferJobView = false)
         {
             var code = new List<string>();
             foreach (var l in lines)
@@ -447,7 +586,7 @@ namespace CNC.Controls
                 return;
 
             bool done = false;
-            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, () =>
+            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, preferJobView, () =>
             {
                 done = true;
                 DebugLog.Write("macro", string.Format("StreamProgram: onDone fired, StreamingState={0} GrblState={1}",
@@ -467,9 +606,14 @@ namespace CNC.Controls
         // macro here, not sail on to the next prompt as if the burst had succeeded. Same Alarm/Unknown check
         // WaitForIdle already uses for the same reason, just reached from a different gate (WAITIDLE isn't
         // the only place a burst's outcome needs checking - any MBOX/PROMPT right after G-code content does).
-        private static bool AbortedByAlarm(GrblViewModel model, string name)
+        // alarmBefore: model.AlarmEventCounter captured BEFORE the burst that just ran (Flush) was sent - a
+        // latch, not a sampled value, so an alarm the operator already cleared (Reset+Unlock) faster than
+        // this check runs is still caught, instead of being silently missed the way sampling only the
+        // CURRENT GrblState.State would. See GrblViewModel.AlarmEventCounter's own comment - confirmed as a
+        // real bug 2026-08-01, same race class as the fix documented above this method's own call sites.
+        private static bool AbortedByAlarm(GrblViewModel model, string name, long alarmBefore)
         {
-            if (model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
+            if (model.AlarmEventCounter == alarmBefore && model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
                 return false;
             ShowMessage(string.Format("Macro \"{0}\" aborted: the controller alarmed (or the connection was lost) mid-run.", name),
                 "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -520,6 +664,10 @@ namespace CNC.Controls
         // Returns false (after a message) if the file cannot be read.
         private static bool ResolveFileReference(ref string code, string name)
         {
+            // Extensionless @<path> defaults to ".macro" - normally already baked into the stored text
+            // by MacroCreateDialog, this is a safety net for references normalized before that existed.
+            code = MacroManagerDialog.NormalizeMacroReference(code);
+
             string trimmed = code.TrimStart();
             if (!trimmed.StartsWith("@"))
                 return true;
@@ -695,7 +843,16 @@ namespace CNC.Controls
         // The wait runs on the UI thread, so it pumps the dispatcher the same way the rest of
         // the app does (see Grbl.WaitForIdle) - background threads observe controller responses
         // while EventUtils.DoEvents keeps status reports (and the UI) flowing.
-        private static bool WaitForIdle(GrblViewModel model)
+        // How long to allow for motion to be observed STARTING before concluding it already finished. Only a
+        // controller-side job ($F=) can begin moving after its ack, and only then is the long allowance
+        // justified; for everything else Flush(wait:true) has already returned on a real Idle detection, so
+        // the full 2s was dead time charged to every (WAITIDLE) - three of them in a Start Job program, which
+        // is most of the multi-second stalls seen between steps. The short value still spans two status
+        // reports at the usual ~200ms cadence.
+        private const int ObserveMotionStartMs = 400;
+        private const int ObserveMotionStartSdMs = 2000;
+
+        private static bool WaitForIdle(GrblViewModel model, bool sdJobPossible = false)
         {
             DebugLog.Write("macro", string.Format("WaitForIdle: enter, StreamingState={0} GrblState={1}",
                 model.StreamingState, model.GrblState.State));
@@ -716,19 +873,29 @@ namespace CNC.Controls
             // stall/disconnect check below (2 consecutive silent report timeouts), so this can't hang forever.
             var token = new CancellationToken();
 
+            // Snapshot the alarm latch before waiting - see GrblViewModel.AlarmEventCounter's own comment.
+            // Checked alongside (not instead of) the sampled GrblState.State below: the counter catches an
+            // alarm the operator already cleared (Reset+Unlock) faster than this loop happened to poll,
+            // which the sampled state alone would miss entirely - confirmed as a real bug 2026-08-01, where
+            // that exact race let a macro silently continue past a probe-failure alarm the operator had
+            // already manually cleared, moving on to its next step as if nothing had happened.
+            long alarmCountAtStart = model.AlarmEventCounter;
+
             // A $F= job acks immediately and only then starts running, so first wait briefly for
             // the controller to actually leave Idle before watching for it to return - otherwise
             // the very first status report could still show the pre-run Idle and we would finish early.
             var sw = Stopwatch.StartNew();
             bool started = model.GrblState.State != GrblStates.Idle;
 
-            while (!started && sw.ElapsedMilliseconds < 2000)
+            int observeStartMs = sdJobPossible ? ObserveMotionStartSdMs : ObserveMotionStartMs;
+
+            while (!started && sw.ElapsedMilliseconds < observeStartMs)
             {
                 PumpForReport(model, token, 500);
 
-                if (model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
+                if (model.AlarmEventCounter != alarmCountAtStart || model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
                 {
-                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - GrblState={0} while waiting to observe motion start", model.GrblState.State));
+                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - alarm seen (or GrblState={0}) while waiting to observe motion start", model.GrblState.State));
                     return false;
                 }
 
@@ -737,7 +904,7 @@ namespace CNC.Controls
 
             if (!started)
             {
-                DebugLog.Write("macro", "WaitForIdle: never observed motion start within 2000ms - treating as already-finished");
+                DebugLog.Write("macro", string.Format("WaitForIdle: never observed motion start within {0}ms - treating as already-finished", observeStartMs));
                 return true;    // job finished (or produced no motion) before we could observe it running
             }
 
@@ -757,6 +924,12 @@ namespace CNC.Controls
                     continue;
                 }
                 silentReports = 0;
+
+                if (model.AlarmEventCounter != alarmCountAtStart)
+                {
+                    DebugLog.Write("macro", "WaitForIdle: abort - alarm seen (latched) while waiting for completion");
+                    return false;
+                }
 
                 switch (model.GrblState.State)
                 {

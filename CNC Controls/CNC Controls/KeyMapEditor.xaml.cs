@@ -1,4 +1,4 @@
-/*
+﻿/*
  * KeyMapEditor.xaml.cs - part of CNC Controls library for Grbl
  *
  * Modal editor for keyboard mappings: jog keys and action shortcuts (including the
@@ -22,8 +22,29 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    public partial class KeyMapEditor : UserControl, ISettingsEditorTab, ISettingsResettable
+    public partial class KeyMapEditor : UserControl, ISettingsEditorTab, ISettingsResettable, ISettingsPageProvider
     {
+        // The editor's Keyboard/Controller tab strip becomes two nav pages. The editor itself stays the
+        // content of BOTH pages - it is not taken apart - because its behaviour is hooked on the control:
+        // PreviewKeyDown drives shortcut capture, and Loaded/Unloaded pause controller dispatch so testing
+        // a gamepad button in here cannot move the machine. Handing out the two tab bodies on their own
+        // would have left the editor outside the visual tree and silently killed both.
+        // Its tab strip is templated away (see the XAML), so ShowPage just switches the selected item.
+        public IEnumerable<SettingsSubPage> GetPages()
+        {
+            return tabs.Items.OfType<TabItem>()
+                       .Select((item, i) => new SettingsSubPage(
+                            i == 0 ? "Tab.Settings.Keyboard" : "Tab.Settings.Controller",
+                            item.Header as string ?? string.Empty, this)
+                            { IndexRoot = item.Content as FrameworkElement })
+                       .ToList();
+        }
+
+        public void ShowPage(string key)
+        {
+            tabs.SelectedIndex = key == "Tab.Settings.Controller" ? 1 : 0;
+        }
+
         private readonly KeypressHandler keyboard;
         private readonly GrblViewModel model;
         private readonly ObservableCollection<BindingRow> rows = new ObservableCollection<BindingRow>();
@@ -156,7 +177,7 @@ namespace CNC.Controls
                 var s = savedActions?.FirstOrDefault(x => x.Id == z.Id);
                 if (s != null)
                     ShortcutKey.TryParse(s.Key, out b.Key, out b.Modifiers);   // TryParse leaves Key.None on an explicit empty (cleared) row
-                Add(new BindingRow(b, z.Label) { IsZoomAction = true, Description = z.Label });
+                Add(new BindingRow(b, z.Label) { IsZoomAction = true, ActionGroup = z.Group, Description = z.Description ?? z.Label });
             }
 
             BuildGroupStates();
@@ -517,12 +538,12 @@ namespace CNC.Controls
             return new List<ActionItem>
             {
                 new ActionItem(ControllerAction.None, "(none)", "No action assigned to this button."),
-                new ActionItem(ControllerAction.CycleStart, "Run / Resume", "Start the loaded program, or resume after a feed hold."),
-                new ActionItem(ControllerAction.FeedHold, "Feed Hold", "Pause motion (feed hold)."),
+                new ActionItem(ControllerAction.CycleStart, RunLabels.CycleStart + " / Resume", string.Format("Start the loaded program, or resume after a {0}.", RunLabels.FeedHold)),
+                new ActionItem(ControllerAction.FeedHold, RunLabels.FeedHold, "Pause motion."),
                 new ActionItem(ControllerAction.Reset, "Reset (soft-reset)", "Soft-reset the controller (Ctrl-X)."),
                 new ActionItem(ControllerAction.Unlock, "Unlock", "Clear an alarm / unlock the controller ($X)."),
                 new ActionItem(ControllerAction.Home, "Home", "Run the homing cycle ($H)."),
-                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", "Stop the spindle (during a feed hold)."),
+                new ActionItem(ControllerAction.SpindleStop, "Spindle stop", string.Format("Stop the spindle (during a {0}).", RunLabels.FeedHold)),
                 new ActionItem(ControllerAction.JogXPlus, "Jog X +", "Jog the X axis +" + xp + jogNote),
                 new ActionItem(ControllerAction.JogXMinus, "Jog X −", "Jog the X axis −" + xm + jogNote),
                 new ActionItem(ControllerAction.JogYPlus, "Jog Y +", "Jog the Y axis +" + yp + jogNote),
@@ -576,7 +597,7 @@ namespace CNC.Controls
 
         public static bool IsGroupExpanded(string name)
         {
-            // Default collapsed (like the Load Folder outline); remembered once toggled this session.
+            // Default collapsed (like the program-list toolpath outline); remembered once toggled this session.
             bool v;
             return name != null && groupExpanded.TryGetValue(name, out v) && v;
         }
@@ -648,80 +669,65 @@ namespace CNC.Controls
             public TabTarget(string id, string label, string description) { Id = id; Label = label; Description = description; }
         }
 
-        // The bindable tabs, in display order within their group. Id is "Tab.<Name>" for a main-page tab and
-        // "Tab.Settings.<Name>" for a Settings sub-tab. This is the source of truth for the editor rows; the
-        // matching id -> tab dispatch lives in MainWindow.RegisterTabShortcuts / MainWindow_PreviewKeyDown.
+        // The bindable views, in display order within their group. Id is "Tab.<Name>" for a top-level view and
+        // "Tab.<Parent>.<Sub>" for a second-level tab inside one. This is the source of truth for the editor
+        // rows; the matching id -> view dispatch lives in MainWindow.registerTabShortcuts / dispatchTabShortcut.
+        //
+        // An id names a VIEW, not a place. Since 2026-08-03 a top-level view may sit on the main tab bar OR in
+        // the File/Tools menus (its own window), and the user can move it either way in Settings > Main Page -
+        // so the same binding has to work from wherever the view currently lives, and the ids deliberately did
+        // NOT get renamed when the views moved (a saved binding keys on the id; renaming would silently orphan
+        // every one of them). Hence the labels say "Settings", not "Settings tab".
         public static readonly TabTarget[] TabTargets = new[]
         {
-            new TabTarget("Tab.Settings",     "Settings tab",      "Switch to the Settings tab."),
-            new TabTarget("Tab.StartJob",     "Start Job tab",     "Switch to the Start Job tab."),
-            new TabTarget("Tab.Job",          "Job tab",           "Switch to the Job tab."),
-            new TabTarget("Tab.Offsets",      "Offsets tab",       "Switch to the Offsets tab."),
-            new TabTarget("Tab.SDCard",       "SD Card tab",       "Switch to the SD Card tab."),
-            new TabTarget("Tab.Probing",      "Probing tab",       "Switch to the Probing tab."),
-            new TabTarget("Tab.Tools",        "Tools tab",         "Switch to the Tools tab."),
-            new TabTarget("Tab.MachineSetup", "Machine Setup tab", "Switch to the Machine Setup tab."),
-            new TabTarget("Tab.HeightMap",    "Height Map tab",    "Switch to the Height Map tab."),
-            new TabTarget("Tab.LatheWizard",  "Lathe Tools tab",   "Switch to the Lathe Tools tab."),
+            new TabTarget("Tab.Settings",     "Settings",       "Show Settings, wherever it lives - main tab or File menu."),
+            new TabTarget("Tab.FeedsSpeeds",  "Feeds & Speeds", "Show Feeds & Speeds, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.StartJob",     "Setup",          "Show Setup, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.Job",          "Job",            "Show the Job view, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.Offsets",      "Offsets",        "Show Offsets, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.SDCard",       "SD Card",        "Show SD Card, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Probing",      "Probing",        "Show Probing, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.WorkOrder",    "Work Order",     "Show Work Order, wherever it lives - main tab or menu."),
+            new TabTarget("Tab.MachineSetup", "Machine Setup",  "Show Machine Setup, wherever it lives - main tab or File menu."),
+            new TabTarget("Tab.HeightMap",    "Height Map",     "Show Height Map, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.LatheWizard",  "Lathe Tools",    "Show Lathe Tools, wherever it lives - main tab or Tools menu."),
 
-            new TabTarget("Tab.Settings.Grbl",     "Settings → Grbl",                  "Switch to Settings and show the Grbl sub-tab."),
-            new TabTarget("Tab.Settings.App",      "Settings → App",                   "Switch to Settings and show the App sub-tab."),
-            new TabTarget("Tab.Settings.Jogging",  "Settings → Jogging",               "Switch to Settings and show the Jogging sub-tab."),
-            new TabTarget("Tab.Settings.GCode",    "Settings → G Code",                "Switch to Settings and show the G Code sub-tab."),
-            new TabTarget("Tab.Settings.Keyboard", "Settings → Keyboard & Controller", "Switch to Settings and show the Keyboard & Controller sub-tab."),
-            new TabTarget("Tab.Settings.Macros",   "Settings → Macros",                "Switch to Settings and show the Macros sub-tab."),
-            new TabTarget("Tab.Settings.MainPage", "Settings → Main Page",             "Switch to Settings and show the Main Page sub-tab."),
+            // The three tools the dissolved Tools tab used to carry. Their ids keep the old "Tab.Tools." prefix
+            // so bindings made while they were sub-tabs still work; each is now a view in its own right (a
+            // Tools menu window by default), not a sub-tab of anything - so they sit in this group, not their
+            // own. The retired "Tab.Tools" container id itself is gone (AppConfig.ApplyOneTimeFixups strips it).
+            new TabTarget("Tab.Tools.ToolTable", "Tool table",     "Show the tool table, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Tools.Trinamic",  "Trinamic tuner", "Show the Trinamic tuner, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Tools.PID",       "PID tuner",      "Show the PID tuner, wherever it lives - main tab or Tools menu."),
 
-            new TabTarget("Tab.MachineSetup.Overview", "Machine Setup → Overview",           "Switch to Machine Setup and show the Overview step."),
-            new TabTarget("Tab.MachineSetup.Machine",  "Machine Setup → Machine",            "Switch to Machine Setup and show the Machine step."),
-            new TabTarget("Tab.MachineSetup.Home",     "Machine Setup → Home position",      "Switch to Machine Setup and show the Home position step."),
-            new TabTarget("Tab.MachineSetup.Axis",     "Machine Setup → Axis information",   "Switch to Machine Setup and show the Axis information step."),
-            new TabTarget("Tab.MachineSetup.Homing",   "Machine Setup → Homing & limits",    "Switch to Machine Setup and show the Homing & limits step."),
-            new TabTarget("Tab.MachineSetup.Probes",   "Machine Setup → Probe definitions",  "Switch to Machine Setup and show the Probe definitions step."),
-            new TabTarget("Tab.MachineSetup.Macros",   "Machine Setup → Controller macros",  "Switch to Machine Setup and show the Controller macros step."),
-
-            new TabTarget("Tab.Probing.ToolOffset",   "Probing → Tool length offset",    "Switch to Probing and show the Tool length offset tab."),
-            new TabTarget("Tab.Probing.EdgeExternal", "Probing → Edge finder, external", "Switch to Probing and show the external Edge finder tab."),
-            new TabTarget("Tab.Probing.EdgeInternal", "Probing → Edge finder, internal", "Switch to Probing and show the internal Edge finder tab."),
-            new TabTarget("Tab.Probing.Center",       "Probing → Center finder",         "Switch to Probing and show the Center finder tab."),
-
-            new TabTarget("Tab.Tools.ToolTable",         "Tools → Tool table",                   "Switch to Tools and show the Tool table tab."),
-            new TabTarget("Tab.Tools.StepperCal",        "Tools → Stepper calibration",          "Switch to Tools and show the Stepper calibration tab."),
-            new TabTarget("Tab.Tools.StepperScratch",    "Tools → Stepper calibration (scratch)", "Switch to Tools and show the scratch Stepper calibration tab."),
-            new TabTarget("Tab.Tools.SurfaceSpoilboard", "Tools → Surface spoilboard",           "Switch to Tools and show the Surface spoilboard tab."),
-            new TabTarget("Tab.Tools.Squareness",        "Tools → Squareness",                   "Switch to Tools and show the Squareness tab."),
-            new TabTarget("Tab.Tools.Trinamic",          "Tools → Trinamic tuner",               "Switch to Tools and show the Trinamic tuner tab."),
-            new TabTarget("Tab.Tools.PID",               "Tools → PID Tuner",                    "Switch to Tools and show the PID Tuner tab."),
-
-            new TabTarget("Tab.LatheWizard.Turning",   "Lathe Tools → Turning",   "Switch to Lathe Tools and show the Turning tab."),
-            new TabTarget("Tab.LatheWizard.Parting",   "Lathe Tools → Parting",   "Switch to Lathe Tools and show the Parting tab."),
-            new TabTarget("Tab.LatheWizard.Facing",    "Lathe Tools → Facing",    "Switch to Lathe Tools and show the Facing tab."),
-            new TabTarget("Tab.LatheWizard.Threading", "Lathe Tools → Threading", "Switch to Lathe Tools and show the Threading tab."),
+            // NOTHING BELOW THE TOP LEVEL. Every second-level target - Settings pages, Machine Setup steps,
+            // Probing / Lathe Tools / Odd Jobs tabs - was removed on 2026-08-03 at the user's direction: this
+            // list is the top-level tab strip and the menus, one flat set, and nothing else. Adding a sub-page
+            // target back would also reintroduce the group-per-parent clutter that motivated the removal.
+            // AppConfig.ApplyOneTimeFixups strips any that were already saved - a binding that still fires
+            // while being invisible here is worse than one that is gone.
         };
 
         // ---- categories (outline groups) ------------------------------------------------------
+
+        /// <summary>The single group holding every top-level destination - tab strip entries and menu
+        /// entries alike. ActionKeyBinder's main-menu catalog entries name it too, so the two halves of the
+        /// list can't drift into separate groups.</summary>
+        public const string TopLevelGroup = "Top Level Tabs";
+        private const int TopLevelOrder = 13;
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             if (r.IsConsole) { r.Set("Program", 9); return; }
-            if (r.IsZoomAction) { r.Set("UI zoom", 9); return; }
-            if (r.IsTabSwitch)
-            {
-                // "Tab.<Name>" is a main-page tab; "Tab.<Parent>.<Sub>" is a second-level tab grouped by parent.
-                string[] parts = (r.Model.Method ?? string.Empty).Split('.');
-                if (parts.Length < 3) { r.Set("Main Page tabs", 13); return; }
-                switch (parts[1])
-                {
-                    case "Settings": r.Set("Settings tabs", 14); break;
-                    case "MachineSetup": r.Set("Machine Setup tabs", 15); break;
-                    case "Probing": r.Set("Probing tabs", 16); break;
-                    case "Tools": r.Set("Tools tabs", 17); break;
-                    case "LatheWizard": r.Set("Lathe Tools tabs", 18); break;
-                    default: r.Set("Settings tabs", 14); break;
-                }
-                return;
-            }
+            // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
+            // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
+            // One group for everything reachable from the top-level tab strip or the menus - the views
+            // (TabTargets) and the main-menu commands (ActionKeyBinder, handled above) sit together, because
+            // to the operator they are one list of destinations and whether a given one is currently a tab or
+            // a menu entry is their own layout choice, not a category.
+            if (r.IsTabSwitch) { r.Set(TopLevelGroup, TopLevelOrder); return; }
 
             string m = r.Model.Method ?? string.Empty;
 
@@ -758,12 +764,7 @@ namespace CNC.Controls
             { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { "Main Page tabs", "Jump straight to a main-page tab from anywhere in the app." },
-            { "Settings tabs", "Jump to the Settings tab and show a specific sub-tab." },
-            { "Machine Setup tabs", "Jump to Machine Setup and show a specific step." },
-            { "Probing tabs", "Jump to Probing and show a specific probing tab." },
-            { "Tools tabs", "Jump to Tools and show a specific tool tab." },
-            { "Lathe Tools tabs", "Jump to Lathe Tools and show a specific wizard tab." },
+            { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },
             { "Other", "Additional actions." }
         };
 
@@ -775,13 +776,13 @@ namespace CNC.Controls
 
         private static readonly Dictionary<string, string> descriptions = new Dictionary<string, string>
         {
-            { "JobControl.StartJob", "Start the loaded job, or resume after a feed hold." },
+            { "JobControl.StartJob", string.Format("Start the loaded job, or resume after a {0}.", RunLabels.FeedHold) },
             { "JobControl.StopJob", "Stop the running job." },
             { "JobControl.Home", "Run the homing cycle." },
             { "JobControl.Unlock", "Clear an alarm / unlock the controller ($X)." },
             { "JobControl.Reset", "Soft-reset the controller (Ctrl-X)." },
             { "JobControl.ResetAndUnlock", "Soft-reset the controller, then clear the alarm ($X) once it restarts." },
-            { "JobControl.FeedHold", "Pause motion (feed hold)." },
+            { "JobControl.FeedHold", "Pause motion." },
             { "JobControl.FeedRateUp", "Increase the programmed feed rate." },
             { "JobControl.FeedRateDown", "Decrease the programmed feed rate." },
             { "JobControl.FeedRateUpFine", "Increase the feed rate in a small step." },
@@ -831,7 +832,7 @@ namespace CNC.Controls
             { "KeypressHandler.SpindleOverrideFineMinus", "Decrease spindle override by 1%." },
             { "KeypressHandler.SpindleOverrideCoarsePlus", "Increase spindle override by 10%." },
             { "KeypressHandler.SpindleOverrideCoarseMinus", "Decrease spindle override by 10%." },
-            { "KeypressHandler.SpindleOverrideStop", "Stop the spindle while in feed hold." },
+            { "KeypressHandler.SpindleOverrideStop", string.Format("Stop the spindle while in {0}.", RunLabels.FeedHold) },
             { "KeypressHandler.ProbeConnectedToggle", "Toggle the simulated probe-connected state." },
             { "KeypressHandler.OptionalStopToggle", "Toggle optional stop (M1) handling." },
             { "KeypressHandler.SingleBlockToggle", "Toggle single-block (step one line at a time) mode." }
@@ -859,13 +860,13 @@ namespace CNC.Controls
 
         private static readonly Dictionary<string, string> labels = new Dictionary<string, string>
         {
-            { "JobControl.StartJob", "Start / resume job" },
+            { "JobControl.StartJob", RunLabels.CycleStart + " / resume job" },
             { "JobControl.StopJob", "Stop job" },
             { "JobControl.Home", "Home" },
             { "JobControl.Unlock", "Unlock (clear alarm)" },
             { "JobControl.Reset", "Reset (soft-reset)" },
             { "JobControl.ResetAndUnlock", "Reset and unlock" },
-            { "JobControl.FeedHold", "Feed hold" },
+            { "JobControl.FeedHold", RunLabels.FeedHold },
             { "JobControl.FeedRateUp", "Feed rate +" },
             { "JobControl.FeedRateDown", "Feed rate −" },
             { "JobControl.FeedRateUpFine", "Feed rate + (fine)" },
@@ -1015,6 +1016,7 @@ namespace CNC.Controls
             public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
             public bool IsZoomAction { get; set; }
+            public string ActionGroup { get; set; }   // ActionKeyBinder.ActionInfo.Group, when the entry names one
             public bool IsJog { get { return Model.IsJog; } }
 
             public string Category { get; private set; }

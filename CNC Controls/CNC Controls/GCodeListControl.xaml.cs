@@ -75,7 +75,7 @@ namespace CNC.Controls
             Unloaded += (s, e) => MacroProcessor.ActiveProgramChanged -= RefreshSourceHighlight;
         }
 
-        // The program this view renders. A program is just a list of G-code blocks - file, folder or wizard,
+        // The program this view renders. A program is just a list of G-code blocks - loaded file or wizard,
         // all the same. Pass null to fall back to the loaded job. Cuts the old hard-wired tie to GCode.File.
         public void SetProgram(ObservableCollection<GCodeBlock> blocks)
         {
@@ -316,7 +316,7 @@ namespace CNC.Controls
 
                 case nameof(GrblViewModel.IsLoading):
                     // Scope the "busy" hourglass to the program list only (the rest of the UI stays responsive
-                    // while a file/folder loads on the background thread). ForceCursor so it shows over the rows.
+                    // while a file loads on the background thread). ForceCursor so it shows over the rows.
                     bool loading = ((GrblViewModel)sender).IsLoading;
                     Cursor = loading ? System.Windows.Input.Cursors.Wait : null;
                     ForceCursor = loading;
@@ -402,7 +402,7 @@ namespace CNC.Controls
             return null;
         }
 
-        // Group the gcode list by toolpath section when a folder is loaded (outline view),
+        // Group the gcode list by toolpath section when the loaded file has section markers (outline view),
         // ungrouped flat list otherwise. The DataGrid uses the default view of GCode.File.Data.
         private void ApplyGrouping(bool grouped)
         {
@@ -416,6 +416,21 @@ namespace CNC.Controls
                 if (grouped)
                     view.GroupDescriptions.Add(new PropertyGroupDescription("Section"));
             }
+
+            view.Refresh();
+
+            // None of DeferRefresh's Dispose (documented to trigger a refresh), an explicit view.Refresh(),
+            // nor UpdateLayout() was enough to make the grouped layout actually repaint when this fires right
+            // after GCode.Pop's batched restore (2026-08-01) - the data was correct throughout (confirmed:
+            // even a minute of scrolling never surfaced it), only an actual tab switch did. A tab switch is a
+            // much stronger signal than a view refresh - Visibility Collapsed->Visible plus, more to the
+            // point, the DataGrid's ItemsSource binding gets fully torn down and rebuilt against a "new"
+            // DataContext, not just asked to redraw its EXISTING one. Replicate that directly: toggle
+            // DataContext off and back on to force ItemsSource/virtualization to rebuild from scratch, rather
+            // than trying to find the one specific Invalidate*/Refresh call that a plain re-layout was missing.
+            var dc = grdGCode.DataContext;
+            grdGCode.DataContext = null;
+            grdGCode.DataContext = dc;
         }
 
         private void StartSection_Click(object sender, RoutedEventArgs e)

@@ -52,15 +52,29 @@ namespace CNC.Controls
     // Stable component keys + slot names. Tab keys reuse the ViewType names (Phase 1 TabRegistry).
     public static class LayoutKeys
     {
-        // root container + its single slot
+        // root container + its slots. The main bar is no longer the only destination: a component may
+        // sit in the tab strip OR in one of the menus, and the TREE decides which (2026-08-03). The
+        // registry's Presentation/Menu only SEED this - so the split we shipped is a default the user
+        // can drag back the other way in Settings > Main Page.
         public const string Root = "MainWindow";
         public const string SlotTabs = "tabs";
+        public const string SlotMenuFile = "menuFile";
+        public const string SlotMenuTools = "menuTools";
+
+        // Every slot on the root that can hold a top-level component, in display order.
+        public static readonly string[] RootSlots = { SlotTabs, SlotMenuFile, SlotMenuTools };
 
         // top-level tabs (== ViewType names)
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
                             LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
-                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds";
+                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", WorkOrder = "WorkOrder";
+        // OddJobs (the old container tab) is retired (2026-07-31) - Work Order was its only remaining sub-tab
+        // (Setup fixup already folded into the Setup tab itself), so it's promoted to a bare top-level leaf
+        // (WorkOrder, above) instead of a tab-inside-a-tab. OddJobs/SlotOddJobs/OddJobsWorkOrder/OddJobsSetup
+        // stay defined ONLY for AppConfig.ApplyOneTimeFixups' migration of already-persisted layouts - nothing
+        // current registers or reads them.
+        public const string OddJobs = "OddJobs";
 
         // Grbl tab's center container (JobWorkspace) + slot
         public const string SlotCenter = "center";
@@ -68,10 +82,21 @@ namespace CNC.Controls
 
         // Tools container slot + tool components
         public const string SlotTools = "tools";
-        public const string ToolTable = "ToolTable", StepperCal = "StepperCal", StepperScratch = "StepperScratch",
+        public const string ToolTable = "ToolTable", Trinamic = "Trinamic", PID = "PID";
+        // Retired Tools components, kept defined ONLY so AppConfig.ApplyOneTimeFixups can strip them from
+        // already-persisted layouts (same precedent as OddJobs above) - nothing registers or reads them now.
+        //   2026-08-01: StepperCal (manual measurement) and StepperScratch (V-bit scratch marks) - the probe
+        //               method replaced both.
+        //   2026-08-02: StepperCalProbe and Squareness moved into Machine Setup's Calibration step, and
+        //               SurfaceSpoilboard became a Work Order toolpath kind. Tools now holds only the three
+        //               hardware-gated tools above, and hides itself when none of them are available.
+        public const string StepperCal = "StepperCal", StepperScratch = "StepperScratch",
                             StepperCalProbe = "StepperCalProbe",
-                            SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness",
-                            Trinamic = "Trinamic", PID = "PID";
+                            SurfaceSpoilboard = "SurfaceSpoilboard", Squareness = "Squareness";
+
+        // Odd Jobs container slot + job components
+        public const string SlotOddJobs = "oddjobs";
+        public const string OddJobsSetup = "Setup", OddJobsWorkOrder = "WorkOrder";
 
         // Components that must always remain reachable (recovery invariant).
         public static readonly string[] Essential = { Grbl, Settings, MachineSetup };
@@ -84,24 +109,34 @@ namespace CNC.Controls
         public static LayoutNode Build()
         {
             return new LayoutNode(LayoutKeys.Root,
+                // The main bar carries only what is used WHILE A JOB RUNS (2026-08-03). Everything else
+                // moved to the menus - but this is a default, not a rule: all three slots are drop
+                // targets in Settings > Main Page, so anything here can be dragged back to the tabs.
+                // Start Job then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
                 new LayoutSlot(LayoutKeys.SlotTabs,
-                    new LayoutNode(LayoutKeys.Settings),
-                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
-                    // Start Job (StartJob) then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
                     new LayoutNode(LayoutKeys.StartJob),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
-                    new LayoutNode(LayoutKeys.Offsets),
-                    new LayoutNode(LayoutKeys.SDCard),
-                    new LayoutNode(LayoutKeys.Probing),
-                    new LayoutNode(LayoutKeys.Tools,
-                        new LayoutSlot(LayoutKeys.SlotTools, new[] {
-                            LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
-                            LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
-                            LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID })),
+                    new LayoutNode(LayoutKeys.WorkOrder),
+                    new LayoutNode(LayoutKeys.Offsets)),
+
+                new LayoutSlot(LayoutKeys.SlotMenuFile,
                     new LayoutNode(LayoutKeys.MachineSetup),
+                    new LayoutNode(LayoutKeys.Settings)),
+
+                // The Tools CONTAINER is gone: its three hardware-gated tools are listed directly here,
+                // one menu entry each, instead of being sub-tabs of a wrapper tab.
+                // Work Order is a TAB (above), not a menu entry: File > Load/New Work Order still work,
+                // they just select the tab rather than opening a window - see ShowWorkOrder().
+                new LayoutSlot(LayoutKeys.SlotMenuTools,
+                    new LayoutNode(LayoutKeys.SDCard),
+                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
+                    new LayoutNode(LayoutKeys.Probing),
                     new LayoutNode(LayoutKeys.HeightMap),
-                    new LayoutNode(LayoutKeys.LatheWizards)));
+                    new LayoutNode(LayoutKeys.LatheWizards),
+                    new LayoutNode(LayoutKeys.ToolTable),
+                    new LayoutNode(LayoutKeys.Trinamic),
+                    new LayoutNode(LayoutKeys.PID)));
         }
     }
 

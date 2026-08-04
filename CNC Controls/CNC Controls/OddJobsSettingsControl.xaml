@@ -1,0 +1,39 @@
+<UserControl x:Class="CNC.Controls.OddJobsSettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="360" d:DesignWidth="300">
+    <GroupBox x:Uid="grb_workOrderConfig" x:Name="grpOddJobs" Header="Work Order" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="300">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
+            <CheckBox x:Uid="chk_ojAutoSave" Content="Auto-save workorder on exit" Margin="5,0,0,0"
+                      IsChecked="{Binding Path=AutoSaveWorkOrderOnExit, Mode=TwoWay}"
+                      ToolTip="Save the Work Order automatically when leaving that tab, instead of always asking."/>
+            <CheckBox x:Uid="chk_ojPromptSave" Content="Prompt before auto-saving" Margin="25,0,0,0"
+                      IsChecked="{Binding Path=PromptBeforeAutoSaveWorkOrder, Mode=TwoWay}"
+                      IsEnabled="{Binding Path=AutoSaveWorkOrderOnExit}"
+                      ToolTip="Ask before each auto-save instead of saving silently."/>
+            <StackPanel Orientation="Horizontal" Margin="5,10,0,0">
+                <Label x:Uid="lbl_ojSpindleDir" Content="Spindle direction:" Padding="0,0,4,0" VerticalAlignment="Center"
+                       ToolTip="Some spindle/VFD setups only run one physical direction regardless of M3/M4 - if that's yours, set it here so Climb/Conventional on Work Order operations gets the cut direction right, and so the Job tab's Spindle panel only offers the direction that actually works."/>
+                <ComboBox x:Name="cbxSpindleDirection" MinWidth="160" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxSpindleDirection_SelectionChanged">
+                    <ComboBoxItem x:Uid="cbx_sdBidir" Content="Bidirectional (standard)"/>
+                    <ComboBoxItem x:Uid="cbx_sdFixedCW" Content="Fixed - CW only"/>
+                    <ComboBoxItem x:Uid="cbx_sdFixedCCW" Content="Fixed - CCW only"/>
+                </ComboBox>
+            </StackPanel>
+            <Separator Margin="0,10,0,6"/>
+            <DockPanel Margin="5,0,0,4" LastChildFill="False">
+                <TextBlock x:Uid="lbl_ojToolTable" DockPanel.Dock="Left" Text="Tools - click one to view or tune its feeds and speeds:" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <Button x:Uid="btn_ojAddTool" DockPanel.Dock="Right" x:Name="btnAddTool" Content="+" MinWidth="24" MinHeight="22" Padding="0" Click="btnAddTool_Click"
+                        ToolTip="Add a custom tool - a bit ioSender has no built-in preset for."/>
+            </DockPanel>
+            <ListBox x:Name="lstOddJobsTools" Height="220" MinWidth="290" Margin="5,0,0,0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" SelectionChanged="lstOddJobsTools_SelectionChanged"/>
+            <TextBlock x:Uid="lbl_ojCustomToolHint" Foreground="#586069" FontSize="11" Margin="5,4,0,0" TextWrapping="Wrap"
+                       Text="Right-click a tool to edit or delete it."/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>

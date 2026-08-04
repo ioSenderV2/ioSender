@@ -47,8 +47,12 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for BasicConfigControl.xaml
     /// </summary>
-    public partial class BasicConfigControl : UserControl, IRestartRequired, ISettingsResettable
+    public partial class BasicConfigControl : UserControl, IRestartRequired, ISettingsResettable, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.Application; } }
+        public int SettingsOrder { get { return 0; } }
+
         public event EventHandler<RestartRequiredEventArgs> RestartRequired;
 
         public BasicConfigControl()
@@ -89,7 +93,6 @@ namespace CNC.Controls
                 return;
 
             var d = AppConfig.GetFactoryDefaults();
-            cfg.Theme = d.Theme;
             cfg.ResetDelay = d.ResetDelay;
             cfg.PollInterval = d.PollInterval;
             cfg.MaxBufferSize = d.MaxBufferSize;

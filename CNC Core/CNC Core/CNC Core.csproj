@@ -64,10 +64,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
+    <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
+    <Compile Include="RotatingFileStore.cs" />
     <Compile Include="SecretStore.cs" />
     <Compile Include="EltimaStream.cs" />
     <Compile Include="GCode.cs" />
@@ -77,6 +79,7 @@
     <Compile Include="Grbl.cs" />
     <Compile Include="Comms.cs" />
     <Compile Include="ConfigStore.cs" />
+    <Compile Include="BulkObservableCollection.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
     <Compile Include="FeedsSpeedsAdvisor.cs" />
     <Compile Include="GCodeJob.cs" />

@@ -36,21 +36,26 @@ TARGETS = [
     # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/JobControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PortDialog.xaml', 'CNC.Controls.WPF'),
-    ('CNC Controls/CNC Controls/SurfaceSpoilboardWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
-    ('CNC Controls/CNC Controls/StepperCalibrationScratchWizard.xaml', 'CNC.Controls.WPF'),
-    ('CNC Controls/CNC Controls/StepperCalibrationWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ToolView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/WorkOrderView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/ProgramView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/TrinamicView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PIDLogView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/SimulatorConfigView.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/MachineSetupWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/FixtureEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigView.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/SettingsNavShell.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ErrorsAndAlarms.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/UiGeneralConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OddJobsSettingsControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/CustomToolEditDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/KbdDefaultSpeedControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),
@@ -139,6 +144,11 @@ def prop_for(tag, attr):
         return ('System.Windows.Controls.ContentControl.Content', CONTENT_CATEGORY[tag], 'True', 'True')
     if attr == 'Text' and tag == 'TextBlock':
         return ('System.Windows.Controls.TextBlock.Text', 'Text', 'True', 'True')
+    if attr == 'Text' and tag == 'Run':
+        # Inline runs inside a TextBlock - used where part of a sentence needs its own styling, or
+        # where a literal phrase sits next to a data-bound one (a bound value can't be localized, so
+        # the prose has to be its own Run to stay reachable).
+        return ('System.Windows.Documents.Run.Text', 'Text', 'True', 'True')
     return None
 
 
@@ -214,6 +224,9 @@ def main():
     grand = 0
     jobs = [(x, a, rows_for) for (x, a) in TARGETS] + [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS]
     for xaml, assembly, builder in jobs:
+        if not os.path.exists(os.path.join(REPO, xaml)):
+            print('  skip (missing): %s' % xaml)
+            continue
         rows = builder(xaml, assembly)
         for loc in LOCALES:
             path = os.path.join(REPO, 'Locale', loc, 'csv', '%s.resources.%s.csv' % (assembly, loc))

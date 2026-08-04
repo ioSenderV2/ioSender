@@ -1,0 +1,140 @@
+; pcenter.macro - center finder for grblHAL (Start Job "Dynamic" mode center dot).
+;
+; PROTOTYPE (2026-07-26): unlike pcorner.macro, this does NOT auto-discover its own probing Z depth -
+; the caller must already know a safe Z (machine coords) to seek at before calling. For a solid boss that's
+; a quick single top-probe the caller runs first (same idea as pcorner's DISCOVER pass); for a hole it MUST
+; be a depth the operator trusts is below the surrounding surface and above the hole's floor - there is no
+; safe way to auto-discover that (a probe centered over an open/through hole may never trigger downward at
+; all). Rough edge, called out deliberately rather than papered over - see the Start Job Dynamic-mode plan.
+;
+; Args (globals, same "set globals then bare CALL" idiom as pcorner.macro - grblHAL's O-word CALL does not
+; reliably accept multiple bracketed args):
+;   #<_ls_rad>     = probe tip radius (mm).
+;   #<_ls_refx/refy> = machine XY of the estimated center (jog target - the green center dot).
+;   #<_ls_startz>  = machine Z to seek at (see PROTOTYPE note above - caller-supplied, not discovered here).
+;   #<_ls_wpx>, #<_ls_wpy> = estimated boss/hole size (mm) along X and Y - diameter for round, width/height
+;                    otherwise. Same field either way; a non-round hole is NOT specially handled (2026-07-26
+;                    prototype scope - see the Dynamic-mode plan's "not round" caveat).
+;   #<_ls_center_mode> = 0 = OUTSIDE (solid boss - probe inward from clearance outside the estimated size).
+;                        1 = INSIDE (hole - probe outward from near-center to the estimated wall).
+;   #<_ls_clear>   = clearance/inset (mm) - how far outside (mode 0) or short of (mode 1) the estimated
+;                    size the initial position sits, same role as pcorner's XYClearance.
+;   #<_ls_searchf>, #<_ls_latchf> = fast/slow probe feeds (from the probe definition, same as pcorner).
+;
+; Outputs (GLOBAL named params, survive the SUB):
+;   #<_center_x>, #<_center_y> = the found center, machine coords, radius-compensated.
+
+O<pcenter> SUB
+  #<rad>   = #1
+  #<rx>    = #<_ls_refx>
+  #<ry>    = #<_ls_refy>
+  #<z>     = #<_ls_startz>
+  #<wpx>   = #<_ls_wpx>
+  #<wpy>   = #<_ls_wpy>
+  #<mode>  = #<_ls_center_mode>
+  #<clear> = #<_ls_clear>
+  (PRINT, PCTR ENTER mode=#<mode> rx=#<rx> ry=#<ry> z=#<z> wpx=#<wpx> wpy=#<wpy>)
+
+  G49
+  G92.1
+  G10 L2 P1 X0 Y0 Z0
+  G90
+
+  o10 IF [#<mode> EQ 0]
+    ; OUTSIDE (solid boss): start clear of the estimated size on the -X side, drop to the probing depth,
+    ; seek INWARD (+X) to find the near face; cross to the +X side, seek INWARD (-X) for the far face.
+    #<x0> = [#<rx> - [#<wpx> / 2 + #<clear>]]
+    G53 G0 X[#<x0>] Y[#<ry>]
+    G53 G0 Z[#<z>]
+    G38.2 X[#<rx>] F[#<_ls_searchf>]
+    #<xa> = #5061
+    G1 X[#<xa> - 4] F1000
+    G38.2 X[#<xa> + 6] F[#<_ls_latchf>]
+    #<x_near> = #5061
+    G1 X[#<x_near> - 10] F1000
+    (PRINT, PCTR x_near=#<x_near>)
+
+    #<x1> = [#<rx> + [#<wpx> / 2 + #<clear>]]
+    G53 G0 X[#<x1>] Y[#<ry>]
+    G38.2 X[#<rx>] F[#<_ls_searchf>]
+    #<xb> = #5061
+    G1 X[#<xb> + 4] F1000
+    G38.2 X[#<xb> - 6] F[#<_ls_latchf>]
+    #<x_far> = #5061
+    G1 X[#<x_far> + 10] F1000
+    (PRINT, PCTR x_far=#<x_far>)
+
+    #<y0> = [#<ry> - [#<wpy> / 2 + #<clear>]]
+    G53 G0 X[#<rx>] Y[#<y0>]
+    G38.2 Y[#<ry>] F[#<_ls_searchf>]
+    #<ya> = #5062
+    G1 Y[#<ya> - 4] F1000
+    G38.2 Y[#<ya> + 6] F[#<_ls_latchf>]
+    #<y_near> = #5062
+    G1 Y[#<y_near> - 10] F1000
+    (PRINT, PCTR y_near=#<y_near>)
+
+    #<y1> = [#<ry> + [#<wpy> / 2 + #<clear>]]
+    G53 G0 X[#<rx>] Y[#<y1>]
+    G38.2 Y[#<ry>] F[#<_ls_searchf>]
+    #<yb> = #5062
+    G1 Y[#<yb> + 4] F1000
+    G38.2 Y[#<yb> - 6] F[#<_ls_latchf>]
+    #<y_far> = #5062
+    G1 Y[#<y_far> + 10] F1000
+    (PRINT, PCTR y_far=#<y_far>)
+
+    #<_center_x> = [[#<x_near> + #<x_far>] / 2]
+    #<_center_y> = [[#<y_near> + #<y_far>] / 2]
+  o10 ELSE
+    ; INSIDE (hole): start near-center but inset short of the estimated wall by the clearance, seek
+    ; OUTWARD (away from center) to find each wall.
+    #<x0> = [#<rx> - [#<wpx> / 2 - #<clear>]]
+    G53 G0 X[#<x0>] Y[#<ry>]
+    G53 G0 Z[#<z>]
+    G38.2 X[#<x0> - [2 * #<clear>]] F[#<_ls_searchf>]
+    #<xa> = #5061
+    G1 X[#<xa> + 4] F1000
+    G38.2 X[#<xa> - 6] F[#<_ls_latchf>]
+    #<x_near> = #5061
+    G1 X[#<x_near> + 10] F1000
+    (PRINT, PCTR x_near=#<x_near>)
+
+    #<x1> = [#<rx> + [#<wpx> / 2 - #<clear>]]
+    G53 G0 X[#<x1>] Y[#<ry>]
+    G38.2 X[#<x1> + [2 * #<clear>]] F[#<_ls_searchf>]
+    #<xb> = #5061
+    G1 X[#<xb> - 4] F1000
+    G38.2 X[#<xb> + 6] F[#<_ls_latchf>]
+    #<x_far> = #5061
+    G1 X[#<x_far> - 10] F1000
+    (PRINT, PCTR x_far=#<x_far>)
+
+    #<y0> = [#<ry> - [#<wpy> / 2 - #<clear>]]
+    G53 G0 X[#<rx>] Y[#<y0>]
+    G38.2 Y[#<y0> - [2 * #<clear>]] F[#<_ls_searchf>]
+    #<ya> = #5062
+    G1 Y[#<ya> + 4] F1000
+    G38.2 Y[#<ya> - 6] F[#<_ls_latchf>]
+    #<y_near> = #5062
+    G1 Y[#<y_near> + 10] F1000
+    (PRINT, PCTR y_near=#<y_near>)
+
+    #<y1> = [#<ry> + [#<wpy> / 2 - #<clear>]]
+    G53 G0 X[#<rx>] Y[#<y1>]
+    G38.2 Y[#<y1> + [2 * #<clear>]] F[#<_ls_searchf>]
+    #<yb> = #5062
+    G1 Y[#<yb> - 4] F1000
+    G38.2 Y[#<yb> + 6] F[#<_ls_latchf>]
+    #<y_far> = #5062
+    G1 Y[#<y_far> - 10] F1000
+    (PRINT, PCTR y_far=#<y_far>)
+
+    #<_center_x> = [[#<x_near> + #<x_far>] / 2]
+    #<_center_y> = [[#<y_near> + #<y_far>] / 2]
+  o10 ENDIF
+
+  G90
+  G53 G0 Z[#<z> + 20]
+  (PRINT, PCTR OUT x=#<_center_x> y=#<_center_y>)
+O<pcenter> ENDSUB

@@ -50,16 +50,17 @@
 			</ContextMenu>
         </DataGrid.ContextMenu>
         <DataGrid.GroupStyle>
-            <!-- Toolpath outline: collapsible per-section groups, shown only when a folder is loaded
-                 (see GCode.LoadFolder; a single-file load adds no group descriptions so this is inert). -->
+            <!-- Toolpath outline: collapsible per-section groups, shown only when the loaded file has the
+                 Fusion add-in's section markers (see GCodeJob.HasSections; a file with no markers adds no
+                 group descriptions so this is inert). -->
             <GroupStyle>
                 <GroupStyle.ContainerStyle>
                     <Style TargetType="{x:Type GroupItem}">
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type GroupItem}">
-                                    <!-- Groups default collapsed so the whole toolpath outline is visible after a
-                                         folder load; expand individually via the chevron. -->
+                                    <!-- Groups default collapsed so the whole toolpath outline is visible after
+                                         loading; expand individually via the chevron. -->
                                     <Expander IsExpanded="False" Background="#FFEFEFEF" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1">
                                         <Expander.Header>
                                             <!-- Context menu lives on the header only (not the Expander) so gcode-line

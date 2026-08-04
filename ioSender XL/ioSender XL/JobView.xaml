@@ -73,11 +73,21 @@
                     <RowDefinition Height="Auto" x:Name="joggerRow"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"/>
+                <!-- joggerRow is Auto, so collapsing the pad takes its height to zero and the panel columns
+                     below get it - no separate row handling needed. Toggled by Settings > User Interface >
+                     Job tab layout.
+                     Hiding it costs no FUNCTION, and not just because a Collapsed element still raises Loaded:
+                     the run bar hosts the very same JogBaseControl class (MainWindow.xaml's jogPad,
+                     ArrowsOnly), JogBaseControl.keyboardMappingsOk is a STATIC one-shot so whichever instance
+                     loads first registers the Ctrl+Shift jog handlers for both, and JogData is a static
+                     singleton so the distance/feed providers either instance installs are equivalent. -->
+                <cnccontrols:JogControl x:Name="jogControl" Grid.Row="0" Grid.ColumnSpan="2" Margin="5,0,0,0" MinWidth="510"
+                                        Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ShowJobJogPad, Converter={StaticResource IsVisibleConverter}}"/>
                 <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
                      balanced by height (see BuildMainPanels), so they fit instead of a rigid split. Each column
                      is a ScrollViewer so an over-tall stack scrolls instead of clipping (worse at high DPI). -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer x:Name="mainScrollLeft" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              SizeChanged="MainScrollLeft_SizeChanged">
                     <StackPanel x:Name="mainSlotsLeft" Margin="5,0,0,0" MinWidth="250"/>
                 </ScrollViewer>
                 <!-- Capped (not just MinWidth) so Feed/Spindle/Outline (the panels that consistently land here -
@@ -85,7 +95,10 @@
                      in particular) at the expense of the Program/3D View/Console workspace, which only gets
                      whatever's left over from this region. Content wraps to more lines instead - the
                      ScrollViewer already handles any resulting overflow height. -->
-                <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <!-- Collapsed by DistributeMainPanels whenever the panels all fit in the first column, so this
+                     Auto column takes zero width instead of reserving MinWidth's worth of nothing. -->
+                <ScrollViewer x:Name="mainScrollRight" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              SizeChanged="MainScrollRight_SizeChanged">
                     <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
                 </ScrollViewer>
             </Grid>

@@ -104,7 +104,7 @@ namespace CNC.Controls
                 { GrblStates.Unknown, "Not connected, or the controller state is unknown." },
                 { GrblStates.Idle, "Ready - idle and waiting for commands." },
                 { GrblStates.Run, "Running - executing a program or commanded motion." },
-                { GrblStates.Hold, "Feed hold - motion is paused. Press Run to resume." },
+                { GrblStates.Hold, string.Format("{0} - motion is paused. Press {1} to resume.", RunLabels.FeedHold, RunLabels.CycleStart) },
                 { GrblStates.Jog, "Jogging - a manual move is in progress." },
                 { GrblStates.Home, "Homing - seeking the machine's reference (limit) switches." },
                 { GrblStates.Check, "Check mode - G-code is parsed and validated but not executed; no motion. Turn it off to cut for real." },
@@ -526,6 +526,73 @@ namespace CNC.Controls
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Appended after the (localized) DRO header text - blank before a controller connection has reported a
+    // work coordinate system, " (G54)" once GrblViewModel.WorkCoordinateSystem has a real value. A separate
+    // run rather than baked into the header string itself, so the translated "DRO" word (several locales have
+    // a real translation, not just the literal word - de-DE "Anzeige", ru-RU/uk-UA/zh-CN their own) stays
+    // driven by the normal x:Uid/CSV mechanism instead of being replaced by an English-only binding.
+    public class WcsHeaderSuffixConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string wcs = value as string;
+            return string.IsNullOrEmpty(wcs) ? string.Empty : string.Format(" ({0})", wcs);
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Per-axis DRO field tooltip - so hovering a single axis shows THAT axis's own live work offset without
+    // checking the separate Offsets flyout (see WcsHeaderSuffixConverter for the DRO group header's own,
+    // whole-panel "(G54)" indicator this complements). ConverterParameter carries the axis letter (fixed -
+    // "X"/"Y"/etc, the underlying WorkPositionOffset property name - not whatever a remapped axis Label
+    // happens to display). No tooltip at all (null) until a controller has actually reported a WCS - showing
+    // "0.000" before any connection would look like a real reading.
+    //
+    // Deliberately NOT worded "<WCS> offset" - GrblViewModel.WorkPositionOffset is grblHAL's WCO, which bundles
+    // the active WCS's own stored value with G92 and any active tool length offset (G43.1) - see
+    // macros/pcorner.macro's own comment ("WCO = G5x offset + G92 offset + TLO"). Confirmed as a real,
+    // user-facing mislabel 2026-07-31: the Offsets grid showed G54's Z stored at 0.000, but this tooltip said
+    // "G54 Z offset: -9.341" - correct NUMBER (that's really what's shifting Z right now), wrong claim about
+    // where it came from (an active TLO, not G54's table entry). Naming the WCS but not claiming the number
+    // IS its stored value avoids repeating that.
+    //
+    // A 3rd binding (values[2], GrblViewModel.ToolOffset.Z) is optional - only Z's own MultiBinding in
+    // DROControl.xaml supplies it, since TLO is a Z-axis-only concept (see GrblViewModel's own TLO parsing,
+    // which folds a reported TLO straight into ToolOffset.Z and always zeroes ToolOffset.X/Y - confirmed
+    // 2026-07-31, there is no X/Y TLO to show). Its ABSENCE (not just a null/NaN value) is what decides
+    // whether "TLO" is mentioned at all - X/Y/A/B/C/U/V/W say "(G54 + G92 combined)" with no TLO wording,
+    // since it plays no part in their offset; only Z (which always supplies a 3rd binding, even if the value
+    // itself is NaN before TLO is known) says "+ TLO".
+    public class WcsOffsetTooltipConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            string wcs = values.Length > 0 ? values[0] as string : null;
+            if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
+                return null;
+
+            string line2;
+            if (values.Length <= 2)
+                line2 = string.Format(CultureInfo.CurrentCulture, "({0} + G92 combined)", wcs);
+            else
+            {
+                double? tlo = values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
+                line2 = tlo.HasValue
+                    ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
+                    : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
+            }
+
+            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
+        }
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -162,25 +163,184 @@ namespace GCode_Sender
                 CaptureRefs(ctl);
             }
 
-            // Flow across the two columns by measured height, in order: fill the left column to ~half the total
-            // height, then the rest go right - so the columns stay about even. Done inline (before first paint)
-            // using DesiredSize so the layout is final when the window renders, with no post-paint reshuffle.
-            double total = 0d;
-            var h = new double[panels.Count];
-            for (int i = 0; i < panels.Count; i++)
+            mainPanels.Clear();
+            mainPanels.AddRange(panels);
+            mainSplit = -1;   // the columns were just cleared, so force a re-parent even if the split is unchanged
+            DistributeMainPanels();
+        }
+
+        // The panels built by BuildMainPanels, held so the two columns can be re-flowed on a resize without
+        // rebuilding them - recreating would discard each panel's live state and re-run CaptureRefs (which
+        // subscribes DRO events), so creation happens once and only the parenting changes afterwards.
+        private readonly System.Collections.Generic.List<UserControl> mainPanels = new System.Collections.Generic.List<UserControl>();
+        private int mainSplit = -1;   // last applied split point; -1 = nothing distributed yet
+        private bool postRenderSplitDone = false;   // the one deferred re-decide once the panels have rendered
+
+        // Flow the panels down the FIRST column and start the second only when the next panel would not fit
+        // in the height that is left.
+        //
+        // It used to balance the two columns by height - half the total each - which meant two short panels
+        // always landed one per column, and since both columns carry MinWidth=250 the second reserved its
+        // width whether or not it earned it. Two columns exist to avoid a scrollbar when a lot of panels are
+        // assigned, not as a look; with a few panels (especially with the jog pad off, which hands this row
+        // the pad's height) they belong in one column and the other should disappear so the workspace gets
+        // the width back.
+        private void DistributeMainPanels()
+        {
+            // Available height is only known after the first layout pass. Until then put everything in the
+            // first column - MainScrollLeft_SizeChanged re-runs this the moment a real height exists, and
+            // one column is the right answer far more often than not, so there is no visible reshuffle.
+            // Less whatever the flyout clearance is holding at the top - that margin is inside the viewport,
+            // so it is height the panels genuinely cannot use.
+            double available = mainScrollLeft.ActualHeight - mainSlotsLeft.Margin.Top;
+            double width = mainScrollLeft.ViewportWidth > 0d ? mainScrollLeft.ViewportWidth : 250d;
+
+            // The split has to be decided from heights the panels ACTUALLY rendered at. Before the first
+            // arrange every ActualHeight is 0 and the only figure available is a Measure() guess, which is
+            // what got this wrong twice: it over-reports for content that wraps at the guessed width. So on
+            // that first pass put everything in column one - always a legal arrangement, the ScrollViewer
+            // copes - and re-decide once there are real numbers. postRenderSplitDone stops it re-deferring
+            // for ever if a panel legitimately measures zero.
+            bool rendered = mainPanels.All(p => p.ActualHeight > 0d);
+            if (!rendered && !postRenderSplitDone)
             {
-                panels[i].Measure(new System.Windows.Size(250d, double.PositiveInfinity));
-                total += (h[i] = panels[i].DesiredSize.Height);
+                postRenderSplitDone = true;
+                Dispatcher.BeginInvoke(new System.Action(DistributeMainPanels), System.Windows.Threading.DispatcherPriority.Loaded);
             }
-            double half = total / 2d, leftH = 0d;
-            int split = panels.Count;
-            for (int i = 0; i < panels.Count; i++)
+
+            int split = mainPanels.Count;
+            if (available > 0d && rendered)
             {
-                if (i > 0 && leftH + h[i] / 2d > half) { split = i; break; }
-                leftH += h[i];
+                double used = 0d;
+                for (int i = 0; i < mainPanels.Count; i++)
+                {
+                    double height = PanelHeight(mainPanels[i], width);
+                    // Spill when MOST of the panel would not fit, not when it fails to fit entirely. The
+                    // strict test sent Goto to the second column for missing by 0.4px (measured: 526.0 into
+                    // 525.6) and left a 143px hole behind it - which reads as "there was plenty of room",
+                    // because there very nearly was. The column scrolls, so a panel hanging slightly over the
+                    // bottom is a far better outcome than a gap here and a panel stranded over there.
+                    //
+                    // i > 0: the first panel always goes in the first column even if it is taller than the
+                    // viewport on its own - moving it right would only leave the first column empty instead.
+                    if (i > 0 && used + height / 2d > available) { split = i; break; }
+                    used += height;
+                }
             }
-            for (int i = 0; i < panels.Count; i++)
-                (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(panels[i]);
+
+            if (CNC.Core.DebugLog.Enabled)
+                CNC.Core.DebugLog.Write("layout", string.Format(
+                    "DistributeMainPanels: avail={0:0.#} (viewportH={1:0.#} - clearance={2:0.#}) width={3:0.#} rendered={4} split={5}/{6}  heights=[{7}]",
+                    available, mainScrollLeft.ActualHeight, mainSlotsLeft.Margin.Top, width, rendered,
+                    split, mainPanels.Count,
+                    string.Join(", ", mainPanels.Select(p => p.GetType().Name + "=" + PanelHeight(p, width).ToString("0.#")))));
+
+            if (split != mainSplit)
+            {
+                mainSplit = split;
+
+                mainSlotsLeft.Children.Clear();
+                mainSlotsRight.Children.Clear();
+                for (int i = 0; i < mainPanels.Count; i++)
+                    (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(mainPanels[i]);
+
+                // An empty column must take no width at all, not MinWidth's worth of blank.
+                mainScrollRight.Visibility = mainSlotsRight.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            ApplyFlyoutClearance();
+        }
+
+        // Start the RIGHT-MOST occupied panel column below the flyout tab strip.
+        //
+        // The flyout panels are children of the main window's 22px sidebar canvas but render outside it
+        // (Canvas.Right=22, ClipToBounds=False, ZIndex 1), so an open or pinned flyout floats over the
+        // right-most panel column and hides whatever is at the top of it. The gap is reserved unconditionally
+        // rather than appearing when a flyout opens: the panels would otherwise jump down and back every time
+        // one is toggled, and a stack that moves under the pointer is worse than a fixed strip of blank.
+        // Deferred to Loaded priority, which runs AFTER the arrange pass. Measuring inline was wrong in the one
+        // case that matters: the column being measured has usually just been un-collapsed by the caller, and an
+        // element that has not been arranged since still reports its OLD position - so the gap came out as
+        // though that column started at the top of the window (roughly the whole strip height) instead of the
+        // true overhang, and nothing ever recomputed it. Coalesced, so a burst of resize events measures once.
+        private bool clearancePending = false;
+
+        private void ApplyFlyoutClearance()
+        {
+            if (clearancePending)
+                return;
+
+            clearancePending = true;
+            Dispatcher.BeginInvoke(new System.Action(MeasureFlyoutClearance), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void MeasureFlyoutClearance()
+        {
+            clearancePending = false;
+
+            bool rightUsed = mainSlotsRight.Children.Count > 0;
+            double gap = FlyoutClearance(rightUsed ? mainScrollRight : mainScrollLeft);
+
+            // Setting a Thickness to an equal value is a no-op in WPF, and neither margin can change its
+            // ScrollViewer's size (the Grid fixes those), so this cannot loop through layout.
+            mainSlotsLeft.Margin = new Thickness(5d, rightUsed ? 0d : gap, 0d, 0d);
+            mainSlotsRight.Margin = new Thickness(0d, rightUsed ? gap : 0d, 0d, 5d);
+        }
+
+        // How far the flyout strip's bottom edge sits below the top of host, or 0 when it is already above it
+        // (the jog pad, when shown, can push the panels clear on its own).
+        //
+        // Measured against the HOST ScrollViewer, never the inner StackPanel: the margin this feeds moves the
+        // StackPanel, so measuring against that would compute a gap, apply it, then measure zero and remove it
+        // again, forever. The ScrollViewer's own position is fixed by the Grid and does not move.
+        private double FlyoutClearance(FrameworkElement host)
+        {
+            var strip = MainWindow.SidebarFlyoutStrip;
+            if (strip == null || !strip.IsVisible || host == null || !host.IsVisible || strip.ActualHeight <= 0d)
+                return 0d;
+
+            try
+            {
+                return System.Math.Max(0d, strip.TransformToVisual(host).Transform(new Point(0d, strip.ActualHeight)).Y);
+            }
+            catch (System.InvalidOperationException)
+            {
+                return 0d;   // not a common ancestor (yet) - a later pass will get it
+            }
+        }
+
+        // How much vertical room a panel actually needs, margins included (a StackPanel stacks by desired size,
+        // which counts margin).
+        //
+        // Prefers the height it RENDERED at over a fresh Measure. Measuring against a guessed 250px reported
+        // several panels taller than they really are - anything whose content wraps at 250 but not at the real
+        // column width - which pushed a panel that comfortably fitted into the second column (Goto, observed
+        // 2026-08-03 with visible room left below it). Measure is only the fallback for a panel that has never
+        // been arranged, and even then it uses the true viewport width rather than a constant.
+        private static double PanelHeight(UserControl panel, double width)
+        {
+            double h = panel.ActualHeight;
+            if (h <= 0d)
+            {
+                panel.Measure(new System.Windows.Size(width, double.PositiveInfinity));
+                h = panel.DesiredSize.Height;
+            }
+            return h + panel.Margin.Top + panel.Margin.Bottom;
+        }
+
+        // The first column's height changes both when the window resizes and when the jog pad above it is
+        // toggled (its row is Auto, so collapsing it hands this row the height) - one signal covers both.
+        private void MainScrollLeft_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.HeightChanged && mainPanels.Count > 0)
+                DistributeMainPanels();
+        }
+
+        // The second column's own size settling (in particular the 0 -> real change when it is un-collapsed)
+        // is the moment its position becomes measurable, so re-measure the clearance from here too.
+        private void MainScrollRight_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ApplyFlyoutClearance();
         }
 
         // Capture references to panels that have host wiring (focus gating, program-limits reveal) so they
@@ -601,9 +761,10 @@ namespace GCode_Sender
             // Remove the main-page tabs this controller can't support (Lathe Tools / SD Card / Probing) and record
             // WHY under Edit Main Page > Unavailable. Each gated view owns its own prerequisite + reason
             // (IAvailabilityGated) - the single source the removal and the listing now share. Survivors are
-            // (re)enabled by UpdateConnectionGatedTabs on the connect transition. Height Map stays either way (it
-            // can still load/apply a saved .map offline, gated at run time instead). Tools stays even with no tool
-            // table (NumTools == 0) - only its tool-table sub-tab is dropped, in ToolsView.
+            // (re)enabled by UpdateConnectionGatedViews on the connect transition. Height Map stays either way (it
+            // can still load/apply a saved .map offline, gated at run time instead). Tools now goes too when the
+            // controller supports none of the three tools it still hosts (2026-08-02) - it gates itself on its
+            // own children, so this one call drops both the sub-tabs and, if nothing survives, the tab itself.
             ComponentAvailability.Note(MainWindow.ui.tabMode.PruneUnavailable());
 
             MainWindow.EnableView(true, ViewType.Tools);
@@ -685,7 +846,18 @@ namespace GCode_Sender
         void JobView_Load(object sender, EventArgs e)
         {
             MainWindow.ui.RunControl.CallHandler(StreamingState.Idle, true);
+
+            // The flyout strip is populated during startup, after this view is built, and grows/shrinks as
+            // flyouts are assigned - so the clearance has to be recomputed when it changes, not just once.
+            var strip = MainWindow.SidebarFlyoutStrip;
+            if (strip != null && !flyoutStripHooked)
+            {
+                flyoutStripHooked = true;
+                strip.SizeChanged += (s, ev) => { if (ev.HeightChanged) ApplyFlyoutClearance(); };
+            }
         }
+
+        private bool flyoutStripHooked = false;
 
         private void JobView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {

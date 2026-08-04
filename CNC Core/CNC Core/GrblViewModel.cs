@@ -82,6 +82,15 @@ namespace CNC.Core
         public Action<string> OnWCOUpdated;
         public Action<Position> OnCameraProbe;
 
+        // Incremented the instant a transition INTO Alarm is parsed (see DataReceived) - a latch, not a
+        // sampled value, so a caller polling GrblState.State later can miss an alarm entirely if the
+        // operator clears it (Reset+Unlock) faster than the poll happens to run. Confirmed as a real bug
+        // 2026-08-01: MacroProcessor.WaitForIdle's poll-then-read-current-state pattern silently treated a
+        // probe-failure alarm the operator had already manually cleared as "finished successfully", letting
+        // the macro continue on to its next move as if nothing had happened. Thread-safe (Interlocked) since
+        // DataReceived isn't guaranteed to run on the UI thread.
+        public long AlarmEventCounter;
+
         public delegate void GrblResetHandler();
         public event EventHandler OnCycleStart;
         public event EventHandler OnStop;
@@ -474,7 +483,7 @@ namespace CNC.Core
         public ObservableCollection<string> SystemInfo { get { return GrblInfo.SystemInfo; } }
         public string Tool { get { return _tool; } set { _tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
         public int Probe { get { return int.Parse(_probe); } set { _probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
-        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); } }
+        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
         public bool IsTloReferenceSet {
             get { return _isTloRefSet; }
             private set
@@ -485,7 +494,20 @@ namespace CNC.Core
                         TloReference = double.NaN;
                     _isTloRefSet = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(TloReferenceTooltip));
                 }
+            }
+        }
+        // Signal indicator tooltips only showed IsTloReferenceSet's bool ("Tool length reference set") with no
+        // way to see WHAT it was set to short of digging into a console log - added so the value itself is
+        // visible at a glance (SignalsControl's "T" LED).
+        public string TloReferenceTooltip
+        {
+            get
+            {
+                return IsTloReferenceSet && !double.IsNaN(TloReference)
+                    ? string.Format("Tool length reference set: {0:0.000}", TloReference)
+                    : "Tool length reference not set";
             }
         }
         public bool IsCameraVisible { get { return _isCameraVisible; } set { if (_isCameraVisible != value) { _isCameraVisible = value; OnPropertyChanged(); } } }
@@ -549,8 +571,8 @@ namespace CNC.Core
         public EnumFlags<Signals> OptionalSignals { get; set; } = new EnumFlags<Signals>(Core.Signals.Off);
         public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
         public string FileName { get { return _fileName; } set { _fileName = value; SDRewind = false; OnPropertyChanged(); OnPropertyChanged(nameof(IsFileLoaded)); OnPropertyChanged(nameof(IsPhysicalFileLoaded)); } }
-        // Full source path for display tooltips: the file path for a single file, the full folder path for a
-        // Load-Folder program, or the tool/wizard name for a generated program (no on-disk path). Set in GCode.
+        // Full source path for display tooltips: the file path for a loaded file, or the tool/wizard name for
+        // a generated program (no on-disk path). Set in GCode.
         public string ProgramPath { get { return _programPath; } set { _programPath = value; OnPropertyChanged(); } }
         public bool IsSDCardJob { get { return FileName.StartsWith("SDCard:"); } }
         public bool SDRewind { get; set; }
@@ -571,11 +593,11 @@ namespace CNC.Core
         // Consumed (and reset) by CycleStart. Used by "Run just this toolpath".
         public int RunToBlock { get; set; } = -1;
         public int BlockExecuting { get { return _executingBlock; } set { _executingBlock = value; OnPropertyChanged(); } }
-        // True when the loaded program has an outline to show - either Load Folder's stitching (GCode.LoadFolder)
-        // or Load File recognizing the Fusion add-in's (--- seq: name (Tn) ---) section markers
-        // (GCodeJob.HasSections) - the Program list then renders as a grouped outline.
+        // True when the loaded program has an outline to show - Load File recognizing the Fusion add-in's
+        // (--- seq: name (Tn) ---) section markers (GCodeJob.HasSections) - the Program list then renders as
+        // a grouped outline.
         public bool HasOutline { get { return _hasOutline; } set { if (_hasOutline != value) { _hasOutline = value; OnPropertyChanged(); } } }
-        // True while a file/folder is being read+parsed on the background loader. The program view(s) show a
+        // True while a file is being read+parsed on the background loader. The program view(s) show a
         // Wait cursor while it is set; the rest of the UI stays responsive. See GCode.BackgroundLoad.
         public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }
         public string FsCwd { get { return _fsCwd; } private set { _fsCwd = value; OnPropertyChanged(); } }
@@ -1276,6 +1298,14 @@ namespace CNC.Core
                     break;
 
                 case "TLR":
+                    // Instrumented 2026-07-27 to chase a real-hardware report: TLR read back false right
+                    // before running Contour, moments after Setup's own run had just set it. Logs every
+                    // TLR report (not just changes) so a repro shows exactly when/how often the controller
+                    // itself reports this, without needing a debugger attached. Enable via -debuglog=tlo
+                    // (or IOSENDER_DEBUGLOG=1 + categories) and check %AppData%\ioSender\ioSender.debug.log.
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("tlo", string.Format("TLR report: value=\"{0}\" -> IsTloReferenceSet {1} -> {2}",
+                            value, IsTloReferenceSet, value != "0"));
                     IsTloReferenceSet = value != "0";
                     break;
 
@@ -1488,10 +1518,19 @@ namespace CNC.Core
                     Comms.com.WriteByte(GrblConstants.CMD_AUTO_REPORTING_TOGGLE);
                 }
             }
-            else if (_grblState.State != GrblStates.Jog)
+            // Responses used to be suppressed entirely while the state was Jog. That silently starved the jog
+            // back-pressure gate of the very acknowledgement it waits for: the first $J puts the controller in
+            // Jog, so that jog's "ok" - and every later one - was swallowed, leaving JogGate to fall back on
+            // its 2s timeout and eventually emit an UNACKNOWLEDGED $J, exactly what it exists to prevent.
+            // Delivered unconditionally now; JobControl.ResponseReceived carries the Jog filter instead, since
+            // its streaming/MDI ack accounting is the one consumer that actually needed it.
+            else
             {
                 if (data == "ok")
+                {
+                    JogGate.Ack();
                     OnCommandResponseReceived?.Invoke(data);
+                }
                 else
                 {
                     if (data.StartsWith("error:"))
@@ -1503,6 +1542,7 @@ namespace CNC.Core
                         catch
                         {
                         }
+                        JogGate.Ack();
                         OnCommandResponseReceived?.Invoke(data);
                     }
                     else if (!data.StartsWith("?"))
@@ -1520,6 +1560,7 @@ namespace CNC.Core
             bool isBootBanner = data.ToLower().StartsWith("grbl");
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
+                System.Threading.Interlocked.Increment(ref AlarmEventCounter);
                 SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
             }

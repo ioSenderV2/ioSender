@@ -6,5 +6,8 @@
              xmlns:local="clr-namespace:CNC.Controls"
              mc:Ignorable="d"
              d:DesignHeight="515" d:DesignWidth="900">
-    <local:MachineSetupWizard x:Name="machineSetupWizard" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+    <!-- The wizard's step tabs are nodes in this shell's tree now (phase 2 of
+         docs/Architecture-Settings-Nav-Overhaul.md). The wizard itself stays whole and is the content
+         of every page; the shell drives it through ISettingsPageProvider.ShowPage(). -->
+    <local:SettingsNavShell x:Name="nav" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
 </UserControl>

@@ -7,6 +7,12 @@
              xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF" x:Class="CNC.Controls.Camera.ConfigControl"
              mc:Ignorable="d" 
              d:DesignHeight="160" d:DesignWidth="310">
+    <!-- Two settings pages, not one panel: "Camera" and "Demo recording (OBS)" are separate nodes in
+         the settings tree. Both stay inside this one control because its behaviour is hooked on the
+         control (Loaded refreshes the device-bind UI and the stored OBS password), so taking the
+         sections apart would leave it outside the visual tree and stop both firing. ShowPage() swaps
+         which section is visible. -->
+    <Grid>
     <GroupBox x:Uid="grp_camera" x:Name="grpCamera" Header="Camera" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="Auto" MinWidth="310" Grid.IsSharedSizeScope="True">
         <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
             <!-- Camera device bind (menu overhaul): pick a local webcam and Connect to enable the Camera menu.
@@ -36,12 +42,17 @@
                 <ComboBox x:Uid="comboBox" x:Name="comboBox" ItemsSource="{Binding Path=Camera.MoveModes}" SelectedItem="{Binding Path=Camera.MoveMode, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="80"/>
             </Grid>
             <Button x:Uid="btn_getPosition" x:Name="getPosition" Content="Get current position" MinWidth="150" Margin="0,4,0,0" Click="getPosition_Click"/>
+        </StackPanel>
+    </GroupBox>
+
+    <GroupBox x:Uid="grp_obs" x:Name="grpObs" Header="Demo recording (OBS)" HorizontalAlignment="Stretch"
+              VerticalAlignment="Top" Height="Auto" MinWidth="310" Grid.IsSharedSizeScope="True" Visibility="Collapsed">
+        <StackPanel HorizontalAlignment="Stretch" Height="Auto" Margin="0,3,0,0" VerticalAlignment="Top">
 
             <!-- Demo recording (OBS) - only matters on a -demomarker launch, harmless otherwise. Was
                  IOSENDER_OBS*/IOSENDER_OBSWS_* env vars (hidden, dev-machine-only state); moved here so
                  it's a real, visible, per-profile setting instead. -->
             <DockPanel Margin="0,10,0,2" LastChildFill="False">
-                <TextBlock x:Uid="lbl_obsSection" DockPanel.Dock="Left" Text="Demo recording (OBS)" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <Button x:Uid="btn_obsInstructions" DockPanel.Dock="Right" Content="Instructions…" Padding="6,0" Click="btnObsInstructions_Click"
                         ToolTip="How to set up a named, remote-controllable source in OBS."/>
                 <Button x:Uid="btn_obsValidate" DockPanel.Dock="Right" Content="Validate" Padding="6,0" Margin="0,0,6,0" Click="btnObsValidate_Click"
@@ -121,4 +132,5 @@
             </Grid>
         </StackPanel>
     </GroupBox>
+    </Grid>
 </UserControl>

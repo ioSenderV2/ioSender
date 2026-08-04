@@ -1,4 +1,4 @@
-CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Добавить
+﻿CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,btn_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Добавить
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_backup:System.Windows.Controls.ContentControl.Content,Button,True,True,,Архив.
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Отмена
 CNC.Controls.WPF.g.en-US.resources:gcoderotatedialog.baml,btn_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Отмена
@@ -590,42 +590,6 @@ CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_scNoAxisRes:System.String
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valHomingCancel:System.String.$Content,None,True,True,,Homing did not complete - validation cancelled.
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
 CNC.Controls.WPF.g.ru-RU.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdiameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sboverlap:CNC.Controls.NumericField.Label,None,False,True,,Overlap:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sboverlap:CNC.Controls.NumericField.Unit,None,False,True,,%
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbstepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbstepover:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbdoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbtotal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbtotal:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:CNC.Controls.NumericField.Label,None,False,True,,Finish pass:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbfinish:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"A light final pass at this depth (0 = none). Roughing steps by Depth of cut down to Total depth minus this, then one pass removes the last Finish-pass amount for a clean surface."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbsafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbsafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:CNC.Controls.NumericField.Label,None,False,True,,Edge margin:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbmargin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clearance kept between the raster and each machine travel limit (on top of the homing pull-off). The surfaced area = travel less twice this on each axis.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbwidth:CNC.Controls.NumericField.Label,None,False,True,,Area width:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbheight:CNC.Controls.NumericField.Label,None,False,True,,Area height:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,fld_sbheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,lbl_sbtool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sboutline:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Outline only
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sboutline:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Trace the rectangular perimeter of the area at safe Z - no plunge, spindle off - to check the extents before a full surfacing pass."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbdryrun:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Dry run
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbdryrun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Trace the path at safe Z with no plunge and the spindle off - to verify motion and extents without cutting.
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbreuse:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Reuse Z0
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,chk_sbreuse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Skip the park + Z touch-off + dust-boot prompts and reuse the work Z0 from the last run (same bit / setup, boot already fitted). Auto-ticked after a run so you can dry-run, untick Dry run, and Run again to cut at the same Z0. Untick it to touch off afresh (e.g. after a bit change)."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,btn_sbgen:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,txt_asgangedaxis:System.Windows.Controls.TextBlock.Text,Text,True,True,,Ganged axis:
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asoffset:CNC.Controls.NumericField.Label,None,False,True,,Current offset:
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asoffset:CNC.Controls.NumericField.Unit,None,False,True,,mm
@@ -702,7 +666,7 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valHomingCancel:System.St
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valNoCheckMode:System.String.$Content,None,True,True,,The controller did not enter check mode ($C) - validation aborted.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_valSetupRejected:System.String.$Content,None,True,True,,The controller rejected a basic set-up command - validation aborted.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabJob:System.String.$Content,None,True,True,,Job
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStartJob:System.String.$Content,None,True,True,,Start Job
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSetup:System.String.$Content,None,True,True,,Setup
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabOffsets:System.String.$Content,None,True,True,,Offsets
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSettings:System.String.$Content,None,True,True,,Settings
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabProbing:System.String.$Content,None,True,True,,Probing
@@ -772,12 +736,12 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_debounce:System.W
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_debounce:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fld_debounce:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Time the switch signal must stay steady before it counts, in milliseconds. Filters electrical noise and contact bounce."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_probes:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_probesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Load Stock and the probing tabs."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_probesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Start Job and the probing tabs."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_ctrlMacros:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_ctrlMacrosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Start Job corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_ctrlMacrosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Setup corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_installMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros…
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_refreshMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Refresh
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.Controls.ContentControl.Content,Button,True,True,,Forget machine
@@ -789,10 +753,6 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_preview:System.Wi
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the changed settings to the controller.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabToolTable:System.String.$Content,None,True,True,,Tool table
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperCal:System.String.$Content,None,True,True,,Stepper calibration
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabStepperScratch:System.String.$Content,None,True,True,,Stepper calibration (scratch)
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSurfaceSpoilboard:System.String.$Content,None,True,True,,Surface spoilboard
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabSquareness:System.String.$Content,None,True,True,,Squareness
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTrinamic:System.String.$Content,None,True,True,,Trinamic tuner
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabPID:System.String.$Content,None,True,True,,PID Tuner
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSelectProbe:System.String.$Content,None,True,True,,Select a probe definition first (Machine Setup Wizard &gt; Probe definitions).
@@ -808,10 +768,6 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmSaveTitle:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmLoadTitle:System.String.$Content,None,True,True,,Load height map
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_hmFileFilter:System.String.$Content,None,True,True,,Height map files (*.map)|*.map|All files (*.*)|*.*
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_readyCycleStart:System.String.$Content,None,True,True,,{0} ready - press Cycle Start to run.
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbOverlapHigh:System.String.$Content,None,True,True,,Overlap is too high - the stepover is zero or negative. Reduce overlap below 100%.
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoTravel:System.String.$Content,None,True,True,,"Max travel ($130-$132) is not set. The raster is referenced to the homed machine envelope, so travel must be known first."
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbNoArea:System.String.$Content,None,True,True,,Set the area width and height first (they default to the machine travel envelope).
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_sbRpmHigh:System.String.$Content,None,True,True,,Spindle RPM ({0:0}) exceeds the bit's rated max RPM ({1:0}).\n\nGenerate anyway?
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoTravel:System.String.$Content,None,True,True,,Max travel ($130-$132) is not set - the hole positions are referenced to the homed envelope.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asNoOffset:System.String.$Content,None,True,True,,No auto-square offset setting on this controller.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_asCaution:System.String.$Content,None,True,True,,"\n\nCAUTION: {0:0.0} mm is a lot of offset - on a rigid gantry it will rack the frame and may bind. If so, the gantry is mechanically out of square (Y rails out of phase) and must be corrected there first."
@@ -828,7 +784,7 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_keysConfig:System.Win
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_macrosConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Macros
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_mainPageConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Main Page
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,lbl_searchSetting:System.Windows.Controls.TextBlock.Text,Text,True,True,,Search:
-CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,fld_searchSetting:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Search settings: $53 jumps to a setting; $5? expands all of $50-$59; text like Jog (or a bare number like 10) highlights every setting whose name or value contains it. Press Enter to select the first match.
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,fld_searchSetting:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Search: $53 jumps to a setting; $5? expands all of $50-$59; text like Jog (or a bare number like 10) highlights every setting whose name or value contains it. Press Enter to select the first match.
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_copyToSim:System.Windows.Controls.ContentControl.Content,Button,True,True,,Copy to simulator
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_copyToSim:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Mirror the current settings into the bundled simulator's &quot;My Machine&quot; profile, so a later simulator connection matches this machine."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,cbo_theme:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Application colour theme.
@@ -844,9 +800,6 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,btn_matchNext:System.W
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ask before writing changed grbl ($) settings to the controller when leaving the tab, instead of writing them silently."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_autoSaveGrblSettings:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save grbl settings on leave
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_promptOnGrblSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About surfacing the spoilboard
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,hlp_sbBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Generates a raster (boustrophedon) facing program that skims the whole bed with a surfacing bit, so the spoilboard surface ends up perfectly parallel to the gantry.&#10;&#10;Set the bit diameter, overlap and depths, then Generate. The area defaults to the machine travel less the edge margin - adjust Area width/height to face a smaller region. Tick Outline only or Dry run to trace the extents at safe Z first, then Run to cut. Reuse Z0 skips the touch-off so you can re-run at the same height."
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,txt_sbSummaryEmpty:System.Windows.Controls.TextBlock.Text,Text,True,True,,Set the parameters and click Generate - a summary of the generated program appears here.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.Controls.ContentControl.Content,Button,True,True,,Clear
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,btn_asclear:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Reset the squaring offset ($17x) to 0 and re-home - quicker than typing $17x=0 in MDI.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,fld_asgap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The gap you measured at the X-leg pin. Sets the New offset. (Leave 0 if you'd rather type the offset directly.)
@@ -990,7 +943,7 @@ CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:CN
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate).
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Label,None,False,True,,Ball diameter:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Load Stock approach clearance.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Setup approach clearance.
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Label,None,False,True,,Plate thickness:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Plate height - work Z0 is the plate top minus this.
@@ -1062,7 +1015,6 @@ CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_collapseAll:System.Wind
 CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,mnu_resetGroup:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Reset group to defaults
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_saveProgramGrp:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save program...
 CNC.Controls.WPF.g.en-US.resources:gcodelistcontrol.baml,mnu_transformCtx:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Transform
-CNC.Controls.WPF.g.en-US.resources:surfacespoilboardwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the surfacing bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before surfacing.
 CNC.Controls.WPF.g.en-US.resources:autosquarewizard.baml,cbxGangedAxis:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write."
 CNC.Controls.WPF.g.en-US.resources:steppercalibrationscratchwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.
 CNC.Controls.WPF.g.en-US.resources:pidlogview.baml,btnGetPIDData:System.Windows.Controls.ContentControl.Content,Button,True,True,,Get data
@@ -1342,7 +1294,7 @@ CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_loadRun:System.Windows.Fr
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_copyTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Cop_y to
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,mnu_moveTo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Move to
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros
-CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Install or update the controller-side macros (tc, pcorner) on the controller's LittleFS - required for the Start Job / automatic tool-change sequence."
+CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btnInstallAtc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Install or update the controller-side macros (tc, pcorner) on the controller's LittleFS - required for the Setup / automatic tool-change sequence."
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,btn_upload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Upload a local file to the controller's storage.
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Dry run (spindle/coolant forced off)
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,mnu_dryRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Next run: offset Z clear of stock AND force the spindle/coolant off for the whole run, regardless of what the program contains - watch the toolpath without cutting or spinning anything."
@@ -1410,3 +1362,386 @@ CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,lbl_fsNotesDetail:Sys
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_aiKey:System.Windows.Controls.TextBlock.Text,Text,True,True,,AI Review Key:
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_aiKey:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Anthropic API key for Feeds &amp; Speeds' optional 'Ask AI to review' second-opinion pass. Stored in the registry, never shown once set."
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,btn_aiKey:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set AI key
+CNC.Controls.WPF.g.en-US.resources:oddjobsview.baml,TxtOddJobsPlaceholder:System.Windows.Controls.TextBlock.Text,Text,True,True,,Odd Jobs - coming soon
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssw:CNC.Controls.NumericField.Label,None,False,True,,Stock width:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssw:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssh:CNC.Controls.NumericField.Label,None,False,True,,Stock height:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssh:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssdiameter:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssdiameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssoverlap:CNC.Controls.NumericField.Label,None,False,True,,Overlap:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssoverlap:CNC.Controls.NumericField.Unit,None,False,True,,%
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssstepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssstepover:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssdoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_ssdoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_sstotal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_sstotal:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_sssafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,fld_sssafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,lbl_sstool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,cbxTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Loaded: the surfacing bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before surfacing.
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,hlp_ssHdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,About Surface Stock
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,hlp_ssBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Faces a rectangular area of stock flat, referenced to the work origin Setup already zeroed (Odd Jobs' first sub-tab) - run Setup first.&#10;&#10;Set the stock width/height, bit diameter, overlap and depths, then Generate and Run."
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,txt_ssSummaryEmpty:System.Windows.Controls.TextBlock.Text,Text,True,True,,Set the parameters and click Generate - a summary of the generated program appears here.
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,rb_dbdrill:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Drill (peck)
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,rb_dbbore:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Bore (helical)
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbx:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dby:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dby:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbholedia:CNC.Controls.NumericField.Label,None,False,True,,Hole diameter:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbholedia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbtooldia:CNC.Controls.NumericField.Label,None,False,True,,Tool diameter:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbtooldia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,chk_dbthrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,chk_dbthrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut all the way through the stock (thickness + 0.5 mm overcut) instead of a fixed depth.
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbthick:CNC.Controls.NumericField.Label,None,False,True,,Stock thickness:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbthick:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbdepth:CNC.Controls.NumericField.Label,None,False,True,,Depth:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbdepth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbpeck:CNC.Controls.NumericField.Label,None,False,True,,Peck depth:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbpeck:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbsafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbsafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate (bore):
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,fld_dbrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,lbl_dbtool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,hlp_dbBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,Drills or bores a single hole at an X/Y offset from the work origin Setup already zeroed (Odd Jobs' first sub-tab). Drill pecks on-center; Bore helically clears out to the hole diameter (needs hole dia &gt; tool dia).
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,rb_pkround:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Round
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,rb_pkrect:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Rectangular
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkx:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pky:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pky:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkdia:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkdia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkw:CNC.Controls.NumericField.Label,None,False,True,,Width:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkw:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkl:CNC.Controls.NumericField.Label,None,False,True,,Length:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkl:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkbit:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkbit:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkthrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkthrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut all the way through the stock (thickness + 0.5 mm overcut). Auto-leaves tabs on the outer wall so the piece doesn't fall out.
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkthick:CNC.Controls.NumericField.Label,None,False,True,,Stock thickness:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkthick:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktotal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktotal:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkdoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkdoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pksafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pksafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,lbl_pktool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,txt_pktabshdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tabs (through cuts only):
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pknumtabs:CNC.Controls.NumericField.Label,None,False,True,,Number of tabs:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktabwidth:CNC.Controls.NumericField.Label,None,False,True,,Tab width:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktabwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktabheight:CNC.Controls.NumericField.Label,None,False,True,,Tab height:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pktabheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,hlp_pkBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,Pockets a round or rectangular area at an X/Y offset from the work origin Setup already zeroed (Odd Jobs' first sub-tab). Tick Through for a full-depth cut - tabs are then left automatically on the outer wall so the piece stays put.
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvround:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Round
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvrect:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Rectangular
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvx:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvy:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvy:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvdia:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvdia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvw:CNC.Controls.NumericField.Label,None,False,True,,Width:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvw:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvl:CNC.Controls.NumericField.Label,None,False,True,,Length:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvl:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvoutside:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Outside
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvoutside:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cutter runs around the outside of the drawn shape - e.g. cutting a blank out.
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvonline:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,On-line
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvonline:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cutter centerline follows the drawn shape exactly - e.g. a slot on the line.
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvinside:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Inside
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,rb_cvinside:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cutter runs inside the drawn shape - e.g. cutting a window/slot opening.
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvbit:CNC.Controls.NumericField.Label,None,False,True,,Bit diameter:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvbit:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,chk_cvthrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,chk_cvthrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut all the way through the stock (thickness + 0.5 mm overcut). Auto-leaves tabs so the piece doesn't fall out.
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvthick:CNC.Controls.NumericField.Label,None,False,True,,Stock thickness:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvthick:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtotal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtotal:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvdoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvdoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvsafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvsafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvplunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvplunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvfeed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvmaxrpm:CNC.Controls.NumericField.Label,None,False,True,,Bit max RPM:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvrpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,lbl_cvtool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,txt_cvtabshdr:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tabs (through cuts only):
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvnumtabs:CNC.Controls.NumericField.Label,None,False,True,,Number of tabs:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtabwidth:CNC.Controls.NumericField.Label,None,False,True,,Tab width:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtabwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtabheight:CNC.Controls.NumericField.Label,None,False,True,,Tab height:
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,fld_cvtabheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,hlp_cvBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Cuts a single profile pass (Outside/On-line/Inside) around a round or rectangular shape at an X/Y offset from the work origin Setup already zeroed (Odd Jobs' first sub-tab) - e.g. cutting a blank out, or milling a slot. Tick Through for tabs."
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,btn_ssfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:surfacestockwizard.baml,btn_ssfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Bit diameter, spindle RPM, feed rate and plunge feed - with a recommendation lookup by material."
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,btn_dbfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:drillborewizard.baml,btn_dbfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Spindle RPM, plunge feed and (Bore mode) cutting feed - with a recommendation lookup by material."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Bit diameter, spindle RPM, feed rate and plunge feed - with a recommendation lookup by material."
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,btn_cvfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:contourwizard.baml,btn_cvfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Bit diameter, spindle RPM, feed rate and plunge feed - with a recommendation lookup by material."
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_material:System.Windows.Controls.ContentControl.Content,Label,True,True,,Material:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_diameter:CNC.Controls.NumericField.Label,None,False,True,,Tool diameter:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_diameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_flutes:CNC.Controls.NumericField.Label,None,False,True,,Flutes:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_rpm:CNC.Controls.NumericField.Label,None,False,True,,Spindle RPM:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_feed:CNC.Controls.NumericField.Label,None,False,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_feed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_plunge:CNC.Controls.NumericField.Label,None,False,True,,Plunge feed:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_plunge:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_doc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_doc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_recommend:System.Windows.Controls.ContentControl.Content,Button,True,True,,Get recommendation
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_recommend:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Looks up published chip-load/surface-speed reference data for the selected material and tool (FeedsSpeedsAdvisor - the same engine the Feeds &amp; Speeds tab uses).
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_recresult:System.Windows.Controls.TextBlock.Text,Text,True,True,,A field highlighted amber differs from the recommendation - hover it for why, double-click to apply just that one.
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_userec:System.Windows.Controls.ContentControl.Content,Button,True,True,,Use recommended values
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkfinish:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Finishing pass (ball end)
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkfinish:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Adds one extra lap around the final wall with a ball-end bit after the roughing pass, for a cleaner finish."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkfinishfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Finishing feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkfinishfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ball-end bit diameter, spindle RPM, feed rate and plunge feed for the finishing pass."
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_materialro:System.Windows.Controls.TextBlock.Text,Text,True,True,,Material: (set on the Setup tab)
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_tool:System.Windows.Controls.ContentControl.Content,Label,True,True,,Tool:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbx:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbx:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cby:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cby:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,lbl_cbsize:System.Windows.Controls.ContentControl.Content,Label,True,True,,Fastener size:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,rb_cbsocket:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Socket
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,rb_cbbutton:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Button
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,rb_cbhex:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Hex
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,rb_cbflat:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Flat
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,lbl_cbclear:System.Windows.Controls.ContentControl.Content,Label,True,True,,Clearance:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,txt_cbtight:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tight
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,txt_cbnormal:System.Windows.Controls.TextBlock.Text,Text,True,True,,Normal
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,txt_cbloose:System.Windows.Controls.TextBlock.Text,Text,True,True,,Loose
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdia:CNC.Controls.NumericField.Label,None,False,True,,Counterbore diameter:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdepth:CNC.Controls.NumericField.Label,None,False,True,,Counterbore depth:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdepth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdrilldia:CNC.Controls.NumericField.Label,None,False,True,,Drill diameter:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdrilldia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,chk_cbthrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,chk_cbthrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Drill all the way through the stock (thickness + 0.5 mm overcut) instead of a fixed depth.
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbthick:CNC.Controls.NumericField.Label,None,False,True,,Stock thickness:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbthick:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdepthtot:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbdepthtot:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbsafez:CNC.Controls.NumericField.Label,None,False,True,,Safe Z:
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,fld_cbsafez:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,btn_cbfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Counterbore feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,btn_cbdrillfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Drill feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,btn_cbchamferfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Chamfer feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,hlp_cbBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Counterbores a fastener at an X/Y offset from the work origin Setup already zeroed (Odd Jobs' first sub-tab): bore the counterbore, drill the clearance hole, then chamfer the counterbore's top edge 0.5 mm. Pick a fastener size/head style/clearance - the diameter, depth and drill fields are seeded from standard reference dimensions and can be overridden."
+CNC.Controls.WPF.g.en-US.resources:counterborewizard.baml,rb_cbpan:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Pan
+CNC.Controls.WPF.g.en-US.resources:signalscontrol.baml,lbl_signalTloRef:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tool length reference set
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pksidefinish:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Side finishing pass (ball end)
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pksidefinish:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Re-traces the wall at every depth pass with a ball-end bit after roughing, for a cleaner wall finish. Roughing leaves a thin skin on the wall for this to remove."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pksidefinishfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Side finishing feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pksidefinishfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ball-end bit diameter, spindle RPM, feed rate and plunge feed for the side finishing pass."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkwallleave:CNC.Controls.NumericField.Label,None,False,True,,Wall stock to leave:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkwallleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkwallleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material roughing leaves on the wall for this pass to remove. The roughing wall is inset by this amount; the side-finish pass cuts out to the true wall position.
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkbottomfinish:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Bottom finishing pass (ball end)
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkbottomfinish:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Adds one final lap around the wall/floor corner at true depth with a ball-end bit after roughing, for a cleaner floor edge. Roughing stops short of true depth to leave material for this."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkbottomfinishfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Bottom finishing feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkbottomfinishfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Ball-end bit diameter, spindle RPM, feed rate and plunge feed for the bottom finishing pass."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkfloorleave:CNC.Controls.NumericField.Label,None,False,True,,Floor stock to leave:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkfloorleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkfloorleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material roughing leaves on the floor for this pass to remove. Roughing's own depth stops this far short of true depth.
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_generateAndRun:System.Windows.Controls.ContentControl.Content,Button,True,True,,Generate and Run
+CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_generateAndRun:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Generate and run in one step, skipping the routine confirmation prompts (real safety warnings still show)."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkstepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkstepover:CNC.Controls.NumericField.Unit,None,False,True,,%
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,fld_pkstepover:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Radial engagement for clearing the pocket's interior, as a % of the roughing bit's diameter. 30-50% is a typical range for a 2-3 flute end mill."
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Chamfer top edge (V-bit)
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,chk_pkchamfer:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Last toolpath: a 45 deg V-bit traces the pocket's true top edge to break the sharp corner. Runs after roughing and any finishing passes.
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Chamfer feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:pocketwizard.baml,btn_pkchamferfeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"V-bit spindle RPM, feed rate and chamfer depth."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Group operations by tool
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wogroupbytool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Emit the program grouped onto as few tool changes as possible instead of strictly in tree order. Each toolpath's own operation order is always preserved - roughing still runs before the finishing passes that depend on it - so grouping only combines tools where that allows.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woskipfirsttc:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,First tool already loaded
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woskipfirsttc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Leave out the M6 for the program's first tool, on the basis that it is already in the spindle - usually true when it is the tool you just set up with. Note the tool change is also what re-probes the toolsetter and applies the tool length offset, so the first operation will run on whatever offset is currently in force."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_woname:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wogeom:System.Windows.Controls.ContentControl.Content,Label,True,True,,Geometry:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wox:CNC.Controls.NumericField.Label,None,False,True,,X offset:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wox:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woy:CNC.Controls.NumericField.Label,None,False,True,,Y offset:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woy:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wolen:CNC.Controls.NumericField.Label,None,False,True,,Length:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wolen:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:CNC.Controls.NumericField.Label,None,False,True,,Angle:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woangle:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodia:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodia:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosize:CNC.Controls.NumericField.Label,None,False,True,,Size:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosize:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wow:CNC.Controls.NumericField.Label,None,False,True,,Width (X):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wow:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wod:CNC.Controls.NumericField.Label,None,False,True,,Depth (Y):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wod:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wopattern:System.Windows.Controls.ContentControl.Content,Label,True,True,,Pattern:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocols:CNC.Controls.NumericField.Label,None,False,True,,Columns (X):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:CNC.Controls.NumericField.Label,None,False,True,,X spacing:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocolsp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Center-to-center distance between columns. Negative runs the grid in -X.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worows:CNC.Controls.NumericField.Label,None,False,True,,Rows (Y):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:CNC.Controls.NumericField.Label,None,False,True,,Y spacing:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_worowsp:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Center-to-center distance between rows. Negative runs the grid in -Y.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopcount:CNC.Controls.NumericField.Label,None,False,True,,Count:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:CNC.Controls.NumericField.Label,None,False,True,,Bolt circle radius:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woprad:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Distance from the anchor X/Y out to each instance.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:CNC.Controls.NumericField.Label,None,False,True,,Start angle:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopstart:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Where the first instance sits, measured from +X counter-clockwise."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:CNC.Controls.NumericField.Label,None,False,True,,Arc span:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:CNC.Controls.NumericField.Unit,None,False,True,,deg
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopspan:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"360 spreads the instances evenly around the full circle. A smaller span spreads them across that arc, with one instance at each end."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wothrough:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Through
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wothrough:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut all the way through the stock (thickness + 0.5 mm overcut) instead of to a set depth.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:CNC.Controls.NumericField.Label,None,False,True,,Hole diameter:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wohole:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The hole this operation makes, centered on the toolpath. Independent of the geometry's own diameter, so several holes of different sizes can share one centerline."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.NumericField.Label,None,False,True,,Total depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Axial step per pass - how much deeper each pass goes.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Label,None,False,True,,Peck depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:CNC.Controls.NumericField.Label,None,False,True,,Step down (per rev):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepdown:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much deeper the helix goes on each revolution around the hole.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:CNC.Controls.NumericField.Label,None,False,True,,Stepover:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:CNC.Controls.NumericField.Unit,None,False,True,,%
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wostepover:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Radial engagement for clearing the interior, as a % of the bit's diameter. 30-50% is typical for a 2-3 flute end mill."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:CNC.Controls.NumericField.Label,None,False,True,,Wall stock to leave:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wowallleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material the roughing operation leaves on the wall for this pass to remove. Roughing's wall is inset by this; this pass cuts to the true outline.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:CNC.Controls.NumericField.Label,None,False,True,,Floor stock to leave:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorleave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wochamferdepth:CNC.Controls.NumericField.Label,None,False,True,,Chamfer depth:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wochamferdepth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,txt_wotabs:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tabs
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wonumtabs:CNC.Controls.NumericField.Label,None,False,True,,Number of tabs:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabwidth:CNC.Controls.NumericField.Label,None,False,True,,Tab width:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabwidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabheight:CNC.Controls.NumericField.Label,None,False,True,,Tab height:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wotabheight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_wofeeds:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and speeds...
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_wofeeds:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Pick the tool and set its RPM, feed and plunge - with a recommendation lookup by material, -10%/+10% nudges, and your own dialed-in values remembered per tool and material."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,hlp_woBody:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_slower:System.Windows.Controls.ContentControl.Content,Button,True,True,,-10%
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_slower:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Knock the feed and plunge down 10% - click again to keep backing off. Chart values assume an industrial machine; this is how you dial a bit in for yours. Whatever you settle on is remembered for this tool and material.
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_faster:System.Windows.Controls.ContentControl.Content,Button,True,True,,+10%
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_faster:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Push the feed and plunge back up 10%.
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsLoadLatest:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Load latest export
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsWriteApply:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write apply file
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsAskAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask AI to review
+CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsSelectAllAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Prefer AI for all
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_drillstyle:System.Windows.Controls.ContentControl.Content,Label,True,True,,Drill style:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_tloRefDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Tool-length reference baseline - probed once against the toolsetter puck, reused by every job so 'work Z0' means the same real height no matter which tool is mounted. Whatever's in the spindle now touches the puck; check the box first if that's the 3D probe itself."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_tloRef3d:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,3D probe is in the spindle now
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_tloRef:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reference TLO
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wosource:System.Windows.Controls.ContentControl.Content,Label,True,True,,Source toolpath:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocountersink:CNC.Controls.NumericField.Label,None,False,True,,Countersink diameter:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocountersink:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocountersink:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically.
+CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_friendlyRunLabels:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Renames the run bar's Cycle Start and Feed Hold buttons to the friendlier Start/Pause. Check Run, Dry Run, and Simulate keep their own names either way."
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_materialpick:System.Windows.Controls.ContentControl.Content,Label,True,True,,Material:
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,grb_oddJobsConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Odd Jobs
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojAutoSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save workorder on exit
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojAutoSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save the Work Order automatically when leaving that tab, instead of always asking."
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojPromptSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,chk_ojPromptSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask before each auto-save instead of saving silently.
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojToolTable:System.Windows.Controls.TextBlock.Text,Text,True,True,,Tools - click one to view or tune its feeds and speeds:
+CNC.Controls.WPF.g.en-US.resources:kbddefaultspeedcontrol.baml,lbl_kbdDefSpeed:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kbd Def Speed:
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabWorkOrder:System.String.$Content,None,True,True,,Work Order
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,grb_workOrderConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Work Order
+CNC.Controls.WPF.g.en-US.resources:programview.baml,btn_progvieweditsource:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_direction:System.Windows.Controls.ContentControl.Content,Label,True,True,,Direction:
+CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_direction:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Conventional cuts against the cutter's rotation - slower to bite in, more forgiving of backlash/flex. Climb cuts with the rotation - cleaner finish and less tearout in wood, but needs a backlash-free, rigid setup or the cutter can grab and dig in."
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojSpindleDir:System.Windows.Controls.ContentControl.Content,Label,True,True,,Spindle direction:
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojSpindleDir:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Some spindle/VFD setups only run one physical direction regardless of M3/M4 - if that's yours, set it here so Climb/Conventional on Work Order operations gets the cut direction right, and so the Job tab's Spindle panel only offers the direction that actually works."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woentirespoilboard:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Entire spoilboard
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woentirespoilboard:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Face the whole in-bounds machine travel, ignoring this toolpath's Width/Depth/X/Y above. Machine-referenced (no WCS to set it from) - touches off its own Z0 by jogging to the surface, and must be the only enabled operation in this work order."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calibration:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Stepper calibration and frame squareness.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calibration:System.Windows.Controls.TextBlock.Text,Text,True,True,,8 · Calibration
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calStepper:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Correct steps/mm by probing a reference block of known size against a validated Corner Fence.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calStepper:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stepper calibration
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calSquareness:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check and correct gantry squareness.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calSquareness:System.Windows.Controls.TextBlock.Text,Text,True,True,,Squareness
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerTL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to back-left corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerTR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to back-right corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBL:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to front-left corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:jogbasecontrol.baml,btn_jogCornerBR:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Go to front-right corner at safe Z
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,btn_ojAddTool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a custom tool - a bit ioSender has no built-in preset for.
+CNC.Controls.WPF.g.en-US.resources:oddjobssettingscontrol.baml,lbl_ojCustomToolHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Custom tools (below the built-ins) can be right-clicked to edit or delete.
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_name:System.Windows.Controls.ContentControl.Content,Label,True,True,,Name:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_kind:System.Windows.Controls.ContentControl.Content,Label,True,True,,Kind:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_diameter:CNC.Controls.NumericField.Label,None,False,True,,Diameter:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_diameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:CNC.Controls.NumericField.Label,None,False,True,,Flutes:
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_flutes:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Not used for Drill or Countersink - their feed formulas don't factor in flute count.
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Controls.WPF.g.en-US.resources:customtooleditdialog.baml,ct_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wowcs:System.Windows.Controls.ContentControl.Content,Label,True,True,,Origin (WCS):
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wowcs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Which work coordinate system this work order's origin/tool length reference lives in. &quot;Follow Setup&quot; (the default) always uses whatever Setup is currently set to; pin a specific one instead if this work order's origin needs to stay on a particular WCS even after Setup moves on to a different job.
+CNC.Controls.WPF.g.en-US.resources:settingsnavshell.baml,fld_settingsSearch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Filter the list below. Esc clears.
+CNC.Controls.WPF.g.en-US.resources:settingsnavshell.baml,lbl_settingsSearchHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Search
+CNC.Controls.WPF.g.en-US.resources:settingsnavshell.baml,lbl_settingsNoSelection:System.Windows.Controls.TextBlock.Text,Text,True,True,,Select a page on the left.
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_unavailable:System.Windows.Controls.ContentControl.Content,Button,True,True,,Unavailable...
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,btn_unavailable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Components this controller does not offer, and why."
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,grp_uiGeneral:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,General
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_keepMdiFocus:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Keep MDI focus
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_keepMdiFocus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Keeps the cursor in the MDI command box after you send a command, so you can type the next one without clicking back into it."
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_restoreWindowSize:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Restore last window size on startup
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_restoreWindowSize:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore window size on next startup.
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_friendlyRunLabels:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Use &quot;Start&quot;/&quot;Pause&quot; instead of &quot;Cycle Start&quot;/&quot;Feed Hold&quot;
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_friendlyRunLabels:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Renames the run bar's Cycle Start and Feed Hold buttons to the friendlier Start/Pause. Check Run, Dry Run, and Simulate keep their own names either way."
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_uiScale:System.Windows.Controls.TextBlock.Text,Text,True,True,,UI scale
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_uiScale:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_autoSaveSettings:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Auto-save settings on exit
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_autoSaveSettings:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save app settings automatically when leaving Settings or closing, instead of using the Save settings button. Does not affect grbl ($) settings - those have their own option on the Application page."
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_promptOnSave:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Prompt before auto-saving
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_promptOnSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show a confirm/discard list of changed settings before auto-saving.
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_showJogTargetButtons:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Show go-to buttons on the jog pad
+CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_showJogTargetButtons:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Shows the four corner buttons and the centre bullseye on the jog pad - each rapids to that machine position at safe Z. Untick for a plain arrow pad; the arrow and Z buttons are unaffected.
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,txt_viewPlacement:System.Windows.Controls.TextBlock.Text,Text,True,True,,Where each view appears. Order within a destination is top to bottom (left to right on the tab bar). Applied on restart.
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,lbl_showJobJogPad:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Show the jog pad on the Job tab
+CNC.Controls.WPF.g.en-US.resources:mainpageeditor.baml,lbl_showJobJogPad:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The full arrow pad across the top of the two right-hand columns. Unticking it gives that height back to the panels; the run bar's own compact jog controls are unaffected.

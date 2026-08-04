@@ -10,9 +10,11 @@
  * flagged run, WITHOUT hand-rolling a throwaway logger and tearing it down again.
  *
  * Companion to the crash log (App.xaml.cs) and the serial-wire Console verbose log;
- * this one is for app-internal state/flow, not the wire protocol. File creation and size-based
- * rotation are handled by LogFile - the same primitive ConsoleLog and the crash logger use; this
- * class just owns the enable flag, the category filter, and line formatting.
+ * this one is for app-internal state/flow, not the wire protocol. A fresh, timestamped file is
+ * created per run in a day-of-week subfolder, with "latest_debug.log" (hard-)linked in the
+ * top-level logs folder - file creation, folder placement, size-based rotation and per-folder
+ * retention are all handled by LogFile - the same primitive ConsoleLog and the crash logger use;
+ * this class just owns the enable flag, the category filter, and line formatting.
  */
 
 using System;
@@ -59,7 +61,7 @@ namespace CNC.Core
                         _categories.Add(c.Trim());
                 }
 
-                _log = LogFile.Open("ioSender.debug");
+                _log = LogFile.Open("ioSender.debug", latestLinkName: "latest_debug.log");
                 if (_log == null)
                 {
                     Enabled = false;

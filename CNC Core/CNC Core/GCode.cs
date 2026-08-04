@@ -418,9 +418,12 @@ namespace CNC.GCode
         public bool ConfirmOnExecute { get; set; } = true;
         public string Code { get; set; }
 
-        /// <summary>Function key that runs this macro: 1-12 = F1-F12, 0 = none (see JobControl.FnKeyHandler).
-        /// Legacy configs without this element are migrated from <see cref="Id"/> on load.</summary>
+        /// <summary>Function key that runs this macro: 1-12 = F1-F12, 0 = none (see JobControl.FnKeyHandler).</summary>
         public int FKey { get { return _fkey; } set { _fkey = value; OnPropertyChanged(); } }
+
+        /// <summary>When true, a top-level main-menu item is built for this macro (appended after Help -
+        /// see MainWindow.xaml.cs's BuildMacroMenuItems). Applies on next launch, same as other layout config.</summary>
+        public bool AddToMenu { get; set; } = false;
     }
 
     public struct Point6D

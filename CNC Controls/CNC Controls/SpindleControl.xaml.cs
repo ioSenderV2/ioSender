@@ -64,6 +64,22 @@ namespace CNC.Controls
             overrideControl.CoarsePlusCommand = GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS;
 
             cvRPM.PreviewKeyUp += txtPos_KeyPress;
+
+            ApplyDirectionCapability();
+        }
+
+        // Hides whichever of CW/CCW the machine's spindle/VFD can't actually run (Settings:App > Work Order >
+        // Spindle direction - see SpindleDirectionCapability's own comment) - offering a direction button that
+        // does nothing, or silently does the OTHER direction, is worse than not showing it. Applied once at
+        // construction: like most Settings:App options that reshape a control's layout, a change made while
+        // this panel already exists in a live session needs a restart to take effect.
+        private void ApplyDirectionCapability()
+        {
+            var cap = AppConfig.Settings.Base?.SpindleDirectionCapability ?? SpindleDirectionCapability.Bidirectional;
+            if (cap == SpindleDirectionCapability.FixedCW)
+                rbSpindleCCW.Visibility = Visibility.Collapsed;
+            else if (cap == SpindleDirectionCapability.FixedCCW)
+                rbSpindleCW.Visibility = Visibility.Collapsed;
         }
 
         private void SpindleControl_DataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
@@ -102,9 +118,13 @@ namespace CNC.Controls
 
         private void txtPos_KeyPress(object sender, KeyEventArgs e)
         {
+            // sender is cvRPM itself (a NumericField UserControl, not a NumericTextBox) - this handler is
+            // only ever wired to cvRPM.PreviewKeyUp (constructor), so read the value straight off it rather
+            // than casting sender, which was always null and crashed on Enter. Confirmed via crash log
+            // 2026-08-01: NullReferenceException at this line from turning the spindle on/typing an RPM.
             if (e.Key == Key.Enter && !(DataContext as GrblViewModel).IsJobRunning)
             {
-                (DataContext as GrblViewModel).ExecuteCommand(string.Format("S{0}", (sender as NumericTextBox).Value));
+                (DataContext as GrblViewModel).ExecuteCommand(string.Format("S{0}", cvRPM.Value));
             }
         }
 

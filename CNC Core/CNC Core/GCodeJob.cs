@@ -140,9 +140,9 @@ namespace CNC.Core
         // reset) before this fix.
         public bool HasToolChange { get; set; }
 
-        // Outline grouping: set when a program is assembled from a folder of
-        // per-toolpath files (see GCode.LoadFolder). Null for ordinary single-
-        // file loads (the Program list then renders flat, ungrouped).
+        // Outline grouping: set when the Fusion add-in's own section-marker comments are recognized in a
+        // loaded file (see rxSectionMarker below). Null for a file with no section markers (the Program list
+        // then renders flat, ungrouped).
         public string Section { get; set; }
         public bool IsSectionStart { get; set; }
 
@@ -166,8 +166,7 @@ namespace CNC.Core
 
         // Section-marker comment the Fusion ioSenderBatchPost add-in emits between operations in its combined
         // output - "(--- 2: FinishBottom (T2) ---)" - captures the inner text verbatim as the section name
-        // (matches FolderToolpath.Section's "{seq}: {name} (T{tool})" format exactly, since that's what the
-        // add-in wraps). Recognized during a plain Load File parse, not just Load Folder's stitching.
+        // ("{seq}: {name} (T{tool})", the format the add-in wraps). Recognized during a plain Load File parse.
         private static readonly Regex rxSectionMarker = new Regex(@"^\(---\s*(.+?)\s*---\)$");
 
         // Neutralise interior parens in a comment line so it survives as ONE well-formed comment regardless of
@@ -226,7 +225,10 @@ namespace CNC.Core
         }
 
         private string filename = string.Empty;
-        public ObservableCollection<GCodeBlock> blocks = new ObservableCollection<GCodeBlock>();
+        // Concrete type is BulkObservableCollection (AddRange/ReplaceAll - one notification for many items,
+        // not one per item) - declared as the plain base type since every external reader only needs
+        // INotifyCollectionChanged/IList; callers that need the bulk API (GCode.cs's load/Pop paths) cast.
+        public ObservableCollection<GCodeBlock> blocks = new BulkObservableCollection<GCodeBlock>();
 
         public Queue<string> commands = new Queue<string>();
 
@@ -258,8 +260,8 @@ namespace CNC.Core
         private bool sectionStartPending = false;
 
         // True once BeginSection() has been called at least once since the last Reset() - i.e. this program
-        // has an outline to show (GrblViewModel.HasOutline), regardless of whether it came from Load Folder's
-        // stitching or Load File recognizing the Fusion add-in's (--- seq: name (Tn) ---) section markers.
+        // has an outline to show (GrblViewModel.HasOutline), from Load File recognizing the Fusion add-in's
+        // (--- seq: name (Tn) ---) section markers.
         public bool HasSections { get; private set; }
 
         // Modal state (distance/feed mode, plane, units) to replay when starting mid-program from an
@@ -349,8 +351,8 @@ namespace CNC.Core
                             LineNumber++;
 
                         // Recognize the Fusion add-in's (--- seq: name (Tn) ---) section-marker comments so a
-                        // plain Load File builds the same outline Load Folder's stitching produces - AddStamped
-                        // (not Emit) is what actually attaches Section/IsSectionStart to the block.
+                        // plain Load File builds a grouped outline - AddStamped (not Emit) is what actually
+                        // attaches Section/IsSectionStart to the block.
                         if (isComment)
                         {
                             var sm = rxSectionMarker.Match(block);
@@ -420,7 +422,15 @@ namespace CNC.Core
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
-                bool passThrough = GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0);
+                // A bare $-command (e.g. $TLR, $X) isn't valid G-code syntax, so Parser.ParseBlock below fails
+                // on it - and unlike the O-word/#-expression case, that failure isn't gated on
+                // GrblInfo.ExpressionsSupported at all: $-commands are basic Grbl/grblHAL system commands
+                // supported on every build, expressions or not. Without this, the block was silently DROPPED
+                // (parsed=false, passThrough=false -> neither branch adds it, no error, nothing sent) -
+                // confirmed on real hardware 2026-07-27: a generated program's own "$TLR" line vanished
+                // entirely between the previous and next line in the actual wire transmission.
+                bool isSystemCommand = ts.Length > 0 && ts[0] == '$';
+                bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
 
                 int tokenStart = Parser.Tokens.Count;
                 bool parsed;
@@ -431,10 +441,11 @@ namespace CNC.Core
                 {
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
-                    // with error:25). Also never number an O-word or #-parameter line (see above).
+                    // with error:25). Also never number an O-word, #-parameter, or $-command line (see above -
+                    // a $-command specifically must have '$' as the line's very first character).
                     string nt = block.TrimStart();
                     bool alreadyNumbered = nt.Length > 1 && (nt[0] == 'N' || nt[0] == 'n') && char.IsDigit(nt[1]);
-                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !isParamLine && !alreadyNumbered)
+                    if(GrblInfo.UseLinenumbers && AddLineNumbers && !isOword && !isParamLine && !isSystemCommand && !alreadyNumbered)
                     {
                         LineNumber += 10;
                         block = "N" + LineNumber.ToString() + block;
@@ -546,6 +557,67 @@ namespace CNC.Core
             filename = "";
 
             FileChanged?.Invoke(filename);
+        }
+
+        // --- Lightweight snapshot/restore (GCode.File.Push/Pop) ------------------------------------------
+        // Swap the loaded job out for another program's blocks/limits and back again WITHOUT re-reading/
+        // re-parsing from disk. A naive Pop that just re-Load()ed the previous filename took 30+ seconds on
+        // real hardware (2026-07-31, a ~220k-line file) - full lexical re-parse every time. This captures
+        // exactly the two things that actually matter and are cheap to copy: the block list (each
+        // GCodeBlock already carries its own per-line Tokens from the original parse, so hover-explain etc.
+        // keep working with no extra work) and the bounding box (a Clone - BoundingBox.Reset() mutates the
+        // SAME object in place on every subsequent load, so a bare reference would get corrupted by
+        // whatever loads in between Push and Pop). NOT captured: GCodeParser's own summary stats
+        // (ToolChanges/Decimals/HasGoPredefinedPosition - private setters, would need reaching into Parser
+        // internals) and min_feed/max_feed (currently unread anywhere in the app). Those stay whatever the
+        // intervening load left them at until the next real Load - a stale summary number is a display gap,
+        // not a correctness one; the block list and bounding box (what's actually displayed/streamed/used
+        // for travel-limit sanity) are exact.
+        // Public, not internal: the caller (GCode.Pop/PopAsync, a DIFFERENT assembly - CNC.Controls) needs to
+        // read Blocks/HasSections directly to batch the restore and set Model.HasOutline at the right moment
+        // (see PrepareRestore's own comment) - it can't be done as one opaque Restore() call.
+        public class Snapshot
+        {
+            public string FileName;
+            public List<GCodeBlock> Blocks;
+            public GcodeBoundingBox BoundingBox;
+            public bool HasSections;
+            public bool HeightMapApplied;
+        }
+
+        public Snapshot TakeSnapshot()
+        {
+            return new Snapshot
+            {
+                FileName = filename,
+                Blocks = new List<GCodeBlock>(blocks),
+                BoundingBox = new GcodeBoundingBox
+                {
+                    Min = (double[])BoundingBox.Min.Clone(),
+                    Max = (double[])BoundingBox.Max.Clone(),
+                    Size = (double[])BoundingBox.Size.Clone()
+                },
+                HasSections = HasSections,
+                HeightMapApplied = HeightMapApplied
+            };
+        }
+
+        // Split from a single Restore() call into Prepare/(caller bulk-adds blocks)/RaiseFileChanged so the
+        // caller (GCode.Pop) can populate `blocks` via BulkObservableCollection.ReplaceAll - one Reset
+        // notification for the whole program, not one Add() notification per block (confirmed on real
+        // hardware, 2026-08-01: a plain foreach-Add over ~220k blocks on the live, DataGrid-bound collection
+        // froze the app "Not Responding"). Deliberately does NOT clear `blocks` itself - ReplaceAll's own
+        // clear+add is the single atomic operation; clearing here first would just be a second, wasted Reset.
+        // This split also lets the caller set Model.HasOutline (GrblViewModel, not visible from GCodeJob)
+        // AFTER blocks/BoundingBox/HasSections are all fully consistent but BEFORE FileChanged fires - setting
+        // it any earlier let GCodeListControl's HasOutline-changed handler call ApplyGrouping against
+        // still-stale block data (the outgoing program, not yet cleared) rather than the restored one.
+        public void PrepareRestore(Snapshot snapshot)
+        {
+            filename = snapshot.FileName;
+            BoundingBox = snapshot.BoundingBox;
+            HasSections = snapshot.HasSections;
+            HeightMapApplied = snapshot.HeightMapApplied;
         }
 
         private void Reset()

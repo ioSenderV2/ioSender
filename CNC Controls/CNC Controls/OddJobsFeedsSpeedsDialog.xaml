@@ -1,0 +1,60 @@
+<Window x:Class="CNC.Controls.OddJobsFeedsSpeedsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CNC.Controls"
+        Title="Feeds and Speeds" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" ShowInTaskbar="False">
+    <StackPanel Margin="14" Width="380">
+        <TextBlock x:Uid="fs_materialro" x:Name="txtMaterial" Foreground="#586069" Margin="0,0,0,8" FontStyle="Italic"
+                   Text="Material: (set on the Setup tab)"/>
+        <!-- Browse mode only (EnableMaterialPicker, e.g. Settings:App > Odd Jobs' tool table) - there's no
+             work order/Setup tab material to read here, so the operator picks one directly to preview that
+             tool's feeds and speeds in it. Hidden/collapsed otherwise; txtMaterial above is what normal
+             (work-order-driven) callers see instead. -->
+        <StackPanel x:Name="pnlMaterialPicker" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
+            <Label x:Uid="fs_materialpick" Content="Material:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxMaterialPicker" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxMaterialPicker_SelectionChanged"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+            <Label x:Uid="fs_tool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <!-- Populated at runtime from CustomTools.SectionConfig (PopulateToolItems) - every tool, factory-
+                 default or operator-added, is a data-driven CustomTool row now; no static items here. -->
+            <ComboBox x:Name="cbxTool" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"/>
+        </StackPanel>
+        <StackPanel x:Name="pnlDirection" Orientation="Horizontal" Margin="0,0,0,6">
+            <Label x:Uid="fs_direction" Content="Direction:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"
+                   ToolTip="Conventional cuts against the cutter's rotation - slower to bite in, more forgiving of backlash/flex. Climb cuts with the rotation - cleaner finish and less tearout in wood, but needs a backlash-free, rigid setup or the cutter can grab and dig in."/>
+            <ComboBox x:Name="cbxDirection" MinWidth="220" MinHeight="22" VerticalAlignment="Center">
+                <ComboBoxItem x:Uid="fs_dirconv" Content="Conventional"/>
+                <ComboBoxItem x:Uid="fs_dirclimb" Content="Climb"/>
+            </ComboBox>
+        </StackPanel>
+        <StackPanel x:Name="pnlDrillStyle" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">
+            <Label x:Uid="fs_drillstyle" Content="Drill style:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbxDrillStyle" MinWidth="220" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxDrillStyle_SelectionChanged">
+                <ComboBoxItem x:Uid="fs_drillbrad" Content="Brad point / twist"/>
+                <ComboBoxItem x:Uid="fs_drillhss" Content="HSS twist"/>
+            </ComboBox>
+        </StackPanel>
+        <local:NumericField x:Uid="fs_diameter" x:Name="fldDiameter" Label="Tool diameter:" ColonAt="120" Format="###0.0##" Unit="mm"/>
+        <local:NumericField x:Uid="fs_flutes" x:Name="fldFlutes" Label="Flutes:" ColonAt="120" Format="#0" Unit=""/>
+        <local:NumericField x:Uid="fs_rpm" x:Name="fldRpm" Label="Spindle RPM:" ColonAt="120" Format="######0" Unit="" PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+        <local:NumericField x:Uid="fs_feed" x:Name="fldFeed" Label="Feed rate:" ColonAt="120" Format="######0" Unit="mm/min" PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+        <local:NumericField x:Uid="fs_plunge" x:Name="fldPlunge" Label="Plunge feed:" ColonAt="120" Format="######0" Unit="mm/min" PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+        <local:NumericField x:Uid="fs_doc" x:Name="fldDoc" Label="Depth of cut:" ColonAt="120" Format="###0.0##" Unit="mm" PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+        <TextBlock x:Uid="fs_recresult" x:Name="txtRecommendation" TextWrapping="Wrap" FontSize="11" Foreground="#FFB8860B" Margin="0,8,0,0" Visibility="Collapsed"
+                   Text="A field highlighted amber differs from the recommendation - hover it for why, double-click to apply just that one."/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <Button x:Uid="fs_userec" x:Name="btnUseRecommended" Content="Use recommended values" Padding="6,3" IsEnabled="False" Click="btnUseRecommended_Click"/>
+            <Button x:Uid="fs_slower" x:Name="btnSlower" Content="-10%" Width="52" Padding="0,3" Margin="8,0,0,0" Click="btnNudge_Click" Tag="-10"
+                    ToolTip="Knock the feed and plunge down 10% - click again to keep backing off. Chart values assume an industrial machine; this is how you dial a bit in for yours. Whatever you settle on is remembered for this tool and material."/>
+            <Button x:Uid="fs_faster" x:Name="btnFaster" Content="+10%" Width="52" Padding="0,3" Margin="4,0,0,0" Click="btnNudge_Click" Tag="10"
+                    ToolTip="Push the feed and plunge back up 10%."/>
+        </StackPanel>
+        <TextBlock x:Name="txtNudge" Foreground="#586069" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Uid="fs_ok" Content="OK" MinWidth="80" MinHeight="26" Margin="0,0,8,0" IsDefault="True" Click="btnOK_Click"/>
+            <Button x:Uid="fs_cancel" Content="Cancel" MinWidth="80" MinHeight="26" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

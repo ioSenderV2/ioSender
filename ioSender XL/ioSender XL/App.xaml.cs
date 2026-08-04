@@ -90,7 +90,13 @@ namespace GCode_Sender
             string[] args = Environment.GetCommandLineArgs();
 
             int p = 0, lng = 0;
+#if DEBUG
+            // Debug builds trace by default - no need to remember -debuglog on every launch while iterating.
+            // Release builds stay opt-in (the flag/parsing below still works the same in both configurations).
+            bool debugLog = true;
+#else
             bool debugLog = false;
+#endif
             string debugCategories = null;
             bool demoMarker = false;
             bool crashTest = false;
@@ -131,6 +137,14 @@ namespace GCode_Sender
                     // IOSENDER_SELF_RELAUNCH=1 env var; not meant to be passed by a human.
                     case "-self-relaunch":
                         selfRelaunch = true;
+                        break;
+
+                    // -notoolsetter  test the touch-plate TLO path (2026-07-31) without a toolsetter puck
+                    // mounted: flips tc.macro's own #<_tc_touchplate> flag to 1 before it's provisioned to the
+                    // controller (AtcMacros.ReadEmbedded), so every tool - including T8's 3D-probe stylus -
+                    // probes via the main probe input instead of switching to the toolsetter input.
+                    case "-notoolsetter":
+                        CNC.Controls.AtcMacros.NoToolsetter = true;
                         break;
 
                     default:
@@ -390,13 +404,15 @@ namespace GCode_Sender
             base.OnExit(e);
         }
 
-        // Append a timestamped crash entry to %AppData%\ioSender\logs\ioSender.crash.log (falls back to the
-        // app folder if the config dir isn't resolved yet, e.g. a crash during early startup). File creation
-        // and the 8MB/.1 size rollover are handled by LogFile - the same primitive ConsoleLog/DebugLog use.
-        // Returns the path written, or a best-effort path string if the write itself failed. Never throws.
+        // Write a fresh, timestamped crash entry under %AppData%\ioSender\logs\<DayOfWeek>\ (falls back to
+        // the app folder if the config dir isn't resolved yet, e.g. a crash during early startup), with
+        // "latest_crash.log" (hard-)linked in the top-level logs folder. File creation, day-of-week folder
+        // placement, the 8MB/.1 size rollover and per-folder retention are all handled by LogFile - the
+        // same primitive ConsoleLog/DebugLog use. Returns the path written, or a best-effort path string if
+        // the write itself failed. Never throws.
         private static string WriteCrashLog(string source, Exception ex)
         {
-            var log = CNC.Core.LogFile.Open("ioSender.crash");
+            var log = CNC.Core.LogFile.Open("ioSender.crash", latestLinkName: "latest_crash.log");
             string path = log?.Path ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ioSender.crash.log");
 
             try

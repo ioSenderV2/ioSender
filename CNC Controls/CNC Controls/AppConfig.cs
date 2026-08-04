@@ -311,10 +311,14 @@ namespace CNC.Controls
     {
         private int _pollInterval = 200, /* ms*/  _maxBufferSize = 300, _resetDelay = 2000;
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
+        private bool _showJogTargetButtons = false;
+        private bool _showJobJogPad = true;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
+        private bool _autoSaveWorkOrderOnExit = false, _promptBeforeAutoSaveWorkOrder = false;
+        private SpindleDirectionCapability _spindleDirectionCapability = SpindleDirectionCapability.Bidirectional;
         private CommandIgnoreState _ignoreM6 = CommandIgnoreState.No, _ignoreM7 = CommandIgnoreState.No, _ignoreM8 = CommandIgnoreState.No, _ignoreG61G64 = CommandIgnoreState.Strip;
         private string _theme = "default";
 
@@ -364,6 +368,61 @@ namespace CNC.Controls
         // successful connection - wired to GrblInfo.LastKnownBuild at startup (see AppConfig.RegisterSections)
         // so a firmware change across connections/reboots can be flagged in the console.
         public string LastFirmwareBuild { get; set; } = string.Empty;
+        // Machine-wide tool-length-reference baseline (machine Z at the toolsetter puck), captured ONCE via
+        // Machine Setup's Probes step ("Reference TLO") - every job loads this into #<_tlo_ref> at its own
+        // start instead of resetting it to 0, so "work Z" under G43.1 means the same physical height (the
+        // puck's own) regardless of which tool is currently mounted. Replaces the old per-fixture
+        // Fixture.SpoilboardZ scheme entirely, which cached a RAW machine-Z reading that was only ever valid
+        // for the specific tool length in the spindle when it was captured - unsound for Touch Plate users,
+        // who deliberately probe with whatever bit they're about to cut with (see the design conversation
+        // this replaced - "No need for Zspoil" once TLO is referenced against a fixed physical object first).
+        // 0 = never captured.
+        public double TloRefBaseline { get; set; } = 0d;
+        // ProbeDefinitions.SetItems seeds a typical 3D probe + touch plate on a fresh install (see its own
+        // comment) so the Machine Setup gate no longer has to force a stop for step 5 - but those are generic
+        // numbers, not this machine's actual probe geometry. False until the operator has been through Start
+        // Job/Odd Jobs Setup's readiness popup at least once (whether they edited them or accepted them as-is).
+        public bool ProbeDefinitionsReviewed { get; set; } = false;
+        // Odd Jobs Work Order tab: which .workorder file the CONTENT currently showing came from (null = never
+        // loaded from/saved to one - New, or content only ever entered by hand). The content itself is a
+        // separate WorkOrderView.SectionConfig fragment that ConfigPanel<T> already auto-persists on every edit
+        // (see ConfigPanel.Persist) - that survives a restart on its own, but WorkOrderView.currentFilePath was
+        // just a private field, not part of that fragment, so the association with its SOURCE FILE was lost on
+        // every restart even though the toolpaths/operations themselves came back fine. Confirmed as a real gap
+        // 2026-07-30. LastWorkOrderName is the New dialog's chosen name (WorkOrderView.pendingName) for the
+        // same reason - both are read back in WorkOrderView.OnConfigReady.
+        public string LastWorkOrderFilePath { get; set; } = null;
+        public string LastWorkOrderName { get; set; } = null;
+        // Load File's own remembered folder (GCode.Open) - kept separate from Work Order's Load/Save
+        // dialogs (which explicitly pin InitialDirectory to the Work Orders folder every time) so loading a
+        // work order doesn't silently drag the next Load File open there too. See GCode.Open's own comment.
+        public string LastGCodeFolder { get; set; } = null;
+        // True from the first edit after a New/Load/Save until the next Save - the live (auto-persisted)
+        // content has diverged from LastWorkOrderFilePath on disk (or was never saved to a file at all, if
+        // that's null too). Persisted (not just an in-memory flag) so the warning survives a restart - the
+        // live content itself always comes back via the auto-persisted fragment either way, this only tracks
+        // whether the NAMED FILE is stale. Checked by WorkOrderView.Activate(false) to prompt for a save when
+        // leaving Odd Jobs with unsaved changes.
+        public bool WorkOrderDirty { get; set; } = false;
+        // Run bar labels: default is grbl's own terminology (Cycle Start/Feed Hold) - accurate to what the
+        // buttons actually send, but Cycle Start in particular reads oddly to a newer/non-grbl-fluent operator
+        // expecting a plain "Start". Opt-in (not the default) since it's a naming preference, not a fix -
+        // JobControl.UpdateRunButtonLabel reads this for the normal-mode label; Feed Hold's swap to "Pause"
+        // is set alongside it, same condition. Check Run/Dry Run/Simulate keep their own names either way -
+        // those are modes worth understanding on their own terms, not a rename target.
+        public bool UseFriendlyRunLabels { get; set; } = false;
+        // Jog pad's five "go to a place" buttons - the four corner targets and the centre bullseye
+        // (JogBaseControl). Default OFF (user, 2026-08-03): they drive the machine across the table at
+        // rapid, so the pad ships as a plain arrow pad and the operator opts in once they know what the
+        // buttons do. Notifies so the pad follows the checkbox live, no restart.
+        // Only affects NEW profiles - a saved config keeps whatever it already has.
+        public bool ShowJogTargetButtons { get { return _showJogTargetButtons; } set { if (_showJogTargetButtons != value) { _showJogTargetButtons = value; OnPropertyChanged(); } } }
+        // The Job tab's full jog pad (JobView's jogControl - the arrow pad spanning both right-hand columns
+        // above the panel stacks). Default ON. Off collapses it and hands the height to the panel columns;
+        // the run bar's own compact jog stays either way, which is the point - it is enough for some
+        // operators, and the pad is the single largest thing competing with the program view for width.
+        // Notifies, so the checkbox takes effect immediately rather than on the layout editor's usual restart.
+        public bool ShowJobJogPad { get { return _showJobJogPad; } set { if (_showJobJogPad != value) { _showJobJogPad = value; OnPropertyChanged(); } } }
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -382,7 +441,15 @@ namespace CNC.Controls
         public bool ConsoleFilterRT { get; set; } = false;
         public bool ConsoleShowRTAll { get; set; } = false;
         public bool ConsoleWindowOpen { get; set; } = false;
-        public string ConsoleShortcut { get; set; } = "Esc";
+        // F12, NOT Esc (changed 2026-08-03). The console toggle is dispatched from MainWindow's
+        // PreviewKeyDown, which tunnels from the root before any control sees the key - so binding it to Esc
+        // took Esc away from its actual job everywhere inside the main window: cancelling an edit, closing a
+        // popup, backing out of anything. A shortcut that is worth having is not worth that.
+        // ConsoleShortcutEscMigrated moves already-saved profiles off the old default.
+        public string ConsoleShortcut { get; set; } = "F12";
+        // One-shot: see ConsoleShortcut above. Flagged rather than unconditional so someone who genuinely
+        // wants Esc can set it back and keep it.
+        public bool ConsoleShortcutEscMigrated { get; set; } = false;
         // Point size for the console scrollback + command prompt. Notifies so the console updates live.
         private double _consoleFontSize = 10d;
         public double ConsoleFontSize { get { return _consoleFontSize; } set { if (_consoleFontSize != value) { _consoleFontSize = Math.Max(6d, Math.Min(32d, value)); OnPropertyChanged(); } } }
@@ -429,7 +496,11 @@ namespace CNC.Controls
         // List<string> directly. XmlSerializer APPENDS to a pre-initialized List<T> on load (defaults +
         // saved), which silently discarded the user's edits; a string property is replaced cleanly, and a
         // missing element still falls back to the initializer defaults for configs that predate the feature.
-        private List<string> _mainPanels = new List<string> { "Outline", "Spindle", "Coolant", "WorkParameters", "Feed", "Goto" };
+        // UIJogging FIRST and deliberately: the jog pad only hides its own Distance/Feed radio columns when a
+        // UI Jogging panel is placed somewhere (see JogBaseControl.JogControl_Loaded). Without one the pad
+        // renders those two radio stacks crowded against the arrows - which is what a fresh profile used to
+        // look like, and is not the intended jog UI. The 2x4 grid panel is, so it ships placed.
+        private List<string> _mainPanels = new List<string> { "UIJogging", "KeyboardJogging", "Goto", "Spindle", "Coolant", "WorkParameters", "Feed" };
         private List<string> _flyoutItems = new List<string> { "Macros", "MachinePosition" };
         // LeftPanels: ordered panel names filling the area left of the 3D view (default = the original DRO +
         // program-limits stack). Signals/Status stay fixed below it.
@@ -437,9 +508,17 @@ namespace CNC.Controls
         // Tabs: ordered ViewType names of the main TabControl tabs that should be shown, in display order.
         // Empty (the default) means "show all available tabs in their built-in order" - no reordering/hiding.
         private List<string> _tabs = new List<string>();
+        // HiddenViews: component keys the user has deliberately placed NOWHERE - not on the tab bar, not in a
+        // menu (Settings > Main Page > Top-level tabs). It has to be recorded explicitly, because "in no slot"
+        // is also what a brand-new component looks like, and EnforceMenuPlacement puts THOSE into their
+        // default menu so they can't go missing. Without this list, hiding a menu-defaulted view was
+        // impossible - it came straight back on the next load.
+        private List<string> _hiddenViews = new List<string>();
 
         [XmlIgnore]
         public List<string> MainPanels { get { return _mainPanels; } set { _mainPanels = value ?? new List<string>(); } }
+        [XmlIgnore]
+        public List<string> HiddenViews { get { return _hiddenViews; } set { _hiddenViews = value ?? new List<string>(); } }
         [XmlIgnore]
         public List<string> Tabs { get { return _tabs; } set { _tabs = value ?? new List<string>(); } }
         [XmlIgnore]
@@ -469,6 +548,11 @@ namespace CNC.Controls
             get { return string.Join(",", _tabs); }
             set { _tabs = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
         }
+        public string HiddenViewsKeys
+        {
+            get { return string.Join(",", _hiddenViews); }
+            set { _hiddenViews = string.IsNullOrEmpty(value) ? new List<string>() : new List<string>(value.Split(',')); }
+        }
 
         // One-shot: the Height Map tab was introduced after tab layouts started persisting, so an existing
         // saved layout/tab-order won't include it and would filter it out. Injected once on load (then the
@@ -482,6 +566,10 @@ namespace CNC.Controls
 
         // Names of flyouts the user has pinned; reopened (pinned) on next launch. (Empty default -> append is harmless.)
         public List<string> PinnedFlyouts { get; set; } = new List<string>();
+        // Macro.Id of up to 4 macros pinned to the quick-access shortlist shown by the Macros main-page panel
+        // (MacroPinnedListControl) - index 0 is the top slot. Newly pinned macros go in slot 0, pushing the
+        // rest down; whatever falls off slot 3 loses its pinned status.
+        public List<int> PinnedMacros { get; set; } = new List<int>();
         // Settings:App autosave on tab-leave / close (opt-in); PromptOnSave shows a confirm/discard list of changes.
         public bool AutoSaveSettings { get { return _autoSaveSettings; } set { _autoSaveSettings = value; OnPropertyChanged(); } }
         public bool PromptOnSave { get { return _promptOnSave; } set { _promptOnSave = value; OnPropertyChanged(); } }
@@ -489,6 +577,14 @@ namespace CNC.Controls
         // hardware). When off, leaving the tab with unsaved changes still prompts "save now?" (legacy behavior).
         public bool AutoSaveGrblSettings { get { return _autoSaveGrblSettings; } set { _autoSaveGrblSettings = value; OnPropertyChanged(); } }
         public bool PromptOnGrblSave { get { return _promptOnGrblSave; } set { _promptOnGrblSave = value; OnPropertyChanged(); } }
+        // Odd Jobs Work Order autosave on leaving that tab (opt-in, default off - preserves the legacy
+        // unconditional "save before leaving?" prompt). When on, PromptBeforeAutoSaveWorkOrder decides whether
+        // that save happens silently or still asks first - see WorkOrderView.Activate(false).
+        public bool AutoSaveWorkOrderOnExit { get { return _autoSaveWorkOrderOnExit; } set { _autoSaveWorkOrderOnExit = value; OnPropertyChanged(); } }
+        public bool PromptBeforeAutoSaveWorkOrder { get { return _promptBeforeAutoSaveWorkOrder; } set { _promptBeforeAutoSaveWorkOrder = value; OnPropertyChanged(); } }
+        // Read by WorkOrderCompiler (Climb/Conventional's CW/CCW orbit math) and SpindleControl (hides
+        // whichever of CW/CCW the machine can't actually run) - see SpindleDirectionCapability's own comment.
+        public SpindleDirectionCapability SpindleDirectionCapability { get { return _spindleDirectionCapability; } set { _spindleDirectionCapability = value; OnPropertyChanged(); } }
 
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();
@@ -518,6 +614,12 @@ namespace CNC.Controls
         // Set when a load migrated the on-disk format (legacy <Config> v1 -> sectioned <AppConfig> v2)
         // or imported a legacy standalone file, so LoadConfig persists the converted form immediately.
         private bool _migratedFormat = false;
+
+        // One-line-per-section summary of anything ConfigStore had to discard on the last load (see
+        // ConfigStore.LoadWarnings) - null/empty on a clean load. Static + public so the shell can check
+        // it once after startup and show the operator a one-time notice; always also written to
+        // ConsoleLog regardless of whether anything shows it.
+        public static List<string> LastLoadWarnings = null;
 
         // Full Config serializer for reading the legacy v1 (<Config>) file - nested objects included.
         private static readonly XmlSerializer legacySerializer = new XmlSerializer(typeof(Config));
@@ -575,18 +677,44 @@ namespace CNC.Controls
 
             // Tool/wizard parameter blobs (were their own .xml files). These live in CNC.Controls so they save
             // via AppConfig directly; each keeps a static holder the section reads.
-            RegisterFolded<SurfaceParams>("SurfaceSpoilboard",
-                () => SurfaceSpoilboardWizard.SectionConfig, v => SurfaceSpoilboardWizard.SectionConfig = v, "SurfaceSpoilboard.xml");
+            // The "SurfaceSpoilboard" section is gone with its wizard (2026-08-02, replaced by the Work Order
+            // Surface toolpath, which persists inside the work order itself). An existing App.config may still
+            // carry the section; ConfigStore loads sections independently, so an unclaimed one is simply
+            // ignored rather than failing the load.
             RegisterFolded<AutoSquareParams>("AutoSquare",
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
-            RegisterFolded<ScratchParams>("StepperCalScratch",
-                () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
             // No legacy standalone file (new section) - "StepperCalProbe.xml" never exists, so ImportLegacy is
             // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
             RegisterFolded<StepperCalProbeParams>("StepperCalProbe",
                 () => StepperCalibrationProbeWizard.SectionConfig, v => StepperCalibrationProbeWizard.SectionConfig = v, "StepperCalProbe.xml");
+            // Shared by both StartJobView instances now - the real Start Job tab and Odd Jobs' "Setup" sub-tab
+            // (job-flow unification, 2026-07-31 - see StartJobConfig's own comment). Used to be two
+            // independent sections; the second ("OddJobsSetup") is retired outright, no migration - Setup was
+            // never meant to be duplicated per program source in the first place.
             RegisterFolded<StartJobSettings>("StartJob",
                 () => StartJobConfig.Section, v => StartJobConfig.Section = v, "StartJob.xml");
+            // Brand-new section (2026-08-01), no legacy standalone file - same "never exists" idiom as
+            // StepperCalProbe's own registration above. Registered BEFORE OddJobsWorkOrder deliberately -
+            // ConfigStore.ReadDocument processes sections in REGISTRATION order, and OddJobsWorkOrder's own
+            // load-side ReconcileToolIds (below) needs CustomTools.SectionConfig already populated (built-ins
+            // merged in) to look tools up against - MergeFactoryDefaultTools runs synchronously in THIS
+            // section's own set callback, so it's guaranteed done before OddJobsWorkOrder's runs next.
+            RegisterFolded<CustomToolList>("CustomTools",
+                () => CustomTools.SectionConfig,
+                v => { CustomTools.SectionConfig = v; if (MergeFactoryDefaultTools()) _migratedFormat = true; },
+                "CustomTools.xml");
+            // The composed work order (jobs -> operations) that replaced the five fixed job wizards, plus the
+            // per-(tool, diameter, material) feeds/speeds the operator dialed in themselves. SyncToolNames
+            // runs on every save (get side effect - Write() reads through this getter) so each operation's
+            // ToolName snapshot is always current; ReconcileToolIds runs once on load (set side effect,
+            // BEFORE the section is exposed to the rest of the app) to repair/invalidate a Tool Id that no
+            // longer means what it did when saved - see both methods' own comments (WorkOrderModel.cs).
+            RegisterFolded<WorkOrder>("OddJobsWorkOrder",
+                () => { WorkOrderView.SectionConfig?.SyncToolNames(); return WorkOrderView.SectionConfig; },
+                v => { if (v != null && v.ReconcileToolIds()) _migratedFormat = true; WorkOrderView.SectionConfig = v; },
+                "OddJobsWorkOrder.xml");
+            RegisterFolded<ToolMemoryList>("OddJobsToolMemory",
+                () => OddJobsToolMemory.SectionConfig, v => OddJobsToolMemory.SectionConfig = v, "OddJobsToolMemory.xml");
 
             // Hierarchical layout tree (Phase 2b). Registered after Core so its migration importer can
             // read Base.Tabs when the section is absent (first run on a build that has it).
@@ -873,9 +1001,10 @@ namespace CNC.Controls
         {
             // Try the live config first. If it is missing, 0 bytes, or otherwise unreadable - an
             // interrupted save or a sync truncation can leave it empty - fall back to the newest
-            // Backups\<datetime>_App.config startup snapshot. Recovering the last good copy avoids
-            // losing the user's settings AND the destructive "create new?" prompt that a false
-            // "invalid" used to trigger.
+            // Backups\<DayOfWeek>\App.config_<timestamp> startup snapshot (latest_App.config is a
+            // hard-linked alias to it, checked first). Recovering the last good copy avoids losing
+            // the user's settings AND the destructive "create new?" prompt that a false "invalid"
+            // used to trigger.
             _migratedFormat = false;
 
             if (TryLoad(filename))
@@ -884,9 +1013,12 @@ namespace CNC.Controls
             string newest = null;
             try
             {
-                newest = Directory.Exists(Resources.BackupsFolder)
-                    ? Directory.GetFiles(Resources.BackupsFolder, "*_App.config").OrderByDescending(f => f).FirstOrDefault()
-                    : null;
+                string latest = Path.Combine(Resources.BackupsFolder, "latest_App.config");
+                newest = File.Exists(latest) ? latest
+                    : RotatingFileStore.ExistingDayDirectories(Resources.BackupsFolder)
+                        .SelectMany(d => Directory.GetFiles(d, "App.config_*"))
+                        .OrderByDescending(f => f)
+                        .FirstOrDefault();
             }
             catch { }
 
@@ -900,9 +1032,11 @@ namespace CNC.Controls
             return false;
         }
 
-        // Snapshot the current live config to Backups\<datetime>_App.config, once per session (before
-        // any in-session edits), so Load() has a known-good fallback and the user has a manual restore
-        // point. Best-effort; failure must not block startup.
+        // Snapshot the current live config to Backups\<DayOfWeek>\App.config_<timestamp>, once per
+        // session (before any in-session edits), so Load() has a known-good fallback and the user has a
+        // manual restore point. Folder placement, per-folder retention and the "latest_App.config" alias
+        // are all handled by RotatingFileStore - the same scheme the debug/console/crash logs use.
+        // Best-effort; failure must not block startup.
         public static void BackupStartupSnapshot(string filename)
         {
             try
@@ -910,11 +1044,11 @@ namespace CNC.Controls
                 if (!File.Exists(filename))
                     return;
 
-                Directory.CreateDirectory(Resources.BackupsFolder);
-                string name = string.Format("{0}_App.config", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-                File.Copy(filename, System.IO.Path.Combine(Resources.BackupsFolder, name), true);
+                string dayDir = RotatingFileStore.PrepareDayDirectory(Resources.BackupsFolder, "App.config", retentionCount: 10);
+                string path = Path.Combine(dayDir, "App.config_" + RotatingFileStore.Stamp() + ".config");
+                File.Copy(filename, path, true);
 
-                Resources.PruneBackups();
+                RotatingFileStore.UpdateLatestLink(Resources.BackupsFolder, "latest_App.config", path);
             }
             catch { }
         }
@@ -965,6 +1099,15 @@ namespace CNC.Controls
                             Base = new Config();
                         if (ConfigStore.MigratedOnLoad)
                             _migratedFormat = true;
+                        // Surface (don't silently swallow) any section ConfigStore had to skip - see
+                        // ConfigStore.LoadWarnings' own comment. Logged unconditionally (cheap, durable);
+                        // the shell shows a one-time startup notice too - see LastLoadWarnings.
+                        if (ConfigStore.LoadWarnings.Count > 0)
+                        {
+                            LastLoadWarnings = new List<string>(ConfigStore.LoadWarnings);
+                            foreach (var w in LastLoadWarnings)
+                                CNC.Core.ConsoleLog.Write("[AppConfig] section discarded on load - " + w);
+                        }
                     }
                     configfile = filename;
 
@@ -974,12 +1117,6 @@ namespace CNC.Controls
                     foreach (var macro in new List<CNC.GCode.Macro>(Base.Macros))
                         if (macro.IsSession)
                             Base.Macros.Remove(macro);
-
-                    // Migrate legacy macros (saved before the FKey element existed) to an explicit
-                    // F-key: a macro with Id n used to be run by Fn (see JobControl.FnKeyHandler).
-                    foreach (var macro in Base.Macros)
-                        if (macro.FKey == 0 && macro.Id >= 1 && macro.Id <= 12)
-                            macro.FKey = macro.Id;
 
                     ApplyOneTimeFixups();
 
@@ -996,6 +1133,158 @@ namespace CNC.Controls
             return ok;
         }
 
+        /// <summary>
+        /// 2026-08-03: the main bar was cut back to the views used while a job runs; the rest moved to
+        /// the File/Tools menus, which are now layout slots of their own. A profile saved before that
+        /// has every component in the "tabs" slot and no menu slots at all, so without this it would
+        /// keep the old thirteen-tab bar and get empty menus.
+        ///
+        /// Runs ONCE per profile, detected by the menu slots being absent entirely. That matters: once
+        /// a user has dragged something back onto the tabs in Settings > Main Page, this must never
+        /// undo it - which is why the trigger is "no menu slots yet", not "component is in tabs".
+        /// </summary>
+        private void MigrateTopLevelComponentsToMenus()
+        {
+            var root = Layout;
+            if (root == null || root.Slot(LayoutKeys.SlotTabs) == null)
+                return;
+            if (root.Slot(LayoutKeys.SlotMenuFile) != null || root.Slot(LayoutKeys.SlotMenuTools) != null)
+                return;   // already migrated (or authored fresh) - leave the arrangement alone
+
+            var tabs = root.Slot(LayoutKeys.SlotTabs);
+            var toMenu = DefaultMenuPlacement;
+
+            var fileItems = new List<LayoutNode>();
+            var toolsItems = new List<LayoutNode>();
+
+            // The retired Tools CONTAINER: promote whatever tools it still holds to Tools menu entries,
+            // keeping the user's own ordering of them, then drop the wrapper node.
+            var toolsNode = tabs.Items.FirstOrDefault(n => n.Component == LayoutKeys.Tools);
+            if (toolsNode != null)
+            {
+                var inner = toolsNode.Slot(LayoutKeys.SlotTools);
+                if (inner != null)
+                    foreach (var t in inner.Items)
+                        toolsItems.Add(new LayoutNode(t.Component));
+                tabs.Items.Remove(toolsNode);
+            }
+
+            foreach (var node in tabs.Items.ToList())
+            {
+                string slot;
+                if (!toMenu.TryGetValue(node.Component, out slot))
+                    continue;
+                (slot == LayoutKeys.SlotMenuFile ? fileItems : toolsItems).Add(node);
+                tabs.Items.Remove(node);
+            }
+
+            // Work Order stays on the bar (user, 2026-08-03) - File > Load/New Work Order select the
+            // tab rather than opening a window. Nothing to move.
+
+            root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuFile, fileItems.ToArray()));
+            root.Slots.Add(new LayoutSlot(LayoutKeys.SlotMenuTools, toolsItems.ToArray()));
+
+            // The retired Tools wrapper has no home in the new model - drop it from the legacy list too.
+            // Everything else is handled by EnforceMenuPlacement, which runs right after this and also
+            // covers profiles that were migrated before that invariant existed.
+            if (Base?.Tabs != null)
+                Base.Tabs.RemoveAll(t => t == LayoutKeys.Tools);
+        }
+
+        /// <summary>
+        /// Keep the legacy flat tab list and the layout tree from contradicting each other. Runs every
+        /// load and is idempotent - unlike the one-shot migration above, which cannot help a profile
+        /// that has already been through it.
+        ///
+        /// Two invariants:
+        ///  1. A component sitting in a menu slot must NOT be in Base.Tabs. TabOrder.Apply rebuilds the
+        ///     tabs slot to contain exactly Base.Tabs' entries, so a leftover there puts the component
+        ///     back on the bar at every launch - which is what kept Feeds and Speeds pinned to the tab
+        ///     strip no matter how often it was removed in Edit Main Page.
+        ///  2. A component that belongs in a menu by default, and is in neither the tabs slot nor a
+        ///     menu slot, is unreachable - put it back in its default menu.
+        ///
+        /// Neither fights a deliberate choice: moving something back to the tabs in the editor puts it
+        /// in the tabs slot, where invariant 1 doesn't apply and invariant 2 is satisfied.
+        /// </summary>
+        private void EnforceMenuPlacement()
+        {
+            var root = Layout;
+            var fileSlot = root?.Slot(LayoutKeys.SlotMenuFile);
+            var toolsSlot = root?.Slot(LayoutKeys.SlotMenuTools);
+            if (fileSlot == null || toolsSlot == null)
+                return;   // not migrated yet - MigrateTopLevelComponentsToMenus owns that case
+
+            var inMenus = new HashSet<string>(
+                fileSlot.Items.Concat(toolsSlot.Items).Select(n => n.Component), StringComparer.Ordinal);
+
+            if (Base?.Tabs != null && Base.Tabs.Count > 0)
+                Base.Tabs.RemoveAll(t => inMenus.Contains(t));
+
+            var hidden = new HashSet<string>(Base?.HiddenViews ?? new List<string>(), StringComparer.Ordinal);
+
+            foreach (var kv in DefaultMenuPlacement)
+            {
+                if (LayoutTree.Contains(root, kv.Key))
+                    continue;
+                if (hidden.Contains(kv.Key))
+                    continue;   // placed nowhere ON PURPOSE - invariant 2 must not undo a deliberate choice
+                (kv.Value == LayoutKeys.SlotMenuFile ? fileSlot : toolsSlot).Items.Add(new LayoutNode(kv.Key));
+            }
+        }
+
+        /// <summary>
+        /// A component may appear at most ONCE across the three root slots - it is a placement, and a thing
+        /// cannot be in two places. Keeps the first occurrence (so the user's own ordering of the real one
+        /// survives) and drops the rest.
+        ///
+        /// Added 2026-08-03 after a retired fixup was found appending a duplicate Work Order tab on every
+        /// launch (see the OddJobs note in ApplyOneTimeFixups). The generator is gone, but a profile that ran
+        /// those builds carries the duplicates in its saved tree and would keep showing them for ever - this
+        /// repairs it in place rather than making the user delete their config. Cheap and idempotent, so it
+        /// stays as a standing invariant: a future placement bug gets cleaned up instead of accumulating.
+        /// </summary>
+        private void DeduplicateTopLevelPlacements()
+        {
+            var root = Layout;
+            if (root == null)
+                return;
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int removed = 0;
+
+            foreach (var slotName in LayoutKeys.RootSlots)
+            {
+                var slot = root.Slot(slotName);
+                if (slot == null)
+                    continue;
+                removed += slot.Items.RemoveAll(n => n?.Component == null || !seen.Add(n.Component));
+            }
+
+            if (removed > 0)
+            {
+                _migratedFormat = true;   // persist the repair so it is done once, not re-done every launch
+                CNC.Core.DebugLog.Write("config", string.Format(
+                    "ApplyOneTimeFixups: dropped {0} duplicate top-level placement(s)", removed));
+            }
+        }
+
+        // Where a component lives unless the user has moved it. Shared by the one-shot migration and the
+        // every-load invariant above so the two can never disagree about a component's default home.
+        private static readonly Dictionary<string, string> DefaultMenuPlacement =
+            new Dictionary<string, string>(StringComparer.Ordinal) {
+                { LayoutKeys.MachineSetup,   LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.Settings,       LayoutKeys.SlotMenuFile  },
+                { LayoutKeys.SDCard,         LayoutKeys.SlotMenuTools },
+                { LayoutKeys.FeedsAndSpeeds, LayoutKeys.SlotMenuTools },
+                { LayoutKeys.Probing,        LayoutKeys.SlotMenuTools },
+                { LayoutKeys.HeightMap,      LayoutKeys.SlotMenuTools },
+                { LayoutKeys.LatheWizards,   LayoutKeys.SlotMenuTools },
+                { LayoutKeys.ToolTable,      LayoutKeys.SlotMenuTools },
+                { LayoutKeys.Trinamic,       LayoutKeys.SlotMenuTools },
+                { LayoutKeys.PID,            LayoutKeys.SlotMenuTools },
+            };
+
         // One-time config fixups: converting/invalidating already-persisted data after a code change
         // that changes what a saved value MEANS (not a permanent back-compat shim - the fixup runs every
         // load, but is written to be a no-op once every file in the wild has actually been through it,
@@ -1008,18 +1297,36 @@ namespace CNC.Controls
             // user's API key survives. Guarded on "nothing stored yet", so it is a no-op from then on.
             LegacySecrets.MigrateAll();
 
+            MigrateTopLevelComponentsToMenus();
+            EnforceMenuPlacement();
+
+            // 2026-08-03: keyboard shortcuts address TOP-LEVEL destinations only - the tab strip and the
+            // menus (KeyMapEditor.TabTargets). Every second-level target was withdrawn, so drop any binding
+            // saved against one: the dispatcher would still resolve several of them, and a key that fires
+            // while being invisible in the editor is worse than one that is simply gone.
+            //
+            // "Tab.Tools" (the dissolved container tab) goes with them; its three CHILDREN do not - they are
+            // top-level views now and keep their nested-looking ids, which is why this tests the specific
+            // prefixes rather than "does the id contain two dots".
+            //
+            // An earlier version of this fixup, written the same morning, stripped only "Tab.Settings.*" and
+            // "Tab.MachineSetup.*" while the editor still OFFERED those targets - so it silently deleted
+            // bindings the user could still make. Whatever this list strips must stay out of TabTargets.
+            string[] retiredPrefixes = { "Tab.Settings.", "Tab.MachineSetup.", "Tab.Probing.", "Tab.OddJobs.", "Tab.LatheWizard." };
+            int deadShortcuts = Base?.TabShortcuts?.RemoveAll(
+                t => t?.Id != null && (t.Id == "Tab.Tools" || retiredPrefixes.Any(p => t.Id.StartsWith(p, StringComparison.Ordinal)))) ?? 0;
+            if (deadShortcuts > 0)
+                CNC.Core.DebugLog.Write("config", string.Format(
+                    "ApplyOneTimeFixups: removed {0} shortcut(s) for withdrawn second-level tab targets", deadShortcuts));
+
             // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
             // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
             // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
             // "never actually probed under this scheme" - force those fixtures back to not-validated so the
             // operator is prompted to re-run Test position (which now also captures the corner offset).
-            // 2026-07-20 (later same day): Fixture.SpoilboardZ is new too, added right after CornerOffsetX/Y -
-            // a fixture tested in the short window between those two changes has X/Y populated but
-            // SpoilboardZ still 0 (StartJobView.BuildProgram would seed #<_bottom> from a bogus 0). Same fixup,
-            // same reasoning, separate condition since X/Y alone no longer implies "fully captured."
             foreach (var fx in Fixtures.Items)
                 if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
-                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d || fx.SpoilboardZ == 0d))
+                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
                     fx.PositionValidated = false;
 
             // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to
@@ -1038,8 +1345,6 @@ namespace CNC.Controls
             if (toolsSlot != null)
             {
                 string[] desiredOrder = {
-                    LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard,
-                    LayoutKeys.StepperScratch, LayoutKeys.StepperCal,
                     LayoutKeys.ToolTable, LayoutKeys.Trinamic, LayoutKeys.PID
                 };
                 var byKey = toolsSlot.Items.GroupBy(n => n.Component).ToDictionary(g => g.Key, g => g.First());
@@ -1049,22 +1354,92 @@ namespace CNC.Controls
                         reordered.Add(n);
                 if (!toolsSlot.Items.Select(n => n.Component).SequenceEqual(reordered.Select(n => n.Component)))
                     toolsSlot.Items = reordered;
+
+                // Drop retired Tools components a persisted profile still carries (same RemoveAll pattern as
+                // the Odd Jobs slot fixup below).
+                //   2026-08-01: StepperCal / StepperScratch - the probe method replaced both.
+                //   2026-08-02: StepperCalProbe + Squareness now live in Machine Setup's Calibration step and
+                //               SurfaceSpoilboard is a Work Order toolpath kind. Without this, an existing
+                //               profile keeps three dead nodes whose components no longer resolve, and
+                //               BuildTools would silently render an empty strip for them.
+                string[] retiredToolsComponents = {
+                    LayoutKeys.StepperCal, LayoutKeys.StepperScratch,
+                    LayoutKeys.StepperCalProbe, LayoutKeys.Squareness, LayoutKeys.SurfaceSpoilboard
+                };
+                toolsSlot.Items.RemoveAll(n => retiredToolsComponents.Contains(n.Component));
             }
 
-            // 2026-07-24: LayoutKeys.FeedsAndSpeeds (new top-level tab) was added to DefaultLayout.Build(),
-            // but same story as StepperCalProbe above - only seeds a FRESH profile. EnsureEssentials won't
-            // add it either (it's not in LayoutKeys.Essential - this tab isn't required for recovery, just
-            // new). Append it directly to the root tabs slot if an already-persisted tree doesn't have it -
-            // AND to the legacy flat Base.Tabs list (SetTabPresent's own dual-update pattern): TabOrder.Apply
-            // (called later, from a non-empty Base.Tabs) rebuilds the tree's tabs slot to contain EXACTLY
-            // Base.Tabs' entries, so a tree-only fix here would get silently dropped right back out the
-            // moment that runs - confirmed missing from both the main tab bar AND the Edit Main Page Tabs
-            // editor's available list on a real saved profile before this fix.
+            // 2026-07-24 (RETIRED 2026-08-03): this used to append LayoutKeys.FeedsAndSpeeds to the root
+            // tabs slot AND to Base.Tabs whenever the tree didn't contain it, to get the then-new tab
+            // onto already-persisted profiles. It ran on every load, so once the tabs/menu split made
+            // placement the USER's choice it became a bug: removing Feeds and Speeds in Edit Main Page
+            // put it straight back on the bar at the next launch, however many times you removed it.
+            // MigrateTopLevelComponentsToMenus now seeds it into the Tools menu (including for profiles
+            // that never had it), so nothing here needs to force it anywhere.
             var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
-            if (tabsSlot != null && !LayoutTree.Contains(layoutSection.Root, LayoutKeys.FeedsAndSpeeds))
-                tabsSlot.Items.Add(new LayoutNode(LayoutKeys.FeedsAndSpeeds));
-            if (Base != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.FeedsAndSpeeds))
-                Base.Tabs.Add(LayoutKeys.FeedsAndSpeeds);
+
+            // 2026-07-26 (RETIRED 2026-08-03): this appended LayoutKeys.OddJobs to the tabs slot whenever the
+            // tree didn't contain one - the same "get a new tab onto existing profiles" idiom as the
+            // FeedsAndSpeeds block above, and retired for a worse version of the same reason.
+            //
+            // Once OddJobs itself was retired, NOTHING ever put an OddJobs node in the tree, so the guard was
+            // permanently true and this planted one on every single load - and the promotion fixup below then
+            // found that fresh node and swapped it for a WorkOrder. Net result: one extra Work Order tab per
+            // launch, for ever. Observed 2026-08-03 as three Work Order tabs on a config two launches old.
+            //
+            // The lesson generalises: an "add it if the tree lacks it" fixup for a component that nothing else
+            // creates is not idempotent, it is a generator. Anything of this shape needs a persisted one-shot
+            // flag (see HeightMapTabMigrated) or it must not exist.
+
+            // 2026-07-26 (later still): LayoutKeys.OddJobs went from a leaf (the fixup just above, added
+            // earlier this session before the tab had sub-tabs) to a container with its own "oddjobs" slot -
+            // same SlotTools-merge story as StepperCalProbe above: an already-persisted OddJobs node (whether
+            // from the fixup just above or a fresh leaf some other way) never picks up a newly-introduced slot
+            // on its own.
+            // 2026-07-28: the five fixed job wizards (SurfaceStock/DrillBore/Counterbore/Pocket/Contour) were
+            // replaced by the single WorkOrder composer tab, so the slot is now Setup + WorkOrder. A profile
+            // saved with the old leaves would keep rendering tabs whose components no longer exist (silently
+            // skipped by BuildJobs, leaving stale entries in the tab-editor's list) - drop them and add the
+            // new one.
+            // 2026-07-31: Odd Jobs' own "Setup" sub-tab is retired too (job-flow unification - Setup is one
+            // shared screen now, hosted on the Start Job tab, not duplicated per program source) - same
+            // stale-entry problem, same fix: drop it from any profile that has it.
+            var oddJobsNode = LayoutTree.Flatten(layoutSection?.Root).FirstOrDefault(n => n.Component == LayoutKeys.OddJobs);
+            if (oddJobsNode != null)
+            {
+                var oddJobsSlot = oddJobsNode.Slot(LayoutKeys.SlotOddJobs);
+                if (oddJobsSlot == null)
+                {
+                    oddJobsSlot = new LayoutSlot(LayoutKeys.SlotOddJobs);
+                    oddJobsNode.Slots.Add(oddJobsSlot);
+                }
+                string[] retiredComponents = { "SurfaceStock", "DrillBore", "Counterbore", "Pocket", "Contour", LayoutKeys.OddJobsSetup };
+                oddJobsSlot.Items.RemoveAll(n => retiredComponents.Contains(n.Component));
+                if (!oddJobsSlot.Items.Any(n => n.Component == LayoutKeys.OddJobsWorkOrder))
+                    oddJobsSlot.Items.Add(new LayoutNode(LayoutKeys.OddJobsWorkOrder));
+            }
+
+            // 2026-07-31 (same day, later still): the Odd Jobs container itself is retired now - Work Order
+            // was its only remaining sub-tab (the fixup just above), so it's promoted to a bare top-level tab
+            // instead of a tab-inside-a-tab. Swap OddJobs for WorkOrder at the SAME position in both the
+            // tree's tabs slot and the legacy flat Base.Tabs list, rather than remove+append, so an operator's
+            // existing tab ORDER doesn't jump just because the tab was renamed/promoted underneath them.
+            if (tabsSlot != null)
+            {
+                int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.OddJobs);
+                if (idx >= 0)
+                    tabsSlot.Items[idx] = new LayoutNode(LayoutKeys.WorkOrder);
+                else if (!LayoutTree.Contains(layoutSection.Root, LayoutKeys.WorkOrder))
+                    tabsSlot.Items.Add(new LayoutNode(LayoutKeys.WorkOrder));
+            }
+            if (Base != null && Base.Tabs.Count > 0)
+            {
+                int idx = Base.Tabs.IndexOf(LayoutKeys.OddJobs);
+                if (idx >= 0)
+                    Base.Tabs[idx] = LayoutKeys.WorkOrder;
+                else if (!Base.Tabs.Contains(LayoutKeys.WorkOrder))
+                    Base.Tabs.Add(LayoutKeys.WorkOrder);
+            }
 
             // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly
             // lived as a loose FeedsAndSpeedsIntroShown.txt marker file in the config folder before moving
@@ -1077,6 +1452,46 @@ namespace CNC.Controls
                     File.Delete(staleMarker);
             }
             catch { }
+
+            // LAST, deliberately: several fixups above move or add top-level nodes, so this is the point at
+            // which the tree is final and a stray duplicate can be cleaned up.
+            DeduplicateTopLevelPlacements();
+        }
+
+        // 2026-08-02: the Work Order built-in tools moved from a hardcoded OddJobsTool enum into a seeded
+        // CustomTools section (Id 0-13 - see Default-App.config's own comment on that section). A profile
+        // whose CustomTools section already existed before this change (this box's own custom-tool testing
+        // earlier the same session, or simply anyone who added a custom tool before upgrading to a build
+        // with this merge) never gets the section-absent template fallback in ConfigStore.ReadDocument on
+        // its own - called from the CustomTools registration's own set callback (RegisterSections) to merge
+        // in whichever seeded Ids it's still missing, same "merge newly introduced defaults into an existing
+        // list" idiom as the Layout-tree fixups in ApplyOneTimeFixups. Reads the SAME template payload the
+        // absent-section path already falls back to, rather than duplicating the tool list here. Returns
+        // whether anything was added (caller resaves to make it durable).
+        private static bool MergeFactoryDefaultTools()
+        {
+            try
+            {
+                var payload = GetTemplateSectionPayload("CustomTools");
+                if (payload == null)
+                    return false;
+                var template = (CustomToolList)new XmlSerializer(typeof(CustomToolList)).Deserialize(payload.CreateReader());
+                if (template?.Entries == null)
+                    return false;
+
+                if (CustomTools.SectionConfig == null)
+                    CustomTools.SectionConfig = new CustomToolList();
+                var haveIds = new HashSet<int>(CustomTools.SectionConfig.Entries.Select(t => t.Id));
+                bool added = false;
+                foreach (var t in template.Entries)
+                    if (!haveIds.Contains(t.Id))
+                    {
+                        CustomTools.SectionConfig.Entries.Add(t);
+                        added = true;
+                    }
+                return added;
+            }
+            catch { return false; }
         }
 
         public void Shutdown()
@@ -1155,6 +1570,39 @@ namespace CNC.Controls
 
             _factoryDefaults = tpl ?? new Config();
             return _factoryDefaults;
+        }
+
+        // Raw XDocument of the shipped template, for ConfigStore.TemplateSectionLookup - separate cache
+        // from GetFactoryDefaults' deserialized Config (that one only carries Core/Jog/JogUiMetric; this
+        // one exposes EVERY section the template has, by key, undeserialized, so ConfigStore can hand a
+        // section's own payload to its own Read() regardless of which feature/build owns that key).
+        private static XDocument _templateDoc;
+        private static bool _templateDocLoadAttempted;
+
+        // ConfigStore.TemplateSectionLookup implementation - see that field's own comment. Loaded once,
+        // lazily, on first use (typically the first ReadDocument() of a load that has an absent section).
+        private static XElement GetTemplateSectionPayload(string key)
+        {
+            if (!_templateDocLoadAttempted)
+            {
+                _templateDocLoadAttempted = true;
+                try
+                {
+                    string dir = string.IsNullOrEmpty(CNC.Core.Resources.Path) ? AppDomain.CurrentDomain.BaseDirectory : CNC.Core.Resources.Path;
+                    string path = Path.Combine(dir, DefaultTemplateName);
+                    if (File.Exists(path))
+                    {
+                        var doc = XDocument.Load(path);
+                        if (!ConfigStore.IsLegacy(doc))
+                            _templateDoc = doc;
+                    }
+                }
+                catch { _templateDoc = null; }
+            }
+
+            return _templateDoc?.Root?.Elements("section")
+                                      .FirstOrDefault(sec => (string)sec.Attribute("key") == key)
+                                     ?.Elements().FirstOrDefault();
         }
 
         // Deserialize one <section key="..."> payload from a v2 config document.
@@ -1261,6 +1709,11 @@ namespace CNC.Controls
             _useSimulatorPort = null;
             _startupPort = _startupBaud = string.Empty;
             string port = string.Empty, baud = string.Empty;
+
+            // Wire the template-default fallback before anything below can call ReadDocument (a section
+            // absent from the user's own file - e.g. a feature added since they last saved - recovers the
+            // shipped template's curated value instead of just the bare C# field-initializer default).
+            ConfigStore.TemplateSectionLookup = GetTemplateSectionPayload;
 
             // Read-only shipped resources (CSVs, images, the App.config template) are read from the app folder;
             // all user-written state lives in a per-user folder (%AppData%\ioSender), seeded from the app folder
@@ -1395,8 +1848,13 @@ namespace CNC.Controls
             {
                 Base.HeightMapTabMigrated = true;
 
+                // Tree-wide Contains, not "is it in the tabs slot": since the tabs/menu split, Height Map's
+                // DEFAULT home is the Tools menu, so a brand-new profile has it placed perfectly well and the
+                // old tabs-slot-only test read that as missing and put a second one on the bar. "Not on the
+                // tab strip" has not meant "absent" since menus became placement slots of their own - the
+                // same trap EnforceMenuPlacement's invariant 2 is written around.
                 var tabsSlot = layoutSection?.Root?.Slot(LayoutKeys.SlotTabs);
-                if (tabsSlot != null && tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.HeightMap) < 0)
+                if (tabsSlot != null && !LayoutTree.Contains(layoutSection?.Root, LayoutKeys.HeightMap))
                 {
                     int after = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.Probing);
                     tabsSlot.Items.Insert(after >= 0 ? after + 1 : tabsSlot.Items.Count, new LayoutNode(LayoutKeys.HeightMap));
@@ -1407,6 +1865,24 @@ namespace CNC.Controls
                     Base.Tabs.Insert(after >= 0 ? after + 1 : Base.Tabs.Count, LayoutKeys.HeightMap);
                 }
                 _migratedFormat = true;   // persist the injected layout/flag via the save below
+            }
+
+            // One-shot: the console toggle shipped defaulted to Esc, which MainWindow's PreviewKeyDown then
+            // swallowed app-wide - so Esc stopped dismissing anything inside the main window. Move a profile
+            // still sitting on that default over to F12 (the same key the toggle now defaults to). Only ever
+            // touches the literal old default: a profile with any other binding, including a deliberate Esc
+            // set after this ran, is left alone.
+            if (!Base.ConsoleShortcutEscMigrated)
+            {
+                Base.ConsoleShortcutEscMigrated = true;
+
+                if (string.Equals(Base.ConsoleShortcut, "Esc", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Base.ConsoleShortcut, "Escape", StringComparison.OrdinalIgnoreCase))
+                {
+                    Base.ConsoleShortcut = "F12";
+                    CNC.Core.DebugLog.Write("config", "ApplyOneTimeFixups: console toggle moved off Esc to F12");
+                }
+                _migratedFormat = true;   // persist the flag (and any change) via the save below
             }
 
             // One-shot: move Load Stock (now "Start Job") to the front of the tab order for existing saved
@@ -1445,7 +1921,21 @@ namespace CNC.Controls
             // Keep the layout tree's top-level tab order in sync with the legacy Config.Tabs (still the
             // editor's source until the layout editor edits the tree). Transitional - tree drives the build.
             if (layoutSection != null)
+            {
                 TabOrder.Apply(layoutSection.Root, Base.Tabs);
+
+                // Apply() REBUILDS the tabs slot to contain exactly Base.Tabs' entries, which silently DELETES
+                // any node in that slot the flat list doesn't name - and it runs long after
+                // ApplyOneTimeFixups, so the menu-placement invariant never sees the orphan.
+                //
+                // That is how Height Map ended up in no slot at all (observed 2026-08-03): it sat in the tabs
+                // slot, EnforceMenuPlacement correctly left it alone because it WAS in the tree, then Apply
+                // dropped it because the flat list didn't mention it, and it was gone. Re-running the
+                // invariant here rescues anything Apply orphaned back to its default menu, so a component can
+                // never be deleted out of existence by a flat list that predates it.
+                EnforceMenuPlacement();
+                DeduplicateTopLevelPlacements();
+            }
 
             // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
             // standalone file: persist the converted form now so the stored config is canonical. The

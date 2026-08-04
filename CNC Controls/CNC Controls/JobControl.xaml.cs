@@ -268,7 +268,7 @@ namespace CNC.Controls
             if (model == null)
                 return;
             if (ready)
-                model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program");
+                model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program", RunLabels.CycleStart);
             else
                 // Drop the prompt along with the cue itself - previously only the (invisible) boolean flipped
                 // here, leaving the "<name> ready - press Run to run." TEXT stale on screen through an entire
@@ -500,8 +500,35 @@ namespace CNC.Controls
                     AbortPump();
                     JobTimer.Stop();
                     streamingHandler.Call(StreamingState.Stop, true);
+                    DiscardResumableJob();
+                    break;
+
+                case nameof(GrblViewModel.HomedState):
+                    // A homing cycle just re-established trusted position - the same moment "resume the same
+                    // generated program" (see MacroProcessor.DiscardGenerated's own comment, and the
+                    // GrblReset case above) stops making sense: a home doesn't continue anything, it re-zeros
+                    // the very position reference the paused job's remaining lines were written against.
+                    // Confirmed on real hardware 2026-07-29: after a real collision alarm and a controller
+                    // power cycle, the surviving generated program silently resumed and ran to completion -
+                    // including a toolsetter probe - the moment a stray Cycle Start signal arrived after a
+                    // successful rehome, with no operator "Run" click at all.
+                    if ((sender as GrblViewModel).HomedState == HomedState.Homed)
+                        DiscardResumableJob();
                     break;
             }
+        }
+
+        // Wipes everything that lets a later Cycle Start (or Run) silently continue a job from wherever it
+        // left off. Called after a controller reboot or a completed homing cycle - the two events that make
+        // "resume the same run" unsafe regardless of which alarm, if any, preceded them. Deliberately
+        // narrower than a plain Stop/error abort (see OnStop, and MainWindow's own DiscardGenerated call,
+        // which stay resumable on purpose) - e.g. Alarm:5 (a probe search came up empty; nothing was ever
+        // touched) is fine to unlock and continue right where it left off, without either of these two
+        // events happening first.
+        private void DiscardResumableJob()
+        {
+            job = new JobData();
+            MacroProcessor.DiscardGenerated?.Invoke();
         }
 
         public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }
@@ -741,31 +768,79 @@ namespace CNC.Controls
         // ToolTipService.ShowOnDisabled in XAML); enabled -> what THIS press will actually do, matching the
         // selected mode - a plain "Alt+R" static tip left an operator to discover Dry Run/Check Run's real
         // effect (Z offset, spindle/coolant forced off, etc.) only by reading the dropdown's own tooltips first.
+        // Shared by both Generate-first early-return branches in UpdateRunButtonLabel (pre- and post-generate) -
+        // a tab that opted in via MacroProcessor.SupportsGenerateAndRun gets the mode dropdown back just to
+        // offer that one entry, in either state (pressing it before Generate has run just means "build it,
+        // then run it" instead of the normal two clicks).
+        private void UpdateGenerateAndRunVisibility()
+        {
+            bool show = MacroProcessor.SupportsGenerateAndRun && MacroProcessor.ActiveGenerateAndRun != null;
+            if (btnStartMode != null)
+                btnStartMode.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (pnlNormalModes != null)
+                pnlNormalModes.Visibility = Visibility.Collapsed;
+            if (pnlGenerateAndRun != null)
+                pnlGenerateAndRun.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void GenerateAndRun_Click(object sender, RoutedEventArgs e)
+        {
+            startModePopup.IsOpen = false;
+            MacroProcessor.ActiveGenerateAndRun?.Invoke();
+        }
+
+        // "Cycle Start"/"Start" (and the dropdown item that shares the same text) and "Feed Hold"/"Pause" -
+        // see RunLabels' own comment (the single source of truth every other user-facing reference to these
+        // two actions reads from too - signal tooltips, key-binding names, status messages).
+        private object NormalModeLabel()
+        {
+            return RunLabels.CycleStart;
+        }
+
         private void UpdateRunButtonLabel()
         {
             if (model == null || btnStart == null)
                 return;
 
-            // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard) is
-            // focused: it owns no standalone Generate button of its own any more (see MacroProcessor's
-            // Generate-mode plumbing) - the Run bar itself reads "Generate" (gated on IsGenerateReady) until
-            // the tab has built its program, then flips to plain "Run". Dry Run/Check Run never apply to
-            // these tabs, so the mode dropdown is hidden outright for the whole time the tab is focused.
-            if (MacroProcessor.SupportsGenerateMode)
+            if (btnHold != null)
+                btnHold.Content = RunLabels.FeedHold;
+            if (btnStartModeNormalItem != null)
+                btnStartModeNormalItem.Content = NormalModeLabel();
+
+            // A Generate-first tool tab (Start Job, Stepper Calibration, Auto Square, Surface Spoilboard,
+            // Odd Jobs' job wizards) is focused: it owns no standalone Generate button of its own any more
+            // (see MacroProcessor's Generate-mode plumbing) - the Run bar itself reads "Generate" (gated on
+            // IsGenerateReady) until the tab has built its program, then flips to plain "Run" (or, for a tab
+            // that opted in via AllowRunModesWhenGenerated, the normal mode dropdown - see below).
+            if (MacroProcessor.SupportsGenerateMode && !MacroProcessor.IsProgramGenerated)
             {
-                bool generated = MacroProcessor.IsProgramGenerated;
-                btnStart.Content = generated ? FindResource("StartModeNormal") : FindResource("GenerateLabel");
-                IsRunActionEnabled = IsRunEnabled && (generated || MacroProcessor.IsGenerateReady);
-                IsGenerateActionReady = !generated && IsRunActionEnabled;
-                btnStart.ToolTip = generated ? FindResource("StartTipNormal")
-                                  : IsRunActionEnabled ? FindResource("GenerateTipReady")
-                                  : FindResource("GenerateTipDisabled");
-                if (btnStartMode != null)
-                    btnStartMode.Visibility = Visibility.Collapsed;
+                btnStart.Content = FindResource("GenerateLabel");
+                IsRunActionEnabled = IsRunEnabled && MacroProcessor.IsGenerateReady;
+                IsGenerateActionReady = IsRunActionEnabled;
+                btnStart.ToolTip = IsRunActionEnabled ? FindResource("GenerateTipReady") : FindResource("GenerateTipDisabled");
+                UpdateGenerateAndRunVisibility();
+                return;
+            }
+            // Program's generated (or this isn't a Generate-first tab at all). Most Generate-first tabs are
+            // pure setup/probing macros where Dry Run/Check Run/Simulate don't mean anything, so they stay
+            // hidden even now - only a tab that explicitly opted in (Odd Jobs' cutting wizards - a generated
+            // program there IS real toolpath worth dry-running) falls through to the normal mode-dropdown
+            // logic below instead.
+            if (MacroProcessor.SupportsGenerateMode && !MacroProcessor.AllowRunModesWhenGenerated)
+            {
+                btnStart.Content = NormalModeLabel();
+                IsRunActionEnabled = IsRunEnabled;
+                IsGenerateActionReady = false;
+                btnStart.ToolTip = FindResource("StartTipNormal");
+                UpdateGenerateAndRunVisibility();
                 return;
             }
             if (btnStartMode != null)
                 btnStartMode.Visibility = Visibility.Visible;
+            if (pnlNormalModes != null)
+                pnlNormalModes.Visibility = Visibility.Visible;
+            if (pnlGenerateAndRun != null)
+                pnlGenerateAndRun.Visibility = Visibility.Collapsed;
             IsRunActionEnabled = IsRunEnabled;
             IsGenerateActionReady = false;
 
@@ -789,7 +864,7 @@ namespace CNC.Controls
             btnStart.Content = showCheck ? FindResource("StartModeCheck")
                               : showSimulate ? FindResource("StartModeSimulate")
                               : connected && model.IsDryRunMode ? FindResource("StartModeDryRun")
-                              : FindResource("StartModeNormal");
+                              : NormalModeLabel();
             btnStart.ToolTip = !IsRunEnabled ? FindResource("StartTipDisabled")
                               : showCheck ? FindResource("StartTipCheck")
                               : showSimulate ? FindResource("StartTipSimulate")
@@ -801,7 +876,7 @@ namespace CNC.Controls
 
         // honorActiveProgram: when a wizard tab is up it registers its program as the active program
         // (MacroProcessor.ActiveRun). A fresh (idle) Run then runs THAT instead of the loaded job - so one
-        // Run runs whatever program is active, file/folder or wizard. The internal stream-starters that
+        // Run runs whatever program is active, loaded file or wizard. The internal stream-starters that
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
@@ -1003,21 +1078,19 @@ namespace CNC.Controls
                     while (res == null)
                         EventUtils.DoEvents();
 
-                    // The send/ack flow control runs on a dedicated background thread (StreamPump) so UI load
-                    // can never stall motion. Check mode ($C) keeps the legacy UI-thread streamer: it reports
-                    // every line's error and keeps going (the pump stops on first error), and there is no motion
-                    // to stutter, so the pump gives no benefit there.
-                    if (!job.IsChecking)
-                    {
-                        if (pump == null)
-                            pump = new StreamPump(model, Dispatcher);
-                        pumpActive = true;
-                        pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
-                                   AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
-                                   OnPumpJobFinished, OnPumpError);
-                    }
-                    else
-                        SendNextLine();
+                    // The send/ack flow control always runs on the dedicated background thread (StreamPump) so
+                    // UI load can never stall motion - including Check mode ($C), which used to fall back to
+                    // the legacy UI-thread streamer because it reports EVERY line's error and keeps going,
+                    // where the pump used to abort on the first error. StreamPump.continueOnError now
+                    // reproduces that same keep-going-and-report-every-error behavior (OnPumpCheckError below),
+                    // so Check mode no longer needs a separate streamer.
+                    if (pump == null)
+                        pump = new StreamPump(model, Dispatcher);
+                    pumpActive = true;
+                    pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
+                               AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
+                               OnPumpJobFinished, OnPumpError,
+                               continueOnError: job.IsChecking, onCheckError: OnPumpCheckError);
                 }
             }
         }
@@ -1083,6 +1156,18 @@ namespace CNC.Controls
             streamingHandler.Count = false;
             job.HasError = model.IsGrblHAL;
             ResetRunModeAfterJob();
+            streamingHandler.Call(StreamingState.Error, true);
+        }
+
+        // Check mode (StreamPump.continueOnError): fires on EVERY error line, not just the first - the run
+        // keeps streaming afterward (pump does not abort), so this must not tear the run down the way
+        // OnPumpError does. The actual per-line "Sent" text (the error response) is already written by
+        // StreamPump's own MarkSent/Drain, same path every other line's status uses - this only drives the
+        // state-machine/UI bookkeeping the legacy check-mode streamer used to do inline (ResponseReceived's
+        // old isError branch: streamingHandler.Call(StreamingState.Error, true) + job.HasError).
+        private void OnPumpCheckError()
+        {
+            job.HasError = model.IsGrblHAL;
             streamingHandler.Call(StreamingState.Error, true);
         }
 
@@ -1624,6 +1709,17 @@ namespace CNC.Controls
             else if (pumpActive)
                 ArmIdleKick();
 
+            // An alarm must release the pump (and, critically, Comms.com.AckSink) IMMEDIATELY, regardless of
+            // which tab currently has focus - this is a comms-safety concern, not a UI-state one. Confirmed
+            // as a real hang 2026-08-01: an alarm during a Check-mode run landed while a different tab was
+            // active, the isActive-gated switch below skipped AbortPump() entirely (its own case, further
+            // down), and the pump's AckSink stayed hijacked - every subsequent response (including jog acks
+            // sent from the other tab) silently vanished into the abandoned, undrained pump instead of
+            // reaching the app, and the pump's own still-queued lines from the aborted check file later got
+            // flushed mid-jog, producing a bogus "error:9 locked out during alarm or jog state".
+            if (newstate.State == GrblStates.Alarm)
+                AbortPump();
+
             // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
             // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
             // there too (Idle re-enables Run after a run, Hold/Tool/Alarm behave as on the Grbl tab).
@@ -1715,7 +1811,7 @@ namespace CNC.Controls
                     break;
 
                 case GrblStates.Alarm:
-                    AbortPump();
+                    // AbortPump() already ran unconditionally above, regardless of this gate.
                     grblState.State = newstate.State;
                     grblState.Substate = newstate.Substate;
                     streamingHandler.Call(StreamingState.Stop, false);
@@ -1736,8 +1832,21 @@ namespace CNC.Controls
             if (Comms.com == null)
                 return;
 
+            // Jog acks are not this handler's business, and counting them here corrupts real accounting:
+            // "missed" would climb on every jog, and a jog's "ok" would satisfy the SendMDI ack-pacing switch
+            // below as though it were the ack for an outstanding MDI command. Jogging while a macro streams is
+            // a live path (the fixture dialog is non-modal precisely so jogging stays reachable during one).
+            // This filter used to live in GrblViewModel, which suppressed responses for EVERY consumer while
+            // jogging - see the comment there for why it had to move: it was starving JogGate of its ack.
+            if (model != null && model.GrblState.State == GrblStates.Jog)
+                return;
+
             // When the background pump is driving the job it owns all flow-control accounting (off the UI
             // thread). Skip the accounting here; the MDI/Reset switch below still runs on the UI thread.
+            // Check mode ($C) now also always sets pumpActive (see Run()) - the job.IsChecking branches
+            // below this point are consequently unreachable for the checking case (kept rather than
+            // pruned: they're still live for job.IsSDFile, which shares the same conditionals, and this
+            // is real-time streaming code where a conservative diff beats a clever one).
             if (pumpActive)
             {
             }

@@ -1,0 +1,211 @@
+<local:ConfigPanel x:TypeArguments="local:WorkOrder" x:Class="CNC.Controls.WorkOrderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="515" d:DesignWidth="980">
+    <Grid VerticalAlignment="Stretch">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="270" MinWidth="263"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="1*" MinWidth="290"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="1*" MinWidth="190"/>
+        </Grid.ColumnDefinitions>
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+        <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+
+        <!-- Toolpaths: each a named piece of geometry with its operations underneath. -->
+        <Grid Grid.Column="0" Margin="5,5,0,5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <!-- No in-tab New/Load/Save UI - New/Load live on the main menu (2026-07-31, ViewType.WorkOrder
+                 entry points); Save happens implicitly (the existing tab-leave auto-save/prompt, unchanged)
+                 as part of Run switching to the Job tab - see Run()'s own comment. Generate/Run are the shared
+                 bottom run bar, same as every other Generate-first tab. -->
+            <!-- Work order's own name (its file's name, no path or extension) - not the word "Toolpaths",
+                 which said nothing this panel doesn't already show by being full of toolpaths. -->
+            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold"
+                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis"/>
+            <Border Grid.Row="2" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
+                <TreeView x:Name="treeToolpaths" BorderThickness="0" Background="Transparent"
+                          SelectedItemChanged="treeToolpaths_SelectedItemChanged" PreviewKeyDown="TreeToolpaths_PreviewKeyDown"/>
+            </Border>
+            <StackPanel Grid.Row="3" Margin="0,14,0,0">
+                <CheckBox x:Uid="chk_wogroupbytool" x:Name="chkGroupByTool" Content="Group operations by tool" Click="chkGroupByTool_Click"
+                          ToolTip="Emit the program grouped onto as few tool changes as possible instead of strictly in tree order. Each toolpath's own operation order is always preserved - roughing still runs before the finishing passes that depend on it - so grouping only combines tools where that allows."/>
+                <TextBlock x:Name="txtGroupByToolSummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
+                <CheckBox x:Uid="chk_woskipfirsttc" x:Name="chkSkipFirstToolChange" Content="First tool already loaded" Margin="0,4,0,0" Click="chkSkipFirstToolChange_Click"
+                          ToolTip="Leave out the M6 for the program's first tool, on the basis that it is already in the spindle - usually true when it is the tool you just set up with. Note the tool change is also what re-probes the toolsetter and applies the tool length offset, so the first operation will run on whatever offset is currently in force."/>
+                <TextBlock x:Name="txtSkipFirstToolChangeSummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Label x:Uid="lbl_wowcs" Content="Origin (WCS):" Padding="0,0,4,0" VerticalAlignment="Center"
+                           ToolTip="Which work coordinate system this work order's origin/tool length reference lives in. &quot;Follow Setup&quot; (the default) always uses whatever Setup is currently set to; pin a specific one instead if this work order's origin needs to stay on a particular WCS even after Setup moves on to a different job."/>
+                    <ComboBox x:Name="cbxWcs" MinWidth="110" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxWcs_SelectionChanged">
+                        <ComboBoxItem x:Uid="cbx_wowcsfollow" Content="Follow Setup"/>
+                        <ComboBoxItem Content="G54"/>
+                        <ComboBoxItem Content="G55"/>
+                        <ComboBoxItem Content="G56"/>
+                        <ComboBoxItem Content="G57"/>
+                        <ComboBoxItem Content="G58"/>
+                        <ComboBoxItem Content="G59"/>
+                    </ComboBox>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- Parameters: a toolpath's geometry, or a selected operation's cutting values. -->
+        <Grid Grid.Column="2" Margin="5,5,0,5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="txtPanelHeader" Grid.Row="0" Text="Add a toolpath to get started" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <!-- Cycle (not the default Continue, which lets Tab walk OUT of this panel once it runs out
+                     of focusable fields here - e.g. Tab on the grid pattern's last field, Y spacing, was
+                     landing in the main window's menu) - wraps back to the first focusable field in whichever
+                     of pnlToolpath/pnlOperation is actually visible instead of escaping the tab entirely. -->
+                <StackPanel Orientation="Vertical" KeyboardNavigation.TabNavigation="Cycle">
+
+                    <!-- ===== Toolpath (geometry) ===== -->
+                    <StackPanel x:Name="pnlToolpath" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_woname" Content="Name:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBox x:Name="txtName" MinWidth="180" MinHeight="22" VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                     TextChanged="txtName_TextChanged"/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlGeometryRow" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_wogeom" Content="Geometry:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxGeometry" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxGeometry_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlIndirectSource" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_wosource" Content="Source toolpath:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxIndirectSource" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxIndirectSource_SelectionChanged"
+                                      ToolTip="Runs this toolpath's CURRENT geometry and operations here, at this toolpath's own X/Y - a live reference, not a copy. Editing the source later changes this one too."/>
+                        </StackPanel>
+
+                        <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_woangle" x:Name="fldAngle" Label="Angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
+                                            ToolTip="Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."/>
+                        <local:NumericField x:Uid="fld_wodia" x:Name="fldDiameter" Label="Diameter:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wosize" x:Name="fldSize" Label="Size:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wow" x:Name="fldWidth" Label="Width (X):" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wod" x:Name="fldDepthY" Label="Depth (Y):" ColonAt="150" Format="###0.0##" Unit="mm"/>
+
+                        <!-- Surface only - see WorkOrderToolpath.EntireSpoilboard's own comment. -->
+                        <StackPanel x:Name="pnlEntireSpoilboard" Orientation="Horizontal" Margin="0,0,0,6">
+                            <CheckBox x:Uid="chk_woentirespoilboard" x:Name="chkEntireSpoilboard" Content="Entire spoilboard" VerticalAlignment="Center" Click="chkEntireSpoilboard_Click"
+                                      ToolTip="Face the whole in-bounds machine travel, ignoring this toolpath's Width/Depth/X/Y above. Machine-referenced (no WCS to set it from) - touches off its own Z0 by jogging to the surface, and must be the only enabled operation in this work order."/>
+                        </StackPanel>
+
+                        <!-- Pattern: repeats this toolpath - geometry AND all its operations - at each instance
+                             position. The X/Y above stays the anchor: a grid grows from it, a circle orbits it.
+                             Not offered on Indirect - it already IS a single repeat of another toolpath at a
+                             different X/Y, so patterning it too would be a repeat of a repeat. -->
+                        <StackPanel x:Name="pnlPatternSection">
+                            <Separator Margin="0,8"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Label x:Uid="lbl_wopattern" Content="Pattern:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="cbxPattern" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxPattern_SelectionChanged"
+                                          ToolTip="Repeat this whole toolpath at several positions - every operation on it is repeated too, each within a single tool change."/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlGrid">
+                                <local:NumericField x:Uid="fld_wocols" x:Name="fldColumns" Label="Columns (X):" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_wocolsp" x:Name="fldColumnSpacing" Label="X spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Center-to-center distance between columns. Negative runs the grid in -X."/>
+                                <local:NumericField x:Uid="fld_worows" x:Name="fldRows" Label="Rows (Y):" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_worowsp" x:Name="fldRowSpacing" Label="Y spacing:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Center-to-center distance between rows. Negative runs the grid in -Y."/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlCircular">
+                                <local:NumericField x:Uid="fld_wopcount" x:Name="fldPatternCount" Label="Count:" ColonAt="150" Format="##0" Unit=""/>
+                                <local:NumericField x:Uid="fld_woprad" x:Name="fldPatternRadius" Label="Bolt circle radius:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                                    ToolTip="Distance from the anchor X/Y out to each instance."/>
+                                <local:NumericField x:Uid="fld_wopstart" x:Name="fldPatternStartAngle" Label="Start angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
+                                                    ToolTip="Where the first instance sits, measured from +X counter-clockwise."/>
+                                <local:NumericField x:Uid="fld_wopspan" x:Name="fldPatternArcSpan" Label="Arc span:" ColonAt="150" Format="-###0.0#" Unit="deg"
+                                                    ToolTip="360 spreads the instances evenly around the full circle. A smaller span spreads them across that arc, with one instance at each end."/>
+                            </StackPanel>
+                            <TextBlock x:Name="txtPatternSummary" Foreground="#586069" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ===== Operation: how to cut it, including how deep ===== -->
+                    <StackPanel x:Name="pnlOperation" Visibility="Collapsed">
+                        <!-- Depth belongs to the cut, not the shape: one circle can be contoured through the
+                             stock while another is pocketed 3 mm deep. Through is only offered on the
+                             operations it means anything for (see WorkOrderRules.SupportsThrough). -->
+                        <StackPanel x:Name="pnlThrough" Orientation="Horizontal" Margin="0,0,0,2">
+                            <CheckBox x:Uid="chk_wothrough" x:Name="chkThrough" Content="Through" VerticalAlignment="Center" Click="chkThrough_Click"
+                                      ToolTip="Cut all the way through the stock (thickness + 0.5 mm overcut) instead of to a set depth."/>
+                        </StackPanel>
+                        <!-- Drill/Bore carry their own hole size, concentric with the toolpath's center - so one
+                             centerline can hold a wide shallow counterbore and a narrow through hole. -->
+                        <local:NumericField x:Uid="fld_wohole" x:Name="fldHoleDiameter" Label="Hole diameter:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="The hole this operation makes, centered on the toolpath. Independent of the geometry's own diameter, so several holes of different sizes can share one centerline."/>
+                        <TextBlock x:Name="txtDrillMatch" Foreground="#586069" FontSize="11" Margin="0,2,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
+                        <local:NumericField x:Uid="fld_wototal" x:Name="fldTotalDepth" Label="Total depth:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wodoc" x:Name="fldDepthOfCut" Label="Depth of cut:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="Axial step per pass - how much deeper each pass goes."/>
+                        <local:NumericField x:Uid="fld_wopeck" x:Name="fldPeckDepth" Label="Peck depth:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes."/>
+                        <local:NumericField x:Uid="fld_wostepdown" x:Name="fldBoreStepDown" Label="Step down (per rev):" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="How much deeper the helix goes on each revolution around the hole."/>
+                        <local:NumericField x:Uid="fld_wostepover" x:Name="fldStepover" Label="Stepover:" ColonAt="150" Format="##0" Unit="%"
+                                            ToolTip="Radial engagement for clearing the interior, as a % of the bit's diameter. 30-50% is typical for a 2-3 flute end mill."/>
+                        <local:NumericField x:Uid="fld_wowallleave" x:Name="fldWallStockToLeave" Label="Wall stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="How much material the roughing operation leaves on the wall for this pass to remove. Roughing's wall is inset by this; this pass cuts to the true outline."/>
+                        <local:NumericField x:Uid="fld_wofloorleave" x:Name="fldFloorStockToLeave" Label="Floor stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
+                        <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wocountersink" x:Name="fldCountersinkDiameter" Label="Countersink diameter:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically."/>
+
+                        <!-- Only a through CONTOUR frees a piece that needs holding in place. -->
+                        <StackPanel x:Name="pnlTabs">
+                            <TextBlock x:Uid="txt_wotabs" Text="Tabs" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                            <local:NumericField x:Uid="fld_wonumtabs" x:Name="fldNumTabs" Label="Number of tabs:" ColonAt="150" Format="#0" Unit=""/>
+                            <local:NumericField x:Uid="fld_wotabwidth" x:Name="fldTabWidth" Label="Tab width:" ColonAt="150" Format="##0.0" Unit="mm"/>
+                            <local:NumericField x:Uid="fld_wotabheight" x:Name="fldTabHeight" Label="Tab height:" ColonAt="150" Format="##0.0##" Unit="mm"/>
+                        </StackPanel>
+
+                        <Separator Margin="0,8"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <Button x:Uid="btn_wofeeds" x:Name="btnFeedsSpeeds" Content="Feeds and speeds..." Padding="6,3" Click="btnFeedsSpeeds_Click"
+                                    ToolTip="Pick the tool and set its RPM, feed and plunge - with a recommendation lookup by material, -10%/+10% nudges, and your own dialed-in values remembered per tool and material."/>
+                        </StackPanel>
+                        <TextBlock x:Name="txtFeedsSummary" Foreground="#586069" Margin="0,2,0,6" FontSize="11" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+            <TextBlock x:Name="txtWarnings" Grid.Row="2" Foreground="#C62828" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        </Grid>
+
+        <!-- Stock diagram: every toolpath at once, the selected one highlighted. -->
+        <Grid Grid.Column="4" Margin="5,5,5,5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*" MinHeight="120"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Uid="hlp_woBody" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
+                       Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
+            <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
+                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged"/>
+            </Border>
+            <TextBlock x:Name="txtSummary" Grid.Row="2" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
+        </Grid>
+    </Grid>
+</local:ConfigPanel>

@@ -144,6 +144,24 @@ namespace CNC.Core
         // file (decision B) - the caller should persist immediately so the data lands in App.config.
         public static bool MigratedOnLoad { get; private set; }
 
+        // Sections whose Read() threw on the last ReadDocument() call, with a short reason - e.g. a
+        // persisted enum value that a later code change removed/renamed (confirmed as a real case
+        // 2026-08-02: a custom Work Order tool saved with Kind="Mill" before that value was split into
+        // EndMill/OFlute/BallEnd/Surfacing). That section is left at whatever default its owner already
+        // had (silently discarding just its own data), rather than letting the exception escape ONE
+        // section's Read() and abort the whole document - which, before this existed, meant every OTHER
+        // section registered after the failing one in Register() order silently never loaded either (fell
+        // back to defaults too) even though its own data in the file was perfectly fine. The caller
+        // (AppConfig) surfaces this list to the operator rather than resetting/losing data silently.
+        public static readonly List<string> LoadWarnings = new List<string>();
+
+        // AppConfig wires this once (before the first ReadDocument) to the shipped read-only
+        // Default-App.config template - keeps this file free of that file-path/AppConfig-specific
+        // knowledge (see the header comment) while still letting a section absent from the user's own
+        // file recover the shop-curated default instead of just the bare C# field-initializer default.
+        // Returns the section's payload XElement (same shape ReadDocument hands to s.Read()), or null.
+        public static Func<string, XElement> TemplateSectionLookup;
+
         // Register (or replace, by Key) a section. Registration order is the on-disk order; register
         // "Core" first so it rebuilds AppConfig.Base before the nested sections assign into it.
         public static void Register(IConfigSection section)
@@ -202,6 +220,7 @@ namespace CNC.Core
         {
             MigratedOnLoad = false;
             _unknown.Clear();
+            LoadWarnings.Clear();
 
             var root = doc?.Root;
             if (root == null)
@@ -225,10 +244,39 @@ namespace CNC.Core
                 {
                     var payload = sec.Elements().FirstOrDefault();
                     if (payload != null)
-                        s.Read(payload);
+                    {
+                        // Isolated per section - a single section whose saved data no longer deserializes
+                        // (a persisted value a later code change removed/renamed) must not take any OTHER
+                        // section down with it. That section's owner simply keeps whatever default it
+                        // already had; see LoadWarnings' own comment for why this matters and how it's
+                        // surfaced.
+                        try { s.Read(payload); }
+                        catch (Exception ex) { LoadWarnings.Add(string.Format("{0}: {1}", s.Key, ex.Message)); }
+                    }
                 }
-                else if (s.ImportLegacy())   // section absent from the file: one-time legacy import
-                    MigratedOnLoad = true;
+                else
+                {
+                    // Section absent from the user's own file. Prefer a real legacy standalone file (the
+                    // operator's own actual prior data) over the shipped template; only fall back to the
+                    // template's curated default - not just the section owner's bare C# field-initializer
+                    // default - when there's no legacy data to recover. Neither counts as "migrated" (a
+                    // save-worthy change) if it silently fails; a template value merged in IS worth an
+                    // immediate save, same as a legacy import, so an upgrade's curated defaults actually
+                    // land in the user's own App.config rather than being re-derived from the template
+                    // every single launch.
+                    bool recovered = s.ImportLegacy();
+                    if (!recovered)
+                    {
+                        var tmplPayload = TemplateSectionLookup?.Invoke(s.Key);
+                        if (tmplPayload != null)
+                        {
+                            try { s.Read(tmplPayload); recovered = true; }
+                            catch (Exception ex) { LoadWarnings.Add(string.Format("{0} (template default): {1}", s.Key, ex.Message)); }
+                        }
+                    }
+                    if (recovered)
+                        MigratedOnLoad = true;
+                }
             }
 
             // Preserve any file sections we don't own (a feature not present in this build).

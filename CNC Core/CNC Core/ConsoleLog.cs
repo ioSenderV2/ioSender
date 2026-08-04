@@ -10,9 +10,9 @@
  * A fresh, timestamped file per run (rather than one ever-growing appended file) keeps each
  * ioSender launch's log independently identifiable - useful when correlating a specific repro
  * attempt against its own log rather than scrolling through prior runs first. "latest_console.log"
- * is (hard-)linked to the current run's file so it never has to be hunted down by timestamp.
- * File creation, size-based rotation and age-based pruning are all handled by LogFile - the same
- * primitive DebugLog and the crash logger use.
+ * is (hard-)linked to the current run's file so it never has to be hunted down by timestamp or
+ * weekday. File creation, day-of-week folder placement, size-based rotation and per-folder
+ * retention are all handled by LogFile - the same primitive DebugLog and the crash logger use.
  *
  * The write itself runs on a dedicated background thread, fed by a BlockingCollection queue -
  * ResponseLog changes are appended to the UI thread (Dispatcher-marshalled), so the file I/O
@@ -33,8 +33,9 @@ namespace CNC.Core
         private static Thread _writer;
 
         // Best-effort retention: run-timestamped files never get overwritten (unlike the old single
-        // appended console.log), so without pruning they'd accumulate forever.
-        private const int RetentionDays = 10;
+        // appended console.log), so without pruning they'd accumulate forever. Kept per day-of-week
+        // folder (see LogFile), not by calendar age.
+        private const int RetentionCount = 10;
 
         /// <summary>Full path of the active log file, or empty if logging couldn't start.</summary>
         public static string LogPath { get { return _log?.Path ?? string.Empty; } }
@@ -42,7 +43,7 @@ namespace CNC.Core
         /// <summary>Start the background writer. Safe to call once at startup; never throws.</summary>
         public static void Init()
         {
-            _log = LogFile.Open("console", perRun: true, retentionDays: RetentionDays, latestLinkName: "latest_console.log");
+            _log = LogFile.Open("console", retentionCount: RetentionCount, latestLinkName: "latest_console.log");
             if (_log == null)
                 return;
 

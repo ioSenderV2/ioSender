@@ -86,6 +86,12 @@ namespace CNC.Controls
         // store (main bar, Tools) subscribe to persist the new Items order there.
         public event EventHandler TabsReordered;
 
+        /// <summary>True while a header drag is in progress. The host checks this before dispatching view
+        /// activation on SelectionChanged: reordering Items raises SelectionChanged SYNCHRONOUSLY, and the
+        /// TabItem being moved is momentarily unparented, so its inherited DataContext is null while it
+        /// happens. Activating a view in that window crashed the app - see MainWindow.TabMode_SelectionChanged.</summary>
+        public bool IsReordering { get { return dragging; } }
+
         // Raised true when a header drag starts, false when it ends. This control can only Clip its OWN
         // visual subtree (see the Clip in OnReorderMouseMove) - it has no way to reach a SIBLING element
         // elsewhere in the host window, e.g. MainWindow's pinned sidebar flyout icons docked next to the
@@ -239,6 +245,14 @@ namespace CNC.Controls
                     Math.Abs(pos.Y - dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
                     return;
                 dragging = true;
+                // Capture, so a mouse-up ANYWHERE still reaches us. Without this the drag could only be
+                // ended by a mouse-up on this control: release over the content pane, another panel or
+                // outside the window and EndReorder never ran, stranding the OverrideCursor and the Clip
+                // below - the app then looked frozen (invisible content, horizontal-arrow cursor) and had
+                // to be restarted. That is issue #17, "Drag Tab hangs ioSender", present since 2.16.
+                // It also makes the LostMouseCapture handler meaningful: nothing was ever captured before,
+                // so that safety net could never fire.
+                CaptureMouse();
                 Mouse.OverrideCursor = Cursors.SizeWE;
                 // Live header reorder is what's wanted here (tabs visibly swap position as you drag over
                 // them) - the actual complaint was the CONTENT pane repainting/flickering along with it each
@@ -271,12 +285,20 @@ namespace CNC.Controls
 
         private void EndReorder()
         {
-            if (dragging)
-            {
+            // Cursor and clip are reset unconditionally, not just when `dragging` is set. They are global,
+            // sticky UI state (Mouse.OverrideCursor is application-wide), so if any path ever reaches here
+            // with the flag already cleared - re-entrancy, a second EndReorder from capture loss after the
+            // mouse-up - the alternative is a permanently unusable window. Cheap to reset, catastrophic to skip.
+            if (Mouse.OverrideCursor != null)
                 Mouse.OverrideCursor = null;
-                Clip = null;   // reveal the settled content pane again - see OnReorderMouseMove's own comment
+            if (Clip != null)
+                Clip = null;
+
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
+
+            if (dragging)
                 ReorderDragging?.Invoke(this, false);
-            }
             if (movedThisDrag)
             {
                 // Self-persist when we own the order; otherwise let the host store it (main bar / Tools).
@@ -352,6 +374,26 @@ namespace CNC.Controls
         protected override void OnItemsChanged(NotifyCollectionChangedEventArgs e)
         {
             base.OnItemsChanged(e);
+            // A tab hidden/shown later (e.g. Tools' capability-gated sub-tabs) changes
+            // how much width is available to spread across the REST of the strip, but neither Add/Remove here
+            // nor this control's own SizeChanged fires just from a child's Visibility flipping - confirmed on
+            // real hardware: newly-revealed tabs kept whatever stale Width they'd last been assigned (often 0,
+            // from before they ever had visible content to measure), wrapping the strip onto 2 rows instead of
+            // spreading evenly. Track each tab's IsVisibleChanged directly so a pure visibility change queues
+            // the same recompute an Add/Remove/resize would.
+            if (e.OldItems != null)
+                foreach (var item in e.OldItems)
+                    if (item is TabItem ti)
+                        ti.IsVisibleChanged -= TabItem_IsVisibleChanged;
+            if (e.NewItems != null)
+                foreach (var item in e.NewItems)
+                    if (item is TabItem ti)
+                        ti.IsVisibleChanged += TabItem_IsVisibleChanged;
+            QueueUpdate();
+        }
+
+        private void TabItem_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
             QueueUpdate();
         }
 

@@ -44,8 +44,12 @@ namespace CNC.Controls
     /// <summary>
     /// Interaction logic for StripGCodeConfigControl.xaml
     /// </summary>
-    public partial class StripGCodeConfigControl : UserControl, ISettingsResettable
+    public partial class StripGCodeConfigControl : UserControl, ISettingsResettable, ISettingsPanelCategory
     {
+        // Where this panel sits in the settings navigation tree (ISettingsPanelCategory).
+        public string SettingsCategory { get { return SettingsCategories.GCode; } }
+        public int SettingsOrder { get { return 0; } }
+
         public StripGCodeConfigControl()
         {
             InitializeComponent();

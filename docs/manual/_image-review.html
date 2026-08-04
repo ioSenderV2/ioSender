@@ -1,30 +1,52 @@
 ﻿<!doctype html>
-<html><head><meta charset="utf-8"><title>Manual image review</title>
+<html><head><meta charset="utf-8"><title>Manual screenshot status</title>
 <style>
 body { font-family: Segoe UI, sans-serif; background:#1e1e1e; color:#ddd; margin:0; padding:16px; }
-h1 { font-size:16px; font-weight:600; }
+h1 { font-size:16px; font-weight:600; margin:0 0 4px; }
+.sub { color:#999; font-size:12px; margin-bottom:16px; }
 .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:16px; }
 .card { background:#2a2a2a; border-radius:6px; overflow:hidden; }
 .card img { width:100%; display:block; border-bottom:1px solid #444; }
 .cap { padding:6px 8px; font-size:13px; }
 .mtime { color:#999; font-size:11px; }
+.note { color:#bbb; font-size:11px; }
+.card.reshoot { outline:2px solid #c0392b; }
+.card.orphaned { outline:2px solid #7f8c8d; }
+.card.current { outline:2px solid #2ecc71; }
+.card.wanted { background:#332; border:2px dashed #d4a017; display:flex; flex-direction:column; }
+.card.wanted .ph { flex:1; min-height:180px; display:flex; align-items:center; justify-content:center;
+                   color:#d4a017; font-size:13px; text-align:center; padding:12px; }
+.pill { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; text-transform:uppercase;
+        letter-spacing:.04em; vertical-align:1px; margin-right:4px; }
+.pill.reshoot { background:#c0392b; color:#fff; }
+.pill.wanted { background:#d4a017; color:#221; }
+.pill.orphaned { background:#7f8c8d; color:#fff; }
+.pill.current { background:#2ecc71; color:#132; }
 </style></head>
 <body>
-<h1>docs/manual/img - 14 images (regenerate: tools\gen-image-review.ps1)</h1>
+<h1>Manual screenshot status - 2 wanted &middot; 4 orphaned &middot; 14 current</h1>
+<div class="sub">generated 2026-08-03 07:47 by tools\gen-image-review.ps1 &middot; status derived from docs/manual/index.html
+plus the $Wanted / $Reshoot tables in that script</div>
 <div class="grid">
-<div class='card'><img src='img/connect-dialog.png' loading='lazy'><div class='cap'>connect-dialog.png<br><span class='mtime'>2026-07-07 09:13:33</span></div></div>
-<div class='card'><img src='img/errors-dialog.png' loading='lazy'><div class='cap'>errors-dialog.png<br><span class='mtime'>2026-07-07 09:13:34</span></div></div>
-<div class='card'><img src='img/feeds-and-speeds.png' loading='lazy'><div class='cap'>feeds-and-speeds.png<br><span class='mtime'>2026-07-25 14:53:04</span></div></div>
-<div class='card'><img src='img/gcode-viewer.png' loading='lazy'><div class='cap'>gcode-viewer.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/heightmap.png' loading='lazy'><div class='cap'>heightmap.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/job-runscreen.png' loading='lazy'><div class='cap'>job-runscreen.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/lathe-wizard.png' loading='lazy'><div class='cap'>lathe-wizard.png<br><span class='mtime'>2026-07-07 09:13:34</span></div></div>
-<div class='card'><img src='img/machine-setup-overview.png' loading='lazy'><div class='cap'>machine-setup-overview.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/offsets-table.png' loading='lazy'><div class='cap'>offsets-table.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/probing-tabs.png' loading='lazy'><div class='cap'>probing-tabs.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/sdcard.png' loading='lazy'><div class='cap'>sdcard.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/settings-grbl.png' loading='lazy'><div class='cap'>settings-grbl.png<br><span class='mtime'>2026-07-25 14:49:20</span></div></div>
-<div class='card'><img src='img/start-job-panel.png' loading='lazy'><div class='cap'>start-job-panel.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
-<div class='card'><img src='img/tools-tab.png' loading='lazy'><div class='cap'>tools-tab.png<br><span class='mtime'>2026-07-25 12:44:33</span></div></div>
+<div class='card wanted'><div class='ph'>shot needed</div><div class='cap'><span class='pill wanted'>wanted</span> machine-setup-calibration.png<br><span class='note'>Machine Setup &gt; 8 - Calibration &gt; Stepper: fixture pick, true/measured size, new steps/mm</span></div></div>
+<div class='card wanted'><div class='ph'>shot needed</div><div class='cap'><span class='pill wanted'>wanted</span> work-order-surface.png<br><span class='note'>a Work Order with a Surface toolpath selected, Entire Spoilboard ticked</span></div></div>
+<div class='card orphaned'><img src='img/heightmap.png' loading='lazy'><div class='cap'><span class='pill orphaned'>orphaned</span> heightmap.png<br><span class='mtime'>2026-07-29 10:05:24</span><br><span class='note'>orphaned - nothing in index.html references it (kept: git history makes it recoverable)</span></div></div>
+<div class='card orphaned'><img src='img/odd-jobs-work-order.png' loading='lazy'><div class='cap'><span class='pill orphaned'>orphaned</span> odd-jobs-work-order.png<br><span class='mtime'>2026-07-30 19:07:43</span><br><span class='note'>orphaned - nothing in index.html references it (kept: git history makes it recoverable)</span></div></div>
+<div class='card orphaned'><img src='img/probing-tabs.png' loading='lazy'><div class='cap'><span class='pill orphaned'>orphaned</span> probing-tabs.png<br><span class='mtime'>2026-07-29 10:05:24</span><br><span class='note'>orphaned - nothing in index.html references it (kept: git history makes it recoverable)</span></div></div>
+<div class='card orphaned'><img src='img/tools-tab.png' loading='lazy'><div class='cap'><span class='pill orphaned'>orphaned</span> tools-tab.png<br><span class='mtime'>2026-07-29 10:05:24</span><br><span class='note'>orphaned - nothing in index.html references it (kept: git history makes it recoverable)</span></div></div>
+<div class='card current'><img src='img/connect-dialog.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> connect-dialog.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card current'><img src='img/errors-dialog.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> errors-dialog.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card current'><img src='img/feeds-and-speeds.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> feeds-and-speeds.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card current'><img src='img/gcode-viewer.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> gcode-viewer.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card current'><img src='img/job-runscreen.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> job-runscreen.png<br><span class='mtime'>2026-08-01 05:45:02</span></div></div>
+<div class='card current'><img src='img/lathe-wizard.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> lathe-wizard.png<br><span class='mtime'>2026-07-29 10:05:24</span></div></div>
+<div class='card current'><img src='img/machine-setup-overview.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> machine-setup-overview.png<br><span class='mtime'>2026-08-03 07:46:00</span></div></div>
+<div class='card current'><img src='img/offsets-table.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> offsets-table.png<br><span class='mtime'>2026-08-01 05:59:46</span></div></div>
+<div class='card current'><img src='img/sdcard.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> sdcard.png<br><span class='mtime'>2026-08-01 06:06:17</span></div></div>
+<div class='card current'><img src='img/settings-grbl.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> settings-grbl.png<br><span class='mtime'>2026-08-03 07:23:18</span></div></div>
+<div class='card current'><img src='img/settings-search.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> settings-search.png<br><span class='mtime'>2026-08-03 07:43:48</span></div></div>
+<div class='card current'><img src='img/setup-dynamic-geometry.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> setup-dynamic-geometry.png<br><span class='mtime'>2026-08-01 05:55:36</span></div></div>
+<div class='card current'><img src='img/start-job-panel.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> start-job-panel.png<br><span class='mtime'>2026-08-01 04:35:44</span></div></div>
+<div class='card current'><img src='img/work-order.png' loading='lazy'><div class='cap'><span class='pill current'>current</span> work-order.png<br><span class='mtime'>2026-08-01 04:39:19</span></div></div>
 </div>
 </body></html>
