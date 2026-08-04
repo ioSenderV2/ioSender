@@ -1878,7 +1878,21 @@ namespace CNC.Controls
             // Keep the layout tree's top-level tab order in sync with the legacy Config.Tabs (still the
             // editor's source until the layout editor edits the tree). Transitional - tree drives the build.
             if (layoutSection != null)
+            {
                 TabOrder.Apply(layoutSection.Root, Base.Tabs);
+
+                // Apply() REBUILDS the tabs slot to contain exactly Base.Tabs' entries, which silently DELETES
+                // any node in that slot the flat list doesn't name - and it runs long after
+                // ApplyOneTimeFixups, so the menu-placement invariant never sees the orphan.
+                //
+                // That is how Height Map ended up in no slot at all (observed 2026-08-03): it sat in the tabs
+                // slot, EnforceMenuPlacement correctly left it alone because it WAS in the tree, then Apply
+                // dropped it because the flat list didn't mention it, and it was gone. Re-running the
+                // invariant here rescues anything Apply orphaned back to its default menu, so a component can
+                // never be deleted out of existence by a flat list that predates it.
+                EnforceMenuPlacement();
+                DeduplicateTopLevelPlacements();
+            }
 
             // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
             // standalone file: persist the converted form now so the stored config is canonical. The

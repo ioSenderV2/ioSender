@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -173,6 +174,7 @@ namespace GCode_Sender
         // subscribes DRO events), so creation happens once and only the parenting changes afterwards.
         private readonly System.Collections.Generic.List<UserControl> mainPanels = new System.Collections.Generic.List<UserControl>();
         private int mainSplit = -1;   // last applied split point; -1 = nothing distributed yet
+        private bool postRenderSplitDone = false;   // the one deferred re-decide once the panels have rendered
 
         // Flow the panels down the FIRST column and start the second only when the next panel would not fit
         // in the height that is left.
@@ -193,8 +195,21 @@ namespace GCode_Sender
             double available = mainScrollLeft.ActualHeight - mainSlotsLeft.Margin.Top;
             double width = mainScrollLeft.ViewportWidth > 0d ? mainScrollLeft.ViewportWidth : 250d;
 
+            // The split has to be decided from heights the panels ACTUALLY rendered at. Before the first
+            // arrange every ActualHeight is 0 and the only figure available is a Measure() guess, which is
+            // what got this wrong twice: it over-reports for content that wraps at the guessed width. So on
+            // that first pass put everything in column one - always a legal arrangement, the ScrollViewer
+            // copes - and re-decide once there are real numbers. postRenderSplitDone stops it re-deferring
+            // for ever if a panel legitimately measures zero.
+            bool rendered = mainPanels.All(p => p.ActualHeight > 0d);
+            if (!rendered && !postRenderSplitDone)
+            {
+                postRenderSplitDone = true;
+                Dispatcher.BeginInvoke(new System.Action(DistributeMainPanels), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+
             int split = mainPanels.Count;
-            if (available > 0d)
+            if (available > 0d && rendered)
             {
                 double used = 0d;
                 for (int i = 0; i < mainPanels.Count; i++)
@@ -207,6 +222,13 @@ namespace GCode_Sender
                     used += height;
                 }
             }
+
+            if (CNC.Core.DebugLog.Enabled)
+                CNC.Core.DebugLog.Write("layout", string.Format(
+                    "DistributeMainPanels: avail={0:0.#} (viewportH={1:0.#} - clearance={2:0.#}) width={3:0.#} rendered={4} split={5}/{6}  heights=[{7}]",
+                    available, mainScrollLeft.ActualHeight, mainSlotsLeft.Margin.Top, width, rendered,
+                    split, mainPanels.Count,
+                    string.Join(", ", mainPanels.Select(p => p.GetType().Name + "=" + PanelHeight(p, width).ToString("0.#")))));
 
             if (split != mainSplit)
             {
