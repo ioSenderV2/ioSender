@@ -501,10 +501,35 @@ namespace CNC.Core
         // that homes ANY axis to the min end the very first anchor targeted a coordinate outside the
         // envelope and check mode - which DOES enforce soft limits - threw Alarm:2 before a single
         // feature was tested. Observed on a machine reporting MPos X:+751 with Y/Z negative.
+        private static bool IsPositiveSpace(int axis)
+        {
+            return GrblInfo.ForceSetOrigin && GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis));
+        }
+
         private static double EnvelopeCentre(int axis, double travel)
         {
-            bool positive = GrblInfo.ForceSetOrigin && GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis));
-            return positive ? travel / 2.0 : -travel / 2.0;
+            return IsPositiveSpace(axis) ? travel / 2.0 : -travel / 2.0;
+        }
+
+        // Is this MACHINE coordinate inside the axis's soft-limit envelope? An axis with no configured
+        // travel ($13x = 0) has no soft limit to violate, so anything goes.
+        // The visualisation job below commands REAL motion at F6000. Soft limits catch a bad target on a
+        // machine that has them enabled ($20) - a machine without them has nothing between a mis-framed
+        // coordinate and the hard stops, so the job is checked here rather than trusted.
+        // This checks move ENDPOINTS, not swept arc extents. That is sufficient rather than lucky: every
+        // move is a spoke of at most _scale from the envelope centre and _scale is capped at a quarter of
+        // the SMALLEST axis travel, so an endpoint sits within [tr/4, 3tr/4] of the envelope; the widest
+        // sweep here (the full circle G2 X0 Y0 I-s J0, which reaches 2s past the centre) still lands
+        // exactly on the boundary in the worst case, never outside it.
+        private static bool WithinEnvelope(int axis, double machineCoord)
+        {
+            double tr = AxisTravel(axis);
+            if (tr <= 0.0)
+                return true;
+
+            return IsPositiveSpace(axis)
+                ? machineCoord >= 0.0 && machineCoord <= tr
+                : machineCoord <= 0.0 && machineCoord >= -tr;
         }
 
         // Size the motion-test moves to the machine: big enough to see in the 3D view (~100 mm) but
@@ -550,8 +575,22 @@ namespace CNC.Core
         /// Returns an EMPTY list when no motion test passed, so a caller can tell "nothing to show" from a
         /// real program without counting prefix lines.
         /// </summary>
-        public List<string> BuildSafeJob()
+        public List<string> BuildSafeJob(GrblViewModel model)
         {
+            // The geometry below is computed in MACHINE coordinates, because that is the frame the
+            // soft-limit envelope is expressed in - but the job runs in the WORK frame (it sets G54/G90),
+            // so every coordinate is translated on the way out by subtracting the work offset.
+            // This used to emit the machine numbers directly, on the stated assumption that "the work
+            // offset is ~zero, which it is for a homed machine with G54 at machine origin". That is not
+            // the validate norm at all: on a machine reporting WCO 90.759,-696.144,-108.492 the very
+            // first move asked for machine Y = -MaxTravelY/2 - 696.1 and threw Alarm:2 without moving.
+            var workOffset = new double[GrblInfo.NumAxes];
+            for (int i = 0; i < workOffset.Length; i++)
+                workOffset[i] = model != null && i < model.WorkPositionOffset.Values.Length
+                              ? model.WorkPositionOffset.Values[i] : 0.0;
+
+            bool inEnvelope = true;
+
             var lines = new List<string>();
             // ABSOLUTE (G90) variant of the prefix. The test streams relative (G91) moves re-anchored with
             // G53 machine coords; the 3D emulator renders that offset from the live tool position, so the
@@ -564,7 +603,7 @@ namespace CNC.Core
             lines.Add("F" + VisualizeFeed);
             int prefixCount = lines.Count;
 
-            string absAnchor = BuildAbsoluteAnchor();   // "G0 X<cx> Y<cy> Z<cz>" to the envelope centre
+            string absAnchor = BuildAbsoluteAnchor(workOffset, ref inEnvelope);   // "G0 X.. Y.. Z.." to the envelope centre
 
             for (int i = 0; i < Tests.Count; i++)
             {
@@ -573,7 +612,7 @@ namespace CNC.Core
                     continue;
                 if (absAnchor != null && i > 0 && Tests[i - 1].Helper && Tests[i - 1].Code == _anchor)
                     lines.Add(absAnchor);
-                lines.Add(ToAbsolute(StripFeed(t.Code)));   // relative-from-centre -> absolute
+                lines.Add(ToAbsolute(StripFeed(t.Code), workOffset, ref inEnvelope));   // relative-from-centre -> absolute
             }
 
             // Nothing but the prefix means no motion test passed - there is no toolpath to show. The old
@@ -586,18 +625,30 @@ namespace CNC.Core
             if (absAnchor != null)
                 lines.Add(absAnchor);                        // park back at centre when the run ends
 
+            // Any target outside the envelope means the frame is wrong, not that one move is unlucky -
+            // emit nothing rather than hand the operator a program that alarms at best and crashes into a
+            // hard stop at worst. Losing the 3D preview is the cheap failure here.
+            if (!inEnvelope)
+                return new List<string>();
+
             return lines;
         }
 
-        // "G0 X<cx> Y<cy> Z<cz>" rapid to the envelope centre in absolute coords, or null if no travel.
-        private string BuildAbsoluteAnchor()
+        // "G0 X<cx> Y<cy> Z<cz>" rapid to the envelope centre, in WORK coordinates, or null if no travel.
+        private string BuildAbsoluteAnchor(double[] workOffset, ref bool inEnvelope)
         {
             if (_center == null)
                 return null;
             var sb = new StringBuilder("G0");
             bool any = false;
             for (int i = 0; i < _center.Length; i++)
-                if (!double.IsNaN(_center[i])) { sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i])); any = true; }
+                if (!double.IsNaN(_center[i]))
+                {
+                    if (!WithinEnvelope(i, _center[i]))
+                        inEnvelope = false;
+                    sb.Append(' ').Append(GrblInfo.AxisIndexToLetter(i)).Append(Num(_center[i] - workOffset[i]));
+                    any = true;
+                }
             return any ? sb.ToString() : null;
         }
 
@@ -608,7 +659,7 @@ namespace CNC.Core
         private static readonly System.Text.RegularExpressions.Regex WordRx =
             new System.Text.RegularExpressions.Regex(@"([A-Za-z])\s*([-+]?[0-9]*\.?[0-9]+)");
 
-        private string ToAbsolute(string relCode)
+        private string ToAbsolute(string relCode, double[] workOffset, ref bool inEnvelope)
         {
             var sb = new StringBuilder();
             foreach (System.Text.RegularExpressions.Match m in WordRx.Matches(relCode))
@@ -619,7 +670,10 @@ namespace CNC.Core
                 if (axis >= 0 && _center != null && axis < _center.Length && !double.IsNaN(_center[axis]))
                 {
                     double rel = double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    sb.Append(letter).Append(Num(_center[axis] + rel));
+                    double machineTarget = _center[axis] + rel;
+                    if (!WithinEnvelope(axis, machineTarget))
+                        inEnvelope = false;
+                    sb.Append(letter).Append(Num(machineTarget - workOffset[axis]));
                 }
                 else
                     sb.Append(letter).Append(m.Groups[2].Value);   // Gn / I / J / K / R / centre-less axis
