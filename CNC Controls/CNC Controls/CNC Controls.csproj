@@ -89,7 +89,6 @@
     <Compile Include="ComponentAvailability.cs" />
     <Compile Include="ComponentRegistry.cs" />
     <Compile Include="StretchTabControl.cs" />
-    <Compile Include="IProgramSource.cs" />
     <Compile Include="StreamPump.cs" />
     <Compile Include="LayoutModel.cs" />
     <Compile Include="LayoutSection.cs" />

@@ -1,5 +1,5 @@
 /*
- * IProgramSource.cs - part of CNC Controls library
+ * IProgramSource.cs - part of CNC Core library
  *
  * The read surface the job streamer (JobControl) needs to stream a program. The loaded job (GCode /
  * GCode.File) implements it; a tool can supply its OWN in-memory program so a generated run streams
@@ -13,7 +13,7 @@ using System.Collections.ObjectModel;
 using CNC.Core;
 using CNC.GCode;
 
-namespace CNC.Controls
+namespace CNC.Core
 {
     public interface IProgramSource
     {
