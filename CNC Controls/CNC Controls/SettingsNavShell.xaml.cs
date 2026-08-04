@@ -37,6 +37,51 @@ namespace CNC.Controls
             InitializeComponent();
             Nodes = new ObservableCollection<SettingsNavNode>();
             navTree.ItemsSource = Nodes;
+
+            // handledEventsToo: the whole point is to see wheel events an inner control already marked
+            // handled. See PageScroll_MouseWheel.
+            pageScroll.AddHandler(MouseWheelEvent, new MouseWheelEventHandler(PageScroll_MouseWheel), true);
+        }
+
+        // Scroll the page when the wheel turns over a child that swallowed the event without moving.
+        //
+        // Every settings page sits inside pageScroll, which hands its content unlimited height - so a list
+        // control on a page (the Key Mappings grid, the placement list) lays out at its FULL height and its
+        // own internal ScrollViewer has nothing left to scroll. WPF's ScrollViewer.OnMouseWheel marks the
+        // event handled regardless of whether it actually moved anything, so the wheel died over the list and
+        // only worked with the pointer directly over pageScroll's scrollbar.
+        //
+        // So: if the nearest ScrollViewer between the mouse and pageScroll can't scroll vertically (or there
+        // isn't one), drive pageScroll instead. A child that CAN scroll is left alone, which is why this
+        // walks the tree per event rather than blanket-handling the wheel at the top.
+        private void PageScroll_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.Delta == 0 || InnerScrollCanScroll(e.OriginalSource as DependencyObject))
+                return;
+
+            // Match what the ScrollViewer would have done itself, rather than treating the raw delta as a
+            // pixel count (which scrolls ~2.5x too far per notch): Windows' own wheel setting, in lines of
+            // roughly one text row, scaled for a mouse that reports more than one notch per event.
+            int lines = SystemParameters.WheelScrollLines;
+            double distance = lines < 0 ? pageScroll.ViewportHeight : lines * 16d;   // -1 = "one screen at a time"
+            double notches = System.Math.Abs(e.Delta) / 120d;
+
+            pageScroll.ScrollToVerticalOffset(
+                pageScroll.VerticalOffset + (e.Delta > 0 ? -1d : 1d) * distance * System.Math.Max(1d, notches));
+            e.Handled = true;
+        }
+
+        // True when some ScrollViewer between node and pageScroll has vertical room to move - in which case
+        // that control owns the wheel and this handler keeps its hands off.
+        private bool InnerScrollCanScroll(DependencyObject node)
+        {
+            while (node != null && node != pageScroll)
+            {
+                if (node is ScrollViewer sv && sv.ScrollableHeight > 0d)
+                    return true;
+                node = VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node);
+            }
+            return false;
         }
 
         public ObservableCollection<SettingsNavNode> Nodes { get; private set; }
