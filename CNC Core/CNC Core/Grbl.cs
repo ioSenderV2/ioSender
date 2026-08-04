@@ -1578,9 +1578,25 @@ namespace CNC.Core
 
         private static void Process(string data)
         {
-            if (!target.IsCurrent)
+            Process(data, false);
+        }
+
+        // 'marshalled' makes the hop to the captured thread happen AT MOST ONCE, and it is load-bearing.
+        // This guard used to re-raise the dataReceived multicast - which this method is itself the only
+        // subscriber to - so the marshalled call re-entered here. That was safe under the
+        // Dispatcher.Invoke it replaced, because a dispatcher can never run the callback inline on the
+        // calling thread. SyncTarget.Send CAN: it deliberately runs inline when it has no context to
+        // marshal through (a plain worker thread, or a headless host with no UI thread registered), and
+        // the base SynchronizationContext.Send likewise invokes its delegate on the calling thread.
+        // Inline means IsCurrent is still false on re-entry, so this recursed until the stack died -
+        // a StackOverflowException, which no AppDomain handler can catch, so the process disappeared
+        // with no crash log and no dialog. Running the body on the "wrong" thread when there is nothing
+        // to marshal to is the correct headless behaviour; recursing is never correct.
+        private static void Process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                target.Send(() => dataReceived(data));
+                target.Send(() => Process(data, true));
                 return;
             }
 
@@ -2297,9 +2313,17 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (!target.IsCurrent)
+            process(data, false);
+        }
+
+        // See GrblParserState.Process for why the marshal must not re-raise dataReceived: SyncTarget.Send
+        // can run inline, and re-entering this guard then recurses to a StackOverflowException. This is the
+        // site that actually crashed - loading a large program while $# was in flight.
+        private static void process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                target.Send(() => dataReceived(data));
+                target.Send(() => process(data, true));
                 return;
             }
 
@@ -2572,9 +2596,15 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (!target.IsCurrent)
+            process(data, false);
+        }
+
+        // Same one-hop guard as the other two handshakes - see GrblParserState.Process.
+        private static void process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                target.Send(() => dataReceived(data));
+                target.Send(() => process(data, true));
                 return;
             }
 
