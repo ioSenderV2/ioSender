@@ -523,21 +523,41 @@
     probing, work-offset setup, tool changes, machine commissioning and a live 3D view of the toolpath.</p>
 
     <h3>The main window at a glance</h3>
-    <p>Across the top is a row of <strong>tabs</strong>. The important ones, left to right:</p>
+    <p>The <strong>tab strip</strong> across the top carries only what you need <em>while a job runs</em>.
+    Everything else — commissioning, settings, probing, the hardware tuners — lives in the <strong>File</strong>
+    and <strong>Tools</strong> menus and opens in its own window. Four tabs, left to right:</p>
     <table class="reftab">
       <tr><th>Tab</th><th>What it's for</th></tr>
       <tr><td><a href="#setup">Setup</a></td><td>The front door: measure your stock, set the origin, and launch a job.</td></tr>
       <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run bar.</td></tr>
       <tr><td><a href="#work-order">Work Order</a></td><td>Compose a quick job (pockets, drills, contours…) without a CAM round-trip.</td></tr>
-      <tr><td><a href="#machine-setup">Machine&nbsp;Setup</a></td><td>Guided first-time commissioning of a new controller.</td></tr>
-      <tr><td><a href="#settings">Settings</a></td><td>All grbl <code>$</code> settings plus the app's own preferences, in a searchable navigation tree.</td></tr>
-      <tr><td><a href="#tools">Tools</a></td><td>Tool table, Trinamic and PID tuning — <em>only appears if your controller supports one of them</em>, so don't worry if you don't have this tab.</td></tr>
+      <tr><td><a href="#offsets">Offsets</a></td><td>The work-coordinate table — review, nudge and manage G54–G59.3.</td></tr>
     </table>
+    <p>And the menu bar beside them:</p>
+    <table class="reftab">
+      <tr><th>Menu</th><th>What's in it</th></tr>
+      <tr><td><strong>Connect…</strong></td><td>Not a menu but a command — opens the <a href="#connect">connection dialog</a>. Reads <em>Reconnect…</em> once you're connected.</td></tr>
+      <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order, then the two configuration destinations: <strong>Machine</strong> (<a href="#machine-setup">Machine&nbsp;Setup</a>) and <a href="#settings">Settings</a>.</td></tr>
+      <tr><td><strong>Tools</strong></td><td>Camera, <a href="#sdcard">SD Card</a>, <a href="#feeds-and-speeds">Feeds and Speeds</a>, Probing, Height Map, <a href="#lathe">Lathe Tools</a> — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
+      <tr><td><strong>Help</strong></td><td>Wiki, usage tips, a brief tour, video tutorials, error &amp; alarm codes, and <strong>Support</strong> (check for updates, roll back a version, open the app data folder).</td></tr>
+    </table>
+
+    <figure>
+      <div class="shot-todo">screenshot: the main window with the Tools menu open — the four-tab strip (Setup, Job, Work Order, Offsets) visible behind it, and the menu listing Camera, SD Card, Feeds and Speeds, Probing, Height Map, Lathe Tools</div>
+      <figcaption>The main window: four tabs for running work, with everything else one menu away.</figcaption>
+    </figure>
+
+    <div class="callout note"><span class="k">That split is a default, not a rule</span><br>
+      <strong>Settings → User Interface → Top-level tabs</strong> lets you put any view where you want it —
+      tab bar, File menu, Tools menu, or hidden. Prefer Probing as a tab? Put it back. See
+      <a href="#settings">Where each view lives</a>. And a keyboard shortcut names a <em>view</em>, not a
+      place, so moving something never costs it its key.</div>
 
     <h3>Your first five minutes</h3>
     <ol>
       <li><a href="#connect">Connect</a> to the controller (serial port or network).</li>
-      <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once.</li>
+      <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once
+      (<strong>File → Machine</strong>).</li>
       <li>Learn to <a href="#jogging">jog</a> — move the machine safely by hand.</li>
       <li>Load some g-code on the <a href="#job">Job</a> tab, use <a href="#setup">Setup</a> to probe your
       stock, or compose a quick job in <a href="#work-order">Work Order</a>.</li>
@@ -584,7 +604,8 @@
     <h3>What happens on connect</h3>
     <p>Once the link opens, ioSender runs a <strong>handshake</strong> with the controller: it reads the
     firmware build, the axis count, and the available options (probing, WCS rotation, plugins), then enables
-    only the tabs that controller actually supports. This is also when the
+    only the views that controller actually supports — a tab or a menu entry for something your board can't
+    do simply isn't there. This is also when the
     <a href="#getting-started">option-matched simulator</a> is selected, if you're running one.</p>
 
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#settings">Settings</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
@@ -1113,9 +1134,9 @@
       <li><strong>Firmware information</strong> (the <code>$I</code> window shown here) — a read-only dump of the controller's reported firmware, version, build, axis count and enabled options — handy when reporting a problem.</li>
       <li><strong>Forget machine / Reload / Preview / Apply</strong> (bottom right) — Apply is the only button that actually writes settings to the controller; Preview lets you review the resulting <code>$</code> settings first.</li>
     </ul>
-    <p><strong>Machine Setup</strong> is a guided wizard that walks you through the settings a new machine
-    needs before it can safely home and run — in plain-English steps instead of a wall of <code>$</code>
-    numbers. Do it <strong>once</strong> when you first connect a controller (and again after a firmware
+    <p><strong>Machine Setup</strong> — opened from <strong>File → Machine</strong>, in its own window — is a
+    guided wizard that walks you through the settings a new machine needs before it can safely home and run —
+    in plain-English steps instead of a wall of <code>$</code> numbers. Do it <strong>once</strong> when you first connect a controller (and again after a firmware
     reset). It writes real grbl settings to the controller's <a href="#intro-to-cnc">NVRAM</a>, so it's how
     you turn a blank board into <em>your</em> machine.</p>
 
@@ -1194,23 +1215,27 @@
            data-track="novice:0,intermediate:2,machinist:4">
     <h2>Tools — the hardware-gated extras <a class="anchor" href="#tools">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
-    <p>The <strong>Tools</strong> tab holds the three utilities that depend on what your <em>controller</em>
-    supports, rather than on how you work:</p>
+    <p>Three utilities depend on what your <em>controller</em> supports rather than on how you work. Each is
+    its own entry at the bottom of the <strong>Tools</strong> menu, and each appears only when the connected
+    board has the thing it tunes:</p>
     <table class="reftab">
-      <tr><th>Tool</th><th>What it does</th><th>Only if…</th></tr>
+      <tr><th>Tools menu entry</th><th>What it does</th><th>Only if…</th></tr>
       <tr><td><strong>Tool table</strong></td><td>Define your tools (number, diameter, length) so tool changes and offsets know each bit.</td><td>the firmware was built with a tool table (<code>N_TOOLS</code> non-zero)</td></tr>
-      <tr><td><strong>Trinamic</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard).</td><td>the board has TMC drivers</td></tr>
-      <tr><td><strong>PID</strong></td><td>Tune closed-loop / spindle PID.</td><td>the controller exposes a PID log</td></tr>
+      <tr><td><strong>Trinamic tuner</strong></td><td>Tune Trinamic stepper drivers (current, StallGuard).</td><td>the board has TMC drivers</td></tr>
+      <tr><td><strong>PID Tuner</strong></td><td>Tune closed-loop / spindle PID.</td><td>the controller exposes a PID log</td></tr>
     </table>
 
-    <div class="callout note"><span class="k">No Tools tab? Nothing is wrong</span><br>
-      The tab hides itself when your controller supports <em>none</em> of the three — which is the common case
-      on a hobby machine — and shows just the relevant sub-tabs when it supports some. If you're looking for
-      it and it isn't there, your board simply has nothing to put in it.</div>
+    <div class="callout note"><span class="k">Nothing under Camera in the Tools menu? Nothing is wrong</span><br>
+      On a hobby machine the common case is that your controller has <em>none</em> of the three, so none of
+      them are listed — there is nothing to look for. There is no longer a "Tools" tab wrapping them: the
+      wrapper is gone and the three tools stand on their own, so a board with just one of them shows just
+      that one. Like any view, each can be moved onto the tab bar from
+      <strong>Settings → User Interface → Top-level tabs</strong>.</div>
 
     <h3>Where the rest of it went</h3>
-    <p>This tab used to be a catch-all for machine utilities. Everything that wasn't hardware-gated has moved
-    to where it's actually used, and the standalone wizards were deleted rather than kept in two places:</p>
+    <p>There used to be a <strong>Tools</strong> tab, a catch-all for machine utilities. Everything that wasn't
+    hardware-gated has moved to where it's actually used, the standalone wizards were deleted rather than kept
+    in two places, and what remained no longer needed a tab of its own:</p>
     <table class="reftab">
       <tr><th>Used to be here</th><th>Now</th></tr>
       <tr><td><strong>Surface Spoilboard</strong></td><td>A <strong>Surface</strong> toolpath in <a href="#work-order">Work Order</a> — same tool list, same feeds &amp; speeds advisor, same generate/run path and dry run as any other operation. Its <em>Entire Spoilboard</em> mode is a checkbox on the toolpath.</td></tr>
@@ -1302,15 +1327,16 @@
       <li><strong>Save / Restart / Reset to Default</strong> (bottom) is a shared footer; which buttons appear depends on the page (Reset only shows where the page actually has resettable settings).</li>
       <li>On the <strong>Grbl</strong> page specifically, the footer gains <strong>Reload / Backup / Restore / Copy to simulator</strong> — Backup/Restore snapshot and roll back a whole settings set; Copy to simulator pushes the same settings into the bundled offline simulator so it matches your real machine.</li>
     </ul>
-    <p><strong>Settings</strong> holds the controller's settings plus ioSender's own preferences, in one
-    place. They're organised as a tree of five categories:</p>
+    <p><strong>Settings</strong> — opened from <strong>File → Settings</strong>, in its own window — holds the
+    controller's settings plus ioSender's own preferences, in one place. They're organised as a tree of five
+    categories:</p>
     <table class="reftab">
       <tr><th>Category</th><th>Pages</th></tr>
       <tr><td><strong>Controller</strong></td><td><strong>Grbl</strong> — every <code>$</code> setting the controller has, with its own group tree and <code>$</code>-search (see below). <strong>Simulator</strong> — build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>), also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
-      <tr><td><strong>Application</strong></td><td>ioSender's own preferences, one page per panel — <strong>Main</strong> (colours, behaviour, the lathe-mode switch — see <a href="#lathe">Lathe</a>), <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>.</td></tr>
+      <tr><td><strong>Application</strong></td><td>One page per panel — <strong>Main</strong> is how ioSender <em>talks to the controller</em> (reset delay, poll interval, buffer size and aggressive buffering, comment/line-number handling, prefer-network-if-available, and the grbl auto-save pair), plus <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>. How the app itself <em>looks and behaves</em> is not here — that's User Interface → General, below.</td></tr>
       <tr><td><strong>Jogging</strong></td><td><strong>UI jogging</strong> and <strong>Keyboard jogging</strong> — jog steps and feeds for each, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
       <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> (what gets filtered on the way out) and <strong>GCode Viewer</strong> (how the <a href="#gcode-viewer">3D view</a> draws it).</td></tr>
-      <tr><td><strong>User Interface</strong></td><td><strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
+      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-bar labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
     <figure>
       <img src="img/settings-search.png" alt="The Settings search filtered to two matches for the term strip, with the Matched tooltip explainer hovering over the Main entry">
@@ -1361,6 +1387,11 @@
     <p>Settings, Machine Setup and Job can be moved between the bar and a menu but not hidden — ioSender puts
     them back rather than let a layout lock you out.</p>
 
+    <figure>
+      <div class="shot-todo">screenshot: Settings → User Interface → Top-level tabs — the view rows with their destination dropdowns, one of them open showing Tab bar / File menu / Tools menu / Not shown</div>
+      <figcaption>The placement editor: one row per view, one destination each.</figcaption>
+    </figure>
+
     <h3>Binding a key to a tab or menu entry</h3>
     <p><strong>Settings → User Interface → Keyboard</strong> has one group, <strong>Top Level Tabs</strong>,
     holding every top-level destination: the views (Job, Setup, Offsets, Probing, Settings, Machine Setup, the
@@ -1400,7 +1431,7 @@
     </ul>
     <p>The <strong>ioSenderV2 Fusion Addin</strong> adds an "ioSenderV2" panel to Fusion 360's Manufacture
     workspace with <strong>Feeds and Speeds</strong> and <strong>Batch Post Process</strong> commands. The
-    matching <strong>Feeds &amp; Speeds</strong> tab in ioSender reviews what Fusion exports against a
+    matching <strong>Tools → Feeds and Speeds</strong> view in ioSender reviews what Fusion exports against a
     material chip-load/surface-speed table and your connected controller's actual machine limits, before
     you post any g-code — no controller connection required, it works entirely offline against the export
     file.</p>
@@ -1468,7 +1499,7 @@
       <li>Selecting a file (not shown open here) offers Load and run / Edit / View / Delete / Move / Copy.</li>
     </ul>
     <p>Many controllers have an <strong>SD card</strong> (or onboard flash) that stores g-code files on the
-    controller itself. The SD Card tab manages those files and can run them directly.</p>
+    controller itself. <strong>Tools → SD Card</strong> manages those files and can run them directly.</p>
     <ul>
       <li><strong>Upload / From file</strong> — copy a local g-code file onto the card.</li>
       <li><strong>Load and run</strong> — run a file straight <em>from the card</em>: the controller streams
@@ -1545,9 +1576,10 @@
       <li><strong>CSS</strong> (Constant Surface Speed) — holds a constant cutting speed at the tool tip by varying spindle RPM as the diameter changes, instead of a fixed RPM.</li>
       <li><strong>Calculate</strong> generates the actual turning program from these numbers, ready to load and run like any other g-code.</li>
     </ul>
-    <p>ioSender also drives <strong>lathes</strong>. Turn on lathe mode under
-    <a href="#settings">Settings → Application → Main</a> and the interface switches to a lathe layout — X becomes the
-    diameter/radius axis and Z runs along the spindle.</p>
+    <p>ioSender also drives <strong>lathes</strong>. There is no app switch to throw: lathe mode follows the
+    <em>controller</em> — a firmware built with lathe support reports it (<code>LATHE</code> in its
+    <code>$I</code> options) and the interface switches to a lathe layout, with X as the diameter/radius axis
+    and Z running along the spindle. The wizards live at <strong>Tools → Lathe Tools</strong>.</p>
     <h3>The wizards</h3>
     <p>Rather than hand-writing turning g-code, fill in dimensions and let a wizard generate the program:</p>
     <table class="reftab">
