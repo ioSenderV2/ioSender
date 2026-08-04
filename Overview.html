@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>208 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>214 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -189,6 +189,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The always-visible pinned-position flyouts (G28/G30/G59.3/etc.) no longer overlap the top tab labels; their vertical offset is now measured from the tab strip's real rendered height instead of a hand-tuned guess.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr170">170</a></td></tr>
 <tr><td>The Feed rate panel could only show a couple of digits of a 4-5 digit feed; the run bar trades its static unit label for a tooltip.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr203">203</a></td></tr>
 <tr><td>Mashing a D-pad direction or the run bar jog pad could leave the controller answering nothing at all; the guard against that now covers every input and can actually see its acknowledgement.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr205">205</a></td></tr>
+<tr><td>Thirteen top-level tabs cut to four &mdash; Setup, Job, Work Order, Offsets. The rest open as their own windows from File and Tools, and where each one lives is a layout slot you can change.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr210">210</a></td></tr>
+<tr><td>Hide the jog pad or just its five go-to buttons; the right-hand panels then fill one column instead of always spreading across two, and stop sitting under the flyouts.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr213">213</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -229,6 +231,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The two standalone stepper-calibration wizards are gone; calibration is now a step inside Machine Setup alongside squareness.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr197">197</a></td></tr>
 <tr><td>Three fixes to the fixture editor - Test position no longer drives back to a stale saved point, the 3D Probe / Touch Plate choice survives closing, and dismissing the dialog no longer minimizes the main window.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr206">206</a></td></tr>
 <tr><td>Both tabs now use a searchable category tree instead of tab strips - every config panel is its own page, and search matches the words on the page, not just page names.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr208">208</a></td></tr>
+<tr><td>A search hit found in a tooltip now says which control that tooltip belongs to, so the answer is "hover Send comments", not "it is on this page somewhere".</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr209">209</a></td></tr>
+<tr><td>How the app looks and behaves moved off the Application page into its own General page; the dead Theme dropdown is gone.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr211">211</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -342,6 +346,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Console shows a controller restart-after-hang notice (with a report-it dialog) and a firmware-change notice, right on reconnect.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr126">126</a></td></tr>
 <tr><td>OBS Control panel + F7-F12 hotkeys start/stop the 2 Tapo RTSP cameras and the app screen-capture source individually, filing each take into a named subfolder.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr142">142</a></td></tr>
 <tr><td>Works through the UI feedback Phil Barrett sent after his first sessions with V2.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr190">190</a></td></tr>
+<tr><td>One Top Level Tabs group holds every tab-strip and menu destination; a key reaches its target wherever it currently lives, menu commands can be bound too, and the menu shows the key.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr212">212</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -397,6 +402,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A saved keymap entry missing its Method no longer crashes startup; a probing-triggered status message can no longer crash the app from a background thread; the console shows the controller's $I response and typed $ commands again, while internal $CWD housekeeping traffic stays quiet.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr189">189</a></td></tr>
 <tr><td>Dragging a tab header no longer crashes the app or strands it with an invisible page and a stuck cursor.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr191">191</a></td></tr>
 <tr><td>A missing section now inherits the shipped template's curated value, and one unreadable section can no longer take every other section down with it.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr200">200</a></td></tr>
+<tr><td>A tab that multiplied on every launch, a setup prompt that reappeared for ever, Esc stolen from every window, and a scroll wheel that only worked over the scrollbar.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr214">214</a></td></tr>
 </table>
 </div>
 
@@ -643,7 +649,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">207</td><td><a href="#pr207">Setup step timing, shorter probe retreats, and two upload/session hangs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">7</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+174</span> <span class="del">-73</span></td></tr>
 <tr class="ver-hdr"><td colspan="3">Version 2.38</td></tr>
 <tr><td class="n">208</td><td><a href="#pr208">Settings &amp; Machine Setup: searchable navigation tree replaces tab strips</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">45</span> <span class="del">0</span> <span class="add">+6</span><br><span class="k">Lines:</span> <span class="add">+1788</span> <span class="del">-309</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (208 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1833</span> <span class="del">29</span> <span class="add">+210</span><br><span class="k">Lines:</span> <span class="add">+75923</span> <span class="del">-15750</span></td></tr>
+<tr><td class="n">209</td><td><a href="#pr209">Settings search names the matched control</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+125</span> <span class="del">-16</span></td></tr>
+<tr><td class="n">210</td><td><a href="#pr210">Main bar cut back; the rest opens from the File/Tools menus</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+590</span> <span class="del">-118</span></td></tr>
+<tr><td class="n">211</td><td><a href="#pr211">Interface preferences gather under User Interface &rarr; General</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+171</span> <span class="del">-24</span></td></tr>
+<tr><td class="n">212</td><td><a href="#pr212">Shortcuts follow a view; menu commands bindable; placement editor</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+621</span> <span class="del">-266</span></td></tr>
+<tr><td class="n">213</td><td><a href="#pr213">Jog pad optional; Job panels fill one column and clear the flyouts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+323</span> <span class="del">-121</span></td></tr>
+<tr><td class="n">214</td><td><a href="#pr214">Fix batch: duplicate tabs, unsatisfiable setup prompt, Esc, scroll wheel</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+239</span> <span class="del">-29</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (214 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1896</span> <span class="del">29</span> <span class="add">+214</span><br><span class="k">Lines:</span> <span class="add">+77992</span> <span class="del">-16324</span></td></tr>
 </table>
 </div>
 
@@ -4134,6 +4146,97 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">140</td><td class="num del">14</td></tr>
 </table>
 <div class="desc"><p>Settings and Machine Setup were top-level tabs whose contents were themselves tab strips - about twenty destinations across two of them, and Machine Setup's Calibration step nested a third tab strip inside the second. Tabs stopped scaling: they compete for horizontal space, offer no grouping, and cannot be searched. Both now use one shared shell - a searchable category tree on the left, the selected page on the right, with the existing Save / Restart / Reset footer beneath.</p><p><b>Every config panel is its own page.</b> The App, Jogging and G Code tabs used to cram unrelated panels into two or three columns because there was nowhere else to put them; that cramming is gone. Camera splits further into <i>Camera</i> and <i>Demo recording (OBS)</i>. Machine Setup keeps its numbered steps and its green/orange/red grading, now shown as a status dot beside each step.</p><p><b>Search matches the words on the page</b>, not just page names - "backlash" finds Axis information, "OBS" finds Demo recording - with a match count, and a tooltip explaining any hit you cannot see on the page (much of the useful text lives in tooltips, so a match can read as wrong until it says <i>Matched tooltip: ...</i>). The index is built by walking the logical tree, so it never has to open a page: opening a Machine Setup step queries the controller's filesystem, and indexing must never talk to the machine.</p><p>Page labels are read from each panel's own already-localized group header, so they are correct in all seven languages without a single new string. Placement moved onto the panels themselves, retiring the hardcoded table in the settings host that had to match panels in other assemblies by full type name - a feature can now contribute a settings page without the host knowing it exists.</p><p>The Grbl page deliberately keeps its own group tree and $-search: that is live controller data, fetched on connect and absent entirely on classic grbl, so lifting it into the navigation tree would have made the tree change shape whenever the machine connected.</p><p>Sub-tab keyboard shortcuts are dropped - the badge and right-click bind menu lived on tab headers that no longer exist - and any already saved are removed on load. <b>Top-level tab shortcuts are unaffected.</b></p><p>Prompted by this work, long tooltips now wrap at a sensible width app-wide instead of running off as one line, and sit clear of the mouse pointer: WPF places them assuming a standard cursor, so an extra-large Windows pointer covered the first few characters.</p></div>
+</div>
+<!-- ===== #209 ===== -->
+<div class="pr">
+<h2 id="pr209"><span class="badge">#209</span>Settings search names the control a matched tooltip belongs to</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsSearchIndex.cs</td><td class="num add">72</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsNavShell.xaml.cs</td><td class="num add">52</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsNavNode.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The navigation tree's search (<a href="#pr208">#208</a>) already told you <em>why</em> a page matched &mdash; <em>Matched text</em> or <em>Matched tooltip</em>, quoting the words it hit. A tooltip match still left you hunting, because a tooltip has no visible text of its own: you knew the page held the answer but not which control to hover.</p><ul><li><strong>Every indexed tooltip now carries its owner's name</strong> &mdash; resolved by a naming ladder that tries the control's <code>Content</code>, then its <code>Header</code>, then a <code>Label</code> property, then its automation name, and only gives up if none of those exist.</li><li><strong>The match explainer quotes the owner</strong> &mdash; "Matched tooltip on <em>Send comments</em>: ...", so the hover target is named outright.</li><li><strong>Opening words are preserved</strong> when the hit lands near the start of a tooltip, instead of eliding them into a leading ellipsis.</li></ul></div>
+</div>
+<!-- ===== #210 ===== -->
+<div class="pr">
+<h2 id="pr210"><span class="badge">#210</span>The main bar carries what a running job needs; everything else opens from the File and Tools menus</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ViewHostWindow.xaml.cs</td><td class="num add">195</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ViewHostWindow.xaml</td><td class="num add">13</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">157</td><td class="num del">52</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">137</td><td class="num del">28</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">35</td><td class="num del">23</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TabRegistry.cs</td><td class="num add">30</td><td class="num del">5</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">16</td><td class="num del">8</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The tab strip had grown to thirteen tabs, most of which are places you visit once to set something up rather than screens you work from. It is now cut back to the four used while a job actually runs &mdash; <strong>Setup</strong>, <strong>Job</strong>, <strong>Work Order</strong>, <strong>Offsets</strong> &mdash; and each remaining view opens in its own window from <strong>File</strong> or <strong>Tools</strong>.</p><ul><li><strong>A hosted view keeps tab semantics</strong> &mdash; <code>ViewHostWindow</code> runs the same Setup / Activate / CloseFile lifecycle a <code>TabItem</code> gave it, and caches the instance, so a view reopens in the state you left it. Closing is ESC or the window X; the windows are deliberately non-modal, because the machine keeps running behind them.</li><li><strong>Placement is a layout slot, not a hardcoded decision</strong> &mdash; the File and Tools menus are slots of the same layout tree that drives the tab strip, so what ships is a default rather than a rule.</li><li><strong>Work Order stays a tab</strong>, and File's Load / New Work Order select it rather than opening a second copy.</li><li><strong>Existing profiles migrate once</strong>, and only once: a saved arrangement that already has menu slots is left exactly as the user left it.</li></ul><p class="foot">Host windows inherit the main window's DataContext explicitly &mdash; that does not cross a Window boundary on its own, and several views read their model from it rather than from Setup().</p></div>
+</div>
+<!-- ===== #211 ===== -->
+<div class="pr">
+<h2 id="pr211"><span class="badge">#211</span>Interface preferences gather under User Interface &rarr; General</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiGeneralConfigControl.xaml.cs</td><td class="num add">33</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiGeneralConfigControl.xaml</td><td class="num add">30</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">9</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml</td><td class="num add">8</td><td class="num del">18</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/BasicConfigControl.xaml.cs</td><td class="num add">0</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">91</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The Application page had become a mix of two unrelated things: how ioSender talks to the <em>controller</em>, and how the app itself looks and behaves. The second group now has a page of its own at <strong>Settings &rarr; User Interface &rarr; General</strong>, which sorts first under that heading.</p><ul><li><strong>Moved:</strong> keep MDI focus, restore last window size, friendly Start/Pause run-bar labels, UI scale, and the auto-save / prompt-before-saving pair.</li><li><strong>Deliberately left behind:</strong> the grbl auto-save options &mdash; those write <code>$</code> settings to the machine, which is controller interaction, not an interface preference.</li><li><strong>The Theme dropdown is removed</strong> &mdash; it listed five themes and applied none of them. Dead UI that only ever raised the question of why it did nothing.</li></ul></div>
+</div>
+<!-- ===== #212 ===== -->
+<div class="pr">
+<h2 id="pr212"><span class="badge">#212</span>A shortcut names a view, not a place &mdash; and you choose whether that view is a tab or a menu entry</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">198</td><td class="num del">26</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">163</td><td class="num del">65</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">77</td><td class="num del">103</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">62</td><td class="num del">17</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">46</td><td class="num del">22</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">26</td><td class="num del">13</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">12</td><td class="num del">9</td></tr>
+<tr><td class="mono">docs/manual/index.html</td><td class="num add">30</td><td class="num del">11</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Moving ten views into the menus (<a href="#pr210">#210</a>) silently killed every keyboard shortcut bound to them: dispatch resolved a shortcut to a <code>TabItem</code> and gave up when there was not one. The fix is the principle rather than the symptom &mdash; <strong>a shortcut id names a view, not a place</strong>.</p><ul><li><strong>A key reaches its target wherever it lives</strong> &mdash; tab or menu window &mdash; so moving a view never costs it its shortcut. The ids were deliberately not renamed when the views moved, so bindings made before the move still work.</li><li><strong>One group, top level only.</strong> Seven groups (Views, Settings pages, Machine Setup steps, Probing / Lathe / Odd Jobs tabs, Menu commands) collapse into a single <strong>Top Level Tabs</strong> list holding exactly the tab-strip and menu destinations. Second-level targets are withdrawn: whether something is currently a tab or a menu entry is a layout choice, not a category.</li><li><strong>Main-menu commands are bindable</strong> &mdash; Connect, Load Program, Load/New Work Order, Camera and the Help entries. All unbound by default, and a shortcut is refused while its menu entry is greyed out, so a key can never do what the menu will not.</li><li><strong>The menu shows the key</strong> &mdash; every shortcut-capable entry carries its binding in the gesture column, refreshed off the same event the tab-header badges use, so the two cannot disagree.</li><li><strong>Top-level tabs becomes a placement editor</strong> &mdash; one row per view choosing Tab bar, File menu, Tools menu or Not shown, with ordering within each. The old shuttle could only say "tab bar or nothing", and did not even list a menu-hosted view. Settings, Machine Setup and Job cannot be hidden, because the app puts them back rather than let a layout lock you out.</li></ul></div>
+</div>
+<!-- ===== #213 ===== -->
+<div class="pr">
+<h2 id="pr213"><span class="badge">#213</span>Job tab: the jog pad and its go-to buttons are optional, and the panels use the room that frees up</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">182</td><td class="num del">33</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml</td><td class="num add">26</td><td class="num del">44</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml</td><td class="num add">24</td><td class="num del">14</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">18</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">17</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">12</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">11</td><td class="num del">21</td></tr>
+<tr><td class="mono">docs/manual/index.html</td><td class="num add">5</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">28</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The jog pad was the widest thing competing with the program view, and nothing could remove it. Both it and its go-to buttons are now yours to switch off, and the panel columns finally use whatever that frees.</p><ul><li><strong>Show go-to buttons on the jog pad</strong> (Settings &rarr; User Interface &rarr; General) hides the four corner targets and the centre bullseye. Default on, so nothing changes until you untick it.</li><li><strong>The centre button loses its hidden second job.</strong> While a jog was running it silently cancelled the jog instead of going to centre, with nothing on the button saying so; the same branch came out of the corner buttons. Releasing the key or button, Feed Hold and Reset all still stop a jog.</li><li><strong>Show the jog pad on the Job tab</strong> (Job tab layout) removes the pad entirely for anyone who finds the run bar's compact jog enough. Keyboard and game-controller jogging are unaffected &mdash; the run bar hosts the same control and does the key registration either way.</li><li><strong>Panels fill one column before starting a second.</strong> They used to be balanced by height, so two short panels always landed one per column and the second reserved its width whether or not it held anything. An unused column now collapses to nothing and the workspace gets the width back.</li><li><strong>The right-most column clears the flyout strip</strong>, so a pinned flyout no longer floats over the top of whatever panel is there.</li></ul></div>
+</div>
+<!-- ===== #214 ===== -->
+<div class="pr">
+<h2 id="pr214"><span class="badge">#214</span>Fix batch: duplicate Work Order tabs, a setup prompt that could never be satisfied, Esc, and the settings scroll wheel</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">99</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsNavShell.xaml.cs</td><td class="num add">45</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">31</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleWindow.xaml.cs</td><td class="num add">25</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">23</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogControl.xaml</td><td class="num add">6</td><td class="num del">2</td></tr>
+<tr><td class="mono">docs/manual/index.html</td><td class="num add">3</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Five fixes, four of them fallout from the tabs-to-menus move (<a href="#pr210">#210</a>) and one older.</p><ul><li><strong>A new Work Order tab on every launch.</strong> A fixup re-added the retired Odd Jobs node whenever the tree lacked one &mdash; which, once nothing else created it, was always &mdash; and the next fixup promoted that fresh node to a Work Order. An "add it if absent" fixup for a component nothing else creates is not idempotent, it is a generator. A dedupe pass repairs profiles that already grew copies.</li><li><strong>Height Map could be deleted out of existence.</strong> Its injection tested only the tab strip, but since menus became placement slots "not on the tab strip" no longer means "absent"; and the flat tab list, applied later, dropped nodes it did not name with nothing left to rescue them. Both closed.</li><li><strong>"Let's finish setting up your machine" every single launch.</strong> The prompt navigated via the Machine Setup tab, which no longer exists, so it left you on the Job screen &mdash; and because the wizard was never reached, no step could be completed, so it re-armed next launch. Self-sustaining rather than merely annoying.</li><li><strong>Esc is free again.</strong> The console toggle defaulted to Esc and is dispatched before any control sees the key, so Esc stopped cancelling edits, closing popups and backing out of things. It defaults to F12 now, existing profiles are moved off the old default, and the console window gained its own Esc-to-close &mdash; two-stage, so Esc still clears a part-typed command first.</li><li><strong>The scroll wheel works over a settings page</strong>, not just over its scrollbar. A list laid out at full height inside the page scroller had nothing of its own left to scroll, but still marked the wheel handled.</li></ul></div>
 </div>
 </section>
 
