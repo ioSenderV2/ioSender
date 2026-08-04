@@ -504,9 +504,23 @@ namespace CNC.Controls
 
             BackgroundLoad(() =>
             {
+                // Timed separately (2026-08-04): these two are very different jobs and the old single
+                // "read+parse+ComputeLimits" number could not tell them apart. ParseFileLines lexes and
+                // builds the token model; ComputeLimits then re-executes every token through a
+                // GCodeEmulator - a SECOND full interpretation of the program - and takes the bounding box
+                // of each arc by expanding it into 0.01 mm points. Which of the two owns the ~32 s on a
+                // 220k-line file decides whether the fix is an analytic arc bounding box (contained) or the
+                // per-line token allocation (invasive - the viewer and explainer read those tokens).
+                var phase = System.Diagnostics.Stopwatch.StartNew();
                 ok[0] = Program.ParseFileLines(filename, addLineNumbers);
+                CNC.Core.DebugLog.Write("load", string.Format("  read+parse: {0} ms ({1:N0} tokens)", phase.ElapsedMilliseconds, Program.Tokens.Count));
+
                 if (ok[0])
+                {
+                    phase.Restart();
                     Program.ComputeLimits();
+                    CNC.Core.DebugLog.Write("load", string.Format("  ComputeLimits (emulator re-run + arc bounds): {0} ms", phase.ElapsedMilliseconds));
+                }
             },
             () =>
             {
