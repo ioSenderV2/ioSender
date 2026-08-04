@@ -305,7 +305,31 @@ finally {
     # failed build). Waiting for the process matters: ioSender writes App.config as it exits.
     if ($DefaultConfig -and (Test-Path $stashedCfg)) {
         Stop-IoSenderAndWait
-        if (Test-Path $liveCfg) { Move-Item $liveCfg $sessionCfg -Force }
+        if (Test-Path $liveCfg) {
+            Move-Item $liveCfg $sessionCfg -Force
+            # A session that connected records what it connected TO, and what it found there. This
+            # file exists to be copied into Default-App.config, which ships in every release, so
+            # blank that here rather than rely on spotting it later. LastMachine matters most: it is
+            # the answer to Machine Setup's "start from your machine", and shipping it would
+            # pre-answer that wizard with someone else's mill on every new install.
+            try {
+                $doc = New-Object System.Xml.XmlDocument
+                $doc.PreserveWhitespace = $true
+                $doc.Load($sessionCfg)
+                $scrubbed = $false
+                foreach ($tag in 'NetworkHost', 'PortParams', 'LastMachine', 'LastFirmwareBuild') {
+                    foreach ($n in $doc.SelectNodes("//$tag")) {
+                        if ($n.InnerText) {
+                            Write-Host "==> Scrubbed $tag ($($n.InnerText)) from the session config." -ForegroundColor Cyan
+                            $n.InnerText = ''
+                            $scrubbed = $true
+                        }
+                    }
+                }
+                if ($scrubbed) { $doc.Save($sessionCfg) }
+            }
+            catch { Write-Host "==> Scrub failed ($($_.Exception.Message)) - check this file for your own machine/address before copying it anywhere." -ForegroundColor Yellow }
+        }
         Move-Item $stashedCfg $liveCfg -Force
         Write-Host "==> Your App.config is back." -ForegroundColor Green
         if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
