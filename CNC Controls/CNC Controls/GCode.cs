@@ -415,12 +415,22 @@ namespace CNC.Controls
         // batch still hundreds/thousands of individual ObservableCollection.Add() notifications on the live
         // grid - confirmed as real, measurable load-time cost on a 220k-line file (2026-08-01); a single
         // BulkObservableCollection.ReplaceAll at the end fires exactly one Reset instead.
-        private async void BackgroundLoad(System.Action parse, System.Action onDone)
+        // 'displayName' drives the status line: "Loading <name>..." while the worker reads the file, then
+        // "Loaded <name> - N lines in T s" once it is bound. On a 220k-line file the load is long enough
+        // that a silent wait cursor reads as a hang, so it says what it is doing and what it did.
+        private async void BackgroundLoad(System.Action parse, System.Action onDone, string displayName = null)
         {
             var buffer = new List<GCodeBlock>(65536);
 
             if (Model != null)
                 Model.IsLoading = true;
+
+            // Whole-operation timing, distinct from the per-phase sw below: this is the number the operator
+            // actually waited, so it must span read+parse, the UI bind AND onDone, not just one phase.
+            var total = System.Diagnostics.Stopwatch.StartNew();
+
+            if (Model != null && displayName != null)
+                Model.Message = string.Format("Loading {0}...", displayName);
 
             // Worker-thread sink: just accumulate. No dispatcher marshalling at all until parsing is done.
             Program.BlockConsumer = b => buffer.Add(b);
@@ -443,6 +453,14 @@ namespace CNC.Controls
                 sw.Restart();
                 onDone?.Invoke();
                 CNC.Core.DebugLog.Write("load", string.Format("onDone (FileChanged/HasOutline/simulator push/...): {0} ms", sw.ElapsedMilliseconds));
+
+                // Program.Loaded distinguishes a real load from one onDone aborted (a parse failure calls
+                // Close()) - reporting "Loaded" for a discarded partial file would be a lie, so that case
+                // just clears the "Loading..." text rather than replacing it.
+                if (Model != null && displayName != null)
+                    Model.Message = Program.Loaded
+                        ? string.Format("Loaded {0} - {1:N0} lines in {2:N1} s", displayName, buffer.Count, total.Elapsed.TotalSeconds)
+                        : string.Empty;
             }
             catch (Exception e)
             {
@@ -503,7 +521,8 @@ namespace CNC.Controls
                 }
                 else
                     Close();   // aborted mid-parse: discard the partial load
-            });
+            },
+            System.IO.Path.GetFileName(filename));
         }
 
         public void Save()
