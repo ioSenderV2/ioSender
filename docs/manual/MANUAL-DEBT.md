@@ -207,8 +207,12 @@ box's saved layout; the script files the capture when you quit the app.
 - [x] `machine-setup-calibration.png` (`#machine-setup`) — **Z stepper via a 1-2-3 block, NOT a fixture.**
       The planned caption was wrong: a default config has no fixture *by design* (a fixture is a validated
       known position), and Z stepper calibration never needed one.
-- [ ] **Still owed: Work Order Surface toolpath** with Entire Spoilboard ticked (`#work-order`) — its
-      placeholder is still in the page, under "Surfacing the spoilboard".
+- [x] `work-order-surface.png` (`#work-order`) — a Surface toolpath with the **Feeds and Speeds dialog
+      open**, which turned out to be worth more than the planned framing: it is the manual's only shot of
+      the advisor, so the caption covers material, chip load and the ±10% nudge. *Entire Spoilboard* sits
+      behind the dialog, so the caption says so rather than letting the figure imply it.
+
+**No screenshot placeholders remain in the page.**
 - [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
       the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
       window chrome in the shot doesn't misrepresent where they live.
