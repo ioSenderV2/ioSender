@@ -109,6 +109,9 @@ param(
     [switch]$Scratch,
     [switch]$Headless,
     [switch]$Clean,
+    # Spelled -default-config on the command line to match ioSender's own flags (-self-relaunch,
+    # -forgetnetwork); -DefaultConfig works too, and the alias keeps the variable readable in here.
+    [Alias('default-config')]
     [switch]$DefaultConfig,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
     #   .\build.ps1 -Launch -forgetnetwork -demomarker
@@ -270,6 +273,22 @@ if ($Launch -or $DefaultConfig) {
                 # the moment ioSender exits, with no second command to remember.
                 Write-Host "==> Running on a default config. Quit ioSender to end the session and get your own settings back." -ForegroundColor Cyan
                 $proc.WaitForExit()
+
+                # Settings' "Restart" is a SELF-relaunch (GrblConfigView.DoRestart): the app starts a
+                # fresh ioSender.exe -self-relaunch and shuts the current one down. So the process we
+                # launched exiting does NOT mean the session ended - without following the successor,
+                # the restore below kills the instance the user just asked to come back, and a layout
+                # change (which prompts for exactly that restart) looks like it did nothing.
+                while ($true) {
+                    $successor = $null
+                    for ($i = 0; $i -lt 20 -and -not $successor; $i++) {
+                        Start-Sleep -Milliseconds 250
+                        $successor = @(Get-Process ioSender -ErrorAction SilentlyContinue) | Select-Object -First 1
+                    }
+                    if (-not $successor) { break }
+                    Write-Host "==> ioSender relaunched itself - still in the session (quit it to end)." -ForegroundColor Cyan
+                    try { $successor | Wait-Process -ErrorAction Stop } catch { }
+                }
             }
         }
         else {
