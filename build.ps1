@@ -79,25 +79,16 @@
     instance launched from there keeps running untouched.
 
 .PARAMETER DefaultConfig
-    Start a "default config session": move your own %AppData%\ioSender\App.config aside, then
-    build and launch. ioSender's own fresh-install path (AppConfig.SeedUserConfigDir) sees no
-    App.config and seeds one by copying the shipped Default-App.config, so the run is exactly
-    what a brand-new install gets - the right state for default-matching screenshots, and for
-    arranging the layout you want the template to ship with. This script never copies the
-    template itself; it only stashes and restores. End the session with -EndDefaultConfig.
+    Run this build against a brand-new config instead of yours. Your
+    %AppData%\ioSender\App.config is moved aside, the app is launched, and the script WAITS -
+    quitting ioSender is what ends the session. Your own config is then moved back, and what
+    the session produced is left at %AppData%\ioSender\App.config.default-session for you (or
+    Claude) to look at and, if it's worth keeping, copy into the repo's Default-App.config.
 
-.PARAMETER EndDefaultConfig
-    End the session: kill the app (so its final write lands), park the arranged config, print a
-    section-level comparison against the shipped template, and move your own App.config back.
-    Nothing is written to the repo unless you also pass -Adopt. The arranged file is kept, so
-    you can adopt it afterwards without redoing the session.
-
-.PARAMETER Adopt
-    With -EndDefaultConfig: copy the arranged config over the repo's
-    ioSender XL\ioSender XL\Default-App.config before restoring your own. The template's XML
-    comments (the file header and the CustomTools note) are re-injected afterwards, because
-    ioSender composes the document from scratch on save and drops them. Review with git diff
-    before committing - anything you touched in the session lands in the shipped default.
+    The script never copies the template in: with no App.config present, ioSender's own
+    first-run path (AppConfig.SeedUserConfigDir) seeds one from the shipped Default-App.config,
+    so the run really is what a new install gets - right for default-matching screenshots, and
+    for arranging a layout by doing it rather than describing it. Implies -Launch.
 
 .EXAMPLE
     .\build.ps1 -Clean -Launch
@@ -105,12 +96,9 @@
     referencing a file that was just deleted/renamed (stale incremental cache), not routinely.
 
 .EXAMPLE
-    .\build.ps1 -DefaultConfig -Launch
-    Stash your App.config, build, launch a first-run-clean ioSender. Arrange the layout, quit.
-
-.EXAMPLE
-    .\build.ps1 -EndDefaultConfig -Adopt
-    Take what you arranged, write it into the repo template, and restore your own config.
+    .\build.ps1 -DefaultConfig
+    Build, launch a first-run-clean ioSender, and wait. Arrange the layout, quit the app, and
+    your own settings are back by the time the prompt returns.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -122,8 +110,6 @@ param(
     [switch]$Headless,
     [switch]$Clean,
     [switch]$DefaultConfig,
-    [switch]$EndDefaultConfig,
-    [switch]$Adopt,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
     #   .\build.ps1 -Launch -forgetnetwork -demomarker
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -177,154 +163,38 @@ function ScratchOutDir([string]$Config) {
 }
 
 # ---------------------------------------------------------------------------------------------
-# Default-config session. The point: see (and shape) what a brand-new install gets. This script
-# NEVER copies the template into %AppData% - it only moves your own App.config out of the way,
-# and ioSender's own first-run path (AppConfig.SeedUserConfigDir) does the seeding, so the run
-# exercises the real fresh-install behaviour rather than an imitation of it.
+# Default-config session (-DefaultConfig). Move your own App.config aside, run, put it back when
+# the app exits. This script NEVER copies the template into %AppData% - with no App.config there,
+# ioSender's own first-run path (AppConfig.SeedUserConfigDir) seeds one from Default-App.config,
+# so the run exercises the real fresh-install behaviour instead of imitating it. What the session
+# produced is parked next to your config; deciding whether any of it belongs in the shipped
+# template is a judgement call, so it happens outside this script.
 # ---------------------------------------------------------------------------------------------
-$userCfgDir  = Join-Path $env:APPDATA 'ioSender'
-$liveCfg     = Join-Path $userCfgDir 'App.config'
-$sessionDir  = Join-Path $userCfgDir '_default-config-session'
-$stashedCfg  = Join-Path $sessionDir 'App.config.mine'       # yours, parked for the session
-$arrangedCfg = Join-Path $sessionDir 'App.config.arranged'   # what the session produced
-$templateCfg = Join-Path $root 'ioSender XL\ioSender XL\Default-App.config'
-$sessionActive = Test-Path $stashedCfg
+$userCfgDir = Join-Path $env:APPDATA 'ioSender'
+$liveCfg    = Join-Path $userCfgDir 'App.config'
+$stashedCfg = Join-Path $userCfgDir 'App.config.mine'            # yours, parked for the session
+$sessionCfg = Join-Path $userCfgDir 'App.config.default-session' # what the session produced
 
 function Stop-IoSenderAndWait {
-    # The running instance rewrites App.config as it exits, so every file swap below has to wait
-    # for the process to be GONE, not merely signalled - otherwise its dying write lands on top
-    # of whichever file we just moved into place.
+    # A running instance rewrites App.config as it exits, so a swap has to wait for the process to
+    # be GONE, not merely signalled - otherwise its dying write lands on the file we just moved in.
     $procs = @(Get-Process ioSender -ErrorAction SilentlyContinue)
     if ($procs.Count -eq 0) { return }
     $procs | Stop-Process -Force
     try { $procs | Wait-Process -Timeout 15 -ErrorAction Stop } catch { }
 }
 
-function Get-ConfigSections([string]$path) {
-    # key -> that section's XML, whitespace-normalised so indentation changes don't read as edits.
-    $map = @{}
-    $doc = New-Object System.Xml.XmlDocument
-    $doc.PreserveWhitespace = $false
-    $doc.Load($path)
-    foreach ($n in $doc.DocumentElement.SelectNodes('section')) { $map[$n.GetAttribute('key')] = $n.OuterXml }
-    return $map
-}
-
-function Show-ConfigComparison([string]$arranged, [string]$template) {
-    $a = Get-ConfigSections $arranged
-    $t = Get-ConfigSections $template
-    $keys = @($a.Keys) + @($t.Keys) | Sort-Object -Unique
-    Write-Host "==> Arranged config vs shipped template, by section:" -ForegroundColor Cyan
-    $changes = 0
-    foreach ($k in $keys) {
-        if (-not $t.ContainsKey($k))      { Write-Host ("    {0,-22} NEW      (absent from the template)" -f $k) -ForegroundColor Yellow; $changes++ }
-        elseif (-not $a.ContainsKey($k))  { Write-Host ("    {0,-22} REMOVED" -f $k) -ForegroundColor Yellow; $changes++ }
-        elseif ($a[$k] -ne $t[$k])        { Write-Host ("    {0,-22} changed" -f $k) -ForegroundColor Yellow; $changes++ }
-        else                              { Write-Host ("    {0,-22} same" -f $k) -ForegroundColor DarkGray }
-    }
-    if ($changes -eq 0) { Write-Host "    (identical - nothing to adopt)" -ForegroundColor DarkGray }
-    return $changes
-}
-
-function Restore-TemplateComments([string]$newFile, [string]$oldTemplate) {
-    # ioSender composes App.config from scratch (ConfigStore.WriteDocument), so an adopted file
-    # arrives with none of the template's prose - the file header explaining what this file IS,
-    # and the CustomTools note recording why ids 0-13 must not move. Both are load-bearing for
-    # the next person reading it, so put them back: document-level comments at the top, and any
-    # comment that preceded a <section> re-attached to that same section by key.
-    # Anchors are found with the DOM (reliable), but the splice itself is textual: XmlDocument
-    # refuses a newly created whitespace node at document level, and re-saving the whole document
-    # would reflow it - a text splice keeps every comment's own indentation and touches nothing else.
-    try {
-        $old = New-Object System.Xml.XmlDocument; $old.PreserveWhitespace = $true; $old.Load($oldTemplate)
-        $text = [System.IO.File]::ReadAllText($newFile)
-        $rootTag = '<' + $old.DocumentElement.Name
-        $orphans = @()
-
-        foreach ($c in @($old.DocumentElement.ChildNodes | Where-Object { $_.NodeType -eq 'Comment' })) {
-            $anchor = $c.NextSibling
-            while ($anchor -and $anchor.NodeType -ne 'Element') { $anchor = $anchor.NextSibling }
-            $key = if ($anchor) { $anchor.GetAttribute('key') } else { $null }
-            $m = if ($key) { [regex]::Match($text, "(?m)^([ \t]*)<section key=""$([regex]::Escape($key))""") } else { $null }
-            if ($m -and $m.Success) {
-                $indent = $m.Groups[1].Value
-                $text = $text.Remove($m.Index, 0).Insert($m.Index, $indent + $c.OuterXml + "`n")
-            }
-            else { $orphans += ($c.Value -split "`n")[0].Trim() }
-        }
-
-        # Document-level comments (the file header) go immediately above the root element.
-        foreach ($c in @($old.ChildNodes | Where-Object { $_.NodeType -eq 'Comment' })) {
-            $i = $text.IndexOf($rootTag)
-            if ($i -ge 0) { $text = $text.Insert($i, $c.OuterXml + "`n") }
-            else { $orphans += ($c.Value -split "`n")[0].Trim() }
-        }
-
-        [System.IO.File]::WriteAllText($newFile, $text)
-        if ($orphans.Count) {
-            Write-Host "==> Could not re-attach $($orphans.Count) template comment(s) - the section they described is gone:" -ForegroundColor Yellow
-            $orphans | ForEach-Object { Write-Host "      $_" -ForegroundColor Yellow }
-        }
-    }
-    catch {
-        Write-Host "==> Comments could not be re-injected ($($_.Exception.Message)) - check git diff before committing." -ForegroundColor Yellow
-    }
-}
-
-if ($DefaultConfig -and $EndDefaultConfig) { throw "-DefaultConfig and -EndDefaultConfig are opposite ends of the same session; pass one." }
-if ($Adopt -and -not $EndDefaultConfig)    { throw "-Adopt only means anything with -EndDefaultConfig (it adopts what that session produced)." }
-
-if ($EndDefaultConfig) {
-    if (-not $sessionActive) { throw "No default-config session is active (nothing stashed at $stashedCfg)." }
-    Stop-IoSenderAndWait
-
-    if (Test-Path $liveCfg) {
-        Copy-Item $liveCfg $arrangedCfg -Force
-        Write-Host "==> Session config parked: $arrangedCfg" -ForegroundColor Cyan
-        $changed = Show-ConfigComparison $arrangedCfg $templateCfg
-
-        if ($Adopt) {
-            if ($changed -eq 0) { Write-Host "==> Nothing differs; template left alone." -ForegroundColor Yellow }
-            else {
-                # Keep the outgoing template aside first: its comments are the source for the
-                # re-injection below, and overwriting it in place would destroy them.
-                $priorTemplate = Join-Path $sessionDir 'Default-App.config.prior'
-                Copy-Item $templateCfg $priorTemplate -Force
-                Copy-Item $arrangedCfg $templateCfg -Force
-                Restore-TemplateComments $templateCfg $priorTemplate
-                Write-Host "==> Adopted into $templateCfg - review with git diff before committing." -ForegroundColor Green
-            }
-        }
-        elseif ($changed -gt 0) {
-            Write-Host "==> Not adopted. Re-run with -EndDefaultConfig -Adopt to write it into the template." -ForegroundColor Yellow
-        }
-    }
-    else { Write-Host "==> No App.config was produced this session - nothing to compare." -ForegroundColor Yellow }
-
-    Move-Item $stashedCfg $liveCfg -Force
-    Write-Host "==> Your own App.config restored." -ForegroundColor Green
-    return
-}
-
 if ($DefaultConfig) {
-    if ($sessionActive) { throw "A default-config session is already active (yours is stashed at $stashedCfg). End it with -EndDefaultConfig first." }
+    if ($Scratch) { throw "-DefaultConfig runs the app; -Scratch is a verify-only build. Pass one." }
+    # Refuse rather than overwrite: a stash present here means an earlier session died before its
+    # restore, and that file is the only copy of the real settings.
+    if (Test-Path $stashedCfg) { throw "$stashedCfg already exists - an earlier session did not restore. Move it back to App.config yourself, then re-run." }
     Stop-IoSenderAndWait
-    New-Item -ItemType Directory -Force -Path $sessionDir | Out-Null
     if (Test-Path $liveCfg) {
         Move-Item $liveCfg $stashedCfg -Force
-        Write-Host "==> Your App.config stashed: $stashedCfg" -ForegroundColor Cyan
+        Write-Host "==> Your App.config stashed as App.config.mine; ioSender will seed a fresh one from Default-App.config." -ForegroundColor Cyan
     }
-    else {
-        # Nothing to stash, but the session still needs its marker so -EndDefaultConfig has
-        # something to end and no later run mistakes this for a normal one.
-        New-Item -ItemType File -Path $stashedCfg | Out-Null
-        Write-Host "==> No existing App.config to stash (marker written)." -ForegroundColor Yellow
-    }
-    Write-Host "==> ioSender will seed a fresh config from Default-App.config on launch." -ForegroundColor Cyan
-}
-elseif ($sessionActive) {
-    Write-Host "==> DEFAULT-CONFIG SESSION ACTIVE - this instance is NOT using your own settings." -ForegroundColor Yellow
-    Write-Host "    Yours is stashed at $stashedCfg (restore with -EndDefaultConfig)." -ForegroundColor Yellow
+    else { Write-Host "==> No App.config to stash - already starting clean." -ForegroundColor Yellow }
 }
 
 if (-not (Test-Path $solution)) { throw "Solution not found: $solution" }
@@ -366,7 +236,9 @@ switch ($Configuration) {
     default { Invoke-Build $Configuration $(if ($Scratch) { ScratchOutDir $Configuration }) }
 }
 
-if ($Launch) {
+try {
+
+if ($Launch -or $DefaultConfig) {
     if ($Scratch) {
         Write-Host "==> -Launch ignored with -Scratch (a scratch build is verify-only)." -ForegroundColor Yellow
     }
@@ -391,11 +263,32 @@ if ($Launch) {
             $cmdLine = if ($finalArgs) { "$exe $($quotedArgs -join ' ')" } else { $exe }
             Write-Host "==> Launching: $cmdLine" -ForegroundColor Cyan
 
-            if ($finalArgs) { Start-Process $exe -ArgumentList ($quotedArgs -join ' ') } else { Start-Process $exe }
+            $proc = if ($finalArgs) { Start-Process $exe -ArgumentList ($quotedArgs -join ' ') -PassThru } else { Start-Process $exe -PassThru }
+
+            if ($DefaultConfig) {
+                # Quitting the app IS the end of the session - block here so the restore below runs
+                # the moment ioSender exits, with no second command to remember.
+                Write-Host "==> Running on a default config. Quit ioSender to end the session and get your own settings back." -ForegroundColor Cyan
+                $proc.WaitForExit()
+            }
         }
         else {
             Write-Host "==> Built exe not found: $exe" -ForegroundColor Red
             exit 1
         }
+    }
+}
+
+}
+finally {
+    # Always - a failed build, a crash, or Ctrl-C must not leave the real settings parked under
+    # another name (PowerShell runs finally on 'exit' too, which is how Invoke-Build ends a
+    # failed build). Waiting for the process matters: ioSender writes App.config as it exits.
+    if ($DefaultConfig -and (Test-Path $stashedCfg)) {
+        Stop-IoSenderAndWait
+        if (Test-Path $liveCfg) { Move-Item $liveCfg $sessionCfg -Force }
+        Move-Item $stashedCfg $liveCfg -Force
+        Write-Host "==> Your App.config is back." -ForegroundColor Green
+        if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
     }
 }
