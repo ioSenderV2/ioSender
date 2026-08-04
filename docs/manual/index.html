@@ -1035,8 +1035,12 @@
     ordinary g-code program and runs it exactly like a loaded file.</p>
 
     <figure>
-      <img src="img/work-order.png" alt="The Work Order tab: toolpath/operations tree, tool-order summary and the compiled program">
-      <figcaption>The Work Order tab, with the compiled tool order and generated g-code shown in the flyout.</figcaption>
+      <img src="img/work-order-composition.png" alt="The Work Order tab: a five-toolpath work order with its operations tree, a selected finishing pass, and the stock layout preview">
+      <figcaption>A real work order — five toolpaths, fifteen operations, one program. The tree (left)
+      hangs operations under each toolpath: the contour is cut through, side-finished and chamfered; the
+      counterbore is one circle carrying a bore, a through drill and a chamfer. Selecting an operation
+      (here a side finishing pass) shows its own parameters and the tool it will use. The preview (right)
+      places each toolpath on the stock by name, and the footer keeps count.</figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
@@ -1062,6 +1066,11 @@
       <li><strong>Run</strong> — sends the generated program to the <a href="#job">Job</a> tab as the actual
       loaded job (see below), then streams it through the normal run pipeline.</li>
     </ul>
+
+    <figure>
+      <img src="img/work-order.png" alt="The Work Order tab with the compiled tool order and generated g-code shown in the flyout">
+      <figcaption>After Generate: the compiled tool order and the g-code it produced, in the flyout.</figcaption>
+    </figure>
 
     <h3>Running a Work Order</h3>
     <p>Pressing <strong>Run</strong> switches you to the <a href="#job">Job</a> tab and loads the generated
