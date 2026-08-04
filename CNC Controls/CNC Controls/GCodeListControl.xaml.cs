@@ -301,7 +301,63 @@ namespace CNC.Controls
                 var dataColumn = grdGCode.Columns[2];
                 dataColumn.Width = new DataGridLength(0);
                 dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+
+                LogWidthDiagnostics();
             }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        // TEMPORARY (2026-08-04) - the Data column stays collapsed at startup and toggling the star width
+        // after layout did not fix it, so measure instead of theorising. The question this answers: is the
+        // grid being measured with an UNBOUNDED width (in which case every star column collapses to its
+        // MinWidth by definition, re-toggling can never help, and the fix has to be the ancestor that
+        // supplies the infinite constraint), or does it have a real width and the columns are simply not
+        // dividing it up? Walks the visual ancestors because the culprit is whichever one reports a width
+        // wildly different from its parent.
+        private void LogWidthDiagnostics()
+        {
+            if (!DebugLog.Enabled)
+                return;
+
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendFormat("grid ActualWidth={0:F1}", grdGCode.ActualWidth);
+
+                var sv = scroll ?? UIUtils.GetScrollViewer(grdGCode);
+                if (sv != null)
+                    sb.AppendFormat(" | ScrollViewer Viewport={0:F1} Extent={1:F1} HScroll={2}",
+                        sv.ViewportWidth, sv.ExtentWidth, sv.HorizontalScrollBarVisibility);
+
+                foreach (var c in grdGCode.Columns)
+                    sb.AppendFormat(" | col[{0}] '{1}' Actual={2:F1} Width={3} Min={4} Max={5}",
+                        c.DisplayIndex, c.Header, c.ActualWidth, c.Width, c.MinWidth, c.MaxWidth);
+
+                DebugLog.Write("gridwidth", sb.ToString());
+
+                // Ancestor chain: the infinite-width supplier, if there is one, shows up as an ancestor whose
+                // ActualWidth is far larger than its own parent's (or as a ScrollViewer that scrolls
+                // horizontally, or a horizontal StackPanel - both measure their child with infinity).
+                var chain = new System.Text.StringBuilder("ancestors:");
+                DependencyObject d = grdGCode;
+                for (int i = 0; i < 14 && d != null; i++)
+                {
+                    var fe = d as FrameworkElement;
+                    if (fe != null)
+                        chain.AppendFormat(" <- {0}{1}[w={2:F1}]",
+                            d.GetType().Name,
+                            string.IsNullOrEmpty(fe.Name) ? "" : "(" + fe.Name + ")",
+                            fe.ActualWidth);
+                    else
+                        chain.AppendFormat(" <- {0}", d.GetType().Name);
+
+                    d = System.Windows.Media.VisualTreeHelper.GetParent(d);
+                }
+                DebugLog.Write("gridwidth", chain.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                DebugLog.Write("gridwidth", "diagnostics failed: " + ex.Message);
+            }
         }
 
         private void GCodeListControl_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
