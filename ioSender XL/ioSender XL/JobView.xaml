@@ -97,7 +97,8 @@
                      ScrollViewer already handles any resulting overflow height. -->
                 <!-- Collapsed by DistributeMainPanels whenever the panels all fit in the first column, so this
                      Auto column takes zero width instead of reserving MinWidth's worth of nothing. -->
-                <ScrollViewer x:Name="mainScrollRight" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer x:Name="mainScrollRight" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              SizeChanged="MainScrollRight_SizeChanged">
                     <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
                 </ScrollViewer>
             </Grid>

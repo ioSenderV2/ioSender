@@ -229,12 +229,31 @@ namespace GCode_Sender
         // right-most panel column and hides whatever is at the top of it. The gap is reserved unconditionally
         // rather than appearing when a flyout opens: the panels would otherwise jump down and back every time
         // one is toggled, and a stack that moves under the pointer is worse than a fixed strip of blank.
+        // Deferred to Loaded priority, which runs AFTER the arrange pass. Measuring inline was wrong in the one
+        // case that matters: the column being measured has usually just been un-collapsed by the caller, and an
+        // element that has not been arranged since still reports its OLD position - so the gap came out as
+        // though that column started at the top of the window (roughly the whole strip height) instead of the
+        // true overhang, and nothing ever recomputed it. Coalesced, so a burst of resize events measures once.
+        private bool clearancePending = false;
+
         private void ApplyFlyoutClearance()
         {
+            if (clearancePending)
+                return;
+
+            clearancePending = true;
+            Dispatcher.BeginInvoke(new System.Action(MeasureFlyoutClearance), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void MeasureFlyoutClearance()
+        {
+            clearancePending = false;
+
             bool rightUsed = mainSlotsRight.Children.Count > 0;
             double gap = FlyoutClearance(rightUsed ? mainScrollRight : mainScrollLeft);
 
-            // Setting a Thickness to an equal value is a no-op in WPF, so this cannot loop through layout.
+            // Setting a Thickness to an equal value is a no-op in WPF, and neither margin can change its
+            // ScrollViewer's size (the Grid fixes those), so this cannot loop through layout.
             mainSlotsLeft.Margin = new Thickness(5d, rightUsed ? 0d : gap, 0d, 0d);
             mainSlotsRight.Margin = new Thickness(0d, rightUsed ? gap : 0d, 0d, 5d);
         }
@@ -267,6 +286,13 @@ namespace GCode_Sender
         {
             if (e.HeightChanged && mainPanels.Count > 0)
                 DistributeMainPanels();
+        }
+
+        // The second column's own size settling (in particular the 0 -> real change when it is un-collapsed)
+        // is the moment its position becomes measurable, so re-measure the clearance from here too.
+        private void MainScrollRight_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ApplyFlyoutClearance();
         }
 
         // Capture references to panels that have host wiring (focus gating, program-limits reveal) so they
