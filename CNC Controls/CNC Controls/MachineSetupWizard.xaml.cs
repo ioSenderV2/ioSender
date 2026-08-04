@@ -1576,6 +1576,11 @@ namespace CNC.Controls
                     if (model != null)
                         model.Message = "Machine setup: machine recorded (settings already matched).";
                     UpdateApplyState();
+                    // Explicitly, for the same reason Apply needed enabling by hand on this path: no setting
+                    // changed, so no PropertyChanged fires, so nothing else would repaint step 1's indicator -
+                    // it stayed red after being satisfied. RefreshStepColors raises StepStatusChanged, which
+                    // is what the navigation tree's dots listen to.
+                    RefreshStepColors();
                     SetupApplied?.Invoke();
                     return;
                 }
