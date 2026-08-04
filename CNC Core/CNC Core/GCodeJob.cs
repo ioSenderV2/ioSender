@@ -320,7 +320,17 @@ namespace CNC.Core
 
             StreamReader sr = file.OpenText();
 
+            // Per-phase accumulators (2026-08-04). A Release build loads a 220k-line file in the same ~31 s
+            // as Debug, so the cost is real work rather than unoptimized IL, and three plausible-sounding
+            // theories about WHERE it goes were all wrong (ComputeLimits: 105 ms; ~1 token per line, so the
+            // token allocation is small; the per-line token helpers correctly scan from tokenStart, so no
+            // quadratic blowup). Rather than guess a fourth time, split the loop itself. GetTimestamp is
+            // ~20 ns against a measured ~140 us per line, so the instrument does not distort the result.
+            long tRead = 0, tSanitize = 0, tParse = 0, tStamp = 0, t0;
+
+            t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             string block = sr.ReadLine();
+            tRead += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
 
             while (block != null)
             {
@@ -334,10 +344,19 @@ namespace CNC.Core
                     // parens ( -> [, ) -> ] ) so a single well-formed comment survives regardless of what's
                     // inside it; a no-op for ordinary comments (STOCK/TOOL lines have no interior parens).
                     if (block.Length > 1 && block[0] == '(')
+                    {
+                        t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                         block = SanitizeCommentParens(block);
+                        tSanitize += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+                    }
 
                     int tokenStart = Parser.Tokens.Count;
-                    if (Parser.ParseBlock(ref block, false, out ln, out isComment))
+                    t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    bool parsed = Parser.ParseBlock(ref block, false, out ln, out isComment);
+                    tParse += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+
+                    t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    if (parsed)
                     {
                         if (ln > 0)
                         {
@@ -371,7 +390,11 @@ namespace CNC.Core
                             AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                         }
                     }
+                    tStamp += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+
+                    t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                     block = sr.ReadLine();
+                    tRead += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                 }
                 catch (Exception e)
                 {
@@ -383,6 +406,11 @@ namespace CNC.Core
             }
 
             sr.Close();
+
+            long freq = System.Diagnostics.Stopwatch.Frequency / 1000;   // ticks per ms
+            DebugLog.Write("load", string.Format(
+                "    ParseFileLines split: ReadLine {0} ms, SanitizeCommentParens {1} ms, ParseBlock {2} ms, AddStamped+GetRange {3} ms",
+                tRead / freq, tSanitize / freq, tParse / freq, tStamp / freq));
 
             return ok;
         }
