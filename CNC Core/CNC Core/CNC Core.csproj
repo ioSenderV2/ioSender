@@ -91,6 +91,7 @@
     <Compile Include="FeedsSpeedsExport.cs" />
     <Compile Include="FeedsSpeedsAdvisor.cs" />
     <Compile Include="GCodeJob.cs" />
+    <Compile Include="ControllerValidator.cs" />
     <Compile Include="GCodeProgram.cs" />
     <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="Geometry.cs" />
