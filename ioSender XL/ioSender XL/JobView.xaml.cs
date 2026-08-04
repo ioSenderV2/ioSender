@@ -188,7 +188,10 @@ namespace GCode_Sender
             // Available height is only known after the first layout pass. Until then put everything in the
             // first column - MainScrollLeft_SizeChanged re-runs this the moment a real height exists, and
             // one column is the right answer far more often than not, so there is no visible reshuffle.
-            double available = mainScrollLeft.ActualHeight;
+            // Less whatever the flyout clearance is holding at the top - that margin is inside the viewport,
+            // so it is height the panels genuinely cannot use.
+            double available = mainScrollLeft.ActualHeight - mainSlotsLeft.Margin.Top;
+            double width = mainScrollLeft.ViewportWidth > 0d ? mainScrollLeft.ViewportWidth : 250d;
 
             int split = mainPanels.Count;
             if (available > 0d)
@@ -196,8 +199,7 @@ namespace GCode_Sender
                 double used = 0d;
                 for (int i = 0; i < mainPanels.Count; i++)
                 {
-                    mainPanels[i].Measure(new System.Windows.Size(250d, double.PositiveInfinity));
-                    double height = mainPanels[i].DesiredSize.Height;
+                    double height = PanelHeight(mainPanels[i], width);
                     // i > 0: the first panel always goes in the first column even if it is taller than the
                     // viewport on its own - the ScrollViewer handles that, and moving it right would only
                     // leave the first column empty instead.
@@ -278,6 +280,25 @@ namespace GCode_Sender
             {
                 return 0d;   // not a common ancestor (yet) - a later pass will get it
             }
+        }
+
+        // How much vertical room a panel actually needs, margins included (a StackPanel stacks by desired size,
+        // which counts margin).
+        //
+        // Prefers the height it RENDERED at over a fresh Measure. Measuring against a guessed 250px reported
+        // several panels taller than they really are - anything whose content wraps at 250 but not at the real
+        // column width - which pushed a panel that comfortably fitted into the second column (Goto, observed
+        // 2026-08-03 with visible room left below it). Measure is only the fallback for a panel that has never
+        // been arranged, and even then it uses the true viewport width rather than a constant.
+        private static double PanelHeight(UserControl panel, double width)
+        {
+            double h = panel.ActualHeight;
+            if (h <= 0d)
+            {
+                panel.Measure(new System.Windows.Size(width, double.PositiveInfinity));
+                h = panel.DesiredSize.Height;
+            }
+            return h + panel.Margin.Top + panel.Margin.Bottom;
         }
 
         // The first column's height changes both when the window resizes and when the jog pad above it is

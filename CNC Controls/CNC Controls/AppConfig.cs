@@ -482,7 +482,11 @@ namespace CNC.Controls
         // List<string> directly. XmlSerializer APPENDS to a pre-initialized List<T> on load (defaults +
         // saved), which silently discarded the user's edits; a string property is replaced cleanly, and a
         // missing element still falls back to the initializer defaults for configs that predate the feature.
-        private List<string> _mainPanels = new List<string> { "Outline", "Spindle", "Coolant", "WorkParameters", "Feed", "Goto" };
+        // UIJogging FIRST and deliberately: the jog pad only hides its own Distance/Feed radio columns when a
+        // UI Jogging panel is placed somewhere (see JogBaseControl.JogControl_Loaded). Without one the pad
+        // renders those two radio stacks crowded against the arrows - which is what a fresh profile used to
+        // look like, and is not the intended jog UI. The 2x4 grid panel is, so it ships placed.
+        private List<string> _mainPanels = new List<string> { "UIJogging", "KeyboardJogging", "Goto", "Spindle", "Coolant", "WorkParameters", "Feed" };
         private List<string> _flyoutItems = new List<string> { "Macros", "MachinePosition" };
         // LeftPanels: ordered panel names filling the area left of the 3D view (default = the original DRO +
         // program-limits stack). Signals/Status stay fixed below it.
