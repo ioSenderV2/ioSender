@@ -162,25 +162,69 @@ namespace GCode_Sender
                 CaptureRefs(ctl);
             }
 
-            // Flow across the two columns by measured height, in order: fill the left column to ~half the total
-            // height, then the rest go right - so the columns stay about even. Done inline (before first paint)
-            // using DesiredSize so the layout is final when the window renders, with no post-paint reshuffle.
-            double total = 0d;
-            var h = new double[panels.Count];
-            for (int i = 0; i < panels.Count; i++)
+            mainPanels.Clear();
+            mainPanels.AddRange(panels);
+            mainSplit = -1;   // the columns were just cleared, so force a re-parent even if the split is unchanged
+            DistributeMainPanels();
+        }
+
+        // The panels built by BuildMainPanels, held so the two columns can be re-flowed on a resize without
+        // rebuilding them - recreating would discard each panel's live state and re-run CaptureRefs (which
+        // subscribes DRO events), so creation happens once and only the parenting changes afterwards.
+        private readonly System.Collections.Generic.List<UserControl> mainPanels = new System.Collections.Generic.List<UserControl>();
+        private int mainSplit = -1;   // last applied split point; -1 = nothing distributed yet
+
+        // Flow the panels down the FIRST column and start the second only when the next panel would not fit
+        // in the height that is left.
+        //
+        // It used to balance the two columns by height - half the total each - which meant two short panels
+        // always landed one per column, and since both columns carry MinWidth=250 the second reserved its
+        // width whether or not it earned it. Two columns exist to avoid a scrollbar when a lot of panels are
+        // assigned, not as a look; with a few panels (especially with the jog pad off, which hands this row
+        // the pad's height) they belong in one column and the other should disappear so the workspace gets
+        // the width back.
+        private void DistributeMainPanels()
+        {
+            // Available height is only known after the first layout pass. Until then put everything in the
+            // first column - MainScrollLeft_SizeChanged re-runs this the moment a real height exists, and
+            // one column is the right answer far more often than not, so there is no visible reshuffle.
+            double available = mainScrollLeft.ActualHeight;
+
+            int split = mainPanels.Count;
+            if (available > 0d)
             {
-                panels[i].Measure(new System.Windows.Size(250d, double.PositiveInfinity));
-                total += (h[i] = panels[i].DesiredSize.Height);
+                double used = 0d;
+                for (int i = 0; i < mainPanels.Count; i++)
+                {
+                    mainPanels[i].Measure(new System.Windows.Size(250d, double.PositiveInfinity));
+                    double height = mainPanels[i].DesiredSize.Height;
+                    // i > 0: the first panel always goes in the first column even if it is taller than the
+                    // viewport on its own - the ScrollViewer handles that, and moving it right would only
+                    // leave the first column empty instead.
+                    if (i > 0 && used + height > available) { split = i; break; }
+                    used += height;
+                }
             }
-            double half = total / 2d, leftH = 0d;
-            int split = panels.Count;
-            for (int i = 0; i < panels.Count; i++)
-            {
-                if (i > 0 && leftH + h[i] / 2d > half) { split = i; break; }
-                leftH += h[i];
-            }
-            for (int i = 0; i < panels.Count; i++)
-                (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(panels[i]);
+
+            if (split == mainSplit)
+                return;   // nothing to move - also stops a resize storm re-parenting on every pixel
+            mainSplit = split;
+
+            mainSlotsLeft.Children.Clear();
+            mainSlotsRight.Children.Clear();
+            for (int i = 0; i < mainPanels.Count; i++)
+                (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(mainPanels[i]);
+
+            // An empty column must take no width at all, not MinWidth's worth of blank.
+            mainScrollRight.Visibility = mainSlotsRight.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        // The first column's height changes both when the window resizes and when the jog pad above it is
+        // toggled (its row is Auto, so collapsing it hands this row the height) - one signal covers both.
+        private void MainScrollLeft_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.HeightChanged && mainPanels.Count > 0)
+                DistributeMainPanels();
         }
 
         // Capture references to panels that have host wiring (focus gating, program-limits reveal) so they

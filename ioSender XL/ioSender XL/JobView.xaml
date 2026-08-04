@@ -86,7 +86,8 @@
                 <!-- Configurable main-page panels: the assigned panels flow across the two columns at runtime,
                      balanced by height (see BuildMainPanels), so they fit instead of a rigid split. Each column
                      is a ScrollViewer so an over-tall stack scrolls instead of clipping (worse at high DPI). -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer x:Name="mainScrollLeft" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              SizeChanged="MainScrollLeft_SizeChanged">
                     <StackPanel x:Name="mainSlotsLeft" Margin="5,0,0,0" MinWidth="250"/>
                 </ScrollViewer>
                 <!-- Capped (not just MinWidth) so Feed/Spindle/Outline (the panels that consistently land here -
@@ -94,7 +95,9 @@
                      in particular) at the expense of the Program/3D View/Console workspace, which only gets
                      whatever's left over from this region. Content wraps to more lines instead - the
                      ScrollViewer already handles any resulting overflow height. -->
-                <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <!-- Collapsed by DistributeMainPanels whenever the panels all fit in the first column, so this
+                     Auto column takes zero width instead of reserving MinWidth's worth of nothing. -->
+                <ScrollViewer x:Name="mainScrollRight" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="mainSlotsRight" Margin="0,0,0,5" MinWidth="250" MaxWidth="260"/>
                 </ScrollViewer>
             </Grid>
