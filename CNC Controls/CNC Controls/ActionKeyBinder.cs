@@ -104,6 +104,19 @@ namespace CNC.Controls
             handlers[id] = handler;
         }
 
+        /// <summary>The action's current shortcut as a display string ("Ctrl+S"), or null when unbound.
+        /// The ActionShortcuts counterpart of TabKeyBinder.CurrentDisplay, so a caller showing a binding
+        /// (a menu item's gesture text, say) does not care which of the two stores it came from.</summary>
+        public static string CurrentDisplay(string id)
+        {
+            var row = AppConfig.Settings.Base.ActionShortcuts?.FirstOrDefault(x => x.Id == id);
+            Key k;
+            ModifierKeys m;
+            if (row != null && !string.IsNullOrEmpty(row.Key) && ShortcutKey.TryParse(row.Key, out k, out m) && k != Key.None)
+                return ShortcutKey.ToDisplayString(k, m);
+            return null;
+        }
+
         // Resolve the pressed key/modifiers against Config.ActionShortcuts and invoke the matching
         // registered handler, if any. Reads the list fresh each call (small, rarely-pressed, no need to
         // cache) so it always reflects whatever Keyboard & Controller last saved. Returns true (and the

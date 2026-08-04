@@ -2781,6 +2781,7 @@ namespace GCode_Sender
                 string k = node.Component, label = c.Label;   // capture per-iteration for the closure
                 item.Click += (s, e) => ViewHostWindow.OpenComponent(k, label, UIViewModel, AppConfig.Settings, this);
                 parent.Items.Add(item);
+                trackMenuShortcut(item, componentViewIds.FirstOrDefault(kv => kv.Value == k).Key);
             }
         }
 
@@ -2796,6 +2797,10 @@ namespace GCode_Sender
                 IsEnabled = d.EnabledWhenDisconnected
             };
             item.Click += (s, e) => ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            // Show the view's shortcut here too. It is the SAME "Tab.<Name>" id a tab header badges, because
+            // the binding names the view rather than its current home - so the key a user set while this was
+            // a tab is the key this menu entry now advertises.
+            trackMenuShortcut(item, tabViewIds.FirstOrDefault(kv => kv.Value == d.ViewType).Key);
             return item;
         }
 
@@ -2951,16 +2956,17 @@ namespace GCode_Sender
             registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
             registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
 
-            // Help entries: always available (no per-item gate beyond the menu bar's own), so no item to pass.
-            registerMenuAction("Menu.Wiki", null, () => aboutWikiItem_Click(null, null));
-            registerMenuAction("Menu.UsageTips", null, () => tipsWikiItem_Click(null, null));
-            registerMenuAction("Menu.BriefTour", null, () => briefTour_Click(null, null));
-            registerMenuAction("Menu.VideoTutorials", null, () => videoTutorials_Click(null, null));
-            registerMenuAction("Menu.ErrorCodes", null, () => errorAndAlarms_Click(null, null));
-            registerMenuAction("Menu.CheckForUpdates", null, () => checkForUpdates_Click(null, null));
-            registerMenuAction("Menu.RollBack", null, () => rollbackVersion_Click(null, null));
-            registerMenuAction("Menu.OpenDataFolder", null, () => openConfigFolderMenuItem_Click(null, null));
-            registerMenuAction("Menu.About", null, () => aboutMenuItem_Click(null, null));
+            // Help entries are always available, so the per-item enable gate is a formality - but they are
+            // passed anyway so each one can show its bound key in the menu (see trackMenuShortcut).
+            registerMenuAction("Menu.Wiki", menuWiki, () => aboutWikiItem_Click(null, null));
+            registerMenuAction("Menu.UsageTips", menuUsageTips, () => tipsWikiItem_Click(null, null));
+            registerMenuAction("Menu.BriefTour", menuBriefTour, () => briefTour_Click(null, null));
+            registerMenuAction("Menu.VideoTutorials", menuVideoTutorials, () => videoTutorials_Click(null, null));
+            registerMenuAction("Menu.ErrorCodes", menuErrorsAndAlarms, () => errorAndAlarms_Click(null, null));
+            registerMenuAction("Menu.CheckForUpdates", menuCheckForUpdates, () => checkForUpdates_Click(null, null));
+            registerMenuAction("Menu.RollBack", menuRollbackVersion, () => rollbackVersion_Click(null, null));
+            registerMenuAction("Menu.OpenDataFolder", menuOpenConfigFolder, () => openConfigFolderMenuItem_Click(null, null));
+            registerMenuAction("Menu.About", menuAbout, () => aboutMenuItem_Click(null, null));
         }
 
         // Refuse the shortcut whenever the menu bar is disabled (menuMain's IsEnabled is bound to
@@ -2975,6 +2981,43 @@ namespace GCode_Sender
                 invoke();
                 return true;
             });
+
+            trackMenuShortcut(item, id);
+        }
+
+        // Menu items that can carry a keyboard shortcut, paired with the id it is stored under. Two stores
+        // feed this - Config.TabShortcuts for the view entries, Config.ActionShortcuts for the menu commands -
+        // and the display side does not care which, so they are held in one list.
+        private readonly List<KeyValuePair<MenuItem, string>> shortcutMenuItems = new List<KeyValuePair<MenuItem, string>>();
+        private bool menuShortcutTextHooked = false;
+
+        private void trackMenuShortcut(MenuItem item, string id)
+        {
+            if (item == null || string.IsNullOrEmpty(id))
+                return;
+
+            shortcutMenuItems.Add(new KeyValuePair<MenuItem, string>(item, id));
+
+            if (!menuShortcutTextHooked)
+            {
+                // Same event the tab-header badges refresh on (AppConfig.NotifyTabShortcutsChanged, raised by
+                // KeyMapEditor.Commit and by TabKeyBinder's right-click bind/clear), so a menu entry and a tab
+                // header can never disagree about what a view is bound to.
+                AppConfig.TabShortcutsChanged += refreshMenuShortcutText;
+                menuShortcutTextHooked = true;
+            }
+            refreshMenuShortcutText();
+        }
+
+        // Show each tracked item's binding in the menu's gesture column - the menu is where a user looks to
+        // find out what a command's key is, and until this it advertised nothing even when one was bound.
+        private void refreshMenuShortcutText()
+        {
+            foreach (var pair in shortcutMenuItems)
+                pair.Key.InputGestureText = (pair.Value.StartsWith("Menu.", StringComparison.Ordinal)
+                                                ? ActionKeyBinder.CurrentDisplay(pair.Value)
+                                                : TabKeyBinder.CurrentDisplay(pair.Value))
+                                            ?? string.Empty;
         }
 
         // A parsed tab-switch binding: key + modifiers -> the tab id it selects (see KeyMapEditor.TabTargets).
