@@ -271,6 +271,12 @@ namespace CNC.Controls
             // SetProgram, and the empty-at-startup case that the Loaded call alone could never fix.
             grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => RefreshDataColumnWidth();
 
+            // While the grid is empty the Data column carries an explicit pixel width (see
+            // RefreshDataColumnWidth), and a pixel width does not follow a resize the way Star would - so
+            // recompute it when the list changes size. Once rows exist the column is back on Star and this
+            // costs one no-op dispatcher hop per resize.
+            grdGCode.SizeChanged += (s, ea) => RefreshDataColumnWidth();
+
             RefreshDataColumnWidth();
         }
 
@@ -299,8 +305,34 @@ namespace CNC.Controls
             {
                 _widthRefreshPending = false;
                 var dataColumn = grdGCode.Columns[2];
-                dataColumn.Width = new DataGridLength(0);
-                dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+
+                // Star width is distributed across the CELLS panel, so with no rows there is nothing to
+                // distribute over and the columns keep whatever they resolved to on the very first pass -
+                // which is the pass where the grid's own ActualWidth is still 0, i.e. their MinWidths.
+                // Measured 2026-08-04: grid 1092.9 wide, ScrollViewer Extent 0.0, columns stuck at
+                // 60/30/20. Re-toggling Star could never fix that; it re-runs the same distribution over
+                // the same nothing. So when the grid is empty, do the arithmetic here - the viewport width
+                // really is known by this point - and hand the column back to Star as soon as rows exist.
+                double avail = grdGCode.ActualWidth;
+                bool empty = grdGCode.Items.Count == 0;
+
+                if (empty && avail > 0)
+                {
+                    double used = 0;
+                    for (int i = 0; i < grdGCode.Columns.Count - 1; i++)
+                        used += grdGCode.Columns[i].ActualWidth;
+
+                    // Leave room for the vertical scrollbar / grid lines so the last column never forces a
+                    // horizontal scrollbar into existence.
+                    double target = avail - used - 4;
+                    if (target > dataColumn.MinWidth)
+                        dataColumn.Width = new DataGridLength(target);
+                }
+                else
+                {
+                    dataColumn.Width = new DataGridLength(0);
+                    dataColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+                }
 
                 LogWidthDiagnostics();
             }), System.Windows.Threading.DispatcherPriority.Loaded);
