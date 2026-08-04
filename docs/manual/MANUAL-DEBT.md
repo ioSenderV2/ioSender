@@ -157,3 +157,49 @@ Needs `-testserver`, so it needs the user's explicit turn-by-turn go-ahead.
       entries and is wrong from 6 onward — it says "6 · Controller macros" when step 6 is Fixture definitions
       and 7 is Controller macros. Missing Fixture definitions, Calibration and Build simulator entirely.
       Fixing it means 3 new `x:Uid` rows through `tools/locadd.py` across all 7 locales.
+
+---
+
+## Debt from v2.39 (#209–#214, shipped 2026-08-03)
+
+The **tabs-to-menus move**. The main bar was cut back to what a running job needs — Setup, Job, Work
+Order, Offsets — and everything else went to the **File** and **Tools** menus, opening in its own
+window (#210). The **Tools container tab is gone entirely**: its three hardware-gated tools are
+individual Tools-menu entries. On top of that: interface preferences gathered under **User Interface →
+General** (#211), a shortcut now names a *view* not a place plus the **Top-level tabs placement
+editor** (#212), the jog pad's go-to buttons became optional (#213), and #214's fix batch moved the
+console off **Esc** onto **F12**.
+
+### Text — DONE 2026-08-04
+- [x] `#getting-started` "The main window at a glance": the six-row tab table (which still listed
+      Machine Setup, Settings and Tools as tabs) split into a **four-tab table** plus a **menu-bar
+      table** for Connect / File / Tools / Help, and a callout that the split is a default — Top-level
+      tabs moves anything anywhere, and a shortcut follows its view.
+- [x] `#tools`: no longer "the Tools tab holds three utilities" — three separate Tools-menu entries
+      under Camera, with the real labels (Tool table, **Trinamic tuner**, **PID Tuner**). The
+      "No Tools tab?" callout became "Nothing under Camera in the Tools menu?".
+- [x] Locations corrected: Machine Setup = **File → Machine**, Settings = **File → Settings** (both in
+      their own window), SD Card and Feeds and Speeds = **Tools →**, and `#connect` now says the
+      handshake enables the *views* a controller supports, not "the tabs".
+- [x] `#settings` category table: **User Interface gained the General page** (#211) with what actually
+      moved onto it, and **Application → Main** is described as controller comms rather than "colours,
+      behaviour" — those left in #211.
+- [x] `#lathe`: dropped "turn on lathe mode under Settings → Application → Main" — there is no such
+      switch; lathe mode follows the controller reporting `LATHE` in `$I`. Wizards are at
+      **Tools → Lathe Tools**.
+- [x] Verified after the pass: every `href="#…"` resolves, 18 topic sections balanced.
+- [x] Already current before this pass, checked not assumed: `#settings` placement editor + shortcut
+      rules + search-owner naming (written when #212/#209 shipped), `#jogging` go-to-buttons checkbox,
+      and the **F12** console key in `#job`.
+
+### Screenshots to reshoot/add — NOT DONE
+Placeholders are in the page, so they show as grey boxes until shot.
+- [ ] **New: the main window with the Tools menu open** (`#getting-started`) — four-tab strip visible
+      behind it, menu listing Camera / SD Card / Feeds and Speeds / Probing / Height Map / Lathe Tools.
+- [ ] **New: Settings → User Interface → Top-level tabs** (`#settings`) — the placement rows with a
+      destination dropdown open (Tab bar / File menu / Tools menu / Not shown).
+- [ ] Carried over from the #197–#208 batch, still owed: **Work Order Surface toolpath** (`#work-order`)
+      and **Machine Setup → 8 · Calibration → Stepper** (`#machine-setup`).
+- [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
+      the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
+      window chrome in the shot doesn't misrepresent where they live.
