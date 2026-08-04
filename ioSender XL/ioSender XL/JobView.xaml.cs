@@ -206,17 +206,59 @@ namespace GCode_Sender
                 }
             }
 
-            if (split == mainSplit)
-                return;   // nothing to move - also stops a resize storm re-parenting on every pixel
-            mainSplit = split;
+            if (split != mainSplit)
+            {
+                mainSplit = split;
 
-            mainSlotsLeft.Children.Clear();
-            mainSlotsRight.Children.Clear();
-            for (int i = 0; i < mainPanels.Count; i++)
-                (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(mainPanels[i]);
+                mainSlotsLeft.Children.Clear();
+                mainSlotsRight.Children.Clear();
+                for (int i = 0; i < mainPanels.Count; i++)
+                    (i < split ? mainSlotsLeft : mainSlotsRight).Children.Add(mainPanels[i]);
 
-            // An empty column must take no width at all, not MinWidth's worth of blank.
-            mainScrollRight.Visibility = mainSlotsRight.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+                // An empty column must take no width at all, not MinWidth's worth of blank.
+                mainScrollRight.Visibility = mainSlotsRight.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            ApplyFlyoutClearance();
+        }
+
+        // Start the RIGHT-MOST occupied panel column below the flyout tab strip.
+        //
+        // The flyout panels are children of the main window's 22px sidebar canvas but render outside it
+        // (Canvas.Right=22, ClipToBounds=False, ZIndex 1), so an open or pinned flyout floats over the
+        // right-most panel column and hides whatever is at the top of it. The gap is reserved unconditionally
+        // rather than appearing when a flyout opens: the panels would otherwise jump down and back every time
+        // one is toggled, and a stack that moves under the pointer is worse than a fixed strip of blank.
+        private void ApplyFlyoutClearance()
+        {
+            bool rightUsed = mainSlotsRight.Children.Count > 0;
+            double gap = FlyoutClearance(rightUsed ? mainScrollRight : mainScrollLeft);
+
+            // Setting a Thickness to an equal value is a no-op in WPF, so this cannot loop through layout.
+            mainSlotsLeft.Margin = new Thickness(5d, rightUsed ? 0d : gap, 0d, 0d);
+            mainSlotsRight.Margin = new Thickness(0d, rightUsed ? gap : 0d, 0d, 5d);
+        }
+
+        // How far the flyout strip's bottom edge sits below the top of host, or 0 when it is already above it
+        // (the jog pad, when shown, can push the panels clear on its own).
+        //
+        // Measured against the HOST ScrollViewer, never the inner StackPanel: the margin this feeds moves the
+        // StackPanel, so measuring against that would compute a gap, apply it, then measure zero and remove it
+        // again, forever. The ScrollViewer's own position is fixed by the Grid and does not move.
+        private double FlyoutClearance(FrameworkElement host)
+        {
+            var strip = MainWindow.SidebarFlyoutStrip;
+            if (strip == null || !strip.IsVisible || host == null || !host.IsVisible || strip.ActualHeight <= 0d)
+                return 0d;
+
+            try
+            {
+                return System.Math.Max(0d, strip.TransformToVisual(host).Transform(new Point(0d, strip.ActualHeight)).Y);
+            }
+            catch (System.InvalidOperationException)
+            {
+                return 0d;   // not a common ancestor (yet) - a later pass will get it
+            }
         }
 
         // The first column's height changes both when the window resizes and when the jog pad above it is
@@ -730,7 +772,18 @@ namespace GCode_Sender
         void JobView_Load(object sender, EventArgs e)
         {
             MainWindow.ui.RunControl.CallHandler(StreamingState.Idle, true);
+
+            // The flyout strip is populated during startup, after this view is built, and grows/shrinks as
+            // flyouts are assigned - so the clearance has to be recomputed when it changes, not just once.
+            var strip = MainWindow.SidebarFlyoutStrip;
+            if (strip != null && !flyoutStripHooked)
+            {
+                flyoutStripHooked = true;
+                strip.SizeChanged += (s, ev) => { if (ev.HeightChanged) ApplyFlyoutClearance(); };
+            }
         }
+
+        private bool flyoutStripHooked = false;
 
         private void JobView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {

@@ -66,6 +66,17 @@ namespace GCode_Sender
         private const string legacyVersion = "2.39";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
         public static MainWindow ui = null;
+
+        /// <summary>
+        /// The vertical flyout tab strip (sidebarCanvas's stacked labels). Exposed because the flyout PANELS
+        /// open leftward out of that 22px canvas (Canvas.Right=22, ClipToBounds=False, ZIndex 1) and so float
+        /// over whatever the Job view has in its right-most panel column - JobView keeps that column clear of
+        /// them by measuring against this. Null until the window is built.
+        /// </summary>
+        public static FrameworkElement SidebarFlyoutStrip
+        {
+            get { return ui == null ? null : ui.sidebarTabs; }
+        }
         public static CNC.Controls.Viewer.Viewer GCodeViewer = null;
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
 
@@ -809,7 +820,7 @@ namespace GCode_Sender
 
             UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
 
-            xx.ItemsSource = UIViewModel.SidebarItems;
+            sidebarTabs.ItemsSource = UIViewModel.SidebarItems;
 
             // Build sidebar flyouts from the user's FlyoutItems list (Edit Main Page dialog).
             var seenFlyouts = new System.Collections.Generic.HashSet<string>();

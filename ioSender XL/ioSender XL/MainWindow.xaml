@@ -310,7 +310,7 @@
              measures the real TabPanel part inside tabMode's template and keeps this Margin in sync via
              SizeChanged, so this XAML value is only the fallback shown before that runs once at startup. -->
         <Canvas x:Name="sidebarCanvas" DockPanel.Dock="Right" Width="22" VerticalAlignment="Stretch" HorizontalAlignment="Right" ClipToBounds="False" Panel.ZIndex="1" Margin="0,38,0,0">
-            <ItemsControl x:Name="xx" Width="22" VerticalAlignment="Stretch">
+            <ItemsControl x:Name="sidebarTabs" Width="22" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top" Width="22"/>
