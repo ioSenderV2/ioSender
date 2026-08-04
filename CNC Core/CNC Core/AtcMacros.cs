@@ -1,5 +1,5 @@
 /*
- * AtcMacros.cs - part of CNC Controls library
+ * AtcMacros.cs - part of CNC Core library
  *
  * Provisions the ATC support macros (tc/pcorner/pvisecorner) onto the controller's filesystem when it
  * reports them missing - $I [NEWOPT:...] "ATC=0" means an ATC is configured but tc.macro is not present.
@@ -16,7 +16,7 @@ using System.Linq;
 using System.Reflection;
 using CNC.Core;
 
-namespace CNC.Controls
+namespace CNC.Core
 {
     public static class AtcMacros
     {

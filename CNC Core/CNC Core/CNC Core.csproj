@@ -13,6 +13,11 @@
     <FileAlignment>512</FileAlignment>
     <WarningLevel>4</WarningLevel>
     <TargetFrameworkProfile />
+    <!-- The ATC .macro files are EmbeddedResources from ..\..\macros\ (outside this project). VS's fast
+         up-to-date check ignores external files, so a normal Build skips re-embedding edited macros (leaving
+         stale embedded/seeded/uploaded copies). Disabling it forces the real up-to-date check, which tracks
+         the EmbeddedResource inputs - so editing a macro + Build re-embeds it without needing a Clean. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -75,6 +80,7 @@
     <Compile Include="GCodeEmulator.cs" />
     <Compile Include="GCodeParser.cs" />
     <Compile Include="GCodeExplainer.cs" />
+    <Compile Include="AtcMacros.cs" />
     <Compile Include="Grbl.cs" />
     <Compile Include="GrblFilesystems.cs" />
     <Compile Include="GrblSDCard.cs" />
@@ -115,6 +121,12 @@
          so blocked a .NET 8 target. The x:Uid/x:Key pairs are unchanged, so the
          Locale/<loc>/csv/CNC.Core.resources.*.csv rows and tools/locadd.py still apply. -->
     <EmbeddedResource Include="LibStrings.xaml" />
+    <!-- ATC support macros, embedded for auto-provisioning (AtcMacros.cs). LogicalName = bare file name.
+         They live in THIS assembly because AtcMacros reads them via GetExecutingAssembly. -->
+    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

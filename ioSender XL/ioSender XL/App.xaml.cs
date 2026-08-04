@@ -144,7 +144,7 @@ namespace GCode_Sender
                     // controller (AtcMacros.ReadEmbedded), so every tool - including T8's 3D-probe stylus -
                     // probes via the main probe input instead of switching to the toolsetter input.
                     case "-notoolsetter":
-                        CNC.Controls.AtcMacros.NoToolsetter = true;
+                        CNC.Core.AtcMacros.NoToolsetter = true;
                         break;
 
                     default:

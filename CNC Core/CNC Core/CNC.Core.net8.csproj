@@ -33,6 +33,12 @@
   <ItemGroup>
     <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="LibStrings.xaml" />
+    <!-- AtcMacros reads these via GetExecutingAssembly, so they must be embedded here too. Leave them out
+         and the probe still COMPILES - it would only fail at runtime, with every macro reading as absent. -->
+    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
