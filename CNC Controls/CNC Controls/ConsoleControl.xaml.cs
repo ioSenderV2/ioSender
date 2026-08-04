@@ -137,6 +137,13 @@ namespace CNC.Controls
                     break;
 
                 case Key.Escape:
+                    // Only consume Esc when there is something to clear. On an empty box it must keep
+                    // bubbling so ConsoleWindow's own handler can hide the window - two-stage: Esc clears
+                    // the line, Esc again closes the console. Handling it unconditionally (as this did)
+                    // meant Esc did nothing visible whenever the input was already empty, which is most of
+                    // the time. See ConsoleWindow.OnKeyDown.
+                    if (tb.Text.Length == 0)
+                        break;
                     tb.Clear();
                     historyIndex = -1;
                     e.Handled = true;

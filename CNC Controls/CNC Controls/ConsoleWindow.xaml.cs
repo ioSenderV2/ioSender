@@ -58,6 +58,31 @@ namespace CNC.Controls
             base.Close();
         }
 
+        /// <summary>
+        /// Esc hides the console, the same way every other floating window here closes on Esc.
+        ///
+        /// It used to happen for free, because Esc WAS the global console toggle - so when that moved to F12
+        /// (2026-08-03, Esc being swallowed app-wide was costing it its real job) this window lost its close
+        /// key and needed its own handler.
+        ///
+        /// Deliberately the BUBBLING KeyDown, not PreviewKeyDown: preview tunnels from the root down, so it
+        /// would beat the command box's own Esc-clears-the-line binding. Bubbling means the input gets first
+        /// refusal and this only runs when nothing else wanted the key.
+        ///
+        /// Hide(), not Close(): matches the F12 toggle and the window's X (see Window_Closing), both of which
+        /// keep the instance and its scrollback alive.
+        /// </summary>
+        protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape && !e.Handled)
+            {
+                Hide();
+                e.Handled = true;
+                return;
+            }
+            base.OnKeyDown(e);
+        }
+
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             // Preserve size and position for the next session (runs both on user hide and on app shutdown close)
