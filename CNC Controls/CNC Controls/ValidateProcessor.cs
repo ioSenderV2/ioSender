@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ValidateProcessor.cs - part of CNC Controls library
  *
  * The desktop face of "Validate controller". Everything that talks to the CONTROLLER - check mode,
@@ -6,9 +6,14 @@
  * test set, the safe visualisation job and the report text - lives in CNC.Core.ControllerValidator.
  * What is left here is what talks to the operator:
  *
- *   - the live progress panel and the results window (both hand-built WPF)
+ *   - the completion summary and the full results window
  *   - the clipboard export
  *   - every message and prompt.
+ *
+ * Progress during a run is the status line and nothing else - ControllerValidator writes
+ * "Test n of M - <feature> - PASS/FAIL" to Model.Message as each one completes. The validator still
+ * raises Started/Progress; those are its host-progress API (a headless or web host needs them), not
+ * this client's window, and this client simply does not subscribe.
  *
  * That last one is not just tidiness. The "validation aborted" strings live in THIS assembly's
  * LibStrings.xaml, and this solution has three different LibStrings classes - a FindResource call
@@ -18,6 +23,7 @@
 
 using System;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -63,13 +69,6 @@ namespace CNC.Controls
                 }
             }
 
-            // Small non-modal progress panel (bottom-right): live pass/fail tally and current test, with a
-            // "View Summary" button that enables when the run finishes. Streaming stays off-screen and fast.
-            // Raised by the validator once it knows how many real feature tests this controller gets.
-            ValidateProgress progress = null;
-            validator.Started = total => { progress = new ValidateProgress(total); progress.Show(); };
-            validator.Progress = (n, pass, fail) => { if (progress != null) progress.Update(n, pass, fail); };
-
             ValidationOutcome outcome;
             _running = true;
             try
@@ -86,9 +85,6 @@ namespace CNC.Controls
             // the restore waited on the operator dismissing a dialog. Cleanup first, then report.
             if (outcome != ValidationOutcome.Completed)
             {
-                if (progress != null)
-                    progress.Close();
-
                 AppDialogs.Show(
                     LibStrings.FindResource(outcome == ValidationOutcome.NoCheckMode ? "ValNoCheckMode" : "ValSetupRejected"),
                     "Validate controller", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -96,79 +92,76 @@ namespace CNC.Controls
                 return true;
             }
 
-            // Nothing is loaded into the program buffer. Validation used to build a runnable "passed moves"
-            // program out of the motion tests and leave it ready for Cycle Start; it drove a real machine
-            // into its front right corner at full speed and was removed (see ControllerValidator). Check
-            // mode is where this feature exercises the controller - the results window is the deliverable.
-            string status = validator.Aborted ? "Completed (stopped early)." : "Completed.";
-
-            // Enable "View Summary" on the (non-modal) panel - the user opens the full report when ready.
-            progress.SetCompleted(status, () => ShowResults(validator));
+            // Summarise, and offer the detail. Progress during the run is the status line only - the
+            // validator writes "Test n of M - <feature> - PASS/FAIL" to Model.Message per test - so there
+            // is no window in the corner to notice, dismiss, or lose behind the main one.
+            // Nothing is loaded into the program buffer either. Validation used to build a runnable
+            // "passed moves" program out of the motion tests and leave it ready for Cycle Start; it drove a
+            // real machine into its front right corner at full speed and was removed (see
+            // ControllerValidator). Check mode is where this feature exercises the controller, and the
+            // report is the deliverable.
+            if (AppDialogs.Show(BuildSummary(validator), "Validate controller",
+                                MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                ShowResults(validator);
 
             return true;
         }
 
-        // Small non-modal progress panel shown bottom-right during a validation run: live "Test n of M",
-        // a pass/fail tally, and a "View Summary" button that stays disabled until the run completes.
-        private class ValidateProgress
+        // The completion message: the headline counts, what actually failed and why, and anything that
+        // qualifies the result. Capped, because a controller can fail a lot of features at once and a
+        // message box is the wrong place to render sixty lines - the full report is one click away.
+        private const int MaxListedFailures = 12;
+
+        private static string BuildSummary(ControllerValidator validator)
         {
-            private readonly Window win;
-            private readonly TextBlock testLine, tally;
-            private readonly Button summary;
-            private readonly int total;
+            var tests = validator.Tests;
+            int total = tests.Count(x => !x.Helper);
+            int passed = tests.Count(x => !x.Helper && x.Passed);
+            var failed = tests.Where(x => !x.Helper && !x.Passed).ToList();
 
-            public ValidateProgress(int total)
+            var sb = new StringBuilder();
+
+            sb.AppendLine(string.Format("{0}{1}  -  {2} axes",
+                GrblInfo.Firmware,
+                string.IsNullOrEmpty(GrblInfo.Version) ? "" : " " + GrblInfo.Version,
+                GrblInfo.NumAxes));
+            sb.AppendLine();
+
+            if (failed.Count == 0)
+                sb.AppendLine(string.Format("All {0} features passed.", total));
+            else
             {
-                this.total = total;
+                sb.AppendLine(string.Format("{0} of {1} features passed, {2} failed:", passed, total, failed.Count));
+                sb.AppendLine();
 
-                testLine = new TextBlock { Text = "Starting...", Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap };
-                tally = new TextBlock { Text = "Pass: 0    Fail: 0" };
-                summary = new Button { Content = "View Summary", IsEnabled = false, MinWidth = 110,
-                    HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+                foreach (var test in failed.Take(MaxListedFailures))
+                {
+                    string why = test.TimedOut
+                               ? "no response"
+                               : ControllerValidator.ErrorMessage(test.Response) ?? test.Response;
+                    sb.AppendLine(string.Format("    {0}  -  {1}", test.Feature, why));
+                }
 
-                var panel = new StackPanel { Margin = new Thickness(12) };
-                panel.Children.Add(testLine);
-                panel.Children.Add(tally);
-                panel.Children.Add(summary);
-
-                win = new Window {
-                    Title = "Validating controller",
-                    Content = panel,
-                    SizeToContent = SizeToContent.Height,
-                    Width = 230,
-                    ResizeMode = ResizeMode.NoResize,
-                    WindowStyle = WindowStyle.ToolWindow,
-                    ShowInTaskbar = false,
-                    Topmost = true
-                };
-                if (Application.Current?.MainWindow != null && Application.Current.MainWindow.IsVisible)
-                    win.Owner = Application.Current.MainWindow;
-
-                // Park it in the bottom-right of the work area so it doesn't cover the 3D view / DRO.
-                win.Loaded += (s, e) => {
-                    var wa = SystemParameters.WorkArea;
-                    win.Left = wa.Right - win.ActualWidth - 16;
-                    win.Top = wa.Bottom - win.ActualHeight - 16;
-                };
+                if (failed.Count > MaxListedFailures)
+                    sb.AppendLine(string.Format("    ... and {0} more", failed.Count - MaxListedFailures));
             }
 
-            public void Show() => win.Show();
-
-            public void Update(int testNum, int pass, int fail)
+            if (validator.Aborted)
             {
-                testLine.Text = string.Format("Test {0} of {1}", testNum, total);
-                tally.Text = string.Format("Pass: {0}    Fail: {1}", pass, fail);
+                sb.AppendLine();
+                sb.AppendLine("Stopped early: the controller could not return to check mode after an error, so the remaining features were not tested.");
             }
 
-            // Run finished: show the final status and enable the summary button.
-            public void SetCompleted(string status, System.Action onViewSummary)
+            if (validator.Unhomed)
             {
-                testLine.Text = status;
-                summary.IsEnabled = true;
-                summary.Click += (s, e) => { win.Close(); onViewSummary(); };   // dismiss the panel, then show the report
+                sb.AppendLine();
+                sb.AppendLine("A recovery reset left the machine un-homed - re-home before running a job.");
             }
 
-            public void Close() => win.Close();
+            sb.AppendLine();
+            sb.Append("Show the full report?");
+
+            return sb.ToString();
         }
 
         #region Results window
