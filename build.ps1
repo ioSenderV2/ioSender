@@ -95,10 +95,22 @@
     Wipe every project's bin\/obj\ first, then build and launch - use after a build fails
     referencing a file that was just deleted/renamed (stale incremental cache), not routinely.
 
+.PARAMETER Shot
+    Manual-screenshot capture, for use with -DefaultConfig: name the target file in
+    docs\manual\img and, once you quit the app, the newest capture from the Snipping Tool folder
+    is filed there (via tools\copy-latest-screenshot.ps1). Only a capture taken AFTER the launch
+    counts - forget to shoot one and it says so rather than re-filing an older image. Pair it with
+    -message so the app itself tells you which screen to shoot.
+
 .EXAMPLE
     .\build.ps1 -DefaultConfig
     Build, launch a first-run-clean ioSender, and wait. Arrange the layout, quit the app, and
     your own settings are back by the time the prompt returns.
+
+.EXAMPLE
+    .\build.ps1 -default-config -Shot main-window-tools-menu -message="Open the Tools menu, then shoot"
+    Same, but on a default config for a screenshot that matches a fresh install - and the capture
+    is filed as docs\manual\img\main-window-tools-menu.png when you quit.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -113,6 +125,8 @@ param(
     # -forgetnetwork); -DefaultConfig works too, and the alias keeps the variable readable in here.
     [Alias('default-config')]
     [switch]$DefaultConfig,
+    # Target name in docs\manual\img for the screenshot taken during a -DefaultConfig session.
+    [string]$Shot,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
     #   .\build.ps1 -Launch -forgetnetwork -demomarker
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -187,8 +201,21 @@ function Stop-IoSenderAndWait {
     try { $procs | Wait-Process -Timeout 15 -ErrorAction Stop } catch { }
 }
 
+# Newest capture in the Snipping Tool folder BEFORE the app starts, so -Shot can tell a screenshot
+# taken during the session from one that was already sitting there. Without this, quitting without
+# shooting anything would quietly re-file the previous screen as the new one.
+$screenshotsDir = 'C:\Users\steve\OneDrive\Pictures\Screenshots'
+function Get-NewestScreenshotTime {
+    $f = Get-ChildItem -Path $screenshotsDir -Filter '*.png' -ErrorAction SilentlyContinue |
+         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($f) { $f.LastWriteTime } else { [datetime]::MinValue }
+}
+
+if ($Shot -and -not $DefaultConfig) { throw "-Shot files the capture when a session ends, so it needs -DefaultConfig (that is the run that waits for you to quit)." }
+
 if ($DefaultConfig) {
     if ($Scratch) { throw "-DefaultConfig runs the app; -Scratch is a verify-only build. Pass one." }
+    if ($Shot) { $shotBaseline = Get-NewestScreenshotTime }
     # Refuse rather than overwrite: a stash present here means an earlier session died before its
     # restore, and that file is the only copy of the real settings.
     if (Test-Path $stashedCfg) { throw "$stashedCfg already exists - an earlier session did not restore. Move it back to App.config yourself, then re-run." }
@@ -333,5 +360,15 @@ finally {
         Move-Item $stashedCfg $liveCfg -Force
         Write-Host "==> Your App.config is back." -ForegroundColor Green
         if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
+
+        # File the capture only if one was actually taken during the session - see -Shot's help.
+        if ($Shot) {
+            if ((Get-NewestScreenshotTime) -gt $shotBaseline) {
+                & (Join-Path $root 'tools\copy-latest-screenshot.ps1') -Name $Shot
+            }
+            else {
+                Write-Host "==> No screenshot taken this session - docs\manual\img\$Shot is unchanged." -ForegroundColor Yellow
+            }
+        }
     }
 }
