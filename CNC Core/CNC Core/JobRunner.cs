@@ -35,6 +35,36 @@ namespace CNC.Core
 {
     public class JobRunner : ViewModelBase
     {
+        // --- Host policy: what to run -------------------------------------------------------------------
+        // "Cycle Start" does not always mean "stream the loaded job". A tool tab (Start Job, Surface
+        // Spoilboard, Odd Jobs, ...) can be focused with its own program, and one that has not generated yet
+        // must generate first. Which program that is, and whether a tab is even focused, is entirely a client
+        // concept - so the engine asks rather than knows.
+        //
+        // Each returns true if it handled the press, false to fall through to the ordinary behaviour.
+        // Unset means no host policy: always fall through, which is exactly right for a headless run.
+        //
+        // The engine keeps the GATING (is this idle? is this a resume?) because that is streaming state, and
+        // it calls these at two specific points whose ORDER is load-bearing - RunActiveProgram in particular
+        // sits after the hold/tool-change/timer resume branches, so pressing Run while paused resumes the job
+        // instead of launching a wizard program.
+
+        /// <summary>The focused tool tab still has to build its program; Run should generate, not stream.</summary>
+        public System.Func<bool> GenerateActiveProgram;
+
+        /// <summary>Run the focused tool tab's own program rather than the loaded job.</summary>
+        public System.Func<bool> RunActiveProgram;
+
+        public bool TryGenerateActiveProgram()
+        {
+            return GenerateActiveProgram != null && GenerateActiveProgram();
+        }
+
+        public bool TryRunActiveProgram()
+        {
+            return RunActiveProgram != null && RunActiveProgram();
+        }
+
         private bool _canRun = false, _canStop = false, _canRewind = false;
         private bool _feedHoldArmed = false, _canFeedHold = false, _stopShowsPause = false;
 

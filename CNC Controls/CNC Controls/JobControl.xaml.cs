@@ -137,6 +137,7 @@ namespace CNC.Controls
 
             DataContextChanged += JobControl_DataContextChanged;
             runner.PropertyChanged += Runner_PropertyChanged;
+            RegisterActiveProgramPolicy();
 
             grblState.State = GrblStates.Unknown;
             grblState.Substate = 0;
@@ -177,6 +178,35 @@ namespace CNC.Controls
             // otherwise the bar's enables stay frozen and Run looks dead on the wizard tab.
             MacroProcessor.ActiveProgramChanged += OnActiveProgramChanged;
             ProgramView.ActiveChanged += OnActiveProgramChanged;   // a connected ProgramView is an active program too
+        }
+
+        // Tell the runner what "the active program" means here. MacroProcessor's active-program surface is
+        // pure client bookkeeping - which tool tab is focused, whether it has generated yet - so the engine
+        // asks these instead of reading it. Each returns whether it handled the press; false falls through.
+        // Both conditions are the ones Run used to test inline, unchanged; only WHERE they are evaluated moved.
+        private void RegisterActiveProgramPolicy()
+        {
+            runner.GenerateActiveProgram = () =>
+            {
+                if (!MacroProcessor.SupportsGenerateMode || MacroProcessor.IsProgramGenerated ||
+                    MacroProcessor.ActiveGenerate == null)
+                    return false;
+
+                // Pressing "Generate" only generates - it does NOT also run. The second press, once
+                // IsProgramGenerated flips true and the button reads "Run", falls through to
+                // RunActiveProgram below like any other wizard tab.
+                MacroProcessor.ActiveGenerate();
+                return true;
+            };
+
+            runner.RunActiveProgram = () =>
+            {
+                if (MacroProcessor.ActiveRun == null)
+                    return false;
+
+                MacroProcessor.ActiveRun();
+                return true;
+            };
         }
 
         // Mirror the portable run-control state onto this control's DependencyProperties, which is what the
@@ -953,12 +983,10 @@ namespace CNC.Controls
             // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
             // second press, once IsProgramGenerated flips true and the button reads "Run", falls through to
             // the honorActiveProgram/ActiveRun branch below like any other wizard tab.
-            if (honorActiveProgram && MacroProcessor.SupportsGenerateMode && !MacroProcessor.IsProgramGenerated
-                && MacroProcessor.ActiveGenerate != null && grblState.State == GrblStates.Idle)
-            {
-                MacroProcessor.ActiveGenerate();
+            // Which program is "active", and whether it still needs generating, is client policy - it lives in
+            // RegisterActiveProgramPolicy below. The gates stay here because they are streaming state.
+            if (honorActiveProgram && grblState.State == GrblStates.Idle && runner.TryGenerateActiveProgram())
                 return;
-            }
 
             // The dropdown's "Check Run" only arms the intent (see checkModeArmed's own comment) - this is
             // where it actually takes effect, right before the run it was meant to gate would otherwise start.
@@ -991,12 +1019,15 @@ namespace CNC.Controls
                 JobTimer.Pause = false;
                 streamingHandler.Call(StreamingState.Send, false);
             }
-            else if (honorActiveProgram && MacroProcessor.ActiveRun != null && grblState.State == GrblStates.Idle)
+            // A wizard tab is active and the machine is idle: run its program (generate-and-run, with its
+            // prompts/flow control) rather than the loaded job. It routes back here with honorActiveProgram:
+            // false to stream. Idle-gated so a Run mid-run can never re-trigger it.
+            // Position in this chain is load-bearing and unchanged: it sits AFTER the hold / SD-rewind /
+            // tool-change / running-timer branches, so pressing Run while paused resumes the job rather than
+            // launching a wizard program. Returning false falls through to the loaded-job branch below,
+            // exactly as an unmatched else-if did.
+            else if (honorActiveProgram && grblState.State == GrblStates.Idle && runner.TryRunActiveProgram())
             {
-                // A wizard tab is active and the machine is idle: run its program (generate-and-run, with its
-                // prompts/flow control) rather than the loaded job. It routes back here with honorActiveProgram:
-                // false to stream. Idle-gated so a Run mid-run can never re-trigger it.
-                MacroProcessor.ActiveRun();
             }
             else if (Source.IsLoaded)
             {
