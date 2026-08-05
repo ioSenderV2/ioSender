@@ -2408,11 +2408,66 @@ namespace GCode_Sender
             ValidateProcessor.Run((GrblViewModel)DataContext);
         }
 
-        // Copy the full status-bar message to the clipboard (the line itself is single-line / can be truncated).
+        // Copy the full status-bar message to the clipboard (the line itself is single-line / can be truncated,
+        // so what is copied is the whole Message, not what happens to be visible).
+        //
+        // This used to be a bare Clipboard.SetText inside an empty catch, which gave the operator no way to
+        // tell a successful copy from a failed one. Two separate problems, both measured rather than assumed:
+        //   - an empty Message did NOT throw (checked: SetText("") succeeds) - it WIPED the clipboard, so
+        //     clicking the button with no message replaced whatever the operator had copied with nothing;
+        //   - the Win32 clipboard is a shared, lockable resource. Another app holding it (clipboard managers
+        //     and remote-desktop clients do this constantly) makes the call fail, transiently, and the empty
+        //     catch hid that completely - the previous clipboard content survives, so a later paste produces
+        //     older text and reads as "it copied the wrong thing".
+        // Hence: leave the clipboard alone when there is nothing to copy, SetDataObject with a short retry,
+        // and a visible confirmation ONLY on a call that actually succeeded.
         private void CopyMessage_Click(object sender, RoutedEventArgs e)
         {
-            try { System.Windows.Clipboard.SetText((DataContext as GrblViewModel)?.Message ?? string.Empty); }
-            catch { /* clipboard may be locked by another app - ignore */ }
+            string text = (DataContext as GrblViewModel)?.Message ?? string.Empty;
+            if (string.IsNullOrEmpty(text))
+                return;                     // nothing to copy - leave the clipboard alone rather than clear it
+
+            if (CopyToClipboard(text))
+                FlashCopied();
+        }
+
+        // True only if the text is verifiably on the clipboard. Retries because the failure is a transient
+        // lock, not a bad argument - the standard mitigation for CLIPBRD_E_CANT_OPEN.
+        private static bool CopyToClipboard(string text)
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    // copy:true leaves the data on the clipboard after this process exits, which is what an
+                    // operator copying an error message to paste into a report actually wants.
+                    System.Windows.Clipboard.SetDataObject(text, true);
+                    return true;
+                }
+                catch
+                {
+                    System.Threading.Thread.Sleep(40);   // let the other app release the lock
+                }
+            }
+
+            CNC.Core.DebugLog.Write("ui", "CopyMessage: clipboard unavailable after 5 attempts");
+            return false;
+        }
+
+        private DispatcherTimer copiedTimer = null;
+
+        private void FlashCopied()
+        {
+            lblCopied.Visibility = Visibility.Visible;
+
+            if (copiedTimer == null)
+            {
+                copiedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+                copiedTimer.Tick += (s, a) => { copiedTimer.Stop(); lblCopied.Visibility = Visibility.Collapsed; };
+            }
+
+            copiedTimer.Stop();    // restart the window on a repeated click rather than letting it expire early
+            copiedTimer.Start();
         }
 
         private void AttachBasePropertyChangedHandler()
