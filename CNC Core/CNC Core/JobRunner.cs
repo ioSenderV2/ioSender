@@ -65,6 +65,39 @@ namespace CNC.Core
             return RunActiveProgram != null && RunActiveProgram();
         }
 
+        // --- Host policy: preparing a run ---------------------------------------------------------------
+        /// <summary>
+        /// Host work that must happen before a run starts, at the very top of Run. Return false to abort it.
+        /// ioSender uses this for the run-mode selector's "Simulate", which has to switch the CONNECTION to
+        /// the simulator - launching and connecting it synchronously - and repaint the run button. All of
+        /// that is host business; the engine only needs to know whether to carry on.
+        /// Unset = nothing to prepare, run proceeds.
+        /// </summary>
+        public System.Func<bool> PrepareRun;
+
+        public bool PrepareForRun()
+        {
+            return PrepareRun == null || PrepareRun();
+        }
+
+        // --- Run-mode state -----------------------------------------------------------------------------
+        // Armed by the host's run-mode selector, consumed by the engine. Deliberately plain state rather
+        // than an argument to Run: arming and pressing Run are two separate operator actions, and the
+        // intent has to survive between them.
+
+        /// <summary>
+        /// "Check Run" is armed. The engine sends $C at the next idle start and clears this. Not applied
+        /// mid-run: a hold or tool-change resume is not "starting a check run", so it stays armed for the
+        /// next genuine fresh start.
+        /// </summary>
+        public bool CheckModeArmed { get; set; }
+
+        /// <summary>
+        /// This run switched the connection to the simulator, so the end of the run has to switch back.
+        /// Stays false when the session was already on the simulator - nothing was disturbed.
+        /// </summary>
+        public bool SimulateActive { get; set; }
+
         private bool _canRun = false, _canStop = false, _canRewind = false;
         private bool _feedHoldArmed = false, _canFeedHold = false, _stopShowsPause = false;
 

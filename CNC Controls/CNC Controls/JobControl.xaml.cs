@@ -104,7 +104,7 @@ namespace CNC.Controls
         // was switched to the bundled simulator right before Run() streamed the job (see the top of Run()),
         // so ResetRunModeAfterJob must switch it back once the job ends, same as dryRunActive's own G92.1
         // cleanup. See MainWindow.SwitchToSimulatorForRun/RestoreConnectionAfterSimulate.
-        private bool simulateActive = false;
+        // Set when a run switched the connection to the simulator - see JobRunner.SimulateActive.
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
@@ -205,6 +205,39 @@ namespace CNC.Controls
                     return false;
 
                 MacroProcessor.ActiveRun();
+                return true;
+            };
+
+            // The run-mode selector's "Simulate" only arms the intent - the actual connection switch happens
+            // here, right before the run it was meant to gate would otherwise start. Blocking (launches and
+            // connects the simulator synchronously, a few seconds worst case) - the same cost every other
+            // connect path in this app already pays, not something new. If the session is already on the
+            // simulator there is nothing to switch, so SimulateActive stays false and ResetRunModeAfterJob
+            // won't try to "restore" a connection that was never disturbed.
+            // Returns false only when the switch was wanted and failed - that aborts the run.
+            runner.PrepareRun = () =>
+            {
+                if (!simulateArmed)
+                    return true;
+
+                simulateArmed = false;
+
+                if (!SimulatorManager.IsSimulatorConnection())
+                {
+                    // MainWindow lives in the app project, which CNC Controls cannot reference directly (the
+                    // dependency runs the other way) - SwitchToSimulatorForRun is a hook MainWindow registers
+                    // at startup, same pattern as AppConfig.DeviceEnumerator.
+                    bool switched = SimulatorManager.SwitchToSimulatorForRun?.Invoke() ?? false;
+                    if (!switched)
+                    {
+                        model.Message = "Could not switch to the simulator - build one in Settings > Simulator first.";
+                        UpdateRunButtonLabel();
+                        return false;
+                    }
+                    runner.SimulateActive = true;
+                }
+
+                UpdateRunButtonLabel();
                 return true;
             };
         }
@@ -764,7 +797,7 @@ namespace CNC.Controls
         // only be a label/intent change (Home and other Idle-gated controls must stay enabled until the
         // operator actually presses Run) - the real $C fires from Run() itself, right before it would otherwise
         // start streaming. Cleared by picking a different mode, or once Run() actually sends $C.
-        private bool checkModeArmed = false;
+        // "Check Run" armed intent now lives on the runner - see JobRunner.CheckModeArmed.
 
         // Armed by selecting "Simulate" from the dropdown, same deferred-until-Run() idiom as checkModeArmed -
         // the connection switch to the bundled simulator only happens once the operator actually presses Run,
@@ -803,12 +836,12 @@ namespace CNC.Controls
             {
                 case "check":
                     m.IsDryRunMode = false;
-                    checkModeArmed = true;
+                    runner.CheckModeArmed = true;
                     simulateArmed = false;
                     break;
 
                 case "dryrun":
-                    checkModeArmed = false;
+                    runner.CheckModeArmed = false;
                     simulateArmed = false;
                     if (state == GrblStates.Check)
                         Grbl.Reset();
@@ -816,7 +849,7 @@ namespace CNC.Controls
                     break;
 
                 case "simulate":
-                    checkModeArmed = false;
+                    runner.CheckModeArmed = false;
                     if (state == GrblStates.Check)
                         Grbl.Reset();
                     m.IsDryRunMode = false;
@@ -824,7 +857,7 @@ namespace CNC.Controls
                     break;
 
                 default:   // normal Run
-                    checkModeArmed = false;
+                    runner.CheckModeArmed = false;
                     simulateArmed = false;
                     if (state == GrblStates.Check)
                         Grbl.Reset();
@@ -929,11 +962,11 @@ namespace CNC.Controls
             // checkModeArmed (picked from the dropdown, $C not sent yet - see its own comment) reads the same
             // as actually being in Check state (a real, already-running check) - both mean "Run will behave
             // as Check Run", just at different points before/after the operator actually presses it.
-            bool showCheck = checkModeArmed || (connected && model.IsCheckMode);
+            bool showCheck = runner.CheckModeArmed || (connected && model.IsCheckMode);
             // simulateActive (the run already switched connections and is streaming against the sim right
             // now) reads the same as simulateArmed (picked but not yet pressed) - both mean "this run is/will
             // be against the simulator", matching checkModeArmed/model.IsCheckMode's own before/after pairing.
-            bool showSimulate = simulateArmed || simulateActive;
+            bool showSimulate = simulateArmed || runner.SimulateActive;
             btnStart.Content = showCheck ? FindResource("StartModeCheck")
                               : showSimulate ? FindResource("StartModeSimulate")
                               : connected && model.IsDryRunMode ? FindResource("StartModeDryRun")
@@ -953,31 +986,11 @@ namespace CNC.Controls
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
-            // The dropdown's "Simulate" only arms the intent (same idiom as checkModeArmed) - the actual
-            // connection switch happens here, right before the run it was meant to gate would otherwise
-            // start. Blocking (launches/connects the simulator synchronously, a few seconds worst case) - the
-            // same cost every other connect path in this app already pays, not something new. If already on
-            // the simulator, there is nothing to switch (simulateActive stays false, so ResetRunModeAfterJob
-            // won't try to "restore" a connection that was never disturbed).
-            if (simulateArmed)
-            {
-                simulateArmed = false;
-                if (!SimulatorManager.IsSimulatorConnection())
-                {
-                    // MainWindow lives in the app project, which CNC Controls cannot reference directly (the
-                    // dependency runs the other way) - SwitchToSimulatorForRun is a hook MainWindow registers
-                    // at startup, same pattern as AppConfig.DeviceEnumerator.
-                    bool switched = SimulatorManager.SwitchToSimulatorForRun?.Invoke() ?? false;
-                    if (!switched)
-                    {
-                        model.Message = "Could not switch to the simulator - build one in Settings > Simulator first.";
-                        UpdateRunButtonLabel();
-                        return;
-                    }
-                    simulateActive = true;
-                }
-                UpdateRunButtonLabel();
-            }
+            // Host work first - switching the connection to the simulator when "Simulate" was armed. That
+            // whole step is client business (it launches the simulator and repaints the run button), so it
+            // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
+            if (!runner.PrepareForRun())
+                return;
 
             // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
             // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
@@ -993,9 +1006,9 @@ namespace CNC.Controls
             // Idle-gated same as the old immediate-send behavior (StartMode_Click used to require this too);
             // if not idle when Run() fires, silently skip for now (stays armed - a Hold/Tool resume etc. isn't
             // "starting a check run" anyway, and the next genuine fresh start will pick it up).
-            if (checkModeArmed && grblState.State == GrblStates.Idle)
+            if (runner.CheckModeArmed && grblState.State == GrblStates.Idle)
             {
-                checkModeArmed = false;
+                runner.CheckModeArmed = false;
                 model.ExecuteCommand(GrblConstants.CMD_CHECK);
             }
 
@@ -1187,7 +1200,7 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            checkModeArmed = false;   // belt-and-suspenders - Run() should already have cleared this before $C ever went out
+            runner.CheckModeArmed = false;   // belt-and-suspenders - Run() should already have cleared this before $C ever went out
 
             if (dryRunActive)
             {
@@ -1214,9 +1227,9 @@ namespace CNC.Controls
             // switch back now that it's over, same finish/error/abort coverage as dryRunActive's G92.1 cleanup
             // above. Unconditional on WHY the job ended - a simulated run that errors or gets Stopped still
             // needs its real controller back, same as user answer #2 (still reconnect on a mid-run abort).
-            if (simulateActive)
+            if (runner.SimulateActive)
             {
-                simulateActive = false;
+                runner.SimulateActive = false;
                 SimulatorManager.RestoreConnectionAfterSimulate?.Invoke();
             }
         }
