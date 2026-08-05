@@ -1410,6 +1410,17 @@ namespace GCode_Sender
             if (model == null)
                 return;
 
+            // Not while a program is in flight. This is purely informational and runs on every activation, so
+            // skipping one costs nothing - but it queries the controller filesystem (AtcMacros.GetStatus), and
+            // that traffic shares the wire with the g-code being streamed. On real hardware 2026-08-04 this
+            // fired during a Setup macro's own (WAITIDLE) pause and killed the run at N600 with error:9, before
+            // it could write the probed work origin. GrblSDCard.Load now refuses as well; this stops the app
+            // asking in the first place, and stops a readiness dialog popping over a running job.
+            if (model.IsJobRunning || (model.StreamingState != StreamingState.Idle &&
+                                       model.StreamingState != StreamingState.NoFile &&
+                                       model.StreamingState != StreamingState.JobFinished))
+                return;
+
             bool macrosBad = false;
             if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
                 macrosBad = AtcMacros.GetStatus(model).Any(r => r.State != AtcMacros.MacroState.Installed);

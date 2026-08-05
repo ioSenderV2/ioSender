@@ -102,8 +102,44 @@ namespace CNC.Core
         // if the call was skipped by the re-entrancy guard or the link was down - in which case the table's
         // contents are NOT a trustworthy result of this call. Callers that judge presence/absence (e.g.
         // AtcMacros.GetStatus feeding the Machine Setup gate) must treat false as "unknown", not "empty".
+        // True when the SENDER has a program in flight, whatever the controller happens to be reporting.
+        // It must be the sender's view, NOT GrblState: a macro's own (WAITIDLE) deliberately parks the
+        // controller at Idle mid-program, and a status report reading "Idle" there is exactly how the
+        // collision below got through.
+        private static bool ProgramInFlight(GrblViewModel model)
+        {
+            if (model == null)
+                return false;
+
+            if (model.IsJobRunning)
+                return true;
+
+            switch (model.StreamingState)
+            {
+                case StreamingState.NoFile:
+                case StreamingState.Idle:
+                case StreamingState.Stop:
+                case StreamingState.JobFinished:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
         public static bool Load(GrblViewModel model, bool ViewAll)
         {
+            // NEVER enumerate the controller filesystem while a program is streaming. $F / $CWD / $F<= are
+            // ordinary commands on the same wire as the g-code, and the controller rejects a g-code line that
+            // lands while it is busy servicing one. Confirmed on real hardware 2026-08-04: a Start Job tab
+            // activation ran the readiness check during a Setup macro's (WAITIDLE) pause, this listing went
+            // out mid-stream, and N600 came back "error:9 - G-code commands are locked out". The run stopped
+            // there, so N630 - the G10 L2 P1 that writes the probed corner into G54 - never executed and the
+            // operator was left with a completed-looking Setup and a zero work origin. The listing corrupted
+            // its own answer too: atc.sum read back empty, so every macro reported Missing until the next poll.
+            // False = "unknown", which every caller already handles (see the contract note above).
+            if (ProgramInFlight(model))
+                return false;
+
             // Load pumps the dispatcher (EventUtils.DoEvents) while waiting on the controller, so a refresh
             // queued meanwhile - tab activation, ATC provisioning - can re-enter and clear/rebuild the shared
             // DataTable mid-listing. That corrupted the parse state and cascaded into unhandled exceptions
