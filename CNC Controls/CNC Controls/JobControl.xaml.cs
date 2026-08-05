@@ -986,23 +986,11 @@ namespace CNC.Controls
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
-            // NOTE: runner.PrepareForRun() - the host step that switches the connection to the simulator when
-            // "Simulate" was armed - is deliberately NOT called here. It used to be, and switching a
-            // connection before knowing whether this press even starts a run was the cause of two problems:
-            //
-            //   - it stranded the operator on the simulator. Undoing the switch runs through
-            //     ResetRunModeAfterJob, which is only reachable from OnPumpJobFinished / OnPumpError /
-            //     AbortPump - all of which need the pump to have STARTED. Any press that switched and then
-            //     did not stream (a Generate-only press, a wizard refused by its own (PREREQ) gate, or this
-            //     chain simply matching nothing) left the connection on the simulator with nothing left to
-            //     put it back. Confirmed on real hardware: a Work Order failed "machine is not homed / no
-            //     TLO reference / G54 not set" against the fresh simulator and the session stayed there.
-            //   - arming Simulate and then pressing Run on a HELD job switched the connection mid-job, which
-            //     is never what that means.
-            //
-            // It is now called at the one point Run actually commits to streaming - the Source.IsLoaded
-            // branch below. Every resume path reaches Cycle Start without it, and the wizard path still gets
-            // it because a wizard streams by re-entering Run(0, false), which lands in that same branch.
+            // Host work first - switching the connection to the simulator when "Simulate" was armed. That
+            // whole step is client business (it launches the simulator and repaints the run button), so it
+            // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
+            if (!runner.PrepareForRun())
+                return;
 
             // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
             // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
@@ -1081,15 +1069,10 @@ namespace CNC.Controls
                             "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
-                    if (!runner.PrepareForRun())   // point of commitment - see the note at the top of Run
-                        return;
                     Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + model.FileName.Substring(7));
                 }
                 else
                 {
-                    if (!runner.PrepareForRun())   // point of commitment - see the note at the top of Run
-                        return;
-
                     job.ToolChangeLine = -1;
                     model.BlockExecuting = fromBlock;
                     job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
