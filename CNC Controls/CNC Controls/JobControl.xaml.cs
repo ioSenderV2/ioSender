@@ -82,7 +82,14 @@ namespace CNC.Controls
         private static bool keyboardMappingsOk = false;
 
         private int serialSize = 128;
-        private bool initOK = false, isActive = false, useBuffering = false, feedHoldEnable = false;
+        private bool initOK = false, isActive = false, useBuffering = false;
+
+        // The run-control enable state the streaming state machine below decides, held portably rather than
+        // written straight into this control's DependencyProperties. Mirrored into those DPs by
+        // Runner_PropertyChanged, so the XAML and every binding are untouched. This is the seam the state
+        // machine itself moves through next - it is here first, and on its own, so the mirror gets exercised
+        // on real hardware before any streaming logic relocates.
+        private readonly JobRunner runner = new JobRunner();
         // Probe-streaming throttle: once a probe (G38) has been streamed, cap look-ahead (ProbeLookahead lines)
         // and never send past an in-flight probe until it completes - so a streamed probe macro can't race lines
         // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
@@ -129,6 +136,7 @@ namespace CNC.Controls
             InitializeComponent();
 
             DataContextChanged += JobControl_DataContextChanged;
+            runner.PropertyChanged += Runner_PropertyChanged;
 
             grblState.State = GrblStates.Unknown;
             grblState.Substate = 0;
@@ -171,6 +179,40 @@ namespace CNC.Controls
             ProgramView.ActiveChanged += OnActiveProgramChanged;   // a connected ProgramView is an active program too
         }
 
+        // Mirror the portable run-control state onto this control's DependencyProperties, which is what the
+        // XAML actually binds to. One-way by design: the state machine decides, the view reflects.
+        // Assignment-per-change (not a blanket refresh) preserves the DP semantics the machine already
+        // relied on - notably that IsRunEnabled's PropertyChangedCallback fires UpdateRunButtonLabel only on
+        // a real transition. JobRunner's setters dedupe for the same reason.
+        private void Runner_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(JobRunner.CanRun):
+                    IsRunEnabled = runner.CanRun;
+                    break;
+
+                case nameof(JobRunner.CanFeedHold):
+                    IsFeedHoldEnabled = runner.CanFeedHold;
+                    break;
+
+                case nameof(JobRunner.CanStop):
+                    IsStopEnabled = runner.CanStop;
+                    break;
+
+                case nameof(JobRunner.CanRewind):
+                    IsRewindEnabled = runner.CanRewind;
+                    break;
+
+                // State in, words out: Core does not know "Stop" from "Pause" - see JobRunner's header on
+                // why nothing in Core resolves a localized resource.
+                case nameof(JobRunner.StopShowsPause):
+                    if (btnStop != null)
+                        btnStop.Content = (string)FindResource(runner.StopShowsPause ? "JobPause" : "JobStop");
+                    break;
+            }
+        }
+
         private void OnActiveProgramChanged()
         {
             if (model == null)
@@ -185,7 +227,7 @@ namespace CNC.Controls
             // Refresh Run now (only meaningful when idle; a running/held job manages its own enables).
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
             {
-                IsRunEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                runner.CanRun = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
                 SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
             }
             else
@@ -494,7 +536,7 @@ namespace CNC.Controls
                 }
 
                 case nameof(GrblViewModel.FeedHoldDisabled):
-                    IsFeedHoldEnabled = !(sender as GrblViewModel).FeedHoldDisabled && feedHoldEnable;
+                    runner.CanFeedHold = !(sender as GrblViewModel).FeedHoldDisabled && runner.FeedHoldArmed;
                     break;
 
                 case nameof(GrblViewModel.GrblReset):
@@ -1280,7 +1322,7 @@ namespace CNC.Controls
             {
                 using (new UIUtils.WaitCursor())
                 {
-                    IsRunEnabled = false;
+                    runner.CanRun = false;
 
    //                 grdGCode.DataContext = null;
 
@@ -1292,7 +1334,7 @@ namespace CNC.Controls
                     job.CurrBlock = job.LastExecuting = job.PendingLine = job.ACKPending = model.BlockExecuting = 0;
                     job.PgmEndLine = Source.Blocks - 1;
 
-                    IsRunEnabled = true;
+                    runner.CanRun = true;
                 }
             }
         }
@@ -1322,9 +1364,9 @@ namespace CNC.Controls
             {
                 case StreamingState.ToolChange:
                     model.IsJobRunning = false; // only enable UI if no ATC?
-                    IsRunEnabled = true;
-                    IsFeedHoldEnabled = (feedHoldEnable = false);
-                    IsStopEnabled = true;
+                    runner.CanRun = true;
+                    runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                    runner.CanStop = true;
                     if (JobTimer.IsRunning)
                         JobTimer.Pause = true;
                     break;
@@ -1374,10 +1416,10 @@ namespace CNC.Controls
                 {
                     case StreamingState.Halted:
                     case StreamingState.FeedHold:
-                        IsRunEnabled = true;
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
-                        if ((IsStopEnabled = model.IsJobRunning || model.IsSDCardJob) && !GrblInfo.IsGrblHAL)
-                            btnStop.Content = (string)FindResource("JobStop");
+                        runner.CanRun = true;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                        if ((runner.CanStop = model.IsJobRunning || model.IsSDCardJob) && !GrblInfo.IsGrblHAL)
+                            runner.StopShowsPause = false;
                         streamingHandler.Count = job.CurrentRow != null;
                         break;
 
@@ -1419,9 +1461,9 @@ namespace CNC.Controls
                     case StreamingState.Idle:
                         if(streamingState == StreamingState.Error)
                         {
-                            IsRunEnabled = !GrblInfo.IsGrblHAL; // BAD! ?
-                            IsFeedHoldEnabled = (feedHoldEnable = false);
-                            IsStopEnabled = true;
+                            runner.CanRun = !GrblInfo.IsGrblHAL; // BAD! ?
+                            runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                            runner.CanStop = true;
                             SetStreamingHandler(StreamingHandler.AwaitAction);
                         }
                         else
@@ -1431,15 +1473,15 @@ namespace CNC.Controls
                     case StreamingState.Send:
                         if (!model.IsJobRunning)
                             model.IsJobRunning = true;
-                        IsRunEnabled = false;
-                        IsFeedHoldEnabled = (feedHoldEnable = true) && !model.FeedHoldDisabled;
-                        IsStopEnabled = true;
-                        IsRewindEnabled = false;
+                        runner.CanRun = false;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = true) && !model.FeedHoldDisabled;
+                        runner.CanStop = true;
+                        runner.CanRewind = false;
                         break;
 
                     case StreamingState.Error:
                     case StreamingState.Halted:
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
                         break;
 
                     case StreamingState.FeedHold:
@@ -1491,7 +1533,7 @@ namespace CNC.Controls
                 switch (newState)
                 {
                     case StreamingState.Idle:
-                        IsRunEnabled = !GrblInfo.IsGrblHAL;
+                        runner.CanRun = !GrblInfo.IsGrblHAL;
                         break;
 
                     case StreamingState.Stop:
@@ -1510,11 +1552,11 @@ namespace CNC.Controls
 
                     // Note: Only entered in legacy mode
                     case StreamingState.Paused:
-                        IsRunEnabled = false;
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
-                        IsRunEnabled = true;
-                        IsStopEnabled = true;
-                        btnStop.Content = (string)FindResource("JobStop");
+                        runner.CanRun = false;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                        runner.CanRun = true;
+                        runner.CanStop = true;
+                        runner.StopShowsPause = false;
                         if (job.ACKPending == 0)
                             streamingHandler.Count = false;
                         break;
@@ -1558,16 +1600,16 @@ namespace CNC.Controls
 
                     case StreamingState.Error:
                     case StreamingState.Halted:
-                        IsRunEnabled = !GrblInfo.IsGrblHAL;
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
-                        IsStopEnabled = true;
+                        runner.CanRun = !GrblInfo.IsGrblHAL;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                        runner.CanStop = true;
                         break;
 
                     case StreamingState.Send:
-                        IsRunEnabled = false;
-                        IsFeedHoldEnabled = (feedHoldEnable = true) && !model.FeedHoldDisabled;
-                        IsStopEnabled = true;
-                        IsRewindEnabled = false;
+                        runner.CanRun = false;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = true) && !model.FeedHoldDisabled;
+                        runner.CanStop = true;
+                        runner.CanRewind = false;
                         break;
 
                     case StreamingState.FeedHold:
@@ -1613,10 +1655,10 @@ namespace CNC.Controls
                         IsEnabled = !grblState.MPG;
                         // Also enabled when a wizard tab is up (its program is the active program Run runs),
                         // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
-                        IsRunEnabled = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
-                        IsStopEnabled = model.IsSDCardJob && model.SDRewind;
-                        IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
-                        IsRewindEnabled = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
+                        runner.CanRun = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                        runner.CanStop = model.IsSDCardJob && model.SDRewind;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
+                        runner.CanRewind = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
                         SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
                         break;
@@ -1629,8 +1671,8 @@ namespace CNC.Controls
                             SetStreamingHandler(StreamingHandler.SendFile);
                         else
                         {
-                            IsStopEnabled = true;
-                            IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
+                            runner.CanStop = true;
+                            runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
                         }
                         break;
 
@@ -1640,9 +1682,9 @@ namespace CNC.Controls
 
                     case StreamingState.Error:
                     case StreamingState.Halted:
-                        IsRunEnabled = !grblState.MPG;
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
-                        IsStopEnabled = !grblState.MPG;
+                        runner.CanRun = !grblState.MPG;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
+                        runner.CanStop = !grblState.MPG;
                         break;
 
                     case StreamingState.FeedHold:
@@ -1654,10 +1696,10 @@ namespace CNC.Controls
                         break;
 
                     case StreamingState.Stop:
-                        IsFeedHoldEnabled = (feedHoldEnable = !(grblState.MPG || grblState.State == GrblStates.Alarm)) && !model.FeedHoldDisabled;
-                        IsRunEnabled = feedHoldEnable && Source.IsLoaded; //!GrblInfo.IsGrblHAL;
-                        IsStopEnabled = false;
-                        IsRewindEnabled = false;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = !(grblState.MPG || grblState.State == GrblStates.Alarm)) && !model.FeedHoldDisabled;
+                        runner.CanRun = runner.FeedHoldArmed && Source.IsLoaded; //!GrblInfo.IsGrblHAL;
+                        runner.CanStop = false;
+                        runner.CanRewind = false;
                         model.IsJobRunning = false;
                         job.CurrentRow = job.NextRow = null;
                         if (model.IsSDCardJob && !Source.IsLoaded)
@@ -1756,16 +1798,16 @@ namespace CNC.Controls
                         streamingHandler.Call(StreamingState.Send, false);
                     if (newstate.Substate == 1)
                     {
-                        IsRunEnabled = !grblState.MPG;
-                        IsFeedHoldEnabled = (feedHoldEnable = false);
+                        runner.CanRun = !grblState.MPG;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
                     }
                     else if (grblState.Substate == 1)
                     {
-                        IsRunEnabled = false;
-                        IsFeedHoldEnabled = (feedHoldEnable = !grblState.MPG) && !model.FeedHoldDisabled;
+                        runner.CanRun = false;
+                        runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
                     }
                     if (!GrblInfo.IsGrblHAL)
-                        btnStop.Content = (string)FindResource("JobPause");
+                        runner.StopShowsPause = true;
                     break;
 
                 case GrblStates.Tool:
@@ -1813,9 +1855,9 @@ namespace CNC.Controls
                         if (streamingState == StreamingState.Send)
                             streamingHandler.Call(StreamingState.FeedHold, false);
                         else
-                            IsRunEnabled = false;
+                            runner.CanRun = false;
                     } else
-                        IsRunEnabled = true;
+                        runner.CanRun = true;
                     break;
 
                 case GrblStates.Alarm:
