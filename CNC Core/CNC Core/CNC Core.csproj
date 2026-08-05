@@ -99,6 +99,7 @@
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="JogController.cs" />
     <Compile Include="LibStrings.cs" />
+    <Compile Include="MacroRunner.cs" />
     <Compile Include="Machine.cs" />
     <Compile Include="MeasureViewModel.cs" />
     <Compile Include="NetworkScanner.cs" />
