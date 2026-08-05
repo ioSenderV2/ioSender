@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StreamPump.cs - part of CNC Controls library
  *
  * Background G-code send/ack pump - runs the job flow control off the WPF UI thread.
@@ -33,15 +33,13 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using System.Windows.Threading;
-using CNC.Core;
 
-namespace CNC.Controls
+namespace CNC.Core
 {
     // Lightweight file tracer for diagnosing stay-put/macro streaming (Load Stock). Writes to
     // %TEMP%\iosender-startjob.log. Cleared at the start of each small (<200-block) run so each
     // reproduction is self-contained; large cutting jobs are not traced (Enabled=false) to avoid bloat.
-    internal static class PumpLog
+    public static class PumpLog
     {
         private static readonly object gate = new object();
         public static bool Enabled = false;
@@ -69,7 +67,25 @@ namespace CNC.Controls
         }
 
         private readonly GrblViewModel model;
-        private readonly Dispatcher dispatcher;
+        // How a coalesced display update gets onto the host's UI thread. Injected rather than taken as a
+        // Dispatcher so this class carries no WPF - but ALSO so the host keeps the priority decision, which
+        // matters here: this marshals per-line status markers into the program list, and ioSender posts it at
+        // DispatcherPriority.Background deliberately so it can never compete with streaming or with operator
+        // input. UiContext.Post would run it at Normal, which is the wrong direction (see the Feed Hold
+        // starvation fix in AppConfig.OpenStreamFor for what Normal-priority marshalling costs).
+        // Null = no display to update; the marks are still dequeued, just never rendered.
+        private readonly System.Action<System.Action> displayMarshal;
+
+        // How a STATE-MACHINE callback (job finished / error / check-mode error) gets onto the host's UI
+        // thread. Deliberately separate from displayMarshal: ioSender posts these at DispatcherPriority
+        // Normal, because control flow must outrank the coalesced status-marker drain above. Collapsing the
+        // two would either starve the state machine behind display work or promote display work to compete
+        // with streaming. Null = run inline on the pump thread (headless).
+        private readonly System.Action<System.Action> controlMarshal;
+
+        // Probe-streaming throttle: once a probe (G38) has been streamed, cap look-ahead to this many
+        // lines. Lives with the pump that enforces it; JobControl's legacy sender reads it from here.
+        public const int ProbeLookahead = 10;
 
         private IProgramSource source;
         private int serialSize;
@@ -110,10 +126,20 @@ namespace CNC.Controls
         // start; their acks are swallowed in Run so they don't advance job-line accounting.
         private int preambleAcks = 0;
 
-        public StreamPump(GrblViewModel model, Dispatcher dispatcher)
+        public StreamPump(GrblViewModel model, System.Action<System.Action> controlMarshal,
+                          System.Action<System.Action> displayMarshal)
         {
             this.model = model;
-            this.dispatcher = dispatcher;
+            this.controlMarshal = controlMarshal;
+            this.displayMarshal = displayMarshal;
+        }
+
+        private void PostControl(System.Action action)
+        {
+            if (controlMarshal != null)
+                controlMarshal(action);
+            else
+                action();
         }
 
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
@@ -285,7 +311,7 @@ namespace CNC.Controls
                     len = line.Length + 1;
                 }
 
-                if (serialUsed < serialSize - len && (!jobHasProbe || inflight.Count < JobControl.ProbeLookahead))
+                if (serialUsed < serialSize - len && (!jobHasProbe || inflight.Count < ProbeLookahead))
                 {
                     // program-end markers (mirror the legacy SendNextLine bookkeeping)
                     if (line == "%")
@@ -373,7 +399,7 @@ namespace CNC.Controls
                 if (!continueOnError)
                 {
                     aborted = true;
-                    dispatcher.BeginInvoke(onError, ack);
+                    PostControl(() => onError(ack));
                     return;
                 }
 
@@ -381,14 +407,14 @@ namespace CNC.Controls
                 // end, matching the legacy check-mode streamer's behavior this replaces. The per-line
                 // Sent text (including this error) was already written by MarkSent above, same as any
                 // other line.
-                dispatcher.BeginInvoke(onCheckError);
+                PostControl(onCheckError);
             }
 
             if (sendIdx < 0 && inflight.Count == 0)  // everything sent and acked
             {
                 PumpLog.W("JOB FINISHED (all sent+acked)");
                 aborted = true;
-                dispatcher.BeginInvoke(onJobFinished);
+                PostControl(onJobFinished);
                 return;
             }
 
@@ -416,14 +442,14 @@ namespace CNC.Controls
                 if (sendIdx < 0 && inflight.Count == 0)
                 {
                     aborted = true;
-                    dispatcher.BeginInvoke(onJobFinished);
+                    PostControl(onJobFinished);
                 }
             }
             else if (inflight.Count > 0)
             {
                 // Everything was sent; only a tail ack is missing and the controller is idle - the job is done.
                 aborted = true;
-                dispatcher.BeginInvoke(onJobFinished);
+                PostControl(onJobFinished);
             }
         }
 
@@ -438,7 +464,12 @@ namespace CNC.Controls
         private void ScheduleDrain()
         {
             if (Interlocked.Exchange(ref drainPending, 1) == 0)
-                dispatcher.BeginInvoke((System.Action)Drain, DispatcherPriority.Background);
+            {
+                if (displayMarshal != null)
+                    displayMarshal(Drain);
+                else
+                    Drain();            // headless: no UI thread to hop to
+            }
         }
 
         private void Drain()

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * JobControl.xaml.cs - part of CNC Controls library for Grbl
  *
  * v0.47 / 2026-02-22 / Io Engineering (Terje Io)
@@ -44,6 +44,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using System.Threading;
 using CNC.Core;
 using CNC.GCode;
@@ -86,7 +87,7 @@ namespace CNC.Controls
         // and never send past an in-flight probe until it completes - so a streamed probe macro can't race lines
         // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
         private bool jobHasProbe = false, probePending = false;
-        internal const int ProbeLookahead = 10;
+        // Defined by the pump that enforces it - see StreamPump.ProbeLookahead.
         // Set when the currently running job had dry-run mode applied at start (G92 Z-offset queued, M5/M9
         // preamble sent, and per-line M3/M4/M7/M8 suppression armed for the streamers). Cleared (G92.1 sent)
         // at every job-end path so the temporary offset never survives past the run. See Run,
@@ -1085,7 +1086,14 @@ namespace CNC.Controls
                     // reproduces that same keep-going-and-report-every-error behavior (OnPumpCheckError below),
                     // so Check mode no longer needs a separate streamer.
                     if (pump == null)
-                        pump = new StreamPump(model, Dispatcher);
+                        // Two marshals, and the difference is deliberate - the priorities stay here in the
+                        // WPF host rather than inside the now-portable pump. Control flow (job finished /
+                        // error) at Normal, because the state machine must not wait behind display work;
+                        // the coalesced per-line status markers at Background, because they must never
+                        // compete with the streaming itself or with operator input.
+                        pump = new StreamPump(model,
+                                              a => Dispatcher.BeginInvoke(a, DispatcherPriority.Normal),
+                                              a => Dispatcher.BeginInvoke(a, DispatcherPriority.Background));
                     pumpActive = true;
                     pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
                                AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
@@ -2009,7 +2017,7 @@ namespace CNC.Controls
                 }
 
                 if (job.serialUsed < (serialSize - (int)job.NextRow.Length)
-                     && (!jobHasProbe || job.ACKPending < ProbeLookahead))   // cap look-ahead once probing
+                     && (!jobHasProbe || job.ACKPending < StreamPump.ProbeLookahead))   // cap look-ahead once probing
                 {
 
                     if (Source.Commands.Count > 0)
