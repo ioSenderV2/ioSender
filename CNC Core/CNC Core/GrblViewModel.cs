@@ -1505,10 +1505,18 @@ namespace CNC.Core
                     Poller.SetState(0);
                 _grblState.State = GrblStates.Unknown;
                 var msg = Message;
+                // Capture BEFORE GrblReset, whose Message = "" runs the setter and clears the flag.
+                // The save/restore below exists so transient status text (the reconnect notice, say)
+                // survives the controller's banner. An ERROR must not: a soft reset is the operator
+                // explicitly clearing one, and restoring it made Reset look completely dead - confirmed
+                // on real hardware 2026-08-04, where "G-code commands are locked out during alarm or jog
+                // state" sat in the message bar through repeated resets with the machine plainly Idle.
+                bool wasError = IsMessageError;
                 GrblReset = true;
                 IsJobRunning = false;
                 OnGrblReset?.Invoke(data);
-                Message = msg;
+                if (!wasError)
+                    Message = msg;
                 _reset = false;
                 OnPropertyChanged(nameof(IsCheckMode));
                 OnPropertyChanged(nameof(IsSleepMode));
