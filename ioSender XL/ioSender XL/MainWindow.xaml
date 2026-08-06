@@ -187,7 +187,7 @@
         </StatusBar>
         <!-- Single, always-visible machine-control cluster (Phase 2c) - replaced the former floating
              run-control window and the Grbl-tab's lower-left controls. Signals + Status (state/check +
-             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop / Rewind) +
+             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop) +
              Feed/rapid override + MDI. Docked just above the status bar, full width, present on every tab so
              Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
         <Border x:Name="runControlBorder" DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">

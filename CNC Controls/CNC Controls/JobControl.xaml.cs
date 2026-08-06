@@ -173,9 +173,8 @@ namespace CNC.Controls
                     IsStopEnabled = runner.CanStop;
                     break;
 
-                case nameof(JobRunner.CanRewind):
-                    IsRewindEnabled = runner.CanRewind;
-                    break;
+                // JobRunner.CanRewind is deliberately NOT mirrored - the Rewind button was removed (see
+                // JobControl.xaml). The runner still maintains the state for any other host to surface.
 
                 // State in, words out: Core does not know "Stop" from "Pause" - see JobRunner's header on
                 // why nothing in Core resolves a localized resource.
@@ -321,13 +320,6 @@ namespace CNC.Controls
         {
             get { return (bool)GetValue(IsStopEnabledEnabledProperty); }
             set { SetValue(IsStopEnabledEnabledProperty, value); }
-        }
-
-        public static readonly DependencyProperty IsRewindEnabledProperty = DependencyProperty.Register(nameof(IsRewindEnabled), typeof(bool), typeof(JobControl));
-        public bool IsRewindEnabled
-        {
-            get { return (bool)GetValue(IsRewindEnabledProperty); }
-            set { SetValue(IsRewindEnabledProperty, value); }
         }
 
         private void JobControl_Loaded(object sender, RoutedEventArgs e)
@@ -643,11 +635,6 @@ namespace CNC.Controls
         #endregion
 
         #region UIevents
-
-        void btnRewind_Click(object sender, RoutedEventArgs e)
-        {
-            runner.Rewind();
-        }
 
         void btnHold_Click(object sender, RoutedEventArgs e)
         {

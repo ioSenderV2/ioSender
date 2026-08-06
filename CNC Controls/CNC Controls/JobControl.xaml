@@ -38,7 +38,7 @@
         <system:String x:Uid="str_transferComplete" x:Key="TransferComplete">Transfer complete</system:String>
         <!-- Fixed MinWidth (sized to the longest label, "Feed Hold"/"Check Run") so the run button row reads
              as an even grid instead of ragged content-sized buttons. -->
-        <!-- BasedOn the app-wide implicit Button style (AppleStyles.xaml) so Feed Hold/Stop/Rewind/Run get
+        <!-- BasedOn the app-wide implicit Button style (AppleStyles.xaml) so Feed Hold/Stop/Run get
              the same rounded pill/gradient look as everything else - an explicit x:Key style does NOT
              inherit the implicit default on its own, it replaces it outright, which is why these buttons
              rendered as stock unstyled chrome the first time this was wired up. -->
@@ -163,6 +163,11 @@
              a literal here purely as the design-time/fallback value. -->
         <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
         <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
-        <Button x:Uid="btn_rewind" x:Name="btnRewind" Content="Rewind" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsRewindEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnRewind_Click"/>
+        <!-- There was a Rewind button here. Removed 2026-08-06: it was unreachable in practice. Stopping a
+             running job hands off to StreamingAwaitIdle, whose Idle case calls RewindFile() as soon as the
+             machine reports Idle, so job.CurrBlock is already 0 by the time JobRunner.CanRewind is evaluated
+             (it requires CurrBlock != 0). The only route that left it enabled was an error/alarm mid-job.
+             The MECHANISM is untouched - JobRunner.Rewind()/RewindFile()/CanRewind all remain, the automatic
+             rewind on job end and stop is unchanged, and JobView still calls RunControl.RewindFile(). -->
     </StackPanel>
 </UserControl>
