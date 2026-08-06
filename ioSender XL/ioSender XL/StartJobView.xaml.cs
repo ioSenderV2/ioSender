@@ -1607,12 +1607,19 @@ namespace GCode_Sender
                     return;
             }
 
-            // Dynamic mode: any probe-point pick other than the default (outside corner, front-left, index 0)
-            // goes through BuildDynamicProbeProgram instead - a one-shot single probe (not the 4-corner measure
-            // system). The default pick reproduces the exact original G28/Dynamic behavior unchanged below.
+            // Dynamic mode: EVERY probe-point pick goes through BuildDynamicProbeProgram - a one-shot single
+            // probe, not the 4-corner measure system.
+            // Front-left/outside-corner used to be special-cased into BuildProgram to "reproduce the exact
+            // original G28/Dynamic behavior". That made one of four identical-looking corner buttons generate
+            // a materially different program from its three siblings - TLO reference, rotation and the
+            // 4-corner Measure on FL, a single probe on the rest - with nothing in the UI to say so. Removed
+            // 2026-08-06 at the user's request: same fixture, same geometry settings, same builder.
+            // What FL gives up, stated plainly because none of it is visible from the tab: EmitTloReference,
+            // WCS rotation, the corner 2/3/4 Measure sequence, and with them the OriginZ frame correction
+            // (a1b5d6b), which is gated on a TLO reference actually having been taken this run.
             if (IsG28(fx))
                 UpdateDynamicSelectionFromGeometry();   // pick up the Geometry panel's current state, belt-and-suspenders
-            if (IsG28(fx) && !(dynamicProbePoint == ProbePoint.OutsideCorner && dynamicIndex == 0))
+            if (IsG28(fx))
             {
                 program = BuildDynamicProbeProgram(p, widthMm, heightMm, cbxWcs.SelectedIndex + 1, IsG92, setOrigin, setTloRef, touchPlate, stockConductive, thicknessMm);
             }
@@ -2356,11 +2363,20 @@ namespace GCode_Sender
         private static readonly int[] EdgeCornerId = { 1, 2, 3, 1 };
         private static readonly int[] EdgeFaces = { 2, 1, 2, 1 };
 
-        // Dynamic mode's one-shot probe (any pick other than the default outside-corner-FL, which stays on
-        // the existing BuildProgram/4-corner path - see Generate_Click). Single pcorner/pcenter call, then the
-        // same origin-or-offset ending BuildProgram uses. Non-static (reads dynamicProbePoint/dynamicIndex and
-        // the center solid/hole radios directly) - unlike BuildProgram/BuildViseProgram, which are pure
-        // functions of their arguments.
+        // Dynamic mode's one-shot probe - EVERY pick since 2026-08-06 (front-left/outside-corner used to be
+        // special-cased onto BuildProgram's 4-corner path; see Generate_Click). Single pcorner/pcenter call,
+        // then the same origin-or-offset ending BuildProgram uses. Non-static (reads dynamicProbePoint/
+        // dynamicIndex and the center solid/hole radios directly) - unlike BuildProgram/BuildViseProgram,
+        // which are pure functions of their arguments.
+        //
+        // ⚠ setTloRef IS ACCEPTED AND NEVER USED. This builder does not call EmitTloReference, so the tab's
+        // "Set TLO reference" checkbox does nothing for ANY Dynamic pick - and since FL moved here, that is
+        // now the whole Dynamic fixture rather than three of its four corners. It was already true for those
+        // three; unifying the builders made it uniform, not new. Two honest ways out, neither taken yet
+        // because both are more than a routing change: emit the reference here (and then the OriginZ frame
+        // correction has a fresh #<_probe_z> to work from, which is exactly why it was scoped to BuildProgram
+        // in a1b5d6b), or disable the checkbox while a Dynamic fixture is selected so the operator can see it
+        // does not apply. Leaving a live-looking checkbox silently inert is the one option that is not OK.
         private string BuildDynamicProbeProgram(ProbeDefinition p, double estW, double estH, int wcsP, bool useG92, bool setOrigin, bool setTloRef, bool touchPlate, bool stockConductive, double thicknessMm)
         {
             double r = p.ProbeDiameter / 2d;
