@@ -53,83 +53,17 @@ namespace CNC.Controls
 {
     public partial class JobControl : UserControl
     {
-        private enum StreamingHandler
-        {
-            Idle = 0,
-            SendFile,
-            FeedHold,
-            ToolChange,
-            AwaitAction,
-            AwaitIdle,
-            Previous,
-            Max // only used for array instantiation
-        }
-
-        private struct StreamingHandlerFn
-        {
-            public StreamingHandler Handler;
-            public bool Count;
-            public Func<StreamingState, bool, bool> Call;
-        }
-
-        private struct JobData
-        {
-            public int CurrBlock, LastExecuting, PendingLine, PgmEndLine, ToolChangeLine, ACKPending, serialUsed;
-            public bool Started, Transferred, Complete, IsSDFile, IsChecking, HasError, Stopped, ToolChanged;
-            public GCodeBlock CurrentRow, NextRow;
-        }
-
         private static bool keyboardMappingsOk = false;
 
-        private int serialSize = 128;
-        private bool initOK = false, isActive = false, useBuffering = false;
+        private bool initOK = false, isActive = false;
 
-        // The run-control enable state the streaming state machine below decides, held portably rather than
-        // written straight into this control's DependencyProperties. Mirrored into those DPs by
-        // Runner_PropertyChanged, so the XAML and every binding are untouched. This is the seam the state
-        // machine itself moves through next - it is here first, and on its own, so the mirror gets exercised
-        // on real hardware before any streaming logic relocates.
+        // The streaming engine. It owns the job, the pump, the handler table and every decision about what
+        // the machine does next; this control owns what the operator sees. The run-control enable state it
+        // decides is mirrored into this control's DependencyProperties by Runner_PropertyChanged, so the XAML
+        // and every binding are untouched.
         private readonly JobRunner runner = new JobRunner();
-        // Probe-streaming throttle: once a probe (G38) has been streamed, cap look-ahead (ProbeLookahead lines)
-        // and never send past an in-flight probe until it completes - so a streamed probe macro can't race lines
-        // into the controller's RX during a probe. Self-scoping: normal cutting jobs (no G38) are untouched.
-        private bool jobHasProbe = false, probePending = false;
-        // Defined by the pump that enforces it - see StreamPump.ProbeLookahead.
-        // Set when the currently running job had dry-run mode applied at start (G92 Z-offset queued, M5/M9
-        // preamble sent, and per-line M3/M4/M7/M8 suppression armed for the streamers). Cleared (G92.1 sent)
-        // at every job-end path so the temporary offset never survives past the run. See Run,
-        // OnPumpJobFinished, OnPumpError and AbortPump.
-        private bool dryRunActive = false;
-        // Set when the currently running job was started via the Run dropdown's "Simulate" - the connection
-        // was switched to the bundled simulator right before Run() streamed the job (see the top of Run()),
-        // so ResetRunModeAfterJob must switch it back once the job ends, same as dryRunActive's own G92.1
-        // cleanup. See MainWindow.SwitchToSimulatorForRun/RestoreConnectionAfterSimulate.
-        // Set when a run switched the connection to the simulator - see JobRunner.SimulateActive.
-        private volatile StreamingState streamingState = StreamingState.NoFile;
-        private GrblState grblState;
+
         private GrblViewModel model;
-        private JobData job;
-        private int missed = 0;
-
-        // Background send/ack pump - owns flow control off the UI thread for cutting jobs (check mode keeps the
-        // legacy streamer). When pumpActive, ResponseReceived's accounting is skipped (the pump owns it).
-        private StreamPump pump;
-        private volatile bool pumpActive = false;
-        private System.Windows.Threading.DispatcherTimer idleKickTimer;   // nudges a stalled pump when the controller sits idle mid-run
-
-        private StreamingHandlerFn[] streamingHandlers = new StreamingHandlerFn[(int)StreamingHandler.Max];
-        private StreamingHandlerFn streamingHandler;
-
-        // The program the streamer reads. Defaults to the loaded job (GCode.File); a tool can point it at its
-        // own in-memory program for a run (so the run never touches the job buffer), then reset it to null.
-        // Resolved lazily so it does not force GCode.File creation during early startup.
-        private IProgramSource _source;
-        public IProgramSource Source { get { return _source ?? GCode.File; } set { _source = value; } }
-
-        //       private delegate void GcodeCallback(string data);
-
-        public delegate void StreamingStateChangedHandler(StreamingState state, bool MPGMode);
-        public event StreamingStateChangedHandler StreamingStateChanged;
 
         public JobControl()
         {
@@ -138,37 +72,7 @@ namespace CNC.Controls
             DataContextChanged += JobControl_DataContextChanged;
             runner.PropertyChanged += Runner_PropertyChanged;
             RegisterActiveProgramPolicy();
-
-            grblState.State = GrblStates.Unknown;
-            grblState.Substate = 0;
-            grblState.MPG = false;
-
-            job.PgmEndLine = -1;
-
-            streamingHandlers[(int)StreamingHandler.Idle].Call = StreamingIdle;
-            streamingHandlers[(int)StreamingHandler.Idle].Count = false;
-
-            streamingHandlers[(int)StreamingHandler.SendFile].Call = StreamingSendFile;
-            streamingHandlers[(int)StreamingHandler.SendFile].Count = true;
-
-            streamingHandlers[(int)StreamingHandler.ToolChange].Call = StreamingToolChange;
-            streamingHandlers[(int)StreamingHandler.ToolChange].Count = false;
-
-            streamingHandlers[(int)StreamingHandler.FeedHold].Call = StreamingFeedHold;
-            streamingHandlers[(int)StreamingHandler.FeedHold].Count = true;
-
-            streamingHandlers[(int)StreamingHandler.AwaitAction].Call = StreamingAwaitAction;
-            streamingHandlers[(int)StreamingHandler.AwaitAction].Count = true;
-
-            streamingHandlers[(int)StreamingHandler.AwaitIdle].Call = StreamingAwaitIdle;
-            streamingHandlers[(int)StreamingHandler.AwaitIdle].Count = false;
-
-            streamingHandler = streamingHandlers[(int)StreamingHandler.Previous] = streamingHandlers[(int)StreamingHandler.Idle];
-
-            for (int i = 0; i < streamingHandlers.Length; i++)
-                streamingHandlers[i].Handler = (StreamingHandler)i;
-
-//            Thread.Sleep(100);
+            RegisterEngineSeams();
 
             Loaded += JobControl_Loaded;
 
@@ -309,7 +213,7 @@ namespace CNC.Controls
             // Setting the DP behind the runner's back would let the two diverge - the engine sets ready
             // true, a tab change sets the DP false directly, and the engine's next identical assignment
             // then dedupes to nothing, leaving the cue stuck off with no way to recover.
-            if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
+            if (!JobTimer.IsRunning && runner.MachineState == GrblStates.Idle)
             {
                 runner.CanRun = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
                 runner.ActiveProgramReady = HasActiveProgram && runner.CanRun && !IsGenerateModeBlocking;
@@ -470,7 +374,7 @@ namespace CNC.Controls
                 GCodeParser.IgnoreM7 = AppConfig.Settings.Base.IgnoreM7;
                 GCodeParser.IgnoreM8 = AppConfig.Settings.Base.IgnoreM8;
 
-                useBuffering = AppConfig.Settings.Base.UseBuffering; // && GrblInfo.IsGrblHAL;
+                runner.UseBuffering = AppConfig.Settings.Base.UseBuffering; // && GrblInfo.IsGrblHAL;
             }
         }
 
@@ -481,7 +385,7 @@ namespace CNC.Controls
             GCodeParser.IgnoreM8 = AppConfig.Settings.Base.IgnoreM8;
             GCodeParser.IgnoreG61G64 = AppConfig.Settings.Base.IgnoreG61G64;
 
-            useBuffering = AppConfig.Settings.Base.UseBuffering; // && GrblInfo.IsGrblHAL;
+            runner.UseBuffering = AppConfig.Settings.Base.UseBuffering; // && GrblInfo.IsGrblHAL;
         }
 
         private void JobControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -493,7 +397,7 @@ namespace CNC.Controls
                 model = (GrblViewModel)e.NewValue;
                 model.PropertyChanged += OnDataContextPropertyChanged;
                 model.OnRealtimeStatusProcessed += RealtimeStatusProcessed;
-                model.OnCommandResponseReceived += ResponseReceived;
+                runner.Attach(model);   // the engine takes the command responses it does flow control on
                 model.OnCycleStart += OnCycleStart;
                 model.OnStop += OnStop;
                 GCode.File.Model = model;   // wire the loaded job's model (job setup, not the streamed Source)
@@ -503,15 +407,12 @@ namespace CNC.Controls
 
         private void OnStop(object sender, EventArgs e)
         {
-            AbortPump();
-            JobTimer.Stop();
-            job.Stopped = true;
-            streamingHandler.Call(StreamingState.Stop, true);
+            runner.Stop();
         }
 
         private void OnCycleStart(object sender, EventArgs e)
         {
-            if (isActive && JobPending)
+            if (isActive && runner.JobPending)
             {
                 Run(0);
             }
@@ -523,34 +424,22 @@ namespace CNC.Controls
                 model.RunTime = JobTimer.RunTime;
         }
 
+        // The model is where the machine reports in, and both halves have work to do on it. This routes each
+        // notification: the engine's half through the JobRunner entry point for that case, this control's half
+        // (the run button's label, the load-time warnings) inline. Order within each case is the order the
+        // single inline switch had before step 4c-4 moved the engine out - for GrblState the engine goes
+        // first and the label follows, for a newly loaded file the warnings come before the engine settles
+        // the enables. That ordering is why this stays one switch rather than becoming a second subscriber.
         private void OnDataContextPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (sender is GrblViewModel) switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.LineNumber):
-                    if(job.CurrBlock > 0)
-                    {
-                            int found = 0;
-                        var block = job.CurrBlock;
-                        var lineNum = (sender as GrblViewModel).LineNumber;
-                        do
-                        {
-                            if(Source.Data[block].LineNum == lineNum)
-                            {
-                                found = block - 1;
-                                Source.Data[block].Sent = "@";
-                                break;
-                            }
-                        } while (--block > job.LastExecuting);
-                        while (job.LastExecuting < found)
-                        {
-                            Source.Data[++job.LastExecuting].Sent = "ok";
-                        }
-                    }
+                    runner.OnLineNumberChanged((sender as GrblViewModel).LineNumber);
                     break;
 
                 case nameof(GrblViewModel.GrblState):
-                    GrblStateChanged((sender as GrblViewModel).GrblState);
+                    runner.GrblStateChanged((sender as GrblViewModel).GrblState);
                     UpdateRunButtonLabel();   // IsCheckMode is derived from GrblState - no PropertyChanged of its own
                     break;
 
@@ -564,15 +453,12 @@ namespace CNC.Controls
                     // with no indication while the link is actually gone. Stop the job so the UI reflects the
                     // lost connection (idle-time loss is already surfaced by the poller). Only fires while a
                     // job is active, so it cannot affect normal streaming.
-                    if ((sender as GrblViewModel).IsConnectionLost && (model.IsJobRunning || JobTimer.IsRunning))
-                    {
-                        AbortPump();
-                        streamingHandler.Call(StreamingState.Stop, true);
-                    }
+                    if ((sender as GrblViewModel).IsConnectionLost)
+                        runner.OnConnectionLost();
                     break;
 
                 case nameof(GrblViewModel.MDI):
-                    SendCommand((sender as GrblViewModel).MDI);
+                    runner.SendCommand((sender as GrblViewModel).MDI);
                     break;
 
                 case nameof(GrblViewModel.StartFromBlockNum):
@@ -580,54 +466,25 @@ namespace CNC.Controls
                     Run((sender as GrblViewModel).StartFromBlockNum, false);
                     break;
 
-                    case nameof(GrblViewModel.IsMPGActive):
-                    grblState.MPG = (sender as GrblViewModel).IsMPGActive == true;
-                    (sender as GrblViewModel).Poller.SetState(grblState.MPG ? 0 : AppConfig.Settings.Base.PollInterval);
-                    streamingHandler.Call(grblState.MPG ? StreamingState.Disabled : StreamingState.Idle, false);
+                case nameof(GrblViewModel.IsMPGActive):
+                    runner.OnMPGChanged((sender as GrblViewModel).IsMPGActive == true);
                     break;
 
                 case nameof(GrblViewModel.ProgramEnd):
-                    if (!Source.IsLoaded)
-                        streamingHandler.Call(model.IsSDCardJob ? StreamingState.JobFinished : StreamingState.NoFile, model.IsSDCardJob);
-                    else if(JobTimer.IsRunning && !job.Complete)
-                        streamingHandler.Call(StreamingState.JobFinished, true);
-                    if (!model.IsParserStateLive)
-                        SendCommand(GrblConstants.CMD_GETPARSERSTATE);
+                    runner.OnProgramEnd();
                     break;
 
                 case nameof(GrblViewModel.FileName):
-                {
-                    job.IsSDFile = false;
-                    if(string.IsNullOrEmpty((sender as GrblViewModel).FileName))
-                        job.NextRow = null;
-                    else
-                    {
-                        job.ToolChangeLine = -1;
-                        job.ToolChanged = false;
-                        job.CurrBlock = job.PendingLine = job.ACKPending = model.BlockExecuting = 0;
-                        job.PgmEndLine = Source.Blocks - 1;
-                        if ((sender as GrblViewModel).IsPhysicalFileLoaded)
-                        {
-                            if (Source.ToolChanges > 0 && GrblSettings.HasSetting(grblHALSetting.ToolChangeMode)
-                                && GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) > 0 && !model.IsTloReferenceSet)
-                                AppDialogs.Show(string.Format((string)FindResource("JobToolReference"), Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            if (Source.HasGoPredefinedPosition && (sender as GrblViewModel).IsGrblHAL && (sender as GrblViewModel).HomedState != HomedState.Homed)
-                                AppDialogs.Show((string)FindResource("JobG28G30"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            streamingHandler.Call(Source.IsLoaded ? StreamingState.Idle : StreamingState.NoFile, false);
-                        }
-                    }
+                    runner.OnFileNameChanged();   // raises LoadedJobWarning for the two load-time warnings
                     break;
-                }
 
                 case nameof(GrblViewModel.FeedHoldDisabled):
-                    runner.CanFeedHold = !(sender as GrblViewModel).FeedHoldDisabled && runner.FeedHoldArmed;
+                    runner.RefreshFeedHoldGate((sender as GrblViewModel).FeedHoldDisabled);
                     break;
 
                 case nameof(GrblViewModel.GrblReset):
-                    AbortPump();
-                    JobTimer.Stop();
-                    streamingHandler.Call(StreamingState.Stop, true);
-                    DiscardResumableJob();
+                    runner.OnGrblReset();
+                    MacroProcessor.DiscardGenerated?.Invoke();
                     break;
 
                 case nameof(GrblViewModel.HomedState):
@@ -654,31 +511,32 @@ namespace CNC.Controls
         // events happening first.
         private void DiscardResumableJob()
         {
-            job = new JobData();
+            runner.ResetJobData();
             MacroProcessor.DiscardGenerated?.Invoke();
         }
 
-        public bool canJog { get { return grblState.State == GrblStates.Idle || grblState.State == GrblStates.Tool || grblState.State == GrblStates.Jog; } }
+        public bool canJog { get { return runner.CanJog; } }
         // A job is ready to start: a loaded job, or an active wizard program (so the physical Run button
         // runs a wizard's program too, not just a loaded file). False once a job/stream is actually running.
-        public bool JobPending { get { return (Source.IsLoaded || HasActiveProgram) && !JobTimer.IsRunning; } }
+        public bool JobPending { get { return runner.JobPending; } }
 
         public bool Activate(bool activate)
         {
             if (activate && !initOK)
             {
                 initOK = true;
-                serialSize = Math.Min(AppConfig.Settings.Base.MaxBufferSize, (int)(GrblInfo.SerialBufferSize * 0.9f)); // size should be less than hardware handshake HWM
+                runner.SerialSize = Math.Min(AppConfig.Settings.Base.MaxBufferSize, (int)(GrblInfo.SerialBufferSize * 0.9f)); // size should be less than hardware handshake HWM
                 Source.Parser.Dialect = GrblInfo.IsGrblHAL ? Dialect.GrblHAL : Dialect.Grbl;
                 Source.Parser.ExpressionsSupported = GrblInfo.ExpressionsSupported;
 
                 if (GrblInfo.HasRTC)
-                    SendCommand("$RTC=" + DateTime.Now.ToLocalTime().ToString("s"));
+                    runner.SendCommand("$RTC=" + DateTime.Now.ToLocalTime().ToString("s"));
             }
 
             EnablePolling(activate);
 
             isActive = activate;
+            runner.IsActive = activate;
 
             return isActive;
         }
@@ -719,7 +577,7 @@ namespace CNC.Controls
 
         private bool StopJob(Key key)
         {
-            streamingHandler.Call(StreamingState.Stop, false);
+            runner.CallHandler(StreamingState.Stop, false);
             return true;
         }
 
@@ -761,9 +619,9 @@ namespace CNC.Controls
 
         private bool FeedHold(Key key)
         {
-            if (grblState.State != GrblStates.Idle)
+            if (runner.MachineState != GrblStates.Idle)
                 btnHold_Click(null, null);
-            return grblState.State != GrblStates.Idle;
+            return runner.MachineState != GrblStates.Idle;
         }
 
         private bool FnKeyHandler(Key key)
@@ -784,17 +642,11 @@ namespace CNC.Controls
 
         #endregion
 
-        public bool CallHandler (StreamingState state, bool always)
-        {
-            return streamingHandler.Call(state, always);
-        }
-
         #region UIevents
 
         void btnRewind_Click(object sender, RoutedEventArgs e)
         {
-            RewindFile();
-            streamingHandler.Call(streamingState, true);
+            runner.Rewind();
         }
 
         void btnHold_Click(object sender, RoutedEventArgs e)
@@ -804,8 +656,7 @@ namespace CNC.Controls
 
         void btnStop_Click(object sender, RoutedEventArgs e)
         {
-            AbortPump();
-            streamingHandler.Call(StreamingState.Stop, true);
+            runner.Abort();
         }
 
         void btnStart_Click(object sender, RoutedEventArgs e)
@@ -1001,1168 +852,139 @@ namespace CNC.Controls
 
         #endregion
 
-        // honorActiveProgram: when a wizard tab is up it registers its program as the active program
-        // (MacroProcessor.ActiveRun). A fresh (idle) Run then runs THAT instead of the loaded job - so one
-        // Run runs whatever program is active, loaded file or wizard. The internal stream-starters that
-        // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
-        public void Run(int fromBlock, bool honorActiveProgram = true)
+        // The streaming state machine itself lives in CNC.Core.JobRunner as of step 4c-4 - Run, the six
+        // Streaming* handlers, ResponseReceived's flow control, SendNextLine and GrblStateChanged. What is
+        // left here is the operator's side of it: the DependencyProperties the XAML binds to, the run button
+        // and its mode dropdown, the keyboard shortcuts, and the handful of host services the engine asks for
+        // (words, a wait cursor, a timer, the marshals). The forwarders below keep every existing caller -
+        // MainWindow.RunControl.*, JobView - spelled exactly as before.
+
+        // The pump-stall watchdog's timer. It stays on this side because its PRIORITY is the point: a
+        // Background-priority DispatcherTimer can never preempt streaming or operator input, and it is a
+        // watchdog - being late is harmless, being in the way is not. The engine owns the decision (is the
+        // pump actually stalled?), this owns the clock.
+        private DispatcherTimer idleKickTimer;
+
+        // Tell the engine how to reach the operator. Every one of these is optional to the engine and each
+        // unset default is the headless one - registering them is what makes it a desktop sender rather than
+        // a server. See JobRunner's "Host seams" region for what each is for.
+        private void RegisterEngineSeams()
         {
-            // Host work first - switching the connection to the simulator when "Simulate" was armed. That
-            // whole step is client business (it launches the simulator and repaints the run button), so it
-            // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
-            if (!runner.PrepareForRun())
-                return;
+            // The engine names a message, this resolves it - the strings are JobControl.xaml's own resources,
+            // localized per-locale like every other UI string. Core has no dictionary that contains them (it
+            // has its OWN LibStrings, which is exactly how a FindResource in the wrong assembly resolves to
+            // nothing and still compiles).
+            runner.Localizer = key => FindResource(key) as string;
 
-            // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
-            // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
-            // second press, once IsProgramGenerated flips true and the button reads "Run", falls through to
-            // the honorActiveProgram/ActiveRun branch below like any other wizard tab.
-            // Which program is "active", and whether it still needs generating, is client policy - it lives in
-            // RegisterActiveProgramPolicy below. The gates stay here because they are streaming state.
-            if (honorActiveProgram && grblState.State == GrblStates.Idle && runner.TryGenerateActiveProgram())
-                return;
+            // DeclaredStock, NOT the .Stock property - .Stock falls back to the machine's FULL Z travel range
+            // as a conservative default when the program has no (STOCK ...) comment, which is right for other
+            // features but wildly wrong as a dry-run clearance. No declaration = 0 extra clearance.
+            runner.DeclaredStockZ = () => ProgramView.LoadedJob != null && ProgramView.LoadedJob.IsLoadedJob
+                                            ? (ProgramView.LoadedJob.DeclaredStock?.Z ?? 0d) : 0d;
 
-            // The dropdown's "Check Run" only arms the intent (see checkModeArmed's own comment) - this is
-            // where it actually takes effect, right before the run it was meant to gate would otherwise start.
-            // Idle-gated same as the old immediate-send behavior (StartMode_Click used to require this too);
-            // if not idle when Run() fires, silently skip for now (stays armed - a Hold/Tool resume etc. isn't
-            // "starting a check run" anyway, and the next genuine fresh start will pick it up).
-            if (runner.CheckModeArmed && grblState.State == GrblStates.Idle)
-            {
-                runner.CheckModeArmed = false;
-                model.ExecuteCommand(GrblConstants.CMD_CHECK);
-            }
+            runner.BusyCursor = () => new UIUtils.WaitCursor();
 
-            if (grblState.State == GrblStates.Hold || (grblState.State == GrblStates.Run && grblState.Substate == 1) || (grblState.State == GrblStates.Door && (grblState.Substate == 0 || grblState.Substate == 5)))
-                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
-            else if(grblState.State == GrblStates.Idle && model.SDRewind) {
-                streamingHandler.Call(StreamingState.Start, false);
-                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
-            }
-            else if (grblState.State == GrblStates.Tool)
+            // Two marshals, and the difference is deliberate - the priorities stay here in the WPF host rather
+            // than inside the now-portable pump. Control flow (job finished / error) at Normal, because the
+            // state machine must not wait behind display work; the coalesced per-line status markers at
+            // Background, because they must never compete with the streaming itself or with operator input.
+            runner.ControlMarshal = a => Dispatcher.BeginInvoke(a, DispatcherPriority.Normal);
+            runner.DisplayMarshal = a => Dispatcher.BeginInvoke(a, DispatcherPriority.Background);
+
+            // Read live, not captured - a Settings change applies to the next line streamed.
+            runner.GetSendComments = () => AppConfig.Settings.Base.SendComments;
+            runner.GetStartSimulator = () => AppConfig.Settings.Base.StartSimulator;
+
+            // The mirror of PrepareRun: a "Simulate" run switched the live connection to the bundled
+            // simulator, so the end of the run switches it back - whatever ended it. See SimulatorManager.
+            runner.RestoreAfterRun = () => SimulatorManager.RestoreConnectionAfterSimulate?.Invoke();
+
+            // Resolved lazily so it does not force GCode.File creation during early startup.
+            runner.DefaultSource = () => GCode.File;
+
+            // Unguarded on purpose: this is the "set the poll rate" primitive the engine drives (MPG taking
+            // control stops polling outright). EnablePolling below is the guarded variant this control uses
+            // for its own tab-activation bookkeeping.
+            runner.SetPolling = enable => model?.Poller.SetState(enable ? AppConfig.Settings.Base.PollInterval : 0);
+
+            runner.RequestIdleKick = ArmIdleKick;
+            runner.CancelIdleKick = () => idleKickTimer?.Stop();
+
+            // Core states the condition, this words it. Both are load-time warnings about the program that
+            // was just opened, raised before the engine settles the run controls.
+            runner.LoadedJobWarning = warning =>
             {
-                model.Message = string.Empty;
-                job.ToolChanged = false;
-                job.ToolChangeLine = -1;
-                if (pumpActive)
-                    pump.Suspended = false;   // resume consuming acks for the buffered (and M6) lines
-                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_CYCLE_START));
-            }
-            else if(JobTimer.IsRunning)
-            {
-                JobTimer.Pause = false;
-                streamingHandler.Call(StreamingState.Send, false);
-            }
-            // A wizard tab is active and the machine is idle: run its program (generate-and-run, with its
-            // prompts/flow control) rather than the loaded job. It routes back here with honorActiveProgram:
-            // false to stream. Idle-gated so a Run mid-run can never re-trigger it.
-            // Position in this chain is load-bearing and unchanged: it sits AFTER the hold / SD-rewind /
-            // tool-change / running-timer branches, so pressing Run while paused resumes the job rather than
-            // launching a wizard program. Returning false falls through to the loaded-job branch below,
-            // exactly as an unmatched else-if did.
-            else if (honorActiveProgram && grblState.State == GrblStates.Idle && runner.TryRunActiveProgram())
-            {
-            }
-            else if (Source.IsLoaded)
-            {
-                model.Message = model.RunTime = string.Empty;
-                Source.StatusDirty = true;   // a run is about to mark block Sent status; let ClearStatus know there's something to clear
-                if(job.ToolChanged)
+                switch (warning)
                 {
-                    job.ToolChanged = false;
-                    if (job.ToolChangeLine != -1)
-                    {
-                        job.ToolChangeLine = -1;
-                        SendNextLine();
-                    }
+                    case JobRunner.JobLoadWarning.ToolReferenceNotSet:
+                        AppDialogs.Show(string.Format((string)FindResource("JobToolReference"), runner.Source.ToolChanges), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        break;
+
+                    case JobRunner.JobLoadWarning.NotHomedForPredefinedPosition:
+                        AppDialogs.Show((string)FindResource("JobG28G30"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        break;
                 }
-                else if (model.IsSDCardJob)
-                {
-                    // Dry run cannot protect an SD-card job: the controller runs it directly off its own SD
-                    // card (CMD_SDCARD_RUN below) - the sender never sees or streams individual lines, so
-                    // there is nothing for the per-line M3/M4/M7/M8 suppression to intercept, and the initial
-                    // M5/M9 preamble would be a false sense of safety if the program turns the spindle back
-                    // on moments later. Refuse rather than silently run unprotected while the toggle is
-                    // checked - see GrblViewModel.IsDryRunMode.
-                    if (model.IsDryRunMode)
-                    {
-                        AppDialogs.Show("Dry run is not supported for SD card jobs - the controller runs them directly, so the sender cannot intercept spindle/coolant commands. Turn dry run off, or load the file into the sender instead.",
-                            "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-                    Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_RUN + model.FileName.Substring(7));
-                }
-                else
-                {
-                    job.ToolChangeLine = -1;
-                    model.BlockExecuting = fromBlock;
-                    job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
-                    // Bound the run: stop after RunToBlock when set ("Run just this toolpath"),
-                    // otherwise run to program end. One-shot - consumed here.
-                    job.PgmEndLine = model.RunToBlock >= 0 ? model.RunToBlock : Source.Blocks - 1;
-                    model.RunToBlock = -1;
-                    job.serialUsed = missed = 0;
-                    probePending = jobHasProbe = false;
-                    job.Started = job.Transferred = job.HasError = job.ToolChanged = false;
-                    job.NextRow = Source.Data[job.CurrBlock];
-
-                    // Dry run has no effect in check mode - the controller doesn't move regardless of any
-                    // offset, so skip it there rather than leaving stray preamble commands queued for
-                    // nothing. Queued as a preamble on Source.Commands (mirrors "Start from this toolpath"'s
-                    // modal-reset prolog): it survives PurgeQueue below and is drained ahead of the first
-                    // program line, by SendNextLine (legacy path) or StreamPump.Start's own preamble drain
-                    // (buffered path). M5/M9 go first as a DEFENSIVE measure - the spindle/coolant might
-                    // already be on from a previous operation, and per-line suppression in the streamers
-                    // (GCodeBlock.HasSpindleOrCoolantOn) only neutralises commands IN the program, not
-                    // whatever state the machine is already in when dry run starts.
-                    //
-                    // Also gated on !(Source is a transient macro/tool run): dry-run is a loaded-job-only
-                    // toggle the operator arms from the Run dropdown on the Job tab - it must never leak
-                    // into a probing/wizard macro (Start Job, Load Stock, ...) streamed via RunStreamedJobInPlace,
-                    // which shares this same Run. A stray G92 Z offset there corrupts the macro's own
-                    // positioning (e.g. a spoilboard probe search starting ~10mm+ too high and timing out) even
-                    // though the macro never armed dry run itself - it was simply still checked from an earlier,
-                    // unrelated loaded-job test.
-                    if ((dryRunActive = model.IsDryRunMode && model.GrblState.State != GrblStates.Check
-                                          && !((Source as GCode)?.IsTransient ?? false)))
-                    {
-                        // DeclaredStock (NOT the .Stock property) - .Stock falls back to the machine's FULL
-                        // Z travel range as a conservative default when the program has no (STOCK ...)
-                        // comment, which is right for other features but wildly wrong here. No declaration
-                        // = 0 extra clearance, not the whole machine.
-                        double stockZ = ProgramView.LoadedJob != null && ProgramView.LoadedJob.IsLoadedJob ? (ProgramView.LoadedJob.DeclaredStock?.Z ?? 0d) : 0d;
-                        double offset = 10d + stockZ;
-                        Source.Commands.Enqueue("M5");
-                        Source.Commands.Enqueue("M9");
-                        // G21 first: offset is always computed in mm (stockZ from DeclaredStock.Z, which the
-                        // Fusion post always declares in mm) - without forcing units here, this preamble runs
-                        // in WHATEVER modal state the controller happens to be in at Run (leftover
-                        // from an earlier G20 command, a previous job, etc.), and a G20 (inch) controller
-                        // reads "G92Z-17" as -17 IN (~432mm), not -17mm - a massive, silent overshoot instead
-                        // of the intended small clearance.
-                        Source.Commands.Enqueue("G21");
-
-                        // "G92 Zk" does NOT set an absolute offset - it makes WHEREVER THE MACHINE CURRENTLY
-                        // IS read as work-Z=k. The bug this replaces just sent "G92Z-<offset>" unconditionally,
-                        // which only gives the intended clearance if the machine happens to already be sitting
-                        // at the stock surface when Run runs - it never was (typically wherever the
-                        // last job/macro parked, e.g. Start Job's G30). Confirmed on real hardware: a machine
-                        // parked ~67mm above the true stock plus the intended 17mm clearance gave a 84mm gap,
-                        // not 17mm - exactly this bug's arithmetic.
-                        //
-                        // Fix: compute the k that ACTUALLY produces "work-zero is offset mm above the true
-                        // stock", using where the machine really is right now (MachinePosition, live) and
-                        // where work-zero really is right now (WorkPositionOffset, live - assumes G92 is 0
-                        // here, which ClearDryRunOffset's G92.1 guarantees between runs). Derivation: G92 Zk
-                        // sets WCO_new = MachinePosition.Z - k; we want WCO_new = WorkPositionOffset.Z + offset
-                        // (true work-zero, shifted up by the clearance) => k = MachinePosition.Z -
-                        // (WorkPositionOffset.Z + offset).
-                        double k = model.MachinePosition.Z - (model.WorkPositionOffset.Z + offset);
-                        Source.Commands.Enqueue("G92Z" + k.ToInvariantString());
-                    }
-
-                    Comms.com.PurgeQueue();
-                    JobTimer.Start();
-                    streamingHandler.Call(StreamingState.Send, false);
-                    if ((job.IsChecking = model.GrblState.State == GrblStates.Check))
-                        model.Message = (string)FindResource("Checking");
-                    else if (dryRunActive)
-                        model.Message = (string)FindResource("DryRun");
-
-                    bool? res = null;
-                    CancellationToken cancellationToken = new CancellationToken();
-
-                    // Wait a bit for unlikely event before starting...
-                    new Thread(() =>
-                    {
-                        res = WaitFor.SingleEvent<string>(
-                        cancellationToken,
-                        null,
-                        a => model.OnGrblReset += a,
-                        a => model.OnGrblReset -= a,
-                       250);
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
-
-                    // The send/ack flow control always runs on the dedicated background thread (StreamPump) so
-                    // UI load can never stall motion - including Check mode ($C), which used to fall back to
-                    // the legacy UI-thread streamer because it reports EVERY line's error and keeps going,
-                    // where the pump used to abort on the first error. StreamPump.continueOnError now
-                    // reproduces that same keep-going-and-report-every-error behavior (OnPumpCheckError below),
-                    // so Check mode no longer needs a separate streamer.
-                    if (pump == null)
-                        // Two marshals, and the difference is deliberate - the priorities stay here in the
-                        // WPF host rather than inside the now-portable pump. Control flow (job finished /
-                        // error) at Normal, because the state machine must not wait behind display work;
-                        // the coalesced per-line status markers at Background, because they must never
-                        // compete with the streaming itself or with operator input.
-                        pump = new StreamPump(model,
-                                              a => Dispatcher.BeginInvoke(a, DispatcherPriority.Normal),
-                                              a => Dispatcher.BeginInvoke(a, DispatcherPriority.Background));
-                    pumpActive = true;
-                    pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
-                               AppConfig.Settings.Base.SendComments, AppConfig.Settings.Base.StartSimulator,
-                               OnPumpJobFinished, OnPumpError,
-                               continueOnError: job.IsChecking, onCheckError: OnPumpCheckError);
-                }
-            }
+            };
         }
 
-        // Resets the run-mode selection (Dry Run / Check Run) back to plain Run once the job that used it ends -
-        // normal finish, error, or stop/alarm/connection-lost (all of which route through AbortPump, so this
-        // fires from OnPumpJobFinished/OnPumpError/AbortPump, the same three paths). Neither mode is a sticky
-        // setting the operator meant to leave armed for the NEXT, unrelated job - re-arming either for another
-        // run is one click; staying silently armed (or, for check mode, silently STUCK - see below) across
-        // unrelated runs is exactly the kind of state an operator can lose track of.
-        private void ResetRunModeAfterJob()
-        {
-            if (model == null)
-                return;
-
-            runner.CheckModeArmed = false;   // belt-and-suspenders - Run() should already have cleared this before $C ever went out
-
-            if (dryRunActive)
-            {
-                dryRunActive = false;
-                // Deliberately does NOT re-send M5/M9 here - the run already forced them at start, and
-                // re-issuing them on every job end (including ordinary non-dry-run jobs, since AbortPump is
-                // the shared stop path) would fight a job that legitimately wants to leave the spindle running
-                // (M5 is not modal-safe to send blind).
-                Comms.com.WriteCommand("G92.1");
-                model.IsDryRunMode = false;
-            }
-
-            // Check mode ($C) has no auto-exit of its own - grblHAL stays in the Check state after the checked
-            // program finishes until an explicit soft reset (see StartMode_Click, which uses the same
-            // mechanism to leave it deliberately). Without this, both the controller AND btnStart's label
-            // (model.IsCheckMode is a live read of GrblState, not a separate flag - see UpdateRunButtonLabel)
-            // would still show Check Run for the NEXT job too - and since that's the CONTROLLER'S own state,
-            // not something ioSender caches, it would look "stuck" even across an app restart if the operator
-            // closed ioSender before ever leaving check mode.
-            if (model.GrblState.State == GrblStates.Check)
-                Grbl.Reset();
-
-            // A "Simulate" run switched the live connection to the bundled simulator (see the top of Run()) -
-            // switch back now that it's over, same finish/error/abort coverage as dryRunActive's G92.1 cleanup
-            // above. Unconditional on WHY the job ended - a simulated run that errors or gets Stopped still
-            // needs its real controller back, same as user answer #2 (still reconnect on a mid-run abort).
-            if (runner.SimulateActive)
-            {
-                runner.SimulateActive = false;
-                SimulatorManager.RestoreConnectionAfterSimulate?.Invoke();
-            }
-        }
-
-        // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.
-        private void OnPumpJobFinished()
-        {
-            PumpLog.W("OnPumpJobFinished -> JobFinished, state=" + grblState.State);
-            pumpActive = false;
-            streamingHandler.Count = false;   // pump owned flow control; stop legacy line accounting so a late/trailing response can't re-enter it
-            ResetRunModeAfterJob();
-            streamingHandler.Call(StreamingState.JobFinished, true);
-        }
-
-        private void OnPumpError(string response)
-        {
-            pumpActive = false;
-            streamingHandler.Count = false;
-            job.HasError = model.IsGrblHAL;
-            ResetRunModeAfterJob();
-            streamingHandler.Call(StreamingState.Error, true);
-        }
-
-        // Check mode (StreamPump.continueOnError): fires on EVERY error line, not just the first - the run
-        // keeps streaming afterward (pump does not abort), so this must not tear the run down the way
-        // OnPumpError does. The actual per-line "Sent" text (the error response) is already written by
-        // StreamPump's own MarkSent/Drain, same path every other line's status uses - this only drives the
-        // state-machine/UI bookkeeping the legacy check-mode streamer used to do inline (ResponseReceived's
-        // old isError branch: streamingHandler.Call(StreamingState.Error, true) + job.HasError).
-        private void OnPumpCheckError()
-        {
-            job.HasError = model.IsGrblHAL;
-            streamingHandler.Call(StreamingState.Error, true);
-        }
-
-        // Stop the background pump (Stop/Reset/Alarm/connection-lost). Idempotent.
-        private void AbortPump()
-        {
-            if (pumpActive)
-            {
-                pumpActive = false;
-                streamingHandler.Count = false;
-                pump?.Abort();
-            }
-            ResetRunModeAfterJob();
-            idleKickTimer?.Stop();
-        }
-
-        // (Re)arm the pump-stall watchdog: if the controller is still idle a short while from now while the pump
-        // still thinks a job is in flight, the pump has stalled - nudge it to resume sending / finish. One-shot;
-        // re-armed on each idle report and cancelled by any non-idle report (see GrblStateChanged).
+        // (Re)arm the pump-stall watchdog: if the controller is still idle a short while from now while the
+        // pump still thinks a job is in flight, the pump has stalled - nudge it to resume sending / finish.
+        // One-shot; re-armed on each idle report and cancelled by any non-idle report (see the engine's
+        // GrblStateChanged, which drives both through RequestIdleKick/CancelIdleKick).
         private void ArmIdleKick()
         {
             if (idleKickTimer == null)
             {
-                idleKickTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background)
+                idleKickTimer = new DispatcherTimer(DispatcherPriority.Background)
                 {
                     Interval = TimeSpan.FromMilliseconds(700)
                 };
                 idleKickTimer.Tick += (s, e) =>
                 {
                     idleKickTimer.Stop();
-                    PumpLog.W(string.Format("IDLEKICK timer fire  pumpActive={0} state={1}", pumpActive, grblState.State));
-                    if (pumpActive && grblState.State == GrblStates.Idle)
-                        pump?.KickIdle();
+                    runner.OnIdleKick();
                 };
             }
             idleKickTimer.Stop();
             idleKickTimer.Start();
         }
 
-        public void SendRTCommand(string command)
+        #region Engine forwarders
+        // Kept so every existing caller - MainWindow.RunControl.Run/Source, JobView's RewindFile/CallHandler -
+        // reads exactly as it did before the engine moved. Same approach as MacroProcessor.Run forwarding to
+        // MacroRunner.Run: relocating the code should not churn 17 unrelated call sites.
+
+        /// <summary>The program the streamer reads - a tool can point this at its own in-memory program.</summary>
+        public IProgramSource Source
         {
-            var b = Convert.ToInt32(command[0]);
-
-            if(b > 255) switch(b)
-            { 
-                case 8222:
-                    b = GrblConstants.CMD_SAFETY_DOOR;
-                    break;
-
-                case 8225:
-                    b = GrblConstants.CMD_STATUS_REPORT_ALL;
-                    break;
-
-                case 710:
-                    b = GrblConstants.CMD_OPTIONAL_STOP_TOGGLE;
-                    break;
-
-                case 8240:
-                    b = GrblConstants.CMD_SINGLE_BLOCK_TOGGLE;
-                    break;
-            }
-
-            if(b <= 255)
-                Comms.com.WriteByte((byte)b);
+            get { return runner.Source; }
+            set { runner.Source = value; }
         }
 
-        private void SendCommand(string command)
+        // honorActiveProgram: when a wizard tab is up it registers its program as the active program
+        // (MacroProcessor.ActiveRun). A fresh (idle) Run then runs THAT instead of the loaded job - so one
+        // Run runs whatever program is active, loaded file or wizard. The internal stream-starters that
+        // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
+        public void Run(int fromBlock, bool honorActiveProgram = true)
         {
-            if (command.Length == 1)
-                SendRTCommand(command);
-            else if (streamingState == StreamingState.Idle ||
-                      streamingState == StreamingState.NoFile ||
-                       streamingState == StreamingState.JobFinished ||
-                        streamingState == StreamingState.ToolChange ||
-                         streamingState == StreamingState.Stop ||
-                          streamingState == StreamingState.SendMDI ||
-                          (command == GrblConstants.CMD_UNLOCK && streamingState != StreamingState.Send))
-            {
-                //                command = command.ToUpper();
-                try
-                {
-                    string c = command;
-                    Source.Parser.ParseBlock(ref c, true);
-                    Source.Commands.Enqueue(command);
-                    if (streamingState != StreamingState.SendMDI)
-                    {
-                        streamingState = StreamingState.SendMDI;
-                        ResponseReceived("go");
-                    }
-                }
-                catch
-                {
-                }
-            }
+            runner.Run(fromBlock, honorActiveProgram);
+        }
+
+        public bool CallHandler(StreamingState state, bool always)
+        {
+            return runner.CallHandler(state, always);
         }
 
         public void RewindFile()
         {
-            job.Complete = false;
-
-            if (Source.IsLoaded)
-            {
-                using (new UIUtils.WaitCursor())
-                {
-                    runner.CanRun = false;
-
-   //                 grdGCode.DataContext = null;
-
-                    Source.ClearStatus();
-
-                    //                  grdGCode.DataContext = Source.Data.DefaultView;
-                    model.ScrollPosition = 0;
-                    job.ToolChangeLine = -1;
-                    job.CurrBlock = job.LastExecuting = job.PendingLine = job.ACKPending = model.BlockExecuting = 0;
-                    job.PgmEndLine = Source.Blocks - 1;
-
-                    runner.CanRun = true;
-                }
-            }
+            runner.RewindFile();
         }
 
-        private void SetStreamingHandler(StreamingHandler handler)
+        public void SendRTCommand(string command)
         {
-            if (handler == StreamingHandler.Previous)
-                streamingHandler = streamingHandlers[(int)StreamingHandler.Previous];
-            else if (streamingHandler.Handler != handler)
-            {
-                if (handler == StreamingHandler.Idle)
-                    streamingHandler = streamingHandlers[(int)StreamingHandler.Previous] = streamingHandlers[(int)StreamingHandler.Idle];
-                else {
-                    streamingHandlers[(int)StreamingHandler.Previous] = streamingHandler;
-                    streamingHandler = streamingHandlers[(int)handler];
-                    if (handler == StreamingHandler.AwaitAction)
-                        streamingHandler.Count = true;
-                }
-            }
+            runner.SendRTCommand(command);
         }
 
-        public bool StreamingToolChange(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState;
-
-            switch (newState)
-            {
-                case StreamingState.ToolChange:
-                    model.IsJobRunning = false; // only enable UI if no ATC?
-                    runner.CanRun = true;
-                    runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                    runner.CanStop = true;
-                    if (JobTimer.IsRunning)
-                        JobTimer.Pause = true;
-                    break;
-
-                case StreamingState.Idle:
-                case StreamingState.Send:
-                    if (JobTimer.IsRunning)
-                    {
-                        model.IsJobRunning = true;
-                        JobTimer.Pause = false;
-                        if (job.ToolChangeLine >= 0)
-                            Source.Data[job.ToolChangeLine].Sent = "ok";
-                        SetStreamingHandler(StreamingHandler.SendFile);
-                    }
-                    else
-                        SetStreamingHandler(StreamingHandler.Previous);
-                    job.ToolChanged = true;
-                    break;
-
-                case StreamingState.Error:
-                    SetStreamingHandler(StreamingHandler.Previous);
-                    break;
-
-                case StreamingState.Stop:
-                    SetStreamingHandler(StreamingHandler.Idle);
-                    break;
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.ToolChange)
-                return streamingHandler.Call(newState, true);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        public bool StreamingFeedHold(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState;
-
-            if (always || changed)
-            {
-                switch (newState)
-                {
-                    case StreamingState.Halted:
-                    case StreamingState.FeedHold:
-                        runner.CanRun = true;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                        if ((runner.CanStop = model.IsJobRunning || model.IsSDCardJob) && !GrblInfo.IsGrblHAL)
-                            runner.StopShowsPause = false;
-                        streamingHandler.Count = job.CurrentRow != null;
-                        break;
-
-                    case StreamingState.Send:
-                    case StreamingState.Error:
-                    case StreamingState.Idle:
-                        SetStreamingHandler(StreamingHandler.Previous);
-                        break;
-
-                    case StreamingState.Stop:
-                        SetStreamingHandler(StreamingHandler.Idle);
-                        break;
-
-                    case StreamingState.JobFinished:
-                        SetStreamingHandler(StreamingHandler.SendFile);
-                        break;
-                }
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.FeedHold)
-                return streamingHandler.Call(newState, true);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        public bool StreamingSendFile(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState;
-
-            if (changed || always)
-            {
-                switch (newState)
-                {
-                    case StreamingState.Idle:
-                        if(streamingState == StreamingState.Error)
-                        {
-                            runner.CanRun = !GrblInfo.IsGrblHAL; // BAD! ?
-                            runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                            runner.CanStop = true;
-                            SetStreamingHandler(StreamingHandler.AwaitAction);
-                        }
-                        else
-                            changed = false; // ignore
-                        break;
-
-                    case StreamingState.Send:
-                        if (!model.IsJobRunning)
-                            model.IsJobRunning = true;
-                        runner.CanRun = false;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = true) && !model.FeedHoldDisabled;
-                        runner.CanStop = true;
-                        runner.CanRewind = false;
-                        break;
-
-                    case StreamingState.Error:
-                    case StreamingState.Halted:
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                        break;
-
-                    case StreamingState.FeedHold:
-                        SetStreamingHandler(StreamingHandler.FeedHold);
-                        break;
-
-                    case StreamingState.ToolChange:
-                        SetStreamingHandler(StreamingHandler.ToolChange);
-                        break;
-
-                    case StreamingState.JobFinished:
-                        if (grblState.State == GrblStates.Idle || grblState.State == GrblStates.Check)
-                            newState = StreamingState.Idle;
-                        job.Complete = job.Transferred = true;
-                        job.ACKPending = job.CurrBlock = 0;
-                        job.CurrentRow = job.NextRow = null;
-                        SetStreamingHandler(StreamingHandler.AwaitIdle);
-                        break;
-
-                    case StreamingState.Stop:
-                        if (GrblInfo.IsGrblHAL)
-                            SetStreamingHandler(StreamingHandler.Idle);
-                        else
-                        {
-                            newState = StreamingState.Paused;
-                            SetStreamingHandler(StreamingHandler.AwaitAction);
-                        }
-                        break;
-                }
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.SendFile)
-                return streamingHandler.Call(newState, true);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        public bool StreamingAwaitAction(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState || newState == StreamingState.Idle;
-
-            if (changed || always)
-            {
-                switch (newState)
-                {
-                    case StreamingState.Idle:
-                        runner.CanRun = !GrblInfo.IsGrblHAL;
-                        break;
-
-                    case StreamingState.Stop:
-                        if (GrblInfo.IsGrblHAL) {
-                            if (!model.GrblReset)
-                            {
-                                Comms.com.WriteByte(GrblConstants.CMD_STOP);
-                                if (!model.IsParserStateLive)
-                                    SendCommand(GrblConstants.CMD_GETPARSERSTATE);
-                            }
-                        } else if(grblState.State == GrblStates.Run)
-                            Comms.com.WriteByte(GrblConstants.CMD_RESET);
-                        newState = StreamingState.Idle;
-                        SetStreamingHandler(StreamingHandler.AwaitIdle);
-                        break;
-
-                    // Note: Only entered in legacy mode
-                    case StreamingState.Paused:
-                        runner.CanRun = false;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                        runner.CanRun = true;
-                        runner.CanStop = true;
-                        runner.StopShowsPause = false;
-                        if (job.ACKPending == 0)
-                            streamingHandler.Count = false;
-                        break;
-
-                    case StreamingState.Send:
-                        SetStreamingHandler(StreamingHandler.SendFile);
-                        SendNextLine();
-                        break;
-
-                    case StreamingState.JobFinished:
-                        SetStreamingHandler(StreamingHandler.SendFile);
-                        break;
-                }
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.AwaitAction)
-                return streamingHandler.Call(newState, true);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        public bool StreamingAwaitIdle(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState || newState == StreamingState.Idle;
-
-            if (changed || always)
-            {
-                switch (newState)
-                {
-                    case StreamingState.Idle:
-                        model.RunTime = JobTimer.RunTime;
-                        JobTimer.Stop();
-                        RewindFile();
-                        SetStreamingHandler(StreamingHandler.Idle);
-                        break;
-
-                    case StreamingState.Error:
-                    case StreamingState.Halted:
-                        runner.CanRun = !GrblInfo.IsGrblHAL;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                        runner.CanStop = true;
-                        break;
-
-                    case StreamingState.Send:
-                        runner.CanRun = false;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = true) && !model.FeedHoldDisabled;
-                        runner.CanStop = true;
-                        runner.CanRewind = false;
-                        break;
-
-                    case StreamingState.FeedHold:
-                        SetStreamingHandler(StreamingHandler.FeedHold);
-                        break;
-
-                    case StreamingState.Stop:
-                        SetStreamingHandler(StreamingHandler.Idle);
-                        break;
-                }
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.AwaitIdle)
-                return streamingHandler.Call(newState, true);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        public bool StreamingIdle(StreamingState newState, bool always)
-        {
-            bool changed = streamingState != newState || newState == StreamingState.Idle;
-
-            if (changed || always)
-            {
-                switch (newState)
-                {
-                    case StreamingState.Disabled:
-                        runner.ControlsEnabled = false;
-                        break;
-
-                    case StreamingState.JobFinished:
-                        if(model.IsSDCardJob && grblState.State == GrblStates.Check)
-                            SetStreamingHandler(StreamingHandler.SendFile);
-                        break;
-
-                    case StreamingState.Idle:
-                    case StreamingState.NoFile:
-                        runner.ControlsEnabled = !grblState.MPG;
-                        // Also enabled when a wizard tab is up (its program is the active program Run runs),
-                        // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
-                        runner.CanRun = Source.IsLoaded || runner.AnyActiveProgram || (model.IsSDCardJob && model.SDRewind);
-                        runner.CanStop = model.IsSDCardJob && model.SDRewind;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
-                        runner.CanRewind = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
-                        model.IsJobRunning = JobTimer.IsRunning;
-                        runner.ActiveProgramReady = runner.AnyActiveProgram && runner.CanRun && !runner.IsGenerateBlocking;
-                        break;
-
-                    case StreamingState.Send:
-                        runner.ActiveProgramReady = false;   // running now - drop the "press Run" cue
-                        if (!string.IsNullOrEmpty(model.FileName) && !grblState.MPG)
-                            model.IsJobRunning = true;
-                        if (JobTimer.IsRunning)
-                            SetStreamingHandler(StreamingHandler.SendFile);
-                        else
-                        {
-                            runner.CanStop = true;
-                            runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
-                        }
-                        break;
-
-                    case StreamingState.Start: // Streaming from SD Card
-                        job.IsSDFile = true;
-                        break;
-
-                    case StreamingState.Error:
-                    case StreamingState.Halted:
-                        runner.CanRun = !grblState.MPG;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                        runner.CanStop = !grblState.MPG;
-                        break;
-
-                    case StreamingState.FeedHold:
-                        SetStreamingHandler(StreamingHandler.FeedHold);
-                        break;
-
-                    case StreamingState.ToolChange:
-                        SetStreamingHandler(StreamingHandler.ToolChange);
-                        break;
-
-                    case StreamingState.Stop:
-                        runner.CanFeedHold = (runner.FeedHoldArmed = !(grblState.MPG || grblState.State == GrblStates.Alarm)) && !model.FeedHoldDisabled;
-                        runner.CanRun = runner.FeedHoldArmed && Source.IsLoaded; //!GrblInfo.IsGrblHAL;
-                        runner.CanStop = false;
-                        runner.CanRewind = false;
-                        model.IsJobRunning = false;
-                        job.CurrentRow = job.NextRow = null;
-                        if (model.IsSDCardJob && !Source.IsLoaded)
-                            model.FileName = string.Empty;
-                        if (!grblState.MPG && !job.Stopped)
-                        {
-                            if (GrblInfo.IsGrblHAL && !(grblState.State == GrblStates.Home || grblState.State == GrblStates.Alarm))
-                            {
-                                if (!model.GrblReset)
-                                {
-                                    Comms.com.WriteByte(GrblConstants.CMD_STOP);
-                                    if (!model.IsParserStateLive)
-                                        SendCommand(GrblConstants.CMD_GETPARSERSTATE);
-                                }
-                            }
-                            else if (grblState.State == GrblStates.Hold && !model.GrblReset)
-                                Comms.com.WriteByte(GrblConstants.CMD_RESET);
-                        }
-                        job.Stopped = false;
-                        if (JobTimer.IsRunning)
-                        {
-                            always = false;
-                            model.StreamingState = streamingState = streamingState == StreamingState.Error ? StreamingState.Idle : newState;
-                            SetStreamingHandler(StreamingHandler.AwaitIdle);
-                        } else if(grblState.State != GrblStates.Alarm)
-                            return streamingHandler.Call(StreamingState.Idle, true);
-                        break;
-                }
-            }
-
-            if (streamingHandler.Handler != StreamingHandler.Idle)
-                return streamingHandler.Call(newState, always);
-            else if (changed)
-            {
-                model.StreamingState = streamingState = newState;
-                StreamingStateChanged?.Invoke(streamingState, grblState.MPG);
-            }
-
-            return true;
-        }
-
-        void GrblStateChanged(GrblState newstate)
-        {
-            if (grblState.State == GrblStates.Jog)
-                model.IsJobRunning = false;
-
-            // Pump-stall watchdog: a pump-streamed run (e.g. Load Stock's O-word/probe program) can deadlock
-            // with the controller idle but the pump believing its buffer is full, so the tail (final G30 park +
-            // M2) is never sent and the run never finalises. Arm a short timer whenever the controller goes idle
-            // mid-pump; if it's still idle when it fires, nudge the pump (KickIdle) to resume/finish. Cancel on
-            // any non-idle report so it never fires during real motion.
-            if (pumpActive || JobTimer.IsRunning)
-                PumpLog.W(string.Format("STATE {0} (sub {1})  pumpActive={2} streamingState={3}", newstate.State, newstate.Substate, pumpActive, streamingState));
-
-            if (newstate.State != GrblStates.Idle)
-                idleKickTimer?.Stop();
-            else if (pumpActive)
-                ArmIdleKick();
-
-            // An alarm must release the pump (and, critically, Comms.com.AckSink) IMMEDIATELY, regardless of
-            // which tab currently has focus - this is a comms-safety concern, not a UI-state one. Confirmed
-            // as a real hang 2026-08-01: an alarm during a Check-mode run landed while a different tab was
-            // active, the isActive-gated switch below skipped AbortPump() entirely (its own case, further
-            // down), and the pump's AckSink stayed hijacked - every subsequent response (including jog acks
-            // sent from the other tab) silently vanished into the abandoned, undrained pump instead of
-            // reaching the app, and the pump's own still-queued lines from the aborted check file later got
-            // flushed mid-jog, producing a bogus "error:9 locked out during alarm or jog state".
-            if (newstate.State == GrblStates.Alarm)
-                AbortPump();
-
-            // Process state transitions when the Grbl tab is active OR a wizard program is the active source: the
-            // fixed bottom bar drives that program from the wizard tab, so its enables must track the machine
-            // there too (Idle re-enables Run after a run, Hold/Tool/Alarm behave as on the Grbl tab).
-            // Also while a job/stream is actually running (JobTimer): a stay-put run (Load Stock) finishes on a
-            // non-Grbl tab and parks in AwaitIdle waiting for the controller's final Idle - if its active program
-            // was already torn down, neither flag above is set and that Idle would be dropped, leaving the bar
-            // stuck "running" until Stop is pressed. JobTimer is live for exactly that finishing window.
-            if (isActive || runner.AnyActiveProgram || JobTimer.IsRunning) switch(newstate.State)
-            {
-                case GrblStates.Idle:
-                    streamingHandler.Call(StreamingState.Idle, true);
-                    break;
-
-                case GrblStates.Jog:
-                    model.IsJobRunning = !model.IsToolChanging;
-                    break;
-
-                //case GrblStates.Check
-                //    streamingHandler.Call(StreamingState.Send, false);
-                //    break;
-
-                case GrblStates.Run:
-                    if (JobTimer.IsPaused)
-                        JobTimer.Pause = false;
-                    if (model.StreamingState != StreamingState.Error)
-                        streamingHandler.Call(StreamingState.Send, false);
-                    if (newstate.Substate == 1)
-                    {
-                        runner.CanRun = !grblState.MPG;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = false);
-                    }
-                    else if (grblState.Substate == 1)
-                    {
-                        runner.CanRun = false;
-                        runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
-                    }
-                    if (!GrblInfo.IsGrblHAL)
-                        runner.StopShowsPause = true;
-                    break;
-
-                case GrblStates.Tool:
-                    if (grblState.State != GrblStates.Jog)
-                    {
-                        // In pump mode read the pump's progress mirror, and suspend it so jog/MDI acks during the
-                        // tool change aren't consumed as job-line acks (resumed from Run's Tool branch).
-                        int pendingLine = pumpActive ? pump.PendingLine : job.PendingLine;
-                        if (pumpActive)
-                            pump.Suspended = true;
-                        if (JobTimer.IsRunning && pendingLine > 0 && !model.IsSDCardJob)
-                        {
-                            job.ToolChangeLine = pendingLine - 1;
-                            Source.Data[job.ToolChangeLine].Sent = "pending";
-                        //      ResponseReceived("pending");
-                        }
-                        streamingHandler.Call(StreamingState.ToolChange, true);
-                        if (!grblState.MPG)
-                            Comms.com.WriteByte(GrblConstants.CMD_TOOL_ACK);
-                    }
-                    break;
-
-                case GrblStates.Hold:
-                    streamingHandler.Call(StreamingState.FeedHold, false);
-                    break;
-
-                case GrblStates.Home:
-                    EnablePolling(true);
-                    break;
-
-                case GrblStates.Door:
-
-                    //if (newstate.Substate == 1)
-                    //    Comms.com.WriteByte(GrblConstants.CMD_TOOL_ACK);
-                    //else if (newstate.Substate == 5)
-                    //    streamingHandler.Call(StreamingState.ToolChange, true);
-
-                    //if (newstate.Substate != 5 && streamingState == StreamingState.Send)
-                    //    streamingHandler.Call(StreamingState.FeedHold, false);
-                    //else
-                    //    IsRunEnabled = newstate.Substate != 5;
-
-                    if (newstate.Substate > 0)
-                    {
-                        if (streamingState == StreamingState.Send)
-                            streamingHandler.Call(StreamingState.FeedHold, false);
-                        else
-                            runner.CanRun = false;
-                    } else
-                        runner.CanRun = true;
-                    break;
-
-                case GrblStates.Alarm:
-                    // AbortPump() already ran unconditionally above, regardless of this gate.
-                    grblState.State = newstate.State;
-                    grblState.Substate = newstate.Substate;
-                    streamingHandler.Call(StreamingState.Stop, false);
-                    break;
-            }
-
-            grblState.State = newstate.State;
-            grblState.Substate = newstate.Substate;
-            grblState.MPG = newstate.MPG;
-        }
-
-        private void ResponseReceived(string response)
-        {
-            // ResponseReceived is raised by a specific comms instance, but the streaming switch below writes to
-            // the static Comms.com. During a reconnect/teardown (startup simulator handshake, or the Restart
-            // relaunch) the static can be null/replaced while an in-flight response from the old link still
-            // arrives - writing then NREs (SendMDI/Reset cases). No link means nothing to send, so bail out.
-            if (Comms.com == null)
-                return;
-
-            // Jog acks are not this handler's business, and counting them here corrupts real accounting:
-            // "missed" would climb on every jog, and a jog's "ok" would satisfy the SendMDI ack-pacing switch
-            // below as though it were the ack for an outstanding MDI command. Jogging while a macro streams is
-            // a live path (the fixture dialog is non-modal precisely so jogging stays reachable during one).
-            // This filter used to live in GrblViewModel, which suppressed responses for EVERY consumer while
-            // jogging - see the comment there for why it had to move: it was starving JogGate of its ack.
-            if (model != null && model.GrblState.State == GrblStates.Jog)
-                return;
-
-            // When the background pump is driving the job it owns all flow-control accounting (off the UI
-            // thread). Skip the accounting here; the MDI/Reset switch below still runs on the UI thread.
-            // Check mode ($C) now also always sets pumpActive (see Run()) - the job.IsChecking branches
-            // below this point are consequently unreachable for the checking case (kept rather than
-            // pruned: they're still live for job.IsSDFile, which shares the same conditionals, and this
-            // is real-time streaming code where a conservative diff beats a clever one).
-            if (pumpActive)
-            {
-            }
-            else if (streamingHandler.Count)
-            {
-                //if(response == "pending")
-                //{
-                //    job.ToolChangeLine = job.PendingLine - 1;
-                //    Source.Data.Rows[job.ToolChangeLine]["Sent"] = response;
-                //    return;
-                //}
-
-                if (job.ACKPending > 0)
-                    job.ACKPending--;
-
-                // Probe barrier released once everything outstanding (including the G38, whose 'ok' arrives only
-                // after the probe finishes) has been acked - then SendNextLine below resumes the stream.
-                if (probePending && job.ACKPending == 0)
-                    probePending = false;
-
-                // A response can still arrive after the program finished/aborted, or after the streamer was
-                // pointed back at the loaded job (a stay-put macro run - e.g. Load Stock probing one corner then
-                // tearing down - leaves the job source empty when no file is loaded). The line accounting below
-                // indexes Source.Data, so ignore a response whose PendingLine is past the current (possibly
-                // empty) program rather than throwing IndexOutOfRange.
-                if (job.PendingLine >= 0 && job.PendingLine < Source.Data.Count)
-                {
-
-                if (!job.IsSDFile && (job.IsChecking || (string)Source.Data[job.PendingLine].Sent == "*"))
-                    job.serialUsed = Math.Max(0, job.serialUsed - (int)Source.Data[job.PendingLine].Length);
-
-                //if (streamingState == StreamingState.Send || streamingState == StreamingState.Paused)
-                //{
-                bool isError = response.StartsWith("error");
-
-                if (!(job.IsSDFile || job.IsChecking))
-                {
-                    if (!job.HasError)
-                    {
-                        Source.Data[job.PendingLine].Sent = response;
-
-                        if (job.PendingLine > 5)
-                            model.ScrollPosition = job.PendingLine - 5;
-                    }
-
-                    if(streamingHandler.Call == StreamingAwaitAction)
-                        streamingHandler.Count = false;
-                }
-
-                if (isError)
-                {
-                    streamingHandler.Call(StreamingState.Error, true);
-                    if(job.IsChecking && !job.HasError)
-                    {
-                        if (job.PendingLine > 5)
-                            model.ScrollPosition = job.PendingLine - 5;
-                        Source.Data[job.PendingLine].Sent = response;
-                    }
-                    job.HasError = model.IsGrblHAL;
-                }
-                else if (job.PgmEndLine == job.PendingLine)
-                    streamingHandler.Call(StreamingState.JobFinished, true);
-                else if (streamingHandler.Count && response == "ok")
-                    SendNextLine();
-                //}
-
-                if (job.Transferred)
-                {
-                    job.Transferred = false;
-                    model.BlockExecuting = 0;
-                    model.Message = (string)FindResource("TransferComplete");
-                }
-                else if(job.PendingLine != job.PgmEndLine )
-                {
-                    job.PendingLine++;
-                    if(!job.IsChecking || job.PendingLine % 250 == 0)
-                        model.BlockExecuting = job.PendingLine;
-                }
-
-                }   // end PendingLine bounds guard
-            }
-            else if (response == "ok")
-                missed++;
-
-            switch (streamingState)
-            {
-                case StreamingState.Send:
-                    if(response == "start")
-                        SendNextLine();
-                    break;
-
-                case StreamingState.SendMDI:
-                    // A command was just dequeued and written -> we are now awaiting ITS real ack, so stay
-                    // busy (SendMDI) regardless of whether more are queued behind it. Only go Idle when this
-                    // call found nothing to send at all - i.e. a real ack just arrived for the last
-                    // outstanding write and nothing new was enqueued in the meantime. Getting this backwards
-                    // (flipping to Idle the moment the LOCAL queue empties, right after writing) let a tight
-                    // caller loop (e.g. a macro sending several lines via SendCommand in one C# loop with
-                    // no real per-line delay) see "Idle" between each SendCommand call and re-kick a fresh
-                    // synthetic "go" send for every line - the whole burst went out with zero ack pacing,
-                    // confirmed via a comms-tx trace: 14 lines / ~670 bytes in 6ms, before a single real ok
-                    // came back. The controller then couldn't keep its NGC expression parser in sync with the
-                    // flood and threw a string of "error:71 - Unknown operation" it should never have seen.
-                    if (Source.Commands.Count > 0)
-                        Comms.com.WriteCommand(Source.Commands.Dequeue());
-                    else
-                        streamingState = StreamingState.Idle;
-                    break;
-
-                case StreamingState.Reset:
-                    Comms.com.WriteCommand(GrblConstants.CMD_UNLOCK);
-                    streamingState = StreamingState.AwaitResetAck;
-                    break;
-
-                case StreamingState.AwaitResetAck:
-                    streamingHandler.Call(Source.IsLoaded ? StreamingState.Idle : StreamingState.NoFile, false);
-                    break;
-            }
-        }
-
-        void SendNextLine()
-        {
-            while (job.NextRow != null) {
-
-                // Probe barrier: hold all lines while a streamed probe (G38) is in flight, until it completes
-                // (every outstanding line acked). Stops post-probe lines piling into the controller's RX during
-                // the probe - the fault that broke streamed Load Stock.
-                if (probePending)
-                    break;
-
-                string line = (string)job.NextRow.Data; //  GCodeUtils.StripSpaces((string)currentRow["Data"]);
-
-                // Send comment lines as empty comment when "Send comments" is off - except to the simulator,
-                // which parses (TOOL T=n D=.. TYPE=..) comments for material removal, so it must always get
-                // the full comment regardless of the setting.
-                if ((bool)job.NextRow.IsComment && !AppConfig.Settings.Base.SendComments && !AppConfig.Settings.Base.StartSimulator)
-                {
-                    line = "()";
-                    job.NextRow.Length = line.Length + 1;
-                }
-
-                // Dry-run/verify mode: neutralise spindle-on (M3/M4) and coolant-on (M7/M8) so the operator
-                // can watch the toolpath move without the spindle or coolant ever actually activating,
-                // regardless of what the loaded program contains - the Z-offset alone is NOT a safety
-                // feature, it only avoids hitting stock. HasSpindleOrCoolantOn is precomputed at load time
-                // from the real G-code parser's tokens (GCodeJob.ParseFileLines/AddBlock), not a regex
-                // re-check here. Mirrors StreamPump.SendNext's buffered-path equivalent.
-                else if (model.IsDryRunMode && job.NextRow.HasSpindleOrCoolantOn)
-                {
-                    line = "()";
-                    job.NextRow.Length = line.Length + 1;
-                }
-
-                // Dry-run mode: also skip the program's own tool changes (M6) entirely - see
-                // StreamPump.SendNext's buffered-path equivalent for the full reasoning.
-                else if (model.IsDryRunMode && job.NextRow.HasToolChange)
-                {
-                    line = "()";
-                    job.NextRow.Length = line.Length + 1;
-                }
-
-                if (job.serialUsed < (serialSize - (int)job.NextRow.Length)
-                     && (!jobHasProbe || job.ACKPending < StreamPump.ProbeLookahead))   // cap look-ahead once probing
-                {
-
-                    if (Source.Commands.Count > 0)
-                        Comms.com.WriteCommand(Source.Commands.Dequeue());
-                    else
-                    {
-                        job.CurrentRow = job.NextRow;
-
-                        if(!job.IsChecking)
-                            job.CurrentRow.Sent = "*";
-
-                        if (line == "%")
-                        {
-                            if (!(job.Started = !job.Started))
-                                job.PgmEndLine = job.CurrBlock;
-                        }
-                        else if (job.CurrentRow.ProgramEnd)
-                            job.PgmEndLine = job.CurrBlock;
-                        job.NextRow = job.PgmEndLine == job.CurrBlock ? null : Source.Data[++job.CurrBlock];
-                        //            ParseBlock(line + "\r");
-                        job.serialUsed += (int)job.CurrentRow.Length;
-                        Comms.com.WriteString(line + '\r');
-                        if (job.CurrentRow.BreakAt)
-                            Comms.com.WriteString("M0" + '\r');
-
-                        // A probe move just went out: throttle this job from here on, and hold further lines
-                        // until this probe completes (cleared when all outstanding lines are acked - see below).
-                        if (line.IndexOf("G38", StringComparison.OrdinalIgnoreCase) >= 0)
-                            probePending = jobHasProbe = true;
-                    }
-                    job.ACKPending++;
-
-                    if (!useBuffering || probePending)
-                        break;
-                }
-                else
-                    break;
-            }
-        }
+        #endregion
     }
 }
