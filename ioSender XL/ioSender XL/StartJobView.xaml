@@ -440,7 +440,7 @@
             <!-- Warning + result + Generate/Run pinned at the bottom-left of the input column -->
             <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
-                           Text="No 3D probe defined. Add one in Machine Setup Wizard &gt; Probe definitions - Start Job reads its tip radius and probing feeds."/>
+                           Text="No 3D probe defined. Add one in Machine Setup Wizard &gt; Probe definitions - Setup reads its tip radius and probing feeds."/>
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>

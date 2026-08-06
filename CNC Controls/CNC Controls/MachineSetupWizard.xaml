@@ -301,7 +301,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Start Job and the probing tabs."/>
+                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"
@@ -342,8 +342,8 @@
                 </Grid>
             </TabItem>
 
-            <!-- 6. Fixture definitions (the user's own named workholding fixtures - Start Job selects from these) -->
-            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Define named workholding fixtures (vise, fence, etc.) used by Start Job.">
+            <!-- 6. Fixture definitions (the user's own named workholding fixtures - Setup selects from these) -->
+            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Define named workholding fixtures (vise, fence, etc.) used by Setup.">
                 <TabItem.Header><TextBlock x:Uid="step_fixtures" x:Name="hdrFixtures" Text="6 · Fixture definitions"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>

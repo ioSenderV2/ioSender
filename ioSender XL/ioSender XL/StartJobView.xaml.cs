@@ -186,13 +186,13 @@ namespace GCode_Sender
             }
         }
 
-        // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Start Job", connected
+        // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Setup", connected
         // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
         private CNC.Controls.ProgramView programView;
         private void EnsureProgramView()
         {
             if (programView == null)
-                programView = new CNC.Controls.ProgramView { Title = "Start Job" };
+                programView = new CNC.Controls.ProgramView { Title = "Setup" };
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
@@ -923,7 +923,7 @@ namespace GCode_Sender
                 "(Machine Setup > Tools) to check steps/mm on each axis.",
                 FormatLen(measuredX.Value), FormatLen(measuredY.Value), FormatLen(fldWidth.Value), FormatLen(fldHeight.Value),
                 FormatLen(SizeMismatchWarnMm), FormatLen(dx), FormatLen(dy)),
-                "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning)));
+                "Setup", MessageBoxButton.OK, MessageBoxImage.Warning)));
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
@@ -1479,7 +1479,7 @@ namespace GCode_Sender
             if (p == null)
             {
                 AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             bool touchPlate = IsTouchPlate;
@@ -1489,7 +1489,7 @@ namespace GCode_Sender
             if (fx == null || !fx.Implemented || !fx.PositionValidated)
             {
                 AppDialogs.Show("Select a fixture with a supported type and a validated position first (Machine Setup > Fixture definitions > Test position).",
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -1505,7 +1505,7 @@ namespace GCode_Sender
                 if (!MacroProcessor.CoordinateSystemDefined("G28"))
                 {
                     if (AppDialogs.Show("G28 is not set. Jog to the position you want to probe the spoilboard Z from - clear of the stock in X/Y, within ~10mm above the spoilboard in Z - then click OK to set G28 there. Cancel aborts.",
-                            "Start Job", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                            "Setup", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                         return;
                     if (!MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false))
                         return;
@@ -1518,7 +1518,7 @@ namespace GCode_Sender
                 string unreachable = MacroProcessor.StoredPositionUnreachable("G28");
                 if (unreachable != null)
                 {
-                    AppDialogs.Show(unreachable, "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    AppDialogs.Show(unreachable, "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     return;
                 }
             }
@@ -1533,7 +1533,7 @@ namespace GCode_Sender
                 && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
             {
                 AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -1547,7 +1547,7 @@ namespace GCode_Sender
                 // carried-over size is the normal case), not a safety gate like the ones below it that still
                 // prompt even here (out-of-travel size, low Safe Z delta).
                 if (!unattended && AppDialogs.Show("Est. width/height/thickness haven't been set for this job - they're carried over from last time. Generate anyway?",
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                     return;
                 sizeFieldsTouched = true;   // confirmed once - don't nag again this session unless the fields change
             }
@@ -1565,7 +1565,7 @@ namespace GCode_Sender
                         N(widthMm), N(heightMm), N(thicknessMm),
                         declared ? "the loaded program's declared stock size" : "this machine's travel",
                         N(bound.Value.X), N(bound.Value.Y), N(bound.Value.Z)),
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
 
@@ -1597,7 +1597,7 @@ namespace GCode_Sender
             {
                 if (AppDialogs.Show(string.Format("Safe Z delta is {0} mm - less than the recommended {1} mm minimum. Too little clearance here can clip the stock/fixture crossing between corners. Generate anyway?",
                         N(safeZDeltaMm), N(minSafeZDeltaMm)),
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
 
@@ -1622,10 +1622,10 @@ namespace GCode_Sender
 
             // Re-arm as the active program: a previous run tears this down (handing the source back to the job),
             // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
-            MacroProcessor.ActiveProgramName = "Start Job";
+            MacroProcessor.ActiveProgramName = "Setup";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             // Start Job owns its ProgramView; the overlay hosts it and it titles itself
-            MacroProcessor.PublishGenerated("Start Job " + fx.Name, program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Setup " + fx.Name, program, EnsureProgramView, () => programView);
             // Flips the Run bar from "Generate" to "Run" (see isActiveTab's own comment on why this is gated).
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;
@@ -1746,7 +1746,7 @@ namespace GCode_Sender
             // it off - see _activeRunner's own field comment for why this can't just be a start/stop bool
             // around the call.
             _activeRunner = this;
-            MacroProcessor.Run(model, "Start Job " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended);
+            MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended);
         }
 
         // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -
@@ -2068,7 +2068,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
 
             // Tool-length reference (opt-in) now runs FIRST, before any stock probing - see the TLO-baseline
             // design conversation this came from. #<_probe_z> (the puck's own machine-Z touch point, always
@@ -2398,7 +2398,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
 
             bool inside = dynamicProbePoint == ProbePoint.InsideCorner || dynamicProbePoint == ProbePoint.InsideEdge;
             bool isEdge = dynamicProbePoint == ProbePoint.OutsideEdge || dynamicProbePoint == ProbePoint.InsideEdge;
@@ -2564,7 +2564,7 @@ namespace GCode_Sender
                     "Heads up: {0} loaded-program move(s) appear to enter the vise jaws' footprint (first at line {1}). " +
                     "This is an XY-only estimate (tool radius from the grblHAL tool table where set, otherwise centerline) " +
                     "- verify clearance before running.", hitCount, firstHitLine),
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -2649,7 +2649,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
 
             // Tool-length reference (opt-in) now runs FIRST, before the stock-top probe - same ordering and
             // reasoning as BuildProgram's own call site (see its comment). The vise's own Z-probe safety
