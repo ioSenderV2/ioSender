@@ -1392,6 +1392,35 @@ namespace CNC.Core
 
         public void DataReceived(string data)
         {
+            if (PollDiag.Enabled)
+            {
+                // Wrapped rather than instrumented inline: this method has a dozen early returns, and a
+                // measurement that misses half of them is worse than none. See PollDiag's header.
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try { DataReceivedCore(data); }
+                finally { PollDiag.Processed(sw.Elapsed.TotalMilliseconds); }
+                return;
+            }
+
+            DataReceivedCore(data);
+        }
+
+        /// <summary>
+        /// This model's hot-event subscriber counts, for the periodic PollDiag line. If these climb across a
+        /// session, handlers are being added on tab activation without being removed and every status report
+        /// is doing more work than the last - which is the leading theory for the latency drift PollDiag was
+        /// written to measure.
+        /// </summary>
+        internal string DiagSubscriberCounts()
+        {
+            return string.Format("resp={0} status={1} propchg={2}",
+                PollDiag.Subscribers(OnCommandResponseReceived),
+                PollDiag.Subscribers(OnRealtimeStatusProcessed),
+                PollDiag.Subscribers(PropertyChangedHandler));
+        }
+
+        private void DataReceivedCore(string data)
+        {
             if (data.Length == 0)
                 return;
 

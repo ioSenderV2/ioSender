@@ -29,6 +29,13 @@ namespace CNC.Core
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+        /// <summary>
+        /// The subscriber list, for diagnostics only (PollDiag counts them to test whether handlers are
+        /// accumulating across a session). A field-like event's backing field is visible only inside the
+        /// class that declares it, so a derived class cannot read it without this.
+        /// </summary>
+        protected PropertyChangedEventHandler PropertyChangedHandler { get { return PropertyChanged; } }
+
         //protected void OnPropertyChanged(string propertyName)
         //{
         //    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

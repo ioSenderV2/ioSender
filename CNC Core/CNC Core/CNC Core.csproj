@@ -71,6 +71,7 @@
     <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
+    <Compile Include="PollDiag.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
     <Compile Include="RotatingFileStore.cs" />

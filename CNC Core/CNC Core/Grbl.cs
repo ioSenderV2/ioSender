@@ -3955,7 +3955,18 @@ namespace CNC.Core
             try
             {
                 if(!suspend)
-                    Comms.com.WriteByte(RTCommand);
+                {
+                    // Timed so a late status report can be attributed: a normal interval here with slow
+                    // reports downstream clears the poller entirely. See PollDiag's header.
+                    if (PollDiag.Enabled)
+                    {
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        Comms.com.WriteByte(RTCommand);
+                        PollDiag.PollSent(sw.Elapsed.TotalMilliseconds);
+                    }
+                    else
+                        Comms.com.WriteByte(RTCommand);
+                }
 
                 if (RTCommand == GrblConstants.CMD_STATUS_REPORT_ALL)
                     RTCommand = GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT);
