@@ -111,6 +111,52 @@ namespace CNC.Core
                 Write('>', command);
         }
 
+        /// <summary>
+        /// One byte went out - a realtime command. Named where the name is known, because "0x85" in a log
+        /// is a lookup and "JOG_CANCEL" is an answer.
+        /// </summary>
+        public static void TxByte(byte data)
+        {
+            if (!Enabled)
+                return;
+
+            string name = RealtimeName(data);
+            Write('>', name != null
+                        ? string.Format(CultureInfo.InvariantCulture, "[0x{0:X2} {1}]", data, name)
+                        : string.Format(CultureInfo.InvariantCulture, "[0x{0:X2} '{1}']", data,
+                                        data >= 0x20 && data < 0x7F ? ((char)data).ToString() : "."));
+        }
+
+        /// <summary>A byte range went out - g-code lines, $ commands, YModem payload.</summary>
+        public static void TxBytes(byte[] bytes, int len)
+        {
+            if (!Enabled || bytes == null || len <= 0)
+                return;
+
+            string text;
+            try { text = System.Text.Encoding.Default.GetString(bytes, 0, System.Math.Min(len, bytes.Length)); }
+            catch { text = "<" + len + " bytes>"; }
+
+            Write('>', text.Replace("\r", "\\r").Replace("\n", "\\n"));
+        }
+
+        private static string RealtimeName(byte data)
+        {
+            switch (data)
+            {
+                case 0x18: return "RESET";
+                case 0x21: return "FEED_HOLD";
+                case 0x3F: return "STATUS";
+                case 0x7E: return "CYCLE_START";
+                case 0x84: return "SAFETY_DOOR";
+                case 0x85: return "JOG_CANCEL";
+                case 0x87: return "STATUS_ALL";
+                case 0x88: return "OPTIONAL_STOP";
+                case 0x8A: return "TOOL_ACK";
+                default: return null;
+            }
+        }
+
         private static void Write(char direction, string text)
         {
             Enqueue(string.Format(CultureInfo.InvariantCulture, "{0}  {1} {2}",

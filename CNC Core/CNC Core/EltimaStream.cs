@@ -51,7 +51,12 @@ using System.Collections.ObjectModel;
 namespace CNC.Core
 {
 #if USEELTIMA
-    public class EltimaStream : StreamComms
+    // NOTE: never compiled in this repo (DefineConstants carries xUSEELTIMA, i.e. disabled), so the
+    // StreamCommsBase conversion below is by inspection only, not by build. Its WriteString goes straight
+    // to serialPort.WriteStr and so bypasses the traced leaves - unlike the other three transports. Left
+    // as-is rather than "fixed" blind: changing an uncompilable write path on a guess is worse than an
+    // acknowledged gap.
+    public class EltimaStream : StreamCommsBase, StreamComms
     {
 
         private SPortLib.SPortAx serialPort = null;
@@ -249,12 +254,12 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             serialPort.Write(ref data, 1);
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             serialPort.Write(ref bytes[0], len);
         }

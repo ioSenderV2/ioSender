@@ -73,6 +73,7 @@
     <Compile Include="DebugLog.cs" />
     <Compile Include="PollDiag.cs" />
     <Compile Include="WireLog.cs" />
+    <Compile Include="StreamCommsBase.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
     <Compile Include="RotatingFileStore.cs" />

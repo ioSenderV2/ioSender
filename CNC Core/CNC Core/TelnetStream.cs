@@ -45,7 +45,7 @@ using System.Threading;
 
 namespace CNC.Core
 {
-    public class TelnetStream : StreamComms
+    public class TelnetStream : StreamCommsBase, StreamComms
     {
         private TcpClient ipserver = null;
         private NetworkStream ipstream = null;
@@ -211,7 +211,7 @@ namespace CNC.Core
         // dropping the payload/CRC. The controller then never sees a complete block, never ACKs, and the
         // transfer times out and CANs (0-byte files). Synchronous Write serialises the bytes correctly;
         // on a local/normal connection it returns as soon as the OS buffers them.
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             try
             {
@@ -231,7 +231,7 @@ namespace CNC.Core
             }
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             try
             {

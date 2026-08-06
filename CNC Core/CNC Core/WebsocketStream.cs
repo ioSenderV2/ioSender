@@ -61,7 +61,7 @@ namespace CNC.Core
      * synchronous contract and websocket-sharp's Send was synchronous too, so blocking preserves the
      * existing behaviour rather than introducing new async semantics on the write path.
      */
-    public class WebsocketStream : StreamComms
+    public class WebsocketStream : StreamCommsBase, StreamComms
     {
         private const int ConnectTimeout = 3000;
 
@@ -284,12 +284,12 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             Send(new byte[1] { data }, 1);
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             Send(bytes, len);
         }

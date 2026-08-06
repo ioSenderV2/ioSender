@@ -48,7 +48,7 @@ using System.Collections.ObjectModel;
 
 namespace CNC.Core
 {
-    public class SerialStream : StreamComms
+    public class SerialStream : StreamCommsBase, StreamComms
     {
         private SerialPort serialPort = null;
         private byte[] buffer = new byte[Comms.RXBUFFERSIZE];
@@ -346,7 +346,7 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             try
             {
@@ -359,7 +359,7 @@ namespace CNC.Core
             }
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             try
             {
@@ -406,6 +406,12 @@ namespace CNC.Core
                 }
                 command += "\r";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(command);
+                // The one write in this solution that does NOT route through StreamCommsBase's leaves, so
+                // it traces itself. This write is deliberately synchronous; handing it to WriteBytes would
+                // make it async (WriteAsync unless BlockingWrites) and change ordering against the machine.
+                // Note it also encodes UTF8 while WriteString above uses Encoding.Default - preserved as
+                // found, not reconciled, because that choice reaches the controller.
+                TraceRawWrite(bytes, bytes.Length);
                 try
                 {
                     if (serialPort != null && serialPort.IsOpen)
