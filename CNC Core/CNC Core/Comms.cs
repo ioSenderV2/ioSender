@@ -62,9 +62,13 @@ namespace CNC.Core
                 return;
 
             // Every reply crosses here, on the read thread, before any marshalling - so this is where the
-            // wire's own timing is visible. See PollDiag's header.
+            // wire's own timing is visible, and where an unfiltered trace has to be taken. Upstream of
+            // SuspendProcessing, Silent and the console's own filter, so a reply the app then ignores is
+            // still recorded. See PollDiag's and WireLog's headers.
             if (PollDiag.Enabled)
                 PollDiag.RxArrived();
+
+            WireLog.Rx(reply);
 
             if (context == null)
                 handler(reply);

@@ -302,6 +302,8 @@ namespace CNC.Core
         {
             if (!string.IsNullOrEmpty(command) && ApplyCommand(command))
             {
+                WireLog.Tx(command);   // unfiltered - see WireLog.cs
+
                 if (command.Length > 1)
                 {
                     CommandLog.Add(command);
@@ -327,6 +329,10 @@ namespace CNC.Core
                 }
                 else if (ApplyCommand(command))
                 {
+                    // Unconditional, unlike the console echo below it: the wire log exists precisely so the
+                    // FILE does not inherit a filter chosen for the on-screen view. See WireLog.cs.
+                    WireLog.Tx(command);
+
                     if (ResponseLogVerbose && !string.IsNullOrEmpty(command) && (command.Length > 1 || (!char.IsControl(command[0]) && command[0] < 0x7F)))
                         ResponseLog.Add(command);
                 }

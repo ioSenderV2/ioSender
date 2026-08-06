@@ -98,6 +98,7 @@ namespace GCode_Sender
             bool debugLog = false;
 #endif
             string debugCategories = null;
+            bool wireLog = false;   // -wirelog; forced on in Debug builds by WireLog.Init itself
             bool demoMarker = false;
             bool crashTest = false;
             bool headless = false;
@@ -155,6 +156,13 @@ namespace GCode_Sender
                             if (eq >= 0)
                                 debugCategories = arg.Substring(eq + 1);
                         }
+                        // -wirelog  unfiltered trace of what actually crossed the link, in its own file.
+                        // console.log mirrors the on-screen Console tab and inherits that view's filter -
+                        // this does not. See WireLog.cs. Already on in Debug builds.
+                        else if (arg == "-wirelog")
+                        {
+                            wireLog = true;
+                        }
                         // -testserver              start the UI test server on the default port
                         // -testserver=8760         ... on an explicit port
                         else if (arg == "-testserver" || arg.StartsWith("-testserver=", StringComparison.OrdinalIgnoreCase))
@@ -182,6 +190,9 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             CNC.Core.ConsoleLog.Init();
+            CNC.Core.WireLog.Init(wireLog);
+            if (CNC.Core.WireLog.Enabled)
+                CNC.Core.DebugLog.Write("app", "wire log: " + CNC.Core.WireLog.LogPath);
             // CNC.Core marshals to the UI thread and pumps messages through this instead of
             // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
             CNC.Controls.UiPump.Register();
