@@ -346,6 +346,12 @@ namespace GCode_Sender
         // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
         // just above a 1 in top for speed - taller stock would be missed. Flag it when the Z estimate exceeds that.
         private const double MaxStockThicknessMm = 25.4d;
+
+        // How far below the operator's G28 park a Dynamic Rectangle pick may seek for the stock top. Same
+        // 12 mm Fixture Test position uses, and for the same reason: a dead or mis-wired probe alarms after
+        // a few millimetres instead of driving to a deep machine target. See the Rectangle branch in
+        // BuildDynamicProbeProgram.
+        private const double DynamicSearchDepthMm = 12d;
         private void UpdateThicknessWarning()
         {
             if (txtThickWarn != null)
@@ -2053,9 +2059,10 @@ namespace GCode_Sender
             L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-            // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is no longer emitted -
-            // corner 1 runs REUSE mode (below), fed #<_ls_maxz> from the fresh puck touch instead, so no call
-            // in this whole program ever takes the DISCOVER branch.
+            // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is not emitted. This
+            // comment used to claim no call here ever took the DISCOVER branch, and it was WRONG - the G28
+            // branch below emitted _ls_spoilz and called with startz 9999 right underneath it. It is true
+            // now: every call in every generator supplies its own floor, so DISCOVER is unreachable.
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
@@ -2088,18 +2095,19 @@ namespace GCode_Sender
             L(string.Format("(--- corner 1 = {0} (origin): reference {1} ---)", cornerName, fx.Name));
             if (IsG28(fx))
             {
-                // G28 (loose-probe synthetic fixture, see its own comment): DISCOVER mode (9999), anchored at
-                // the controller's own G28 stored position - read live via #5161/#5162/#5163 (grblHAL's G28
-                // named parameters), never known to ioSender at generate-time, unlike a real Fixture's cached
-                // Coords. pcorner.macro probes the spoilboard AND the stock top itself here (both unknown), so
-                // topx/topy use the same LOOSE topClearance corners 2-4 already fall back to - there is no tight
-                // per-fixture offset to point at. This recreates the exact behavior Start Job had before
-                // Fixture.CornerOffsetX/Y/SpoilboardZ existed (see pcorner.macro's own "old firmware G28 slot"
-                // reference).
-                L("#<_ls_spoilz> = #5163");
+                // G28 (loose-probe synthetic fixture, see its own comment), anchored at the controller's own
+                // G28 stored position - read live via #5161/#5162/#5163 (grblHAL's G28 named parameters),
+                // never known to ioSender at generate-time unlike a real Fixture's cached Coords. topx/topy
+                // use the same LOOSE topClearance corners 2-4 already fall back to - there is no tight
+                // per-fixture offset to point at.
+                // Bounded exactly like Fixture Test position (#<_bottom> = z - searchDepth,
+                // #<_ls_maxz> = z + 2), the shape every other caller uses. This was DISCOVER (9999), which
+                // sent pcorner off to PROBE THE SPOILBOARD just to derive a floor for its own top-probe
+                // seek - a question the operator has already answered by parking G28 over the stock corner.
+                L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
                 L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-                EmitCall(id1, "#5161", "#5162", "9999");
+                EmitCall(id1, "#5161", "#5162", "0", "[#5163+2]");
             }
             else
             {
@@ -2436,18 +2444,31 @@ namespace GCode_Sender
                 L("#<c1y> = #<_center_y>");
                 L(string.Format("#<c1z> = [#<_ctr_top> - {0}]", N(plateOffset)));
             }
-            else if (isEdge)
-            {
-                L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
-                EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "9999", "0", "9999", inside, EdgeFaces[dynamicIndex]);
-                L("#<c1x> = #<_corner_x>");
-                L("#<c1y> = #<_corner_y>");
-                L("#<c1z> = #<_corner_z>");
-            }
             else
             {
-                L(string.Format("(--- {0} corner ---)", CornerNames[dynamicIndex]));
-                EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "9999", "0", "9999", inside, 0);
+                // Rectangle picks (corner or edge midpoint) used to call pcorner in DISCOVER mode
+                // (startz 9999), which made the macro go and PROBE THE SPOILBOARD purely to derive a floor
+                // for its own top-probe seek. Nothing wanted that measurement; it was only ever answering
+                // "how far down am I allowed to look?" - a question the operator has already answered by
+                // parking at G28 over the stock corner. So bound it to G28's own Z instead, exactly the
+                // shape Fixture Test position uses (#<_bottom> = z - searchDepth, #<_ls_maxz> = z + 2),
+                // and let pcorner's ordinary REUSE path run its own top probe as it does for every other
+                // caller. No extra probing, one less way to drive at the spoilboard, and it drops the last
+                // requirement that the reference sit near the board.
+                // #<_ls_spacer> still applies: it is added to this floor by the caller-side emit above,
+                // so a sacrificial backer is respected the same as before.
+                L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
+                string dynMaxZ = "[#5163+2]";
+                if (isEdge)
+                {
+                    L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
+                    EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "0", dynMaxZ, "9999", inside, EdgeFaces[dynamicIndex]);
+                }
+                else
+                {
+                    L(string.Format("(--- {0} corner ---)", CornerNames[dynamicIndex]));
+                    EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "0", dynMaxZ, "9999", inside, 0);
+                }
                 L("#<c1x> = #<_corner_x>");
                 L("#<c1y> = #<_corner_y>");
                 L("#<c1z> = #<_corner_z>");
