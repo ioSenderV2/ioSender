@@ -34,6 +34,12 @@ namespace CNC.Controls
         private ViewType _viewType;
         private ICNCView _view;
 
+        // Captured in OnClosing, used in OnClosed - see OnClosed's comment. IsActive is already false by
+        // the time OnClosed runs, and Owner is not reliable there either, so both are read while the
+        // window is still alive.
+        private bool _wasActiveOnClose;
+        private Window _ownerOnClose;
+
         public ViewHostWindow()
         {
             InitializeComponent();
@@ -191,6 +197,13 @@ namespace CNC.Controls
             base.OnPreviewKeyDown(e);
         }
 
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            _wasActiveOnClose = IsActive;
+            _ownerOnClose = Owner;
+            base.OnClosing(e);
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             if (_view != null)
@@ -205,6 +218,19 @@ namespace CNC.Controls
             else
                 _open.Remove(_viewType);
             base.OnClosed(e);
+
+            // Hand focus back to the owner instead of letting Windows pick the next top-level window.
+            // Setting Owner is NOT enough on its own: with the main window sitting behind one of these
+            // (and often behind a dialog owned by it in turn - Machine Setup -> Fixture definitions),
+            // closing the last one frequently activates a DIFFERENT APPLICATION rather than ioSender.
+            // Guarded on this window actually having had focus as it closed: if the operator had already
+            // switched to another app, pulling them back would be worse than the bug.
+            if (_wasActiveOnClose && _ownerOnClose != null && _ownerOnClose.IsLoaded)
+            {
+                if (_ownerOnClose.WindowState == WindowState.Minimized)
+                    _ownerOnClose.WindowState = WindowState.Normal;
+                _ownerOnClose.Activate();
+            }
         }
     }
 }
