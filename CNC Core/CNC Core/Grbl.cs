@@ -3975,9 +3975,18 @@ namespace CNC.Core
                     // The only real evidence the link is two-way is that replies keep arriving, so check
                     // that here, on the one timer that is running whenever we expect traffic. Reported
                     // once per outage; the transport's existing Reconnector takes it from here.
+                    // EventMode false = somebody is doing a raw synchronous exchange on this link and
+                    // consuming replies with Comms.com.ReadByte() instead of letting them through
+                    // Comms.PostTo - a YModem file transfer is the one that matters. LinkMonitor.Rx() only
+                    // stamps in PostTo, so during such a transfer it sees zero RX BY CONSTRUCTION and
+                    // starves on a link that is working perfectly.
+                    // Not hypothetical: this tore down a tc.macro upload 10.06s after it started
+                    // (2026-08-06) - NotifyLinkLost mid-YModem, socket reopened under the transfer, the
+                    // controller left mid-protocol and mute until the app was restarted and the machine
+                    // re-homed. A watchdog that kills the thing it is watching is worse than none.
                     // IsReconnecting first: Starved() consumes its report-once token, and burning that
                     // while a reconnect is already in flight would swallow the NEXT real outage.
-                    if (!Comms.com.IsReconnecting && LinkMonitor.Starved())
+                    if (Comms.com.EventMode && !Comms.com.IsReconnecting && LinkMonitor.Starved())
                     {
                         DebugLog.Write("link", string.Format("no reply for {0}ms while polling - reporting the link lost", LinkMonitor.SilentMs));
                         Comms.com.NotifyLinkLost();

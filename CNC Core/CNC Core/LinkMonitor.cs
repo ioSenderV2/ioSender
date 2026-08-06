@@ -49,7 +49,13 @@ namespace CNC.Core
         // and not one per poll. Cleared by Reset() when traffic is flowing again.
         private static int reported;
 
-        /// <summary>Called on the read thread for every reply that arrives, before any marshalling.</summary>
+        /// <summary>
+        /// Called on the read thread for every reply that arrives, before any marshalling.
+        /// ⚠ ONLY reached via Comms.PostTo. A caller that sets Comms.com.EventMode = false and pulls
+        /// replies with ReadByte() - YModem.Upload does exactly that - bypasses this completely, so the
+        /// clock keeps running on a link that is busy and healthy. The poll timer therefore does not
+        /// evaluate starvation while EventMode is false; see PollGrbl.pollTimer_Elapsed.
+        /// </summary>
         public static void Rx()
         {
             // A plain store is sufficient - int writes are atomic on every CLR target, and a reader that
