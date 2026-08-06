@@ -24,15 +24,17 @@
  *     Silent, and the ResponseLog filter, so a reply the app decides to ignore still appears here -
  *     which is exactly the case worth having.
  *
- * TX: commands issued through GrblViewModel (ExecuteCommand / ExecuteMDI). That covers MDI, macros, the
- *     on-screen jog buttons and the gamepad D-pad (ControllerMapper.JogStep deliberately routes through
- *     ExecuteCommand rather than writing to the stream directly).
+ * TX: every byte the sender writes, tapped in StreamCommsBase - the shared write path all four transports
+ *     derive from. That covers MDI, macros, jogging, StreamPump's job lines and the raw realtime bytes
+ *     ('?', feed hold, cycle start, jog cancel), on serial, telnet and websocket alike.
  *
- * TX gaps, stated plainly rather than discovered later: raw Comms.WriteByte realtime bytes ('?', feed
- * hold, cycle start, jog cancel 0x85) and StreamPump's own writes during a job do NOT appear. Both go
- * straight to the stream. Closing that means tapping WriteString/WriteByte in each stream class - a
- * follow-up, deliberately not done in the same change as this, because it edits the write path of the
- * code that talks to the machine.
+ *     An earlier version tapped GrblViewModel.ExecuteCommand/ExecuteMDI instead. That was both incomplete
+ *     (it never saw StreamPump or the realtime bytes) and, once the stream-level tap existed, duplicative:
+ *     the same command appeared twice a millisecond apart, once semantically and once as bytes. Removed -
+ *     the stream tap is strictly better, recording what actually went out rather than what was asked for.
+ *
+ * One TX gap remains, stated plainly rather than left to be discovered: EltimaStream.WriteString writes
+ * straight to its port and so bypasses the traced leaves. That transport never compiles here.
  *
  * Also note the tap point bounds the truth: a reply mangled during the stream's own reply extraction is
  * already mangled by the time it reaches PostTo. Only a raw-byte tap would show that, and this is not one.
@@ -102,13 +104,6 @@ namespace CNC.Core
         {
             if (Enabled && reply != null)
                 Write('<', reply);
-        }
-
-        /// <summary>A command was issued to the controller.</summary>
-        public static void Tx(string command)
-        {
-            if (Enabled && !string.IsNullOrEmpty(command))
-                Write('>', command);
         }
 
         /// <summary>
