@@ -128,6 +128,13 @@ namespace CNC.Core
 
         public static bool Load(GrblViewModel model, bool ViewAll)
         {
+            // Most callers pass "DataContext as GrblViewModel", which is null whenever the view has not been
+            // realized - and every path below dereferences it, starting with ProgramInFlight. Answering
+            // "unknown" is both truthful and already handled by every caller (see the contract note above),
+            // which beats an NRE surfacing from whatever unrelated operation happened to trigger the refresh.
+            if (model == null)
+                return false;
+
             // NEVER enumerate the controller filesystem while a program is streaming. $F / $CWD / $F<= are
             // ordinary commands on the same wire as the g-code, and the controller rejects a g-code line that
             // lands while it is busy servicing one. Confirmed on real hardware 2026-08-04: a Start Job tab

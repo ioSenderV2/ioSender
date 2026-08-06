@@ -273,7 +273,13 @@ namespace CNC.Controls
         // (Re)list the controller files and refresh the free-space banner.
         private void ReloadFiles()
         {
-            GrblSDCard.Load(DataContext as GrblViewModel, ViewAll);
+            // Same rule as UploadLocalFile and ProvisionAtcMacros below: prefer the shared view model, because
+            // this view's DataContext is null until it is realized. ProvisionAtcMacros was careful about that
+            // and then called straight into here, which was not - so an ATC install driven from the Machine
+            // Setup wizard (which builds an SDCardView that never enters the visual tree) uploaded every macro
+            // successfully and THEN threw "Object reference not set to an instance of an object", reporting a
+            // completed install as a failure and inviting a retry that was not needed.
+            GrblSDCard.Load(Grbl.GrblViewModel ?? DataContext as GrblViewModel, ViewAll);
             if (txtFreeSpace != null)
                 txtFreeSpace.Text = GrblSDCard.FreeSpace;
         }
