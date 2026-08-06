@@ -733,7 +733,7 @@ namespace CNC.Controls
             b.AppendLine("G53 G0 X[#5181] Y[#5182]");
             b.AppendLine("G53 G0 X[#5181] Y[#5182] Z[#5183]");
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, p.ProbeDiameter.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
             // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
@@ -831,7 +831,7 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, p.ProbeDiameter.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             b.AppendLine("(--- spoilboard baseline ---)");
             if (reuseStartPos)

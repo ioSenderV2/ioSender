@@ -2068,7 +2068,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Tool-length reference (opt-in) now runs FIRST, before any stock probing - see the TLO-baseline
             // design conversation this came from. #<_probe_z> (the puck's own machine-Z touch point, always
@@ -2398,7 +2398,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             bool inside = dynamicProbePoint == ProbePoint.InsideCorner || dynamicProbePoint == ProbePoint.InsideEdge;
             bool isEdge = dynamicProbePoint == ProbePoint.OutsideEdge || dynamicProbePoint == ProbePoint.InsideEdge;
@@ -2649,7 +2649,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L(string.Format("(MBOX, OKCANCEL, Install and seat the probe: {0}, {1} mm tip. The tip diameter must MATCH what is in the spindle - entering the wrong one silently shifts the work origin by half the difference. Click OK. Cancel aborts.)", p.Name, N(p.ProbeDiameter)));
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Tool-length reference (opt-in) now runs FIRST, before the stock-top probe - same ordering and
             // reasoning as BuildProgram's own call site (see its comment). The vise's own Z-probe safety
