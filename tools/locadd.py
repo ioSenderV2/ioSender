@@ -57,6 +57,9 @@ TARGETS = [
     ('CNC Controls/CNC Controls/CustomToolEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/KbdDefaultSpeedControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogConfigControl.xaml', 'CNC.Controls.WPF'),
+    # Was localized (30 rows already in the CSVs) but never listed here, so new x:Uids on it were
+    # silently skipped - the run reports "Added 0 row(s)" and looks like a no-op rather than a gap.
+    ('CNC Controls/CNC Controls/JogUiConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/FileActionControl.xaml', 'CNC.Controls.WPF'),
