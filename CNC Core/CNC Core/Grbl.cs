@@ -3921,6 +3921,9 @@ namespace CNC.Core
         internal static void Resume()
         {
             suspend = false;
+            // No polls went out while suspended, so that silence is not evidence of anything - start the
+            // starvation clock fresh rather than immediately tripping on a long blocking handshake.
+            LinkMonitor.Reset();
         }
 
         public void Run()
@@ -3942,6 +3945,7 @@ namespace CNC.Core
                 pollTimer.Interval = PollInterval;
                 pollTimer.Start();
                 RTCommand = GrblConstants.CMD_STATUS_REPORT_ALL;
+                LinkMonitor.Reset();   // polling starts now - don't judge the link on time before it
             }
             else
                 pollTimer.Stop();
@@ -3966,6 +3970,18 @@ namespace CNC.Core
                     }
                     else
                         Comms.com.WriteByte(RTCommand);
+
+                    // The write above "succeeded" - which on a half-open socket proves nothing at all.
+                    // The only real evidence the link is two-way is that replies keep arriving, so check
+                    // that here, on the one timer that is running whenever we expect traffic. Reported
+                    // once per outage; the transport's existing Reconnector takes it from here.
+                    // IsReconnecting first: Starved() consumes its report-once token, and burning that
+                    // while a reconnect is already in flight would swallow the NEXT real outage.
+                    if (!Comms.com.IsReconnecting && LinkMonitor.Starved())
+                    {
+                        DebugLog.Write("link", string.Format("no reply for {0}ms while polling - reporting the link lost", LinkMonitor.SilentMs));
+                        Comms.com.NotifyLinkLost();
+                    }
                 }
 
                 if (RTCommand == GrblConstants.CMD_STATUS_REPORT_ALL)

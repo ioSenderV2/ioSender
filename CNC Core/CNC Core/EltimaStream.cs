@@ -69,6 +69,9 @@ namespace CNC.Core
         // Auto-reconnect is not implemented for the (optional, USEELTIMA) Eltima transport;
         // these satisfy the StreamComms contract.
         public bool IsReconnecting { get { return false; } }
+
+        // No auto-reconnect on this transport (see the comment above), so there is nothing to notify.
+        public void NotifyLinkLost() { }
         public event System.Action ConnectionLost;
         public event System.Action Reconnected;
 

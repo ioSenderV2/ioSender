@@ -71,6 +71,7 @@
     <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
+    <Compile Include="LinkMonitor.cs" />
     <Compile Include="PollDiag.cs" />
     <Compile Include="WireLog.cs" />
     <Compile Include="StreamCommsBase.cs" />

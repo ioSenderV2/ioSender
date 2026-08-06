@@ -68,6 +68,10 @@ namespace CNC.Core
             if (PollDiag.Enabled)
                 PollDiag.RxArrived();
 
+            // Always on, unlike the two above - this is the only evidence that the link is actually
+            // two-way, and a half-open socket produces no other symptom. See LinkMonitor's header.
+            LinkMonitor.Rx();
+
             WireLog.Rx(reply);
 
             if (context == null)
@@ -136,6 +140,14 @@ namespace CNC.Core
         bool BlockingWrites { get; set; }
 
         bool IsReconnecting { get; }
+
+        /// <summary>
+        /// Report the link as lost from OUTSIDE the read/write paths, for a failure those paths cannot
+        /// see - a half-open socket that still accepts writes and never errors. Drives the same
+        /// Reconnector as an I/O failure, so ConnectionLost/Reconnected behave identically.
+        /// Idempotent: a second call while already reconnecting does nothing.
+        /// </summary>
+        void NotifyLinkLost();
 
         void Close();
         int ReadByte();

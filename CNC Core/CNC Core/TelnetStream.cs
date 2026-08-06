@@ -155,6 +155,8 @@ namespace CNC.Core
 
         public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
 
+        public void NotifyLinkLost() { reconnector?.NotifyLost(); }
+
         public event System.Action ConnectionLost
         {
             add { reconnector.ConnectionLost += value; }
