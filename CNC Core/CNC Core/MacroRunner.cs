@@ -778,7 +778,13 @@ namespace CNC.Core
                     // A coordinate-system code (case-insensitive)?
                     string code = cond.ToUpperInvariant();
                     if (CoordinateSystemCodes.Contains(code))
-                        return CoordinateSystemDefined(code) ? null : string.Format("{0} is not set", code);
+                    {
+                        if (!CoordinateSystemDefined(code))
+                            return string.Format("{0} is not set", code);
+                        // Set, but for a stored MACHINE position that is only half the question - it also
+                        // has to be somewhere the controller will let us rapid to. See StoredPositionUnreachable.
+                        return StoredPositionUnreachable(code);
+                    }
 
                     // Otherwise require it to be a controller $I build option (NEWOPT), matched
                     // exactly and case-sensitively (e.g. EXPR, TC, THC).
@@ -823,6 +829,88 @@ namespace CNC.Core
                     return true;
 
             return false;
+        }
+
+        // The stored positions PREREQ can require that are MACHINE positions - i.e. ones a program
+        // actually rapids to (G53 G0 X[#5181]...). G54..G59.3/G92 are work OFFSETS, not targets, so
+        // the envelope check below deliberately does not apply to them.
+        private static readonly HashSet<string> StoredMachinePositionCodes = new HashSet<string> { "G28", "G30" };
+
+        // Is a stored machine position (G28/G30) actually REACHABLE under the controller's soft limits?
+        // Returns null when it is (or when the question doesn't apply), otherwise the failure text.
+        //
+        // Being "set" is not enough. A G30 recorded when the pull-off was smaller - or with soft limits
+        // off, or via an MPG - stays in the controller's non-volatile storage at a coordinate the parser
+        // will now refuse, and NOTHING in the sender noticed: every generator that parks at G30
+        // (Start Job, Work Order, stepper calibration, all via EmitGotoG30) emitted a program that
+        // streamed happily and then threw Alarm:2 on the park line, mid-run, with the operator watching.
+        // Observed 2026-08-06: [G30:751.428,-836.262,-34.000] against $131=840 / $27=6 puts Y 2.262 mm
+        // outside its envelope, so "G53 G0 X[#5181] Y[#5182]" alarmed at Ln:220 - and the failure looked
+        // like a generator bug because the preceding line used #<_abs_x>/#<_abs_y>.
+        //
+        // The envelope mirrors grblHAL's own limits_set_work_envelope()/check_travel_limits(), which is
+        // ALSO exactly what JogController.BuildCommand / JogBaseControl.ClampMachine already clamp jogs
+        // to - that rule is proven on real machines, so it is reused rather than re-derived:
+        //     $22 bit 3 (ForceSetOrigin) + the axis's $23 bit  -> 0 .. +(travel - pulloff)
+        //     $22 bit 3, $23 bit clear                         -> -(travel - pulloff) .. 0
+        //     no $22 bit 3                                     -> -(travel - pulloff) .. -pulloff
+        // with pulloff = $27 only when hard limits ($21) are on, matching the firmware's own condition.
+        //
+        // Fails OPEN in every "can't know" case - soft limits off, travel not configured, homed state
+        // unknown, axis not homed - because the firmware itself only checks homed axes with $20 on, and
+        // a false refusal here blocks a job that would have run perfectly well.
+        public static string StoredPositionUnreachable(string code)
+        {
+            if (!StoredMachinePositionCodes.Contains(code) || GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1)
+                return null;
+
+            // The firmware only envelope-checks axes it considers homed; -1 = the $# read gave us no
+            // [HOME:] line at all, so we know nothing and must not guess.
+            int homed = GrblWorkParameters.HomedMask;
+            if (homed <= 0)
+                return null;
+
+            var cs = GrblWorkParameters.GetCoordinateSystem(code);
+            if (cs == null)
+                return null;
+
+            double pulloff = GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) == 1
+                              ? GrblSettings.GetDouble(GrblSetting.HomingPulloff) : 0d;
+
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+            {
+                if ((homed & (1 << i)) == 0 || double.IsNaN(cs.Values[i]))
+                    continue;
+
+                double travel = Math.Abs(GrblInfo.MaxTravel.Values[i]);
+                if (travel <= 0d)
+                    continue;   // $13x not configured for this axis - no envelope to check against
+
+                double lo, hi;
+                if (GrblInfo.ForceSetOrigin)
+                {
+                    if (GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(i))) { lo = 0d; hi = travel - pulloff; }
+                    else { lo = -(travel - pulloff); hi = 0d; }
+                }
+                else { lo = -(travel - pulloff); hi = -pulloff; }
+
+                double pos = cs.Values[i], limit = pos < lo ? lo : hi;
+                if (pos < lo || pos > hi)
+                    return string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        "{0} is stored outside the machine's soft-limit travel: {1} {2:0.###} is {3:0.###} mm beyond the limit of {4:0.###}. " +
+                        "Move the machine inside its travel and set {0} again.",
+                        code, AxisLetter(i), pos, Math.Abs(pos - limit), limit);
+            }
+
+            return null;
+        }
+
+        // Axis letter for an index, for operator-facing text ("Y"). GrblInfo.AxisLetters is remapped for
+        // the controller's actual axis set, so it is the one source to ask.
+        private static string AxisLetter(int axis)
+        {
+            string letters = GrblInfo.AxisLetters;
+            return axis >= 0 && axis < letters.Length ? letters.Substring(axis, 1) : ("axis " + axis);
         }
 
         // Show the message box for an (MBOX...) line; returns false if the user cancelled (Cancel/No).

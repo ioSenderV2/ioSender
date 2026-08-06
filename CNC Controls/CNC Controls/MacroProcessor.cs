@@ -357,6 +357,11 @@ namespace CNC.Controls
             return MacroRunner.CoordinateSystemDefined(code);
         }
 
+        public static string StoredPositionUnreachable(string code)
+        {
+            return MacroRunner.StoredPositionUnreachable(code);
+        }
+
         /// <summary>
         /// Point the engine's operator seams at this assembly's dialogs. Called once at startup, same idiom
         /// as AppDialogs.RegisterCorePrompts. Without it the engine still runs - it just takes each (PROMPT)

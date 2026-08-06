@@ -1509,6 +1509,17 @@ namespace GCode_Sender
                         return;
                     if (!MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false))
                         return;
+                    GrblWorkParameters.Get(model);   // G28 has just changed - re-read before checking it below
+                }
+
+                // Being set is only half of it: the program rapids to G28 ("G53 G0 X#5161 Y#5162"), so it
+                // also has to be somewhere soft limits will allow. Same check the (PREREQ ... G30) path
+                // applies to G30 - a stored position outside the envelope alarms mid-run, not at Generate.
+                string unreachable = MacroProcessor.StoredPositionUnreachable("G28");
+                if (unreachable != null)
+                {
+                    AppDialogs.Show(unreachable, "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    return;
                 }
             }
 
