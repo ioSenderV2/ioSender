@@ -350,8 +350,24 @@ namespace GCode_Sender
 
         // Common fatal path: dump the exception to a known log file, surface it to an interactive user (unless
         // running headless), then exit with CrashExitCode. Never throws.
+        // One crash per process. A fatal exception on one thread does not stop another thread from hitting
+        // its own a moment later, and each entry here opened a FRESH log file and re-pointed the
+        // latest_crash.log link at it. Seen 2026-08-06: the real report landed in the 15:07:35 file, a
+        // second fatal at 15:08:05 created an empty one, and latest_crash.log - the file anyone actually
+        // reads - resolved to the empty one. The first exception is the one that matters; later ones are
+        // usually its wreckage.
+        private static int fatalHandled;
+
         private void HandleFatal(string source, Exception ex)
         {
+            if (Interlocked.CompareExchange(ref fatalHandled, 1, 0) != 0)
+            {
+                // Already going down. Don't touch the log the first crash wrote - just block here so this
+                // thread can't race ahead, and let the Environment.Exit below take the process.
+                Thread.Sleep(Timeout.Infinite);
+                return;
+            }
+
             // Format the report ONCE and give the same string to both consumers. They used to build their
             // own, which is wasted work on the ordinary crash and actively harmful on an
             // OutOfMemoryException, where each allocation is a chance to come away with nothing.

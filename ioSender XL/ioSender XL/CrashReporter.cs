@@ -100,14 +100,28 @@ namespace GCode_Sender
         // OutOfMemoryException diagnosable: in a 32-bit process, private bytes near ~1.5GB with a small
         // GC heap means the address space fragmented, while a GC heap that has grown to match means a
         // managed leak. Without it an OOM report says only "it ran out", which names no suspect.
+        // Measured separately on purpose. The first version took all three from one try block and printed
+        // "(unavailable)" for the 15:07 OutOfMemoryException on 2026-08-06 - losing the whole line to the
+        // one crash it was added for. Process.GetCurrentProcess() allocates a Process object and queries
+        // the OS, which is exactly what an exhausted process cannot do; GC.GetTotalMemory just reads a
+        // runtime counter and survives. So the cheap, most diagnostic number is taken first and on its own.
         private static string DescribeMemory()
         {
+            long gcHeap = -1, ws = -1, priv = -1;
+
+            try { gcHeap = GC.GetTotalMemory(false) >> 20; } catch { }
             try
             {
                 var p = Process.GetCurrentProcess();
-                return string.Format(CultureInfo.InvariantCulture,
-                    "working set {0} MB, private {1} MB, GC heap {2} MB",
-                    p.WorkingSet64 >> 20, p.PrivateMemorySize64 >> 20, GC.GetTotalMemory(false) >> 20);
+                ws = p.WorkingSet64 >> 20;
+                priv = p.PrivateMemorySize64 >> 20;
+            }
+            catch { }
+
+            try
+            {
+                return string.Format(CultureInfo.InvariantCulture, "working set {0}, private {1}, GC heap {2}",
+                    ws < 0 ? "?" : ws + " MB", priv < 0 ? "?" : priv + " MB", gcHeap < 0 ? "?" : gcHeap + " MB");
             }
             catch { return "(unavailable)"; }
         }
