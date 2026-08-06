@@ -91,6 +91,50 @@ namespace CNC.Core
         // handling for every command response, not just a jog's own: the old gate behaved the same way, and a
         // response to anything at all proves the controller is still answering, which is the property this
         // gate actually cares about.
+        /// <summary>
+        /// A status report arrived. The controller is answering, so whatever was outstanding is no longer
+        /// evidence of a wedge and the gate opens.
+        /// </summary>
+        /// <remarks>
+        /// This exists because grblHAL DOES NOT ACK a $J that arrives while it is already in the Jog state -
+        /// proved on the wire 2026-08-06, four times out of four: a jog sent while Idle was acked in ~18ms,
+        /// a jog sent while &lt;Jog| was never acked at all, and both acks then appeared together ~2s later
+        /// when this gate's timeout forced the next send. The operator experienced that as a dead sender that
+        /// would only accept one jog every two seconds - AckTimeoutMs, exactly.
+        ///
+        /// Waiting for that ack is therefore waiting for something the firmware will not send. A status
+        /// report answers the question the gate is actually asking, and does it every poll interval.
+        ///
+        /// This is not a relaxation of the wedge protection - it is the rule this class already describes.
+        /// See the header: "a response to anything at all proves the controller is still answering, which is
+        /// the property this gate actually cares about", and Ack() has always fired on ANY ok/error, not just
+        /// the acknowledgement of the jog it gated. Status reports were simply never routed here.
+        ///
+        /// What it does change is the floor on discrete jog rate: from "one per ack" to "one per status
+        /// report" (~200 ms at the default poll interval). That remains three times more conservative than
+        /// AnalogJogLoop, which deliberately overlaps $J segments every ~67 ms on this same link and does not
+        /// wedge anything - which is also the evidence that overlap alone was never the 2026-07-15 trigger.
+        /// </remarks>
+        public static void Alive()
+        {
+            string trace = null;
+
+            lock (sync)
+            {
+                if (pending && DebugLog.Enabled)
+                {
+                    double waited = (DateTime.UtcNow - sentAtUtc).TotalMilliseconds;
+                    if (waited > 250d)
+                        trace = string.Format(
+                            "OPENED BY STATUS - $J unacked for {0:F0}ms, but the controller is answering", waited);
+                }
+                pending = false;
+            }
+
+            if (trace != null)
+                DebugLog.Write("jog", trace);
+        }
+
         public static void Ack()
         {
             string trace = null;

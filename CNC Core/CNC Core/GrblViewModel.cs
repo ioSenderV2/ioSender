@@ -1434,6 +1434,11 @@ namespace CNC.Core
 
             if (data.First() == '<')
             {
+                // The controller is answering - which is the only thing the jog back-pressure gate actually
+                // needs to know, and the one thing it cannot learn from a jog's own "ok" (grblHAL withholds
+                // that when the $J arrives during Jog state). See JogGate.Alive.
+                JogGate.Alive();
+
                 stateChanged = ParseStatus(data);
 
                 OnRealtimeStatusProcessed?.Invoke(data);
