@@ -41,8 +41,6 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -354,11 +352,17 @@ namespace GCode_Sender
         // running headless), then exit with CrashExitCode. Never throws.
         private void HandleFatal(string source, Exception ex)
         {
-            string logPath = WriteCrashLog(source, ex);
+            // Format the report ONCE and give the same string to both consumers. They used to build their
+            // own, which is wasted work on the ordinary crash and actively harmful on an
+            // OutOfMemoryException, where each allocation is a chance to come away with nothing.
+            string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+            string summary = null;
+            try { summary = CrashReporter.BuildSummary(source, ex, utcStamp); } catch { }
+
+            string logPath = WriteCrashLog(source, ex, summary);
 
             // Capture a minidump + per-crash summary and flag it for report-on-next-launch. Never throws.
-            string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
-            CrashReporter.Capture(source, ex, utcStamp);
+            CrashReporter.Capture(source, ex, utcStamp, summary);
 
             // Skip the modal dialog for unattended runs (build.ps1 -Headless -> -headless) so a crash
             // can't hang the process on an un-clicked message box; the log + exit code carry the signal.
@@ -415,28 +419,51 @@ namespace GCode_Sender
             base.OnExit(e);
         }
 
+        private const string CrashLogSeparator = "========================================================================\r\n";
+
         // Write a fresh, timestamped crash entry under %AppData%\ioSender\logs\<DayOfWeek>\ (falls back to
         // the app folder if the config dir isn't resolved yet, e.g. a crash during early startup), with
         // "latest_crash.log" (hard-)linked in the top-level logs folder. File creation, day-of-week folder
         // placement, the 8MB/.1 size rollover and per-folder retention are all handled by LogFile - the
         // same primitive ConsoleLog/DebugLog use. Returns the path written, or a best-effort path string if
         // the write itself failed. Never throws.
-        private static string WriteCrashLog(string source, Exception ex)
+        private static string WriteCrashLog(string source, Exception ex, string summary = null)
         {
             var log = CNC.Core.LogFile.Open("ioSender.crash", latestLinkName: "latest_crash.log");
             string path = log?.Path ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ioSender.crash.log");
+            if (log == null)
+                return path;
 
+            // Two attempts, with a forced collection between them. An OutOfMemoryException is at once the
+            // crash that most needs recording and the one least able to record itself - formatting the text
+            // allocates, and File.AppendAllText needs a StreamWriter and an encoder buffer. On 2026-08-06 an
+            // OOM got none of that and the log was left as LogFile.Open had created it: three bytes of UTF-8
+            // BOM, indistinguishable from a run that crashed with nothing to say. The retry is not wishful
+            // thinking - the crash reporter's own .txt, written seconds later with no explicit collect, went
+            // through fine, because the OOM was thrown for one request and smaller ones still succeeded.
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    string body = summary ?? CrashReporter.BuildSummary(source, ex,
+                        DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
+                    if (log.Write(CrashLogSeparator + body + "\r\n"))
+                        return path;
+                }
+                catch { /* out of memory, most likely - fall through and try again with more of it */ }
+
+                // Reclaim whatever the failed attempt, and whatever overran before it, left behind. This is
+                // a terminal path, so the cost of a blocking collection buys more than it spends.
+                try { GC.Collect(); GC.WaitForPendingFinalizers(); } catch { }
+            }
+
+            // Both attempts failed. Leave a marker rather than the BOM-only stub: the exception's TYPE is
+            // most of the diagnosis and, for an OOM, very nearly all of it - and this needs one short
+            // concatenation to say so.
             try
             {
-                var sb = new StringBuilder();
-                sb.AppendLine("========================================================================");
-                sb.AppendLine("Time (UTC) : " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
-                sb.AppendLine("Version    : " + (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?"));
-                sb.AppendLine("Source     : " + source);
-                sb.AppendLine("Exception  :");
-                sb.AppendLine(ex?.ToString() ?? "(no exception object)");
-                sb.AppendLine();
-                log?.Write(sb.ToString());
+                File.AppendAllText(path, "CRASH LOG WRITE FAILED - " + source + " - " +
+                    (ex == null ? "(no exception object)" : ex.GetType().FullName) + "\r\n");
             }
             catch { /* last resort: nothing more we can do */ }
 

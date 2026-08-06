@@ -53,7 +53,10 @@ namespace GCode_Sender
 
         // Write a minidump + text summary for this crash and flag it for report-on-next-launch. utcStamp
         // is the crash time string used by the caller elsewhere, kept consistent for the filenames.
-        public static void Capture(string source, Exception ex, string utcStamp)
+        // summary, if supplied, is reused rather than rebuilt - the caller has already formatted exactly
+        // this text for the crash log, and on the crash that needs reporting most (OutOfMemoryException)
+        // every avoided allocation is one fewer chance to come away with nothing.
+        public static void Capture(string source, Exception ex, string utcStamp, string summary = null)
         {
             try
             {
@@ -65,7 +68,8 @@ namespace GCode_Sender
                 string dmpPath = Path.Combine(dir, baseName + ".dmp");
                 string txtPath = Path.Combine(dir, baseName + ".txt");
 
-                string summary = BuildSummary(source, ex, utcStamp);
+                if (summary == null)
+                    summary = BuildSummary(source, ex, utcStamp);
                 try { File.WriteAllText(txtPath, summary); } catch { }
 
                 bool dumped = TryWriteMinidump(dmpPath);
@@ -84,10 +88,28 @@ namespace GCode_Sender
             sb.AppendLine("Version    : " + (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?"));
             sb.AppendLine("OS         : " + Environment.OSVersion + " (" + (Environment.Is64BitProcess ? "x64" : "x86") + ")");
             sb.AppendLine("CLR        : " + Environment.Version);
+            sb.AppendLine("Memory     : " + DescribeMemory());
             sb.AppendLine("Source     : " + source);
             sb.AppendLine("Exception  :");
             sb.AppendLine(ex?.ToString() ?? "(no exception object)");
             return sb.ToString();
+        }
+
+        // Working set / private bytes / managed heap at the moment of the crash. Cheap (three property
+        // reads, no allocation beyond the string) and it is the one line that makes an
+        // OutOfMemoryException diagnosable: in a 32-bit process, private bytes near ~1.5GB with a small
+        // GC heap means the address space fragmented, while a GC heap that has grown to match means a
+        // managed leak. Without it an OOM report says only "it ran out", which names no suspect.
+        private static string DescribeMemory()
+        {
+            try
+            {
+                var p = Process.GetCurrentProcess();
+                return string.Format(CultureInfo.InvariantCulture,
+                    "working set {0} MB, private {1} MB, GC heap {2} MB",
+                    p.WorkingSet64 >> 20, p.PrivateMemorySize64 >> 20, GC.GetTotalMemory(false) >> 20);
+            }
+            catch { return "(unavailable)"; }
         }
 
         private static string SafeStamp(string utcStamp)
