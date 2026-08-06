@@ -215,6 +215,12 @@ namespace CNC.Controls
             // simulator there is nothing to switch, so SimulateActive stays false and ResetRunModeAfterJob
             // won't try to "restore" a connection that was never disturbed.
             // Returns false only when the switch was wanted and failed - that aborts the run.
+            // Whether a tool tab's program is the active one, and whether it still has to generate first,
+            // are read off MacroProcessor/ProgramView - client bookkeeping the engine used to reach into.
+            // Same predicates as before, evaluated in the same place; only WHO evaluates them moved.
+            runner.HasActiveProgram = () => HasActiveProgram;
+            runner.GenerateModeBlocking = () => IsGenerateModeBlocking;
+
             runner.PrepareRun = () =>
             {
                 if (!simulateArmed)
@@ -273,6 +279,16 @@ namespace CNC.Controls
                     if (btnStop != null)
                         btnStop.Content = (string)FindResource(runner.StopShowsPause ? "JobPause" : "JobStop");
                     break;
+
+                case nameof(JobRunner.ControlsEnabled):
+                    IsEnabled = runner.ControlsEnabled;
+                    break;
+
+                // Same split again: the engine decides a tool tab's program is ready to run, this decides
+                // what that looks like - the button cue, and the status line naming the program.
+                case nameof(JobRunner.ActiveProgramReady):
+                    SetActiveProgramReady(runner.ActiveProgramReady);
+                    break;
             }
         }
 
@@ -288,13 +304,18 @@ namespace CNC.Controls
                 EnablePolling(true);
 
             // Refresh Run now (only meaningful when idle; a running/held job manages its own enables).
+            // Through the runner, NOT SetActiveProgramReady directly: the runner is the single source of
+            // truth for this cue and the mirror is the only thing that writes the DependencyProperty.
+            // Setting the DP behind the runner's back would let the two diverge - the engine sets ready
+            // true, a tab change sets the DP false directly, and the engine's next identical assignment
+            // then dedupes to nothing, leaving the cue stuck off with no way to recover.
             if (!JobTimer.IsRunning && grblState.State == GrblStates.Idle)
             {
                 runner.CanRun = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
-                SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
+                runner.ActiveProgramReady = HasActiveProgram && runner.CanRun && !IsGenerateModeBlocking;
             }
             else
-                SetActiveProgramReady(false);
+                runner.ActiveProgramReady = false;
 
             // IsRunEnabled's own DP callback only re-fires UpdateRunButtonLabel on an actual value CHANGE - but
             // Generate-mode readiness (MacroProcessor.IsGenerateReady/IsProgramGenerated) can flip without
@@ -1686,7 +1707,7 @@ namespace CNC.Controls
                 switch (newState)
                 {
                     case StreamingState.Disabled:
-                        IsEnabled = false;
+                        runner.ControlsEnabled = false;
                         break;
 
                     case StreamingState.JobFinished:
@@ -1696,19 +1717,19 @@ namespace CNC.Controls
 
                     case StreamingState.Idle:
                     case StreamingState.NoFile:
-                        IsEnabled = !grblState.MPG;
+                        runner.ControlsEnabled = !grblState.MPG;
                         // Also enabled when a wizard tab is up (its program is the active program Run runs),
                         // even with no job loaded. Re-evaluated on every idle status report, so it tracks tab changes.
-                        runner.CanRun = Source.IsLoaded || HasActiveProgram || (model.IsSDCardJob && model.SDRewind);
+                        runner.CanRun = Source.IsLoaded || runner.AnyActiveProgram || (model.IsSDCardJob && model.SDRewind);
                         runner.CanStop = model.IsSDCardJob && model.SDRewind;
                         runner.CanFeedHold = (runner.FeedHoldArmed = !grblState.MPG) && !model.FeedHoldDisabled;
                         runner.CanRewind = !grblState.MPG && Source.IsLoaded && job.CurrBlock != 0;
                         model.IsJobRunning = JobTimer.IsRunning;
-                        SetActiveProgramReady(HasActiveProgram && IsRunEnabled && !IsGenerateModeBlocking);
+                        runner.ActiveProgramReady = runner.AnyActiveProgram && runner.CanRun && !runner.IsGenerateBlocking;
                         break;
 
                     case StreamingState.Send:
-                        SetActiveProgramReady(false);   // running now - drop the "press Run" cue
+                        runner.ActiveProgramReady = false;   // running now - drop the "press Run" cue
                         if (!string.IsNullOrEmpty(model.FileName) && !grblState.MPG)
                             model.IsJobRunning = true;
                         if (JobTimer.IsRunning)
@@ -1821,7 +1842,7 @@ namespace CNC.Controls
             // non-Grbl tab and parks in AwaitIdle waiting for the controller's final Idle - if its active program
             // was already torn down, neither flag above is set and that Idle would be dropped, leaving the bar
             // stuck "running" until Stop is pressed. JobTimer is live for exactly that finishing window.
-            if (isActive || HasActiveProgram || JobTimer.IsRunning) switch(newstate.State)
+            if (isActive || runner.AnyActiveProgram || JobTimer.IsRunning) switch(newstate.State)
             {
                 case GrblStates.Idle:
                     streamingHandler.Call(StreamingState.Idle, true);

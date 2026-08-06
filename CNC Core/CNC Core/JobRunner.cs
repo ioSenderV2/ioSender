@@ -98,6 +98,50 @@ namespace CNC.Core
         /// </summary>
         public bool SimulateActive { get; set; }
 
+        // --- Host policy: is a tool tab's program the thing Run would run? ------------------------------
+        // Both are pure client bookkeeping (which tab is focused, whether it has generated), so the engine
+        // asks rather than reads. Unset = no tool tab in play, which is what a headless host wants.
+
+        /// <summary>A tool tab's own program is the active one, whether or not a job is also loaded.</summary>
+        public System.Func<bool> HasActiveProgram;
+
+        /// <summary>A Generate-first tab is focused and has not built its program yet.</summary>
+        public System.Func<bool> GenerateModeBlocking;
+
+        public bool AnyActiveProgram
+        {
+            get { return HasActiveProgram != null && HasActiveProgram(); }
+        }
+
+        public bool IsGenerateBlocking
+        {
+            get { return GenerateModeBlocking != null && GenerateModeBlocking(); }
+        }
+
+        private bool _activeProgramReady = false, _controlsEnabled = false;
+
+        /// <summary>
+        /// A tool tab's program is loaded and the machine is idle: it is ready to run on the next Run press.
+        /// The host paints its own "press Run" cue from this and writes the matching status line - Core does
+        /// not know the words (see the header).
+        /// </summary>
+        public bool ActiveProgramReady
+        {
+            get { return _activeProgramReady; }
+            set { if (_activeProgramReady != value) { _activeProgramReady = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// The run controls are usable at all - false while the controller is under MPG (pendant) control,
+        /// where the sender must not drive it. Distinct from the individual Can* flags: this is "is this
+        /// surface live", they are "is this particular action available right now".
+        /// </summary>
+        public bool ControlsEnabled
+        {
+            get { return _controlsEnabled; }
+            set { if (_controlsEnabled != value) { _controlsEnabled = value; OnPropertyChanged(); } }
+        }
+
         private bool _canRun = false, _canStop = false, _canRewind = false;
         private bool _feedHoldArmed = false, _canFeedHold = false, _stopShowsPause = false;
 
