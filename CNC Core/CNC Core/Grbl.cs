@@ -3986,9 +3986,20 @@ namespace CNC.Core
                     // re-homed. A watchdog that kills the thing it is watching is worse than none.
                     // IsReconnecting first: Starved() consumes its report-once token, and burning that
                     // while a reconnect is already in flight would swallow the NEXT real outage.
-                    if (Comms.com.EventMode && !Comms.com.IsReconnecting && LinkMonitor.Starved())
+                    // Widen the window for states where grblHAL legitimately stops answering. Homing is not
+                    // a theory: '$H' at 15:36:44.114 on 2026-08-06 drew a single '<Home|...>' and then total
+                    // silence, and the 10s window then in force declared the link lost and tore it down
+                    // mid-home on a moving machine. The state is read fresh each tick rather than latched on
+                    // entry, so nothing has to remember to clear it; if the link genuinely dies while homing
+                    // the state stays Home and the longer backstop still reports it.
+                    var state = Grbl.GrblViewModel == null ? GrblStates.Unknown : Grbl.GrblViewModel.GrblState.State;
+                    bool quiet = state == GrblStates.Home || state == GrblStates.Sleep;
+
+                    if (Comms.com.EventMode && !Comms.com.IsReconnecting &&
+                         LinkMonitor.Starved(quiet ? LinkMonitor.QuietStateTimeoutMs : LinkMonitor.TimeoutMs))
                     {
-                        DebugLog.Write("link", string.Format("no reply for {0}ms while polling - reporting the link lost", LinkMonitor.SilentMs));
+                        DebugLog.Write("link", string.Format("no reply for {0}ms while polling (state {1}) - reporting the link lost",
+                                                              LinkMonitor.SilentMs, state));
                         Comms.com.NotifyLinkLost();
                     }
                 }

@@ -22,6 +22,24 @@
  * PollDiag is an instrument you switch on when investigating, this is a safety net that is worthless unless
  * it is always armed.
  *
+ * ---- What silence does NOT prove ----
+ *
+ * This class has produced two false positives, both by treating "no reply" as "no link", and both cost a
+ * real operation on real hardware. Read them before tightening anything here.
+ *
+ *   YModem transfer - Rx() only stamps in Comms.PostTo, and a transfer sets EventMode = false and pulls
+ *   bytes with ReadByte(), so the clock sees zero RX BY CONSTRUCTION on a link that is busy and healthy.
+ *   Guarded in PollGrbl.pollTimer_Elapsed (EventMode) and by suspending the poller outright in
+ *   YModem.Upload.
+ *
+ *   Homing - grblHAL answers '<Home|...>' once when '$H' is accepted and then goes silent for the whole
+ *   cycle. A 10s window declared the link lost 10.09s in and tore it down mid-home. Hence
+ *   QuietStateTimeoutMs below, and the state check in the poll timer.
+ *
+ * The pattern in both: the app knew perfectly well it had asked for something that produces silence, and
+ * this class was not told. Before shortening a timeout here, ask what legitimately goes quiet for that
+ * long - the cost of being wrong is aborting a machine operation, not a late log line.
+ *
  * What it does NOT do: decide anything about the connection itself. It calls NotifyLinkLost() and stops.
  * Reconnector owns the retry policy and the ConnectionLost/Reconnected events, and the UI already listens
  * to those - so a starved link now surfaces through exactly the same route as a socket that threw.
@@ -34,11 +52,29 @@ namespace CNC.Core
 {
     public static class LinkMonitor
     {
-        // 10s against a 200ms poll interval = 50 unanswered polls. Long enough that no legitimate pause
-        // reaches it (a busy controller still answers "?" between blocks - status reporting is handled in
-        // grblHAL's realtime path, not the protocol loop, so even a long blocking move keeps replying),
-        // short enough that the operator learns the truth while it still means something.
-        public static int TimeoutMs = 10000;
+        // 30s against a 200ms poll interval = 150 unanswered polls.
+        //
+        // This was 10s, on the claim that "a busy controller still answers '?' between blocks - status
+        // reporting is handled in grblHAL's realtime path, not the protocol loop, so even a long blocking
+        // move keeps replying". That claim is WRONG, and it cost a homing cycle on 2026-08-06: '$H' went
+        // out at 15:36:44.114, grblHAL answered '<Home|...>' exactly once at .129, and then answered
+        // nothing at all - every '?' for the next ten seconds went unanswered until this fired and tore
+        // down a link that was working perfectly, mid-home, on a moving machine.
+        //
+        // So the number is no longer defended by an assumption about firmware internals. The outage this
+        // exists to catch ran for EIGHTEEN MINUTES; 30s finds it with seventeen minutes to spare, and the
+        // 10s that bought nothing had by then produced two false positives (this and the YModem transfer
+        // in PollGrbl.pollTimer_Elapsed). When the cost of a false positive is aborting a machine
+        // operation, the watchdog gets to be slow.
+        public static int TimeoutMs = 30000;
+
+        // States where silence is normal and prolonged, so the window above does not apply. Homing is the
+        // proven one; Sleep is here because a sleeping controller is not talking either, by definition.
+        // A backstop rather than a suspension: if the link really does die during a home, this still says
+        // so eventually instead of leaving the UI frozen and lying - which was the whole point of the
+        // class. Five minutes is longer than any plausible homing cycle, including a slow seek, pull-off
+        // and second pass on a long axis.
+        public static int QuietStateTimeoutMs = 300000;
 
         // Environment.TickCount, not DateTime.UtcNow: monotonic-ish, no syscall, and a wall-clock jump
         // (NTP correction, DST) must never be able to fake a dead link. Wraps every ~24.9 days; the
@@ -82,7 +118,16 @@ namespace CNC.Core
         /// </summary>
         public static bool Starved()
         {
-            if (unchecked(Environment.TickCount - lastRx) < TimeoutMs)
+            return Starved(TimeoutMs);
+        }
+
+        /// <summary>
+        /// As <see cref="Starved()"/>, but against a caller-supplied window - so the poll timer can widen
+        /// it for a controller state in which silence is expected. See QuietStateTimeoutMs.
+        /// </summary>
+        public static bool Starved(int timeoutMs)
+        {
+            if (unchecked(Environment.TickCount - lastRx) < timeoutMs)
                 return false;
 
             // First caller past the threshold wins and reports; the rest see it is already reported.
