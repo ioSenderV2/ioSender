@@ -2296,8 +2296,8 @@ namespace GCode_Sender
                 // move to the probed corner in machine coords first, then zero work coords right there. No
                 // rotation (G92 has no rotation concept) and no WCS activation line (it doesn't select one).
                 L(string.Format("(--- set G92 offset at the {0} corner ---)", cornerName));
-                L("G53 G0 X[#<c1x>] Y[#<c1y>] Z[#<c1z>]");
-                L("G92 X0 Y0 Z0");
+                L("G53 G0 X[#<c1x>] Y[#<c1y>] Z[#<c1z>]");   // machine move - #<c1z>'s own raw frame, correct here
+                L(string.Format("G92 X0 Y0 Z{0}", OriginG92Z(setTloRef)));
             }
             else if (setOrigin)
             {
@@ -2305,7 +2305,8 @@ namespace GCode_Sender
                 // Origin ONLY here - never the rotation R word (that goes in the separate block below). The R word
                 // (incl. R0) only exists on ROTATION_ENABLE firmware; without it ANY "G10 L2 ... R..." errors:20 and
                 // HALTS the program. This block stays bulletproof on every controller.
-                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
+                string originZ = OriginZ(L, setTloRef, "[#<c1z>]");   // emits the conversion line first, if any
+                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z{1}", pCode(wcsP), originZ));
                 L(wcs + "  (activate the coordinate system)");
 
                 // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
@@ -2464,6 +2465,13 @@ namespace GCode_Sender
             else if (setOrigin)
             {
                 L("(--- set work origin at the probed point ---)");
+                // NOT frame-converted (see OriginZ). This builder never calls EmitTloReference - it takes
+                // setTloRef but has no puck-touch step - so #<_probe_z> is whatever a PREVIOUS run left,
+                // possibly for a different tool. Applying the conversion from a stale value could err in
+                // EITHER direction, including into the stock; unconverted at least always errs high.
+                // The center branch compounds it: #<_ctr_top> is read from a sender-emitted G38.2 whose
+                // active frame isn't established here, unlike pcorner's documented G49. Left alone
+                // deliberately - fix needs this path to measure the probe first.
                 L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
                 L(wcs + "  (activate the coordinate system)");
             }
@@ -2829,6 +2837,12 @@ namespace GCode_Sender
                 // assumption. Without Measure, fall back to the always-available fxPos.X/_stock_z as before.
                 string originX = measure ? "[#<c3x>]" : N(fxPos.X);
                 string originZ = measure ? "[#<c3z>]" : "[#<_stock_z>]";
+                // NOT frame-converted (see OriginZ), and deliberately so: unlike pcorner's output, BOTH Z
+                // sources here are read with the TLO from EmitTloReference still ACTIVE (it runs just above,
+                // and nothing cancels G43.1 before the stock-top G38.2), so #5063 - and #<_stock_z> with it -
+                // is ALREADY in the reference frame. Subtracting the probe's TLO again would double-correct
+                // and drive the tool INTO the stock. #<c3z> (the measure path) needs its own frame audit -
+                // pvisecorner may or may not cancel the offset the way pcorner does.
                 if (useG92)
                 {
                     L("(--- set G92 offset: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
@@ -2897,6 +2911,65 @@ namespace GCode_Sender
         {
             switch (c) { case Corner.FrontLeft: return Corner.BackRight; case Corner.FrontRight: return Corner.BackLeft;
                          case Corner.BackLeft: return Corner.FrontRight; default: return Corner.FrontLeft; }
+        }
+
+        // --- Work-origin Z frame conversion -------------------------------------------------------
+        //
+        // pcorner.macro/pcenter.macro run their probes under G49 (see pcorner.macro's own comment at the
+        // G49/G92.1/G10 L2 P1 X0 Y0 Z0 block - deliberate, so their absolute G53 moves and probe reads are
+        // in TRUE machine coordinates) and NEVER restore the tool length offset. So every Z they hand back
+        // - #<_corner_z>, #<_ctr_top>, #<_stock_z> - is a raw SPINDLE-NOSE machine Z with the length of
+        // whatever probe was in the spindle baked into it. It is NOT in the frame a work origin lives in.
+        //
+        // A work origin has to be stored in the machine-wide REFERENCE frame (#<_tlo_ref>, the puck touch
+        // point of the notional reference tool), because that is the frame every later tool's G43.1 is
+        // measured against - tc.macro applies TLO = its own puck touch - #<_tlo_ref>.
+        //
+        // Derivation (L = a tool's tip length below the nose, t = its TLO = L_tool - L_ref):
+        //     work Z0  =>  MPos = W + t                     (WCO = G5x offset + G92 + TLO)
+        //     tip on the surface:  MPos - L_tool = rawZ - L_probe
+        //     =>  W = rawZ - (L_probe - L_ref) = rawZ - TLO_probe
+        // i.e. subtract the PROBE's own TLO. Storing rawZ unconverted leaves work Z0 exactly TLO_probe too
+        // HIGH, so every tool stops that far above the stock. Observed 2026-08-06: a Work Order drilled to
+        // work Z-0.5 and stopped ~7mm short - TLO_probe was +6.971 (probe puck touch -65.061 against the
+        // -72.032 baseline), and the origin had been written at the raw -94.068 instead of -101.039.
+        // The error is invisible whenever #<_tlo_ref> happens to sit near the probe's own touch point,
+        // which is why it survived so long; it always errs HIGH (away from the stock), never into it.
+        //
+        // Only applied when this run actually measured the probe against the puck (setTloRef): #<_probe_z>
+        // is written by EmitTloReference and by tc.macro, so without a fresh measurement this run it is
+        // either unset (reads 0 - the correction would silently vanish) or left over from a DIFFERENT tool
+        // (the correction would be wrong by the difference). Unconverted is the long-standing behaviour and
+        // errs high; a stale correction could err either way. So: correct when it can be trusted, otherwise
+        // leave exactly as before.
+        //
+        // SCOPE - used by BuildProgram ONLY, and that is deliberate. It is correct exactly where the Z came
+        // out of pcorner/pcenter (documented G49, so a raw nose Z) AND this run measured the probe:
+        //   - BuildDynamicProbeProgram never calls EmitTloReference at all, so #<_probe_z> is always stale.
+        //   - BuildViseProgram probes its stock top with EmitTloReference's G43.1 still active, so its Z is
+        //     ALREADY reference-frame and converting would double-correct - into the stock.
+        // Both carry their own comment at the origin write. Don't widen this without re-auditing the frame
+        // each Z source is actually read in; the wrong direction here cuts.
+        private const string ProbeTloExpr = "[#<_probe_z> - #<_tlo_ref>]";
+
+        // Emit the conversion (when it applies) and return the expression to use as the origin's Z word.
+        // 'rawZ' is a bracketed expression or a number, as the caller already builds it.
+        private static string OriginZ(System.Action<string> L, bool setTloRef, string rawZ)
+        {
+            if (!setTloRef)
+                return rawZ;
+
+            L(string.Format("#<_ozw> = [{0} - {1}]", rawZ, ProbeTloExpr));
+            L("(PRINT, LS_ORIGIN_Z raw=" + rawZ + " tlo=" + ProbeTloExpr + " origin=#<_ozw>)");
+            return "[#<_ozw>]";
+        }
+
+        // The G92 form of the same correction. G92 declares "the CURRENT position is work <v>", and the
+        // caller has just moved the nose to rawZ in machine coords, so WCO becomes rawZ - v. We need the
+        // pre-TLO term to be rawZ - TLO_probe, hence v = TLO_probe (not 0).
+        private static string OriginG92Z(bool setTloRef)
+        {
+            return setTloRef ? ProbeTloExpr : "0";
         }
 
         // Safe-Z go-to G30 (probe-install / park): lift to machine top, traverse X/Y, descend - never a bare diagonal.
