@@ -147,6 +147,20 @@ O<pcorner> SUB
     #<sy> = 0 - #<sy>
   o12 ENDIF
   (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in> inside=#<inside> faces=#<faces>)
+  ; Echo EVERY remaining input, here, before the first motion of the call. Two reasons this is worth the
+  ; six lines. A probed corner that comes out wrong is otherwise un-diagnosable after the fact: the caller's
+  ; parameters live in the sender and the log only showed the handful above, so "the macro did what it was
+  ; told" and "the caller told it the wrong thing" looked identical. And these lines READ each global, so a
+  ; parameter the caller forgot to set now fails HERE - before the tool has moved - naming itself, instead
+  ; of aborting mid-probe (see the error:2 note in the header) or, worse, silently reading as something.
+  ; Split across several PRINTs rather than one: grblHAL's line buffer is finite and a truncated trace is
+  ; a trace you cannot trust. The ENTER line above is deliberately left untouched so older logs still diff.
+  (PRINT, PC IN2 mode=#<mode> maxz=#<maxz> appz=#<appz> edgemargin=#<edge_margin>)
+  (PRINT, PC IN3 bottom=#<_bottom> thickness=#<_ls_thickness> zfloor=#<_ls_zfloor>)
+  (PRINT, PC IN4 plateoffset=#<_ls_plateoffset> lipoffset=#<_ls_lipoffset>)
+  (PRINT, PC IN5 topx=#<_ls_topx> topy=#<_ls_topy>)
+  (PRINT, PC IN6 searchf=#<_ls_searchf> latchf=#<_ls_latchf>)
+  (PRINT, PC IN7 spacer=#<_ls_spacer> - accepted and ignored, see header)
 
 
 
