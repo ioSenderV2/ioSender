@@ -1292,13 +1292,19 @@ namespace CNC.Controls
         // Install/update the controller-side macros - delegates to the SD Card view's proven path, then refresh.
         private void InstallMacros_Click(object sender, RoutedEventArgs e)
         {
-            if (SDCardView.Instance != null)
-            {
-                SDCardView.Instance.InstallAtcMacros(Window.GetWindow(this));
-                RefreshMacroStatus();
-            }
-            else
-                AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+            // SDCardView.Instance is set in that view's CONSTRUCTOR. It used to be constructed at app startup
+            // with every other tab, so it was always there; since the SD Card view moved off the tab bar into
+            // a menu-hosted window (2026-08-03) it is not constructed until the operator actually opens that
+            // window - so this refused with "The SD Card view is not available." purely because they had never
+            // visited it. Same class as the getTab(ViewType.X)-returns-null trap the menu-hosting change
+            // introduced elsewhere.
+            // Constructing one here is enough and is safe: the ctor only does InitializeComponent, sets
+            // ctxMenu.DataContext and assigns Instance - no comms, no event wiring. Provisioning explicitly
+            // does not need the view REALIZED either; ProvisionAtcMacros says so itself and deliberately reads
+            // Grbl.GrblViewModel rather than the view's own (still-null) DataContext.
+            var sdCard = SDCardView.Instance ?? new SDCardView();
+            sdCard.InstallAtcMacros(Window.GetWindow(this));
+            RefreshMacroStatus();
         }
 
         // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already

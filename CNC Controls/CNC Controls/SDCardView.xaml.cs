@@ -65,7 +65,10 @@ namespace CNC.Controls
         private DataRow currentFile = null;
 
         // Shared so other views (e.g. the Machine Setup Wizard, Step 6) can trigger ATC-macro provisioning
-        // through this view's proven upload path; set when the tab is realized (at app startup).
+        // through this view's proven upload path. Set in the constructor - which since this view moved off
+        // the tab bar into a menu-hosted window does NOT happen at startup any more, only when the operator
+        // opens the window. Callers must therefore treat null as "not built yet", not "unavailable", and
+        // construct one (see MachineSetupWizard.InstallMacros_Click) rather than refusing.
         public static SDCardView Instance { get; private set; }
 
         public SDCardView()
