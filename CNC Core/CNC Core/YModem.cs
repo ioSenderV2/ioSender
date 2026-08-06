@@ -75,13 +75,32 @@ namespace CNC.Core
             FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
             long bytesRemaining = fileStream.Length;
 
+            // Stop the status poller for the whole transfer. YModem is a framed byte protocol on a link the
+            // poller otherwise writes a '?' into every 200ms, and that byte lands INSIDE a packet - there is
+            // no layer here to keep them apart.
+            //
+            // Traced on the wire 2026-08-06, and the shape of it is unmistakable: packets 0, 1 and 2 were
+            // acked 23-25ms apart, a poll went out at 58.291 between packet 2's CRC and packet 3's header,
+            // packet 2->3 then took 244ms (ten times longer), and packet 3 was never acked again - ten
+            // retransmissions at 5s apart, CAN, and the outer retry in AtcMacros.YModemWrite started over.
+            // The controller was left mid-protocol and mute, which is what "the tc.macro install hangs"
+            // actually was. It is not a race that a longer timeout can win: while a transfer is in flight
+            // this link has exactly one conversation on it.
+            //
+            // Suspend() also purges the queue, and Resume() restarts LinkMonitor's clock - which matters
+            // because LinkMonitor.Rx() only stamps in Comms.PostTo, so it sees zero RX for the whole
+            // transfer BY CONSTRUCTION and would otherwise report the link lost the moment polling resumed.
+            PollGrbl.Suspend();
+
             Comms.com.EventMode = false;
             Comms.com.PurgeQueue();
 
-            ClearPayload();
-
-            if (TransferInitalPacket(remoteName ?? Path.GetFileName(path), fileStream) == TransferState.ACK)
+            try
             {
+                ClearPayload();
+
+                if (TransferInitalPacket(remoteName ?? Path.GetFileName(path), fileStream) == TransferState.ACK)
+                {
                 // Always send 128-byte (SOH) blocks, never 1024-byte (STX). grblHAL's YModem receiver buffers
                 // into a ring of RX_BUFFER_SIZE (1024) whose usable capacity is 1023 bytes - so a full 1024-byte
                 // STX packet (hdr 3 + payload 1024 + crc 2 = 1029) cannot fit. Over a slow serial link the
@@ -89,28 +108,37 @@ namespace CNC.Core
                 // burst faster than the foreground loop drains it -> buffer overflow -> corrupt packet -> the
                 // transfer stalls/retries. 128-byte blocks (133 bytes on the wire) fit with margin and are
                 // reliable on any transport. (More blocks = more round-trips, but these files are small.)
-                do
-                {
-                    packetNum++;
-                    if (bytesRemaining < 128)
-                        ClearPayload();
-                    bytes = fileStream.Read(payload, 0, 128);
-                    bytesRemaining -= bytes;
-                    DataTransferred?.Invoke(fileStream.Length, fileStream.Length - bytesRemaining);
-                    state = TransferPacket(128);
-                } while (bytesRemaining > 0 && state == TransferState.ACK);
+                    do
+                    {
+                        packetNum++;
+                        if (bytesRemaining < 128)
+                            ClearPayload();
+                        bytes = fileStream.Read(payload, 0, 128);
+                        bytesRemaining -= bytes;
+                        DataTransferred?.Invoke(fileStream.Length, fileStream.Length - bytesRemaining);
+                        state = TransferPacket(128);
+                    } while (bytesRemaining > 0 && state == TransferState.ACK);
 
-                if(state == TransferState.ACK)
-                {
-                    hdr[0] = EOT;
-                    Comms.com.WriteBytes(hdr, 1);
+                    if (state == TransferState.ACK)
+                    {
+                        hdr[0] = EOT;
+                        Comms.com.WriteBytes(hdr, 1);
+                    }
                 }
+
+                Thread.Sleep(100);
             }
-
-            Thread.Sleep(100);
-
-            Comms.com.PurgeQueue();
-            Comms.com.EventMode = true;
+            finally
+            {
+                // Restore in a finally, and in this order. Before, a throw anywhere above left EventMode
+                // false for the rest of the session - the app keeps polling but every reply is routed to
+                // ByteReceived instead of Comms.PostTo, so the UI silently stops updating on a link that is
+                // working. The file stream was leaked on that path too.
+                try { fileStream.Dispose(); } catch { }
+                try { Comms.com.PurgeQueue(); } catch { }
+                Comms.com.EventMode = true;
+                PollGrbl.Resume();
+            }
 
             return state == TransferState.ACK;
         }
@@ -161,7 +189,11 @@ namespace CNC.Core
 
         private TransferState Send(int length)
         {
-            TransferState state = TransferState.ACK;
+            // NAK, not ACK. The switch below has no default, so any byte that is not ACK/NAK/CAN used to
+            // leave this at its initializer and report a packet the receiver never acknowledged as
+            // delivered - the transfer would advance over a block that never landed and the file would be
+            // silently corrupt. Anything unexpected is now a failed packet, which TransferPacket retries.
+            TransferState state = TransferState.NAK;
             bool? wait = null;
             CancellationToken cancellationToken = new CancellationToken();
 
@@ -198,9 +230,21 @@ namespace CNC.Core
             // Hard wall-clock cap on top of the worker's own timeout, so even a worker that never returns at
             // all cannot hang the UI. Falling out with 'response' still NAK reads as a failed packet, which
             // Upload's retry/abort logic already handles - the transfer fails cleanly instead of wedging.
+            // Sleep between pumps. DoEvents is not free: each call allocates a DispatcherFrame, a delegate
+            // and a DispatcherOperation (see UiPump), and this loop used to spin as fast as the CPU allows.
+            // A packet that never gets acked waits the full 7s here, ten times over, three times over
+            // again from AtcMacros' outer retry - tens of millions of frames in a 32-BIT address space.
+            // That is not a slow leak, it is an eviction notice: ioSender died of OutOfMemoryException
+            // twice on 2026-08-06 (14:17 and 15:07), both times parked in this loop, and the second time
+            // it went from 142MB to exhausted in eight minutes. The stack blamed a timer callback both
+            // times, because the timer was merely the allocation unlucky enough to ask last.
+            // 1ms still pumps ~1000 times a second, far more than a responsive UI needs.
             var sw = System.Diagnostics.Stopwatch.StartNew();
             while (wait == null && sw.ElapsedMilliseconds < ackTimeout + 2000)
+            {
                 EventUtils.DoEvents();
+                Thread.Sleep(1);
+            }
 
             switch (response)
             {
