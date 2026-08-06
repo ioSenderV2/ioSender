@@ -717,8 +717,6 @@ namespace CNC.Controls
             b.AppendLine("#<_ls_plateoffset> = 0");
             b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
             b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
-            b.AppendLine("#<_ls_spoilx> = 0");
-            b.AppendLine("#<_ls_spoily> = 0");
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
             b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
             b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));

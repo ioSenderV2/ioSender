@@ -2062,8 +2062,6 @@ namespace GCode_Sender
             // probe BODY off the corner while it seeks down. The edge (X/Y face) probes no longer need a
             // separate offset - pcorner.macro anchors them off the top-probe's own verified XY instead.
             double topClearance = p.MinStandoff + 9d;
-            L(string.Format("#<_ls_spoilx> = {0}", N(0d)));
-            L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is not emitted. This
@@ -2411,8 +2409,6 @@ namespace GCode_Sender
             L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
             L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
             double topClearance = p.MinStandoff + 9d;
-            L(string.Format("#<_ls_spoilx> = {0}", N(0d)));
-            L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));

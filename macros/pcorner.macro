@@ -12,39 +12,29 @@
 ;   #<_ls_refx>   = machine X of the reference, just OUTSIDE this corner's X face (clear air).
 ;   #<_ls_refy>   = machine Y of the reference, just OUTSIDE this corner's Y face.
 ;   #<_ls_rad>    = probe tip radius (mm).
-;   #<_ls_spacer> = sacrificial spacer/backer thickness (mm) UNDER the stock, same footprint (0 = none).
-;                   Raises the effective floor to spoilboard+spacer so a thin sheet is probed on the
-;                   material, not down in the backer. Optional; treated as 0 if the caller never sets it.
+;   #<_ls_spacer> = ACCEPTED AND IGNORED since the DISCOVER path was removed (2026-08-06). It only ever
+;                   fed the spoilboard-derived floor. The caller now supplies #<_bottom> directly, so a
+;                   sacrificial backer has to be folded into THAT value by the caller instead.
 ;   #<_ls_thickness> = estimated stock thickness (mm). The X/Y face probes themselves search at a FIXED
 ;                   5mm below the measured top now, not the material midpoint (see #<_start_z> below) - but
 ;                   this is used for the pre-probe APPROACH height (see #<_bottom> + this + #<_ls_plateoffset>
 ;                   below), so the machine doesn't rapid down further than the caller's own best estimate of
 ;                   where the top actually is. Revived 2026-07-27 - was genuinely unused between those two
 ;                   dates (see git history), when the approach height was a blind "assume <= 1in" constant.
-;   #<_ls_spoilx>, #<_ls_spoily> = offset (mm) from the reference, along this corner's stock-interior
-;                   direction, to the spoilboard-probe XY (always 0,0 - AT the reference).
 ;   #<_ls_topx>, #<_ls_topy>     = offset (mm) from the reference, into the stock, to the stock-top probe
 ;                   XY. Derived from the probing 3D probe's body diameter (StartJobView.BuildProgram) -
 ;                   not stored per fixture. Also reused as the edge probes' anchor (see below) - no separate
 ;                   edge offset is needed since the top-probe XY is already verified to be over solid stock.
-;   #<_ls_spoilz> = machine Z of the fixture instance's saved position - the spoilboard probe starts its
-;                   descent from here (replaces the old dependency on the firmware's single-slot G28 Z).
 ;   #<_ls_searchf>= fast search feed (mm/min), from the probe definition (Probe/Search feed).
 ;   #<_ls_latchf> = slow latch / re-probe feed (mm/min), from the probe definition (Latch feed).
-;   #<_ls_startz> = >= 9000  -> DISCOVER (first corner): also probe the spoilboard at the reference
-;                            (clear air below), publishing #<_start_z> as the DISCOVER/REUSE flag.
-;                            (Use for the FIRST corner only - its reference must clear the probe
-;                             body, i.e. the fixture instance set roughly half a body diameter to a
-;                             full body diameter outside the corner - see FixtureEditDialog's schematic.)
-;                 < 9000  -> REUSE: skip the spoilboard probe. EVERY corner (DISCOVER or REUSE)
-;                            still probes its OWN stock top, so each reports its own Z (flatness).
-;   #<_ls_mode>   = 0 = 3D probe (default) - the spoilboard-anchored DISCOVER/REUSE behavior above,
-;                       unchanged.
-;                   1 = touch plate - probes by electrical continuity, so it never falsely triggers on
-;                       non-conductive spoilboard: the separate spoilboard probe is skipped entirely and
-;                       the DISCOVER corner instead anchors its safety floor to its OWN measured stock-top
-;                       Z (see the block right after that probe, below). REUSE corners are unaffected -
-;                       they already just read the shared #<_bottom> global, whichever mode set it.
+;   #<_ls_startz> = ACCEPTED, no longer selects anything (2026-08-06). It used to pick DISCOVER (>= 9000)
+;                   vs REUSE; there is now ONE path. Still echoed in the PC ENTER trace so existing logs
+;                   stay comparable. Every corner probes its OWN stock top, so each reports its own Z
+;                   (that spread across four corners is the flatness measurement).
+;   #<_ls_mode>   = 0 = 3D probe (default).
+;                   1 = touch plate - probes by electrical continuity. Both modes now behave identically
+;                       here; the distinction only mattered to the removed spoilboard probe, which a
+;                       continuity probe could not run against a non-conductive board.
 ;   #<_ls_plateoffset> = Z (mm) subtracted from the probed top before it is reported as this corner's Z.
 ;                       0 for the 3D probe, and for a touch plate run directly against conductive stock
 ;                       (no plate, no offset). A separate metal touch plate against non-conductive stock
@@ -74,12 +64,12 @@
 ; caller-driven, guard the read with EXISTS[] the way tc.macro's o199 does for #<_tlo_ref>.
 ;   #<_ls_maxz>   = OPTIONAL machine Z of a known-safe travel height, already trusted by the caller (e.g.
 ;                       the vise's own centre-of-stock probe, run before any corner calls). When > 0, this
-;                       replaces BOTH the REUSE-corner full retract to machine Z0 (o40 below - normally
-;                       needed so the tool clears clamp/fence hardware between corners, which the vise has
-;                       none of) and the pre-top-probe descent estimate (o41's #<_bottom>+30) with this
+;                       replaces BOTH the full retract to machine Z0 (o42 below - normally needed so the
+;                       tool clears clamp/fence hardware between corners, which the vise has none of) and
+;                       the pre-top-probe descent estimate (o43's #<_approach_z>) with this
 ;                       single known height - the tool never travels above it. 0/unset = old behavior
 ;                       (Corner Fence, no prior stock-top knowledge - safe but more conservative).
-;   #<_ls_appz>   = OPTIONAL machine Z override for ONLY this call's very first height change (o40 below) -
+;   #<_ls_appz>   = OPTIONAL machine Z override for ONLY this call's very first height change (o48 below) -
 ;                       everything else this call still uses #<_ls_maxz>. For a corner reached via a detour
 ;                       that left the fixture's footprint entirely (Corner Fence's TLO-reference park at G30
 ;                       is the current use), so that one return crossing happens at Z0 (always safe) instead
@@ -103,13 +93,13 @@
 ;   #<_corner_x> #<_corner_y>   radius-compensated corner XY (machine coords)
 ;   #<_corner_z>                THIS corner's stock-top Z (machine), less #<_ls_plateoffset> - varies
 ;                                per corner = flatness
-;   #<_start_z>                 published by the DISCOVER call as the REUSE flag for later corners
+;   #<_start_z>                 this corner's face-probe depth (top - 5, clamped to #<_ls_zfloor>)
 ;
 ; Preconditions: homed; probe on the main probe input ($6 polarity correct); stock >= 5 mm (the face probes
 ;   now seek at a FIXED 5mm below the measured top, not the material midpoint - thinner stock has its side
 ;   face searched below its own bottom) AND <= ~25 mm (1 in) thick - the stock-top probe now starts just
 ;   above 1 in for speed, so taller stock would be missed; Z probes seek to -140 (keep within $132). The
-;   DISCOVER reference must have clear air below it to the spoilboard (no fence/clamp) and be >= body-radius
+;   the reference must have clear air below it (no fence/clamp) and be >= body-radius
 ;   outside the faces.
 
 O<pcorner> SUB
@@ -129,9 +119,10 @@ O<pcorner> SUB
   ; below run in TRUE machine coordinates. WCO = G5x offset + G92 offset + TLO (grblHAL gc_get_offset,
   ; gcode.c) - G10 L2 P1 alone only zeros the G5x term. Confirmed via a real Start Job failure + reading
   ; grblHAL's own report.c (is_g92_active()): a leftover non-zero G92 offset (TLO was already clean -
-  ; $G showed G49) was the actual cause - #<_ls_spoilz> (a machine Z) got driven as if it were a work Z
-  ; offset by the stray G92, landing the spoilboard search ~70mm from the real surface instead of the
-  ; ~12mm it expects, well outside the search's travel cap.
+  ; $G showed G49) was the actual cause - a machine Z got driven as if it were a work Z offset by the
+  ; stray G92, landing the search ~70mm from the real surface instead of the ~12mm it expects, well
+  ; outside the search's travel cap. (The parameter in that incident, #<_ls_spoilz>, is gone with the
+  ; spoilboard probe - the failure mode it demonstrates is not, which is why this zeroing stays.)
   ; Load Stock sets the real origin from the probed machine coordinates after all corners are done.
   G49
   G92.1
@@ -157,52 +148,7 @@ O<pcorner> SUB
   o12 ENDIF
   (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in> inside=#<inside> faces=#<faces>)
 
-  ; ================= safety rise to machine top (first corner / DISCOVER only, BOTH modes) =================
-  ; Regardless of probe mode, always rise to Z0 (machine top, always clear) and travel to the reference
-  ; XY there BEFORE any descent. Split out from the 3D-probe-only o20 block below (which used to do this
-  ; too, but only inside its own mode-gated condition) - touch plate mode skips o20 entirely (a continuity
-  ; probe can't detect a non-conductive spoilboard), which meant it silently skipped this rise as well,
-  ; going straight from wherever the caller left the machine (e.g. the G30 park position) down to an
-  ; ESTIMATED safe height (o21's placeholder #<_bottom>) with no verified-clear waypoint first.
-  o19 IF [#<sz_in> GE 9000]
-    G90
-    G53 G0 Z0                                     ; rapid - Z0 is the machine top, always clear
-    G53 G0 X[#<rx> + [#<_ls_spoilx> * #<sx>]] Y[#<ry> + [#<_ls_spoily> * #<sy>]]   ; rapid - travelling AT Z0
-  o19 ENDIF
 
-  ; ================= spoilboard reference Z (first corner / DISCOVER only, 3D probe only) =================
-  ; Probed once at the origin reference (clear air below per preconditions) to anchor thickness;
-  ; later corners skip it. Only used to guard very thin stock when picking start_z.
-  o20 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 0]]
-    G53 G1 F1000 Z[#<_ls_spoilz>]          ; controlled - descending toward the (unverified) spoilboard
-    ; SAFETY: bound the spoilboard probe to a SHORT reach below the start Z. If the probe fails to trip
-    ; (mis-wired, wrong $6 polarity, not seated, on the wrong input) a G38.2 to a deep machine target drives
-    ; straight into - through - the spoilboard before alarming. Capping the seek to ~12 mm below the start
-    ; means a dead probe alarms after a few mm instead. So the fixture instance must be captured within ~10 mm
-    ; above the spoilboard. G54 was zeroed above, so work Z == machine Z here and #<_ls_spoilz> is the datum.
-    G38.2 Z[#<_ls_spoilz> - 12] F[#<_ls_searchf>] ; slow probe to the spoilboard, capped 12 mm below the start Z
-    G91 G1 Z2 F1000
-    G38.2 Z-5 F[#<_ls_latchf>]
-    #<_z_spoil> = #5063
-    G91 G1 Z10 F1000
-    G90
-    (PRINT, PC z_spoil=#<_z_spoil>)
-    ; Effective floor for the face-probe start height = spoilboard + sacrificial spacer/backer thickness
-    ; (#<_ls_spacer>, 0 when none). With a backer under the stock the real material is only the band ABOVE
-    ; it, so start_z must land in that band - not down in the backer/tape. Persists as a global for REUSE corners.
-    #<_bottom> = [#<_z_spoil> + #<_ls_spacer>]
-    (PRINT, PC bottom=#<_bottom> spacer=#<_ls_spacer>)
-  o20 ENDIF
-
-  ; ================= placeholder floor (first corner / DISCOVER only, touch plate only) =================
-  ; A continuity probe never falsely triggers on non-conductive spoilboard, so there is nothing to discover
-  ; there - skip the probe entirely. #<_bottom> just needs SOME value before the approach-height/seek-cap
-  ; math below runs; it is overwritten with a REAL value, anchored to this corner's own measured stock top,
-  ; right after that probe completes (see the block below it).
-  o21 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 1]]
-    #<_bottom> = [#<_ls_spoilz> - 20]
-    (PRINT, PC bottom=#<_bottom> [touch plate placeholder])
-  o21 ENDIF
 
   ; ================= stock-top Z at THIS corner (EVERY corner -> flatness) =================
   ; Move the fixture type's top-probe offset (#<_ls_topx>/#<_ls_topy>) into the stock interior (sign per
@@ -217,84 +163,53 @@ O<pcorner> SUB
   ; barely cleared the stock and did not clear the touch plate at all - a real collision risk.
   #<_approach_z> = [#<_bottom> + #<_ls_thickness> + #<_ls_plateoffset> + 10]
   G90
-  o40 IF [#<sz_in> GE 9000]
-    o47 IF [#<mode> EQ 1]
-      ; Touch plate mode's #<_bottom> (above) is only ever a PLACEHOLDER built from the fixture's SAVED
-      ; machine-Z position - not a value this call ever verified. That saved position only stays a safe
-      ; approach height for whatever tool happened to be chucked when the fixture was captured; it says
-      ; nothing about the tool actually in the spindle THIS run. A touch plate senses by continuity and sits
-      ; physically in this descent's path, so there is no reason this approach needs to be a blind rapid -
-      ; PROBE it instead, same feed as the fast searches elsewhere in this file. An unexpectedly long tool
-      ; (this macro has no notion of tool length at all) then stops the instant it touches the plate instead
-      ; of ramming through it; a normal-length tool reaches #<_approach_z> exactly as before. Confirmed on
-      ; real hardware 2026-07-29: an 8mm drill chucked ~1.5in longer than the tool the fixture was set up
-      ; with drove straight into the touch plate on the old bare G53 G0 here.
-      G38.2 Z[#<_approach_z>] F[#<_ls_searchf>]
-      G91 G1 Z2 F1000          ; back off - whether that stopped early (contact) or reached the full target
-      G90
-    o47 ELSE
-      G53 G0 Z[#<_approach_z>]         ; rapid - first corner: travel just above the estimated top (stock + plate, if any) - trustworthy here because 3D-probe mode's spoilboard reference (o20 above) was itself freshly probed, not assumed
-    o47 ENDIF
-  o40 ELSE
-    ; NE 0, not GT 0 (2026-07 bug, confirmed on real hardware on both this path and o43 below): #<maxz> is a
-    ; MACHINE Z coordinate, and on a machine that homes Z to the top (Z0) with the whole work envelope below
-    ; that, every real value here is NEGATIVE - "GT 0" silently failed for every legitimate maxz the caller
-    ; ever passed (the vise's own #<_lv_safe_z>, Corner Fence's #<c1_maxz>), falling through to the ELSE
-    ; branch every time with no error, just quietly slower/more conservative than intended.
-    ;
-    ; #<appz> (caller-optional, see file header) overrides ONLY this first move - everything else this call
-    ; (the pre-top-probe descent below, the final retreat) still uses the caller's real #<maxz>, same as
-    ; every other corner. Needed for a corner reached via a detour that left the fixture's footprint entirely
-    ; (e.g. Corner Fence's TLO-reference park at G30, not verified clear of fence/clamp hardware) - #<maxz>
-    ; is only trusted WITHIN the footprint (verified by an earlier corner's own measurement), so that one
-    ; return crossing must happen at Z0 instead, without also giving up the trusted height for the rest of
-    ; this corner's own probe sequence. Sentinel is 9999 ("unset"), NOT 0 - unlike #<maxz>, Z0 (machine top)
-    ; is itself a legitimate override value here (that's the whole point), so 0 can't double as "no override".
-    o48 IF [#<appz> LT 9000]
-      G53 G0 Z[#<appz>]
-    o48 ELSE
-    o42 IF [#<maxz> NE 0]
-      G53 G0 Z[#<maxz>]             ; rapid - caller already knows a trusted safe height (e.g. the vise's own centre probe) - never go any higher than necessary
-    o42 ELSE
-      G53 G0 Z0                     ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
-    o42 ENDIF
-    o48 ENDIF
-  o40 ENDIF
+  ; NE 0, not GT 0 (2026-07 bug, confirmed on real hardware on both this path and o43 below): #<maxz> is a
+  ; MACHINE Z coordinate, and on a machine that homes Z to the top (Z0) with the whole work envelope below
+  ; that, every real value here is NEGATIVE - "GT 0" silently failed for every legitimate maxz the caller
+  ; ever passed (the vise's own #<_lv_safe_z>, Corner Fence's #<c1_maxz>), falling through to the ELSE
+  ; branch every time with no error, just quietly slower/more conservative than intended.
+  ;
+  ; #<appz> (caller-optional, see file header) overrides ONLY this first move - everything else this call
+  ; (the pre-top-probe descent below, the final retreat) still uses the caller's real #<maxz>, same as
+  ; every other corner. Needed for a corner reached via a detour that left the fixture's footprint entirely
+  ; (e.g. Corner Fence's TLO-reference park at G30, not verified clear of fence/clamp hardware) - #<maxz>
+  ; is only trusted WITHIN the footprint (verified by an earlier corner's own measurement), so that one
+  ; return crossing must happen at Z0 instead, without also giving up the trusted height for the rest of
+  ; this corner's own probe sequence. Sentinel is 9999 ("unset"), NOT 0 - unlike #<maxz>, Z0 (machine top)
+  ; is itself a legitimate override value here (that's the whole point), so 0 can't double as "no override".
+  o48 IF [#<appz> LT 9000]
+    G53 G0 Z[#<appz>]
+  o48 ELSE
+  o42 IF [#<maxz> NE 0]
+    G53 G0 Z[#<maxz>]             ; rapid - caller already knows a trusted safe height (e.g. the vise's own centre probe) - never go any higher than necessary
+  o42 ELSE
+    G53 G0 Z0                     ; rapid - later corners: retract FULLY to machine top before crossing to the next corner - safer than just above the previous corner's stock in case there's clamp/fence hardware in between
+  o42 ENDIF
+  o48 ENDIF
   #<_topx> = [#<rx> + [#<_ls_topx> * #<sx>]]
   #<_topy> = [#<ry> + [#<_ls_topy> * #<sy>]]
   G53 G0 X[#<_topx>] Y[#<_topy>]    ; rapid - travelling AT the safe height set above
-  o41 IF [#<sz_in> LT 9000]
-    ; Descend to a safe height before this corner's own top probe - NOT #<_safe_z>, which still holds the
-    ; PREVIOUS corner's height (top+20) at this point in the code (this corner's own top probe, which
-    ; recomputes it, hasn't run yet). Flatness/spacer variance between corners means the previous corner's
-    ; safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale height would drive
-    ; straight into solid stock with nothing to catch it. If the caller already knows a trusted height
-    ; (#<maxz>, e.g. the vise's own centre probe) use that directly; otherwise fall back to the same
-    ; thickness/plate-aware #<_approach_z> the DISCOVER corner uses above (same reasoning as o40 above) -
-    ; this is the branch a Corner Fence's OWN corner 1 actually takes (it has no #<c1_maxz> yet - that's
-    ; only computed AFTER corner 1 finishes, for corners 2-4 to use), so this is exactly what needed fixing.
-    o43 IF [#<maxz> NE 0]
-      G53 G0 Z[#<maxz>]
-    o43 ELSE
-      G53 G0 Z[#<_approach_z>]
-    o43 ENDIF
-  o41 ENDIF
+  ; Descend to a safe height before this corner's own top probe - NOT #<_safe_z>, which still holds the
+  ; PREVIOUS corner's height (top+20) at this point in the code (this corner's own top probe, which
+  ; recomputes it, hasn't run yet). Flatness/spacer variance between corners means the previous corner's
+  ; safe height can sit below THIS corner's actual top - a bare G0 rapid to a stale height would drive
+  ; straight into solid stock with nothing to catch it. If the caller already knows a trusted height
+  ; (#<maxz>, e.g. the vise's own centre probe) use that directly; otherwise fall back to the same
+  ; thickness/plate-aware #<_approach_z> computed above (same reasoning) -
+  ; this is the branch a Corner Fence's OWN corner 1 actually takes (it has no #<c1_maxz> yet - that's
+  ; only computed AFTER corner 1 finishes, for corners 2-4 to use), so this is exactly what needed fixing.
+  o43 IF [#<maxz> NE 0]
+    G53 G0 Z[#<maxz>]
+  o43 ELSE
+    G53 G0 Z[#<_approach_z>]
+  o43 ENDIF
   ; SAFETY + early-out. The stock top always sits ABOVE the effective floor (spoilboard + spacer), so bound
   ; this seek instead of driving to a deep machine target - a dead/mis-wired probe then alarms near the board
-  ; instead of ploughing to -140. DISCOVER (corner 1, reliably over stock) seeks to just below the spoilboard.
-  ; REUSE corners are placed from the ESTIMATED size, so cap them at the floor: a real corner triggers on the
+  ; instead of ploughing to -140. Corners are placed from the ESTIMATED size, so cap them at the floor: a real corner triggers on the
   ; material above it, but a corner left over BARE board (estimate too big) reaches the floor with nothing
   ; there and G38.2 aborts right away - no doomed side search into air. The spacer band guarantees the cap
   ; clears the board (floor > spoilboard); with spacer 0 the +1 keeps it a hair above the board.
-  o45 IF [#<sz_in> GE 9000]
-    o46 IF [#<mode> EQ 0]
-      G38.2 Z[#<_z_spoil> - 2] F[#<_ls_searchf>]      ; DISCOVER, 3D probe: seek to just below the spoilboard
-    o46 ELSE
-      G38.2 Z[#<_ls_spoilz> - 12] F[#<_ls_searchf>]   ; DISCOVER, touch plate: seek to just below the fixture's saved reference (no spoilboard probe was run)
-    o46 ENDIF
-  o45 ELSE
-    G38.2 Z[#<_bottom> + 1] F[#<_ls_searchf>]        ; REUSE: refuse to seek below the material floor
-  o45 ENDIF
+  G38.2 Z[#<_bottom> + 1] F[#<_ls_searchf>]        ; refuse to seek below the caller's material floor
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
@@ -312,13 +227,6 @@ O<pcorner> SUB
   G91 G1 Z10 F1000
   G90
   (PRINT, PC z_top=#<_z_top>)
-  ; Touch plate DISCOVER: replace the placeholder floor with a REAL one, anchored to this corner's own
-  ; just-measured top (30 mm margin for stock-flatness variance) - REUSE corners below read this same
-  ; global, same as the 3D-probe path's spoilboard-anchored #<_bottom>.
-  o22 IF [[#<sz_in> GE 9000] AND [#<mode> EQ 1]]
-    #<_bottom> = [#<_z_top> - 30]
-    (PRINT, PC bottom=#<_bottom> [touch plate, from measured top])
-  o22 ENDIF
 
   ; ================= start_z for the face probes (fixed 5mm below the measured top) =================
   ; Was top - thickness/2 (material midpoint) - changed to a fixed 5mm inset (2026-07-20, user request):

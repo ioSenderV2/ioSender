@@ -1,4 +1,4 @@
-/*
+﻿/*
  * FixtureEditDialog.xaml.cs - part of CNC Controls library
  *
  * Edits a single Fixture. The Kind dropdown drives which schematic is shown. The caller passes a clone and
@@ -647,8 +647,6 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("#<_ls_plateoffset> = {0}", (touchPlate ? probe.PlateThickness : 0d).ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_lipoffset> = {0}", (touchPlate ? probe.LipWidth : 0d).ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
-                b.AppendLine("#<_ls_spoilx> = 0");
-                b.AppendLine("#<_ls_spoily> = 0");
                 b.AppendLine(string.Format("#<_ls_topx> = {0}", topClearance.ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_topy> = {0}", topClearance.ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
