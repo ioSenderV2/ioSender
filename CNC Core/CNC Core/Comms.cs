@@ -61,13 +61,18 @@ namespace CNC.Core
             if (handler == null)
                 return;
 
+            // Every reply crosses here, on the read thread, before any marshalling - so this is where the
+            // wire's own timing is visible. See PollDiag's header.
+            if (PollDiag.Enabled)
+                PollDiag.RxArrived();
+
             if (context == null)
                 handler(reply);
             else if (PollDiag.Enabled)
             {
                 // Stamped here on the READ thread and read again inside the callback, so what is measured is
                 // exactly how long this reply waited for the target thread to get to it - the one number that
-                // separates "the poller is late" from "the UI thread is saturated". See PollDiag's header.
+                // separates "the poller is late" from "the UI thread is saturated".
                 double stamp = PollDiag.MarshalStamp();
                 context.Post(state => { PollDiag.MarshalArrived(stamp); handler((string)state); }, reply);
             }

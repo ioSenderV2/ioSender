@@ -51,6 +51,19 @@ namespace CNC.Core
 
         private const int ReportIntervalMs = 60000;
 
+        // Outliers are logged the moment they happen, not just folded into a mean. The fault this exists to
+        // catch is a ONE-OFF: a single reply arriving 7.6s late while every other number in the minute stays
+        // healthy. Averaging is exactly the wrong lens for that - the first version of this instrument
+        // reported "marshal max=259ms" for a minute containing a multi-second stall, because the stall was
+        // not on the path being averaged.
+        private const int MarshalWarnMs = 250;
+        private const int RxGapWarnMs = 1000;
+
+        // ...but a genuinely broken link would then write a line per reply forever. Cap the immediate lines
+        // per reporting window and carry the suppressed count into the periodic line, so the information
+        // survives without the flood.
+        private const int MaxWarningsPerWindow = 20;
+
         private static readonly object sync = new object();
         private static readonly Stopwatch clock = Stopwatch.StartNew();
 
@@ -83,9 +96,12 @@ namespace CNC.Core
         private static readonly Stat writeMs = new Stat();     // ms spent inside Comms.WriteByte
         private static readonly Stat marshalMs = new Stat();   // ms a reply waited for the UI thread
         private static readonly Stat processMs = new Stat();   // ms spent inside DataReceived
+        private static readonly Stat rxGap = new Stat();       // ms between consecutive replies off the wire
 
         private static double lastSendAt = -1d;
+        private static double lastRxAt = -1d;
         private static double lastReportAt;
+        private static int warningsThisWindow, warningsSuppressed;
         private static readonly DateTime startedUtc = DateTime.UtcNow;
 
         private static double NowMs { get { return clock.Elapsed.TotalMilliseconds; } }
@@ -99,6 +115,8 @@ namespace CNC.Core
             if (!Enabled)
                 return;
 
+            string report;
+
             lock (sync)
             {
                 double now = NowMs;
@@ -106,8 +124,40 @@ namespace CNC.Core
                     sendGap.Add(now - lastSendAt);
                 lastSendAt = now;
                 writeMs.Add(writeMilliseconds);
-                MaybeReport(now);
+                report = BuildReport(now);
             }
+
+            if (report != null)
+                DebugLog.Write("poll", report);   // outside the lock - see Emit
+        }
+
+        /// <summary>
+        /// A reply came off the wire. Called on the READ thread, before any marshalling, so the gap measured
+        /// here is the link's own silence - the controller not answering, or the connection stalling. Compare
+        /// against the marshal latency: a long gap here with a short marshal means the app was fine and
+        /// nothing arrived; a short gap with a long marshal means it arrived and then sat in a queue.
+        /// </summary>
+        public static void RxArrived()
+        {
+            if (!Enabled)
+                return;
+
+            string warning = null;
+
+            lock (sync)
+            {
+                double now = NowMs;
+                if (lastRxAt >= 0d)
+                {
+                    double gap = now - lastRxAt;
+                    rxGap.Add(gap);
+                    if (gap > RxGapWarnMs && Admit())
+                        warning = string.Format("RX GAP {0:F0}ms - nothing received off the wire (poller still sending)", gap);
+                }
+                lastRxAt = now;
+            }
+
+            Emit(warning);
         }
 
         /// <summary>
@@ -125,8 +175,39 @@ namespace CNC.Core
             if (!Enabled || stamp <= 0d)
                 return;
 
+            string warning = null;
+
             lock (sync)
-                marshalMs.Add(NowMs - stamp);
+            {
+                double waited = NowMs - stamp;
+                marshalMs.Add(waited);
+                if (waited > MarshalWarnMs && Admit())
+                    warning = string.Format("MARSHAL STALL {0:F0}ms - a reply waited this long for the UI thread", waited);
+            }
+
+            Emit(warning);
+        }
+
+        // Caller holds the lock: has this window's warning budget got room? Counts the overflow either way.
+        private static bool Admit()
+        {
+            if (warningsThisWindow >= MaxWarningsPerWindow)
+            {
+                warningsSuppressed++;
+                return false;
+            }
+
+            warningsThisWindow++;
+            return true;
+        }
+
+        // Deliberately OUTSIDE the lock. DebugLog.Write does file I/O, and this lock is taken by the comms
+        // read thread, the UI thread and the poll timer thread - holding it across a disk write would let the
+        // instrument produce the very stalls it is measuring.
+        private static void Emit(string warning)
+        {
+            if (warning != null)
+                DebugLog.Write("poll", "!! " + warning);
         }
 
         /// <summary>How long DataReceived took - the cost of the handler fan-out once it does run.</summary>
@@ -139,11 +220,12 @@ namespace CNC.Core
                 processMs.Add(milliseconds);
         }
 
-        // Caller holds the lock.
-        private static void MaybeReport(double now)
+        // Caller holds the lock. Returns the line to write (the CALLER writes it, outside the lock - see
+        // Emit), or null when the reporting interval has not elapsed yet.
+        private static string BuildReport(double now)
         {
             if (now - lastReportAt < ReportIntervalMs)
-                return;
+                return null;
 
             lastReportAt = now;
 
@@ -151,20 +233,27 @@ namespace CNC.Core
             try { subs = ProbeSubscribers(); }
             catch (Exception ex) { subs = "probe failed: " + ex.Message; }   // a diagnostic must never take the app down
 
-            DebugLog.Write("poll", string.Format(
+            string line = string.Format(
                 "uptime={0:F1}h  send: n={1} mean={2:F0}ms max={3:F0}ms  write: mean={4:F1}ms max={5:F0}ms  " +
-                "marshal: n={6} mean={7:F1}ms max={8:F0}ms  process: mean={9:F1}ms max={10:F0}ms  subs: {11}",
+                "rx: n={6} mean={7:F0}ms max={8:F0}ms  marshal: n={9} mean={10:F1}ms max={11:F0}ms  " +
+                "process: mean={12:F1}ms max={13:F0}ms  subs: {14}{15}",
                 (DateTime.UtcNow - startedUtc).TotalHours,
                 sendGap.Count, sendGap.Mean, sendGap.Max,
                 writeMs.Mean, writeMs.Max,
+                rxGap.Count, rxGap.Mean, rxGap.Max,
                 marshalMs.Count, marshalMs.Mean, marshalMs.Max,
                 processMs.Mean, processMs.Max,
-                subs));
+                subs,
+                warningsSuppressed > 0 ? string.Format("  [{0} further warnings suppressed]", warningsSuppressed) : "");
 
             sendGap.Reset();
             writeMs.Reset();
             marshalMs.Reset();
             processMs.Reset();
+            rxGap.Reset();
+            warningsThisWindow = warningsSuppressed = 0;
+
+            return line;
         }
 
         /// <summary>
