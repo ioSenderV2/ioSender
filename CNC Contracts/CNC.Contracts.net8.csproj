@@ -18,7 +18,9 @@
     <EnableDefaultItems>false</EnableDefaultItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <BaseOutputPath>bin\net8probe\</BaseOutputPath>
-    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+    <!-- BaseIntermediateOutputPath + MSBuildProjectExtensionsPath come from Directory.Build.props in
+         this folder - set here they are too late for NuGet and its assets file lands in the shared
+         obj\, breaking the legacy CNC.Contracts.csproj build. See that file's comment. -->
   </PropertyGroup>
 
   <ItemGroup>
